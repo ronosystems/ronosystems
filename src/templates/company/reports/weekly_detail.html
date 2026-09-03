@@ -1,0 +1,661 @@
+{% extends 'base.html' %}
+
+{% block title %}RS{% endblock %}
+
+{% block page_title %}Weekly Report{% endblock %}
+{% block page_subtitle %}Week {{ week }}, {{ year }} ({{ week_start|date:"M d" }} - {{ week_end|date:"M d, Y" }}){% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE TABLE STYLING
+    ============================================ */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    
+    .table-excel thead th {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table-excel tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+
+    /* ============================================
+       SUMMARY CARDS
+    ============================================ */
+    .summary-card {
+        background: white;
+        border-radius: 4px;
+        padding: 25px 20px;
+        border: 2px solid #000000;
+        height: 100%;
+        text-align: center;
+        transition: all 0.3s;
+    }
+    .summary-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+    .summary-card .value {
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin: 10px 0 5px;
+        color: #000000;
+    }
+    .summary-card .label {
+        font-size: 0.85rem;
+        color: #000000;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+    .summary-card .icon {
+        font-size: 2rem;
+        opacity: 0.3;
+        color: #000000;
+    }
+    .summary-card.revenue { border-left: 6px solid #007bff; }
+    .summary-card.profit { border-left: 6px solid #28a745; }
+    .summary-card.expenses { border-left: 6px solid #dc3545; }
+    .summary-card.sales { border-left: 6px solid #6f42c1; }
+    .summary-card.cog { border-left: 6px solid #17a2b8; }
+    .summary-card.balance { 
+        border-left: 6px solid #fd7e14;
+        background: linear-gradient(135deg, #fff8f0 0%, #ffffff 100%);
+    }
+    .summary-card.balance .value { 
+        color: #fd7e14;
+        font-size: 2.5rem;
+    }
+    .summary-card.balance .icon {
+        color: #fd7e14;
+        opacity: 0.5;
+    }
+    .summary-card small {
+        color: #000000;
+    }
+    
+    /* ============================================
+       REPORT HEADER
+    ============================================ */
+    .report-header {
+        background: linear-gradient(135deg, #87CEEB 0%, #7bb8d8 100%);
+        color: #000000;
+        border-radius: 4px;
+        border: 2px solid #000000;
+        padding: 25px 30px;
+        margin-bottom: 25px;
+    }
+    .report-header h4 {
+        margin: 0;
+        font-weight: 700;
+        color: #000000;
+    }
+    .report-header small {
+        opacity: 0.8;
+        color: #000000;
+    }
+    .report-header .badge {
+        background: #ffffff !important;
+        color: #000000 !important;
+        border: 1px solid #000000;
+        padding: 4px 12px;
+        font-weight: 600;
+    }
+    
+    /* ============================================
+       SUMMARY GRID
+    ============================================ */
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+    }
+    
+    .card-header h6 {
+        color: #000000;
+        font-weight: 600;
+    }
+    
+    .card-footer {
+        border-top: 2px solid #000000;
+        background-color: #f8f9fa;
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-secondary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-outline-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    /* ============================================
+       DAY CARDS
+    ============================================ */
+    .daily-breakdown {
+        display: flex;
+        gap: 10px;
+        overflow-x: auto;
+        padding: 10px 0;
+    }
+    .day-card {
+        flex: 1;
+        min-width: 100px;
+        background: white;
+        border-radius: 4px;
+        padding: 12px;
+        text-align: center;
+        border: 2px solid #000000;
+        transition: all 0.3s;
+    }
+    .day-card:hover {
+        border-color: #87CEEB;
+        transform: translateY(-2px);
+    }
+    .day-card .day-name {
+        font-size: 0.8rem;
+        color: #000000;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    .day-card .day-date {
+        font-size: 0.75rem;
+        color: #000000;
+    }
+    .day-card .day-revenue {
+        font-weight: 700;
+        color: #007bff;
+        font-size: 1.05rem;
+    }
+    .day-card .day-cogs {
+        font-size: 0.85rem;
+        color: #17a2b8;
+        font-weight: 600;
+    }
+    .day-card .day-profit {
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+    .day-card .day-profit.positive { color: #28a745; }
+    .day-card .day-profit.negative { color: #dc3545; }
+    .day-card .day-sales {
+        font-size: 0.8rem;
+        color: #000000;
+    }
+    .day-card.today {
+        background: #e3f2fd;
+        border-color: #007bff;
+        border-width: 3px;
+    }
+
+    /* ============================================
+       COGS TABLE STYLES
+    ============================================ */
+    .cogs-highlight {
+        background-color: #e8f4f8 !important;
+    }
+    .cogs-highlight th {
+        background-color: #b8dce8 !important;
+    }
+    .text-cogs {
+        color: #17a2b8;
+        font-weight: 600;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .summary-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .summary-card .value {
+            font-size: 1.5rem;
+        }
+        .summary-card.balance .value {
+            font-size: 1.8rem;
+        }
+        .summary-card .label {
+            font-size: 0.7rem;
+        }
+        .day-card {
+            min-width: 80px;
+            padding: 8px;
+        }
+        .day-card .day-revenue {
+            font-size: 0.9rem;
+        }
+        .day-card .day-profit {
+            font-size: 0.8rem;
+        }
+        .report-header h4 {
+            font-size: 1.1rem;
+        }
+        .report-header {
+            padding: 15px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .summary-grid {
+            grid-template-columns: 1fr;
+        }
+        .daily-breakdown {
+            flex-direction: column;
+        }
+        .day-card {
+            min-width: auto;
+        }
+        .day-card .day-name {
+            font-size: 0.9rem;
+        }
+        .day-card .day-date {
+            font-size: 0.85rem;
+        }
+        .day-card .day-revenue {
+            font-size: 1.1rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Navigation -->
+    <div class="mb-3">
+        <a href="{% url 'company-reports-dashboard' %}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i> Back to Reports
+        </a>
+        <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-print"></i> Print
+        </button>
+    </div>
+
+    <!-- Report Header -->
+    <div class="report-header">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <h4><i class="fas fa-calendar-week"></i> Weekly Report</h4>
+                <small>{{ week_start|date:"F d, Y" }} - {{ week_end|date:"F d, Y" }}</small>
+            </div>
+            <div class="col-md-6 text-md-end">
+                <span class="badge">Week {{ week }}, {{ year }}</span>
+                <span class="badge ms-2">Generated: {% now "Y-m-d H:i" %}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="summary-grid">
+        <!-- Total Sales -->
+        <div class="summary-card sales">
+            <div class="icon"><i class="fas fa-shopping-cart"></i></div>
+            <div class="label">Total Sales</div>
+            <div class="value">{{ combined_summary.total_sales|default:"0" }}</div>
+            <small class="text-muted">Transactions this week</small>
+        </div>
+
+        <!-- Total Revenue -->
+        <div class="summary-card revenue">
+            <div class="icon"><i class="fas fa-coins"></i></div>
+            <div class="label">Total Revenue</div>
+            <div class="value">KSh {{ combined_summary.total_revenue|floatformat:2|default:"0.00" }}</div>
+            <small class="text-muted">Sales total</small>
+        </div>
+
+        <!-- Total COGS -->
+        <div class="summary-card cog">
+            <div class="icon"><i class="fas fa-sack-dollar"></i></div>
+            <div class="label">Total COGS</div>
+            <div class="value">KSh {{ combined_summary.total_cogs|floatformat:2|default:"0.00" }}</div>
+            <small class="text-muted">Cost of Goods Sold</small>
+        </div>
+
+        <!-- Gross Profit -->
+        <div class="summary-card profit">
+            <div class="icon"><i class="fas fa-chart-line"></i></div>
+            <div class="label">Gross Profit</div>
+            <div class="value">KSh {{ combined_summary.gross_profit|floatformat:2|default:"0.00" }}</div>
+            <small class="text-muted">Revenue - COGS</small>
+        </div>
+
+        <!-- Total Expenses -->
+        <div class="summary-card expenses">
+            <div class="icon"><i class="fas fa-receipt"></i></div>
+            <div class="label">Total Expenses</div>
+            <div class="value">KSh {{ combined_summary.total_expenses|floatformat:2|default:"0.00" }}</div>
+            <small class="text-muted">Operating costs</small>
+        </div>
+
+        <!-- Net Profit / Closing Balance -->
+        <div class="summary-card balance">
+            <div class="icon"><i class="fas fa-wallet"></i></div>
+            <div class="label">Net Profit</div>
+            <div class="value">KSh {{ combined_summary.net_profit|floatformat:2|default:"0.00" }}</div>
+            <small class="text-muted">Gross Profit - Expenses</small>
+        </div>
+    </div>
+
+    <!-- Daily Breakdown with COGS -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="fas fa-calendar-day"></i> Daily Breakdown</h6>
+                <span class="badge" style="background-color: #87CEEB; color: #000000; border: 1px solid #000000; padding: 4px 10px; font-weight: 600;">{{ daily_breakdown|length }} days</span>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="daily-breakdown">
+                {% for day in daily_breakdown %}
+                <div class="day-card {% if day.date == today %}today{% endif %}"
+                     data-date="{{ day.date|date:'Y-m-d' }}"
+                     data-day="{{ day.day_name }}"
+                     data-revenue="{{ day.revenue }}"
+                     data-cogs="{{ day.cogs }}"
+                     data-profit="{{ day.gross_profit }}"
+                     data-sales="{{ day.sales_count }}">
+                    <div class="day-name">{{ day.day_name|slice:":3" }}</div>
+                    <div class="day-date">{{ day.date|date:"M d" }}</div>
+                    <div class="day-revenue">KSh {{ day.revenue|floatformat:0|default:"0" }}</div>
+                    <div class="day-cogs">COGS: KSh {{ day.cogs|floatformat:0|default:"0" }}</div>
+                    <div class="day-profit {% if day.gross_profit > 0 %}positive{% else %}negative{% endif %}">
+                        KSh {{ day.gross_profit|floatformat:0|default:"0" }}
+                    </div>
+                    <div class="day-sales">{{ day.sales_count }} sales</div>
+                </div>
+                {% empty %}
+                <div class="text-center w-100 py-4">
+                    <i class="fas fa-calendar-times fa-2x text-muted d-block mb-3"></i>
+                    <p class="text-muted">No data for this week</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="card-footer">
+            <small>
+                Week {{ week }}, {{ year }} - {{ week_start|date:"M d" }} to {{ week_end|date:"M d, Y" }} | 
+                <span class="text-cogs">COGS: Cost of Goods Sold</span>
+            </small>
+        </div>
+    </div>
+
+    <!-- COGS Details Table -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="fas fa-table"></i> COGS & Profit Breakdown</h6>
+                <span class="badge" style="background-color: #17a2b8; color: #ffffff; border: 1px solid #000000; padding: 4px 10px; font-weight: 600;">
+                    Detailed
+                </span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="border: 2px solid #000000;">
+                <table class="table-excel table-hover mb-0">
+                    <thead class="cogs-highlight">
+                        <tr>
+                            <th>Date</th>
+                            <th>Day</th>
+                            <th class="text-end">Sales</th>
+                            <th class="text-end">Revenue</th>
+                            <th class="text-end text-cogs">COGS</th>
+                            <th class="text-end">Gross Profit</th>
+                            <th class="text-end">Expenses</th>
+                            <th class="text-end">Net Profit</th>
+                            <th class="text-end">Margin %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for day in daily_breakdown %}
+                        <tr {% if day.date == today %}style="background-color: #e3f2fd;"{% endif %}>
+                            <td>{{ day.date|date:"Y-m-d" }}</td>
+                            <td>{{ day.day_name }}</td>
+                            <td class="text-end">{{ day.sales_count }}</td>
+                            <td class="text-end">KSh {{ day.revenue|floatformat:2|default:"0.00" }}</td>
+                            <td class="text-end text-cogs">KSh {{ day.cogs|floatformat:2|default:"0.00" }}</td>
+                            <td class="text-end {% if day.gross_profit > 0 %}text-success{% else %}text-danger{% endif %}">
+                                KSh {{ day.gross_profit|floatformat:2|default:"0.00" }}
+                            </td>
+                            <td class="text-end">KSh {{ day.expenses|floatformat:2|default:"0.00" }}</td>
+                            <td class="text-end {% if day.net_profit > 0 %}text-success{% else %}text-danger{% endif %}">
+                                KSh {{ day.net_profit|floatformat:2|default:"0.00" }}
+                            </td>
+                            <td class="text-end">
+                                {% if day.profit_margin > 0 %}
+                                    <span class="text-success">{{ day.profit_margin|floatformat:1 }}%</span>
+                                {% else %}
+                                    <span class="text-danger">{{ day.profit_margin|floatformat:1 }}%</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="text-center py-4">
+                                <i class="fas fa-calendar-times text-muted d-block mb-2"></i>
+                                <span class="text-muted">No data available for this week</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="cogs-highlight">
+                        <tr>
+                            <th colspan="2" class="text-end">TOTALS:</th>
+                            <th class="text-end">{{ combined_summary.total_sales|default:"0" }}</th>
+                            <th class="text-end">KSh {{ combined_summary.total_revenue|floatformat:2|default:"0.00" }}</th>
+                            <th class="text-end text-cogs">KSh {{ combined_summary.total_cogs|floatformat:2|default:"0.00" }}</th>
+                            <th class="text-end">KSh {{ combined_summary.gross_profit|floatformat:2|default:"0.00" }}</th>
+                            <th class="text-end">KSh {{ combined_summary.total_expenses|floatformat:2|default:"0.00" }}</th>
+                            <th class="text-end">KSh {{ combined_summary.net_profit|floatformat:2|default:"0.00" }}</th>
+                            <th class="text-end">{{ combined_summary.profit_margin|floatformat:1|default:"0.0" }}%</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- No Sales Message -->
+    {% if not daily_breakdown or daily_breakdown|length == 0 %}
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-calendar-times fa-3x text-muted d-block mb-3"></i>
+            <h5 class="mt-3">No Sales Recorded</h5>
+            <p class="text-muted">There were no sales during week {{ week }}, {{ year }}</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Sorting state for day cards
+let sortState = {
+    column: null,
+    direction: 'asc'
+};
+
+// Function to sort day cards
+function sortDayCards(column) {
+    const container = document.querySelector('.daily-breakdown');
+    const cards = Array.from(container.querySelectorAll('.day-card'));
+    
+    // Skip if no cards or empty state
+    if (cards.length === 0 || cards[0].classList.contains('text-center')) return;
+    
+    // Determine sort direction
+    let direction = 'asc';
+    if (sortState.column === column) {
+        direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+    }
+    sortState.column = column;
+    sortState.direction = direction;
+    
+    // Sort cards
+    cards.sort((a, b) => {
+        let valueA, valueB;
+        
+        switch(column) {
+            case 'date':
+                valueA = new Date(a.dataset.date) || new Date(0);
+                valueB = new Date(b.dataset.date) || new Date(0);
+                break;
+            case 'day':
+                valueA = a.dataset.day || '';
+                valueB = b.dataset.day || '';
+                break;
+            case 'revenue':
+                valueA = parseFloat(a.dataset.revenue) || 0;
+                valueB = parseFloat(b.dataset.revenue) || 0;
+                break;
+            case 'cogs':
+                valueA = parseFloat(a.dataset.cogs) || 0;
+                valueB = parseFloat(b.dataset.cogs) || 0;
+                break;
+            case 'profit':
+                valueA = parseFloat(a.dataset.profit) || 0;
+                valueB = parseFloat(b.dataset.profit) || 0;
+                break;
+            case 'sales':
+                valueA = parseInt(a.dataset.sales) || 0;
+                valueB = parseInt(b.dataset.sales) || 0;
+                break;
+            default:
+                return 0;
+        }
+        
+        // Compare values
+        let comparison = 0;
+        if (typeof valueA === 'number' && typeof valueB === 'number') {
+            comparison = valueA - valueB;
+        } else if (valueA instanceof Date && valueB instanceof Date) {
+            comparison = valueA.getTime() - valueB.getTime();
+        } else {
+            comparison = String(valueA).localeCompare(String(valueB), undefined, { sensitivity: 'base' });
+        }
+        
+        return direction === 'asc' ? comparison : -comparison;
+    });
+    
+    // Re-append sorted cards
+    cards.forEach(card => container.appendChild(card));
+}
+
+// Click day cards to sort
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.querySelector('.daily-breakdown');
+    if (container) {
+        // Sort by date ascending (default) on load
+        sortDayCards('date');
+        
+        // Add click sorting to day cards
+        const cards = container.querySelectorAll('.day-card');
+        cards.forEach(card => {
+            card.addEventListener('click', function() {
+                // Cycle through sorting options
+                const currentColumn = sortState.column;
+                if (currentColumn === 'date') {
+                    sortDayCards('revenue');
+                } else if (currentColumn === 'revenue') {
+                    sortDayCards('profit');
+                } else if (currentColumn === 'profit') {
+                    sortDayCards('sales');
+                } else if (currentColumn === 'sales') {
+                    sortDayCards('cogs');
+                } else {
+                    sortDayCards('date');
+                }
+            });
+        });
+    }
+});
+
+// Keyboard shortcut: Escape to reset
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        sortState.column = 'date';
+        sortState.direction = 'asc';
+        sortDayCards('date');
+    }
+});
+
+// Tooltip helper
+document.addEventListener('DOMContentLoaded', function() {
+    const cogsElements = document.querySelectorAll('.text-cogs');
+    cogsElements.forEach(el => {
+        el.title = 'Cost of Goods Sold - The direct cost of producing the goods sold';
+    });
+});
+</script>
+{% endblock %}

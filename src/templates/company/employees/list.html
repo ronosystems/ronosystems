@@ -1,0 +1,679 @@
+{% extends 'base.html' %}
+
+{% block title %}RS{% endblock %}
+
+{% block page_title %}Employees{% endblock %}
+{% block page_subtitle %}Manage your company employees{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE TABLE STYLING
+    ============================================ */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    
+    .table-excel thead th {
+        background-color: #87CEEB !important; /* Sky Blue */
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    /* Zebra striping for Excel look */
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table-excel tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+
+    /* Sortable headers */
+    .sortable-header {
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        padding-right: 20px !important;
+    }
+    .sortable-header:hover {
+        background-color: #7bb8d8 !important;
+    }
+    .sortable-header .sort-icon {
+        position: absolute;
+        right: 6px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 10px;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+        color: #000000;
+    }
+    .sortable-header:hover .sort-icon {
+        opacity: 1;
+    }
+    .sortable-header.active .sort-icon {
+        opacity: 1;
+    }
+    .sortable-header.asc .sort-icon::after {
+        content: '▲';
+    }
+    .sortable-header.desc .sort-icon::after {
+        content: '▼';
+    }
+
+    /* ============================================
+       ROLE BADGES
+    ============================================ */
+    .badge-role {
+        padding: 5px 12px;
+        border-radius: 50px;
+        font-size: 12px;
+        border: 1px solid #000000;
+        font-weight: 600;
+    }
+    .badge-company_admin { background: #2ed573; color: white; }
+    .badge-company_manager { background: #1e90ff; color: white; }
+    .badge-company_staff { background: #ffa502; color: white; }
+    .badge-employee { background: #a29bfe; color: white; }
+    .badge-super_admin { background: #ff4757; color: white; }
+    
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-footer {
+        border-top: 2px solid #000000;
+        background-color: #f8f9fa;
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-primary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-primary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-danger {
+        border: 2px solid #000000;
+        color: #dc3545;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-danger:hover {
+        background-color: #dc3545;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-outline-secondary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-outline-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    /* ============================================
+       BADGES
+    ============================================ */
+    .badge.bg-success {
+        background-color: #d4edda !important;
+        color: #155724;
+        border: 1px solid #000000;
+        padding: 4px 10px;
+        font-weight: 600;
+    }
+    
+    .badge.bg-danger {
+        background-color: #f8d7da !important;
+        color: #721c24;
+        border: 1px solid #000000;
+        padding: 4px 10px;
+        font-weight: 600;
+    }
+    
+    /* ============================================
+       FILTERS
+    ============================================ */
+    .products-filters {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+        align-items: center;
+    }
+    
+    .search-input {
+        padding: 8px 12px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        min-width: 250px;
+        flex: 1;
+        background: #ffffff;
+    }
+    
+    .search-input:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    .filter-select {
+        padding: 8px 12px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        cursor: pointer;
+    }
+    
+    .filter-select:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    .btn-refresh {
+        padding: 8px 16px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        cursor: pointer;
+        transition: all 0.3s;
+        font-weight: 600;
+    }
+    
+    .btn-refresh:hover {
+        background: #87CEEB;
+        border-color: #000000;
+    }
+    
+    /* ============================================
+       EMPTY STATE
+    ============================================ */
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+    }
+    .empty-icon {
+        font-size: 48px;
+        display: block;
+        margin-bottom: 16px;
+    }
+    
+    /* ============================================
+       AVATAR
+    ============================================ */
+    .avatar-sm {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #87CEEB, #7bb8d8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #000000;
+        font-weight: 700;
+        flex-shrink: 0;
+        border: 2px solid #000000;
+    }
+    
+    /* ============================================
+       PRODUCT ID
+    ============================================ */
+    .product-id {
+        color: #000000;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    
+    /* ============================================
+       HEADER
+    ============================================ */
+    .products-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+    }
+    
+    .products-header h3 {
+        color: #000000;
+        font-weight: 700;
+    }
+    
+    .products-header p {
+        color: #000000;
+    }
+    
+    .header-right {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 12px;
+        }
+        .table-excel th {
+            font-size: 11px;
+        }
+        .btn-sm {
+            font-size: 10px;
+            padding: 2px 6px;
+        }
+        .badge-role {
+            font-size: 10px;
+            padding: 3px 8px;
+        }
+        .search-input {
+            min-width: 150px;
+        }
+        .avatar-sm {
+            width: 30px;
+            height: 30px;
+            font-size: 12px;
+        }
+        .products-header h3 {
+            font-size: 1.1rem;
+        }
+        .products-header p {
+            font-size: 0.85rem;
+        }
+    }
+    
+    @media (max-width: 576px) {
+        .products-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        .products-filters {
+            flex-direction: column;
+        }
+        .search-input {
+            min-width: auto;
+            width: 100%;
+        }
+        .filter-select {
+            width: 100%;
+        }
+        .btn-refresh {
+            width: 100%;
+        }
+        .header-right {
+            width: 100%;
+        }
+        .header-right .btn {
+            width: 100%;
+        }
+        .table-excel th,
+        .table-excel td {
+            padding: 3px 4px;
+            font-size: 10px;
+        }
+        .badge-role {
+            font-size: 8px;
+            padding: 2px 6px;
+        }
+        .avatar-sm {
+            width: 25px;
+            height: 25px;
+            font-size: 10px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="products-header">
+            <div>
+                <h3><i class="fas fa-users"></i> Employee Management</h3>
+                <p class="text-muted">Total: {{ employees|length }} employees</p>
+            </div>
+            <div class="header-right">
+                <a href="{% url 'add-employee' %}" class="btn btn-primary">
+                    <i class="fas fa-user-plus"></i> Add Employee
+                </a>
+            </div>
+        </div>
+
+        <div class="products-filters">
+            <input type="text" class="search-input" placeholder="Search employees by name, email..." id="searchInput" value="{{ search_query }}">
+            <select class="filter-select" id="roleFilter">
+                <option value="">All Roles</option>
+                {% for role_value, role_label in roles %}
+                <option value="{{ role_value }}" {% if role_filter == role_value %}selected{% endif %}>
+                    {{ role_label }}
+                </option>
+                {% endfor %}
+            </select>
+            <button class="btn-refresh" onclick="location.reload()">
+                <i class="fas fa-sync"></i> Refresh
+            </button>
+        </div>
+
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive" style="border: 2px solid #000000;">
+                    <table class="table-excel table-hover mb-0" id="employeeTable">
+                        <thead>
+                            <tr>
+                                <th style="width:5%;" class="sortable-header" data-sort="id" onclick="sortTable('id')">
+                                    #
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:20%;" class="sortable-header" data-sort="name" onclick="sortTable('name')">
+                                    Employee
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:18%;" class="sortable-header" data-sort="email" onclick="sortTable('email')">
+                                    Email
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:10%;" class="sortable-header" data-sort="phone" onclick="sortTable('phone')">
+                                    Phone
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:10%;" class="sortable-header" data-sort="role" onclick="sortTable('role')">
+                                    Role
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:10%;" class="sortable-header" data-sort="department" onclick="sortTable('department')">
+                                    Department
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:9%;" class="sortable-header" data-sort="phone" onclick="sortTable('phone')">
+                                    Branch
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:8%;" class="sortable-header" data-sort="status" onclick="sortTable('status')">
+                                    Status
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:10%;" class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for employee in employees %}
+                            <tr data-employee-id="{{ employee.id }}"
+                                data-id="{{ forloop.counter }}"
+                                data-name="{{ employee.get_full_name|default:employee.username }}"
+                                data-email="{{ employee.email }}"
+                                data-phone="{{ employee.phone|default:'' }}"
+                                data-role="{{ employee.get_role_display|default:employee.role|title }}"
+                                data-department="{{ employee.department|default:'-' }}"
+                                data-branch="{{employee.branch | default:''}}"
+                                data-status="{% if employee.is_active %}Active{% else %}Inactive{% endif %}">
+                                <td><span class="product-id">#{{ forloop.counter }}</span></td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar-sm me-2">
+                                            {{ employee.first_name|default:employee.username|make_list|first|upper }}
+                                        </div>
+                                        <div>
+                                            <strong>{{ employee.get_full_name|default:employee.username }}</strong>
+                                            {% if employee.employee_id %}
+                                            <br><small class="text-muted">ID: {{ employee.employee_id }}</small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><i class="fas fa-envelope" style="color: #000000;"></i> {{ employee.email }}</td>
+                                <td>{% if employee.phone %}<i class="fas fa-phone" style="color: #000000;"></i> {{ employee.phone }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                                <td><span class="badge-role badge-{{ employee.role }}">{{ employee.get_role_display|default:employee.role|title }}</span></td>
+                                <td>{{ employee.department|default:"-" }}</td>
+                                <td>{% if employee.branch %}<i class="fas fa-building" style="color: #000000;"></i> {{ employee.branch }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                                <td>{% if employee.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-danger">Inactive</span>{% endif %}</td>
+                                <td class="text-center">
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'edit-employee' employee.id %}" class="btn btn-outline-primary" title="Edit"><i class="fas fa-edit"></i></a>
+                                        <a href="{% url 'delete-employee' employee.id %}" class="btn btn-outline-danger" title="Delete" onclick="return confirm('Are you sure you want to delete this employee?')"><i class="fas fa-trash"></i></a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" class="text-center py-4">
+                                    <div class="empty-state">
+                                        <span class="empty-icon">👥</span>
+                                        <h3>No Employees Found</h3>
+                                        <p>Start by adding your first employee</p>
+                                        <a href="{% url 'add-employee' %}" class="btn btn-primary"><i class="fas fa-user-plus"></i> Add Employee</a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer text-muted">
+                Showing {{ employees|length }} employees
+                {% if search_query or role_filter %}
+                <span class="float-end">
+                    <a href="{% url 'employee-list' %}" class="btn btn-sm btn-outline-secondary"><i class="fas fa-times"></i> Clear Filters</a>
+                </span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Sorting state
+let sortState = {
+    column: null,
+    direction: 'asc'
+};
+
+// Sort table function
+function sortTable(column) {
+    const table = document.getElementById('employeeTable');
+    if (!table) return;
+    
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    // Skip if no rows or empty state
+    if (rows.length === 0 || rows[0].cells.length === 1) return;
+    
+    // Determine sort direction
+    let direction = 'asc';
+    if (sortState.column === column) {
+        direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+    }
+    sortState.column = column;
+    sortState.direction = direction;
+    
+    // Update header icons
+    table.querySelectorAll('.sortable-header').forEach(header => {
+        header.classList.remove('active', 'asc', 'desc');
+        const icon = header.querySelector('.sort-icon');
+        if (header.dataset.sort === column) {
+            header.classList.add('active', direction);
+        } else {
+            icon.textContent = '';
+        }
+    });
+    
+    // Sort rows
+    rows.sort((a, b) => {
+        let valueA, valueB;
+        
+        switch(column) {
+            case 'id':
+                valueA = parseInt(a.dataset.id) || 0;
+                valueB = parseInt(b.dataset.id) || 0;
+                break;
+            case 'name':
+                valueA = a.dataset.name || '';
+                valueB = b.dataset.name || '';
+                break;
+            case 'email':
+                valueA = a.dataset.email || '';
+                valueB = b.dataset.email || '';
+                break;
+            case 'phone':
+                valueA = a.dataset.phone || '';
+                valueB = b.dataset.phone || '';
+                break;
+            case 'role':
+                valueA = a.dataset.role || '';
+                valueB = b.dataset.role || '';
+                break;
+            case 'department':
+                valueA = a.dataset.department || '';
+                valueB = b.dataset.department || '';
+                break;
+            case 'status':
+                valueA = a.dataset.status || '';
+                valueB = b.dataset.status || '';
+                break;
+            default:
+                return 0;
+        }
+        
+        // Compare values
+        let comparison = 0;
+        if (typeof valueA === 'number' && typeof valueB === 'number') {
+            comparison = valueA - valueB;
+        } else {
+            comparison = String(valueA).localeCompare(String(valueB), undefined, { sensitivity: 'base' });
+        }
+        
+        return direction === 'asc' ? comparison : -comparison;
+    });
+    
+    // Re-append sorted rows
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+// Filter function (original)
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    const roleFilter = document.getElementById('roleFilter');
+    const rows = document.querySelectorAll('#employeeTable tbody tr');
+    
+    function filterTable() {
+        const search = searchInput.value.toLowerCase().trim();
+        const role = roleFilter.value;
+        
+        rows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            const rowRole = row.dataset.role || '';
+            
+            const matchesSearch = !search || text.includes(search);
+            const matchesRole = !role || rowRole.toLowerCase() === role.toLowerCase() || rowRole === role;
+            
+            row.style.display = matchesSearch && matchesRole ? '' : 'none';
+        });
+    }
+    
+    if (searchInput) searchInput.addEventListener('input', filterTable);
+    if (roleFilter) roleFilter.addEventListener('change', filterTable);
+    
+    if (searchInput.value || roleFilter.value) filterTable();
+    
+    // Initialize sorting - sort by name ascending
+    const table = document.getElementById('employeeTable');
+    if (table) {
+        sortState.column = 'name';
+        sortState.direction = 'asc';
+        const nameHeader = table.querySelector('[data-sort="name"]');
+        if (nameHeader) {
+            nameHeader.classList.add('active', 'asc');
+            const icon = nameHeader.querySelector('.sort-icon');
+            icon.textContent = '▲';
+        }
+        sortTable('name');
+    }
+});
+
+// Keyboard shortcut: Escape to clear filters
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const searchInput = document.getElementById('searchInput');
+        const roleFilter = document.getElementById('roleFilter');
+        if (searchInput) {
+            searchInput.value = '';
+            searchInput.dispatchEvent(new Event('input'));
+        }
+        if (roleFilter) {
+            roleFilter.value = '';
+            roleFilter.dispatchEvent(new Event('change'));
+        }
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,426 @@
+{% extends 'base.html' %}
+
+{% block title %}Companies - RonoSystems{% endblock %}
+{% block page_title %}Companies{% endblock %}
+{% block page_subtitle %}Manage all companies{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE TABLE STYLING
+    ============================================ */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    
+    .table-excel thead th {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table-excel tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+
+    /* ============================================
+       STAT CARDS
+    ============================================ */
+    .stat-card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        transition: transform 0.2s;
+        cursor: default;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .stat-card.bg-primary {
+        background: #87CEEB !important;
+        color: #000000 !important;
+    }
+    .stat-card.bg-primary h3 {
+        color: #000000 !important;
+    }
+    .stat-card.bg-primary small {
+        color: #000000 !important;
+    }
+    .stat-card.bg-success {
+        background: #d4edda !important;
+        color: #155724 !important;
+    }
+    .stat-card.bg-success h3 {
+        color: #155724 !important;
+    }
+    .stat-card.bg-success small {
+        color: #155724 !important;
+    }
+    .stat-card.bg-warning {
+        background: #fff3cd !important;
+        color: #000000 !important;
+    }
+    .stat-card.bg-warning h3 {
+        color: #856404 !important;
+    }
+    .stat-card.bg-warning small {
+        color: #856404 !important;
+    }
+
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-body {
+        color: #000000;
+    }
+
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-info {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-info:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-primary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-primary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-danger {
+        border: 2px solid #000000;
+        color: #dc3545;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-danger:hover {
+        background-color: #dc3545;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-sm {
+        padding: 4px 12px;
+        font-size: 12px;
+    }
+
+    /* ============================================
+       BADGES
+    ============================================ */
+    .badge {
+        padding: 4px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    
+    .badge.bg-info {
+        background: #cce5ff !important;
+        color: #004085 !important;
+    }
+    
+    .badge.bg-secondary {
+        background: #f8f9fa !important;
+        color: #000000 !important;
+    }
+    
+    .badge.bg-primary {
+        background: #87CEEB !important;
+        color: #000000 !important;
+    }
+    
+    .badge.bg-success {
+        background: #d4edda !important;
+        color: #155724 !important;
+    }
+    
+    .badge.bg-danger {
+        background: #f8d7da !important;
+        color: #721c24 !important;
+    }
+    
+    .badge.bg-dark {
+        background: #2d3436 !important;
+        color: #ffffff !important;
+    }
+
+    /* ============================================
+       TEXT MUTED OVERRIDE
+    ============================================ */
+    .text-muted {
+        color: #000000 !important;
+    }
+    small.text-muted {
+        color: #000000 !important;
+    }
+
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 11px;
+        }
+        .table-excel th {
+            font-size: 10px;
+        }
+        .btn-sm {
+            font-size: 9px;
+            padding: 2px 6px;
+        }
+        .badge {
+            font-size: 9px;
+            padding: 2px 6px;
+        }
+        .stat-card h3 {
+            font-size: 1.3rem;
+        }
+        .stat-card small {
+            font-size: 0.75rem;
+        }
+        .card-body {
+            padding: 12px;
+        }
+        .d-flex.justify-content-between {
+            flex-direction: column;
+            gap: 10px;
+            align-items: flex-start;
+        }
+        .d-flex.justify-content-between .btn {
+            width: 100%;
+            text-align: center;
+        }
+        .btn-primary {
+            font-size: 12px;
+            padding: 6px 12px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 3px 4px;
+            font-size: 9px;
+        }
+        .table-excel th {
+            font-size: 8px;
+        }
+        .btn-sm {
+            font-size: 8px;
+            padding: 1px 4px;
+        }
+        .btn-sm i {
+            font-size: 10px;
+        }
+        .badge {
+            font-size: 8px;
+            padding: 1px 4px;
+        }
+        .stat-card h3 {
+            font-size: 1.1rem;
+        }
+        .stat-card small {
+            font-size: 0.65rem;
+        }
+        .card-body {
+            padding: 10px;
+        }
+        .btn-primary {
+            font-size: 11px;
+            padding: 4px 8px;
+        }
+        .d-flex.justify-content-between p {
+            font-size: 11px;
+            margin-bottom: 0;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Stats -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card stat-card bg-primary">
+                    <div class="card-body">
+                        <h3>{{ total_companies }}</h3>
+                        <small>Total Companies</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card stat-card bg-success">
+                    <div class="card-body">
+                        <h3>{{ active_companies }}</h3>
+                        <small>Active Companies</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card stat-card bg-warning">
+                    <div class="card-body">
+                        <h3>{{ inactive_companies }}</h3>
+                        <small>Inactive Companies</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <p class="text-muted">Showing {{ companies|length }} companies</p>
+            <a href="/companies/create/" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add Company
+            </a>
+        </div>
+
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive" style="border: 2px solid #000000;">
+                    <table class="table-excel table-hover mb-0" id="companiesTable">
+                        <thead>
+                            <tr>
+                                <th style="width:5%;">#</th>
+                                <th style="width:20%;">Company Name</th>
+                                <th style="width:15%;">Business Type</th>
+                                <th style="width:12%;">Plan</th>
+                                <th style="width:10%;">Employees</th>
+                                <th style="width:10%;">Status</th>
+                                <th style="width:28%;" class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for company in companies %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td>
+                                    <strong>{{ company.name }}</strong>
+                                    <br><small style="color: #000000;">ID: {{ company.id }}</small>
+                                </td>
+                                <td>
+                                    {% if company.business_type %}
+                                    <span class="badge bg-info">{{ company.business_type.name }}</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">None</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if company.plan == 'free' %}secondary{% elif company.plan == 'pro' %}primary{% else %}success{% endif %}">
+                                        {{ company.plan|title }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-dark">{{ company.users.count }}</span>
+                                </td>
+                                <td>
+                                    {% if company.is_active %}
+                                    <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="/companies/{{ company.id }}/" class="btn btn-outline-info">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="/companies/{{ company.id }}/edit/" class="btn btn-outline-primary">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a href="/companies/{{ company.id }}/delete/" class="btn btn-outline-danger" onclick="return confirm('Are you sure you want to delete {{ company.name }}?')">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center py-4">
+                                    <i class="fas fa-building fa-3x d-block mb-3" style="color: #000000;"></i>
+                                    <p style="color: #000000;">No companies found.</p>
+                                    <a href="/companies/create/" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-plus"></i> Add First Company
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

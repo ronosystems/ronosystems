@@ -1,0 +1,343 @@
+{% extends 'base.html' %}
+
+{% block title %}Accessories - RonoSystems{% endblock %}
+
+{% block page_title %}Accessories{% endblock %}
+{% block page_subtitle %}Manage your accessories inventory{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Excel-like table styling */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    
+    .table-excel thead th {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table-excel tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+    
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-footer {
+        border-top: 2px solid #000000;
+        background-color: #f8f9fa;
+    }
+    
+    .search-box {
+        padding: 8px 14px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 14px;
+        min-width: 250px;
+        background: #ffffff;
+    }
+    
+    .search-box:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 1px solid #000000;
+        color: #000000;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-secondary {
+        border: 1px solid #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-secondary:hover {
+        background-color: #f8f9fa;
+        border-color: #000000;
+    }
+    
+    .badge {
+        border: 1px solid #000000;
+        padding: 3px 10px;
+        font-weight: 600;
+    }
+    
+    .badge.bg-info {
+        background-color: #cce5ff !important;
+        color: #004085;
+    }
+    
+    .badge.bg-success {
+        background-color: #d4edda !important;
+        color: #155724;
+    }
+    
+    .badge.bg-warning {
+        background-color: #fff3cd !important;
+        color: #856404;
+    }
+    
+    .badge.bg-danger {
+        background-color: #f8d7da !important;
+        color: #721c24;
+    }
+    
+    .table-responsive {
+        overflow-x: auto;
+        border: 2px solid #000000;
+    }
+    
+    .filter-dropdown {
+        padding: 8px 14px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: #ffffff;
+    }
+    
+    .filter-dropdown:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    @media (max-width: 768px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 12px;
+        }
+        .table-excel th {
+            font-size: 11px;
+        }
+        .search-box {
+            min-width: 100%;
+        }
+        .filter-dropdown {
+            min-width: 100%;
+        }
+        .d-flex {
+            flex-wrap: wrap;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        
+        <!-- Actions Bar -->
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+            <h5>Total: {{ total_count }} accessories</h5>
+            <div class="d-flex gap-2 flex-wrap">
+                <!-- Search -->
+                <input type="text" class="search-box" id="searchAccessories" 
+                       placeholder="Search by name, brand, model..." 
+                       value="{{ search_query }}"
+                       onkeypress="if(event.key==='Enter') applyFilters()">
+                
+                <!-- Category Filter -->
+                <select class="filter-dropdown" id="categoryFilter" onchange="applyFilters()">
+                    <option value="">All Types</option>
+                    {% for type in accessory_types %}
+                        <option value="{{ type.value }}" {% if category_filter == type.value %}selected{% endif %}>
+                            {{ type.label }}
+                        </option>
+                    {% endfor %}
+                </select>
+                
+                <!-- Per Page -->
+                <select class="filter-dropdown" id="perPage" onchange="applyFilters()" style="width: auto;">
+                    <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                    <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+                    <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                </select>
+                
+                <button class="btn btn-primary" onclick="applyFilters()">
+                    <i class="fas fa-search"></i> Search
+                </button>
+                <a href="/epa_shop/products/add/" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Add Accessory
+                </a>
+            </div>
+        </div>
+
+        <!-- Accessories Table -->
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-excel table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width:5%;">#</th>
+                                <th style="width:12%;">Product Code</th>
+                                <th style="width:15%;">Name</th>
+                                <th style="width:12%;">Brand</th>
+                                <th style="width:12%;">Model</th>
+                                <th style="width:12%;">Type</th>
+                                <th style="width:10%;">Stock</th>
+                                <th style="width:12%;">Price</th>
+                                <th style="width:10%;" class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for accessory in accessories %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td>
+                                    <span class="product-code-badge">{{ accessory.product_code }}</span>
+                                </td>
+                                <td>
+                                    <a href="/epa_shop/products/{{ accessory.product_code }}/" class="product-link">
+                                        {{ accessory.name }}
+                                    </a>
+                                </td>
+                                <td>{{ accessory.brand }}</td>
+                                <td>{{ accessory.model|default:"-" }}</td>
+                                <td>
+                                    <span class="badge bg-info">{{ accessory.accessory_type|cut:"_"|title }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge {% if accessory.quantity_in_stock > 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                        {{ accessory.quantity_in_stock }}
+                                    </span>
+                                </td>
+                                <td>KSh {{ accessory.selling_price|floatformat:0 }}</td>
+                                <td>
+                                    <div class="d-flex gap-1 flex-wrap justify-content-center">
+                                        <a href="/epa_shop/products/{{ accessory.product_code }}/" class="btn btn-sm btn-outline-secondary" title="View">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="/epa_shop/products/{{ accessory.product_code }}/edit/" class="btn btn-sm btn-outline-secondary" title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a href="/epa_shop/products/{{ accessory.product_code }}/restock/" class="btn btn-sm btn-outline-secondary" title="Restock">
+                                            <i class="fas fa-plus-circle"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="9" class="text-center py-5">
+                                    <i class="fas fa-box-open fa-3x text-muted d-block mb-3"></i>
+                                    <h5 class="text-muted">No Accessories Found</h5>
+                                    <p class="text-muted">No accessories have been added yet.</p>
+                                    <a href="/epa_shop/products/add/" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-plus"></i> Add First Accessory
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer">
+                <small>Showing {{ accessories|length }} of {{ total_count }} total accessories</small>
+                <span class="float-end">
+                    <!-- Pagination -->
+                    {% if page_obj.has_previous or page_obj.has_next %}
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination pagination-sm mb-0">
+                            {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}&search={{ search_query }}&category={{ category_filter }}&per_page={{ per_page }}">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+                            
+                            <li class="page-item active">
+                                <span class="page-link">
+                                    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                                </span>
+                            </li>
+                            
+                            {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.next_page_number }}&search={{ search_query }}&category={{ category_filter }}&per_page={{ per_page }}">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Apply filters
+function applyFilters() {
+    const search = document.getElementById('searchAccessories').value;
+    const category = document.getElementById('categoryFilter').value;
+    const perPage = document.getElementById('perPage').value;
+    
+    let url = '?';
+    if (search) url += 'search=' + encodeURIComponent(search) + '&';
+    if (category) url += 'category=' + encodeURIComponent(category) + '&';
+    if (perPage) url += 'per_page=' + encodeURIComponent(perPage);
+    
+    window.location.href = url;
+}
+
+// Keyboard shortcut: Escape to clear search
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const searchInput = document.getElementById('searchAccessories');
+        if (searchInput && document.activeElement === searchInput) {
+            searchInput.value = '';
+            applyFilters();
+        }
+    }
+});
+</script>
+{% endblock %}

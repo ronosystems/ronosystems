@@ -1,0 +1,448 @@
+{% extends 'base.html' %}
+
+{% block title %}RS{% endblock %}
+
+{% block page_title %}Payment Settings{% endblock %}
+{% block page_subtitle %}Configure payment methods and currency{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE STYLING
+    ============================================ */
+    .form-section {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        border: 2px solid #000000;
+    }
+    .form-section-title {
+        font-weight: 700;
+        margin-bottom: 15px;
+        color: #000000;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    /* ============================================
+       PAYMENT METHOD GRID
+    ============================================ */
+    .payment-method-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+    }
+    .payment-method-item {
+        background: white;
+        padding: 15px;
+        border-radius: 4px;
+        border: 2px solid #000000;
+        text-align: center;
+        transition: all 0.3s;
+        cursor: pointer;
+    }
+    .payment-method-item:hover {
+        border-color: #87CEEB;
+        background: #f0f8ff;
+    }
+    .payment-method-item.active {
+        border-color: #28a745;
+        background: #d4edda;
+    }
+    .payment-method-item input[type="checkbox"] {
+        display: none;
+    }
+    .payment-method-item .icon {
+        font-size: 2rem;
+        display: block;
+        margin-bottom: 8px;
+        color: #000000;
+    }
+    .payment-method-item .label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #000000;
+    }
+    
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-body {
+        color: #000000;
+    }
+    
+    /* ============================================
+       FORM ELEMENTS
+    ============================================ */
+    .form-control {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        color: #000000;
+    }
+    
+    .form-control:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    .form-label {
+        color: #000000;
+        font-weight: 600;
+    }
+    
+    .form-check-label {
+        color: #000000;
+        font-weight: 500;
+    }
+    
+    .form-check-input {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    .form-check-input:checked {
+        background-color: #87CEEB;
+        border-color: #000000;
+    }
+    
+    .form-check-input:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    /* ============================================
+       TOGGLE SWITCH
+    ============================================ */
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 50px;
+        height: 26px;
+    }
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #ccc;
+        transition: .4s;
+        border-radius: 34px;
+        border: 2px solid #000000;
+    }
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 2px;
+        bottom: 2px;
+        background: white;
+        transition: .4s;
+        border-radius: 50%;
+        border: 1px solid #000000;
+    }
+    input:checked + .slider {
+        background: #28a745;
+    }
+    input:checked + .slider:before {
+        transform: translateX(24px);
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-sm {
+        padding: 4px 12px;
+        font-size: 12px;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .form-section {
+            padding: 15px;
+        }
+        .form-section-title {
+            font-size: 12px;
+        }
+        .card-body {
+            padding: 15px;
+        }
+        .payment-method-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        .payment-method-item {
+            padding: 12px;
+        }
+        .payment-method-item .icon {
+            font-size: 1.5rem;
+        }
+        .payment-method-item .label {
+            font-size: 0.75rem;
+        }
+        .btn-sm {
+            font-size: 10px;
+            padding: 3px 8px;
+        }
+        .d-flex.gap-2 {
+            flex-wrap: wrap;
+        }
+        .d-flex.gap-2 .btn {
+            flex: 1;
+            min-width: 100px;
+            text-align: center;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .form-section {
+            padding: 10px;
+        }
+        .form-control {
+            font-size: 12px;
+            padding: 6px 10px;
+        }
+        .payment-method-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+        .payment-method-item {
+            padding: 10px;
+        }
+        .payment-method-item .icon {
+            font-size: 1.3rem;
+        }
+        .payment-method-item .label {
+            font-size: 0.7rem;
+        }
+        .btn {
+            font-size: 11px;
+            padding: 4px 10px;
+        }
+        .form-check-label {
+            font-size: 12px;
+        }
+        .form-label {
+            font-size: 12px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="mb-3">
+        <a href="{% url 'company-settings-dashboard' %}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i> Back to Settings
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            <div class="card">
+                <div class="card-body p-4">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Currency Settings -->
+                        <div class="form-section">
+                            <h6 class="form-section-title"><i class="fas fa-money-bill-wave"></i> Currency Settings</h6>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Currency Code</label>
+                                    <input type="text" class="form-control" name="currency" value="{{ settings.payment.currency|default:'KES' }}" maxlength="3">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Currency Symbol</label>
+                                    <input type="text" class="form-control" name="currency_symbol" value="{{ settings.payment.currency_symbol|default:'KSh' }}">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Decimal Places</label>
+                                    <input type="number" class="form-control" name="decimal_places" value="{{ settings.payment.decimal_places|default:'2' }}" min="0" max="4">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Payment Methods -->
+                        <div class="form-section">
+                            <h6 class="form-section-title"><i class="fas fa-credit-card"></i> Payment Methods</h6>
+                            <div class="payment-method-grid">
+                                {% for value, label in payment_methods_choices %}
+                                <label class="payment-method-item {% if value in settings.payment.payment_methods %}active{% endif %}">
+                                    <input type="checkbox" name="payment_methods" value="{{ value }}" {% if value in settings.payment.payment_methods %}checked{% endif %}>
+                                    <span class="icon">
+                                        {% if value == 'cash' %}
+                                        <i class="fas fa-money-bill-wave" style="color: #28a745;"></i>
+                                        {% elif value == 'm-pesa' %}
+                                        <i class="fas fa-mobile-alt" style="color: #007bff;"></i>
+                                        {% elif value == 'bank' %}
+                                        <i class="fas fa-university" style="color: #17a2b8;"></i>
+                                        {% elif value == 'card' %}
+                                        <i class="fas fa-credit-card" style="color: #ffc107;"></i>
+                                        {% elif value == 'credit' %}
+                                        <i class="fas fa-hand-holding-usd" style="color: #dc3545;"></i>
+                                        {% endif %}
+                                    </span>
+                                    <span class="label">{{ label }}</span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        
+                        <!-- Advanced Settings -->
+                        <div class="form-section">
+                            <h6 class="form-section-title"><i class="fas fa-sliders-h"></i> Advanced Settings</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Default Tax Rate (%)</label>
+                                    <input type="number" class="form-control" name="default_tax_rate" value="{{ settings.payment.default_tax_rate|default:'0' }}" step="0.01" min="0">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Credit Limit (Default)</label>
+                                    <input type="number" class="form-control" name="credit_limit" value="{{ settings.payment.credit_limit|default:'0' }}" step="0.01" min="0">
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Payment Terms (days)</label>
+                                    <input type="number" class="form-control" name="payment_terms" value="{{ settings.payment.payment_terms|default:'30' }}" min="0">
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="enable_discount" {% if settings.payment.enable_discount %}checked{% endif %}>
+                                        <label class="form-check-label">Enable Discount</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="enable_tax" {% if settings.payment.enable_tax %}checked{% endif %}>
+                                        <label class="form-check-label">Enable Tax</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="enable_partial_payment" {% if settings.payment.enable_partial_payment %}checked{% endif %}>
+                                        <label class="form-check-label">Enable Partial Payment</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="enable_credit" {% if settings.payment.enable_credit %}checked{% endif %}>
+                                        <label class="form-check-label">Enable Credit Sales</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- M-Pesa Settings -->
+                        <div class="form-section">
+                            <h6 class="form-section-title"><i class="fas fa-mobile-alt"></i> M-Pesa Settings</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="enable_mpesa" {% if settings.payment.enable_mpesa %}checked{% endif %}>
+                                        <label class="form-check-label">Enable M-Pesa Payments</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Paybill Number</label>
+                                    <input type="text" class="form-control" name="mpesa_paybill" value="{{ settings.payment.mpesa_paybill|default:'' }}" placeholder="e.g., 123456">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Till Number</label>
+                                    <input type="text" class="form-control" name="mpesa_till" value="{{ settings.payment.mpesa_till|default:'' }}" placeholder="e.g., 123456">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Bank Settings -->
+                        <div class="form-section">
+                            <h6 class="form-section-title"><i class="fas fa-university"></i> Bank Settings</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="enable_bank" {% if settings.payment.enable_bank %}checked{% endif %}>
+                                        <label class="form-check-label">Enable Bank Transfers</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Bank Name</label>
+                                    <input type="text" class="form-control" name="bank_name" value="{{ settings.payment.bank_name|default:'' }}">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Account Number</label>
+                                    <input type="text" class="form-control" name="bank_account" value="{{ settings.payment.bank_account|default:'' }}">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Bank Branch</label>
+                                    <input type="text" class="form-control" name="bank_branch" value="{{ settings.payment.bank_branch|default:'' }}">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Save Changes
+                            </button>
+                            <a href="{% url 'company-settings-dashboard' %}" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

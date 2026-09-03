@@ -1,0 +1,873 @@
+{% extends 'base.html' %}
+
+{% block title %}RS{% endblock %}
+
+{% block page_title %}Expenses Dashboard{% endblock %}
+{% block page_subtitle %}Track daily expenses{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE TABLE STYLING
+    ============================================ */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    
+    .table-excel thead th {
+        background-color: #87CEEB !important; /* Sky Blue */
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    /* Zebra striping for Excel look */
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table-excel tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+
+    /* Sortable headers */
+    .sortable-header {
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        padding-right: 20px !important;
+    }
+    .sortable-header:hover {
+        background-color: #7bb8d8 !important;
+    }
+    .sortable-header .sort-icon {
+        position: absolute;
+        right: 6px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 10px;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+        color: #000000;
+    }
+    .sortable-header:hover .sort-icon {
+        opacity: 1;
+    }
+    .sortable-header.active .sort-icon {
+        opacity: 1;
+    }
+    .sortable-header.asc .sort-icon::after {
+        content: '▲';
+    }
+    .sortable-header.desc .sort-icon::after {
+        content: '▼';
+    }
+
+    /* ============================================
+       STAT CARDS
+    ============================================ */
+    .stat-card {
+        background: white;
+        border-radius: 4px;
+        padding: 20px;
+        border: 2px solid #000000;
+        transition: all 0.3s;
+        height: 100%;
+        text-align: center;
+    }
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+    .stat-card .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #000000;
+    }
+    .stat-card .stat-label {
+        font-size: 0.85rem;
+        color: #000000;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+    .stat-card small {
+        color: #000000;
+    }
+    
+    /* ============================================
+       FILTER FORM
+    ============================================ */
+    .filter-form {
+        background: #f8f9fa;
+        padding: 15px 20px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        border: 2px solid #000000;
+    }
+    
+    .filter-form .form-label {
+        color: #000000;
+        font-weight: 600;
+    }
+    
+    .filter-form .form-select,
+    .filter-form .form-control {
+        border: 2px solid #000000;
+        border-radius: 4px;
+    }
+    
+    .filter-form .form-select:focus,
+    .filter-form .form-control:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-danger {
+        background-color: #dc3545;
+        border: 2px solid #000000;
+        color: #ffffff;
+        border-radius: 4px;
+    }
+    
+    .btn-danger:hover {
+        background-color: #c82333;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-outline-secondary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+    }
+    
+    .btn-outline-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    /* ============================================
+       DAILY RECORDS TABLE
+    ============================================ */
+    .daily-records-table tbody tr.today {
+        background: #fff5f5 !important;
+        border-left: 4px solid #dc3545;
+    }
+    .daily-records-table tbody tr.today td:first-child {
+        border-left: 4px solid #dc3545;
+        padding-left: 11px;
+    }
+    
+    .daily-records-table tbody td .date-number {
+        font-weight: 600;
+        font-size: 1.1rem;
+        color: #000000;
+    }
+    .daily-records-table tbody td .date-month {
+        font-size: 0.75rem;
+        color: #000000;
+    }
+    .daily-records-table tbody td .day-name {
+        font-size: 0.8rem;
+        color: #000000;
+    }
+    
+    .daily-records-table tbody td .expense-count {
+        font-weight: 600;
+        color: #000000;
+    }
+    .daily-records-table tbody td .expense-amount {
+        font-weight: 700;
+        color: #000000;
+        font-size: 1.05rem;
+    }
+    .daily-records-table tbody td .expense-amount.zero {
+        color: #adb5bd;
+        font-weight: 400;
+    }
+    
+    .daily-records-table tbody td .today-badge {
+        background: #dc3545;
+        color: white;
+        padding: 2px 10px;
+        border-radius: 50px;
+        font-size: 0.65rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-left: 8px;
+        border: 1px solid #000000;
+    }
+    
+    .daily-records-table tbody td .view-btn {
+        padding: 4px 12px;
+        border-radius: 4px;
+        background: #87CEEB;
+        color: #000000;
+        border: 2px solid #000000;
+        font-size: 0.75rem;
+        font-weight: 600;
+        transition: all 0.2s;
+        text-decoration: none;
+        display: inline-block;
+    }
+    .daily-records-table tbody td .view-btn:hover {
+        background: #7bb8d8;
+        transform: scale(1.05);
+        color: #000000;
+        text-decoration: none;
+    }
+    
+    /* ============================================
+       SUBMITTED BY STYLING
+    ============================================ */
+    .daily-records-table tbody td .submitted-by {
+        font-weight: 500;
+        color: #000000;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .daily-records-table tbody td .submitted-by .user-avatar {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        background: #87CEEB;
+        color: #000000;
+        border-radius: 50%;
+        border: 1px solid #000000;
+        font-size: 11px;
+        font-weight: 700;
+        flex-shrink: 0;
+        text-transform: uppercase;
+    }
+    
+    .daily-records-table tbody td .submitted-by .submitter-name {
+        font-weight: 500;
+    }
+    
+    .daily-records-table tbody td .submitted-by .submitter-extra {
+        font-size: 0.7rem;
+        color: #666;
+        font-weight: 400;
+        background: #f0f0f0;
+        padding: 1px 8px;
+        border-radius: 50px;
+        border: 1px solid #000000;
+        margin-left: 2px;
+    }
+    
+    .daily-records-table tbody td .submitted-by .submitter-tooltip {
+        cursor: help;
+        border-bottom: 1px dashed #999;
+    }
+    
+    /* Multiple submitters tooltip */
+    .submitter-tooltip-list {
+        display: none;
+        position: absolute;
+        background: white;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 8px 12px;
+        min-width: 150px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 100;
+        font-weight: 400;
+    }
+    
+    .submitter-tooltip-list.show {
+        display: block;
+    }
+    
+    .submitter-tooltip-list .tooltip-item {
+        padding: 2px 0;
+        font-size: 0.85rem;
+    }
+    
+    .submitter-tooltip-list .tooltip-item:not(:last-child) {
+        border-bottom: 1px solid #eee;
+    }
+    
+    /* ============================================
+       CATEGORY BADGES
+    ============================================ */
+    .category-badge {
+        padding: 2px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        display: inline-block;
+        border: 1px solid #000000;
+    }
+    .category-badge.rent { background: #dbeafe; color: #1e40af; }
+    .category-badge.salary { background: #d1fae5; color: #065f46; }
+    .category-badge.transport { background: #fef3c7; color: #92400e; }
+    .category-badge.utilities { background: #fce4ec; color: #c62828; }
+    .category-badge.supplies { background: #e8eaf6; color: #283593; }
+    .category-badge.maintenance { background: #fff3e0; color: #e65100; }
+    .category-badge.marketing { background: #f3e5f5; color: #6a1b9a; }
+    .category-badge.tax { background: #efebe9; color: #4e342e; }
+    .category-badge.insurance { background: #e0f7fa; color: #00695c; }
+    .category-badge.other { background: #eceff1; color: #455a64; }
+    
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+    }
+    
+    .card-header h6 {
+        color: #000000;
+        font-weight: 600;
+    }
+    
+    .card-footer {
+        border-top: 2px solid #000000;
+        background-color: #f8f9fa;
+    }
+    
+    /* ============================================
+       QUICK ADD BUTTON
+    ============================================ */
+    .quick-add-btn {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: #dc3545;
+        color: white;
+        border: 2px solid #000000;
+        font-size: 28px;
+        box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
+        transition: all 0.3s;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        text-decoration: none;
+    }
+    .quick-add-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 20px rgba(220, 53, 69, 0.6);
+        color: white;
+        text-decoration: none;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .daily-records-table thead th,
+        .daily-records-table tbody td {
+            padding: 8px 10px;
+            font-size: 0.8rem;
+        }
+        .daily-records-table tbody td .date-number {
+            font-size: 0.95rem;
+        }
+        .daily-records-table tbody td .expense-amount {
+            font-size: 0.95rem;
+        }
+        .stat-card .stat-value {
+            font-size: 1.5rem;
+        }
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 12px;
+        }
+        .table-excel th {
+            font-size: 11px;
+        }
+        .btn-sm {
+            font-size: 10px;
+            padding: 2px 6px;
+        }
+        .badge {
+            font-size: 10px;
+            padding: 2px 6px;
+        }
+        .daily-records-table tbody td .submitted-by .user-avatar {
+            width: 22px;
+            height: 22px;
+            font-size: 9px;
+        }
+    }
+    
+    @media (max-width: 576px) {
+        .daily-records-table thead {
+            display: none;
+        }
+        .daily-records-table tbody tr {
+            display: block;
+            margin-bottom: 10px;
+            border: 2px solid #000000;
+            border-radius: 4px;
+            padding: 10px;
+            background: white;
+        }
+        .daily-records-table tbody tr.today {
+            border-left: 4px solid #dc3545;
+        }
+        .daily-records-table tbody td {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 10px;
+            border: none;
+            border-bottom: 1px solid #000000;
+        }
+        .daily-records-table tbody td:last-child {
+            border-bottom: none;
+        }
+        .daily-records-table tbody td .date-number {
+            font-size: 0.9rem;
+        }
+        .daily-records-table tbody td .expense-amount {
+            font-size: 0.9rem;
+        }
+        .daily-records-table tbody td .view-btn {
+            font-size: 0.7rem;
+            padding: 3px 10px;
+        }
+        .daily-records-table tbody td .submitted-by {
+            flex-wrap: wrap;
+        }
+        .daily-records-table tbody td .submitted-by .user-avatar {
+            width: 20px;
+            height: 20px;
+            font-size: 8px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            <i class="fas fa-receipt text-danger"></i> Expenses
+            <small class="text-muted fs-6">Daily expense tracking</small>
+        </h1>
+        <div>
+            <a href="{% url 'company-expenses-create' %}" class="btn btn-danger btn-sm">
+                <i class="fas fa-plus"></i> Add Expense
+            </a>
+            <a href="{% url 'company-expenses-dashboard' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-sync"></i> Refresh
+            </a>
+        </div>
+    </div>
+    
+    <!-- Filter Form -->
+    <div class="filter-form">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Branch</label>
+                <select name="branch" class="form-select form-select-sm">
+                    <option value="">All Branches</option>
+                    {% for branch in branches %}
+                    <option value="{{ branch.id }}" {% if selected_branch == branch.id|stringformat:"s" %}selected{% endif %}>
+                        {{ branch.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Date From</label>
+                <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Date To</label>
+                <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}">
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-danger btn-sm w-100">
+                    <i class="fas fa-filter"></i> Apply Filter
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <!-- Today's Expenses Count -->
+        <div class="col-md-3 mb-3">
+            <div class="stat-card">
+                <div class="stat-label">Today's Expenses</div>
+                <div class="stat-value">{{ today_summary.total_expenses|default:"0" }}</div>
+                <small class="text-muted">Transactions</small>
+            </div>
+        </div>
+        <!-- Today's Total -->
+        <div class="col-md-3 mb-3">
+            <div class="stat-card">
+                <div class="stat-label">Today's Total</div>
+                <div class="stat-value">KSh {{ today_summary.total_amount|floatformat:2|default:"0.00" }}</div>
+                <small class="text-muted">Total spent today</small>
+            </div>
+        </div>
+        <!-- Week Total -->
+        <div class="col-md-3 mb-3">
+            <div class="stat-card">
+                <div class="stat-label">Week Total</div>
+                <div class="stat-value">KSh {{ week_summary.total_amount|floatformat:2|default:"0.00" }}</div>
+                <small class="text-muted">This week</small>
+            </div>
+        </div>
+        <!-- Month Total -->
+        <div class="col-md-3 mb-3">
+            <div class="stat-card">
+                <div class="stat-label">Month Total</div>
+                <div class="stat-value">KSh {{ month_summary.total_amount|floatformat:2|default:"0.00" }}</div>
+                <small class="text-muted">This month</small>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Category Breakdown -->
+    {% if category_breakdown %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h6 class="mb-0"><i class="fas fa-chart-pie"></i> Expenses by Category</h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% for key, data in category_breakdown.items %}
+                <div class="col-md-3 col-sm-6 mb-2">
+                    <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded" style="border: 1px solid #000000;">
+                        <span class="category-badge {{ key }}">{{ data.label }}</span>
+                        <span class="fw-bold">KSh {{ data.amount|floatformat:2|default:"0.00" }}</span>
+                        <span class="badge bg-secondary" style="border: 1px solid #000000; background-color: #f8f9fa !important; color: #000000;">{{ data.count }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Daily Records Table -->
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="fas fa-calendar-day"></i> Daily Records</h6>
+                <span class="badge" style="background-color: #dc3545; color: white; border: 1px solid #000000;">{{ daily_records|length }} days</span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="border: 2px solid #000000;">
+                <table class="daily-records-table table-excel" id="expensesTable">
+                    <thead>
+                        <tr>
+                            <th class="sortable-header" data-sort="date" onclick="sortTable('date')">
+                                Date
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="sortable-header" data-sort="day" onclick="sortTable('day')">
+                                Day
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="sortable-header" data-sort="submitted_by" onclick="sortTable('submitted_by')">
+                                Submitted By
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-center sortable-header" data-sort="count" onclick="sortTable('count')">
+                                Expenses
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="amount" onclick="sortTable('amount')">
+                                Total Amount
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in daily_records %}
+                        <tr class="{% if record.is_today %}today{% endif %}" 
+                            data-date="{{ record.date|date:'Y-m-d' }}" 
+                            data-day="{{ record.day_name }}" 
+                            data-submitted_by="{{ record.submitted_by_full|default:'N/A' }}"
+                            data-count="{{ record.expense_count }}" 
+                            data-amount="{{ record.total_amount }}">
+                            <td>
+                                <div class="date-number">
+                                    {{ record.date|date:"d" }}
+                                    <span class="date-month">{{ record.date|date:"M Y" }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="day-name">{{ record.day_name }}</span>
+                                {% if record.is_today %}
+                                <span class="today-badge">Today</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if record.submitter_count > 0 %}
+                                <div class="submitted-by">
+                                    {% with submitters=record.submitters %}
+                                        {% for submitter in submitters %}
+                                            {% if forloop.first %}
+                                                {% with first_name=submitter.created_by__first_name last_name=submitter.created_by__last_name username=submitter.created_by__username %}
+                                                <span class="user-avatar" title="{{ first_name|default:username }}">
+                                                    {% if first_name %}
+                                                        {{ first_name|first }}{{ last_name|first }}
+                                                    {% else %}
+                                                        {{ username|first|upper }}
+                                                    {% endif %}
+                                                </span>
+                                                <span class="submitter-name">
+                                                    {% if first_name or last_name %}
+                                                        {{ first_name }} {{ last_name }}
+                                                    {% else %}
+                                                        {{ username }}
+                                                    {% endif %}
+                                                </span>
+                                                {% endwith %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        {% if record.submitter_count > 1 %}
+                                        <span class="submitter-extra" 
+                                              data-bs-toggle="tooltip" 
+                                              data-bs-placement="top"
+                                              title="
+                                                {% for submitter in submitters %}
+                                                    {% with first_name=submitter.created_by__first_name last_name=submitter.created_by__last_name username=submitter.created_by__username %}
+                                                        {{ first_name|default:username }} {{ last_name }}
+                                                        {% if not forloop.last %}, {% endif %}
+                                                    {% endwith %}
+                                                {% endfor %}
+                                              ">
+                                            +{{ record.submitter_count|add:"-1" }} more
+                                        </span>
+                                        {% endif %}
+                                    {% endwith %}
+                                </div>
+                                {% else %}
+                                <span class="text-muted">N/A</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <span class="expense-count">{{ record.expense_count }}</span>
+                            </td>
+                            <td class="text-end">
+                                <span class="expense-amount {% if record.total_amount == 0 %}zero{% endif %}">
+                                    KSh {{ record.total_amount|floatformat:0|default:"0" }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <a href="{% url 'company-expenses-daily-detail' record.date|date:'Y-m-d' %}" class="view-btn">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-4">
+                                <i class="fas fa-receipt fa-2x text-muted d-block mb-3"></i>
+                                <p class="text-muted">No expenses recorded</p>
+                                <a href="{% url 'company-expenses-create' %}" class="btn btn-danger btn-sm">
+                                    <i class="fas fa-plus"></i> Add First Expense
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer">
+            <small>Showing {{ daily_records|length }} days with expenses</small>
+            <span class="float-end">
+                <a href="{% url 'company-expenses-dashboard' %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Add Button (Floating) -->
+<a href="{% url 'company-expenses-create' %}" class="quick-add-btn" title="Quick Add Expense">
+    <i class="fas fa-plus"></i>
+</a>
+
+<script>
+// Sorting state
+let sortState = {
+    column: null,
+    direction: 'asc'
+};
+
+// Sort table function
+function sortTable(column) {
+    const tbody = document.querySelector('#expensesTable tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    // Skip if no rows or empty state row
+    if (rows.length === 0 || rows[0].cells.length === 1) return;
+    
+    // Determine sort direction
+    let direction = 'asc';
+    if (sortState.column === column) {
+        direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+    }
+    sortState.column = column;
+    sortState.direction = direction;
+    
+    // Update header icons
+    document.querySelectorAll('.sortable-header').forEach(header => {
+        header.classList.remove('active', 'asc', 'desc');
+        const icon = header.querySelector('.sort-icon');
+        if (header.dataset.sort === column) {
+            header.classList.add('active', direction);
+        } else {
+            icon.textContent = '';
+        }
+    });
+    
+    // Sort rows
+    rows.sort((a, b) => {
+        let valueA, valueB;
+        
+        switch(column) {
+            case 'date':
+                valueA = new Date(a.dataset.date) || new Date(0);
+                valueB = new Date(b.dataset.date) || new Date(0);
+                break;
+            case 'day':
+                valueA = a.dataset.day || '';
+                valueB = b.dataset.day || '';
+                break;
+            case 'submitted_by':
+                valueA = a.dataset.submitted_by || '';
+                valueB = b.dataset.submitted_by || '';
+                break;
+            case 'count':
+                valueA = parseInt(a.dataset.count) || 0;
+                valueB = parseInt(b.dataset.count) || 0;
+                break;
+            case 'amount':
+                valueA = parseFloat(a.dataset.amount) || 0;
+                valueB = parseFloat(b.dataset.amount) || 0;
+                break;
+            default:
+                return 0;
+        }
+        
+        // Compare values
+        let comparison = 0;
+        if (typeof valueA === 'number' && typeof valueB === 'number') {
+            comparison = valueA - valueB;
+        } else if (valueA instanceof Date && valueB instanceof Date) {
+            comparison = valueA.getTime() - valueB.getTime();
+        } else {
+            comparison = String(valueA).localeCompare(String(valueB), undefined, { sensitivity: 'base' });
+        }
+        
+        return direction === 'asc' ? comparison : -comparison;
+    });
+    
+    // Re-append sorted rows
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+// Initialize Bootstrap tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize tooltips
+    if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function(tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    }
+    
+    // Sort by date descending (newest first) on load
+    sortState.column = 'date';
+    sortState.direction = 'desc';
+    const dateHeader = document.querySelector('[data-sort="date"]');
+    if (dateHeader) {
+        dateHeader.classList.add('active', 'desc');
+        const icon = dateHeader.querySelector('.sort-icon');
+        icon.textContent = '▼';
+    }
+    sortTable('date');
+});
+
+// Keyboard shortcut: Escape to clear any active filters (if search is added later)
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        // Any search/filter functionality can be cleared here
+    }
+});
+
+// Auto-refresh every 5 minutes
+setTimeout(function() {
+    location.reload();
+}, 300000);
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Additional JavaScript can go here
+    // If you need to handle custom tooltip behavior for the "more" indicator
+    document.addEventListener('DOMContentLoaded', function() {
+        // You can add custom logic here for the submitter tooltips
+        const moreIndicators = document.querySelectorAll('.submitter-extra');
+        moreIndicators.forEach(function(indicator) {
+            indicator.addEventListener('click', function(e) {
+                e.stopPropagation();
+                // Toggle a custom tooltip or modal showing all submitters
+                // This can be expanded as needed
+            });
+        });
+    });
+</script>
+{% endblock %}

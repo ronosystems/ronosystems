@@ -1,0 +1,222 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Purchase{% endblock %}
+
+{% block page_title %}Create Purchase{% endblock %}
+{% block page_subtitle %}Record a new purchase using COGS balance{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 20px;
+        margin-bottom: 20px;
+        background: white;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .form-card .form-label {
+        font-weight: 600;
+        color: #000000;
+    }
+    .form-card .form-control,
+    .form-card .form-select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+    }
+    .form-card .form-control:focus,
+    .form-card .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .form-card .form-control-file {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 8px;
+        width: 100%;
+    }
+    .balance-display {
+        background: #f8f9fa;
+        padding: 15px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        text-align: center;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .balance-display .amount {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #007bff;
+    }
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    .required-field::after {
+        content: " *";
+        color: #dc3545;
+        font-weight: bold;
+    }
+    .file-preview {
+        margin-top: 10px;
+        padding: 10px;
+        border: 2px dashed #000000;
+        border-radius: 4px;
+        text-align: center;
+        display: none;
+        background: #f8f9fa;
+    }
+    .file-preview img {
+        max-width: 200px;
+        max-height: 150px;
+        border: 1px solid #000000;
+        border-radius: 4px;
+    }
+    .file-preview .file-name {
+        display: block;
+        margin-top: 5px;
+        font-weight: 600;
+        color: #000000;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Navigation -->
+    <div class="mb-3">
+        <a href="{% url 'finance-dashboard' %}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Current Balance -->
+    <div class="balance-display mb-4">
+        <h6>Available COGS Balance</h6>
+        <div class="amount">KSh {{ current_balance|floatformat:2|default:"0.00" }}</div>
+    </div>
+
+    <!-- Purchase Form -->
+    <div class="form-card">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <!-- Branch -->
+            <div class="mb-3">
+                <label class="form-label required-field">Branch</label>
+                <select name="branch" class="form-select" required>
+                    <option value="">Select Branch</option>
+                    {% for branch in branches %}
+                    <option value="{{ branch.id }}">{{ branch.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Purchase Type -->
+            <div class="mb-3">
+                <label class="form-label required-field">Purchase Type</label>
+                <select name="purchase_type" class="form-select" required>
+                    <option value="">Select Type</option>
+                    {% for type in purchase_types %}
+                    <option value="{{ type.0 }}">{{ type.1 }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Amount -->
+            <div class="mb-3">
+                <label class="form-label required-field">Amount (KSh)</label>
+                <input type="number" name="amount" class="form-control" step="0.01" placeholder="0.00" required>
+            </div>
+
+            <!-- Reference -->
+            <div class="mb-3">
+                <label class="form-label required-field">Reference</label>
+                <input type="text" name="reference" class="form-control" placeholder="Receipt/Invoice Number" required>
+            </div>
+
+            <!-- Description -->
+            <div class="mb-3">
+                <label class="form-label required-field">Description</label>
+                <textarea name="description" class="form-control" rows="2" placeholder="Brief description" required></textarea>
+            </div>
+
+            <!-- Receipt Upload -->
+            <div class="mb-3">
+                <label class="form-label required-field">Receipt Image</label>
+                <input type="file" name="receipt_image" class="form-control-file" accept="image/*" onchange="previewImage(this)" required>
+                <small class="text-muted">Upload a receipt image (JPEG, PNG, GIF) - Optional</small>
+                <div class="file-preview" id="filePreview">
+                    <img id="previewImg" src="#" alt="Receipt Preview">
+                    <span class="file-name" id="fileName"></span>
+                </div>
+            </div>
+
+            <!-- Hidden fields -->
+            <input type="hidden" name="cogs_account" value="{{ cogs_accounts.first.id }}">
+            <input type="hidden" name="purchase_date" value="{{ today|date:'Y-m-d' }}">
+            <input type="hidden" name="tax" value="0">
+            <input type="hidden" name="total_amount" value="0">
+            <input type="hidden" name="payment_method" value="cash">
+            <input type="hidden" name="supplier_name" value="Walk-in Supplier">
+            <input type="hidden" name="notes" value="">
+
+            <!-- Buttons -->
+            <button type="submit" class="btn btn-primary w-100">
+                <i class="fas fa-save"></i> Create Purchase
+            </button>
+            <a href="{% url 'finance-dashboard' %}" class="btn btn-secondary w-100 mt-2">
+                <i class="fas fa-times"></i> Cancel
+            </a>
+        </form>
+    </div>
+</div>
+
+<script>
+function previewImage(input) {
+    const preview = document.getElementById('filePreview');
+    const img = document.getElementById('previewImg');
+    const fileName = document.getElementById('fileName');
+    
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            img.src = e.target.result;
+            fileName.textContent = input.files[0].name;
+            preview.style.display = 'block';
+        }
+        
+        reader.readAsDataURL(input.files[0]);
+    } else {
+        preview.style.display = 'none';
+        img.src = '#';
+        fileName.textContent = '';
+    }
+}
+</script>
+{% endblock %}

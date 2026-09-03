@@ -1,0 +1,726 @@
+{% extends 'base.html' %}
+
+{% block title %}RS{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE TABLE STYLING
+    ============================================ */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    
+    .table-excel thead th {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table-excel tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+
+    /* ============================================
+       STAT CARDS
+    ============================================ */
+    .stat-card {
+        border-radius: 4px;
+        padding: 20px;
+        transition: transform 0.3s, box-shadow 0.3s;
+        cursor: pointer;
+        border: 2px solid #000000;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    .stat-card.bg-primary { background: #87CEEB !important; color: #000000 !important; }
+    .stat-card.bg-success { background: #d4edda !important; color: #155724 !important; }
+    .stat-card.bg-warning { background: #fff3cd !important; color: #000000 !important; }
+    .stat-card.bg-danger { background: #f8d7da !important; color: #721c24 !important; }
+    .stat-card.bg-info { background: #cce5ff !important; color: #004085 !important; }
+    
+    .stat-card .stat-icon {
+        font-size: 2.5rem;
+        opacity: 0.5;
+        color: #000000;
+    }
+    .stat-card h2 {
+        color: #000000;
+        font-weight: 700;
+    }
+    .stat-card small {
+        color: #000000;
+    }
+    .stat-card.bg-danger h2,
+    .stat-card.bg-danger small {
+        color: #721c24;
+    }
+    .stat-card.bg-success h2,
+    .stat-card.bg-success small {
+        color: #155724;
+    }
+    
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+        color: #000000 !important;
+        border-radius: 0 !important;
+    }
+    
+    .card-header h6 {
+        color: #000000 !important;
+        font-weight: 600;
+        margin: 0;
+    }
+    
+    .card-body {
+        color: #000000;
+    }
+    
+    .card-body.text-center h5,
+    .card-body.text-center h3 {
+        color: #000000;
+    }
+    
+    .card-body.text-center small {
+        color: #000000;
+    }
+    
+    /* ============================================
+       BADGES
+    ============================================ */
+    .badge {
+        padding: 4px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    
+    .badge.bg-primary {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+    }
+    
+    .badge.bg-success {
+        background-color: #d4edda !important;
+        color: #155724 !important;
+    }
+    
+    .badge.bg-warning {
+        background-color: #fff3cd !important;
+        color: #856404 !important;
+    }
+    
+    .badge.bg-danger {
+        background-color: #f8d7da !important;
+        color: #721c24 !important;
+    }
+    
+    .badge.bg-info {
+        background-color: #cce5ff !important;
+        color: #004085 !important;
+    }
+    
+    .badge.bg-secondary {
+        background-color: #f8f9fa !important;
+        color: #000000 !important;
+    }
+    
+    .badge-low-stock {
+        background: #fff3cd;
+        color: #856404;
+        padding: 5px 12px;
+        border-radius: 50px;
+        font-size: 11px;
+        border: 1px solid #000000;
+        font-weight: 600;
+    }
+    .badge-in-stock {
+        background: #d4edda;
+        color: #155724;
+        padding: 5px 12px;
+        border-radius: 50px;
+        font-size: 11px;
+        border: 1px solid #000000;
+        font-weight: 600;
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-success {
+        background-color: #d4edda;
+        border: 2px solid #000000;
+        color: #155724;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-success:hover {
+        background-color: #c3e6cb;
+        border-color: #000000;
+        color: #155724;
+    }
+    
+    .btn-info {
+        background-color: #cce5ff;
+        border: 2px solid #000000;
+        color: #004085;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-info:hover {
+        background-color: #b8d4f0;
+        border-color: #000000;
+        color: #004085;
+    }
+    
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-danger {
+        background-color: #f8d7da;
+        border: 2px solid #000000;
+        color: #721c24;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-danger:hover {
+        background-color: #f5c6cb;
+        border-color: #000000;
+        color: #721c24;
+    }
+    
+    .btn-sm {
+        padding: 4px 12px;
+        font-size: 12px;
+    }
+    
+    /* ============================================
+       QUICK ACTIONS
+    ============================================ */
+    .quick-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    /* ============================================
+       LIST GROUP
+    ============================================ */
+    .list-group-item {
+        border: 1px solid #000000;
+        background: #ffffff;
+        color: #000000;
+        padding: 10px 15px;
+    }
+    
+    .list-group-item:first-child {
+        border-top: 0;
+    }
+    
+    .list-group-item:last-child {
+        border-bottom: 0;
+    }
+    
+    .list-group-item strong {
+        color: #000000;
+    }
+    
+    .list-group-item small {
+        color: #000000;
+    }
+    
+    .list-group-item .text-muted {
+        color: #000000 !important;
+    }
+    
+    .branch-indicator {
+        font-size: 11px;
+        color: #6c757d;
+        background: #f8f9fa;
+        padding: 2px 8px;
+        border-radius: 50px;
+        border: 1px solid #000000;
+        display: inline-block;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 11px;
+        }
+        .table-excel th {
+            font-size: 10px;
+        }
+        .stat-card h2 {
+            font-size: 1.5rem;
+        }
+        .stat-card .stat-icon {
+            font-size: 1.8rem;
+        }
+        .card-header h6 {
+            font-size: 0.9rem;
+        }
+        .btn-sm {
+            font-size: 10px;
+            padding: 3px 8px;
+        }
+        .badge {
+            font-size: 9px;
+            padding: 2px 6px;
+        }
+        .badge-low-stock {
+            font-size: 9px;
+            padding: 3px 8px;
+        }
+    }
+    
+    @media (max-width: 576px) {
+        .stat-card {
+            padding: 12px;
+        }
+        .stat-card h2 {
+            font-size: 1.2rem;
+        }
+        .stat-card .stat-icon {
+            font-size: 1.5rem;
+        }
+        .card-body.text-center h3 {
+            font-size: 1.2rem;
+        }
+        .card-body.text-center h5 {
+            font-size: 0.9rem;
+        }
+        .quick-actions {
+            flex-direction: column;
+        }
+        .quick-actions .btn {
+            width: 100%;
+            text-align: center;
+        }
+        .table-excel th,
+        .table-excel td {
+            padding: 3px 4px;
+            font-size: 9px;
+        }
+        .table-excel th {
+            font-size: 8px;
+        }
+        .list-group-item {
+            font-size: 12px;
+            padding: 8px 10px;
+        }
+        .badge-low-stock {
+            font-size: 8px;
+            padding: 2px 6px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+            <div>
+                <h3><i class="fas fa-store" style="color: #000000;"></i> Main Dashboard</h3>
+                <p class="text-muted" style="color: #000000 !important;">{{ company.name }}</p>
+                {% if user_branch %}
+                    <span class="branch-indicator"><i class="fas fa-store"></i> {{ user_branch.name }}</span>
+                {% endif %}
+                <span class="badge bg-primary ms-1">{{ user_role|title }}</span>
+            </div>
+            <div>
+                <span class="badge bg-primary">{{ business_type.name }}</span>
+            </div>
+        </div>
+
+        <!-- ============================================
+        STATS CARDS - Role-based visibility
+        ============================================ -->
+        
+        {% if is_admin or user_role == 'company_cashier' or user_role == 'company_staff' %}
+        <div class="row mb-4">
+            <div class="col-md-3 col-6 mb-3">
+                <div class="card stat-card bg-primary">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h2 class="mb-0">{{ stats.total_products }}</h2>
+                                <small>Total Products</small>
+                            </div>
+                            <div class="stat-icon"><i class="fas fa-box"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6 mb-3">
+                <div class="card stat-card bg-success">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h2 class="mb-0">{{ stats.total_sales }}</h2>
+                                <small>Total Sales</small>
+                            </div>
+                            <div class="stat-icon"><i class="fas fa-shopping-cart"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6 mb-3">
+                <div class="card stat-card bg-warning">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h2 class="mb-0">KSh {{ stats.total_revenue|floatformat:0 }}</h2>
+                                <small>Total Revenue</small>
+                            </div>
+                            <div class="stat-icon"><i class="fas fa-money-bill-wave"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6 mb-3">
+                <div class="card stat-card bg-danger">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h2 class="mb-0">{{ stats.low_stock }}</h2>
+                                <small>Low Stock Items</small>
+                            </div>
+                            <div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- ============================================
+        AGENT STATS - Only for Agents
+        ============================================ -->
+        {% if user_role == 'company_agent' %}
+        <div class="row mb-4">
+            <div class="col-md-4 mb-3">
+                <div class="card stat-card bg-info">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h2 class="mb-0">{{ stats.agent_units }}</h2>
+                                <small>My Units</small>
+                            </div>
+                            <div class="stat-icon"><i class="fas fa-qrcode"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card stat-card bg-success">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h2 class="mb-0">{{ stats.agent_available }}</h2>
+                                <small>Available</small>
+                            </div>
+                            <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card stat-card bg-warning">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h2 class="mb-0">{{ stats.agent_sold }}</h2>
+                                <small>Sold</small>
+                            </div>
+                            <div class="stat-icon"><i class="fas fa-shopping-cart"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- ============================================
+        QUICK STATS ROW 2
+        ============================================ -->
+        {% if user.role == 'company_manager' or user.role == 'company_admin'%}
+        <div class="row mb-4">
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5>Today</h5>
+                        <h3>{{ stats.today_sales }}</h3>
+                        <small class="text-muted">Sales</small>
+                        <h5 class="mt-2">KSh {{ stats.today_revenue|floatformat:0 }}</h5>
+                        <small class="text-muted">Revenue</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5>This Week</h5>
+                        <h3>{{ stats.week_sales }}</h3>
+                        <small class="text-muted">Sales</small>
+                        <h5 class="mt-2">KSh {{ stats.total_revenue|floatformat:0 }}</h5>
+                        <small class="text-muted">Revenue</small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5>Products</h5>
+                        <div class="row">
+                            <div class="col-4">
+                                <i class="fas fa-laptop" style="color: #000000;"></i>
+                                <h6>{{ stats.electronics }}</h6>
+                                <small>Electronics</small>
+                            </div>
+                            <div class="col-4">
+                                <i class="fas fa-mobile-alt" style="color: #000000;"></i>
+                                <h6>{{ stats.phones }}</h6>
+                                <small>Phones</small>
+                            </div>
+                            <div class="col-4">
+                                <i class="fas fa-headphones" style="color: #000000;"></i>
+                                <h6>{{ stats.accessories }}</h6>
+                                <small>Accessories</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- ============================================
+        QUICK ACTIONS - Role-based
+        ============================================ -->
+        {% if is_admin or user_role == 'company_cashier' or user_role == 'company_agent' %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-bolt" style="color: #000000;"></i> Quick Actions</h6>
+            </div>
+            <div class="card-body">
+                <div class="quick-actions">
+                    
+                    <!-- New Sale -->
+                    {% if user.role == 'company_agent' %}
+                    <a href="/epa_shop/sales/single/" class="btn btn-success btn-sm">
+                        <i class="fas fa-cart-plus"></i> New Sale
+                    </a>
+                    {% endif %}
+                    
+                    <!-- POS -->
+                    {% if user.role == 'company_cashier'%}
+                    <a href="/epa_shop/pos/" class="btn btn-info btn-sm">
+                        <i class="fas fa-shopping-cart"></i> POS
+                    </a>
+                    {% endif %}
+                    
+                    <!-- Inventory -->
+                    {% if user.role == 'company_manager' or user.role == 'company_admin'%}
+                    <a href="/epa_shop/inventory/" class="btn btn-info btn-sm">
+                        <i class="fas fa-warehouse"></i> Inventory
+                    </a>
+                    {% endif %}
+
+                    <!-- Products -->
+                    {% if user.role == 'company_manager' or user.role == 'company_admin'%}
+                    <a href="/epa_shop/products/" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-box"></i> Products
+                    </a>
+                    {% endif %}
+                    
+                    <!-- Product creation -->
+                    {% if user.role == 'company_manager' or user.role == 'company_admin'%}
+                    <a href="/epa_shop/products/add/" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus"></i> Add Product
+                    </a>
+                    {% endif %}
+
+                    <!-- Expenses -->
+                    {% if user.role == 'company_manager' or user.role == 'company_admin'%}
+                    <a href="/company/expenses/" class="btn btn-danger btn-sm">
+                        <i class="fas fa-chart-bar"></i> Expenses
+                    </a>
+                    {% endif %}
+                    
+                    <!-- Reports -->
+                    {% if user.role == 'company_admin'%}
+                    <a href="/company/reports/" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-chart-bar"></i> Reports
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- ============================================
+        RECENT SALES & LOW STOCK
+        ============================================ -->
+        <div class="row">
+            <div class="{% if is_admin or user_role == 'company_cashier' or user_role == 'company_staff' %}col-md-8{% else %}col-md-12{% endif %}">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-clock" style="color: #000000;"></i> Recent Sales</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive" style="border: 2px solid #000000;">
+                            <table class="table-excel table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Sale ID</th>
+                                        <th>Customer</th>
+                                        <th>Items</th>
+                                        <th>Total</th>
+                                        <th>Status</th>
+                                        <th>Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for sale in recent_sales %}
+                                    <tr>
+                                        <td>{{ sale.company_sale_id }}</td>
+                                        <td>{{ sale.customer_name }}</td>
+                                        <td>{{ sale.item_count }}</td>
+                                        <td>KSh {{ sale.net_amount|floatformat:0 }}</td>
+                                        <td>
+                                            <span class="badge bg-{% if sale.payment_status == 'paid' %}success{% elif sale.payment_status == 'pending' %}warning{% else %}danger{% endif %}">
+                                                {{ sale.payment_status|title }}
+                                            </span>
+                                        </td>
+                                        <td>{{ sale.sale_date|date:"Y-m-d H:i" }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="6" class="text-center py-3">
+                                            <i class="fas fa-info-circle" style="color: #000000;"></i>
+                                            <span style="color: #000000;"> No sales recorded yet.</span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Low Stock Alerts - Only for Admins, Managers, Cashiers -->
+            {% if user.role == 'company_manager' or user.role == 'company_admin'%}
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-exclamation-circle" style="color: #dc3545;"></i> Low Stock Alerts</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="list-group list-group-flush">
+                            {% for product in low_stock_products %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ product.name }}</strong>
+                                    <br>
+                                    <small>Stock: {{ product.quantity }}</small>
+                                    {% if product.branch %}
+                                        <br>
+                                        <small class="text-muted"><i class="fas fa-store"></i> {{ product.branch }}</small>
+                                    {% endif %}
+                                </div>
+                                <span class="badge-low-stock">Low Stock</span>
+                            </div>
+                            {% empty %}
+                            <div class="list-group-item text-center py-3">
+                                <i class="fas fa-check-circle" style="color: #28a745;"></i>
+                                <span style="color: #000000;"> All products in stock</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

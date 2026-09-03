@@ -1,0 +1,2140 @@
+{% extends 'base.html' %}
+
+{% block title %}RS{% endblock %}
+
+{% block page_title %}Point of Sale{% endblock %}
+{% block page_subtitle %}Process customer sales{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE STYLING
+    ============================================ */
+    .pos-wrapper {
+        background: #f8f9fa;
+        border-radius: 4px;
+        padding: 15px;
+        border: 2px solid #000000;
+        min-height: calc(100vh - 250px);
+    }
+    
+    .pos-container {
+        display: grid;
+        grid-template-columns: 1fr 380px;
+        gap: 20px;
+        height: calc(100vh - 280px);
+        min-height: 500px;
+    }
+    
+    /* ============================================
+       PRODUCTS SECTION
+    ============================================ */
+    .pos-products {
+        background: rgb(43, 92, 88);
+        border-radius: 4px;
+        padding: 15px;
+        overflow-y: auto;
+        border: 2px solid #000000;
+    }
+    
+    .pos-products-header {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    .pos-products-header input,
+    .pos-products-header select {
+        padding: 8px 12px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 14px;
+        flex: 1;
+        min-width: 150px;
+        background: white;
+        color: #000000;
+    }
+    .pos-products-header input:focus,
+    .pos-products-header select:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .pos-products-header .btn-refresh {
+        padding: 8px 15px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        color: #000000;
+        cursor: pointer;
+        transition: all 0.3s;
+        white-space: nowrap;
+        font-weight: 600;
+    }
+    .pos-products-header .btn-refresh:hover {
+        background: #87CEEB;
+        border-color: #000000;
+    }
+    
+    .pos-products-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 12px;
+    }
+    
+    /* ============================================
+       PRODUCT CARDS
+    ============================================ */
+    .product-card {
+        background: #fcfdfd;
+        border-radius: 4px;
+        padding: 14px;
+        cursor: pointer;
+        transition: all 0.3s;
+        border: 2px solid #000000;
+        position: relative;
+        text-align: center;
+    }
+    .product-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        border-color: #87CEEB;
+    }
+    .product-card.out-of-stock {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .product-card.out-of-stock:hover {
+        border-color: #dc3545;
+    }
+    
+    .product-card .product-name {
+        font-weight: 700;
+        font-size: 14px;
+        color: #000000;
+        margin-bottom: 2px;
+    }
+    .product-card .product-model {
+        font-size: 12px;
+        color: #000000;
+        margin-bottom: 4px;
+    }
+    .product-card .product-price {
+        font-weight: 700;
+        color: #000000;
+        font-size: 16px;
+        display: block;
+    }
+    .product-card .product-stock {
+        font-size: 11px;
+        color: #000000;
+        margin-top: 3px;
+    }
+    .product-card .stock-badge {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 50px;
+        font-size: 10px;
+        font-weight: 600;
+        margin-top: 4px;
+        border: 1px solid #000000;
+    }
+    .stock-badge.in-stock { background: #d4edda; color: #155724; }
+    .stock-badge.low-stock { background: #fff3cd; color: #856404; }
+    .stock-badge.out-of-stock { background: #f8d7da; color: #721c24; }
+    
+    .product-card .out-of-stock-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255,255,255,0.7);
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        color: #dc3545;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        border: 2px solid #dc3545;
+    }
+    
+    /* ============================================
+       CART SECTION
+    ============================================ */
+    .pos-cart {
+        background: rgb(43, 92, 88);
+        border-radius: 4px;
+        padding: 15px;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        border: 2px solid #000000;
+    }
+    .pos-cart-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #000000;
+        margin-bottom: 10px;
+    }
+    .pos-cart-header h5 {
+        margin: 0;
+        font-weight: 700;
+        color: #000000;
+    }
+    .pos-cart-header .cart-count {
+        background: #87CEEB;
+        color: #000000;
+        padding: 2px 10px;
+        border-radius: 50px;
+        font-size: 12px;
+        border: 1px solid #000000;
+        font-weight: 600;
+    }
+    
+    .pos-cart-items {
+        flex: 1;
+        overflow-y: auto;
+        margin-bottom: 10px;
+        max-height: 200px;
+        background-color: #f0f8ff;
+    }
+    .cart-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 10px;
+        border-bottom: 1px solid #000000;
+        font-size: 13px;
+    }
+    .cart-item:hover { background: #f8f9fa; }
+    .cart-item .item-name {
+        font-weight: 500;
+        flex: 1;
+        font-size: 13px;
+        color: #000000;
+    }
+    .cart-item .item-unit {
+        font-size: 11px;
+        color: #000000;
+        font-family: monospace;
+    }
+    .cart-item .item-qty {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        margin: 0 10px;
+    }
+    .cart-item .item-qty button {
+        background: white;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        width: 22px;
+        height: 22px;
+        cursor: pointer;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        color: #000000;
+    }
+    .cart-item .item-qty button:hover { background: #87CEEB; }
+    .cart-item .item-price {
+        font-weight: 600;
+        color: #000000;
+        min-width: 70px;
+        text-align: right;
+    }
+    .cart-item .item-remove {
+        background: none;
+        border: none;
+        color: #dc3545;
+        cursor: pointer;
+        font-size: 16px;
+        padding: 0 5px;
+        font-weight: 700;
+    }
+    .cart-item .item-remove:hover { color: #c82333; }
+    .cart-empty {
+        text-align: center;
+        padding: 40px 0;
+        color: #000000;
+    }
+    .cart-empty i {
+        font-size: 3rem;
+        display: block;
+        margin-bottom: 10px;
+        opacity: 0.4;
+        color: #000000;
+    }
+    .cart-empty p {
+        color: #000000;
+    }
+    .cart-empty small {
+        color: #000000;
+    }
+    
+    .pos-cart-totals {
+        border-top: 2px solid #000000;
+        background-color: rgb(252, 252, 252);
+        padding-top: 10px;
+    }
+    .pos-cart-totals .total-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 0;
+        font-size: 14px;
+        color: #000000;
+    }
+    .pos-cart-totals .total-row.grand {
+        font-size: 18px;
+        font-weight: 700;
+        border-top: 3px solid #000000;
+        background-color: rgb(242, 247, 247);
+        padding-top: 8px;
+        margin-top: 4px;
+    }
+    
+    /* ============================================
+       PAYMENT ACTIONS
+    ============================================ */
+    .payment-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 10px;
+    }
+    .payment-actions .btn-payment {
+        padding: 10px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 13px;
+        transition: all 0.3s;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        color: #000000;
+    }
+    .payment-actions .btn-payment i {
+        font-size: 20px;
+    }
+    .payment-actions .btn-payment:hover {
+        border-color: #87CEEB;
+        background: #f0f8ff;
+    }
+    .payment-actions .btn-payment.btn-cash:hover { border-color: #28a745; background: #e8f5e9; }
+    .payment-actions .btn-payment.btn-mpesa:hover { border-color: #25b978; background: #e8f5e9; }
+    .payment-actions .btn-payment.btn-bank:hover { border-color: #007bff; background: #e8f5e9; }
+    .payment-actions .btn-payment.btn-points:hover { border-color: #ffc107; background: #fff8e1; }
+    
+    .pos-cart-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+    }
+    .pos-cart-actions button {
+        flex: 1;
+        padding: 10px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    .pos-cart-actions .btn-clear {
+        background: #f8f9fa;
+        color: #dc3545;
+        flex: 0.5;
+    }
+    .pos-cart-actions .btn-clear:hover { background: #ffe7e9; }
+    .pos-cart-actions .btn-checkout {
+        background: #28a745;
+        color: white;
+    }
+    .pos-cart-actions .btn-checkout:hover { background: #218838; }
+    .pos-cart-actions .btn-checkout:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .pos-customer {
+        margin-bottom: 10px;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 4px;
+        border: 2px solid #000000;
+    }
+    .pos-customer select,
+    .pos-customer input {
+        width: 100%;
+        padding: 6px 10px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 13px;
+        margin-bottom: 5px;
+        background: white;
+        color: #000000;
+    }
+    .pos-customer select:focus,
+    .pos-customer input:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .pos-customer label {
+        color: #000000;
+        font-weight: 600;
+        font-size: 12px;
+    }
+    .pos-customer .branch-display {
+        background: #e7f1ff;
+        padding: 8px 12px;
+        border-radius: 4px;
+        margin-bottom: 10px;
+        border: 2px solid #000000;
+        text-align: center;
+        font-weight: 600;
+        color: #000000;
+    }
+    
+    /* ============================================
+       MODAL STYLES
+    ============================================ */
+    .pos-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 9999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+    }
+    .pos-modal-overlay.active {
+        display: flex;
+    }
+    .pos-modal {
+        background: white;
+        border-radius: 4px;
+        max-width: 500px;
+        width: 95%;
+        max-height: 90vh;
+        overflow-y: auto;
+        padding: 30px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        animation: slideUp 0.3s ease;
+        border: 2px solid #000000;
+    }
+    @keyframes slideUp {
+        from { transform: translateY(30px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+    .pos-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #000000;
+    }
+    .pos-modal-header h3 {
+        margin: 0;
+        font-weight: 700;
+        color: #000000;
+    }
+    .pos-modal-header h3 i {
+        margin-right: 10px;
+    }
+    .pos-modal-close {
+        background: none;
+        border: none;
+        font-size: 28px;
+        cursor: pointer;
+        color: #000000;
+        padding: 0 10px;
+        font-weight: 700;
+    }
+    .pos-modal-close:hover { color: #dc3545; }
+    
+    .pos-modal-body .product-info {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        border: 2px solid #000000;
+    }
+    .pos-modal-body .product-info h4 {
+        margin: 0 0 5px 0;
+        color: #000000;
+    }
+    .pos-modal-body .product-info .details {
+        font-size: 13px;
+        color: #000000;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    .modal-field {
+        margin-bottom: 15px;
+    }
+    .modal-field label {
+        display: block;
+        font-weight: 700;
+        font-size: 14px;
+        margin-bottom: 5px;
+        color: #000000;
+    }
+    .modal-field input,
+    .modal-field select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 14px;
+        background: white;
+        color: #000000;
+    }
+    .modal-field input:focus,
+    .modal-field select:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .modal-field small {
+        color: #000000;
+    }
+    .modal-field .text-danger {
+        color: #dc3545 !important;
+    }
+    .modal-field .text-muted {
+        color: #000000 !important;
+    }
+    
+    /* ============================================
+       PAYMENT MODAL
+    ============================================ */
+    .payment-amount-display {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 4px;
+        text-align: center;
+        margin-bottom: 20px;
+        border: 2px solid #000000;
+    }
+    .payment-amount-display .amount {
+        font-size: 28px;
+        font-weight: 700;
+        color: #000000;
+    }
+    .payment-amount-display .label {
+        font-size: 13px;
+        color: #000000;
+    }
+    
+    .btn-payment-action {
+        width: 100%;
+        padding: 12px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 0.3s;
+        color: #000000;
+    }
+    .btn-payment-action.btn-cash {
+        background: #28a745;
+        color: white;
+    }
+    .btn-payment-action.btn-cash:hover {
+        background: #218838;
+    }
+    .btn-payment-action.btn-mpesa {
+        background: #25b978;
+        color: white;
+    }
+    .btn-payment-action.btn-mpesa:hover {
+        background: #1e9e65;
+    }
+    .btn-payment-action.btn-bank {
+        background: #87CEEB;
+        color: #000000;
+    }
+    .btn-payment-action.btn-bank:hover {
+        background: #7bb8d8;
+    }
+    .btn-payment-action.btn-points {
+        background: #ffc107;
+        color: #000000;
+    }
+    .btn-payment-action.btn-points:hover {
+        background: #e0a800;
+    }
+    .btn-payment-action:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .payment-status {
+        margin-top: 15px;
+        padding: 10px;
+        border-radius: 4px;
+        font-size: 14px;
+        display: none;
+        border: 2px solid #000000;
+    }
+    .payment-status.success {
+        display: block;
+        background: #d4edda;
+        color: #155724;
+        border-color: #000000;
+    }
+    .payment-status.error {
+        display: block;
+        background: #f8d7da;
+        color: #721c24;
+        border-color: #000000;
+    }
+    .payment-status.pending {
+        display: block;
+        background: #fff3cd;
+        color: #856404;
+        border-color: #000000;
+    }
+    
+    .pos-modal-footer {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+        padding-top: 15px;
+        border-top: 2px solid #000000;
+    }
+    .pos-modal-footer button {
+        flex: 1;
+        padding: 12px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    .pos-modal-footer .btn-cancel-modal {
+        background: #f8f9fa;
+        color: #000000;
+        flex: 0.5;
+    }
+    .pos-modal-footer .btn-cancel-modal:hover { background: #87CEEB; }
+    .pos-modal-footer .btn-add-to-cart {
+        background: #87CEEB;
+        color: #000000;
+    }
+    .pos-modal-footer .btn-add-to-cart:hover { background: #7bb8d8; }
+    .pos-modal-footer .btn-add-to-cart:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    /* ============================================
+       TOASTS
+    ============================================ */
+    .success-toast {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        background: #28a745;
+        color: white;
+        padding: 15px 25px;
+        border-radius: 4px;
+        border: 2px solid #000000;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        z-index: 10000;
+        animation: slideInRight 0.3s ease;
+        display: none;
+        font-weight: 600;
+    }
+    @keyframes slideInRight {
+        from { transform: translateX(100px); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    
+    .stock-update-indicator {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #28a745;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 4px;
+        border: 2px solid #000000;
+        z-index: 10001;
+        font-weight: 600;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        animation: slideInRight 0.3s ease;
+        display: none;
+    }
+    
+    /* ============================================
+       SELECTED UNIT DISPLAY
+    ============================================ */
+    .selected-unit {
+        background: #e7f1ff;
+        padding: 10px 15px;
+        border-radius: 4px;
+        margin-top: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border: 2px solid #000000;
+    }
+    .selected-unit .unit-label {
+        font-weight: 600;
+        color: #000000;
+    }
+    .selected-unit .unit-value {
+        font-family: monospace;
+        color: #000000;
+    }
+    .selected-unit .unit-remove {
+        background: none;
+        border: none;
+        color: #dc3545;
+        cursor: pointer;
+        font-size: 18px;
+        font-weight: 700;
+    }
+    
+    /* ============================================
+       UNIT SEARCH
+    ============================================ */
+    .unit-search-container {
+        position: relative;
+    }
+    .unit-search-container .unit-results {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        max-height: 150px;
+        overflow-y: auto;
+        z-index: 100;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        display: none;
+    }
+    .unit-search-container .unit-results.active {
+        display: block;
+    }
+    .unit-result-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        border-bottom: 1px solid #000000;
+        display: flex;
+        justify-content: space-between;
+        font-size: 13px;
+        color: #000000;
+    }
+    .unit-result-item:hover { background: #f8f9fa; }
+    .unit-result-item .unit-id { font-family: monospace; color: #000000; }
+    .unit-result-item .unit-status.available { color: #28a745; }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 992px) {
+        .pos-container {
+            grid-template-columns: 1fr;
+            height: auto;
+        }
+        .pos-cart { height: 400px; }
+        .pos-products-grid {
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        }
+        .pos-modal { max-width: 95%; padding: 20px; }
+        .payment-actions {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .pos-wrapper {
+            padding: 10px;
+        }
+        .pos-products-header {
+            flex-direction: column;
+        }
+        .pos-products-header input,
+        .pos-products-header select {
+            width: 100%;
+            min-width: auto;
+        }
+        .pos-products-header .btn-refresh {
+            width: 100%;
+        }
+        .pos-cart {
+            height: 350px;
+        }
+        .pos-cart-items {
+            max-height: 150px;
+        }
+        .payment-actions {
+            grid-template-columns: 1fr 1fr;
+        }
+        .pos-cart-actions {
+            flex-wrap: wrap;
+        }
+        .pos-cart-actions button {
+            flex: 1;
+            min-width: 80px;
+        }
+        .pos-cart-actions .btn-clear {
+            flex: 0.3;
+        }
+        .pos-modal {
+            padding: 15px;
+        }
+        .pos-modal-header h3 {
+            font-size: 1.1rem;
+        }
+        .pos-modal-body .product-info h4 {
+            font-size: 1rem;
+        }
+        .pos-modal-body .product-info .details {
+            font-size: 11px;
+            gap: 5px;
+        }
+        .product-card {
+            padding: 10px;
+        }
+        .product-card .product-name {
+            font-size: 12px;
+        }
+        .product-card .product-price {
+            font-size: 14px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .pos-wrapper {
+            padding: 5px;
+        }
+        .pos-container {
+            gap: 10px;
+        }
+        .pos-products {
+            padding: 10px;
+        }
+        .pos-products-grid {
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 8px;
+        }
+        .pos-cart {
+            padding: 10px;
+            height: 300px;
+        }
+        .pos-cart-items {
+            max-height: 120px;
+        }
+        .payment-actions {
+            grid-template-columns: 1fr 1fr;
+        }
+        .payment-actions .btn-payment {
+            font-size: 11px;
+            padding: 8px;
+        }
+        .payment-actions .btn-payment i {
+            font-size: 16px;
+        }
+        .pos-cart-actions button {
+            font-size: 11px;
+            padding: 8px;
+        }
+        .pos-modal {
+            padding: 12px;
+        }
+        .pos-modal-header h3 {
+            font-size: 1rem;
+        }
+        .pos-modal-footer button {
+            font-size: 12px;
+            padding: 10px;
+        }
+        .modal-field label {
+            font-size: 12px;
+        }
+        .modal-field input {
+            padding: 8px 10px;
+            font-size: 12px;
+        }
+        .cart-item {
+            font-size: 11px;
+            padding: 6px 8px;
+        }
+        .cart-item .item-price {
+            min-width: 50px;
+            font-size: 11px;
+        }
+        .cart-item .item-qty button {
+            width: 18px;
+            height: 18px;
+            font-size: 12px;
+        }
+        .payment-amount-display .amount {
+            font-size: 22px;
+        }
+        .success-toast {
+            bottom: 15px;
+            right: 15px;
+            padding: 10px 15px;
+            font-size: 12px;
+            max-width: 90%;
+        }
+        .stock-update-indicator {
+            top: 10px;
+            right: 10px;
+            padding: 8px 12px;
+            font-size: 12px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pos-wrapper">
+    <div class="pos-container">
+        
+        <!-- LEFT: Products -->
+        <div class="pos-products">
+            <div class="pos-products-header">
+                <input type="text" id="searchProducts" placeholder="Search by name, brand, code..." class="form-control">
+                <select id="categoryFilter" class="form-select">
+                    <option value="all">All Categories</option>
+                    <option value="phones">📱 Phones</option>
+                    <option value="electronics">💻 Electronics</option>
+                    <option value="accessories">🎧 Accessories</option>
+                </select>
+                <button class="btn-refresh" onclick="refreshProductsAfterSale()" title="Refresh Products (Ctrl+R)">
+                    <i class="fas fa-sync"></i>
+                </button>
+            </div>
+            
+            <div class="pos-products-grid" id="productsGrid">
+                <div class="text-center py-5" style="color: #000000;">
+                    <i class="fas fa-spinner fa-spin fa-2x d-block mb-3" style="color: #000000;"></i>
+                    <p style="color: #000000;">Loading products...</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- RIGHT: Cart -->
+        <div class="pos-cart">
+            <div class="pos-cart-header">
+                <h5><i class="fas fa-shopping-cart"></i> Cart</h5>
+                <span class="cart-count" id="cartCount">0</span>
+            </div>
+            
+            <div class="pos-customer">
+                <!-- Branch Display/Selector -->
+                {% if user.role == 'company_cashier' %}
+                    <div class="branch-display">
+                        <i class="fas fa-store"></i> 
+                        Branch: {{ user.branch.name|default:"Not Assigned" }}
+                        {% if user.branch %}
+                            <span style="font-size:11px; display:block; color:#6c757d;">{{ user.branch.code }}</span>
+                        {% endif %}
+                    </div>
+                    <input type="hidden" id="branchSelect" value="{{ user.branch.id|default:'' }}">
+                {% else %}
+                    <select id="branchSelect">
+                        <option value="">Select Branch</option>
+                        {% for branch in branches %}
+                        <option value="{{ branch.id }}">{{ branch.name }} ({{ branch.currency_symbol }})</option>
+                        {% endfor %}
+                    </select>
+                {% endif %}
+                
+                <input type="text" id="customerName" placeholder="Customer Name">
+                <input type="text" id="customerPhone" placeholder="Phone Number">
+            </div>
+            
+            <div class="pos-cart-items" id="cartItems">
+                <div class="cart-empty">
+                    <i class="fas fa-shopping-cart"></i>
+                    <p>Cart is empty</p>
+                    <small>Click a product to add</small>
+                </div>
+            </div>
+            
+            <div class="pos-cart-totals">
+                <div class="total-row">
+                    <span>Subtotal</span>
+                    <span id="subtotal">KSh 0.00</span>
+                </div>
+                <div class="total-row grand">
+                    <span>Total</span>
+                    <span id="total">KSh 0.00</span>
+                </div>
+            </div>
+            
+            <!-- Payment Actions -->
+            <div class="payment-actions">
+                <button class="btn-payment btn-cash" onclick="openPaymentModal('cash')">
+                    <i class="fas fa-money-bill-wave"></i> Cash
+                </button>
+                <button class="btn-payment btn-mpesa" onclick="openPaymentModal('mpesa')">
+                    <i class="fas fa-mobile-alt"></i> M-Pesa
+                </button>
+                <button class="btn-payment btn-bank" onclick="openPaymentModal('bank')">
+                    <i class="fas fa-university"></i> Bank
+                </button>
+                <button class="btn-payment btn-points" onclick="openPaymentModal('points')">
+                    <i class="fas fa-star"></i> Points
+                </button>
+            </div>
+            
+            <div class="pos-cart-actions">
+                <button class="btn-clear" onclick="clearCart()">🗑️</button>
+                <button class="btn-checkout" onclick="completeSale()" id="checkoutBtn" disabled>
+                    💳 Complete Sale
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- PRODUCT MODAL -->
+<!-- ============================================ -->
+<div class="pos-modal-overlay" id="productModal">
+    <div class="pos-modal">
+        <div class="pos-modal-header">
+            <h3 id="modalTitle">Add to Cart</h3>
+            <button class="pos-modal-close" onclick="closeModal()">✕</button>
+        </div>
+        <div class="pos-modal-body">
+            <div class="product-info">
+                <h4 id="modalProductName">Product Name</h4>
+                <div class="details">
+                    <span id="modalProductModel">Model: -</span>
+                    <span id="modalProductSpecs">Specs: -</span>
+                    <span id="modalProductPrice">Price: KSh 0</span>
+                    <span id="modalProductStock">Stock: 0</span>
+                </div>
+                <div class="details" style="margin-top: 8px;">
+                    <span id="modalProductCode" style="background: #f0f2f5; padding: 2px 10px; border-radius: 4px; font-family: monospace; font-size: 13px; border: 1px solid #000000;">
+                        Code: -
+                    </span>
+                </div>
+            </div>
+            <div id="modalFields"></div>
+        </div>
+        <div class="pos-modal-footer">
+            <button class="btn-cancel-modal" onclick="closeModal()">Cancel</button>
+            <button class="btn-add-to-cart" id="addToCartBtn" onclick="addToCartFromModal()" disabled>
+                Add to Cart
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- PAYMENT MODAL -->
+<!-- ============================================ -->
+<div class="pos-modal-overlay" id="paymentModal">
+    <div class="pos-modal">
+        <div class="pos-modal-header">
+            <h3 id="paymentModalTitle"><i class="fas fa-money-bill-wave"></i> Cash Payment</h3>
+            <button class="pos-modal-close" onclick="closePaymentModal()">✕</button>
+        </div>
+        <div class="pos-modal-body">
+            <!-- Amount Display -->
+            <div class="payment-amount-display">
+                <div class="label">Amount to Pay</div>
+                <div class="amount" id="paymentAmount">KSh 0.00</div>
+            </div>
+            
+            <!-- Payment Fields Container -->
+            <div id="paymentFields">
+                <!-- Dynamic content loaded by JavaScript -->
+            </div>
+            
+            <!-- Payment Status -->
+            <div class="payment-status" id="paymentStatus"></div>
+        </div>
+
+        <div class="pos-modal-footer">
+            <button class="btn-cancel-modal" onclick="closePaymentModal()">Cancel</button>
+            <button class="btn-add-to-cart" id="paymentActionBtn" onclick="processPayment()" style="flex:1;">
+                Process Payment
+            </button>
+        </div>               
+    </div>
+</div>
+
+<!-- Success Toast -->
+<div class="success-toast" id="successToast">
+    <i class="fas fa-check-circle"></i> 
+    <span id="successMessage">Sale completed!</span>
+</div>
+
+<!-- Stock Update Indicator -->
+<div class="stock-update-indicator" id="stockUpdateIndicator">
+    ✅ Stock Updated!
+</div>
+
+<script>
+// ============================================
+// CSRF Token
+// ============================================
+function getCsrfToken() {
+    const name = 'csrftoken';
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+        cookie = cookie.trim();
+        if (cookie.startsWith(name + '=')) {
+            return cookie.substring(name.length + 1);
+        }
+    }
+    return '';
+}
+
+// ============================================
+// VARIABLES
+// ============================================
+let cart = [];
+let allProducts = [];
+let currentProduct = null;
+let selectedUnit = null;
+let isRefreshing = false;
+let autoRefreshInterval = null;
+let currentPaymentMethod = 'cash';
+let currentTotal = 0;
+
+// Category mapping
+const CATEGORY_MAP = {
+    'phones': 'Phone',
+    'electronics': 'Electronics',
+    'accessories': 'Accessories'
+};
+
+const CATEGORY_EMOJI = {
+    'Phone': '📱',
+    'Electronics': '💻',
+    'Accessories': '🎧'
+};
+
+// ============================================
+// LOAD PRODUCTS
+// ============================================
+async function loadProducts() {
+    try {
+        const response = await fetch('/epa_shop/pos/search/');
+        if (!response.ok) throw new Error('Network error');
+        const data = await response.json();
+        if (data.error) {
+            console.error('Error:', data.error);
+            showError(data.error);
+            return;
+        }
+        allProducts = data.products || [];
+        applyFilters();
+    } catch (error) {
+        console.error('Error loading products:', error);
+        showError('Failed to load products. Please refresh.');
+    }
+}
+
+function showError(message) {
+    document.getElementById('productsGrid').innerHTML = `
+        <div class="text-center text-danger py-5">
+            <i class="fas fa-exclamation-circle fa-2x d-block mb-3"></i>
+            <p style="color: #dc3545;">${message}</p>
+            <button class="btn btn-primary btn-sm" onclick="loadProducts()" style="border: 2px solid #000000; background: #87CEEB; color: #000000; font-weight: 600;">Retry</button>
+        </div>
+    `;
+}
+
+// ============================================
+// APPLY FILTERS
+// ============================================
+function applyFilters() {
+    const search = document.getElementById('searchProducts').value.toLowerCase().trim();
+    const category = document.getElementById('categoryFilter').value;
+    
+    let filtered = allProducts;
+    
+    if (search) {
+        filtered = filtered.filter(p => 
+            p.name.toLowerCase().includes(search) ||
+            p.brand.toLowerCase().includes(search) ||
+            p.model.toLowerCase().includes(search) ||
+            p.product_code.toLowerCase().includes(search)
+        );
+    }
+    
+    if (category !== 'all') {
+        const targetCategory = CATEGORY_MAP[category];
+        if (targetCategory) {
+            filtered = filtered.filter(p => p.category === targetCategory);
+        }
+    }
+    
+    renderProducts(filtered);
+}
+
+// ============================================
+// RENDER PRODUCTS
+// ============================================
+function renderProducts(products) {
+    const grid = document.getElementById('productsGrid');
+    
+    if (!products || products.length === 0) {
+        grid.innerHTML = '<div class="text-center py-5" style="color: #000000;">No products found</div>';
+        return;
+    }
+    
+    grid.innerHTML = products.map(product => {
+        const inStock = product.stock > 0;
+        const stockClass = product.stock > 5 ? 'in-stock' : (product.stock > 0 ? 'low-stock' : 'out-of-stock');
+        const stockLabel = product.stock > 5 ? 'In Stock' : (product.stock > 0 ? 'Low Stock' : 'Out of Stock');
+        const emoji = CATEGORY_EMOJI[product.category] || '';
+        
+        let specs = '-';
+        if (product.category === 'Phone') {
+            const ram = product.ram || '';
+            const rom = product.storage_capacity || '';
+            specs = ram && rom ? `${ram} / ${rom}` : (ram || rom || '-');
+        } else if (product.category === 'Electronics') {
+            const ram = product.ram || '';
+            const storage = product.storage || '';
+            specs = ram && storage ? `${ram} / ${storage}` : (ram || storage || '-');
+        } else if (product.category === 'Accessories') {
+            specs = product.accessory_type ? product.accessory_type.replace('_', ' ').toUpperCase() : '-';
+        }
+        
+        return `
+            <div class="product-card ${inStock ? '' : 'out-of-stock'}" 
+                 onclick="${inStock ? `openModal('${product.product_code}')` : ''}">
+                <div class="product-name">${emoji} ${product.name}</div>
+                <div class="product-model">${product.brand} ${product.model}</div>
+                <div style="font-size:11px; color:#000000; margin-bottom:4px;">${specs}</div>
+                <span class="product-price">KSh ${product.price.toLocaleString()}</span>
+                <div class="product-stock">
+                    <span class="stock-badge ${stockClass}">${stockLabel} (${product.stock})</span>
+                </div>
+                <div style="font-size:10px; color:#000000; text-align:center; margin-top:4px;">
+                    Code: ${product.product_code}
+                </div>
+                ${!inStock ? '<div class="out-of-stock-overlay">Out of Stock</div>' : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+// ============================================
+// REFRESH PRODUCTS AFTER SALE
+// ============================================
+async function refreshProductsAfterSale() {
+    if (isRefreshing) return;
+    isRefreshing = true;
+    
+    const refreshBtn = document.querySelector('.btn-refresh i');
+    if (refreshBtn) {
+        refreshBtn.className = 'fas fa-spinner fa-spin';
+    }
+    
+    try {
+        const response = await fetch('/epa_shop/pos/search/');
+        if (!response.ok) throw new Error('Network error');
+        const data = await response.json();
+        
+        if (data.error) {
+            console.error('Error:', data.error);
+            return;
+        }
+        
+        allProducts = data.products || [];
+        applyFilters();
+        showStockUpdateIndicator();
+        
+    } catch (error) {
+        console.error('Error refreshing products:', error);
+    } finally {
+        isRefreshing = false;
+        if (refreshBtn) {
+            refreshBtn.className = 'fas fa-sync';
+        }
+    }
+}
+
+function showStockUpdateIndicator() {
+    const indicator = document.getElementById('stockUpdateIndicator');
+    indicator.style.display = 'block';
+    indicator.style.opacity = '1';
+    
+    setTimeout(() => {
+        indicator.style.opacity = '0';
+        indicator.style.transition = 'opacity 0.5s ease';
+        setTimeout(() => {
+            indicator.style.display = 'none';
+            indicator.style.opacity = '1';
+            indicator.style.transition = '';
+        }, 500);
+    }, 2000);
+}
+
+// ============================================
+// SEARCH AND FILTER EVENT HANDLERS
+// ============================================
+document.getElementById('searchProducts').addEventListener('input', function() {
+    applyFilters();
+});
+
+document.getElementById('searchProducts').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        const visibleProducts = document.querySelectorAll('.product-card:not(.out-of-stock)');
+        if (visibleProducts.length > 0) {
+            const firstProduct = visibleProducts[0];
+            if (firstProduct && firstProduct.onclick) {
+                firstProduct.click();
+            }
+        }
+    }
+});
+
+document.getElementById('categoryFilter').addEventListener('change', function() {
+    applyFilters();
+});
+
+// ============================================
+// MODAL FUNCTIONS
+// ============================================
+function openModal(productCode) {
+    const product = allProducts.find(p => p.product_code === productCode);
+    if (!product) return;
+    
+    currentProduct = product;
+    selectedUnit = null;
+    
+    document.getElementById('modalTitle').textContent = `Add to Cart - ${product.category}`;
+    document.getElementById('modalProductName').textContent = product.name;
+    document.getElementById('modalProductModel').textContent = `Model: ${product.brand} ${product.model}`;
+    
+    let specs = '-';
+    if (product.category === 'Phone') {
+        const ram = product.ram || '';
+        const rom = product.storage_capacity || '';
+        specs = ram && rom ? `RAM: ${ram} | ROM: ${rom}` : (ram || rom || '-');
+    } else if (product.category === 'Electronics') {
+        const ram = product.ram || '';
+        const storage = product.storage || '';
+        specs = ram && storage ? `RAM: ${ram} | Storage: ${storage}` : (ram || storage || '-');
+    } else if (product.category === 'Accessories') {
+        specs = product.accessory_type ? product.accessory_type.replace('_', ' ').toUpperCase() : '-';
+    }
+    document.getElementById('modalProductSpecs').textContent = `Specs: ${specs}`;
+    document.getElementById('modalProductPrice').textContent = `Price: KSh ${product.price.toLocaleString()}`;
+    document.getElementById('modalProductStock').textContent = `Stock: ${product.stock}`;
+    document.getElementById('modalProductCode').textContent = `Code: ${product.product_code}`;
+    
+    const fieldsContainer = document.getElementById('modalFields');
+    
+    if (product.category === 'Accessories') {
+        fieldsContainer.innerHTML = `
+            <div class="modal-field">
+                <label>Quantity <span class="text-danger">*</span></label>
+                <input type="number" id="modalQuantity" value="1" min="1" max="${product.stock}" 
+                       onchange="validateAccessoryFields()" oninput="validateAccessoryFields()">
+                <small class="text-muted">Max: ${product.stock}</small>
+            </div>
+            <div class="modal-field">
+                <label>Selling Price per Item <span class="text-danger">*</span></label>
+                <input type="number" id="modalPrice" value="${product.price}" step="0.01" min="0.01" 
+                       onchange="validateAccessoryFields()" oninput="validateAccessoryFields()">
+                <small class="text-muted">Default: KSh ${product.price.toLocaleString()}</small>
+            </div>
+            <div class="modal-field" style="background: #f8f9fa; padding: 12px; border-radius: 4px; border: 2px solid #000000;">
+                <strong style="color: #000000;">Total: </strong>
+                <span id="modalTotalDisplay" style="color: #000000; font-weight: 700;">KSh ${(product.price * 1).toLocaleString()}</span>
+            </div>
+        `;
+        document.getElementById('addToCartBtn').disabled = false;
+        document.getElementById('modalQuantity').addEventListener('input', updateTotalDisplay);
+        document.getElementById('modalPrice').addEventListener('input', updateTotalDisplay);
+        
+    } else {
+        const isPhone = product.category === 'Phone';
+        const label = isPhone ? 'IMEI Number' : 'Serial Number';
+        const placeholder = isPhone ? 'Enter IMEI number...' : 'Enter Serial number...';
+        
+        fieldsContainer.innerHTML = `
+            <div class="modal-field">
+                <label>Search ${label} <span class="text-danger">*</span></label>
+                <div class="unit-search-container">
+                    <input type="text" id="unitSearch" placeholder="${placeholder}"
+                           oninput="searchUnits(this.value)" autocomplete="off" style="border: 2px solid #000000; border-radius: 4px; padding: 10px 12px; width: 100%;">
+                    <div class="unit-results" id="unitResults"></div>
+                </div>
+                <small class="text-muted">Type to search available ${label}s</small>
+            </div>
+            <div id="selectedUnitDisplay">
+                <div class="selected-unit" style="display:none;">
+                    <div>
+                        <span class="unit-label">Selected ${label}:</span>
+                        <span class="unit-value" id="selectedUnitValue"></span>
+                    </div>
+                    <button class="unit-remove" onclick="clearSelectedUnit()">✕</button>
+                </div>
+            </div>
+            <div class="modal-field">
+                <label>Selling Price <span class="text-danger">*</span></label>
+                <input type="number" id="modalUnitPrice" value="${product.price}" step="0.01" min="0.01" style="border: 2px solid #000000; border-radius: 4px; padding: 10px 12px; width: 100%;">
+                <small class="text-muted">Default: KSh ${product.price.toLocaleString()}</small>
+            </div>
+        `;
+        document.getElementById('addToCartBtn').disabled = true;
+        window._availableUnits = product.units || [];
+        window._isPhone = isPhone;
+    }
+    
+    document.getElementById('productModal').classList.add('active');
+    
+    setTimeout(() => {
+        const firstInput = document.querySelector('#modalFields input');
+        if (firstInput) firstInput.focus();
+    }, 100);
+}
+
+function closeModal() {
+    document.getElementById('productModal').classList.remove('active');
+    currentProduct = null;
+    selectedUnit = null;
+    window._availableUnits = [];
+    document.getElementById('searchProducts').focus();
+}
+
+function searchUnits(query) {
+    const resultsDiv = document.getElementById('unitResults');
+    const availableUnits = window._availableUnits || [];
+    
+    if (query.length < 2) {
+        resultsDiv.classList.remove('active');
+        return;
+    }
+    
+    const filtered = availableUnits.filter(u => 
+        u.identifier.toLowerCase().includes(query.toLowerCase()) && 
+        u.status === 'available'
+    );
+    
+    if (filtered.length === 0) {
+        resultsDiv.innerHTML = '<div class="unit-result-item">No units found</div>';
+        resultsDiv.classList.add('active');
+        return;
+    }
+    
+    resultsDiv.innerHTML = filtered.map(unit => `
+        <div class="unit-result-item" onclick="selectUnit('${unit.identifier}')">
+            <span class="unit-id">${unit.identifier}</span>
+            <span class="unit-status available">✅ Available</span>
+        </div>
+    `).join('');
+    resultsDiv.classList.add('active');
+}
+
+function selectUnit(identifier) {
+    const availableUnits = window._availableUnits || [];
+    const unit = availableUnits.find(u => u.identifier === identifier);
+    if (!unit) return;
+    
+    selectedUnit = unit;
+    
+    const display = document.querySelector('.selected-unit');
+    const valueDisplay = document.getElementById('selectedUnitValue');
+    display.style.display = 'flex';
+    valueDisplay.textContent = unit.identifier;
+    
+    document.getElementById('unitSearch').value = '';
+    document.getElementById('unitResults').classList.remove('active');
+    document.getElementById('addToCartBtn').disabled = false;
+    document.getElementById('modalUnitPrice').focus();
+}
+
+function clearSelectedUnit() {
+    selectedUnit = null;
+    document.querySelector('.selected-unit').style.display = 'none';
+    document.getElementById('addToCartBtn').disabled = true;
+    document.getElementById('unitSearch').focus();
+}
+
+function validateAccessoryFields() {
+    const qty = parseInt(document.getElementById('modalQuantity')?.value) || 0;
+    const price = parseFloat(document.getElementById('modalPrice')?.value) || 0;
+    const stock = currentProduct?.stock || 0;
+    
+    const btn = document.getElementById('addToCartBtn');
+    if (qty > 0 && price > 0 && qty <= stock) {
+        btn.disabled = false;
+    } else {
+        btn.disabled = true;
+    }
+}
+
+function updateTotalDisplay() {
+    const qty = parseInt(document.getElementById('modalQuantity')?.value) || 0;
+    const price = parseFloat(document.getElementById('modalPrice')?.value) || 0;
+    const total = qty * price;
+    document.getElementById('modalTotalDisplay').textContent = `KSh ${total.toLocaleString()}`;
+}
+
+// ============================================
+// ADD TO CART FROM MODAL
+// ============================================
+function addToCartFromModal() {
+    if (!currentProduct) return;
+    
+    const isAccessory = currentProduct.category === 'Accessories';
+    
+    if (isAccessory) {
+        const qty = parseInt(document.getElementById('modalQuantity').value) || 1;
+        const price = parseFloat(document.getElementById('modalPrice').value) || currentProduct.price;
+        
+        if (qty <= 0 || price <= 0) {
+            alert('Please enter valid quantity and price');
+            return;
+        }
+        
+        const existing = cart.find(item => item.product_code === currentProduct.product_code);
+        if (existing) {
+            existing.quantity += qty;
+            existing.price = price;
+        } else {
+            cart.push({
+                product_code: currentProduct.product_code,
+                name: currentProduct.name,
+                brand: currentProduct.brand,
+                model: currentProduct.model,
+                category: currentProduct.category,
+                price: price,
+                quantity: qty,
+                unit: null
+            });
+        }
+        
+    } else {
+        if (!selectedUnit) {
+            alert('Please select a unit');
+            return;
+        }
+        
+        const price = parseFloat(document.getElementById('modalUnitPrice').value) || currentProduct.price;
+        
+        if (price <= 0) {
+            alert('Please enter valid price');
+            return;
+        }
+        
+        const existing = cart.find(item => item.unit === selectedUnit.identifier);
+        if (existing) {
+            existing.quantity += 1;
+        } else {
+            cart.push({
+                product_code: currentProduct.product_code,
+                name: currentProduct.name,
+                brand: currentProduct.brand,
+                model: currentProduct.model,
+                category: currentProduct.category,
+                price: price,
+                quantity: 1,
+                unit: selectedUnit.identifier
+            });
+        }
+    }
+    
+    closeModal();
+    renderCart();
+    document.getElementById('searchProducts').focus();
+}
+
+// ============================================
+// CART FUNCTIONS
+// ============================================
+function removeFromCart(index) {
+    cart.splice(index, 1);
+    renderCart();
+}
+
+function updateQuantity(index, delta) {
+    const item = cart[index];
+    item.quantity = Math.max(1, item.quantity + delta);
+    renderCart();
+}
+
+function renderCart() {
+    const container = document.getElementById('cartItems');
+    const count = document.getElementById('cartCount');
+    const subtotalEl = document.getElementById('subtotal');
+    const totalEl = document.getElementById('total');
+    const checkoutBtn = document.getElementById('checkoutBtn');
+    
+    count.textContent = cart.reduce((sum, item) => sum + item.quantity, 0);
+    checkoutBtn.disabled = cart.length === 0;
+    
+    if (cart.length === 0) {
+        container.innerHTML = `
+            <div class="cart-empty">
+                <i class="fas fa-shopping-cart"></i>
+                <p>Cart is empty</p>
+                <small>Click a product to add</small>
+            </div>
+        `;
+        subtotalEl.textContent = 'KSh 0.00';
+        totalEl.textContent = 'KSh 0.00';
+        currentTotal = 0;
+        updateCheckoutButton();
+        return;
+    }
+    
+    let subtotal = 0;
+    container.innerHTML = cart.map((item, index) => {
+        const total = item.price * item.quantity;
+        subtotal += total;
+        const unitDisplay = item.unit ? `<div class="item-unit">${item.unit}</div>` : '';
+        const codeDisplay = `<div style="font-size:10px; color:#000000;">${item.product_code}</div>`;
+        return `
+            <div class="cart-item">
+                <div class="item-name">
+                    ${item.name}
+                    ${unitDisplay}
+                    ${codeDisplay}
+                </div>
+                <div class="item-qty">
+                    <button onclick="updateQuantity(${index}, -1)">−</button>
+                    <span>${item.quantity}</span>
+                    <button onclick="updateQuantity(${index}, 1)">+</button>
+                </div>
+                <div class="item-price">KSh ${total.toLocaleString()}</div>
+                <button class="item-remove" onclick="removeFromCart(${index})">✕</button>
+            </div>
+        `;
+    }).join('');
+    
+    currentTotal = subtotal;
+    subtotalEl.textContent = `KSh ${subtotal.toLocaleString()}`;
+    totalEl.textContent = `KSh ${currentTotal.toLocaleString()}`;
+    updateCheckoutButton();
+}
+
+function updateCheckoutButton() {
+    const checkoutBtn = document.getElementById('checkoutBtn');
+    if (cart.length > 0) {
+        checkoutBtn.disabled = false;
+        checkoutBtn.innerHTML = `💳 Complete Sale - KSh ${currentTotal.toLocaleString()}`;
+    } else {
+        checkoutBtn.disabled = true;
+        checkoutBtn.innerHTML = '💳 Complete Sale';
+    }
+}
+
+function clearCart() {
+    if (cart.length === 0) return;
+    if (!confirm('Clear all items from cart?')) return;
+    cart = [];
+    renderCart();
+    document.getElementById('searchProducts').focus();
+}
+
+// ============================================
+// PAYMENT MODAL FUNCTIONS
+// ============================================
+function openPaymentModal(method) {
+    if (cart.length === 0) {
+        alert('Cart is empty. Please add items first.');
+        return;
+    }
+    
+    currentPaymentMethod = method;
+    const modal = document.getElementById('paymentModal');
+    const title = document.getElementById('paymentModalTitle');
+    const fields = document.getElementById('paymentFields');
+    const status = document.getElementById('paymentStatus');
+    const actionBtn = document.getElementById('paymentActionBtn');
+    
+    // Reset status
+    status.className = 'payment-status';
+    status.style.display = 'none';
+    status.innerHTML = '';
+    
+    // Set amount
+    document.getElementById('paymentAmount').textContent = `KSh ${currentTotal.toFixed(2)}`;
+    
+    // Set title and fields based on method
+    const icons = {
+        cash: 'fa-money-bill-wave',
+        mpesa: 'fa-mobile-alt',
+        bank: 'fa-university',
+        points: 'fa-star'
+    };
+    const titles = {
+        cash: 'Cash Payment',
+        mpesa: 'M-Pesa Payment',
+        bank: 'Bank Card Payment',
+        points: 'Points Redemption'
+    };
+    
+    title.innerHTML = `<i class="fas ${icons[method]}"></i> ${titles[method]}`;
+    
+    // Generate fields
+    let fieldsHTML = '';
+    let actionLabel = 'Process Payment';
+    
+    switch(method) {
+        case 'cash':
+            fieldsHTML = `
+                <div class="modal-field">
+                    <label>Amount Tendered <span class="text-danger">*</span></label>
+                    <input type="number" id="cashTendered" placeholder="Enter amount tendered" step="0.01" min="0" oninput="calculateCashChange()" style="border: 2px solid #000000; border-radius: 4px; padding: 10px 12px; width: 100%;">
+                </div>
+                <div class="modal-field">
+                    <label>Change Due</label>
+                    <div style="font-size:24px; font-weight:700; color:#28a745;" id="cashChange">KSh 0.00</div>
+                </div>
+            `;
+            actionLabel = 'Complete Cash Payment';
+            break;
+            
+        case 'mpesa':
+            fieldsHTML = `
+                <div class="modal-field">
+                    <label>M-Pesa Phone Number <span class="text-danger">*</span></label>
+                    <input type="text" id="mpesaPhone" placeholder="07XX XXX XXX" style="border: 2px solid #000000; border-radius: 4px; padding: 10px 12px; width: 100%;">
+                </div>
+                <div class="modal-field">
+                    <div style="display:flex; gap:10px;">
+                        <button type="button" class="btn-payment-action btn-mpesa" onclick="sendSTKPush()" style="flex:1;">
+                            <i class="fas fa-paper-plane"></i> Send STK Push
+                        </button>
+                        <button type="button" class="btn-payment-action btn-mpesa" onclick="searchMpesaTransaction()" style="flex:1; background: #87CEEB; color: #000000; border: 2px solid #000000;">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                    </div>
+                </div>
+                <div id="mpesaStatusDisplay" style="margin-top:10px; font-size:13px; display:none; color: #000000;"></div>
+            `;
+            actionLabel = 'Confirm M-Pesa Payment';
+            break;
+            
+        case 'bank':
+            fieldsHTML = `
+                <div class="modal-field">
+                    <label>Card Number <span class="text-danger">*</span></label>
+                    <input type="text" id="cardNumber" placeholder="XXXX XXXX XXXX XXXX" maxlength="19" oninput="formatCardNumber(this)" style="border: 2px solid #000000; border-radius: 4px; padding: 10px 12px; width: 100%;">
+                </div>
+                <div class="modal-field" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                    <div>
+                        <label>Expiry Date <span class="text-danger">*</span></label>
+                        <input type="text" id="cardExpiry" placeholder="MM/YY" maxlength="5" oninput="formatExpiry(this)" style="border: 2px solid #000000; border-radius: 4px; padding: 10px 12px; width: 100%;">
+                    </div>
+                    <div>
+                        <label>CVV <span class="text-danger">*</span></label>
+                        <input type="password" id="cardCvv" placeholder="***" maxlength="4" inputmode="numeric" style="border: 2px solid #000000; border-radius: 4px; padding: 10px 12px; width: 100%;">
+                    </div>
+                </div>
+                <div id="bankStatusDisplay" style="margin-top:10px; font-size:13px; display:none; color: #000000;"></div>
+            `;
+            actionLabel = 'Process Card Payment';
+            break;
+            
+        case 'points':
+            const availablePoints = 500;
+            fieldsHTML = `
+                <div class="modal-field">
+                    <label>Available Points</label>
+                    <div style="font-size:20px; font-weight:700; color:#000000;">${availablePoints}</div>
+                </div>
+                <div class="modal-field">
+                    <label>Points to Redeem <span class="text-danger">*</span></label>
+                    <input type="number" id="pointsToRedeem" placeholder="Enter points" min="0" max="${availablePoints}" oninput="calculatePointsValue()" style="border: 2px solid #000000; border-radius: 4px; padding: 10px 12px; width: 100%;">
+                </div>
+                <div class="modal-field">
+                    <label>Points Value</label>
+                    <div style="font-size:20px; font-weight:700; color:#28a745;" id="pointsValueDisplay">KSh 0.00</div>
+                </div>
+                <div style="font-size:12px; color:#000000;">
+                    <i class="fas fa-info-circle"></i> 1 point = KSh 1.00
+                </div>
+            `;
+            actionLabel = 'Redeem Points';
+            break;
+    }
+    
+    fields.innerHTML = fieldsHTML;
+    actionBtn.textContent = actionLabel;
+    actionBtn.className = 'btn-add-to-cart';
+    actionBtn.onclick = function() { processPayment(); };
+    
+    modal.classList.add('active');
+}
+
+function closePaymentModal() {
+    document.getElementById('paymentModal').classList.remove('active');
+    document.getElementById('paymentStatus').className = 'payment-status';
+    document.getElementById('paymentStatus').style.display = 'none';
+}
+
+// ============================================
+// PAYMENT HELPER FUNCTIONS
+// ============================================
+function calculateCashChange() {
+    const tendered = parseFloat(document.getElementById('cashTendered').value) || 0;
+    const total = currentTotal;
+    const change = tendered - total;
+    const changeDisplay = document.getElementById('cashChange');
+    
+    if (change >= 0) {
+        changeDisplay.textContent = `KSh ${change.toFixed(2)}`;
+        changeDisplay.style.color = '#28a745';
+    } else {
+        changeDisplay.textContent = `KSh ${Math.abs(change).toFixed(2)} short`;
+        changeDisplay.style.color = '#dc3545';
+    }
+}
+
+function calculatePointsValue() {
+    const points = parseInt(document.getElementById('pointsToRedeem').value) || 0;
+    const value = points * 1;
+    document.getElementById('pointsValueDisplay').textContent = `KSh ${value.toFixed(2)}`;
+}
+
+function formatCardNumber(input) {
+    let value = input.value.replace(/\D/g, '');
+    if (value.length > 16) value = value.slice(0, 16);
+    let formatted = '';
+    for (let i = 0; i < value.length; i++) {
+        if (i > 0 && i % 4 === 0) formatted += ' ';
+        formatted += value[i];
+    }
+    input.value = formatted;
+}
+
+function formatExpiry(input) {
+    let value = input.value.replace(/\D/g, '');
+    if (value.length > 4) value = value.slice(0, 4);
+    if (value.length >= 2) {
+        const month = parseInt(value.slice(0, 2));
+        if (month > 12) {
+            value = '12' + value.slice(2);
+        }
+        if (value.length >= 3) {
+            input.value = value.slice(0, 2) + '/' + value.slice(2);
+        } else {
+            input.value = value;
+        }
+    } else {
+        input.value = value;
+    }
+}
+
+// ============================================
+// M-PESA PAYMENT FUNCTIONS
+// ============================================
+function sendSTKPush() {
+    const phone = document.getElementById('mpesaPhone').value.trim();
+    const statusDiv = document.getElementById('mpesaStatusDisplay');
+    
+    if (!phone) {
+        statusDiv.innerHTML = '<span style="color:#dc3545;">Please enter phone number</span>';
+        statusDiv.style.display = 'block';
+        return;
+    }
+    
+    if (phone.length < 10) {
+        statusDiv.innerHTML = '<span style="color:#dc3545;">Please enter a valid phone number</span>';
+        statusDiv.style.display = 'block';
+        return;
+    }
+    
+    statusDiv.innerHTML = '<span style="color:#ffc107;"><i class="fas fa-spinner fa-spin"></i> Sending STK Push...</span>';
+    statusDiv.style.display = 'block';
+    
+    setTimeout(() => {
+        const success = Math.random() > 0.3;
+        if (success) {
+            statusDiv.innerHTML = '<span style="color:#28a745;"><i class="fas fa-check-circle"></i> STK Push sent! Please check your phone and enter PIN.</span>';
+            setTimeout(() => {
+                statusDiv.innerHTML = '<span style="color:#28a745;"><i class="fas fa-check-circle"></i> Payment confirmed! KSh ' + currentTotal.toFixed(2) + ' received.</span>';
+                document.getElementById('paymentActionBtn').disabled = false;
+                document.getElementById('paymentActionBtn').textContent = '✅ Payment Confirmed';
+                document.getElementById('paymentActionBtn').style.background = '#28a745';
+            }, 5000);
+        } else {
+            statusDiv.innerHTML = '<span style="color:#dc3545;"><i class="fas fa-times-circle"></i> STK Push failed. Please try again.</span>';
+        }
+    }, 2000);
+}
+
+function searchMpesaTransaction() {
+    const phone = document.getElementById('mpesaPhone').value.trim();
+    const statusDiv = document.getElementById('mpesaStatusDisplay');
+    
+    if (!phone) {
+        statusDiv.innerHTML = '<span style="color:#dc3545;">Please enter phone number</span>';
+        statusDiv.style.display = 'block';
+        return;
+    }
+    
+    statusDiv.innerHTML = '<span style="color:#ffc107;"><i class="fas fa-spinner fa-spin"></i> Searching for transactions...</span>';
+    statusDiv.style.display = 'block';
+    
+    setTimeout(() => {
+        statusDiv.innerHTML = '<span style="color:#28a745;"><i class="fas fa-check-circle"></i> Transaction found! Payment of KSh ' + currentTotal.toFixed(2) + ' confirmed.</span>';
+        document.getElementById('paymentActionBtn').disabled = false;
+        document.getElementById('paymentActionBtn').textContent = '✅ Payment Confirmed';
+        document.getElementById('paymentActionBtn').style.background = '#28a745';
+    }, 2000);
+}
+
+// ============================================
+// PROCESS PAYMENT
+// ============================================
+function processPayment() {
+    const statusDiv = document.getElementById('paymentStatus');
+    
+    // Validate based on payment method
+    if (currentPaymentMethod === 'cash') {
+        const tendered = parseFloat(document.getElementById('cashTendered').value) || 0;
+        if (tendered < currentTotal) {
+            statusDiv.className = 'payment-status error';
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '❌ Amount tendered is less than total amount. Please enter correct amount.';
+            return;
+        }
+        if (tendered === 0) {
+            statusDiv.className = 'payment-status error';
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '❌ Please enter amount tendered.';
+            return;
+        }
+    } else if (currentPaymentMethod === 'mpesa') {
+        const phone = document.getElementById('mpesaPhone').value.trim();
+        if (!phone) {
+            statusDiv.className = 'payment-status error';
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '❌ Please enter M-Pesa phone number.';
+            return;
+        }
+        const mpesaStatus = document.getElementById('mpesaStatusDisplay');
+        if (mpesaStatus && !mpesaStatus.innerHTML.includes('confirmed')) {
+            statusDiv.className = 'payment-status pending';
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '⏳ Please confirm M-Pesa payment first.';
+            return;
+        }
+    } else if (currentPaymentMethod === 'bank') {
+        const cardNumber = document.getElementById('cardNumber').value.trim().replace(/\s/g, '');
+        if (cardNumber.length < 16) {
+            statusDiv.className = 'payment-status error';
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '❌ Please enter a valid card number.';
+            return;
+        }
+        const expiry = document.getElementById('cardExpiry').value.trim();
+        if (!expiry || expiry.length < 5) {
+            statusDiv.className = 'payment-status error';
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '❌ Please enter valid expiry date.';
+            return;
+        }
+        const cvv = document.getElementById('cardCvv').value.trim();
+        if (!cvv || cvv.length < 3) {
+            statusDiv.className = 'payment-status error';
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '❌ Please enter CVV.';
+            return;
+        }
+    } else if (currentPaymentMethod === 'points') {
+        const points = parseInt(document.getElementById('pointsToRedeem').value) || 0;
+        if (points <= 0) {
+            statusDiv.className = 'payment-status error';
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '❌ Please enter points to redeem.';
+            return;
+        }
+        const value = points * 1;
+        if (value < currentTotal) {
+            statusDiv.className = 'payment-status error';
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '❌ Insufficient points. You need ' + Math.ceil(currentTotal) + ' points.';
+            return;
+        }
+    }
+    
+    // Payment successful - close modal and complete sale
+    statusDiv.className = 'payment-status success';
+    statusDiv.style.display = 'block';
+    statusDiv.innerHTML = '✅ Payment processed successfully!';
+    
+    setTimeout(() => {
+        closePaymentModal();
+        completeSale();
+    }, 1000);
+}
+
+// ============================================
+// COMPLETE SALE
+// ============================================
+async function completeSale() {
+    if (cart.length === 0) return;
+    
+    const customerName = document.getElementById('customerName').value || 'Walk-in Customer';
+    const customerPhone = document.getElementById('customerPhone').value || '';
+    
+    let branchId;
+    const branchSelect = document.getElementById('branchSelect');
+    if (branchSelect && branchSelect.tagName === 'SELECT') {
+        branchId = branchSelect.value;
+    } else {
+        branchId = document.getElementById('branchSelect').value;
+    }
+    
+    if (!branchId) {
+        alert('Please select a branch');
+        return;
+    }
+    
+    const total = currentTotal;
+    
+    let itemsList = cart.map(item => 
+        `  - ${item.name} (${item.product_code}) × ${item.quantity} = KSh ${(item.price * item.quantity).toLocaleString()}`
+    ).join('\n');
+    
+    if (!confirm(`Customer: ${customerName}\nPhone: ${customerPhone || 'N/A'}\nPayment: ${currentPaymentMethod.toUpperCase()}\n\nItems:\n${itemsList}\n\nTotal: KSh ${total.toLocaleString()}\n\nProceed with sale?`)) {
+        return;
+    }
+    
+    const saleData = {
+        branch_id: branchId,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        payment_method: currentPaymentMethod,
+        items: cart.map(item => ({
+            product_code: item.product_code,
+            quantity: item.quantity,
+            price: item.price,
+            unit_identifier: item.unit || null,
+        }))
+    };
+    
+    try {
+        const response = await fetch('/epa_shop/sale/process/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify(saleData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Show success message
+            const saleId = data.sale_id || '';
+            showSuccessToast(`✅ Sale completed! Total: KSh ${total.toLocaleString()} (${currentPaymentMethod.toUpperCase()})`);
+            
+            // Clear cart
+            cart = [];
+            renderCart();
+            document.getElementById('customerName').value = '';
+            document.getElementById('customerPhone').value = '';
+            
+            await refreshProductsAfterSale();
+            
+            setTimeout(() => {
+                document.getElementById('searchProducts').focus();
+            }, 300);
+            
+            // Redirect to receipt page (same tab)
+            if (data.sale_id) {
+                setTimeout(() => {
+                    window.location.href = `/epa_shop/sale/receipt/${data.sale_id}/`;
+                }, 1500);
+            }
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error processing sale: ' + error.message);
+    }
+}
+
+function showSuccessToast(message) {
+    const toast = document.getElementById('successToast');
+    document.getElementById('successMessage').textContent = message;
+    toast.style.display = 'block';
+    setTimeout(() => {
+        toast.style.display = 'none';
+    }, 4000);
+}
+
+// ============================================
+// KEYBOARD SHORTCUTS
+// ============================================
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('productModal');
+        if (modal.classList.contains('active')) {
+            closeModal();
+        }
+        const paymentModal = document.getElementById('paymentModal');
+        if (paymentModal.classList.contains('active')) {
+            closePaymentModal();
+        }
+    }
+    
+    if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+        e.preventDefault();
+        refreshProductsAfterSale();
+    }
+});
+
+// ============================================
+// INIT
+// ============================================
+document.addEventListener('DOMContentLoaded', function() {
+    loadProducts();
+    document.getElementById('searchProducts').focus();
+});
+
+// Modal close on overlay click
+document.getElementById('productModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeModal();
+    }
+});
+
+document.getElementById('paymentModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closePaymentModal();
+    }
+});
+</script>
+
+{% endblock %}

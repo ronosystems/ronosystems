@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+
+{% block title %}RS{% endblock %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_subtitle %}{{ page_subtitle }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .sale-details {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+        border: 1px solid #e9ecef;
+        margin-bottom: 20px;
+    }
+    .sale-details .label {
+        font-size: 12px;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+    .sale-details .value {
+        font-size: 16px;
+        font-weight: 600;
+        color: #2d3436;
+    }
+    .warning-box {
+        background: #fff3cd;
+        border-radius: 8px;
+        padding: 15px 20px;
+        border-left: 4px solid #ffc107;
+        margin-bottom: 20px;
+    }
+    .warning-box .warning-icon {
+        font-size: 24px;
+        color: #ffc107;
+        margin-right: 10px;
+    }
+    .warning-box .warning-title {
+        font-weight: 600;
+        color: #856404;
+    }
+    .warning-box .warning-text {
+        color: #856404;
+        margin-top: 5px;
+    }
+    .item-list {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    .item-list .item-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 10px;
+        border-bottom: 1px solid #e9ecef;
+        font-size: 14px;
+    }
+    .item-list .item-row:last-child {
+        border-bottom: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-6 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-undo text-warning"></i> Reverse Sale</h6>
+            </div>
+            <div class="card-body">
+                <!-- Warning -->
+                <div class="warning-box">
+                    <div>
+                        <span class="warning-icon"><i class="fas fa-exclamation-triangle"></i></span>
+                        <span class="warning-title">⚠️ Confirm Sale Reversal</span>
+                    </div>
+                    <div class="warning-text">
+                        This action will return all units to inventory and mark the sale as refunded.
+                        <br><strong>This action cannot be undone!</strong>
+                    </div>
+                </div>
+
+                <!-- Sale Details -->
+                <div class="sale-details">
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="label">Sale ID</div>
+                            <div class="value">#{{ sale.id }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="label">Date</div>
+                            <div class="value">{{ sale.sale_date|date:"Y-m-d H:i" }}</div>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-6">
+                            <div class="label">Customer</div>
+                            <div class="value">{{ sale.customer_name }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="label">Phone</div>
+                            <div class="value">{{ sale.customer_phone|default:"N/A" }}</div>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-6">
+                            <div class="label">Total Amount</div>
+                            <div class="value text-primary">KSh {{ sale.total_amount|floatformat:0 }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="label">Payment Status</div>
+                            <div class="value">
+                                <span class="badge bg-{% if sale.payment_status == 'paid' %}success{% elif sale.payment_status == 'refunded' %}warning{% else %}secondary{% endif %}">
+                                    {{ sale.payment_status|title }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Items List -->
+                <h6 class="mb-2">Items in this sale</h6>
+                <div class="item-list">
+                    {% for item in sale.items.all %}
+                    <div class="item-row">
+                        <span>{{ item.item_name }}</span>
+                        <span>
+                            {{ item.quantity }} × KSh {{ item.unit_price|floatformat:0 }}
+                            = KSh {{ item.total_price|floatformat:0 }}
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="mt-2 text-end">
+                    <strong>Total: KSh {{ sale.total_amount|floatformat:0 }}</strong>
+                </div>
+
+                <!-- Form -->
+                <form method="post" class="mt-3">
+                    {% csrf_token %}
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-danger" 
+                                onclick="return confirm('Are you absolutely sure you want to reverse this sale? This will return all units to inventory and cannot be undone.')">
+                            <i class="fas fa-undo"></i> Yes, Reverse Sale
+                        </button>
+                        <a href="{% url 'epa-product-detail' sale.items.first.item.product_code %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,516 @@
+{% extends 'base.html' %}
+
+{% block title %}Profile - RonoSystems{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+{% block page_subtitle %}Manage your account{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE STYLING
+    ============================================ */
+    .profile-avatar {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 4px solid #000000;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .profile-avatar-placeholder {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        background: #87CEEB;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 4rem;
+        font-weight: 700;
+        color: #000000;
+        border: 4px solid #000000;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        margin: 0 auto;
+    }
+    .avatar-upload {
+        position: relative;
+        display: inline-block;
+    }
+    .avatar-upload .upload-btn {
+        position: absolute;
+        bottom: 5px;
+        right: 5px;
+        background: #87CEEB;
+        color: #000000;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        border: 3px solid #000000;
+        transition: all 0.3s;
+        z-index: 10;
+        font-weight: 700;
+    }
+    .avatar-upload .upload-btn:hover {
+        background: #7bb8d8;
+        transform: scale(1.1);
+    }
+    .password-toggle {
+        cursor: pointer;
+    }
+    .profile-card {
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    #fileInput {
+        display: none;
+    }
+    
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+        color: #000000 !important;
+        border-radius: 0 !important;
+    }
+    
+    .card-header h6 {
+        color: #000000 !important;
+        font-weight: 700;
+        margin: 0;
+    }
+    
+    .card-body {
+        color: #000000;
+    }
+    
+    .card-body h4 {
+        color: #000000;
+    }
+    
+    .card-body .text-muted {
+        color: #000000 !important;
+    }
+    
+    /* ============================================
+       FORM ELEMENTS
+    ============================================ */
+    .form-control {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        color: #000000;
+    }
+    
+    .form-control:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    .form-label {
+        color: #000000;
+        font-weight: 600;
+    }
+    
+    .form-label.required:after {
+        content: " *";
+        color: #dc3545;
+        font-weight: bold;
+    }
+    
+    .input-group .btn-outline-secondary {
+        border: 2px solid #000000;
+        color: #000000;
+        background: white;
+        border-radius: 0 4px 4px 0;
+        font-weight: 600;
+    }
+    
+    .input-group .btn-outline-secondary:hover {
+        background: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .input-group .form-control {
+        border-radius: 4px 0 0 4px;
+    }
+    
+    .input-group .form-control:focus + .btn-outline-secondary {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-warning {
+        background-color: #ffc107;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-warning:hover {
+        background-color: #e0a800;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-danger {
+        border: 2px solid #000000;
+        color: #dc3545;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-danger:hover {
+        background-color: #dc3545;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-sm {
+        padding: 4px 12px;
+        font-size: 12px;
+    }
+    
+    /* ============================================
+       HR
+    ============================================ */
+    hr {
+        border-top: 2px solid #000000;
+        opacity: 1;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .profile-avatar,
+        .profile-avatar-placeholder {
+            width: 120px;
+            height: 120px;
+            font-size: 3rem;
+        }
+        .avatar-upload .upload-btn {
+            width: 34px;
+            height: 34px;
+            font-size: 14px;
+        }
+        .card-header h6 {
+            font-size: 0.9rem;
+        }
+        .card-body {
+            padding: 15px;
+        }
+        .btn-sm {
+            font-size: 10px;
+            padding: 3px 8px;
+        }
+        .form-control {
+            font-size: 13px;
+        }
+        .form-label {
+            font-size: 13px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .profile-avatar,
+        .profile-avatar-placeholder {
+            width: 100px;
+            height: 100px;
+            font-size: 2.5rem;
+        }
+        .avatar-upload .upload-btn {
+            width: 30px;
+            height: 30px;
+            font-size: 12px;
+        }
+        .card-header h6 {
+            font-size: 0.8rem;
+        }
+        .card-body {
+            padding: 12px;
+        }
+        .card-body h4 {
+            font-size: 1.1rem;
+        }
+        .btn {
+            font-size: 12px;
+            padding: 6px 12px;
+        }
+        .btn-sm {
+            font-size: 9px;
+            padding: 2px 6px;
+        }
+        .form-control {
+            font-size: 12px;
+            padding: 6px 10px;
+        }
+        .form-label {
+            font-size: 12px;
+        }
+        .col-md-6 {
+            padding: 0 5px;
+        }
+        .row {
+            margin: 0 -5px;
+        }
+        .input-group .btn-outline-secondary {
+            padding: 6px 8px;
+            font-size: 12px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Profile Picture Card -->
+    <div class="col-md-4">
+        <div class="card profile-card">
+            <div class="card-body text-center py-4">
+                <div class="avatar-upload">
+                    {% if user.profile_picture %}
+                    <img src="/media/{{ user.profile_picture }}" alt="{{ user.get_full_name }}" class="profile-avatar" id="profileImage">
+                    {% else %}
+                    <div class="profile-avatar-placeholder" id="profileImage">
+                        {{ user.first_name|default:user.username|make_list|first|upper }}
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Camera Button -->
+                    <div class="upload-btn" id="cameraBtn">
+                        <i class="fas fa-camera"></i>
+                    </div>
+                    
+                    <!-- Hidden File Input -->
+                    <form method="post" action="/profile/picture/upload/" enctype="multipart/form-data" id="uploadForm">
+                        {% csrf_token %}
+                        <input type="file" name="profile_picture" accept="image/*" id="fileInput">
+                    </form>
+                </div>
+                
+                <h4 class="mt-3">{{ user.get_full_name|default:user.username }}</h4>
+                <p class="text-muted">{{ user.role|title }}</p>
+                
+                {% if user.company %}
+                <p class="text-muted"><i class="fas fa-building"></i> {{ user.company.name }}</p>
+                {% endif %}
+                
+                <hr>
+                
+                <div class="d-flex flex-column gap-2">
+                    <form method="post" action="/profile/picture/remove/" onsubmit="return confirm('Are you sure you want to remove your profile picture?')">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-danger btn-sm w-100">
+                            <i class="fas fa-trash"></i> Remove Picture
+                        </button>
+                    </form>
+                    <div class="text-muted small">
+                        <i class="fas fa-info-circle"></i> Click camera icon to upload
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Info -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-info-circle"></i> Quick Info</h6>
+            </div>
+            <div class="card-body small">
+                <p><strong>Username:</strong> {{ user.username }}</p>
+                <p><strong>Email:</strong> {{ user.email }}</p>
+                <p><strong>Role:</strong> {{ user.role|title }}</p>
+                <p><strong>Joined:</strong> {{ user.date_joined|date:"Y-m-d" }}</p>
+                {% if user.last_login %}
+                <p><strong>Last Login:</strong> {{ user.last_login|date:"Y-m-d H:i" }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Profile Edit Form -->
+    <div class="col-md-8">
+        <!-- Personal Information -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-user"></i> Personal Information</h6>
+            </div>
+            <div class="card-body">
+                <form method="post" action="/profile/update/">
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">First Name</label>
+                            <input type="text" class="form-control" name="first_name" value="{{ user.first_name }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">Last Name</label>
+                            <input type="text" class="form-control" name="last_name" value="{{ user.last_name }}" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">Email</label>
+                            <input type="email" class="form-control" name="email" value="{{ user.email }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Phone</label>
+                            <input type="text" class="form-control" name="phone" value="{{ user.phone }}">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Department</label>
+                            <input type="text" class="form-control" name="department" value="{{ user.department }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Position</label>
+                            <input type="text" class="form-control" name="position" value="{{ user.position }}">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Employee ID</label>
+                            <input type="text" class="form-control" name="employee_id" value="{{ user.employee_id }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Address</label>
+                            <input type="text" class="form-control" name="address" value="{{ user.address }}">
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Update Profile
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Change Password -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-key"></i> Change Password</h6>
+            </div>
+            <div class="card-body">
+                <form method="post" action="/profile/password/change/">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label required">Current Password</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" name="current_password" required id="currentPassword">
+                            <button class="btn btn-outline-secondary password-toggle" type="button" onclick="togglePassword('currentPassword')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label required">New Password</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" name="new_password" required id="newPassword">
+                            <button class="btn btn-outline-secondary password-toggle" type="button" onclick="togglePassword('newPassword')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted">Minimum 8 characters</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label required">Confirm New Password</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" name="confirm_password" required id="confirmPassword">
+                            <button class="btn btn-outline-secondary password-toggle" type="button" onclick="togglePassword('confirmPassword')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-key"></i> Change Password
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function togglePassword(id) {
+    const input = document.getElementById(id);
+    const icon = input.parentElement.querySelector('.password-toggle i');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+
+// Handle camera button click - trigger file input
+document.addEventListener('DOMContentLoaded', function() {
+    const cameraBtn = document.getElementById('cameraBtn');
+    const fileInput = document.getElementById('fileInput');
+    const uploadForm = document.getElementById('uploadForm');
+    
+    if (cameraBtn && fileInput) {
+        // Click camera button triggers file input
+        cameraBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            fileInput.click();
+        });
+        
+        // When file is selected, submit the form
+        fileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                // Show loading state on camera button
+                cameraBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                // Submit the form
+                uploadForm.submit();
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

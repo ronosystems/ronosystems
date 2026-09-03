@@ -1,0 +1,889 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block title %}RS{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE STYLING
+    ============================================ */
+    .stat-card {
+        transition: transform 0.2s;
+        cursor: default;
+        border: 2px solid #000000;
+        border-radius: 4px;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .stat-icon {
+        font-size: 2.5rem;
+        opacity: 0.7;
+        color: #000000;
+    }
+    .progress-sm {
+        height: 8px;
+    }
+    .table-scroll {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    .filter-section {
+        background: #f8f9fa;
+        border-radius: 4px;
+        padding: 15px;
+        margin-bottom: 20px;
+        border: 2px solid #000000;
+    }
+    .chart-container {
+        position: relative;
+        height: 250px;
+    }
+    .badge-expiring {
+        background-color: #ffc107;
+        color: #000000;
+        border: 1px solid #000000;
+        padding: 4px 10px;
+        font-weight: 600;
+    }
+    .badge-expired {
+        background-color: #dc3545;
+        color: #ffffff;
+        border: 1px solid #000000;
+        padding: 4px 10px;
+        font-weight: 600;
+    }
+    
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+        color: #000000 !important;
+        border-radius: 0 !important;
+    }
+    
+    .card-header h6 {
+        color: #000000 !important;
+        font-weight: 700;
+        margin: 0;
+    }
+    
+    .card-body {
+        color: #000000;
+    }
+    
+    .card-body h2, .card-body h3, .card-body h4 {
+        color: #000000;
+    }
+    
+    .card-body .text-muted {
+        color: #000000 !important;
+    }
+    
+    .card-body .text-warning {
+        color: #856404 !important;
+    }
+    
+    .card-body .text-danger {
+        color: #dc3545 !important;
+    }
+    
+    .card-body .text-success {
+        color: #155724 !important;
+    }
+    
+    /* ============================================
+       STAT CARDS COLOR OVERRIDES
+    ============================================ */
+    .stat-card.bg-primary {
+        background: #87CEEB !important;
+    }
+    .stat-card.bg-primary .text-white-50 {
+        color: #000000 !important;
+    }
+    .stat-card.bg-primary h2 {
+        color: #000000 !important;
+    }
+    
+    .stat-card.bg-success {
+        background: #d4edda !important;
+    }
+    .stat-card.bg-success .text-white-50 {
+        color: #155724 !important;
+    }
+    .stat-card.bg-success h2 {
+        color: #155724 !important;
+    }
+    .stat-card.bg-success small {
+        color: #155724 !important;
+    }
+    
+    .stat-card.bg-info {
+        background: #cce5ff !important;
+    }
+    .stat-card.bg-info .text-white-50 {
+        color: #004085 !important;
+    }
+    .stat-card.bg-info h2 {
+        color: #004085 !important;
+    }
+    .stat-card.bg-info small {
+        color: #004085 !important;
+    }
+    
+    .stat-card.bg-warning {
+        background: #fff3cd !important;
+    }
+    .stat-card.bg-warning .text-dark-50 {
+        color: #856404 !important;
+    }
+    .stat-card.bg-warning h2 {
+        color: #856404 !important;
+    }
+    .stat-card.bg-warning small {
+        color: #856404 !important;
+    }
+    
+    /* ============================================
+       FORM ELEMENTS
+    ============================================ */
+    .form-control, .form-select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        color: #000000;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    .form-label {
+        color: #000000;
+        font-weight: 600;
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    /* ============================================
+       TABLE STYLING
+    ============================================ */
+    .table {
+        border-collapse: collapse;
+    }
+    
+    .table th, .table td {
+        border: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+        color: #000000;
+    }
+    
+    .table thead th {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+    }
+    
+    .table tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    .table tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+    
+    .table-sm th, .table-sm td {
+        padding: 6px 10px;
+        font-size: 13px;
+    }
+    
+    .table .badge {
+        border: 1px solid #000000;
+        padding: 4px 10px;
+        font-weight: 600;
+    }
+    
+    .table .badge.bg-info {
+        background-color: #cce5ff !important;
+        color: #004085 !important;
+    }
+    
+    /* ============================================
+       PROGRESS BAR
+    ============================================ */
+    .progress {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        height: 8px;
+    }
+    
+    .progress .progress-bar {
+        border-radius: 2px;
+    }
+    
+    .progress .progress-bar.bg-success {
+        background-color: #28a745 !important;
+    }
+    
+    .progress .progress-bar.bg-warning {
+        background-color: #ffc107 !important;
+    }
+    
+    .progress .progress-bar.bg-danger {
+        background-color: #dc3545 !important;
+    }
+    
+    /* ============================================
+       HR
+    ============================================ */
+    hr {
+        border-top: 2px solid #000000;
+        opacity: 1;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .stat-card .stat-icon {
+            font-size: 1.8rem;
+        }
+        .card-header h6 {
+            font-size: 0.9rem;
+        }
+        .card-body {
+            padding: 15px;
+        }
+        .filter-section {
+            padding: 12px;
+        }
+        .filter-section .row {
+            gap: 10px;
+        }
+        .table th, .table td {
+            padding: 4px 6px;
+            font-size: 11px;
+        }
+        .table-sm th, .table-sm td {
+            padding: 3px 4px;
+            font-size: 10px;
+        }
+        .chart-container {
+            height: 200px;
+        }
+        .btn-primary {
+            font-size: 12px;
+            padding: 6px 12px;
+        }
+        .form-control, .form-select {
+            font-size: 12px;
+            padding: 6px 10px;
+        }
+        .form-label {
+            font-size: 12px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .stat-card .stat-icon {
+            font-size: 1.5rem;
+        }
+        .card-header h6 {
+            font-size: 0.8rem;
+        }
+        .card-body {
+            padding: 12px;
+        }
+        .card-body h2 {
+            font-size: 1.5rem;
+        }
+        .card-body h3 {
+            font-size: 1.2rem;
+        }
+        .card-body h4 {
+            font-size: 1rem;
+        }
+        .filter-section {
+            padding: 10px;
+        }
+        .filter-section .col-md-3 {
+            padding: 0 5px;
+        }
+        .table th, .table td {
+            padding: 3px 4px;
+            font-size: 9px;
+        }
+        .table-sm th, .table-sm td {
+            padding: 2px 3px;
+            font-size: 8px;
+        }
+        .badge {
+            font-size: 8px !important;
+            padding: 2px 6px !important;
+        }
+        .chart-container {
+            height: 150px;
+        }
+        .btn-primary {
+            font-size: 11px;
+            padding: 5px 10px;
+        }
+        .form-control, .form-select {
+            font-size: 11px;
+            padding: 5px 8px;
+        }
+        .form-label {
+            font-size: 11px;
+        }
+        .progress {
+            height: 6px;
+        }
+    }
+</style>
+<!-- Chart.js for charts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h3><i class="fas fa-chart-bar" style="color: #000000;"></i> {{ page_title }}</h3>
+            <p class="text-muted" style="color: #000000 !important;">{{ page_subtitle }}</p>
+        </div>
+    </div>
+
+    <!-- Date Range Filter -->
+    <div class="filter-section">
+        <form method="GET" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label for="start_date" class="form-label">Start Date</label>
+                <input type="date" class="form-control" id="start_date" name="start_date" value="{{ start_date }}">
+            </div>
+            <div class="col-md-3">
+                <label for="end_date" class="form-label">End Date</label>
+                <input type="date" class="form-control" id="end_date" name="end_date" value="{{ end_date }}">
+            </div>
+            <div class="col-md-3">
+                <label for="period" class="form-label">Period</label>
+                <select class="form-select" id="period" name="period">
+                    <option value="month" {% if period == 'month' %}selected{% endif %}>This Month</option>
+                    <option value="quarter" {% if period == 'quarter' %}selected{% endif %}>This Quarter</option>
+                    <option value="year" {% if period == 'year' %}selected{% endif %}>This Year</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-filter"></i> Apply Filter
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Company Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card stat-card bg-primary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-white-50">Total Companies</h6>
+                            <h2 class="mb-0">{{ total_companies }}</h2>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-building"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card bg-success">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-white-50">Active Companies</h6>
+                            <h2 class="mb-0">{{ active_companies }}</h2>
+                            <small>{{ inactive_companies }} inactive</small>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card bg-info">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-white-50">Total Users</h6>
+                            <h2 class="mb-0">{{ total_users }}</h2>
+                            <small>{{ active_users }} active</small>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card bg-warning">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-dark-50">Expiring Soon</h6>
+                            <h2 class="mb-0">{{ expiring_subscriptions }}</h2>
+                            <small>{{ expired_subscriptions }} expired</small>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Subscription & Revenue Stats -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="fas fa-credit-card" style="color: #000000;"></i> Subscription Overview</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="text-center">
+                                <h3>{{ total_subscriptions }}</h3>
+                                <small class="text-muted">Total Subscriptions</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center">
+                                <h3>{{ active_subscriptions }}</h3>
+                                <small class="text-muted">Active Subscriptions</small>
+                            </div>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="text-center">
+                                <h4 class="text-warning">{{ expiring_subscriptions }}</h4>
+                                <small class="text-muted">Expiring (30 days)</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center">
+                                <h4 class="text-danger">{{ expired_subscriptions }}</h4>
+                                <small class="text-muted">Expired</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Revenue Overview -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="fas fa-dollar-sign" style="color: #000000;"></i> Revenue Overview</h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center">
+                        <h2 class="text-success">${{ total_revenue|floatformat:2 }}</h2>
+                        <small class="text-muted">Total Revenue ({{ start_date }} to {{ end_date }})</small>
+                    </div>
+                    <hr>
+                    <div class="table-scroll">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Plan</th>
+                                    <th>Subscriptions</th>
+                                    <th>Revenue</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in revenue_by_plan %}
+                                <tr>
+                                    <td>{{ item.plan__display_name|default:"Unknown" }}</td>
+                                    <td>{{ item.count }}</td>
+                                    <td>${{ item.total|floatformat:2 }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted">No revenue data</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Companies by Plan & Business Type -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="fas fa-layer-group" style="color: #000000;"></i> Companies by Plan</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Plan</th>
+                                    <th>Count</th>
+                                    <th>%</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in companies_by_plan %}
+                                <tr>
+                                    <td>{{ item.plan|title|default:"Unknown" }}</td>
+                                    <td>{{ item.count }}</td>
+                                    <td>
+                                        {% widthratio item.count total_companies 100 %}%
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted">No data</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="fas fa-tags" style="color: #000000;"></i> Companies by Business Type</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Business Type</th>
+                                    <th>Count</th>
+                                    <th>%</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in companies_by_business %}
+                                <tr>
+                                    <td>{{ item.business_type__name|default:"Unknown" }}</td>
+                                    <td>{{ item.count }}</td>
+                                    <td>
+                                        {% widthratio item.count total_companies 100 %}%
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted">No data</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Storage & Expiring Companies -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="fas fa-database" style="color: #000000;"></i> Storage Usage</h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center">
+                        <h4>{{ total_storage_used|floatformat:0 }} MB / {{ total_storage_limit|floatformat:0 }} MB</h4>
+                        <div class="progress progress-sm">
+                            <div class="progress-bar {% if storage_percentage > 90 %}bg-danger{% elif storage_percentage > 70 %}bg-warning{% else %}bg-success{% endif %}" 
+                                 role="progressbar" 
+                                 style="width: {{ storage_percentage }}%" 
+                                 aria-valuenow="{{ storage_percentage }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                            </div>
+                        </div>
+                        <small class="text-muted">{{ storage_percentage }}% of storage used</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="fas fa-exclamation-triangle" style="color: #856404;"></i> Expiring Companies</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-scroll">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Company</th>
+                                    <th>Plan</th>
+                                    <th>Expires</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for company in expiring_companies %}
+                                <tr>
+                                    <td>{{ company.name }}</td>
+                                    <td><span class="badge bg-info">{{ company.plan|title }}</span></td>
+                                    <td>{{ company.subscription_end|date:"Y-m-d" }}</td>
+                                    <td>
+                                        <span class="badge badge-expiring">Expiring</span>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">No companies expiring soon</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Users by Role & Company -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="fas fa-user-tag" style="color: #000000;"></i> Users by Role</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Role</th>
+                                    <th>Count</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in users_by_role %}
+                                <tr>
+                                    <td>{{ item.role|title|default:"No Role" }}</td>
+                                    <td>{{ item.count }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="2" class="text-center text-muted">No data</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="fas fa-building" style="color: #000000;"></i> Users by Company</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-scroll">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Company</th>
+                                    <th>Users</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in users_by_company %}
+                                <tr>
+                                    <td>{{ item.company__name|default:"No Company" }}</td>
+                                    <td>{{ item.count }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="2" class="text-center text-muted">No data</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Monthly Revenue Chart
+    const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+    const monthlyData = {{ monthly_revenue|safe }};
+    
+    new Chart(revenueCtx, {
+        type: 'bar',
+        data: {
+            labels: monthlyData.map(item => item.month),
+            datasets: [{
+                label: 'Revenue ($)',
+                data: monthlyData.map(item => item.revenue),
+                backgroundColor: 'rgba(135, 206, 235, 0.7)',
+                borderColor: 'rgba(0, 0, 0, 1)',
+                borderWidth: 2
+            }, {
+                label: 'Subscriptions',
+                data: monthlyData.map(item => item.count),
+                backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                borderColor: 'rgba(0, 0, 0, 1)',
+                borderWidth: 2,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        color: '#000000',
+                        font: {
+                            weight: 'bold'
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        color: '#000000'
+                    },
+                    grid: {
+                        color: 'rgba(0,0,0,0.1)'
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: '#000000',
+                        callback: function(value) {
+                            return '$' + value;
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(0,0,0,0.1)'
+                    }
+                },
+                y1: {
+                    position: 'right',
+                    beginAtZero: true,
+                    grid: {
+                        drawOnChartArea: false
+                    },
+                    ticks: {
+                        color: '#000000'
+                    }
+                }
+            }
+        }
+    });
+
+    // Revenue by Plan Chart (Pie)
+    const planCtx = document.getElementById('planChart').getContext('2d');
+    const planData = {{ revenue_by_plan|safe }};
+    
+    new Chart(planCtx, {
+        type: 'doughnut',
+        data: {
+            labels: planData.map(item => item.plan__display_name || 'Unknown'),
+            datasets: [{
+                data: planData.map(item => item.total),
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.8)',
+                    'rgba(135, 206, 235, 0.8)',
+                    'rgba(255, 206, 86, 0.8)',
+                    'rgba(75, 192, 192, 0.8)',
+                    'rgba(153, 102, 255, 0.8)',
+                    'rgba(255, 159, 64, 0.8)'
+                ],
+                borderColor: 'rgba(0, 0, 0, 1)',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: '#000000',
+                        font: {
+                            size: 10,
+                            weight: 'bold'
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

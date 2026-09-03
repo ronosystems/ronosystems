@@ -1,0 +1,316 @@
+{% extends 'base.html' %}
+
+{% block title %}RS{% endblock %}
+
+{% block page_title %}Receipt Preview{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE RECEIPT STYLING
+    ============================================ */
+    .receipt-container {
+        max-width: 400px;
+        margin: 20px auto;
+        background: white;
+        padding: 20px;
+        border-radius: 4px;
+        border: 2px solid #000000;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    .receipt-title {
+        font-size: 18px;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 10px;
+        color: #000000;
+    }
+    .receipt-line {
+        border-top: 2px dashed #000000;
+        margin: 8px 0;
+    }
+    .receipt-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 2px 0;
+        color: #000000;
+    }
+    .receipt-total {
+        font-weight: bold;
+        font-size: 14px;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 3px solid #000000;
+        color: #000000;
+    }
+    .receipt-header, .receipt-footer {
+        text-align: center;
+        font-size: 11px;
+        color: #000000;
+    }
+    .receipt-header p, .receipt-footer p {
+        color: #000000;
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-success {
+        background-color: #d4edda;
+        border: 2px solid #000000;
+        color: #155724;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-success:hover {
+        background-color: #c3e6cb;
+        border-color: #000000;
+        color: #155724;
+    }
+    
+    .btn-lg {
+        padding: 10px 24px;
+        font-size: 16px;
+    }
+    
+    /* ============================================
+       BADGE
+    ============================================ */
+    .badge.bg-light {
+        background-color: #f8f9fa !important;
+        color: #000000 !important;
+        border: 1px solid #000000;
+        padding: 4px 10px;
+        font-weight: 600;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 480px) {
+        .receipt-container {
+            max-width: 100%;
+            margin: 10px auto;
+            padding: 15px;
+            font-size: 11px;
+        }
+        .receipt-title {
+            font-size: 16px;
+        }
+        .receipt-total {
+            font-size: 13px;
+        }
+        .btn-lg {
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+        .print-btn {
+            margin-top: 15px;
+        }
+        .no-print .btn {
+            font-size: 11px;
+            padding: 4px 10px;
+        }
+    }
+    
+    @media print {
+        .no-print { display: none !important; }
+        .receipt-container {
+            box-shadow: none;
+            border: 2px solid #000000;
+            margin: 0;
+            padding: 10px;
+            border-radius: 0;
+            max-width: 100%;
+        }
+        .receipt-container .receipt-line {
+            border-top: 2px dashed #000000;
+        }
+        .receipt-container .receipt-total {
+            border-top: 3px solid #000000;
+        }
+        body {
+            background: white !important;
+            margin: 0;
+            padding: 0;
+        }
+        .container-fluid {
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="no-print mb-3">
+        <a href="{% url 'company-settings-receipt' %}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i> Back to Settings
+        </a>
+        <button onclick="window.print()" class="btn btn-primary btn-sm">
+            <i class="fas fa-print"></i> Print Receipt
+        </button>
+    </div>
+
+    <div class="receipt-container" id="receipt" data-auto-print="{{ settings.receipt.auto_print|default:'false' }}">
+        <!-- Header -->
+        <div class="receipt-header">
+            {% if settings.receipt.receipt_header %}
+                <p>{{ settings.receipt.receipt_header }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Title -->
+        <div class="receipt-title">{{ settings.receipt.receipt_title|default:'RECEIPT' }}</div>
+        <div class="receipt-line"></div>
+
+        <!-- Company Details -->
+        {% if settings.receipt.show_company_details %}
+            <div style="color: #000000;"><strong>{{ company.name }}</strong></div>
+            <div style="color: #000000;">{{ company.address|default:'' }}</div>
+            <div style="color: #000000;">Tel: {{ company.phone|default:'' }}</div>
+            <div style="color: #000000;">Email: {{ company.email|default:'' }}</div>
+            <div class="receipt-line"></div>
+        {% endif %}
+
+        <!-- Receipt Info -->
+        <div class="receipt-item"><span>Receipt #:</span><span>{{ receipt.receipt_number }}</span></div>
+        <div class="receipt-item"><span>Date:</span><span>{{ receipt.date }}</span></div>
+
+        <!-- Customer Details -->
+        {% if settings.receipt.show_customer_details %}
+            <div class="receipt-item"><span>Customer:</span><span>{{ receipt.customer }}</span></div>
+            <div class="receipt-item"><span>Phone:</span><span>{{ receipt.customer_phone }}</span></div>
+        {% endif %}
+        
+        <div class="receipt-line"></div>
+
+        <!-- Items -->
+        {% if settings.receipt.show_items %}
+            <div class="receipt-item"><strong>Item</strong><strong>Qty</strong><strong>Price</strong></div>
+            {% for item in receipt.items %}
+            <div class="receipt-item">
+                <span>{{ item.name }}</span>
+                <span>{{ item.qty }}</span>
+                <span>{{ item.total }}</span>
+            </div>
+            {% endfor %}
+            <div class="receipt-line"></div>
+        {% endif %}
+
+        <!-- Totals -->
+        {% if settings.receipt.show_totals %}
+            <div class="receipt-item"><span>Subtotal</span><span></span><span>{{ receipt.subtotal }}</span></div>
+            {% if receipt.discount > 0 %}
+            <div class="receipt-item"><span>Discount</span><span></span><span>{{ receipt.discount }}</span></div>
+            {% endif %}
+            {% if receipt.tax > 0 %}
+            <div class="receipt-item"><span>Tax</span><span></span><span>{{ receipt.tax }}</span></div>
+            {% endif %}
+            <div class="receipt-total">Total: KSh {{ receipt.total }}</div>
+        {% endif %}
+
+        <!-- Payment -->
+        {% if settings.receipt.show_payment %}
+            <div class="receipt-line"></div>
+            <div class="receipt-item"><span>Payment:</span><span>{{ receipt.payment_method }}</span></div>
+            <div class="receipt-item"><span>Status:</span><span>{{ receipt.payment_status }}</span></div>
+        {% endif %}
+
+        <!-- Barcode -->
+        {% if settings.receipt.include_barcode %}
+            <div class="receipt-line"></div>
+            <div style="text-align:center;">
+                <svg height="40" width="200">
+                    <rect x="0" y="0" width="200" height="40" fill="white"/>
+                    <rect x="0" y="0" width="200" height="40" stroke="#000000" stroke-width="1" fill="none"/>
+                    {% for i in "123456789012" %}
+                    <rect x="{{ forloop.counter0|add:10 }}" y="5" width="2" height="30" fill="#000000"/>
+                    {% endfor %}
+                    <!-- Add some variation to barcode -->
+                    <rect x="35" y="5" width="4" height="30" fill="#000000"/>
+                    <rect x="55" y="5" width="6" height="30" fill="#000000"/>
+                    <rect x="80" y="5" width="3" height="30" fill="#000000"/>
+                    <rect x="100" y="5" width="5" height="30" fill="#000000"/>
+                    <rect x="130" y="5" width="4" height="30" fill="#000000"/>
+                    <rect x="160" y="5" width="3" height="30" fill="#000000"/>
+                    <rect x="180" y="5" width="5" height="30" fill="#000000"/>
+                </svg>
+                <div style="font-size:10px; color: #000000;">{{ receipt.receipt_number }}</div>
+            </div>
+        {% endif %}
+
+        <!-- Signature -->
+        {% if settings.receipt.show_signature %}
+            <div class="receipt-line"></div>
+            <div style="text-align:center; color: #000000;">
+                <div>_________________________</div>
+                <div style="font-size:10px; color: #000000;">Authorized Signature</div>
+            </div>
+        {% endif %}
+
+        <!-- Footer -->
+        <div class="receipt-footer">
+            <div class="receipt-line"></div>
+            <p style="color: #000000;">{{ settings.receipt.thank_you_message|default:'Thank you for your business!' }}</p>
+            {% if settings.receipt.receipt_footer %}
+                <p style="color: #000000;">{{ settings.receipt.receipt_footer }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="no-print print-btn" style="text-align: center; margin-top: 20px;">
+        <button onclick="window.print()" class="btn btn-success btn-lg">
+            <i class="fas fa-print"></i> Print Receipt
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Get auto-print setting from data attribute
+    document.addEventListener('DOMContentLoaded', function() {
+        var receipt = document.getElementById('receipt');
+        var autoPrint = receipt ? receipt.dataset.autoPrint === 'true' : false;
+        
+        if (autoPrint) {
+            setTimeout(function() {
+                window.print();
+            }, 1000);
+        }
+    });
+</script>
+{% endblock %}

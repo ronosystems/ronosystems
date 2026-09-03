@@ -1,0 +1,571 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if is_edit %}Edit{% else %}Create{% endif %} Subscription - RonoSystems{% endblock %}
+{% block page_title %}{% if is_edit %}Edit Subscription{% else %}Create Subscription{% endif %}{% endblock %}
+{% block page_subtitle %}{% if is_edit %}Update subscription details{% else %}Assign a plan to a company{% endif %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE STYLING
+    ============================================ */
+    .required:after {
+        content: " *";
+        color: #dc3545;
+        font-weight: bold;
+    }
+    
+    .form-section {
+        background: #f8f9fa;
+        padding: 15px 20px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        border: 2px solid #000000;
+    }
+    .form-section h6 {
+        font-weight: 700;
+        color: #000000;
+        margin-bottom: 15px;
+    }
+    .form-section h6 i {
+        margin-right: 8px;
+        color: #000000;
+    }
+    
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+        color: #000000 !important;
+        border-radius: 0 !important;
+    }
+    
+    .card-header h6 {
+        color: #000000 !important;
+        font-weight: 700;
+        margin: 0;
+    }
+    
+    .card-body {
+        color: #000000;
+    }
+    
+    /* ============================================
+       INFO BOXES
+    ============================================ */
+    .company-info-box {
+        background: white;
+        padding: 15px;
+        border-radius: 4px;
+        border: 2px solid #000000;
+        margin-bottom: 15px;
+    }
+    .company-info-box .company-name {
+        font-weight: 700;
+        font-size: 16px;
+        color: #000000;
+    }
+    .company-info-box .company-details {
+        font-size: 13px;
+        color: #000000;
+    }
+    
+    .plan-info-box {
+        background: white;
+        padding: 15px;
+        border-radius: 4px;
+        border: 2px solid #000000;
+        margin-bottom: 15px;
+    }
+    .plan-info-box .plan-name {
+        font-weight: 700;
+        font-size: 16px;
+        color: #000000;
+    }
+    .plan-info-box .plan-details {
+        font-size: 13px;
+        color: #000000;
+    }
+    .plan-info-box .plan-price {
+        font-weight: 700;
+        color: #000000;
+        font-size: 18px;
+    }
+    
+    /* ============================================
+       FORM ELEMENTS
+    ============================================ */
+    .form-control, .form-select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        color: #000000;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    .form-label {
+        color: #000000;
+        font-weight: 600;
+    }
+    
+    textarea.form-control {
+        border: 2px solid #000000;
+        border-radius: 4px;
+    }
+    
+    textarea.form-control:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    .help-text {
+        font-size: 12px;
+        color: #000000;
+        margin-top: 4px;
+    }
+    
+    /* ============================================
+       STATUS BADGES
+    ============================================ */
+    .status-badge {
+        display: inline-block;
+        padding: 3px 12px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    .status-badge.active { background: #d4edda; color: #155724; }
+    .status-badge.pending { background: #cce5ff; color: #004085; }
+    .status-badge.expired { background: #f8d7da; color: #721c24; }
+    .status-badge.cancelled { background: #fff3cd; color: #856404; }
+    .status-badge.inactive { background: #e9ecef; color: #000000; }
+    
+    /* ============================================
+       BADGES
+    ============================================ */
+    .badge {
+        padding: 4px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    .badge.bg-light {
+        background: #f8f9fa !important;
+        color: #000000 !important;
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(135,206,235,0.3);
+    }
+    
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-danger {
+        background-color: #dc3545;
+        border: 2px solid #000000;
+        color: #ffffff;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-danger:hover {
+        background-color: #c82333;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .form-section {
+            padding: 12px 15px;
+        }
+        .form-section h6 {
+            font-size: 0.9rem;
+        }
+        .card-body {
+            padding: 15px;
+        }
+        .form-control, .form-select {
+            font-size: 13px;
+            padding: 6px 10px;
+        }
+        .form-label {
+            font-size: 13px;
+        }
+        .btn {
+            font-size: 12px;
+            padding: 6px 12px;
+        }
+        .company-info-box .company-name {
+            font-size: 14px;
+        }
+        .company-info-box .company-details {
+            font-size: 12px;
+        }
+        .plan-info-box .plan-name {
+            font-size: 14px;
+        }
+        .plan-info-box .plan-details {
+            font-size: 12px;
+        }
+        .plan-info-box .plan-price {
+            font-size: 16px;
+        }
+        .d-flex.gap-2 {
+            flex-wrap: wrap;
+        }
+        .d-flex.gap-2 .btn {
+            flex: 1;
+            min-width: 80px;
+            text-align: center;
+        }
+        .d-flex.gap-2 .ms-auto {
+            margin-left: 0 !important;
+        }
+        .row {
+            margin: 0 -5px;
+        }
+        .col-md-6 {
+            padding: 0 5px;
+        }
+        .card-header h6 {
+            font-size: 0.9rem;
+        }
+        .help-text {
+            font-size: 11px;
+        }
+        .status-badge {
+            font-size: 10px;
+            padding: 2px 10px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .form-section {
+            padding: 10px 12px;
+        }
+        .form-section h6 {
+            font-size: 0.8rem;
+        }
+        .card-body {
+            padding: 12px;
+        }
+        .form-control, .form-select {
+            font-size: 12px;
+            padding: 4px 8px;
+            height: 32px;
+        }
+        .form-label {
+            font-size: 12px;
+        }
+        .btn {
+            font-size: 11px;
+            padding: 4px 10px;
+        }
+        textarea.form-control {
+            font-size: 12px;
+            padding: 4px 8px;
+        }
+        .company-info-box {
+            padding: 10px;
+        }
+        .company-info-box .company-name {
+            font-size: 13px;
+        }
+        .company-info-box .company-details {
+            font-size: 11px;
+        }
+        .plan-info-box {
+            padding: 10px;
+        }
+        .plan-info-box .plan-name {
+            font-size: 13px;
+        }
+        .plan-info-box .plan-details {
+            font-size: 11px;
+        }
+        .plan-info-box .plan-price {
+            font-size: 14px;
+        }
+        .help-text {
+            font-size: 10px;
+        }
+        .d-flex.gap-2 .btn {
+            font-size: 10px;
+            padding: 3px 8px;
+            min-width: 60px;
+        }
+        .col-md-6 {
+            padding: 0 3px;
+        }
+        .row {
+            margin: 0 -3px;
+        }
+        .mb-3 {
+            margin-bottom: 6px !important;
+        }
+        .card-header {
+            padding: 8px 12px;
+        }
+        .card-header h6 {
+            font-size: 0.8rem;
+        }
+        .status-badge {
+            font-size: 9px;
+            padding: 2px 8px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-{% if is_edit %}edit{% else %}plus-circle{% endif %}"></i>
+                    {% if is_edit %}Edit Subscription{% else %}New Subscription{% endif %}
+                </h6>
+            </div>
+            <div class="card-body p-4">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <!-- Company Selection -->
+                    <div class="form-section">
+                        <h6><i class="fas fa-building"></i> Company</h6>
+                        {% if is_edit %}
+                            <div class="company-info-box">
+                                <div class="company-name">{{ subscription.company.name }}</div>
+                                <div class="company-details">
+                                    <i class="fas fa-envelope"></i> {{ subscription.company.email }}
+                                    {% if subscription.company.phone %}
+                                    | <i class="fas fa-phone"></i> {{ subscription.company.phone }}
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <input type="hidden" name="company" value="{{ subscription.company.id }}">
+                        {% else %}
+                            <div class="mb-3">
+                                <label class="form-label required">Select Company</label>
+                                <select class="form-select" name="company" required>
+                                    <option value="">-- Select Company --</option>
+                                    {% for company in companies %}
+                                    <option value="{{ company.id }}" 
+                                        {% if form_data.company == company.id|stringformat:"s" %}selected{% endif %}
+                                        {% if request.GET.company == company.id|stringformat:"s" %}selected{% endif %}>
+                                        {{ company.name }} ({{ company.email }})
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <div class="help-text">Select the company that will receive this subscription</div>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Plan Selection -->
+                    <div class="form-section">
+                        <h6><i class="fas fa-crown"></i> Plan</h6>
+                        <div class="mb-3">
+                            <label class="form-label required">Select Plan</label>
+                            <select class="form-select" name="plan" id="planSelect" required>
+                                <option value="">-- Select Plan --</option>
+                                {% for plan in plans %}
+                                <option value="{{ plan.id }}" 
+                                    {% if subscription.plan.id == plan.id %}selected{% endif %}
+                                    {% if form_data.plan == plan.id|stringformat:"s" %}selected{% endif %}
+                                    {% if request.GET.plan == plan.id|stringformat:"s" %}selected{% endif %}
+                                    data-price="{{ plan.price }}"
+                                    data-currency="{{ plan.currency }}"
+                                    data-cycle="{{ plan.billing_cycle }}"
+                                    data-employees="{{ plan.max_employees }}"
+                                    data-storage="{{ plan.max_storage }}">
+                                    {{ plan.display_name }} - {{ plan.currency }} {{ plan.price|floatformat:0 }} / {{ plan.billing_cycle }}
+                                    {% if not plan.is_active %} (Inactive){% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="help-text">Select the subscription plan for this company</div>
+                        </div>
+
+                        <!-- Plan Preview -->
+                        <div id="planPreview" style="display: none;" class="plan-info-box">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="plan-name" id="planDisplayName">Plan Name</div>
+                                    <div class="plan-details" id="planDetails">Features will be shown here</div>
+                                </div>
+                                <div class="col-md-6 text-end">
+                                    <div class="plan-price" id="planPrice">KES 0</div>
+                                    <div class="plan-details" id="planCycle">Monthly</div>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <span class="badge bg-light text-dark" id="planEmployees">👥 Employees: 0</span>
+                                <span class="badge bg-light text-dark" id="planStorage">💾 Storage: 0 MB</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Subscription Dates -->
+                    <div class="form-section">
+                        <h6><i class="fas fa-calendar-alt"></i> Subscription Period</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label required">Start Date</label>
+                                <input type="datetime-local" class="form-control" name="start_date" required
+                                       value="{% if subscription.start_date %}{{ subscription.start_date|date:'Y-m-d\TH:i' }}{% elif form_data.start_date %}{{ form_data.start_date }}{% else %}{{ now|date:'Y-m-d\TH:i' }}{% endif %}">
+                                <div class="help-text">When the subscription starts</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">End Date</label>
+                                <input type="datetime-local" class="form-control" name="end_date"
+                                       value="{% if subscription.end_date %}{{ subscription.end_date|date:'Y-m-d\TH:i' }}{% elif form_data.end_date %}{{ form_data.end_date }}{% endif %}">
+                                <div class="help-text">When the subscription ends (leave empty for never)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Status & Payment -->
+                    <div class="form-section">
+                        <h6><i class="fas fa-cog"></i> Status &amp; Payment</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label required">Status</label>
+                                <select class="form-select" name="status" required>
+                                    <option value="active" {% if subscription.status == 'active' or not subscription %}selected{% endif %}>Active</option>
+                                    <option value="pending" {% if subscription.status == 'pending' %}selected{% endif %}>Pending</option>
+                                    <option value="inactive" {% if subscription.status == 'inactive' %}selected{% endif %}>Inactive</option>
+                                    <option value="expired" {% if subscription.status == 'expired' %}selected{% endif %}>Expired</option>
+                                    <option value="cancelled" {% if subscription.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                                </select>
+                                <div class="help-text">Current status of the subscription</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Payment Method</label>
+                                <input type="text" class="form-control" name="payment_method" 
+                                       value="{% if subscription.payment_method %}{{ subscription.payment_method }}{% elif form_data.payment_method %}{{ form_data.payment_method }}{% endif %}"
+                                       placeholder="e.g., Credit Card, M-Pesa, Bank Transfer">
+                                <div class="help-text">How the company is paying</div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-12 mb-3">
+                                <label class="form-label">Payment Reference</label>
+                                <input type="text" class="form-control" name="payment_reference" 
+                                       value="{% if subscription.payment_reference %}{{ subscription.payment_reference }}{% elif form_data.payment_reference %}{{ form_data.payment_reference }}{% endif %}"
+                                       placeholder="Invoice number, transaction ID, etc.">
+                                <div class="help-text">Reference number for the payment</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Buttons -->
+                    <div class="d-flex gap-2 mt-3 flex-wrap">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> 
+                            {% if is_edit %}Update Subscription{% else %}Create Subscription{% endif %}
+                        </button>
+                        <a href="{% url 'plans:subscription-list' %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                        {% if is_edit and subscription.status == 'active' %}
+                        <a href="{% url 'plans:subscription-cancel' subscription.id %}" class="btn btn-danger ms-auto"
+                           onclick="return confirm('Are you sure you want to cancel this subscription?')">
+                            <i class="fas fa-times-circle"></i> Cancel Subscription
+                        </a>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const planSelect = document.getElementById('planSelect');
+    const planPreview = document.getElementById('planPreview');
+    const planDisplayName = document.getElementById('planDisplayName');
+    const planDetails = document.getElementById('planDetails');
+    const planPrice = document.getElementById('planPrice');
+    const planCycle = document.getElementById('planCycle');
+    const planEmployees = document.getElementById('planEmployees');
+    const planStorage = document.getElementById('planStorage');
+    
+    function updatePlanPreview() {
+        const selectedOption = planSelect.options[planSelect.selectedIndex];
+        if (selectedOption && selectedOption.value) {
+            const name = selectedOption.text.split(' - ')[0];
+            const price = selectedOption.dataset.price || '0';
+            const currency = selectedOption.dataset.currency || 'KES';
+            const cycle = selectedOption.dataset.cycle || 'monthly';
+            const employees = selectedOption.dataset.employees || '0';
+            const storage = selectedOption.dataset.storage || '0';
+            
+            planDisplayName.textContent = name;
+            planDetails.textContent = `Includes ${employees} employees and ${storage} MB storage`;
+            planPrice.textContent = `${currency} ${parseFloat(price).toFixed(0)}`;
+            planCycle.textContent = cycle.charAt(0).toUpperCase() + cycle.slice(1);
+            planEmployees.textContent = `👥 Employees: ${employees}`;
+            planStorage.textContent = `💾 Storage: ${storage} MB`;
+            planPreview.style.display = 'block';
+        } else {
+            planPreview.style.display = 'none';
+        }
+    }
+    
+    planSelect.addEventListener('change', updatePlanPreview);
+    
+    // Trigger preview on load if a plan is selected
+    if (planSelect.value) {
+        updatePlanPreview();
+    }
+});
+</script>
+{% endblock %}

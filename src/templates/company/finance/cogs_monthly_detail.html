@@ -1,0 +1,322 @@
+{% extends 'base.html' %}
+
+{% block title %}Monthly Purchases Detail{% endblock %}
+
+{% block page_title %}Monthly Purchases Detail{% endblock %}
+{% block page_subtitle %}{{ month_name }} {{ year }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    
+    .table-excel thead th {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    .table-excel tfoot td {
+        background-color: #e8f4f8 !important;
+        font-weight: 700 !important;
+        border-top: 3px solid #000000 !important;
+        border-bottom: 2px solid #000000 !important;
+        color: #000000 !important;
+    }
+    
+    .stat-card {
+        background: white;
+        border-radius: 4px;
+        padding: 20px;
+        border: 2px solid #000000;
+        height: 100%;
+        transition: all 0.3s;
+    }
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+    .stat-card .stat-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #000000;
+    }
+    .stat-card .stat-label {
+        font-size: 0.85rem;
+        color: #000000;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+    .stat-card.total { border-left: 6px solid #007bff; }
+    .stat-card.count { border-left: 6px solid #6f42c1; }
+    
+    .filter-form {
+        background: #f8f9fa;
+        padding: 15px 20px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        border: 2px solid #000000;
+    }
+    
+    .filter-form .form-label {
+        color: #000000;
+        font-weight: 600;
+    }
+    
+    .filter-form .form-select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+    }
+    
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+    }
+    
+    .card-header h5 {
+        color: #000000;
+        font-weight: 600;
+        margin: 0;
+    }
+    
+    .badge.bg-primary {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        border: 1px solid #000000;
+        padding: 4px 10px;
+        font-weight: 600;
+    }
+    
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 0.8rem;
+        border: 1px solid #000000;
+    }
+    .status-completed { background: #d4edda; color: #155724; }
+    .status-pending { background: #fff3cd; color: #856404; }
+    .status-cancelled { background: #f8d7da; color: #721c24; }
+    
+    .text-danger { color: #dc3545 !important; font-weight: 600; }
+    
+    @media (max-width: 768px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 12px;
+        }
+        .stat-card .stat-value {
+            font-size: 1.3rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Navigation -->
+    <div class="mb-3">
+        <a href="{% url 'finance-cogs-report' %}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i> Back to COGS Report
+        </a>
+        <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-print"></i> Print
+        </button>
+    </div>
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            <i class="fas fa-calendar-alt" style="color: #000000;"></i> Monthly Purchases
+            <small class="text-muted fs-6" style="color: #000000 !important;">{{ month_name }} {{ year }}</small>
+        </h1>
+    </div>
+
+    <!-- Filter Form -->
+    <div class="filter-form">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Branch</label>
+                <select name="branch" class="form-select form-select-sm">
+                    <option value="">All Branches</option>
+                    {% for branch in branches %}
+                    <option value="{{ branch.id }}" {% if selected_branch == branch.id|stringformat:"s" %}selected{% endif %}>
+                        {{ branch.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6">
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="fas fa-filter"></i> Apply Filter
+                </button>
+                <a href="{% url 'finance-cogs-monthly-detail' year month %}" class="btn btn-secondary btn-sm">
+                    <i class="fas fa-sync"></i> Reset
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-6 mb-3">
+            <div class="stat-card total">
+                <div class="stat-label">Total Purchases Value</div>
+                <div class="stat-value">KSh {{ total_purchases_value|floatformat:2|default:"0.00" }}</div>
+                <small>Total spent on purchases</small>
+            </div>
+        </div>
+        <div class="col-md-6 mb-3">
+            <div class="stat-card count">
+                <div class="stat-label">Total Purchases</div>
+                <div class="stat-value">{{ purchases_count }}</div>
+                <small>Number of purchases made</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Purchases List Table -->
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-shopping-bag"></i> Purchases List</h5>
+                <span class="badge bg-primary">{{ purchases|length }} purchases</span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="border: 2px solid #000000;">
+                <table class="table-excel table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Branch</th>
+                            <th>Purchase Type</th>
+                            <th>User</th>
+                            <th class="text-end">Amount Spent</th>
+                            <th>Reference</th>
+                            <th>Status</th>
+                            <th class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for purchase in purchases %}
+                        <tr>
+                            <td>{{ purchase.purchase_date|date:"Y-m-d" }}</td>
+                            <td>{{ purchase.branch.name }}</td>
+                            <td>{{ purchase.get_purchase_type_display }}</td>
+                            <td>{{ purchase.created_by.get_full_name|default:purchase.created_by.username }}</td>
+                            <td class="text-end text-danger">
+                                <strong>KSh {{ purchase.total_amount|floatformat:2 }}</strong>
+                            </td>
+                            <td>
+                                <span class="badge" style="background: #f8f9fa; border: 1px solid #000000; color: #000000; padding: 4px 10px;">
+                                    {{ purchase.payment_reference|default:"-" }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="status-badge status-{{ purchase.status }}">
+                                    {{ purchase.get_status_display }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <a href="{% url 'finance-purchase-detail' purchase.id %}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-4">
+                                <i class="fas fa-inbox fa-2x text-muted d-block mb-2"></i>
+                                <span class="text-muted">No purchases found for {{ month_name }} {{ year }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="4" class="text-end"><strong>TOTAL</strong></td>
+                            <td class="text-end"><strong>KSh {{ total_purchases_value|floatformat:2 }}</strong></td>
+                            <td colspan="3"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer">
+            <small>
+                {{ month_name }} {{ year }} | 
+                Total Purchases: {{ purchases_count }} | 
+                Total Amount: KSh {{ total_purchases_value|floatformat:2 }}
+            </small>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ system_name|default:"RonoSystems" }}{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --sidebar-width: 280px;
+            --sidebar-collapsed: 70px;
+            --primary-color: #87CEEB;
+            --secondary-color: #7bb8d8;
+            --sidebar-bg: #036a77;
+            --sidebar-hover: #02515b;
+            --text-light: #e0f7fa;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+            overflow-x: hidden;
+        }
+
+        /* ============================================
+           SIDEBAR
+        ============================================ */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: var(--sidebar-width);
+            background: var(--sidebar-bg);
+            color: #fff;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1050;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 15px rgba(0, 0, 0, 0.986);
+        }
+
+        .sidebar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sidebar::-webkit-scrollbar-track {
+            background: var(--sidebar-bg);
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background: #87CEEB;
+            border-radius: 10px;
+            border: 1px solid #000000;
+        }
+
+        .sidebar.collapsed {
+            width: var(--sidebar-collapsed);
+        }
+
+        /* ============================================
+           SIDEBAR BRAND
+        ============================================ */
+        .sidebar-brand {
+            padding: 20px 20px 15px;
+            border-bottom: 3px solid #000000;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .sidebar-brand .logo-icon {
+            font-size: 2.2rem;
+            color: #fff;
+        }
+
+        .sidebar-brand .logo-img {
+            max-width: 80px;
+            max-height: 80px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            border: 2px solid #000000;
+        }
+
+        .sidebar-brand h5 {
+            font-weight: 700;
+            margin: 8px 0 0;
+            color: #fff;
+            letter-spacing: 0.5px;
+            transition: opacity 0.2s;
+        }
+
+        .sidebar-brand .company-name {
+            font-size: 0.7rem;
+            color: rgba(255,255,255,0.8);
+            margin-top: 2px;
+            display: block;
+            transition: opacity 0.2s;
+        }
+
+        .sidebar.collapsed .sidebar-brand h5,
+        .sidebar.collapsed .sidebar-brand .company-name {
+            display: none;
+        }
+        
+        .sidebar.collapsed .sidebar-brand .logo-img {
+            max-width: 45px;
+            max-height: 45px;
+        }
+
+        .sidebar.collapsed .sidebar-brand .logo-icon {
+            font-size: 1.5rem;
+        }
+
+        /* ============================================
+           SIDEBAR NAVIGATION (Scrollable)
+        ============================================ */
+        .sidebar-nav-wrapper {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-bottom: 10px;
+        }
+
+        .sidebar-nav-wrapper::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sidebar-nav-wrapper::-webkit-scrollbar-track {
+            background: var(--sidebar-bg);
+        }
+        .sidebar-nav-wrapper::-webkit-scrollbar-thumb {
+            background: #87CEEB;
+            border-radius: 10px;
+            border: 1px solid #000000;
+        }
+
+        .sidebar-nav {
+            padding: 10px 0;
+        }
+
+        .sidebar-nav .nav-label {
+            padding: 8px 20px;
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.5);
+            letter-spacing: 1px;
+            font-weight: 700;
+            transition: opacity 0.2s;
+        }
+
+        .sidebar-nav .nav-item {
+            list-style: none;
+        }
+
+        .sidebar-nav .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 10px 20px;
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            transition: all 0.3s;
+            border-left: 3px solid transparent;
+            gap: 12px;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            border-radius: 0 4px 4px 0;
+            margin: 2px 8px 2px 0;
+            font-weight: 500;
+        }
+
+        .sidebar-nav .nav-link:hover {
+            background: var(--sidebar-hover);
+            color: #fff;
+            border-left-color: #87CEEB;
+        }
+
+        .sidebar-nav .nav-link.active {
+            background: var(--sidebar-hover);
+            color: #fff;
+            border-left-color: #87CEEB;
+        }
+
+        .sidebar-nav .nav-link i {
+            width: 22px;
+            text-align: center;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+            color: #87CEEB;
+        }
+
+        .sidebar-nav .nav-link .badge {
+            margin-left: auto;
+            background: #87CEEB;
+            color: #000000;
+            font-size: 0.6rem;
+            padding: 2px 8px;
+            border-radius: 50px;
+            flex-shrink: 0;
+            border: 1px solid #000000;
+            font-weight: 600;
+        }
+
+        .sidebar-nav .nav-link.text-danger {
+            color: #ff6b6b !important;
+        }
+
+        .sidebar-nav .nav-link.text-danger:hover {
+            background: rgba(255,107,107,0.1);
+            color: #ff6b6b !important;
+        }
+
+        .sidebar-nav .nav-link.text-danger i {
+            color: #ff6b6b !important;
+        }
+
+        .sidebar.collapsed .sidebar-nav .nav-label {
+            display: none;
+        }
+
+        .sidebar.collapsed .sidebar-nav .nav-link {
+            justify-content: center;
+            padding: 12px 10px;
+        }
+
+        .sidebar.collapsed .sidebar-nav .nav-link span:not(.badge) {
+            display: none;
+        }
+
+        .sidebar.collapsed .sidebar-nav .nav-link .badge {
+            display: none;
+        }
+
+        .sidebar.collapsed .sidebar-nav .nav-link i {
+            font-size: 1.3rem;
+            margin: 0;
+        }
+
+        /* ============================================
+           SIDEBAR FOOTER (Fixed at bottom)
+        ============================================ */
+        .sidebar-footer {
+            flex-shrink: 0;
+            border-top: 3px solid #000000;
+            padding: 15px 20px;
+            background: rgba(0,0,0,0.3);
+        }
+
+        .sidebar-toggle-btn {
+            width: 100%;
+            padding: 10px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.05);
+            border: 2px solid #000000;
+            color: rgba(255,255,255,0.8);
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .sidebar-toggle-btn:hover {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border-color: #87CEEB;
+        }
+
+        .sidebar.collapsed .sidebar-footer {
+            padding: 15px 10px;
+        }
+
+        .sidebar.collapsed .sidebar-toggle-btn {
+            padding: 10px;
+            justify-content: center;
+        }
+
+        .sidebar.collapsed .sidebar-toggle-btn span {
+            display: none;
+        }
+
+        /* ============================================
+           MAIN CONTENT
+        ============================================ */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .main-content.expanded {
+            margin-left: var(--sidebar-collapsed);
+        }
+
+        /* ============================================
+           TOP NAVBAR
+        ============================================ */
+        .top-navbar {
+            background: #fff;
+            padding: 12px 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            border-top: 3px solid #000000;
+            border-bottom: 3px solid #000000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 1040;
+        }
+
+        .top-navbar .page-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #000000;
+        }
+
+        .top-navbar .page-title small {
+            font-weight: 400;
+            color: #000000;
+            font-size: 0.85rem;
+        }
+
+        .top-navbar .navbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+
+        .top-navbar .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            padding: 5px 12px;
+            border-radius: 4px;
+            transition: all 0.3s;
+            text-decoration: none;
+            color: #000000;
+            border: 2px solid #000000;
+        }
+
+        .top-navbar .user-profile:hover {
+            background: #f8f9fa;
+            border-color: #87CEEB;
+        }
+
+        .top-navbar .user-profile .avatar-sm {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            overflow: hidden;
+            flex-shrink: 0;
+            background: #87CEEB;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: #000000;
+            border: 2px solid #000000;
+        }
+
+        .top-navbar .user-profile .avatar-sm img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .top-navbar .user-profile .user-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #000000;
+        }
+
+        .top-navbar .user-profile .user-role {
+            font-size: 0.7rem;
+            color: #000000;
+        }
+
+        .sidebar-toggle-mobile {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: #000000;
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: background 0.3s;
+        }
+
+        .sidebar-toggle-mobile:hover {
+            background: #f0f2f5;
+        }
+
+        /* ============================================
+           CONTENT AREA
+        ============================================ */
+        .content-area {
+            flex: 1;
+            padding: 25px 30px;
+        }
+
+        /* ============================================
+           FOOTER
+        ============================================ */
+        .footer {
+            background: #fff;
+            padding: 15px 30px;
+            border-top: 2px solid #000000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .footer .copyright {
+            font-size: 0.85rem;
+            color: #000000;
+        }
+
+        .footer .copyright i {
+            color: #dc3545;
+        }
+
+        .footer .powered-by {
+            font-size: 0.85rem;
+            color: #000000;
+        }
+
+        .footer .powered-by a {
+            color: #000000;
+            text-decoration: none;
+            font-weight: 700;
+        }
+
+        .footer .powered-by a:hover {
+            text-decoration: underline;
+            color: #87CEEB;
+        }
+
+        /* ============================================
+           SIDEBAR OVERLAY (Mobile)
+        ============================================ */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1045;
+        }
+
+        .sidebar-overlay.active {
+            display: block;
+        }
+
+        /* ============================================
+           SEARCH
+        ============================================ */
+        .search-input {
+            border-radius: 4px;
+            border: 2px solid #000000;
+            padding: 6px 15px 6px 35px;
+            font-size: 0.85rem;
+            background: #f8f9fa;
+            transition: all 0.3s;
+            width: 200px;
+            color: #000000;
+        }
+
+        .search-input:focus {
+            width: 280px;
+            background: #fff;
+            border-color: #87CEEB;
+            box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+            outline: none;
+        }
+
+        .search-wrapper {
+            position: relative;
+        }
+
+        .search-wrapper i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #000000;
+            font-size: 0.85rem;
+        }
+
+        /* ============================================
+           ALERTS
+        ============================================ */
+        .alert {
+            border: 2px solid #000000;
+            border-radius: 4px;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border-color: #000000;
+        }
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+            border-color: #000000;
+        }
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border-color: #000000;
+        }
+        .alert-info {
+            background: #cce5ff;
+            color: #004085;
+            border-color: #000000;
+        }
+
+        /* ============================================
+           RESPONSIVE
+        ============================================ */
+        @media (max-width: 992px) {
+            .sidebar {
+                transform: translateX(-100%);
+                width: var(--sidebar-width);
+            }
+
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+
+            .sidebar.collapsed {
+                transform: translateX(-100%);
+                width: var(--sidebar-width);
+            }
+
+            .sidebar.collapsed.mobile-open {
+                transform: translateX(0);
+            }
+
+            .sidebar-overlay.active {
+                display: block;
+            }
+
+            .main-content {
+                margin-left: 0 !important;
+            }
+
+            .sidebar-toggle-mobile {
+                display: block;
+            }
+
+            .top-navbar .page-title {
+                font-size: 0.95rem;
+            }
+
+            .content-area {
+                padding: 15px;
+            }
+
+            .footer {
+                flex-direction: column;
+                text-align: center;
+                padding: 15px;
+            }
+
+            /* Show all content when collapsed on mobile */
+            .sidebar.collapsed .sidebar-brand h5,
+            .sidebar.collapsed .sidebar-brand .company-name,
+            .sidebar.collapsed .sidebar-user .user-info,
+            .sidebar.collapsed .sidebar-nav .nav-label,
+            .sidebar.collapsed .sidebar-nav .nav-link span:not(.badge),
+            .sidebar.collapsed .sidebar-nav .nav-link .badge {
+                display: block !important;
+            }
+
+            .sidebar.collapsed .sidebar-user {
+                justify-content: flex-start;
+                padding: 15px 20px;
+            }
+
+            .sidebar.collapsed .sidebar-nav .nav-link {
+                justify-content: flex-start;
+                padding: 12px 20px;
+            }
+
+            .sidebar.collapsed .sidebar-nav .nav-link i {
+                font-size: 1.1rem;
+                margin: 0;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .top-navbar {
+                padding: 10px 15px;
+            }
+
+            .top-navbar .user-profile .user-name {
+                display: none;
+            }
+
+            .top-navbar .user-profile .user-role {
+                display: none;
+            }
+
+            .content-area {
+                padding: 10px;
+            }
+
+            .search-input {
+                width: 120px;
+            }
+            .search-input:focus {
+                width: 150px;
+            }
+
+            .top-navbar .navbar-actions .notification-btn {
+                font-size: 1rem;
+            }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+    <!-- ============================================
+    SIDEBAR OVERLAY (Mobile)
+    ============================================ -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- ============================================
+    SIDEBAR
+    ============================================ -->
+    <aside class="sidebar" id="sidebar">
+
+        <!-- Brand -->
+        <div class="sidebar-brand">
+            {% if user.is_authenticated and user.company %}
+                {% if user.company.logo %}
+                    <img src="{{ user.company.logo.url }}" alt="{{ user.company.name }}" class="logo-img">
+                {% elif site_logo %}
+                    <img src="/media/{{ site_logo }}" alt="{{ system_name }}" class="logo-img">
+                {% else %}
+                    <div class="logo-icon">
+                        <i class="fas fa-rocket"></i>
+                    </div>
+                {% endif %}
+                <span class="company-name">
+                    <h5>{{ user.company.name }}</h5>
+                </span>
+            {% else %}
+                {% if site_logo %}
+                    <img src="/media/{{ site_logo }}" alt="{{ system_name }}" class="logo-img">
+                {% else %}
+                    <div class="logo-icon">
+                        <i class="fas fa-rocket"></i>
+                    </div>
+                {% endif %}
+                <span class="company-name">
+                    <h5>Enterprise Platform</h5>
+                </span>
+            {% endif %}
+        </div>
+
+        <!-- Navigation (Scrollable) -->
+        <div class="sidebar-nav-wrapper">
+            <nav class="sidebar-nav">
+                <ul class="nav flex-column">
+                    <li class="nav-label">Main</li>
+
+                    <!-- Dashboard -->
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/dashboard/' or request.path == '/epa_shop/dashboard/' %}active{% endif %}" href="/dashboard/">
+                            <i class="fas fa-chart-pie"></i> <span>Dashboard</span>
+                        </a>
+                    </li>
+
+                    <!-- ============================================
+                    EPA SHOP MENU - Check user access
+                    ============================================ -->
+                    {% if user.is_authenticated %}
+                        {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'company_cashier' or user.role == 'company_agent' or user.role == 'company_staff' %}
+                            {% if user.company and user.company.business_type %}
+                                {% if 'epa' in user.company.business_type.name.lower or 'electronics' in user.company.business_type.name.lower %}
+                                <li class="nav-label">EPA Shop</li>
+                                <!-- For Cashiers  SHOP BULK SALES  -->
+                                {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'company_cashier'%}
+                                <li class="nav-item">
+                                    <a class="nav-link {% if '/epa_shop/pos/' in request.path %}active{% endif %}" href="/epa_shop/pos/">
+                                        <i class="fas fa-shopping-cart"></i> <span>POS</span>
+                                    </a>
+                                </li>
+                                {% endif %}
+
+                                {% if user.role == 'company_cashier'%}
+                                <li class="nav-item">
+                                    <a class="nav-link {% if '/company/expenses/' in request.path %}active{% endif %}" href="{% url 'company-expenses-create' %}">
+                                        <i class="fas fa-plus"></i> Expense
+                                    </a>
+                                </li>
+                                {% endif %}
+                                
+
+                                <!-- For Sales Agents  SINGLE SALES  -->
+                                {% if user.role == 'company_agent'%}
+                                <li class="nav-item">
+                                    <a class="nav-link {% if '/epa_shop/sales/single/' in request.path %}active{% endif %}" href="/epa_shop/sales/single/">
+                                        <i class="fas fa-plus"></i> New Sale
+                                    </a>
+                                </li>
+                                {% endif %}
+
+
+                                <!--Phone and Electronic devices -->
+                                {% if user.role == 'company_manager' or user.role == 'super_admin' or user.role == 'company_agent' %}
+                                <li class="nav-item">
+                                    <a class="nav-link {% if '/epa_shop/units/phones/' in request.path %}active{% endif %}" href="/epa_shop/units/phones/">
+                                        <i class="fas fa-box"></i>Smartphones
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link {% if '/epa_shop/units/electronics/' in request.path %}active{% endif %}" href="/epa_shop/units/electronics/">
+                                        <i class="fas fa-box"></i>Electronics
+                                    </a>
+                                </li>
+                                {% endif %}
+
+
+                                <!-- Employee management - Only for Admins and Managers -->
+                                {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' %}
+                                <li class="nav-item">
+                                    <a class="nav-link {% if '/epa_shop/sales/' in request.path %}active{% endif %}" href="/epa_shop/sales/">
+                                        <i class="fas fa-shopping-cart"></i> <span>Sales</span>
+                                    </a>
+                                </li>
+                                
+                                <li class="nav-item">
+                                    <a class="nav-link {% if '/company/employees/' in request.path %}active{% endif %}" href="/company/employees/">
+                                        <i class="fas fa-users"></i> <span>Employees</span>
+                                    </a>
+                                </li>
+
+                                <li class="nav-item">
+                                    <a class="nav-link {% if '/company/expenses/' in request.path %}active{% endif %}" href="{% url 'company-expenses-dashboard' %}">
+                                        <i class="fas fa-wallet"></i> <span>Expenses</span>
+                                    </a>
+                                </li>
+                                {% endif %}
+
+
+                                <!-- For Company admins only  (Owners) -->
+                                {% if user.role == 'company_admin' or user.role == 'super_admin' %}
+                                <li class="nav-item">
+                                    <a class="nav-link {% if '/company/branches/' in request.path %}active{% endif %}" href="/company/branches/">
+                                        <i class="fas fa-building"></i> <span>Branches</span>
+                                    </a>
+                                </li>
+                                
+                                <li class="nav-item">
+                                    <a class="nav-link {% if '/epa_shop/inventory/' in request.path %}active{% endif %}" href="/epa_shop/inventory/">
+                                        <i class="fas fa-warehouse"></i> <span>Inventory</span>
+                                    </a>
+                                </li>
+
+                                <li class="nav-item">
+                                    <a class="nav-link finance-link {% if '/epa_shop/finance/'  in request.path %}active{% endif %}" href="/epa_shop/finance/">
+                                        <i class="fas fa-coins"></i> <span>Finance</span>
+                                    </a>
+                                </li>
+
+                                <li class="nav-item">
+                                    <a class="nav-link {% if '/company/settings/' in request.path %}active{% endif %}" href="/company/settings/">
+                                        <i class="fas fa-gear"></i> <span>Settings</span>
+                                    </a>
+                                </li>
+                                {% endif %}
+                                {% endif %}
+                            {% endif %}
+                        {% endif %}
+                    {% endif %}
+
+                    <!-- ============================================
+                    SUPER ADMIN LINKS
+                    ============================================ -->
+                    {% if user.is_authenticated and user.role == 'super_admin' %}
+                    <li class="nav-label">Administration</li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/">
+                            <i class="fas fa-tag"></i> <span>Admin Panel</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/business_types/' in request.path %}active{% endif %}" href="/business-types/">
+                            <i class="fas fa-tags"></i> <span>Business Types</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/plans/' in request.path %}active{% endif %}" href="/plans/">
+                            <i class="fas fa-dollar-sign"></i> <span>Plans</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/companies/' in request.path %}active{% endif %}" href="/companies/">
+                            <i class="fas fa-building"></i> <span>Companies</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/employees/' in request.path %}active{% endif %}" href="/employees/">
+                            <i class="fas fa-users"></i> <span>Employees</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/reports/' in request.path %}active{% endif %}" href="/reports/">
+                            <i class="fas fa-file-alt"></i> <span>Reports</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/settings/' in request.path %}active{% endif %}" href="/settings/">
+                            <i class="fas fa-cog"></i> <span>Settings</span>
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    <!-- ============================================
+                    ACCOUNT
+                    ============================================ -->
+                    <li class="nav-label">Account</li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/profile/' in request.path %}active{% endif %}" href="/profile/">
+                            <i class="fas fa-user-alt"></i> <span>Profile</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-danger" href="/auth/logout/">
+                            <i class="fas fa-sign-out-alt"></i> <span>Logout</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+
+        <!-- Sidebar Footer (Fixed at bottom) -->
+        <div class="sidebar-footer">
+            <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Sidebar">
+                <i class="fas fa-chevron-left" id="toggleIcon"></i>
+                <span id="toggleText">Collapse</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- ============================================
+    MAIN CONTENT
+    ============================================ -->
+    <div class="main-content" id="mainContent">
+
+        <!-- Top Navbar -->
+        <nav class="top-navbar">
+            <div class="d-flex align-items-center gap-3">
+                <button class="sidebar-toggle-mobile" id="sidebarToggleMobile">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="page-title">
+                    {% block page_title %}Dashboard{% endblock %}
+                    <small>{% block page_subtitle %}{% endblock %}</small>
+                </div>
+            </div>
+
+            <div class="navbar-actions">
+                <div class="search-wrapper">
+                    <i class="fas fa-search"></i>
+                    <input type="text" class="search-input" placeholder="Search..." id="globalSearch">
+                </div>
+
+                <!-- User Profile with Image -->
+                <a href="#" class="user-profile" data-bs-toggle="dropdown">
+                    <div class="avatar-sm">
+                        {% if user.is_authenticated and user.profile_picture %}
+                            <img src="/media/{{ user.profile_picture }}" alt="{{ user.get_full_name|default:user.username }}">
+                        {% else %}
+                            {{ user.first_name|default:user.username|make_list|first|upper }}
+                        {% endif %}
+                    </div>
+                    <div>
+                        <div class="user-name">{{ user.first_name|default:user.username }}</div>
+                        <div class="user-role">{{ user.role|title }}</div>
+                    </div>
+                    <i class="fas fa-chevron-down text-muted" style="font-size: 0.7rem; color: #000000 !important;"></i>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end" style="border: 2px solid #000000; border-radius: 4px;">
+                    <li><span class="dropdown-item-text">
+                        <strong style="color: #000000;">{{ user.first_name|default:user.username }}</strong>
+                        <br><small style="color: #000000;">{{ user.email }}</small>
+                    </span></li>
+                    <li><hr class="dropdown-divider" style="border-top: 2px solid #000000;"></li>
+                    <li><a class="dropdown-item" href="/profile/" style="color: #000000; font-weight: 500;">
+                        <i class="fas fa-user-circle"></i> Profile
+                    </a></li>
+                    <li><hr class="dropdown-divider" style="border-top: 2px solid #000000;"></li>
+                    <li><a class="dropdown-item text-danger" href="/auth/logout/" style="font-weight: 600;">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <!-- Content -->
+        <div class="content-area">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                        <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-circle{% else %}info-circle{% endif %}"></i>
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            {% block content %}{% endblock %}
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="copyright">
+                <i class="fas fa-copyright"></i> {% now "Y" %} {{ system_name|default:"RonoSystems" }}. All rights reserved.
+            </div>
+            <div class="powered-by">
+                Powered by <a href="/">{{ system_name|default:"RonoSystems" }}</a> v1.0.0
+            </div>
+        </footer>
+    </div>
+
+    <!-- ============================================
+    SCRIPTS
+    ============================================ -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Sidebar Toggle
+        const sidebar = document.getElementById('sidebar');
+        const mainContent = document.getElementById('mainContent');
+        const toggleBtn = document.getElementById('sidebarToggleBtn');
+        const toggleIcon = document.getElementById('toggleIcon');
+        const toggleText = document.getElementById('toggleText');
+
+        // Load saved state
+        if (localStorage.getItem('sidebarCollapsed') === 'true') {
+            sidebar.classList.add('collapsed');
+            mainContent.classList.add('expanded');
+            toggleIcon.className = 'fas fa-chevron-right';
+            toggleText.textContent = 'Expand';
+        }
+
+        toggleBtn.addEventListener('click', function() {
+            sidebar.classList.toggle('collapsed');
+            mainContent.classList.toggle('expanded');
+            const isCollapsed = sidebar.classList.contains('collapsed');
+            toggleIcon.className = isCollapsed ? 'fas fa-chevron-right' : 'fas fa-chevron-left';
+            toggleText.textContent = isCollapsed ? 'Expand' : 'Collapse';
+            localStorage.setItem('sidebarCollapsed', isCollapsed);
+        });
+
+        // Mobile Toggle
+        const mobileToggle = document.getElementById('sidebarToggleMobile');
+        const overlay = document.getElementById('sidebarOverlay');
+
+        mobileToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('mobile-open');
+            overlay.classList.toggle('active');
+        });
+
+        overlay.addEventListener('click', function() {
+            sidebar.classList.remove('mobile-open');
+            overlay.classList.remove('active');
+        });
+
+        window.addEventListener('resize', function() {
+            if (window.innerWidth > 992) {
+                sidebar.classList.remove('mobile-open');
+                overlay.classList.remove('active');
+            }
+        });
+
+        // Keyboard Shortcut: Ctrl+B
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+                e.preventDefault();
+                toggleBtn.click();
+            }
+        });
+
+        // Search
+        document.getElementById('globalSearch').addEventListener('keyup', function(e) {
+            if (e.key === 'Enter') {
+                const query = this.value.trim();
+                const items = document.querySelectorAll('.card, .list-group-item, tr');
+                if (query) {
+                    let found = false;
+                    items.forEach(item => {
+                        const text = item.textContent.toLowerCase();
+                        if (text.includes(query.toLowerCase())) {
+                            item.style.display = '';
+                            item.style.border = '2px solid #87CEEB';
+                            found = true;
+                            setTimeout(() => { item.style.border = ''; }, 3000);
+                        } else {
+                            item.style.display = 'none';
+                        }
+                    });
+                    if (!found) alert('No results found for: ' + query);
+                } else {
+                    items.forEach(item => {
+                        item.style.display = '';
+                        item.style.border = '';
+                    });
+                }
+            }
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

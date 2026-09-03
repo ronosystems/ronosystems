@@ -1,0 +1,738 @@
+{% extends 'base.html' %}
+
+{% block title %}Categories - RonoSystems{% endblock %}
+
+{% block page_title %}Categories{% endblock %}
+{% block page_subtitle %}Product categories{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE TABLE STYLING
+    ============================================ */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    
+    .table-excel thead th {
+        background-color: #87CEEB !important; /* Sky Blue */
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    /* Zebra striping for Excel look */
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table-excel tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+
+    /* Sortable headers */
+    .sortable-header {
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        padding-right: 20px !important;
+    }
+    .sortable-header:hover {
+        background-color: #7bb8d8 !important;
+    }
+    .sortable-header .sort-icon {
+        position: absolute;
+        right: 6px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 10px;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+        color: #000000;
+    }
+    .sortable-header:hover .sort-icon {
+        opacity: 1;
+    }
+    .sortable-header.active .sort-icon {
+        opacity: 1;
+    }
+    .sortable-header.asc .sort-icon::after {
+        content: '▲';
+    }
+    .sortable-header.desc .sort-icon::after {
+        content: '▼';
+    }
+
+    /* ============================================
+       CATEGORY TYPE BADGES
+    ============================================ */
+    .category-type-badge {
+        padding: 4px 12px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    .category-type-electronics { background: #d1fae5; color: #065f46; }
+    .category-type-phones { background: #dbeafe; color: #1e40af; }
+    .category-type-accessories { background: #fef3c7; color: #92400e; }
+    .category-type-parts { background: #fce4ec; color: #c62828; }
+    
+    /* ============================================
+       STAT CARDS
+    ============================================ */
+    .stat-card {
+        background: white;
+        border-radius: 4px;
+        padding: 15px 20px;
+        text-align: center;
+        border: 2px solid #000000;
+        transition: all 0.3s;
+    }
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+    .stat-card .stat-number {
+        font-size: 24px;
+        font-weight: 700;
+        color: #000000;
+    }
+    .stat-card .stat-label {
+        font-size: 12px;
+        color: #000000;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+    .stat-card .stat-icon {
+        font-size: 20px;
+        display: block;
+        margin-bottom: 4px;
+        color: #000000;
+    }
+    
+    /* ============================================
+       CATEGORY COUNT BADGE
+    ============================================ */
+    .category-count-badge {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        background: #f8f9fa;
+        color: #000000;
+        margin-left: 8px;
+        border: 1px solid #000000;
+    }
+    
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-footer {
+        border-top: 2px solid #000000;
+        background-color: #f8f9fa;
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-success {
+        border: 2px solid #000000;
+        color: #28a745;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-success:hover {
+        background-color: #28a745;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-outline-primary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-primary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-danger {
+        border: 2px solid #000000;
+        color: #dc3545;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-danger:hover {
+        background-color: #dc3545;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-outline-secondary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .action-btn-group {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    .action-btn-group .btn {
+        padding: 4px 8px;
+        font-size: 12px;
+        border-radius: 4px;
+    }
+    
+    /* ============================================
+       TOGGLE SWITCH
+    ============================================ */
+    .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 44px;
+        height: 24px;
+        margin: 0 5px;
+    }
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #dc3545;
+        transition: .3s;
+        border-radius: 24px;
+        border: 2px solid #000000;
+    }
+    .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 16px;
+        width: 16px;
+        left: 2px;
+        bottom: 2px;
+        background: white;
+        transition: .3s;
+        border-radius: 50%;
+        border: 1px solid #000000;
+    }
+    .toggle-switch input:checked + .toggle-slider {
+        background: #28a745;
+    }
+    .toggle-switch input:checked + .toggle-slider:before {
+        transform: translateX(20px);
+    }
+    .status-label {
+        font-size: 11px;
+        font-weight: 600;
+        margin-left: 4px;
+    }
+    .status-label.text-success {
+        color: #28a745 !important;
+    }
+    .status-label.text-danger {
+        color: #dc3545 !important;
+    }
+    
+    /* ============================================
+       EMPTY STATE
+    ============================================ */
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+    }
+    .empty-state h5 {
+        color: #000000;
+        font-weight: 600;
+    }
+    .empty-state p {
+        color: #000000;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 992px) {
+        .table-excel {
+            font-size: 13px;
+        }
+        .table-excel th,
+        .table-excel td {
+            padding: 6px 8px;
+        }
+        .category-type-badge {
+            font-size: 10px;
+            padding: 3px 8px;
+        }
+        .category-count-badge {
+            font-size: 10px;
+            padding: 1px 8px;
+        }
+        .action-btn-group .btn {
+            padding: 3px 6px;
+            font-size: 11px;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .stat-card .stat-number {
+            font-size: 20px;
+        }
+        .stat-card .stat-label {
+            font-size: 10px;
+        }
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 11px;
+        }
+        .table-excel th {
+            font-size: 10px;
+        }
+        .category-type-badge {
+            font-size: 9px;
+            padding: 2px 6px;
+        }
+        .category-count-badge {
+            font-size: 9px;
+            padding: 1px 6px;
+            margin-left: 4px;
+        }
+        .action-btn-group .btn {
+            padding: 2px 4px;
+            font-size: 10px;
+        }
+        .action-btn-group .btn i {
+            font-size: 10px;
+        }
+        .toggle-switch {
+            width: 36px;
+            height: 20px;
+        }
+        .toggle-slider:before {
+            height: 13px;
+            width: 13px;
+            left: 2px;
+            bottom: 2px;
+        }
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(16px);
+        }
+        .status-label {
+            font-size: 9px;
+        }
+        .d-flex.gap-2.flex-wrap {
+            gap: 4px !important;
+        }
+        .btn-sm {
+            font-size: 10px;
+            padding: 3px 8px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 3px 4px;
+            font-size: 9px;
+        }
+        .table-excel th {
+            font-size: 8px;
+        }
+        .category-type-badge {
+            font-size: 7px;
+            padding: 1px 4px;
+        }
+        .category-count-badge {
+            font-size: 7px;
+            padding: 1px 4px;
+            margin-left: 2px;
+        }
+        .action-btn-group .btn {
+            padding: 1px 3px;
+            font-size: 8px;
+        }
+        .action-btn-group .btn i {
+            font-size: 8px;
+        }
+        .toggle-switch {
+            width: 30px;
+            height: 17px;
+        }
+        .toggle-slider:before {
+            height: 11px;
+            width: 11px;
+            left: 1px;
+            bottom: 1px;
+        }
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(13px);
+        }
+        .status-label {
+            font-size: 8px;
+        }
+        .stat-card .stat-number {
+            font-size: 16px;
+        }
+        .stat-card .stat-icon {
+            font-size: 16px;
+        }
+        .stat-card {
+            padding: 10px 12px;
+        }
+        .btn-sm {
+            font-size: 8px;
+            padding: 2px 6px;
+        }
+        .empty-state h5 {
+            font-size: 0.9rem;
+        }
+        .empty-state p {
+            font-size: 0.8rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center flex-wrap mb-4">
+            <div>
+                <h4 class="mb-0"><i class="fas fa-tags" style="color: #000000;"></i> Categories</h4>
+                <p class="text-muted small mb-0" style="color: #000000 !important;">Manage product categories</p>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="/epa_shop/inventory/" class="btn btn-secondary btn-sm">
+                    <i class="fas fa-arrow-left"></i> Back to Inventory
+                </a>
+                <a href="{% url 'epa-category-create' %}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus"></i> Add Category
+                </a>
+            </div>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3 col-6">
+                <div class="stat-card">
+                    <span class="stat-icon">📂</span>
+                    <div class="stat-number">{{ categories|length }}</div>
+                    <div class="stat-label">Total Categories</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-card">
+                    <span class="stat-icon">✅</span>
+                    <div class="stat-number">{{ active_count|default:0 }}</div>
+                    <div class="stat-label">Active</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-card">
+                    <span class="stat-icon">📱</span>
+                    <div class="stat-number">{{ phones_count|default:0 }}</div>
+                    <div class="stat-label">Phones</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-card">
+                    <span class="stat-icon">💻</span>
+                    <div class="stat-number">{{ electronics_count|default:0 }}</div>
+                    <div class="stat-label">Electronics</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Categories Table -->
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive" style="border: 2px solid #000000;">
+                    <table class="table-excel table-hover mb-0" id="categoriesTable">
+                        <thead>
+                            <tr>
+                                <th style="width:5%;" class="sortable-header" data-sort="id" onclick="sortTable('id')">
+                                    #
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:20%;" class="sortable-header" data-sort="name" onclick="sortTable('name')">
+                                    Name
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:15%;" class="sortable-header" data-sort="type" onclick="sortTable('type')">
+                                    Type
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:25%;" class="sortable-header" data-sort="description" onclick="sortTable('description')">
+                                    Description
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:15%;" class="sortable-header" data-sort="status" onclick="sortTable('status')">
+                                    Status
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:20%;" class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for category in categories %}
+                            <tr data-id="{{ forloop.counter }}"
+                                data-name="{{ category.name }}"
+                                data-type="{{ category.category_type }}"
+                                data-description="{{ category.description|default:'-'|truncatechars:60 }}"
+                                data-status="{% if category.is_active %}Active{% else %}Inactive{% endif %}">
+                                <td>{{ forloop.counter }}</td>
+                                <td>
+                                    <strong>{{ category.name }}</strong>
+                                    <span class="category-count-badge">{{ category.category_type }}</span>
+                                </td>
+                                <td>
+                                    <span class="category-type-badge category-type-{{ category.category_type }}">
+                                        {{ category.category_type|title }}
+                                    </span>
+                                </td>
+                                <td>{{ category.description|default:"-"|truncatechars:60 }}</td>
+                                <td>
+                                    <form method="post" action="{% url 'epa-category-toggle-status' category.id %}" style="display:inline;" id="status-form-{{ category.id }}">
+                                        {% csrf_token %}
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" name="is_active" {% if category.is_active %}checked{% endif %} 
+                                                   onchange="document.getElementById('status-form-{{ category.id }}').submit()">
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                        <span class="status-label {% if category.is_active %}text-success{% else %}text-danger{% endif %}">
+                                            {% if category.is_active %}Active{% else %}Inactive{% endif %}
+                                        </span>
+                                    </form>
+                                </td>
+                                <td>
+                                    <div class="action-btn-group">
+                                        <a href="{% url 'epa-category-products' category.id %}" class="btn btn-outline-success btn-sm" title="View Products">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{% url 'epa-category-edit' category.id %}" class="btn btn-outline-primary btn-sm" title="Edit Category">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a href="{% url 'epa-category-delete' category.id %}" class="btn btn-outline-danger btn-sm" title="Delete Category" 
+                                           onclick="return confirm('Are you sure you want to delete {{ category.name }}?')">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center py-5">
+                                    <div class="empty-state">
+                                        <i class="fas fa-tags fa-4x d-block mb-3" style="color: #000000;"></i>
+                                        <h5>No Categories Found</h5>
+                                        <p>Start by creating your first product category.</p>
+                                        <a href="{% url 'epa-category-create' %}" class="btn btn-primary">
+                                            <i class="fas fa-plus"></i> Add First Category
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer text-muted" style="color: #000000 !important;">
+                <small>Showing {{ categories|length }} categories</small>
+                <span class="float-end">
+                    <a href="/epa_shop/inventory/" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Inventory
+                    </a>
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Sorting state
+let sortState = {
+    column: null,
+    direction: 'asc'
+};
+
+// Sort table function
+function sortTable(column) {
+    const table = document.getElementById('categoriesTable');
+    if (!table) return;
+    
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    // Skip if no rows or empty state
+    if (rows.length === 0 || rows[0].cells.length === 1) return;
+    
+    // Determine sort direction
+    let direction = 'asc';
+    if (sortState.column === column) {
+        direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+    }
+    sortState.column = column;
+    sortState.direction = direction;
+    
+    // Update header icons
+    table.querySelectorAll('.sortable-header').forEach(header => {
+        header.classList.remove('active', 'asc', 'desc');
+        const icon = header.querySelector('.sort-icon');
+        if (header.dataset.sort === column) {
+            header.classList.add('active', direction);
+        } else {
+            icon.textContent = '';
+        }
+    });
+    
+    // Sort rows
+    rows.sort((a, b) => {
+        let valueA, valueB;
+        
+        switch(column) {
+            case 'id':
+                valueA = parseInt(a.dataset.id) || 0;
+                valueB = parseInt(b.dataset.id) || 0;
+                break;
+            case 'name':
+                valueA = a.dataset.name || '';
+                valueB = b.dataset.name || '';
+                break;
+            case 'type':
+                valueA = a.dataset.type || '';
+                valueB = b.dataset.type || '';
+                break;
+            case 'description':
+                valueA = a.dataset.description || '';
+                valueB = b.dataset.description || '';
+                break;
+            case 'status':
+                valueA = a.dataset.status || '';
+                valueB = b.dataset.status || '';
+                break;
+            default:
+                return 0;
+        }
+        
+        // Compare values
+        let comparison = 0;
+        if (typeof valueA === 'number' && typeof valueB === 'number') {
+            comparison = valueA - valueB;
+        } else {
+            comparison = String(valueA).localeCompare(String(valueB), undefined, { sensitivity: 'base' });
+        }
+        
+        return direction === 'asc' ? comparison : -comparison;
+    });
+    
+    // Re-append sorted rows
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+// Initialize: sort by name ascending (default)
+document.addEventListener('DOMContentLoaded', function() {
+    const table = document.getElementById('categoriesTable');
+    if (table) {
+        sortState.column = 'name';
+        sortState.direction = 'asc';
+        const nameHeader = table.querySelector('[data-sort="name"]');
+        if (nameHeader) {
+            nameHeader.classList.add('active', 'asc');
+            const icon = nameHeader.querySelector('.sort-icon');
+            icon.textContent = '▲';
+        }
+        sortTable('name');
+    }
+});
+</script>
+{% endblock %}

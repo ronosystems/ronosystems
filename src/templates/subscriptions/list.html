@@ -1,0 +1,666 @@
+{% extends 'base.html' %}
+
+{% block title %}Subscriptions - RonoSystems{% endblock %}
+{% block page_title %}Subscriptions{% endblock %}
+{% block page_subtitle %}Manage company subscriptions{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE TABLE STYLING
+    ============================================ */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    
+    .table-excel thead th {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table-excel tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+
+    /* ============================================
+       STAT CARDS
+    ============================================ */
+    .stat-card {
+        background: white;
+        border-radius: 4px;
+        padding: 15px 18px;
+        text-align: center;
+        border: 2px solid #000000;
+        transition: all 0.3s;
+    }
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .stat-card .stat-number {
+        font-size: 24px;
+        font-weight: 700;
+        color: #000000;
+    }
+    .stat-card .stat-label {
+        font-size: 12px;
+        color: #000000;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+    .stat-card .stat-icon {
+        font-size: 20px;
+        margin-bottom: 4px;
+        display: block;
+        color: #000000;
+    }
+    .stat-card.bg-primary {
+        background: #87CEEB !important;
+    }
+    .stat-card.bg-primary .stat-number { color: #000000; }
+    .stat-card.bg-primary .stat-icon { color: #000000; }
+    .stat-card.bg-success {
+        background: #d4edda !important;
+    }
+    .stat-card.bg-success .stat-number { color: #155724; }
+    .stat-card.bg-success .stat-icon { color: #155724; }
+    .stat-card.bg-warning {
+        background: #fff3cd !important;
+    }
+    .stat-card.bg-warning .stat-number { color: #856404; }
+    .stat-card.bg-warning .stat-icon { color: #856404; }
+    .stat-card.bg-danger {
+        background: #f8d7da !important;
+    }
+    .stat-card.bg-danger .stat-number { color: #721c24; }
+    .stat-card.bg-danger .stat-icon { color: #721c24; }
+    
+    /* ============================================
+       SUBSCRIPTION STATUS
+    ============================================ */
+    .subscription-status {
+        display: inline-block;
+        padding: 3px 14px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    .subscription-status.active {
+        background: #d4edda;
+        color: #155724;
+    }
+    .subscription-status.expired {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    .subscription-status.cancelled {
+        background: #fff3cd;
+        color: #856404;
+    }
+    .subscription-status.pending {
+        background: #cce5ff;
+        color: #004085;
+    }
+    .subscription-status.inactive {
+        background: #e9ecef;
+        color: #000000;
+    }
+    
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-body {
+        color: #000000;
+    }
+    
+    .card-footer {
+        border-top: 2px solid #000000;
+        background-color: #f8f9fa;
+    }
+    
+    /* ============================================
+       FILTER ROW
+    ============================================ */
+    .filter-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+        padding: 12px 0;
+    }
+    .filter-row .search-input {
+        flex: 1;
+        min-width: 200px;
+        padding: 8px 14px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 14px;
+        background: white;
+        color: #000000;
+    }
+    .filter-row .search-input:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .filter-row .filter-select {
+        padding: 8px 14px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 14px;
+        background: white;
+        min-width: 130px;
+        color: #000000;
+    }
+    .filter-row .filter-select:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .filter-row .btn-filter {
+        padding: 8px 18px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        white-space: nowrap;
+    }
+    .filter-row .btn-filter.btn-primary {
+        background: #87CEEB;
+        color: #000000;
+    }
+    .filter-row .btn-filter.btn-primary:hover {
+        background: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    .filter-row .btn-filter.btn-secondary {
+        background: #f8f9fa;
+        color: #000000;
+        border: 2px solid #000000;
+    }
+    .filter-row .btn-filter.btn-secondary:hover {
+        background: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-secondary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-info {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-info:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-primary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-primary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-danger {
+        border: 2px solid #000000;
+        color: #dc3545;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-danger:hover {
+        background-color: #dc3545;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-sm {
+        padding: 4px 12px;
+        font-size: 12px;
+    }
+    
+    /* ============================================
+       BADGES
+    ============================================ */
+    .badge {
+        padding: 4px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    .badge.bg-light {
+        background: #f8f9fa !important;
+        color: #000000 !important;
+    }
+    .badge.bg-info {
+        background: #cce5ff !important;
+        color: #004085 !important;
+    }
+    
+    /* ============================================
+       TEXT MUTED OVERRIDE
+    ============================================ */
+    .text-muted {
+        color: #000000 !important;
+    }
+    small.text-muted {
+        color: #000000 !important;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .filter-row {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .filter-row .search-input,
+        .filter-row .filter-select,
+        .filter-row .btn-filter {
+            width: 100%;
+        }
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 11px;
+        }
+        .table-excel th {
+            font-size: 10px;
+        }
+        .btn-sm {
+            font-size: 9px;
+            padding: 2px 6px;
+        }
+        .badge {
+            font-size: 9px;
+            padding: 2px 6px;
+        }
+        .stat-card .stat-number {
+            font-size: 20px;
+        }
+        .stat-card .stat-label {
+            font-size: 10px;
+        }
+        .stat-card {
+            padding: 12px 14px;
+        }
+        .card-body {
+            padding: 12px;
+        }
+        .d-flex.justify-content-between {
+            flex-direction: column;
+            gap: 10px;
+            align-items: flex-start;
+        }
+        .d-flex.justify-content-between .btn {
+            width: 100%;
+            text-align: center;
+        }
+        .d-flex.gap-2 {
+            flex-direction: column;
+            width: 100%;
+        }
+        .d-flex.gap-2 .btn {
+            width: 100%;
+            text-align: center;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 3px 4px;
+            font-size: 9px;
+        }
+        .table-excel th {
+            font-size: 8px;
+        }
+        .btn-sm {
+            font-size: 8px;
+            padding: 1px 4px;
+        }
+        .btn-sm i {
+            font-size: 10px;
+        }
+        .badge {
+            font-size: 8px;
+            padding: 1px 4px;
+        }
+        .subscription-status {
+            font-size: 9px;
+            padding: 2px 8px;
+        }
+        .stat-card .stat-number {
+            font-size: 18px;
+        }
+        .stat-card .stat-label {
+            font-size: 9px;
+        }
+        .stat-card {
+            padding: 10px 12px;
+        }
+        .stat-card .stat-icon {
+            font-size: 16px;
+        }
+        .card-body {
+            padding: 10px;
+        }
+        .card-footer {
+            font-size: 10px;
+            padding: 8px 12px;
+        }
+        .filter-row .search-input,
+        .filter-row .filter-select {
+            font-size: 12px;
+            padding: 6px 10px;
+        }
+        .filter-row .btn-filter {
+            font-size: 12px;
+            padding: 6px 12px;
+        }
+        .btn-primary {
+            font-size: 11px;
+            padding: 4px 8px;
+        }
+        .btn-outline-secondary {
+            font-size: 11px;
+            padding: 4px 8px;
+        }
+        .company-name {
+            font-size: 10px;
+        }
+        .plan-name {
+            font-size: 10px;
+        }
+        .row.g-2 {
+            gap: 4px;
+        }
+        .col-6 {
+            padding: 0 4px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+            <div>
+                <h4 class="mb-0"><i class="fas fa-list" style="color: #000000;"></i> Subscriptions</h4>
+                <p class="text-muted mb-0 small">Manage all company subscriptions</p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{% url 'plans:subscription-create' %}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus"></i> New Subscription
+                </a>
+                <a href="{% url 'plans:plan-list' %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-crown"></i> Plans
+                </a>
+            </div>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="row g-2 mb-3">
+            <div class="col-6 col-md-3">
+                <div class="stat-card bg-primary">
+                    <span class="stat-icon"><i class="fas fa-users"></i></span>
+                    <div class="stat-number">{{ subscriptions.count }}</div>
+                    <div class="stat-label">Total</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card bg-success">
+                    <span class="stat-icon"><i class="fas fa-check-circle"></i></span>
+                    <div class="stat-number">{{ active_count|default:0 }}</div>
+                    <div class="stat-label">Active</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card bg-warning">
+                    <span class="stat-icon"><i class="fas fa-clock"></i></span>
+                    <div class="stat-number">{{ pending_count|default:0 }}</div>
+                    <div class="stat-label">Pending</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card bg-danger">
+                    <span class="stat-icon"><i class="fas fa-times-circle"></i></span>
+                    <div class="stat-number">{{ expired_count|default:0 }}</div>
+                    <div class="stat-label">Expired</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search and Filters - One Row -->
+        <div class="card mb-3">
+            <div class="card-body py-2">
+                <form method="get" class="filter-row">
+                    <input type="text" class="search-input" name="search" placeholder="Search by company..." value="{{ search_query }}">
+                    
+                    <select class="filter-select" name="status">
+                        <option value="">All Status</option>
+                        <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                        <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+                        <option value="expired" {% if status_filter == 'expired' %}selected{% endif %}>Expired</option>
+                        <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                        <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+                    </select>
+                    
+                    <select class="filter-select" name="plan">
+                        <option value="">All Plans</option>
+                        {% for plan in plans %}
+                        <option value="{{ plan.id }}" {% if plan_filter == plan.id|stringformat:"s" %}selected{% endif %}>
+                            {{ plan.display_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    
+                    <button type="submit" class="btn-filter btn-primary">
+                        <i class="fas fa-search"></i> Filter
+                    </button>
+                    
+                    <a href="{% url 'plans:subscription-list' %}" class="btn-filter btn-secondary">
+                        <i class="fas fa-times"></i> Clear
+                    </a>
+                </form>
+            </div>
+        </div>
+
+        <!-- Subscriptions Table -->
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive" style="border: 2px solid #000000;">
+                    <table class="table-excel table-hover mb-0" id="subscriptionsTable">
+                        <thead>
+                            <tr>
+                                <th style="width:5%;">#</th>
+                                <th style="width:20%;">Company</th>
+                                <th style="width:18%;">Plan</th>
+                                <th style="width:12%;">Status</th>
+                                <th style="width:15%;">Start Date</th>
+                                <th style="width:15%;">End Date</th>
+                                <th style="width:10%;">Payment</th>
+                                <th style="width:10%;" class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for subscription in subscriptions %}
+                            <tr class="subscription-item">
+                                <td>#{{ subscription.id }}</td>
+                                <td>
+                                    <div class="company-name" style="font-weight: 600; color: #000000;">{{ subscription.company.name }}</div>
+                                    <small style="color: #000000;">{{ subscription.company.email }}</small>
+                                </td>
+                                <td>
+                                    <div class="plan-name" style="font-weight: 500; color: #000000;">
+                                        {{ subscription.plan.display_name }}
+                                        <span class="badge bg-light text-dark">{{ subscription.plan.billing_cycle }}</span>
+                                    </div>
+                                    <small style="color: #000000;">{{ subscription.plan.currency }} {{ subscription.plan.price|floatformat:0 }}</small>
+                                </td>
+                                <td>
+                                    <span class="subscription-status {{ subscription.status }}">
+                                        {{ subscription.status|title }}
+                                    </span>
+                                </td>
+                                <td><small style="color: #000000;">{{ subscription.start_date|date:"Y-m-d" }}</small></td>
+                                <td>
+                                    {% if subscription.end_date %}
+                                        <small style="color: #000000;">{{ subscription.end_date|date:"Y-m-d" }}</small>
+                                    {% else %}
+                                        <span style="color: #000000;">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if subscription.payment_method %}
+                                        <span class="badge bg-info">{{ subscription.payment_method|title }}</span>
+                                    {% else %}
+                                        <span style="color: #000000;">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'plans:subscription-detail' subscription.id %}" class="btn btn-outline-info" title="View">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{% url 'plans:subscription-edit' subscription.id %}" class="btn btn-outline-primary" title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        {% if subscription.status == 'active' %}
+                                        <a href="{% url 'plans:subscription-cancel' subscription.id %}" class="btn btn-outline-danger" title="Cancel"
+                                           onclick="return confirm('Are you sure you want to cancel this subscription for {{ subscription.company.name }}?')">
+                                            <i class="fas fa-times"></i>
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" class="text-center py-5">
+                                    <i class="fas fa-list fa-3x d-block mb-3" style="color: #000000;"></i>
+                                    <h5 style="color: #000000;">No Subscriptions Found</h5>
+                                    <p style="color: #000000;">No subscriptions match your filters.</p>
+                                    <a href="{% url 'plans:subscription-create' %}" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-plus"></i> Create Subscription
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer text-muted" style="color: #000000 !important;">
+                <small>Showing {{ subscriptions|length }} subscriptions</small>
+                {% if search_query or status_filter or plan_filter %}
+                <span class="float-end">
+                    <a href="{% url 'plans:subscription-list' %}" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-times"></i> Clear Filters
+                    </a>
+                </span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-submit on filter change
+document.addEventListener('DOMContentLoaded', function() {
+    const filterSelects = document.querySelectorAll('.filter-select');
+    filterSelects.forEach(select => {
+        select.addEventListener('change', function() {
+            this.closest('form').submit();
+        });
+    });
+});
+</script>
+{% endblock %}

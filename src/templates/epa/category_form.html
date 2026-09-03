@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title }} - RonoSystems{% endblock %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_subtitle %}{{ page_subtitle }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-6 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-{% if category %}edit{% else %}plus-circle{% endif %}"></i>
+                    {{ page_title }}
+                </h6>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label required">Category Name</label>
+                        <input type="text" class="form-control" name="name" 
+                               value="{% if category %}{{ category.name }}{% endif %}" 
+                               placeholder="Enter category name" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label required">Category Type</label>
+                        <select class="form-select" name="category_type" required>
+                            <option value="">Select Type</option>
+                            <option value="electronics" {% if category.category_type == 'electronics' %}selected{% endif %}>Electronics</option>
+                            <option value="phones" {% if category.category_type == 'phones' %}selected{% endif %}>Phones</option>
+                            <option value="accessories" {% if category.category_type == 'accessories' %}selected{% endif %}>Accessories</option>
+                            <option value="parts" {% if category.category_type == 'parts' %}selected{% endif %}>Parts &amp; Components</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" rows="3" 
+                                  placeholder="Enter category description">{% if category %}{{ category.description }}{% endif %}</textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input type="checkbox" class="form-check-input" name="is_active" id="isActive" 
+                                   {% if category and category.is_active %}checked{% endif %}
+                                   {% if not category %}checked{% endif %}>
+                            <label class="form-check-label" for="isActive">Active</label>
+                        </div>
+                        <small class="text-muted">Inactive categories won't appear in product selection</small>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> 
+                            {% if category %}Update{% else %}Create{% endif %} Category
+                        </button>
+                        <a href="{% url 'epa-categories' %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

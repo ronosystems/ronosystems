@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+
+{% block title %}Cancel Subscription - RonoSystems{% endblock %}
+{% block page_title %}Cancel Subscription{% endblock %}
+{% block page_subtitle %}Confirm cancellation for {{ subscription.company.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .confirmation-box {
+        background: #fff3cd;
+        border: 1px solid #ffc107;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .confirmation-box .warning-icon {
+        font-size: 48px;
+        color: #ffc107;
+        display: block;
+        margin-bottom: 10px;
+    }
+    .confirmation-box h5 {
+        color: #856404;
+        font-weight: 600;
+    }
+    .confirmation-box p {
+        color: #856404;
+        margin-bottom: 0;
+    }
+    .subscription-details {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border-left: 4px solid #dc3545;
+    }
+    .subscription-details .detail-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+    .subscription-details .detail-row:last-child {
+        border-bottom: none;
+    }
+    .subscription-details .detail-label {
+        color: #6c757d;
+        font-weight: 500;
+    }
+    .subscription-details .detail-value {
+        font-weight: 600;
+        color: #2d3436;
+    }
+    .status-badge {
+        display: inline-block;
+        padding: 3px 14px;
+        border-radius: 50px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .status-badge.active { background: #d4edda; color: #155724; }
+    .status-badge.pending { background: #cce5ff; color: #004085; }
+    .status-badge.expired { background: #f8d7da; color: #721c24; }
+    .status-badge.cancelled { background: #fff3cd; color: #856404; }
+    .status-badge.inactive { background: #e9ecef; color: #6c757d; }
+    
+    .action-buttons {
+        display: flex;
+        gap: 12px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+    }
+    .action-buttons .btn {
+        flex: 1;
+        min-width: 120px;
+        padding: 12px;
+        font-weight: 600;
+    }
+    .btn-cancel-subscription {
+        background: #dc3545;
+        color: white;
+        border: none;
+    }
+    .btn-cancel-subscription:hover {
+        background: #c82333;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-times-circle text-danger"></i> Cancel Subscription</h6>
+            </div>
+            <div class="card-body p-4">
+                <!-- Warning Message -->
+                <div class="confirmation-box">
+                    <span class="warning-icon"><i class="fas fa-exclamation-triangle"></i></span>
+                    <h5>⚠️ Are you sure you want to cancel this subscription?</h5>
+                    <p>This action will immediately cancel the subscription and the company will lose access to premium features.</p>
+                </div>
+
+                <!-- Subscription Details -->
+                <div class="subscription-details">
+                    <h6 class="mb-3"><i class="fas fa-info-circle"></i> Subscription Details</h6>
+                    <div class="detail-row">
+                        <span class="detail-label">Company</span>
+                        <span class="detail-value">{{ subscription.company.name }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Plan</span>
+                        <span class="detail-value">{{ subscription.plan.display_name }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Price</span>
+                        <span class="detail-value">{{ subscription.plan.currency }} {{ subscription.plan.price|floatformat:0 }} / {{ subscription.plan.billing_cycle }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Status</span>
+                        <span class="detail-value">
+                            <span class="status-badge {{ subscription.status }}">
+                                {{ subscription.status|title }}
+                            </span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Start Date</span>
+                        <span class="detail-value">{{ subscription.start_date|date:"Y-m-d H:i" }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">End Date</span>
+                        <span class="detail-value">
+                            {% if subscription.end_date %}
+                                {{ subscription.end_date|date:"Y-m-d H:i" }}
+                            {% else %}
+                                <span class="text-muted">Never</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Payment Method</span>
+                        <span class="detail-value">
+                            {% if subscription.payment_method %}
+                                {{ subscription.payment_method|title }}
+                            {% else %}
+                                <span class="text-muted">Not specified</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Cancellation Form -->
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="alert alert-warning">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Note:</strong> Cancelling this subscription will:
+                        <ul class="mb-0 mt-2">
+                            <li>Immediately revoke access to premium features</li>
+                            <li>Downgrade the company to the Free plan</li>
+                            <li>This action cannot be undone</li>
+                        </ul>
+                    </div>
+
+                    <div class="action-buttons">
+                        <a href="{% url 'plans:subscription-detail' subscription.id %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Go Back
+                        </a>
+                        <button type="submit" class="btn btn-cancel-subscription" 
+                                onclick="return confirm('Are you absolutely sure you want to cancel this subscription for {{ subscription.company.name }}? This action cannot be undone.')">
+                            <i class="fas fa-times-circle"></i> Yes, Cancel Subscription
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

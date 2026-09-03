@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RonoSystems - Enterprise Management Platform</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #036a77;
+            --primary-dark: #02515b;
+            --primary-light: #e0f7fa;
+            --gradient-start: #00b4d8;
+            --gradient-end: #0077b6;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8fafc;
+            overflow-x: hidden;
+        }
+
+        /* ============================================
+           NAVBAR
+        ============================================ */
+        .navbar-custom {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
+            padding: 12px 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1050;
+            transition: all 0.3s;
+        }
+        .navbar-custom.scrolled {
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.12);
+            background: rgba(255, 255, 255, 0.98);
+        }
+        .navbar-custom .navbar-brand {
+            font-weight: 800;
+            font-size: 1.5rem;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .navbar-custom .navbar-brand i {
+            font-size: 1.8rem;
+            color: var(--primary);
+        }
+        
+        /* Nav Links with Dropdown */
+        .navbar-custom .nav-link {
+            font-weight: 500;
+            color: #2d3436;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+        .navbar-custom .nav-link:hover {
+            color: var(--primary);
+            background: var(--primary-light);
+        }
+        .navbar-custom .nav-link.active {
+            color: var(--primary);
+            background: var(--primary-light);
+        }
+        
+        /* Dropdown Styles */
+        .navbar-custom .dropdown-menu {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            padding: 8px;
+            margin-top: 8px;
+            min-width: 220px;
+        }
+        .navbar-custom .dropdown-item {
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            color: #2d3436;
+        }
+        .navbar-custom .dropdown-item:hover {
+            background: var(--primary-light);
+            color: var(--primary);
+        }
+        .navbar-custom .dropdown-item i {
+            width: 20px;
+            color: var(--primary);
+            margin-right: 10px;
+        }
+        .navbar-custom .dropdown-divider {
+            margin: 4px 8px;
+        }
+        .navbar-custom .dropdown-toggle::after {
+            transition: transform 0.3s;
+        }
+        .navbar-custom .dropdown.show .dropdown-toggle::after {
+            transform: rotate(180deg);
+        }
+        
+        /* Dropdown with badge */
+        .navbar-custom .dropdown-item .badge {
+            font-size: 0.6rem;
+            padding: 2px 8px;
+            border-radius: 50px;
+            margin-left: 8px;
+        }
+        .badge-new {
+            background: #ff4757;
+            color: white;
+        }
+        .badge-hot {
+            background: #ff6b35;
+            color: white;
+        }
+        .badge-coming {
+            background: #6c5ce7;
+            color: white;
+        }
+
+        /* Nav Buttons */
+        .navbar-custom .btn-nav {
+            padding: 8px 24px;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+        .navbar-custom .btn-trial {
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            color: white;
+            border: none;
+        }
+        .navbar-custom .btn-trial:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 180, 216, 0.35);
+        }
+        .navbar-custom .btn-ai {
+            background: #6c5ce7;
+            color: white;
+            border: none;
+            position: relative;
+        }
+        .navbar-custom .btn-ai:hover {
+            background: #5a4bd1;
+            transform: translateY(-2px);
+        }
+        .navbar-custom .btn-ai .ai-pulse {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            width: 12px;
+            height: 12px;
+            background: #00e676;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+            border: 2px solid white;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.5; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* ============================================
+           HERO SECTION
+        ============================================ */
+        .hero-section {
+            padding: 120px 0 80px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            background: linear-gradient(135deg, #f8fafc 0%, #e8f4f8 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(0, 180, 216, 0.08) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+        .hero-section::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            left: -10%;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(0, 119, 182, 0.06) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+        .hero-content {
+            position: relative;
+            z-index: 1;
+        }
+        .hero-badge {
+            display: inline-block;
+            background: rgba(0, 180, 216, 0.12);
+            color: var(--primary);
+            padding: 6px 20px;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+        }
+        .hero-badge i {
+            margin-right: 8px;
+        }
+        .hero-title {
+            font-size: 3.5rem;
+            font-weight: 900;
+            line-height: 1.1;
+            color: #1a1a2e;
+            margin-bottom: 20px;
+        }
+        .hero-title .highlight {
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero-subtitle {
+            font-size: 1.2rem;
+            color: #4a4a6a;
+            line-height: 1.8;
+            max-width: 600px;
+            margin-bottom: 30px;
+            font-weight: 400;
+        }
+        .hero-stats {
+            display: flex;
+            gap: 40px;
+            margin: 30px 0;
+        }
+        .hero-stats .stat-item .number {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #1a1a2e;
+        }
+        .hero-stats .stat-item .label {
+            font-size: 0.85rem;
+            color: #6c6c8a;
+            font-weight: 500;
+        }
+        .hero-actions {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .hero-actions .btn-primary-custom {
+            padding: 14px 40px;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.3s;
+            border: none;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            color: white;
+        }
+        .hero-actions .btn-primary-custom:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(0, 180, 216, 0.4);
+        }
+        .hero-actions .btn-secondary-custom {
+            padding: 14px 40px;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.3s;
+            border: 2px solid #1a1a2e;
+            background: transparent;
+            color: #1a1a2e;
+        }
+        .hero-actions .btn-secondary-custom:hover {
+            background: #1a1a2e;
+            color: white;
+            transform: translateY(-3px);
+        }
+
+        /* Hero Media */
+        .hero-media {
+            position: relative;
+            z-index: 1;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+        }
+        .hero-media img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .hero-media .play-btn {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            border: none;
+        }
+        .hero-media .play-btn:hover {
+            transform: translate(-50%, -50%) scale(1.1);
+            background: white;
+        }
+        .hero-media .play-btn i {
+            font-size: 2rem;
+            color: var(--primary);
+            margin-left: 5px;
+        }
+        .hero-media .media-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(0, 180, 216, 0.15), rgba(0, 119, 182, 0.15));
+            pointer-events: none;
+        }
+
+        /* ============================================
+           RESPONSIVE
+        ============================================ */
+        @media (max-width: 992px) {
+            .hero-title {
+                font-size: 2.8rem;
+            }
+            .hero-section {
+                padding: 100px 0 60px;
+            }
+            .navbar-custom .navbar-collapse {
+                background: white;
+                padding: 20px;
+                border-radius: 12px;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+                margin-top: 10px;
+            }
+            .navbar-custom .dropdown-menu {
+                border: none;
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+                background: transparent;
+            }
+            .navbar-custom .dropdown-item {
+                padding: 8px 16px;
+                padding-left: 30px;
+            }
+            .hero-stats {
+                gap: 20px;
+                flex-wrap: wrap;
+            }
+            .hero-stats .stat-item .number {
+                font-size: 1.5rem;
+            }
+        }
+        @media (max-width: 768px) {
+            .hero-title {
+                font-size: 2.2rem;
+            }
+            .hero-subtitle {
+                font-size: 1rem;
+            }
+            .hero-section {
+                padding: 90px 0 40px;
+            }
+            .hero-media .play-btn {
+                width: 60px;
+                height: 60px;
+            }
+            .hero-media .play-btn i {
+                font-size: 1.5rem;
+            }
+            .hero-actions .btn-primary-custom,
+            .hero-actions .btn-secondary-custom {
+                padding: 12px 28px;
+                font-size: 0.9rem;
+                width: 100%;
+                text-align: center;
+            }
+        }
+        @media (max-width: 576px) {
+            .hero-title {
+                font-size: 1.8rem;
+            }
+            .navbar-custom .navbar-brand {
+                font-size: 1.2rem;
+            }
+            .hero-stats .stat-item .number {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ============================================
+    TOP NAVBAR
+    ============================================ -->
+    <nav class="navbar navbar-expand-lg navbar-custom" id="mainNav">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-rocket"></i>
+                RonoSystems
+            </a>
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-lg-center">
+                    
+                    <!-- HOME with Dropdown -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle active" href="#" id="homeDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-home"></i> Home
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="homeDropdown">
+                            <li><a class="dropdown-item" href="/"><i class="fas fa-home"></i> Homepage</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-newspaper"></i> Blog</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-bullhorn"></i> Announcements</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-life-ring"></i> Help Center</a></li>
+                        </ul>
+                    </li>
+
+                    <!-- ABOUT with Dropdown -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="aboutDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-info-circle"></i> About
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="aboutDropdown">
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-building"></i> Our Company</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-users"></i> Team</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-bullseye"></i> Mission & Vision</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-history"></i> Our Story</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-trophy"></i> Awards</a></li>
+                        </ul>
+                    </li>
+
+                    <!-- FEATURES with Dropdown -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="featuresDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-cogs"></i> Features
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="featuresDropdown">
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-store"></i> EPA Shop</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-chart-line"></i> Analytics <span class="badge badge-hot">Hot</span></a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-robot"></i> AI Assistant <span class="badge badge-new">New</span></a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-users"></i> Team Management</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-file-invoice"></i> Invoicing</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-mobile-alt"></i> Mobile App <span class="badge badge-coming">Coming</span></a></li>
+                        </ul>
+                    </li>
+
+                    <!-- PRICING with Dropdown -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="pricingDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-dollar-sign"></i> Pricing
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="pricingDropdown">
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-gem"></i> Free</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-rocket"></i> Pro <span class="badge badge-hot">Popular</span></a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-building"></i> Enterprise</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-calculator"></i> Pricing Calculator</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-percent"></i> Discounts</a></li>
+                        </ul>
+                    </li>
+
+                    <!-- CONTACT with Dropdown -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="contactDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-envelope"></i> Contact
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="contactDropdown">
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-envelope"></i> Email Us</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-phone"></i> Call Us</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-comment"></i> Live Chat</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#"><i class="fab fa-twitter"></i> Twitter</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fab fa-linkedin"></i> LinkedIn</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fab fa-youtube"></i> YouTube</a></li>
+                        </ul>
+                    </li>
+
+                    <!-- AI Button -->
+                    <li class="nav-item ms-lg-2">
+                        <a href="#" class="btn btn-nav btn-ai">
+                            <i class="fas fa-robot"></i> AI
+                            <span class="ai-pulse"></span>
+                        </a>
+                    </li>
+
+                    <!-- ACCOUNT Link -->
+                    <li class="nav-item ms-lg-2">
+                        <a href="/auth/login/" class="nav-link">
+                            <i class="fas fa-user-circle"></i> Account
+                        </a>
+                    </li>
+
+                    <!-- Start Free Trial -->
+                    <li class="nav-item ms-lg-2">
+                        <a href="/auth/register/" class="btn btn-nav btn-trial">
+                            <i class="fas fa-rocket"></i> Start Free
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ============================================
+    HERO SECTION
+    ============================================ -->
+    <section class="hero-section" id="home">
+        <div class="container">
+            <div class="row align-items-center">
+                <!-- Left Content -->
+                <div class="col-lg-6 hero-content">
+                    <div class="hero-badge">
+                        <i class="fas fa-rocket"></i> 
+                        Next-Gen Enterprise Platform
+                    </div>
+                    <h1 class="hero-title">
+                        Manage Your Business<br>
+                        <span class="highlight">Smarter & Faster</span>
+                    </h1>
+                    <p class="hero-subtitle">
+                        A powerful multi-tenant platform for managing businesses, 
+                        employees, products, and sales. Built for modern enterprises 
+                        with real-time analytics and AI-powered insights.
+                    </p>
+                    
+                    <!-- Stats -->
+                    <div class="hero-stats">
+                        <div class="stat-item">
+                            <div class="number">10K+</div>
+                            <div class="label">Active Users</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="number">500+</div>
+                            <div class="label">Companies</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="number">99.9%</div>
+                            <div class="label">Uptime</div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="hero-actions">
+                        <a href="/auth/register/" class="btn-primary-custom">
+                            <i class="fas fa-rocket"></i> Start Free Trial
+                        </a>
+                        <a href="#features" class="btn-secondary-custom">
+                            <i class="fas fa-play"></i> See Features
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Right Media -->
+                <div class="col-lg-6 mt-4 mt-lg-0">
+                    <div class="hero-media">
+                        <img src="https://images.unsplash.com/photo-1551434678-e076c223a692?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80" 
+                             alt="Dashboard Preview" 
+                             class="img-fluid">
+                        <div class="media-overlay"></div>
+                        <button class="play-btn" onclick="playVideo()">
+                            <i class="fas fa-play"></i>
+                        </button>
+                    </div>
+                    <div class="text-center mt-3">
+                        <small class="text-muted">
+                            <i class="fas fa-play-circle"></i> Click to watch demo
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+    FEATURES SECTION
+    ============================================ -->
+    <section id="features" class="py-5 bg-white">
+        <div class="container">
+            <div class="text-center mb-5">
+                <h2 class="fw-bold">Why Choose RonoSystems?</h2>
+                <p class="text-muted">Everything you need to run your business efficiently</p>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body text-center p-4">
+                            <i class="fas fa-store fa-3x text-primary mb-3"></i>
+                            <h5 class="fw-bold">EPA Shop</h5>
+                            <p class="text-muted">Complete electronics, phones & accessories management system</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body text-center p-4">
+                            <i class="fas fa-chart-line fa-3x text-success mb-3"></i>
+                            <h5 class="fw-bold">Real-time Analytics</h5>
+                            <p class="text-muted">Live dashboards with sales, inventory, and performance metrics</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body text-center p-4">
+                            <i class="fas fa-robot fa-3x text-warning mb-3"></i>
+                            <h5 class="fw-bold">AI-Powered Insights</h5>
+                            <p class="text-muted">Smart recommendations and predictive analytics</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+    FOOTER
+    ============================================ -->
+    <footer class="bg-dark text-white py-4">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5><i class="fas fa-rocket"></i> RonoSystems</h5>
+                    <p class="text-muted small">Enterprise Management Platform v1.0.0</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <a href="#" class="text-white-50 me-3 text-decoration-none">Privacy</a>
+                    <a href="#" class="text-white-50 me-3 text-decoration-none">Terms</a>
+                    <a href="#" class="text-white-50 text-decoration-none">Support</a>
+                </div>
+            </div>
+            <hr class="border-secondary">
+            <div class="text-center text-muted small">
+                &copy; 2026 RonoSystems. All rights reserved.
+            </div>
+        </div>
+    </footer>
+
+    <!-- ============================================
+    SCRIPTS
+    ============================================ -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Navbar scroll effect
+        window.addEventListener('scroll', function() {
+            const nav = document.getElementById('mainNav');
+            if (window.scrollY > 50) {
+                nav.classList.add('scrolled');
+            } else {
+                nav.classList.remove('scrolled');
+            }
+        });
+
+        // Video play function
+        function playVideo() {
+            alert('🎬 Video demo would play here!\n\nYou can embed a YouTube video or your own video file.');
+        }
+
+        // Smooth scroll for nav links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Close mobile menu on link click
+        document.querySelectorAll('.navbar-nav .nav-link, .navbar-nav .dropdown-item').forEach(link => {
+            link.addEventListener('click', () => {
+                const navbar = document.getElementById('navbarNav');
+                if (navbar.classList.contains('show')) {
+                    const bsCollapse = new bootstrap.Collapse(navbar, {
+                        toggle: true
+                    });
+                }
+            });
+        });
+
+        // Dropdown hover effect for desktop
+        if (window.innerWidth > 992) {
+            document.querySelectorAll('.navbar-nav .dropdown').forEach(dropdown => {
+                dropdown.addEventListener('mouseenter', function() {
+                    this.querySelector('.dropdown-menu').classList.add('show');
+                });
+                dropdown.addEventListener('mouseleave', function() {
+                    this.querySelector('.dropdown-menu').classList.remove('show');
+                });
+            });
+        }
+    </script>
+</body>
+</html>

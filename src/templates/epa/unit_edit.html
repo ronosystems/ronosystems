@@ -1,0 +1,275 @@
+{% extends 'base.html' %}
+
+{% block title %}RS{% endblock %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_subtitle %}{{ page_subtitle }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .unit-type-badge {
+        display: inline-block;
+        padding: 4px 14px;
+        border-radius: 50px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .unit-type-badge.imei {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    .unit-type-badge.serial {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    .unit-info-box {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+        border: 1px solid #e9ecef;
+        margin-bottom: 20px;
+    }
+    .unit-info-box .label {
+        font-size: 12px;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+    .unit-info-box .value {
+        font-size: 16px;
+        font-weight: 600;
+        color: #2d3436;
+        font-family: monospace;
+    }
+    
+    /* Select2 Styles */
+    .select2-container .select2-selection--single {
+        height: 40px;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 6px 12px;
+    }
+    .select2-container .select2-selection--single .select2-selection__rendered {
+        line-height: 28px;
+        color: #2d3436;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 38px;
+    }
+    .select2-container--default .select2-dropdown {
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+    }
+    .select2-container--default .select2-results__option--highlighted[aria-selected] {
+        background: #667eea;
+    }
+    .select2-search__field {
+        border-radius: 4px !important;
+        border: 1px solid #dee2e6 !important;
+        padding: 6px 12px !important;
+    }
+    .selected-owner-display {
+        background: #f0f3ff;
+        border-radius: 8px;
+        padding: 12px 15px;
+        border: 1px solid #667eea;
+        margin-top: 10px;
+    }
+    .selected-owner-display .selected-label {
+        font-size: 11px;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+    .selected-owner-display .selected-name {
+        font-weight: 600;
+        color: #2d3436;
+        font-size: 16px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-6 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-edit"></i> Edit Unit
+                    <span class="unit-type-badge {% if product_type == 'Phone' %}imei{% else %}serial{% endif %}">
+                        {% if product_type == 'Phone' %}IMEI{% else %}Serial{% endif %}
+                    </span>
+                </h6>
+            </div>
+            <div class="card-body">
+                <!-- Product Info -->
+                <div class="unit-info-box">
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="label">Product</div>
+                            <div class="value">{{ product.name }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="label">Product Code</div>
+                            <div class="value">{{ product.product_code }}</div>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-6">
+                            <div class="label">Current Identifier</div>
+                            <div class="value">{{ unit.identifier }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="label">Current Status</div>
+                            <div class="value">
+                                <span class="unit-status-badge {{ unit.status }}">
+                                    {{ unit.status|title }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Edit Form -->
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label required">
+                            {% if product_type == 'Phone' %}IMEI Number{% else %}Serial Number{% endif %}
+                        </label>
+                        <input type="text" class="form-control" name="identifier" 
+                               value="{{ unit.identifier }}" required
+                               placeholder="Enter {% if product_type == 'Phone' %}IMEI{% else %}Serial{% endif %} number">
+                        <small class="text-muted">Must be unique within the system</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" name="status">
+                            <option value="available" {% if unit.status == 'available' %}selected{% endif %}>Available</option>
+                            <option value="reserved" {% if unit.status == 'reserved' %}selected{% endif %}>Reserved</option>
+                            <option value="repair" {% if unit.status == 'repair' %}selected{% endif %}>Repair</option>
+                            <option value="sold" {% if unit.status == 'sold' %}selected{% endif %}>Sold</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Owner</label>
+                        <select class="form-select" name="owner_id" id="ownerSelect" style="width: 100%;">
+                            <option value="">No owner / Not assigned</option>
+                            {% for employee in employees %}
+                            <option value="{{ employee.id }}" 
+                                    {% if unit.owner_id == employee.id %}selected{% endif %}
+                                    data-name="{{ employee.get_full_name|default:employee.username }}"
+                                    data-email="{{ employee.email }}"
+                                    data-phone="{{ employee.phone|default:'' }}"
+                                    data-role="{{ employee.get_role_display|default:employee.role|title }}">
+                                {{ employee.get_full_name|default:employee.username }} 
+                                ({{ employee.email }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">Select the owner from company employees</small>
+                    </div>
+
+                    <!-- Selected Owner Display -->
+                    <div class="selected-owner-display" id="selectedOwnerDisplay" 
+                         {% if not unit.owner_id %}style="display:none;"{% endif %}>
+                        <div class="selected-label">Current Owner</div>
+                        <div class="selected-name" id="selectedName">
+                            {% if unit.owner %}
+                                {{ unit.owner.get_full_name|default:unit.owner.username }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if unit.status == 'sold' %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Warning:</strong> This unit is marked as sold. Changing status may affect inventory records.
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Update Unit
+                        </button>
+                        <a href="{% url 'epa-product-detail' product.product_code %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Select2 CSS and JS -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+$(document).ready(function() {
+    $('#ownerSelect').select2({
+        placeholder: 'Search for an employee...',
+        allowClear: true,
+        width: '100%',
+        templateResult: formatEmployee,
+        templateSelection: formatEmployeeSelection
+    });
+
+    function formatEmployee(employee) {
+        if (employee.loading) return employee.text;
+        
+        if (!employee.id) return employee.text;
+        
+        var $container = $(
+            '<div class="employee-option">' +
+                '<span class="employee-avatar">' + getInitials(employee.text) + '</span>' +
+                '<div class="employee-info-text">' +
+                    '<span class="employee-name">' + employee.text + '</span>' +
+                    '<span class="employee-email">' + (employee.element ? employee.element.dataset.email : '') + '</span>' +
+                '</div>' +
+            '</div>'
+        );
+        
+        return $container;
+    }
+
+    function formatEmployeeSelection(employee) {
+        if (!employee.id) return employee.text;
+        return employee.text;
+    }
+
+    function getInitials(text) {
+        if (!text) return '?';
+        var parts = text.split(' ');
+        if (parts.length >= 2) {
+            return (parts[0][0] + parts[1][0]).toUpperCase();
+        }
+        return text.substring(0, 2).toUpperCase();
+    }
+
+    // Update display when selection changes
+    $('#ownerSelect').on('change', function() {
+        var selected = $(this).select2('data')[0];
+        var display = $('#selectedOwnerDisplay');
+        var nameDisplay = $('#selectedName');
+        
+        if (selected && selected.id) {
+            var name = selected.text;
+            nameDisplay.text(name);
+            display.show();
+        } else {
+            nameDisplay.text('No owner assigned');
+            display.show();
+        }
+    });
+});
+</script>
+{% endblock %}

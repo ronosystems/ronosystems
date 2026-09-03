@@ -1,0 +1,535 @@
+{% extends 'base.html' %}
+
+{% block title %}RS{% endblock %}
+
+{% block page_title %}Receipt Settings{% endblock %}
+{% block page_subtitle %}Customize receipt layout and print settings{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE STYLING
+    ============================================ */
+    .form-section {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        border: 2px solid #000000;
+    }
+    .form-section-title {
+        font-weight: 700;
+        margin-bottom: 15px;
+        color: #000000;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .preview-box {
+        background: white;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 20px;
+        min-height: 400px;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+    }
+    .receipt-line {
+        border-top: 2px dashed #000000;
+        margin: 10px 0;
+    }
+    .receipt-title {
+        font-size: 18px;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 10px;
+        color: #000000;
+    }
+    .receipt-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 2px 0;
+        color: #000000;
+    }
+    .receipt-total {
+        font-weight: bold;
+        font-size: 16px;
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 3px solid #000000;
+        color: #000000;
+    }
+    
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+        color: #000000 !important;
+        border-radius: 0 !important;
+    }
+    
+    .card-header h6 {
+        color: #000000 !important;
+        font-weight: 700;
+        margin: 0;
+    }
+    
+    .card-body {
+        color: #000000;
+    }
+    
+    /* ============================================
+       FORM ELEMENTS
+    ============================================ */
+    .form-control, .form-select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        color: #000000;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    .form-label {
+        color: #000000;
+        font-weight: 600;
+    }
+    
+    .form-check-label {
+        color: #000000;
+    }
+    
+    .form-check-input {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    .form-check-input:checked {
+        background-color: #87CEEB;
+        border-color: #000000;
+    }
+    
+    .form-check-input:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    textarea.form-control {
+        border: 2px solid #000000;
+        border-radius: 4px;
+    }
+    
+    /* ============================================
+       TOGGLE SWITCH
+    ============================================ */
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 50px;
+        height: 26px;
+    }
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #ccc;
+        transition: .4s;
+        border-radius: 34px;
+        border: 2px solid #000000;
+    }
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 2px;
+        bottom: 2px;
+        background: white;
+        transition: .4s;
+        border-radius: 50%;
+        border: 1px solid #000000;
+    }
+    input:checked + .slider {
+        background: #28a745;
+    }
+    input:checked + .slider:before {
+        transform: translateX(24px);
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-info {
+        background-color: #cce5ff;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-info:hover {
+        background-color: #b8d4f0;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-sm {
+        padding: 4px 12px;
+        font-size: 12px;
+    }
+    
+    /* ============================================
+       DASHED LINES
+    ============================================ */
+    .dashed-line {
+        border-top: 2px dashed #000000;
+        margin: 15px 0;
+    }
+    
+    /* ============================================
+       PREVIEW TEXT
+    ============================================ */
+    .preview-box strong {
+        color: #000000;
+    }
+    .preview-box .text-muted {
+        color: #000000 !important;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 992px) {
+        .preview-box {
+            min-height: 300px;
+            font-size: 12px;
+        }
+        .receipt-title {
+            font-size: 16px;
+        }
+        .receipt-total {
+            font-size: 14px;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .form-section {
+            padding: 15px;
+        }
+        .form-section-title {
+            font-size: 12px;
+        }
+        .card-body {
+            padding: 15px;
+        }
+        .preview-box {
+            min-height: 250px;
+            font-size: 11px;
+            padding: 15px;
+        }
+        .receipt-title {
+            font-size: 14px;
+        }
+        .receipt-total {
+            font-size: 13px;
+        }
+        .btn-sm {
+            font-size: 10px;
+            padding: 3px 8px;
+        }
+        .d-flex.gap-2 {
+            flex-wrap: wrap;
+        }
+        .d-flex.gap-2 .btn {
+            flex: 1;
+            min-width: 100px;
+            text-align: center;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .form-section {
+            padding: 10px;
+        }
+        .form-control, .form-select {
+            font-size: 12px;
+            padding: 6px 10px;
+        }
+        .preview-box {
+            min-height: 200px;
+            font-size: 10px;
+            padding: 10px;
+        }
+        .receipt-title {
+            font-size: 12px;
+        }
+        .receipt-total {
+            font-size: 11px;
+        }
+        .card-header h6 {
+            font-size: 0.8rem;
+        }
+        .btn {
+            font-size: 11px;
+            padding: 4px 10px;
+        }
+        .btn-sm {
+            font-size: 9px;
+            padding: 2px 6px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="mb-3">
+        <a href="{% url 'company-settings-dashboard' %}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i> Back to Settings
+        </a>
+        <a href="{% url 'company-settings-preview-receipt' %}" class="btn btn-info btn-sm" target="_blank">
+            <i class="fas fa-eye"></i> Preview Receipt
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-body p-4">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Header & Footer -->
+                        <div class="form-section">
+                            <h6 class="form-section-title"><i class="fas fa-header"></i> Header & Footer</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Receipt Header</label>
+                                <input type="text" class="form-control" name="receipt_header" 
+                                       value="{{ settings.receipt.receipt_header|default:'' }}" 
+                                       placeholder="e.g., Welcome to our store!">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Receipt Footer</label>
+                                <input type="text" class="form-control" name="receipt_footer" 
+                                       value="{{ settings.receipt.receipt_footer|default:'' }}" 
+                                       placeholder="e.g., Thank you for shopping with us!">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Thank You Message</label>
+                                <input type="text" class="form-control" name="thank_you_message" 
+                                       value="{{ settings.receipt.thank_you_message|default:'Thank you for your business!' }}">
+                            </div>
+                        </div>
+                        
+                        <!-- Receipt Format -->
+                        <div class="form-section">
+                            <h6 class="form-section-title"><i class="fas fa-print"></i> Receipt Format</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Receipt Title</label>
+                                    <input type="text" class="form-control" name="receipt_title" 
+                                           value="{{ settings.receipt.receipt_title|default:'RECEIPT' }}">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Receipt Format</label>
+                                    <select class="form-select" name="receipt_format">
+                                        {% for value, label in receipt_formats %}
+                                        <option value="{{ value }}" {% if settings.receipt.receipt_format == value %}selected{% endif %}>
+                                            {{ label }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Font Size (px)</label>
+                                    <input type="number" class="form-control" name="receipt_font_size" 
+                                           value="{{ settings.receipt.receipt_font_size|default:'14' }}" min="10" max="24">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Receipt Width (mm)</label>
+                                    <input type="number" class="form-control" name="receipt_width" 
+                                           value="{{ settings.receipt.receipt_width|default:'80' }}" min="40" max="120">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Print Copies</label>
+                                    <input type="number" class="form-control" name="print_copies" 
+                                           value="{{ settings.receipt.print_copies|default:'1' }}" min="1" max="5">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Display Options -->
+                        <div class="form-section">
+                            <h6 class="form-section-title"><i class="fas fa-eye"></i> Display Options</h6>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="show_logo" 
+                                               {% if settings.receipt.show_logo != False %}checked{% endif %}>
+                                        <label class="form-check-label">Show Logo</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="show_company_details" 
+                                               {% if settings.receipt.show_company_details != False %}checked{% endif %}>
+                                        <label class="form-check-label">Show Company Details</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="show_customer_details" 
+                                               {% if settings.receipt.show_customer_details != False %}checked{% endif %}>
+                                        <label class="form-check-label">Show Customer Details</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="show_items" 
+                                               {% if settings.receipt.show_items != False %}checked{% endif %}>
+                                        <label class="form-check-label">Show Items</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="show_totals" 
+                                               {% if settings.receipt.show_totals != False %}checked{% endif %}>
+                                        <label class="form-check-label">Show Totals</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="show_payment" 
+                                               {% if settings.receipt.show_payment != False %}checked{% endif %}>
+                                        <label class="form-check-label">Show Payment Details</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="show_signature" 
+                                               {% if settings.receipt.show_signature != False %}checked{% endif %}>
+                                        <label class="form-check-label">Show Signature</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="include_barcode" 
+                                               {% if settings.receipt.include_barcode %}checked{% endif %}>
+                                        <label class="form-check-label">Include Barcode</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="auto_print" 
+                                               {% if settings.receipt.auto_print %}checked{% endif %}>
+                                        <label class="form-check-label">Auto Print</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Custom CSS -->
+                        <div class="form-section">
+                            <h6 class="form-section-title"><i class="fas fa-code"></i> Custom CSS</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Custom CSS (Optional)</label>
+                                <textarea class="form-control" name="custom_css" rows="4" 
+                                          placeholder="/* Add custom styles for your receipt */">{{ settings.receipt.custom_css|default:'' }}</textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Save Changes
+                            </button>
+                            <a href="{% url 'company-settings-dashboard' %}" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Live Preview -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-eye"></i> Receipt Preview</h6>
+                </div>
+                <div class="card-body">
+                    <div class="preview-box" id="receiptPreview">
+                        <div class="receipt-title">{{ settings.receipt.receipt_title|default:'RECEIPT' }}</div>
+                        <div class="receipt-line"></div>
+                        <div><strong>{{ company.name }}</strong></div>
+                        <div>{{ company.phone|default:'' }}</div>
+                        <div>{{ company.email|default:'' }}</div>
+                        <div class="receipt-line"></div>
+                        <div class="receipt-item"><span>Item</span><span>Qty</span><span>Price</span></div>
+                        <div class="receipt-item"><span>Product 1</span><span>2</span><span>500</span></div>
+                        <div class="receipt-item"><span>Product 2</span><span>1</span><span>1000</span></div>
+                        <div class="receipt-line"></div>
+                        <div class="receipt-item"><span>Total</span><span></span><span>1500</span></div>
+                        <div class="receipt-item"><span>Tax</span><span></span><span>0.00</span></div>
+                        <div class="receipt-total">Total: KSh 1500.00</div>
+                        <div class="receipt-line"></div>
+                        <div style="text-align:center; font-size:12px; color:#000000;">
+                            {{ settings.receipt.thank_you_message|default:'Thank you for your business!' }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

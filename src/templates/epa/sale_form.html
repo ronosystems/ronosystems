@@ -1,0 +1,419 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title }} - RonoSystems{% endblock %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_subtitle %}{{ page_subtitle }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .product-info-box {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 15px 20px;
+        border: 1px solid #e9ecef;
+        margin-bottom: 20px;
+    }
+    .product-info-box .info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+        border-bottom: 1px solid #f1f2f6;
+    }
+    .product-info-box .info-row:last-child {
+        border-bottom: none;
+    }
+    .product-info-box .info-label {
+        color: #6c757d;
+        font-weight: 500;
+    }
+    .product-info-box .info-value {
+        font-weight: 600;
+        color: #2d3436;
+    }
+    .unit-status-badge {
+        padding: 3px 14px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: capitalize;
+        display: inline-block;
+    }
+    .unit-status-badge.available { background: #d4edda; color: #155724; }
+    .unit-status-badge.sold { background: #cce5ff; color: #004085; }
+    .unit-status-badge.reserved { background: #fff3cd; color: #856404; }
+    .unit-status-badge.repair { background: #f8d7da; color: #721c24; }
+    
+    .required:after {
+        content: " *";
+        color: #dc3545;
+    }
+    
+    .btn-success {
+        background-color: #28a745;
+        border: 1px solid #000000;
+        color: #ffffff;
+    }
+    
+    .btn-success:hover {
+        background-color: #218838;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-secondary {
+        background-color: #6c757d;
+        border: 1px solid #000000;
+        color: #ffffff;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #5a6268;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 1px solid #000000;
+        color: #000000;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-header {
+        border-bottom: 2px solid #000000;
+        background-color: #f8f9fa;
+    }
+    
+    .form-control, .form-select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    .badge-paid {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #155724;
+        padding: 4px 12px;
+        border-radius: 50px;
+    }
+    
+    .badge-pending {
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #856404;
+        padding: 4px 12px;
+        border-radius: 50px;
+    }
+    
+    .badge-refunded {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #721c24;
+        padding: 4px 12px;
+        border-radius: 50px;
+    }
+    
+    .edit-mode-badge {
+        background: #cce5ff;
+        color: #004085;
+        border: 1px solid #004085;
+        padding: 2px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        margin-left: 10px;
+    }
+    
+    .branch-info {
+        font-size: 12px;
+        color: #6c757d;
+        margin-top: 4px;
+    }
+    
+    .branch-info i {
+        color: #28a745;
+    }
+    
+    .section-divider {
+        border-top: 2px solid #000000;
+        margin: 20px 0;
+        padding-top: 10px;
+    }
+    
+    .section-title {
+        font-weight: 600;
+        font-size: 14px;
+        color: #2d3436;
+        margin-bottom: 15px;
+    }
+    
+    .section-title i {
+        margin-right: 8px;
+        color: #036a77;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    {% if sale %}
+                        <i class="fas fa-edit text-primary"></i> Edit Sale #{{ sale.company_sale_id }}
+                        <span class="edit-mode-badge">Edit Mode</span>
+                    {% else %}
+                        <i class="fas fa-shopping-cart text-success"></i> Complete Sale
+                    {% endif %}
+                </h6>
+            </div>
+            <div class="card-body">
+                <!-- Product/Sale Info -->
+                <div class="product-info-box">
+                    {% if sale %}
+                        <!-- Edit Mode: Show Sale Info -->
+                        <div class="info-row">
+                            <span class="info-label">Sale ID</span>
+                            <span class="info-value">#{{ sale.company_sale_id }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Sale Date</span>
+                            <span class="info-value">{{ sale.sale_date|date:"Y-m-d H:i" }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Sold By</span>
+                            <span class="info-value">{{ sale.sold_by.get_full_name|default:sale.sold_by.username|title }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Current Status</span>
+                            <span class="info-value">
+                                <span class="badge-{% if sale.payment_status == 'paid' %}paid{% elif sale.payment_status == 'pending' %}pending{% else %}refunded{% endif %}">
+                                    {{ sale.payment_status|title }}
+                                </span>
+                            </span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Items</span>
+                            <span class="info-value">{{ sale_items|length }} item(s)</span>
+                        </div>
+                        
+                        <!-- Sale Items -->
+                        {% if sale_items %}
+                        <div class="info-row" style="font-weight: 600; border-top: 2px solid #000000; margin-top: 6px; padding-top: 6px; border-bottom: 2px solid #000000;">
+                            <span>Item</span>
+                            <span>Unit Identifier</span>
+                            <span>Price</span>
+                        </div>
+                        {% for item in sale_items %}
+                        <div class="info-row">
+                            <span>{{ item.item_name }}</span>
+                            <span>
+                                {% if item.unit %}
+                                    <span style="font-family: 'Courier New', monospace; font-size: 13px;">
+                                        {{ item.unit.identifier }}
+                                    </span>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </span>
+                            <span>KSh {{ item.unit_price|floatformat:0 }}</span>
+                        </div>
+                        {% endfor %}
+                        {% endif %}
+                    {% else %}
+                        <!-- Create Mode: Show Product Info -->
+                        <div class="info-row">
+                            <span class="info-label">Product</span>
+                            <span class="info-value">{{ product.name }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Product Code</span>
+                            <span class="info-value">{{ product.product_code }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Category</span>
+                            <span class="info-value">{{ product_type }}</span>
+                        </div>
+                        {% if unit %}
+                        <div class="info-row">
+                            <span class="info-label">Unit Identifier</span>
+                            <span class="info-value">{{ unit.identifier }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Unit Status</span>
+                            <span class="info-value">
+                                <span class="unit-status-badge {{ unit.status }}">
+                                    {{ unit.status|title }}
+                                </span>
+                            </span>
+                        </div>
+                        {% endif %}
+                    {% endif %}
+                </div>
+
+                <!-- Sale Form -->
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="unit_id" value="{{ unit.id|default:'' }}">
+                    <input type="hidden" name="sale_id" value="{{ sale.id|default:'' }}">
+                    
+                    <!-- Branch Selection -->
+                    <div class="mb-3">
+                        <label class="form-label required">Branch</label>
+                        <select class="form-select" name="branch_id" required>
+                            <option value="">Select Branch</option>
+                            {% for branch in branches %}
+                            <option value="{{ branch.id }}" 
+                                    {% if sale and sale.branch_id == branch.id %}
+                                        selected
+                                    {% elif not sale and request.user.branch and request.user.branch.id == branch.id %}
+                                        selected
+                                    {% endif %}>
+                                {{ branch.name }} ({{ branch.code }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        {% if request.user.branch %}
+                        <div class="branch-info">
+                            <i class="fas fa-check-circle"></i> 
+                            Your assigned branch: <strong>{{ request.user.branch.name }}</strong>
+                            {% if not sale %}
+                                <span class="text-muted">(auto-selected)</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Customer Details Section -->
+                    <div class="section-divider">
+                        <div class="section-title"><i class="fas fa-user"></i> Customer Details</div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">Full Name</label>
+                            <input type="text" class="form-control" name="customer_name" 
+                                   value="{% if sale %}{{ sale.customer_name }}{% else %}{% endif %}" 
+                                   placeholder="Enter customer full name" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">Phone Number</label>
+                            <input type="text" class="form-control" name="customer_phone" 
+                                   value="{% if sale %}{{ sale.customer_phone }}{% endif %}" 
+                                   placeholder="Enter phone number" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">ID Number</label>
+                            <input type="text" class="form-control" name="customer_id_number" 
+                                   value="{% if sale and sale.customer %}{{ sale.customer.id_number }}{% endif %}" 
+                                   placeholder="Enter ID number" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Email (Optional)</label>
+                            <input type="email" class="form-control" name="customer_email" 
+                                   value="{% if sale %}{{ sale.customer_email }}{% endif %}" 
+                                   placeholder="Enter email (optional)">
+                        </div>
+                    </div>
+                    
+                    <!-- Next of Keen Section -->
+                    <div class="section-divider">
+                        <div class="section-title"><i class="fas fa-users"></i> Next of Keen</div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Full Name</label>
+                            <input type="text" class="form-control" name="next_of_keen_name" 
+                                   value="{% if sale and sale.customer %}{{ sale.customer.next_of_keen_name }}{% endif %}" 
+                                   placeholder="Enter next of keen full name">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Phone Number</label>
+                            <input type="text" class="form-control" name="next_of_keen_phone" 
+                                   value="{% if sale and sale.customer %}{{ sale.customer.next_of_keen_phone }}{% endif %}" 
+                                   placeholder="Enter next of keen phone number">
+                        </div>
+                    </div>
+                    
+                    <!-- Sale Information Section -->
+                    <div class="section-divider">
+                        <div class="section-title"><i class="fas fa-shopping-cart"></i> Sale Information</div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">Sale Price (KSh)</label>
+                            <input type="number" class="form-control" name="selling_price" 
+                                   value="{% if sale %}{{ sale.net_amount|floatformat:0 }}{% else %}{{ default_price|floatformat:0 }}{% endif %}" 
+                                   step="0.01" min="0.01" required>
+                            <small class="text-muted">
+                                {% if sale %}
+                                    Current price: KSh {{ sale.net_amount|floatformat:0 }}
+                                {% else %}
+                                    Default price: KSh {{ default_price|floatformat:0 }}
+                                {% endif %}
+                            </small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">Payment Method</label>
+                            <select class="form-select" name="payment_method" required>
+                                <option value="cash" {% if sale and sale.payment_method == 'cash' %}selected{% endif %}>Cash</option>
+                                <option value="mpesa" {% if sale and sale.payment_method == 'mpesa' %}selected{% endif %}>M-Pesa</option>
+                                <option value="bank" {% if sale and sale.payment_method == 'bank' %}selected{% endif %}>Bank Transfer</option>
+                                <option value="card" {% if sale and sale.payment_method == 'card' %}selected{% endif %}>Card</option>
+                                <option value="credit" {% if sale and sale.payment_method == 'credit' %}selected{% endif %}>Credit</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Payment Status - Only in Edit Mode -->
+                    {% if sale %}
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label required">Payment Status</label>
+                            <select class="form-select" name="payment_status" required>
+                                <option value="pending" {% if sale.payment_status == 'pending' %}selected{% endif %}>Pending</option>
+                                <option value="paid" {% if sale.payment_status == 'paid' %}selected{% endif %}>Paid</option>
+                                <option value="refunded" {% if sale.payment_status == 'refunded' %}selected{% endif %}>Refunded</option>
+                            </select>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Form Actions -->
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="submit" class="btn {% if sale %}btn-primary{% else %}btn-success{% endif %}">
+                            <i class="fas fa-{% if sale %}save{% else %}check{% endif %}"></i> 
+                            {% if sale %}Update Sale{% else %}Complete Sale{% endif %}
+                        </button>
+                        <a href="{% if sale %}/epa_shop/sale/receipt/{{ sale.id }}/{% else %}/epa_shop/products/{% endif %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

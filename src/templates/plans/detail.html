@@ -1,0 +1,478 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ plan.display_name }} - RonoSystems{% endblock %}
+{% block page_title %}{{ plan.display_name }}{% endblock %}
+{% block page_subtitle %}Plan Details{% endblock %}
+
+{% block extra_css %}
+<style>
+    .plan-header {
+        background: linear-gradient(135deg, #022ceb 0%, #010377 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 12px 12px 0 0;
+        margin-bottom: 0;
+    }
+    .plan-header .plan-price {
+        font-size: 3rem;
+        font-weight: 700;
+    }
+    .plan-header .plan-price small {
+        font-size: 1rem;
+        font-weight: 400;
+        opacity: 0.8;
+    }
+    .plan-header .plan-badge {
+        display: inline-block;
+        padding: 4px 16px;
+        border-radius: 50px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-top: 8px;
+    }
+    .plan-header .plan-badge.active {
+        background: #28a745;
+        color: white;
+    }
+    .plan-header .plan-badge.inactive {
+        background: #dc3545;
+        color: white;
+    }
+    .plan-header .plan-badge.featured {
+        background: #ffc107;
+        color: #212529;
+    }
+    
+    .stat-box {
+        background: white;
+        border-radius: 10px;
+        padding: 15px;
+        text-align: center;
+        border: 1px solid #00060c;
+        transition: all 0.3s;
+    }
+    .stat-box:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.979);
+    }
+    .stat-box .stat-number {
+        font-size: 28px;
+        font-weight: 700;
+        color: #00080a;
+    }
+    .stat-box .stat-label {
+        font-size: 13px;
+        color: #000508;
+    }
+    .stat-box .stat-icon {
+        font-size: 24px;
+        margin-bottom: 8px;
+        display: block;
+    }
+    
+    .feature-list {
+        list-style: none;
+        padding: 0;
+    }
+    .feature-list li {
+        padding: 10px 0;
+        border-bottom: 1px solid #f1f2f6;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .feature-list li:last-child {
+        border-bottom: none;
+    }
+    .feature-list li .feature-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #e7f1ff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #667eea;
+        flex-shrink: 0;
+    }
+    .feature-list li .feature-name {
+        font-weight: 500;
+        flex: 1;
+    }
+    .feature-list li .feature-status {
+        font-size: 12px;
+        font-weight: 600;
+        padding: 2px 12px;
+        border-radius: 50px;
+    }
+    .feature-list li .feature-status.enabled {
+        background: #d4edda;
+        color: #155724;
+    }
+    .feature-list li .feature-status.disabled {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .subscription-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        border-left: 4px solid #667eea;
+        transition: all 0.3s;
+    }
+    .subscription-item:hover {
+        background: #f0f3ff;
+    }
+    .subscription-item .company-name {
+        font-weight: 600;
+    }
+    .subscription-item .subscription-status {
+        font-size: 12px;
+        font-weight: 600;
+        padding: 2px 12px;
+        border-radius: 50px;
+    }
+    .subscription-item .subscription-status.active {
+        background: #d4edda;
+        color: #155724;
+    }
+    .subscription-item .subscription-status.expired {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    .subscription-item .subscription-status.cancelled {
+        background: #fff3cd;
+        color: #856404;
+    }
+    .subscription-item .subscription-status.pending {
+        background: #cce5ff;
+        color: #004085;
+    }
+    .subscription-item .subscription-date {
+        font-size: 12px;
+        color: #6c757d;
+    }
+    
+    .business-type-tag {
+        display: inline-block;
+        padding: 3px 12px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        background: #e7f1ff;
+        color: #667eea;
+        margin: 3px 4px;
+    }
+    .business-type-tag.all {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .action-buttons .btn {
+        margin-right: 8px;
+    }
+    .action-buttons .btn:last-child {
+        margin-right: 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Plan Header -->
+        <div class="plan-header">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h2 class="mb-1">{{ plan.display_name }}</h2>
+                    <p class="mb-2 opacity-75">{{ plan.description|default:"No description" }}</p>
+                    <div>
+                        {% if plan.is_active %}
+                        <span class="plan-badge active">Active</span>
+                        {% else %}
+                        <span class="plan-badge inactive">Inactive</span>
+                        {% endif %}
+                        {% if plan.is_featured %}
+                        <span class="plan-badge featured">⭐ Featured</span>
+                        {% endif %}
+                        <span class="plan-badge" style="background: #6c757d; color: white;">
+                            {{ plan.get_name_display }}
+                        </span>
+                    </div>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="plan-price">
+                        {{ plan.currency }} {{ plan.price|floatformat:0 }}
+                        <small>/ {{ plan.get_billing_cycle_display }}</small>
+                    </div>
+                    <div class="mt-2 action-buttons">
+                        <a href="{% url 'plans:plan-edit' plan.id %}" class="btn btn-light btn-sm">
+                            <i class="fas fa-edit"></i> Edit
+                        </a>
+                        <a href="{% url 'plans:plan-list' %}" class="btn btn-outline-light btn-sm">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="row mt-4">
+            <div class="col-md-3">
+                <div class="stat-box">
+                    <span class="stat-icon"><i class="fas fa-users text-primary"></i></span>
+                    <div class="stat-number">{{ plan.max_employees }}</div>
+                    <div class="stat-label">Max Employees</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-box">
+                    <span class="stat-icon"><i class="fas fa-building text-success"></i></span>
+                    <div class="stat-number">{{ plan.max_companies }}</div>
+                    <div class="stat-label">Max Companies</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-box">
+                    <span class="stat-icon"><i class="fas fa-store text-warning"></i></span>
+                    <div class="stat-number">{{ plan.max_branches }}</div>
+                    <div class="stat-label">Max Branches</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-box">
+                    <span class="stat-icon"><i class="fas fa-database text-info"></i></span>
+                    <div class="stat-number">{{ plan.max_storage }} MB</div>
+                    <div class="stat-label">Storage</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <!-- Left Column - Features -->
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-star text-warning"></i> Features Included</h6>
+                    </div>
+                    <div class="card-body">
+                        <ul class="feature-list">
+                            <li>
+                                <span class="feature-icon"><i class="fas fa-user-check"></i></span>
+                                <span class="feature-name">Employee Limit</span>
+                                <span class="feature-status enabled">{{ plan.max_employees }} employees</span>
+                            </li>
+                            <li>
+                                <span class="feature-icon"><i class="fas fa-building"></i></span>
+                                <span class="feature-name">Company Limit</span>
+                                <span class="feature-status enabled">{{ plan.max_companies }} company</span>
+                            </li>
+                            <li>
+                                <span class="feature-icon"><i class="fas fa-store"></i></span>
+                                <span class="feature-name">Branch Limit</span>
+                                <span class="feature-status enabled">{{ plan.max_branches }} branches</span>
+                            </li>
+                            <li>
+                                <span class="feature-icon"><i class="fas fa-database"></i></span>
+                                <span class="feature-name">Storage Limit</span>
+                                <span class="feature-status enabled">{{ plan.max_storage }} MB</span>
+                            </li>
+                            <li>
+                                <span class="feature-icon"><i class="fas fa-code"></i></span>
+                                <span class="feature-name">API Access</span>
+                                <span class="feature-status {% if plan.has_api_access %}enabled{% else %}disabled{% endif %}">
+                                    {% if plan.has_api_access %}Enabled{% else %}Disabled{% endif %}
+                                </span>
+                            </li>
+                            <li>
+                                <span class="feature-icon"><i class="fas fa-chart-bar"></i></span>
+                                <span class="feature-name">Advanced Reports</span>
+                                <span class="feature-status {% if plan.has_advanced_reports %}enabled{% else %}disabled{% endif %}">
+                                    {% if plan.has_advanced_reports %}Enabled{% else %}Disabled{% endif %}
+                                </span>
+                            </li>
+                            <li>
+                                <span class="feature-icon"><i class="fas fa-paint-brush"></i></span>
+                                <span class="feature-name">Custom Branding</span>
+                                <span class="feature-status {% if plan.has_custom_branding %}enabled{% else %}disabled{% endif %}">
+                                    {% if plan.has_custom_branding %}Enabled{% else %}Disabled{% endif %}
+                                </span>
+                            </li>
+                            <li>
+                                <span class="feature-icon"><i class="fas fa-headset"></i></span>
+                                <span class="feature-name">Priority Support</span>
+                                <span class="feature-status {% if plan.has_priority_support %}enabled{% else %}disabled{% endif %}">
+                                    {% if plan.has_priority_support %}Enabled{% else %}Disabled{% endif %}
+                                </span>
+                            </li>
+                            <li>
+                                <span class="feature-icon"><i class="fas fa-file-import"></i></span>
+                                <span class="feature-name">Bulk Import</span>
+                                <span class="feature-status {% if plan.has_bulk_import %}enabled{% else %}disabled{% endif %}">
+                                    {% if plan.has_bulk_import %}Enabled{% else %}Disabled{% endif %}
+                                </span>
+                            </li>
+                            <li>
+                                <span class="feature-icon"><i class="fas fa-globe"></i></span>
+                                <span class="feature-name">Custom Domain</span>
+                                <span class="feature-status {% if plan.has_custom_domain %}enabled{% else %}disabled{% endif %}">
+                                    {% if plan.has_custom_domain %}Enabled{% else %}Disabled{% endif %}
+                                </span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column - Business Types & Info -->
+            <div class="col-md-4">
+                <!-- Business Types -->
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-building"></i> Allowed Business Types</h6>
+                    </div>
+                    <div class="card-body">
+                        {% if plan.allowed_business_types.all %}
+                            <div class="d-flex flex-wrap">
+                                {% for bt in plan.allowed_business_types.all %}
+                                <span class="business-type-tag">
+                                    <i class="fas fa-{{ bt.icon|default:'circle' }}"></i>
+                                    {{ bt.name }}
+                                </span>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-muted text-center mb-0">
+                                <i class="fas fa-globe"></i> All business types
+                            </p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Plan Info -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-info-circle"></i> Plan Information</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <strong>Plan Type:</strong>
+                            <span class="badge bg-secondary">{{ plan.get_name_display }}</span>
+                        </div>
+                        <div class="mb-2">
+                            <strong>Billing Cycle:</strong>
+                            <span class="badge bg-info">{{ plan.get_billing_cycle_display }}</span>
+                        </div>
+                        <div class="mb-2">
+                            <strong>Price:</strong>
+                            <span class="badge bg-success">{{ plan.currency }} {{ plan.price|floatformat:0 }}</span>
+                        </div>
+                        <div class="mb-2">
+                            <strong>Order:</strong>
+                            <span class="badge bg-secondary">{{ plan.order }}</span>
+                        </div>
+                        <div>
+                            <strong>Created:</strong>
+                            <span class="text-muted">{{ plan.created_at|date:"Y-m-d H:i" }}</span>
+                        </div>
+                        <div>
+                            <strong>Last Updated:</strong>
+                            <span class="text-muted">{{ plan.updated_at|date:"Y-m-d H:i" }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-cog"></i> Quick Actions</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'plans:plan-edit' plan.id %}" class="btn btn-primary">
+                                <i class="fas fa-edit"></i> Edit Plan
+                            </a>
+                            <form method="post" action="{% url 'plans:plan-toggle-status' plan.id %}" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-{% if plan.is_active %}warning{% else %}success{% endif %} w-100"
+                                        onclick="return confirm('Are you sure you want to {% if plan.is_active %}deactivate{% else %}activate{% endif %} {{ plan.display_name }}?')">
+                                    <i class="fas {% if plan.is_active %}fa-pause{% else %}fa-play{% endif %}"></i>
+                                    {% if plan.is_active %}Deactivate{% else %}Activate{% endif %} Plan
+                                </button>
+                            </form>
+                            <a href="{% url 'plans:plan-delete' plan.id %}" class="btn btn-danger"
+                               onclick="return confirm('Are you sure you want to delete {{ plan.display_name }}? This action cannot be undone.')">
+                                <i class="fas fa-trash"></i> Delete Plan
+                            </a>
+                            <a href="{% url 'plans:subscription-create' %}?plan={{ plan.id }}" class="btn btn-success">
+                                <i class="fas fa-plus"></i> Assign to Company
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Subscriptions Section -->
+        {% if subscriptions %}
+        <div class="card mt-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="fas fa-users"></i> Active Subscriptions</h6>
+                <span class="badge bg-primary">{{ subscription_count }} subscriptions</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Company</th>
+                                <th>Status</th>
+                                <th>Start Date</th>
+                                <th>End Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for subscription in subscriptions %}
+                            <tr>
+                                <td>#{{ subscription.id }}</td>
+                                <td>
+                                    <strong>{{ subscription.company.name }}</strong>
+                                    <br><small class="text-muted">{{ subscription.company.email }}</small>
+                                </td>
+                                <td>
+                                    <span class="subscription-status {{ subscription.status }}">
+                                        {{ subscription.status|title }}
+                                    </span>
+                                </td>
+                                <td>{{ subscription.start_date|date:"Y-m-d" }}</td>
+                                <td>
+                                    {% if subscription.end_date %}
+                                        {{ subscription.end_date|date:"Y-m-d" }}
+                                    {% else %}
+                                        <span class="text-muted">Never</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{% url 'plans:subscription-detail' subscription.id %}" class="btn btn-sm btn-outline-info">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

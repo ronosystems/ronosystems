@@ -1,0 +1,800 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if is_edit %}Edit{% else %}Create{% endif %} Plan - RonoSystems{% endblock %}
+{% block page_title %}{% if is_edit %}Edit Plan{% else %}Create Plan{% endif %}{% endblock %}
+{% block page_subtitle %}{% if is_edit %}Update subscription plan details{% else %}Add a new subscription plan{% endif %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE STYLING
+    ============================================ */
+    .required:after {
+        content: " *";
+        color: #dc3545;
+        font-weight: bold;
+    }
+    
+    .form-section {
+        background: #f8f9fa;
+        padding: 15px 20px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        border: 2px solid #000000;
+    }
+    .form-section h6 {
+        font-weight: 700;
+        color: #000000;
+        margin-bottom: 15px;
+    }
+    .form-section h6 i {
+        margin-right: 8px;
+        color: #000000;
+    }
+    
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+        color: #000000 !important;
+        border-radius: 0 !important;
+    }
+    
+    .card-header h6 {
+        color: #000000 !important;
+        font-weight: 700;
+        margin: 0;
+    }
+    
+    .card-body {
+        color: #000000;
+    }
+    
+    /* ============================================
+       FORM ELEMENTS
+    ============================================ */
+    .form-control, .form-select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        color: #000000;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    .form-control:disabled {
+        background: #e9ecef;
+        cursor: not-allowed;
+        color: #000000;
+    }
+    
+    .form-label {
+        color: #000000;
+        font-weight: 600;
+    }
+    
+    textarea.form-control {
+        border: 2px solid #000000;
+        border-radius: 4px;
+    }
+    
+    textarea.form-control:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    .input-group-text {
+        border: 2px solid #000000;
+        border-right: none;
+        border-radius: 4px 0 0 4px;
+        background: #f8f9fa;
+        color: #000000;
+        font-weight: 600;
+    }
+    
+    .input-group .form-control {
+        border-radius: 0 4px 4px 0;
+        border-left: none;
+    }
+    
+    .input-group .form-control:focus {
+        border-color: #000000;
+        box-shadow: none;
+    }
+    
+    .input-group:focus-within .input-group-text {
+        border-color: #87CEEB;
+    }
+    
+    .input-group:focus-within .form-control {
+        border-color: #87CEEB;
+    }
+    
+    .help-text {
+        font-size: 12px;
+        color: #000000;
+        margin-top: 4px;
+    }
+    
+    .switch-label {
+        font-weight: 600;
+        color: #000000;
+    }
+    
+    /* ============================================
+       CHECKBOXES
+    ============================================ */
+    .feature-checkboxes {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 8px;
+    }
+    .feature-checkboxes .form-check {
+        margin-bottom: 0;
+        padding-left: 28px;
+    }
+    .feature-checkboxes .form-check-input {
+        margin-left: -28px;
+        margin-top: 4px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    .feature-checkboxes .form-check-input:checked {
+        background-color: #87CEEB;
+        border-color: #000000;
+    }
+    .feature-checkboxes .form-check-input:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .feature-checkboxes .form-check-label {
+        font-size: 0.9rem;
+        color: #000000;
+    }
+    .feature-checkboxes .form-check-label i {
+        color: #000000;
+        margin-right: 4px;
+    }
+    
+    /* ============================================
+       BUSINESS TYPE CHECKBOXES
+    ============================================ */
+    .business-type-checkboxes {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 5px;
+        max-height: 150px;
+        overflow-y: auto;
+        padding: 10px;
+        background: white;
+        border-radius: 4px;
+        border: 2px solid #000000;
+    }
+    .business-type-checkboxes .form-check {
+        margin-bottom: 2px;
+        padding-left: 24px;
+    }
+    .business-type-checkboxes .form-check-input {
+        margin-left: -24px;
+        margin-top: 3px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    .business-type-checkboxes .form-check-input:checked {
+        background-color: #87CEEB;
+        border-color: #000000;
+    }
+    .business-type-checkboxes .form-check-input:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .business-type-checkboxes .form-check-label {
+        font-size: 0.85rem;
+        color: #000000;
+    }
+    .business-type-checkboxes .form-check-label i {
+        margin-right: 4px;
+        color: #000000;
+    }
+    .business-type-checkboxes .text-muted {
+        color: #000000 !important;
+    }
+    .business-type-checkboxes .text-muted a {
+        color: #000000;
+        text-decoration: underline;
+    }
+    .business-type-checkboxes .text-muted a:hover {
+        color: #87CEEB;
+    }
+    
+    /* ============================================
+       FORM SWITCH
+    ============================================ */
+    .form-switch .form-check-input {
+        width: 40px;
+        height: 22px;
+        cursor: pointer;
+        border: 2px solid #000000;
+        background: #ccc;
+        border-radius: 22px;
+    }
+    .form-switch .form-check-input:checked {
+        background-color: #28a745;
+        border-color: #000000;
+    }
+    .form-switch .form-check-input:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .form-switch .form-check-label {
+        color: #000000;
+        font-weight: 600;
+        margin-left: 8px;
+    }
+    .form-switch .form-check-label i {
+        margin-right: 4px;
+    }
+    
+    /* ============================================
+       PLAN STATUS BADGES
+    ============================================ */
+    .plan-status-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 50px;
+        font-size: 12px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    .plan-status-badge.active {
+        background: #d4edda;
+        color: #155724;
+    }
+    .plan-status-badge.inactive {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    .plan-status-badge.featured {
+        background: #fff3cd;
+        color: #856404;
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(135,206,235,0.3);
+    }
+    
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-info {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-info:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-danger {
+        border: 2px solid #000000;
+        color: #dc3545;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-danger:hover {
+        background-color: #dc3545;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .form-section {
+            padding: 12px 15px;
+        }
+        .form-section h6 {
+            font-size: 0.9rem;
+        }
+        .card-body {
+            padding: 15px;
+        }
+        .form-control, .form-select {
+            font-size: 13px;
+            padding: 6px 10px;
+        }
+        .form-label {
+            font-size: 13px;
+        }
+        .btn {
+            font-size: 12px;
+            padding: 6px 12px;
+        }
+        .feature-checkboxes {
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        }
+        .business-type-checkboxes {
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        }
+        .d-flex.gap-2 {
+            flex-wrap: wrap;
+        }
+        .d-flex.gap-2 .btn {
+            flex: 1;
+            min-width: 80px;
+            text-align: center;
+        }
+        .d-flex.gap-2 .ms-auto {
+            margin-left: 0 !important;
+        }
+        .row {
+            margin: 0 -5px;
+        }
+        .col-md-3, .col-md-4, .col-md-6 {
+            padding: 0 5px;
+        }
+        .card-header h6 {
+            font-size: 0.9rem;
+        }
+        .plan-status-badge {
+            font-size: 10px;
+            padding: 3px 8px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .form-section {
+            padding: 10px 12px;
+        }
+        .form-section h6 {
+            font-size: 0.8rem;
+        }
+        .card-body {
+            padding: 12px;
+        }
+        .form-control, .form-select {
+            font-size: 12px;
+            padding: 4px 8px;
+            height: 32px;
+        }
+        .form-label {
+            font-size: 12px;
+        }
+        .btn {
+            font-size: 11px;
+            padding: 4px 10px;
+        }
+        textarea.form-control {
+            font-size: 12px;
+            padding: 4px 8px;
+        }
+        .feature-checkboxes {
+            grid-template-columns: 1fr;
+        }
+        .business-type-checkboxes {
+            grid-template-columns: 1fr 1fr;
+            max-height: 120px;
+        }
+        .feature-checkboxes .form-check-label {
+            font-size: 0.8rem;
+        }
+        .business-type-checkboxes .form-check-label {
+            font-size: 0.75rem;
+        }
+        .help-text {
+            font-size: 10px;
+        }
+        .input-group-text {
+            font-size: 12px;
+            padding: 4px 8px;
+        }
+        .d-flex.gap-2 .btn {
+            font-size: 10px;
+            padding: 3px 8px;
+            min-width: 60px;
+        }
+        .col-md-3, .col-md-4, .col-md-6 {
+            padding: 0 3px;
+        }
+        .row {
+            margin: 0 -3px;
+        }
+        .mb-3 {
+            margin-bottom: 6px !important;
+        }
+        .plan-status-badge {
+            font-size: 9px;
+            padding: 2px 6px;
+        }
+        .card-header {
+            padding: 8px 12px;
+        }
+        .card-header h6 {
+            font-size: 0.8rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-10 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="fas fa-{% if is_edit %}edit{% else %}plus-circle{% endif %}"></i>
+                        {% if is_edit %}Edit Plan{% else %}Create New Plan{% endif %}
+                    </h6>
+                    {% if is_edit and plan %}
+                    <div>
+                        {% if plan.is_active %}
+                        <span class="plan-status-badge active">Active</span>
+                        {% else %}
+                        <span class="plan-status-badge inactive">Inactive</span>
+                        {% endif %}
+                        {% if plan.is_featured %}
+                        <span class="plan-status-badge featured">Featured</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body p-4">
+                <form method="post" id="planForm">
+                    {% csrf_token %}
+                    
+                    <!-- Basic Information -->
+                    <div class="form-section">
+                        <h6><i class="fas fa-info-circle"></i> Basic Information</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label required">Plan Name</label>
+                                <select class="form-select" name="name" required>
+                                    <option value="">Select Plan Type</option>
+                                    {% for plan_type in plan_types %}
+                                    <option value="{{ plan_type.0 }}" 
+                                        {% if plan.name == plan_type.0 %}selected{% endif %}
+                                        {% if form_data.name == plan_type.0 %}selected{% endif %}>
+                                        {{ plan_type.1 }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <div class="help-text">Select the plan type from the predefined list</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label required">Display Name</label>
+                                <input type="text" class="form-control" name="display_name" 
+                                       value="{% if plan %}{{ plan.display_name }}{% elif form_data.display_name %}{{ form_data.display_name }}{% endif %}" 
+                                       required>
+                                <div class="help-text">The name shown to users (e.g., "Premium Plan")</div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-12 mb-3">
+                                <label class="form-label">Description</label>
+                                <textarea class="form-control" name="description" rows="2">{% if plan %}{{ plan.description }}{% elif form_data.description %}{{ form_data.description }}{% endif %}</textarea>
+                                <div class="help-text">Brief description of what this plan offers</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pricing -->
+                    <div class="form-section">
+                        <h6><i class="fas fa-tag"></i> Pricing</h6>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Price</label>
+                                <div class="input-group">
+                                    <span class="input-group-text" id="currencySymbol">
+                                        {% if plan and plan.currency == 'USD' %}${% elif plan.currency == 'EUR' %}€{% elif plan.currency == 'GBP' %}£{% else %}KSh{% endif %}
+                                    </span>
+                                    <input type="number" class="form-control" name="price" step="0.01" 
+                                           value="{% if plan %}{{ plan.price }}{% elif form_data.price %}{{ form_data.price }}{% else %}0{% endif %}"
+                                           id="priceInput">
+                                </div>
+                                <div class="help-text">Price per billing cycle</div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Currency</label>
+                                <select class="form-select" name="currency" id="currencySelect">
+                                    <option value="KES" {% if plan.currency == 'KES' %}selected{% endif %}>KES - Kenyan Shilling</option>
+                                    <option value="USD" {% if plan.currency == 'USD' %}selected{% endif %}>USD - US Dollar</option>
+                                    <option value="EUR" {% if plan.currency == 'EUR' %}selected{% endif %}>EUR - Euro</option>
+                                    <option value="GBP" {% if plan.currency == 'GBP' %}selected{% endif %}>GBP - British Pound</option>
+                                    <option value="NGN" {% if plan.currency == 'NGN' %}selected{% endif %}>NGN - Nigerian Naira</option>
+                                    <option value="ZAR" {% if plan.currency == 'ZAR' %}selected{% endif %}>ZAR - South African Rand</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Billing Cycle</label>
+                                <select class="form-select" name="billing_cycle">
+                                    {% for cycle in billing_cycles %}
+                                    <option value="{{ cycle.0 }}" 
+                                        {% if plan.billing_cycle == cycle.0 %}selected{% endif %}
+                                        {% if form_data.billing_cycle == cycle.0 %}selected{% endif %}>
+                                        {{ cycle.1 }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <div class="help-text">How often the customer is billed</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Limits & Restrictions -->
+                    <div class="form-section">
+                        <h6><i class="fas fa-cog"></i> Limits &amp; Restrictions</h6>
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">Max Employees</label>
+                                <input type="number" class="form-control" name="max_employees" 
+                                       value="{% if plan %}{{ plan.max_employees }}{% elif form_data.max_employees %}{{ form_data.max_employees }}{% else %}10{% endif %}"
+                                       min="0">
+                                <div class="help-text">0 = unlimited</div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">Max Companies</label>
+                                <input type="number" class="form-control" name="max_companies" 
+                                       value="{% if plan %}{{ plan.max_companies }}{% elif form_data.max_companies %}{{ form_data.max_companies }}{% else %}1{% endif %}"
+                                       min="0">
+                                <div class="help-text">0 = unlimited</div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">Max Branches</label>
+                                <input type="number" class="form-control" name="max_branches" 
+                                       value="{% if plan %}{{ plan.max_branches }}{% elif form_data.max_branches %}{{ form_data.max_branches }}{% else %}1{% endif %}"
+                                       min="0">
+                                <div class="help-text">0 = unlimited</div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">Max Storage (MB)</label>
+                                <input type="number" class="form-control" name="max_storage" 
+                                       value="{% if plan %}{{ plan.max_storage }}{% elif form_data.max_storage %}{{ form_data.max_storage }}{% else %}100{% endif %}"
+                                       min="0">
+                                <div class="help-text">0 = unlimited</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Features -->
+                    <div class="form-section">
+                        <h6><i class="fas fa-star"></i> Features</h6>
+                        <div class="feature-checkboxes">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="has_api_access" id="apiAccess"
+                                       {% if plan and plan.has_api_access %}checked{% endif %}
+                                       {% if form_data.has_api_access %}checked{% endif %}>
+                                <label class="form-check-label" for="apiAccess">
+                                    <i class="fas fa-code"></i> API Access
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="has_advanced_reports" id="advReports"
+                                       {% if plan and plan.has_advanced_reports %}checked{% endif %}
+                                       {% if form_data.has_advanced_reports %}checked{% endif %}>
+                                <label class="form-check-label" for="advReports">
+                                    <i class="fas fa-chart-bar"></i> Advanced Reports
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="has_custom_branding" id="customBranding"
+                                       {% if plan and plan.has_custom_branding %}checked{% endif %}
+                                       {% if form_data.has_custom_branding %}checked{% endif %}>
+                                <label class="form-check-label" for="customBranding">
+                                    <i class="fas fa-paint-brush"></i> Custom Branding
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="has_priority_support" id="prioritySupport"
+                                       {% if plan and plan.has_priority_support %}checked{% endif %}
+                                       {% if form_data.has_priority_support %}checked{% endif %}>
+                                <label class="form-check-label" for="prioritySupport">
+                                    <i class="fas fa-headset"></i> Priority Support
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="has_bulk_import" id="bulkImport"
+                                       {% if plan and plan.has_bulk_import %}checked{% endif %}
+                                       {% if form_data.has_bulk_import %}checked{% endif %}>
+                                <label class="form-check-label" for="bulkImport">
+                                    <i class="fas fa-file-import"></i> Bulk Import
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="has_custom_domain" id="customDomain"
+                                       {% if plan and plan.has_custom_domain %}checked{% endif %}
+                                       {% if form_data.has_custom_domain %}checked{% endif %}>
+                                <label class="form-check-label" for="customDomain">
+                                    <i class="fas fa-globe"></i> Custom Domain
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="has_mpesa_intergration" id="mpesaIntergration"
+                                       {% if plan and plan.has_mpesa_intergration %}checked{% endif %}
+                                       {% if form_data.has_mpesa_intergration %}checked{% endif %}>
+                                <label class="form-check-label" for="mpesaIntergration">
+                                    <i class="fas fa-dollar"></i> Mpesa Intergration
+                                </label>
+                            </div>
+                        </div>
+                        <div class="help-text mt-2">Select the features included in this plan</div>
+                    </div>
+
+                    <!-- Allowed Business Types -->
+                    <div class="form-section">
+                        <h6><i class="fas fa-building"></i> Allowed Business Types</h6>
+                        <p class="help-text">Select which business types can use this plan (leave empty for all)</p>
+                        <div class="business-type-checkboxes">
+                            {% for business_type in business_types %}
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" 
+                                       name="allowed_business_types" 
+                                       value="{{ business_type.id }}"
+                                       id="bt_{{ business_type.id }}"
+                                       {% if plan and business_type in plan.allowed_business_types.all %}checked{% endif %}
+                                       {% if form_data.allowed_business_types and business_type.id|stringformat:"s" in form_data.allowed_business_types %}checked{% endif %}>
+                                <label class="form-check-label" for="bt_{{ business_type.id }}">
+                                    <i class="fas fa-{{ business_type.icon|default:'circle' }}"></i>
+                                    {{ business_type.name }}
+                                </label>
+                            </div>
+                            {% empty %}
+                            <div class="text-muted text-center py-2">
+                                <small>No business types available. <a href="/business-types/create/">Create one</a></small>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Status -->
+                    <div class="form-section">
+                        <h6><i class="fas fa-toggle-on"></i> Status &amp; Display</h6>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" class="form-check-input" name="is_active" id="isActive"
+                                           {% if plan and plan.is_active %}checked{% endif %}
+                                           {% if form_data.is_active %}checked{% endif %}
+                                           {% if not plan and not form_data %}checked{% endif %}>
+                                    <label class="form-check-label switch-label" for="isActive">
+                                        <i class="fas fa-{% if plan and plan.is_active %}check-circle text-success{% else %}circle text-muted{% endif %}"></i>
+                                        Active
+                                    </label>
+                                </div>
+                                <div class="help-text">Plan is available for subscription</div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" class="form-check-input" name="is_featured" id="isFeatured"
+                                           {% if plan and plan.is_featured %}checked{% endif %}
+                                           {% if form_data.is_featured %}checked{% endif %}>
+                                    <label class="form-check-label switch-label" for="isFeatured">
+                                        <i class="fas fa-star text-warning"></i>
+                                        Featured
+                                    </label>
+                                </div>
+                                <div class="help-text">Highlight this plan on the pricing page</div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Display Order</label>
+                                <input type="number" class="form-control" name="order" 
+                                       value="{% if plan %}{{ plan.order }}{% elif form_data.order %}{{ form_data.order }}{% else %}0{% endif %}"
+                                       min="0">
+                                <div class="help-text">Lower numbers appear first</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Buttons -->
+                    <div class="d-flex gap-2 mt-3 flex-wrap">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> 
+                            {% if is_edit %}Update Plan{% else %}Create Plan{% endif %}
+                        </button>
+                        <a href="{% url 'plans:plan-list' %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                        {% if is_edit %}
+                        <a href="{% url 'plans:plan-detail' plan.id %}" class="btn btn-outline-info">
+                            <i class="fas fa-eye"></i> View
+                        </a>
+                        <a href="{% url 'plans:plan-delete' plan.id %}" class="btn btn-outline-danger ms-auto" 
+                           onclick="return confirm('Are you sure you want to delete this plan? This action cannot be undone.')">
+                            <i class="fas fa-trash"></i> Delete Plan
+                        </a>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Update currency symbol on change
+document.addEventListener('DOMContentLoaded', function() {
+    const currencySelect = document.getElementById('currencySelect');
+    const currencySymbol = document.getElementById('currencySymbol');
+    
+    if (currencySelect && currencySymbol) {
+        currencySelect.addEventListener('change', function() {
+            const symbols = {
+                'USD': '$',
+                'EUR': '€',
+                'GBP': '£',
+                'KES': 'KSh',
+                'NGN': '₦',
+                'ZAR': 'R'
+            };
+            currencySymbol.textContent = symbols[this.value] || 'KSh';
+        });
+    }
+    
+    // Auto-generate display name from plan name
+    const planNameSelect = document.querySelector('select[name="name"]');
+    const displayNameInput = document.querySelector('input[name="display_name"]');
+    
+    if (planNameSelect && displayNameInput && !displayNameInput.value) {
+        planNameSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            if (selectedOption && selectedOption.value) {
+                const text = selectedOption.textContent;
+                // Only set if display name is empty
+                if (!displayNameInput.value) {
+                    displayNameInput.value = text;
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

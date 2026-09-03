@@ -1,0 +1,1037 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}System Settings - RonoSystems{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE STYLING
+    ============================================ */
+    :root {
+        --primary-color: #87CEEB;
+        --secondary-color: #7bb8d8;
+    }
+    
+    .settings-wrapper { padding: 20px 0; }
+    
+    /* ============================================
+       SIDEBAR
+    ============================================ */
+    .settings-sidebar {
+        position: sticky;
+        top: 20px;
+        z-index: 100;
+    }
+    .settings-sidebar .nav-pills .nav-link {
+        color: #000000;
+        border-radius: 4px;
+        padding: 10px 14px;
+        margin-bottom: 3px;
+        transition: all 0.3s ease;
+        font-weight: 600;
+        font-size: 0.9rem;
+        border: 2px solid transparent;
+    }
+    .settings-sidebar .nav-pills .nav-link i {
+        width: 18px;
+        margin-right: 8px;
+        text-align: center;
+    }
+    .settings-sidebar .nav-pills .nav-link:hover {
+        background: #f7fafc;
+        color: #000000;
+        border-color: #87CEEB;
+    }
+    .settings-sidebar .nav-pills .nav-link.active {
+        background: #87CEEB;
+        color: #000000;
+        border-color: #000000;
+        box-shadow: 0 4px 15px rgba(135,206,235,0.3);
+    }
+    
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .settings-card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+        transition: all 0.3s ease;
+        margin-bottom: 20px;
+    }
+    .settings-card:hover {
+        box-shadow: 0 0 30px rgba(0,0,0,0.08);
+    }
+    .settings-card .card-header {
+        background: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+        border-radius: 0 !important;
+    }
+    .settings-card .card-header h6 {
+        margin: 0;
+        font-weight: 700;
+        color: #000000;
+        font-size: 0.95rem;
+    }
+    .settings-card .card-header h6 i {
+        margin-right: 8px;
+        color: #000000;
+    }
+    .settings-card .card-body { 
+        padding: 16px 20px;
+        color: #000000;
+    }
+    .settings-card .card-footer {
+        background: #f8f9fa;
+        border-top: 2px solid #000000;
+        padding: 10px 20px;
+        border-radius: 0 !important;
+        font-size: 0.8rem;
+        color: #000000;
+    }
+    
+    /* ============================================
+       FORM ELEMENTS
+    ============================================ */
+    .form-group { margin-bottom: 14px; }
+    .form-group label {
+        font-weight: 600;
+        color: #000000;
+        margin-bottom: 4px;
+        display: block;
+        font-size: 0.85rem;
+    }
+    .form-group label .required { 
+        color: #dc3545; 
+        margin-left: 4px; 
+    }
+    .form-group .help-text {
+        display: block;
+        font-size: 11px;
+        color: #000000;
+        margin-top: 3px;
+    }
+    .form-group .form-control,
+    .form-group .form-select {
+        border-radius: 4px;
+        border: 2px solid #000000;
+        padding: 6px 12px;
+        transition: all 0.3s ease;
+        font-size: 0.9rem;
+        height: 38px;
+        background: white;
+        color: #000000;
+    }
+    .form-group .form-control:focus,
+    .form-group .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .form-group .form-switch .form-check-input {
+        width: 40px;
+        height: 22px;
+        cursor: pointer;
+        margin-top: 2px;
+        border: 2px solid #000000;
+        background: #ccc;
+    }
+    .form-group .form-switch .form-check-input:checked {
+        background-color: #28a745;
+        border-color: #000000;
+    }
+    .form-group .form-switch .form-check-label {
+        font-size: 0.9rem;
+        margin-left: 8px;
+        color: #000000;
+    }
+    
+    /* ============================================
+       UPLOAD GRID
+    ============================================ */
+    .upload-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+    }
+    .upload-item {
+        background: #f8fafc;
+        border-radius: 4px;
+        padding: 12px;
+        text-align: center;
+        border: 2px dashed #000000;
+        transition: all 0.3s ease;
+    }
+    .upload-item:hover {
+        border-color: #87CEEB;
+        background: #f0f4ff;
+    }
+    .upload-item .label-text {
+        font-weight: 600;
+        font-size: 0.8rem;
+        color: #000000;
+        display: block;
+        margin-bottom: 6px;
+    }
+    .upload-item .label-text i {
+        margin-right: 4px;
+        color: #000000;
+    }
+    .upload-item .preview {
+        width: 100%;
+        height: 70px;
+        border-radius: 4px;
+        overflow: hidden;
+        background: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid #000000;
+        margin-bottom: 8px;
+    }
+    .upload-item .preview img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        padding: 4px;
+    }
+    .upload-item .preview .placeholder {
+        color: #000000;
+        font-size: 12px;
+    }
+    .upload-item .preview .placeholder i {
+        font-size: 24px;
+        display: block;
+        margin-bottom: 4px;
+        color: #000000;
+    }
+    .upload-item .file-input input[type="file"] {
+        font-size: 11px;
+        padding: 4px;
+        width: 100%;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        color: #000000;
+    }
+    .upload-item .btn-remove {
+        font-size: 11px;
+        padding: 2px 10px;
+        border-radius: 20px;
+        margin-top: 4px;
+    }
+    
+    /* ============================================
+       COLOR PICKER
+    ============================================ */
+    .color-picker-group {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+    .color-picker-group input[type="color"] {
+        width: 38px;
+        height: 38px;
+        padding: 2px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        cursor: pointer;
+        background: white;
+    }
+    .color-picker-group input[type="text"] {
+        flex: 1;
+        height: 38px;
+        font-size: 0.85rem;
+        padding: 4px 10px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        color: #000000;
+    }
+    .color-picker-group input[type="text"]:focus {
+        border-color: #87CEEB;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    /* ============================================
+       FORM ACTIONS
+    ============================================ */
+    .settings-actions {
+        background: white;
+        padding: 12px 0;
+        border-top: 2px solid #000000;
+        z-index: 100;
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.05);
+    }
+    .settings-actions .btn {
+        padding: 8px 20px;
+        font-weight: 600;
+        border-radius: 4px;
+        transition: all 0.3s ease;
+        font-size: 0.9rem;
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-primary:hover {
+        background: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(135,206,235,0.4);
+    }
+    
+    .btn-secondary {
+        background: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-secondary:hover {
+        background: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-success {
+        border: 2px solid #000000;
+        color: #155724;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    .btn-outline-success:hover {
+        background: #28a745;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-outline-danger {
+        border: 2px solid #000000;
+        color: #dc3545;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    .btn-outline-danger:hover {
+        background: #dc3545;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-outline-secondary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    .btn-outline-secondary:hover {
+        background: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-sm {
+        padding: 4px 12px;
+        font-size: 12px;
+    }
+    
+    .btn-danger.btn-sm.btn-remove {
+        background: #dc3545;
+        border: 2px solid #000000;
+        color: #ffffff;
+        font-weight: 600;
+    }
+    .btn-danger.btn-sm.btn-remove:hover {
+        background: #c82333;
+        border-color: #000000;
+    }
+    
+    .input-group .btn-outline-secondary {
+        border: 2px solid #000000;
+        border-left: none;
+        border-radius: 0 4px 4px 0;
+        color: #000000;
+        background: white;
+        font-weight: 600;
+    }
+    .input-group .btn-outline-secondary:hover {
+        background: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    .input-group .form-control {
+        border-radius: 4px 0 0 4px;
+        border-right: none;
+    }
+    
+    /* ============================================
+       FORM ROW
+    ============================================ */
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+    }
+    
+    /* ============================================
+       TOAST
+    ============================================ */
+    .toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+    }
+    .toast {
+        border: 2px solid #000000;
+        border-radius: 4px;
+    }
+    .toast.bg-success {
+        background: #d4edda !important;
+        color: #155724 !important;
+    }
+    .toast.bg-danger {
+        background: #f8d7da !important;
+        color: #721c24 !important;
+    }
+    .toast.bg-warning {
+        background: #fff3cd !important;
+        color: #856404 !important;
+    }
+    .toast.bg-info {
+        background: #cce5ff !important;
+        color: #004085 !important;
+    }
+    .toast .toast-body {
+        color: inherit !important;
+    }
+    .toast .btn-close {
+        filter: none;
+        opacity: 0.7;
+    }
+    .toast .btn-close:hover {
+        opacity: 1;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 992px) {
+        .upload-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+        .settings-sidebar {
+            position: relative;
+            top: 0;
+            margin-bottom: 20px;
+        }
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .upload-grid {
+            grid-template-columns: 1fr;
+        }
+        .settings-card .card-body { padding: 12px; }
+        .settings-actions .btn { 
+            width: 100%; 
+            margin-bottom: 8px; 
+        }
+        .settings-actions .d-flex { 
+            flex-direction: column; 
+        }
+        .color-picker-group { 
+            flex-direction: column; 
+        }
+        .color-picker-group input[type="color"] { 
+            width: 100%; 
+        }
+        .settings-actions .d-flex.flex-wrap {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .settings-actions .d-flex.flex-wrap .btn {
+            text-align: center;
+        }
+        .settings-card .card-header h6 {
+            font-size: 0.85rem;
+        }
+        .form-group .form-control,
+        .form-group .form-select {
+            font-size: 13px;
+            height: 34px;
+            padding: 4px 10px;
+        }
+        .form-group label {
+            font-size: 13px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .settings-card .card-body { padding: 10px; }
+        .settings-card .card-header { padding: 8px 12px; }
+        .settings-card .card-header h6 { font-size: 0.8rem; }
+        .settings-actions .btn { font-size: 12px; padding: 6px 14px; }
+        .upload-item .preview { height: 50px; }
+        .upload-item .label-text { font-size: 0.7rem; }
+        .form-group .form-control,
+        .form-group .form-select {
+            font-size: 12px;
+            height: 30px;
+            padding: 3px 8px;
+        }
+        .form-group label {
+            font-size: 12px;
+        }
+        .form-row {
+            gap: 10px;
+        }
+        .color-picker-group input[type="color"] {
+            height: 30px;
+            width: 30px;
+        }
+        .color-picker-group input[type="text"] {
+            height: 30px;
+            font-size: 12px;
+        }
+        .toast-container {
+            top: 10px;
+            right: 10px;
+            left: 10px;
+        }
+        .toast {
+            font-size: 12px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="settings-wrapper">
+    <div class="row">
+        <!-- Header -->
+        <div class="col-12 mb-3">
+            <div class="d-flex justify-content-between align-items-center flex-wrap">
+                <div>
+                    <h4 class="mb-0"><i class="fas fa-cogs" style="color: #000000;"></i> System Settings</h4>
+                    <p class="text-muted small mb-0" style="color: #000000 !important;">Configure your system preferences</p>
+                </div>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.location.reload()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-lg-2 col-md-3">
+            <div class="settings-sidebar">
+                <div class="card shadow-sm">
+                    <div class="card-body p-1" style="border: 2px solid #000000; border-radius: 4px;">
+                        <nav class="nav nav-pills flex-column p-1" id="settingsNav">
+                            <a class="nav-link active" href="#branding" data-bs-toggle="pill">
+                                <i class="fas fa-paint-brush"></i> Branding
+                            </a>
+                            <a class="nav-link" href="#general" data-bs-toggle="pill">
+                                <i class="fas fa-cog"></i> General
+                            </a>
+                            <a class="nav-link" href="#email" data-bs-toggle="pill">
+                                <i class="fas fa-envelope"></i> Email
+                            </a>
+                            <a class="nav-link" href="#payment" data-bs-toggle="pill">
+                                <i class="fas fa-credit-card"></i> Payment
+                            </a>
+                            <a class="nav-link" href="#preferences" data-bs-toggle="pill">
+                                <i class="fas fa-sliders-h"></i> Preferences
+                            </a>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div class="col-lg-10 col-md-9">
+            <form method="post" action="/settings/update/" enctype="multipart/form-data" id="settingsForm">
+                {% csrf_token %}
+                
+                <div class="tab-content" id="settingsTabContent">
+                    
+                    <!-- ==================== BRANDING ==================== -->
+                    <div class="tab-pane fade show active" id="branding">
+                        <div class="card settings-card">
+                            <div class="card-header">
+                                <h6><i class="fas fa-paint-brush"></i> Branding Settings</h6>
+                            </div>
+                            <div class="card-body">
+                                <!-- Colors -->
+                                <div class="form-row mb-3">
+                                    <div class="form-group">
+                                        <label for="PRIMARY_COLOR">Primary Color</label>
+                                        <div class="color-picker-group">
+                                            <input type="color" id="PRIMARY_COLOR" name="PRIMARY_COLOR" 
+                                                   value="{{ settings.PRIMARY_COLOR|default:'#87CEEB' }}">
+                                            <input type="text" id="PRIMARY_COLOR_text" 
+                                                   value="{{ settings.PRIMARY_COLOR|default:'#87CEEB' }}" 
+                                                   oninput="document.getElementById('PRIMARY_COLOR').value = this.value">
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="SECONDARY_COLOR">Secondary Color</label>
+                                        <div class="color-picker-group">
+                                            <input type="color" id="SECONDARY_COLOR" name="SECONDARY_COLOR" 
+                                                   value="{{ settings.SECONDARY_COLOR|default:'#7bb8d8' }}">
+                                            <input type="text" id="SECONDARY_COLOR_text" 
+                                                   value="{{ settings.SECONDARY_COLOR|default:'#7bb8d8' }}" 
+                                                   oninput="document.getElementById('SECONDARY_COLOR').value = this.value">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Uploads in Grid -->
+                                <div class="upload-grid">
+                                    <!-- Logo -->
+                                    <div class="upload-item">
+                                        <span class="label-text"><i class="fas fa-image"></i> Logo</span>
+                                        <div class="preview">
+                                            {% if settings.SITE_LOGO %}
+                                                <img src="/media/{{ settings.SITE_LOGO }}" alt="Logo" id="logo-preview">
+                                            {% else %}
+                                                <div class="placeholder">
+                                                    <i class="fas fa-image"></i>
+                                                    No logo
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="file-input">
+                                            <input type="file" class="form-control form-control-sm" name="SITE_LOGO" accept="image/*" id="logo-input">
+                                        </div>
+                                        {% if settings.SITE_LOGO %}
+                                            <button type="button" class="btn btn-danger btn-sm btn-remove" onclick="removeImage('SITE_LOGO')">
+                                                <i class="fas fa-trash"></i> Remove
+                                            </button>
+                                            <input type="hidden" name="remove_SITE_LOGO" id="remove_SITE_LOGO" value="">
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- Favicon -->
+                                    <div class="upload-item">
+                                        <span class="label-text"><i class="fas fa-star"></i> Favicon</span>
+                                        <div class="preview">
+                                            {% if settings.SITE_FAVICON %}
+                                                <img src="/media/{{ settings.SITE_FAVICON }}" alt="Favicon" id="favicon-preview">
+                                            {% else %}
+                                                <div class="placeholder">
+                                                    <i class="fas fa-star"></i>
+                                                    No favicon
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="file-input">
+                                            <input type="file" class="form-control form-control-sm" name="SITE_FAVICON" accept="image/*" id="favicon-input">
+                                        </div>
+                                        {% if settings.SITE_FAVICON %}
+                                            <button type="button" class="btn btn-danger btn-sm btn-remove" onclick="removeImage('SITE_FAVICON')">
+                                                <i class="fas fa-trash"></i> Remove
+                                            </button>
+                                            <input type="hidden" name="remove_SITE_FAVICON" id="remove_SITE_FAVICON" value="">
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- Login Background -->
+                                    <div class="upload-item">
+                                        <span class="label-text"><i class="fas fa-image"></i> Login BG</span>
+                                        <div class="preview">
+                                            {% if settings.LOGIN_BACKGROUND %}
+                                                <img src="/media/{{ settings.LOGIN_BACKGROUND }}" alt="Login BG" id="login-bg-preview">
+                                            {% else %}
+                                                <div class="placeholder">
+                                                    <i class="fas fa-image"></i>
+                                                    No background
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="file-input">
+                                            <input type="file" class="form-control form-control-sm" name="LOGIN_BACKGROUND" accept="image/*" id="login-bg-input">
+                                        </div>
+                                        {% if settings.LOGIN_BACKGROUND %}
+                                            <button type="button" class="btn btn-danger btn-sm btn-remove" onclick="removeImage('LOGIN_BACKGROUND')">
+                                                <i class="fas fa-trash"></i> Remove
+                                            </button>
+                                            <input type="hidden" name="remove_LOGIN_BACKGROUND" id="remove_LOGIN_BACKGROUND" value="">
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-footer text-muted">
+                                <small><i class="fas fa-info-circle"></i> Upload images (PNG, JPG, SVG). Logo: 200x60px, Favicon: 32x32px, BG: 1920x1080px</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ==================== GENERAL ==================== -->
+                    <div class="tab-pane fade" id="general">
+                        <div class="card settings-card">
+                            <div class="card-header">
+                                <h6><i class="fas fa-cog"></i> General Settings</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="SITE_NAME">Site Name <span class="required">*</span></label>
+                                        <input type="text" class="form-control" id="SITE_NAME" name="SITE_NAME" 
+                                               value="{{ settings.SITE_NAME|default:'RonoSystems' }}" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="SITE_TAGLINE">Tagline</label>
+                                        <input type="text" class="form-control" id="SITE_TAGLINE" name="SITE_TAGLINE" 
+                                               value="{{ settings.SITE_TAGLINE|default:'Enterprise Management Platform' }}">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="TIMEZONE">Timezone</label>
+                                        <select class="form-select" id="TIMEZONE" name="TIMEZONE">
+                                            <option value="UTC" {% if settings.TIMEZONE == 'UTC' %}selected{% endif %}>UTC</option>
+                                            <option value="Africa/Nairobi" {% if settings.TIMEZONE == 'Africa/Nairobi' %}selected{% endif %}>Africa/Nairobi</option>
+                                            <option value="America/New_York" {% if settings.TIMEZONE == 'America/New_York' %}selected{% endif %}>America/New_York</option>
+                                            <option value="Europe/London" {% if settings.TIMEZONE == 'Europe/London' %}selected{% endif %}>Europe/London</option>
+                                            <option value="Asia/Dubai" {% if settings.TIMEZONE == 'Asia/Dubai' %}selected{% endif %}>Asia/Dubai</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="DATE_FORMAT">Date Format</label>
+                                        <select class="form-select" id="DATE_FORMAT" name="DATE_FORMAT">
+                                            <option value="Y-m-d" {% if settings.DATE_FORMAT == 'Y-m-d' %}selected{% endif %}>YYYY-MM-DD</option>
+                                            <option value="d/m/Y" {% if settings.DATE_FORMAT == 'd/m/Y' %}selected{% endif %}>DD/MM/YYYY</option>
+                                            <option value="m/d/Y" {% if settings.DATE_FORMAT == 'm/d/Y' %}selected{% endif %}>MM/DD/YYYY</option>
+                                            <option value="d M Y" {% if settings.DATE_FORMAT == 'd M Y' %}selected{% endif %}>DD Mon YYYY</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ==================== EMAIL ==================== -->
+                    <div class="tab-pane fade" id="email">
+                        <div class="card settings-card">
+                            <div class="card-header">
+                                <h6><i class="fas fa-envelope"></i> Email Settings</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="EMAIL_HOST">SMTP Host</label>
+                                        <input type="text" class="form-control" id="EMAIL_HOST" name="EMAIL_HOST" 
+                                               value="{{ settings.EMAIL_HOST|default:'smtp.gmail.com' }}">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="EMAIL_PORT">SMTP Port</label>
+                                        <input type="number" class="form-control" id="EMAIL_PORT" name="EMAIL_PORT" 
+                                               value="{{ settings.EMAIL_PORT|default:'587' }}">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="EMAIL_USERNAME">SMTP Username</label>
+                                        <input type="text" class="form-control" id="EMAIL_USERNAME" name="EMAIL_USERNAME" 
+                                               value="{{ settings.EMAIL_USERNAME|default:'' }}">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="EMAIL_PASSWORD">SMTP Password</label>
+                                        <div class="input-group">
+                                            <input type="password" class="form-control" id="EMAIL_PASSWORD" name="EMAIL_PASSWORD" 
+                                                   value="{{ settings.EMAIL_PASSWORD|default:'' }}">
+                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('EMAIL_PASSWORD')">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="EMAIL_FROM">From Email</label>
+                                        <input type="email" class="form-control" id="EMAIL_FROM" name="EMAIL_FROM" 
+                                               value="{{ settings.EMAIL_FROM|default:'' }}">
+                                    </div>
+                                    <div class="form-group d-flex align-items-end">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="EMAIL_TLS" name="EMAIL_TLS" 
+                                                   {% if settings.EMAIL_TLS %}checked{% endif %}>
+                                            <label class="form-check-label" for="EMAIL_TLS">Enable TLS</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ==================== PAYMENT ==================== -->
+                    <div class="tab-pane fade" id="payment">
+                        <div class="card settings-card">
+                            <div class="card-header">
+                                <h6><i class="fas fa-credit-card"></i> Payment Settings</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="CURRENCY">Default Currency</label>
+                                        <select class="form-select" id="CURRENCY" name="CURRENCY">
+                                            <option value="KES" {% if settings.CURRENCY == 'KES' %}selected{% endif %}>Kenyan Shilling (KES)</option>
+                                            <option value="USD" {% if settings.CURRENCY == 'USD' %}selected{% endif %}>US Dollar (USD)</option>
+                                            <option value="EUR" {% if settings.CURRENCY == 'EUR' %}selected{% endif %}>Euro (EUR)</option>
+                                            <option value="GBP" {% if settings.CURRENCY == 'GBP' %}selected{% endif %}>British Pound (GBP)</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="CURRENCY_SYMBOL">Currency Symbol</label>
+                                        <input type="text" class="form-control" id="CURRENCY_SYMBOL" name="CURRENCY_SYMBOL" 
+                                               value="{{ settings.CURRENCY_SYMBOL|default:'KSh' }}">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="TAX_RATE">Tax Rate (%)</label>
+                                        <input type="number" class="form-control" id="TAX_RATE" name="TAX_RATE" 
+                                               value="{{ settings.TAX_RATE|default:'0' }}" step="0.01" min="0">
+                                    </div>
+                                    <div class="form-group d-flex align-items-end" style="gap:15px;">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="ENABLE_DISCOUNT" name="ENABLE_DISCOUNT" 
+                                                   {% if settings.ENABLE_DISCOUNT %}checked{% endif %}>
+                                            <label class="form-check-label" for="ENABLE_DISCOUNT">Discounts</label>
+                                        </div>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="ENABLE_TAX" name="ENABLE_TAX" 
+                                                   {% if settings.ENABLE_TAX %}checked{% endif %}>
+                                            <label class="form-check-label" for="ENABLE_TAX">Tax</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ==================== PREFERENCES ==================== -->
+                    <div class="tab-pane fade" id="preferences">
+                        <div class="card settings-card">
+                            <div class="card-header">
+                                <h6><i class="fas fa-sliders-h"></i> Preferences</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-row">
+                                    <div class="form-group d-flex align-items-center" style="gap:20px; flex-wrap:wrap;">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="NOTIFICATIONS" name="NOTIFICATIONS" 
+                                                   {% if settings.NOTIFICATIONS %}checked{% endif %}>
+                                            <label class="form-check-label" for="NOTIFICATIONS">Notifications</label>
+                                        </div>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="EMAIL_NOTIFICATIONS" name="EMAIL_NOTIFICATIONS" 
+                                                   {% if settings.EMAIL_NOTIFICATIONS %}checked{% endif %}>
+                                            <label class="form-check-label" for="EMAIL_NOTIFICATIONS">Email Notifications</label>
+                                        </div>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="PUSH_NOTIFICATIONS" name="PUSH_NOTIFICATIONS" 
+                                                   {% if settings.PUSH_NOTIFICATIONS %}checked{% endif %}>
+                                            <label class="form-check-label" for="PUSH_NOTIFICATIONS">Push Notifications</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="ITEMS_PER_PAGE">Items Per Page</label>
+                                        <select class="form-select" id="ITEMS_PER_PAGE" name="ITEMS_PER_PAGE">
+                                            <option value="10" {% if settings.ITEMS_PER_PAGE == 10 %}selected{% endif %}>10</option>
+                                            <option value="25" {% if settings.ITEMS_PER_PAGE == 25 %}selected{% endif %}>25</option>
+                                            <option value="50" {% if settings.ITEMS_PER_PAGE == 50 %}selected{% endif %}>50</option>
+                                            <option value="100" {% if settings.ITEMS_PER_PAGE == 100 %}selected{% endif %}>100</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Form Actions -->
+                <div class="settings-actions">
+                    <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="submit" class="btn btn-primary" id="saveBtn">
+                                <i class="fas fa-save"></i> Save Settings
+                            </button>
+                            <button type="reset" class="btn btn-secondary">
+                                <i class="fas fa-undo-alt"></i> Reset
+                            </button>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <a href="/dashboard/" class="btn btn-outline-success btn-sm">
+                                <i class="fas fa-tachometer-alt"></i> Dashboard
+                            </a>
+                            <a href="/admin/" class="btn btn-outline-danger btn-sm">
+                                <i class="fas fa-shield-alt"></i> Admin
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// Toggle password visibility
+function togglePassword(id) {
+    const input = document.getElementById(id);
+    const icon = input.parentElement.querySelector('.btn i');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'fas fa-eye-slash';
+    } else {
+        input.type = 'password';
+        icon.className = 'fas fa-eye';
+    }
+}
+
+// Remove image
+function removeImage(key) {
+    if (!confirm('Are you sure you want to remove this image?')) return;
+    document.getElementById('remove_' + key).value = key;
+    document.getElementById('settingsForm').submit();
+}
+
+// Show toast
+function showToast(type, message) {
+    const container = document.getElementById('toastContainer');
+    const colors = { success: 'bg-success', error: 'bg-danger', warning: 'bg-warning', info: 'bg-info' };
+    const icons = { success: 'check-circle', error: 'exclamation-circle', warning: 'exclamation-triangle', info: 'info-circle' };
+    
+    const toast = document.createElement('div');
+    toast.className = `toast align-items-center text-white ${colors[type] || 'bg-primary'} border-0`;
+    toast.role = 'alert';
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="fas fa-${icons[type] || 'info-circle'} me-2"></i>
+                ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+    container.appendChild(toast);
+    const bsToast = new bootstrap.Toast(toast, { delay: 5000 });
+    bsToast.show();
+}
+
+// Color sync
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('input[type="color"]').forEach(function(el) {
+        el.addEventListener('input', function() {
+            const textInput = document.getElementById(this.id + '_text');
+            if (textInput) textInput.value = this.value;
+        });
+    });
+    
+    // Image preview for logo
+    document.getElementById('logo-input')?.addEventListener('change', function() {
+        const file = this.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const preview = document.getElementById('logo-preview');
+                if (preview) {
+                    preview.src = e.target.result;
+                } else {
+                    const container = this.closest('.upload-item');
+                    const previewDiv = container.querySelector('.preview');
+                    const placeholder = previewDiv.querySelector('.placeholder');
+                    if (placeholder) placeholder.remove();
+                    const img = document.createElement('img');
+                    img.id = 'logo-preview';
+                    img.src = e.target.result;
+                    img.alt = 'Logo';
+                    previewDiv.appendChild(img);
+                }
+            }.bind(this);
+            reader.readAsDataURL(file);
+        }
+    });
+    
+    // Image preview for favicon
+    document.getElementById('favicon-input')?.addEventListener('change', function() {
+        const file = this.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const preview = document.getElementById('favicon-preview');
+                if (preview) {
+                    preview.src = e.target.result;
+                } else {
+                    const container = this.closest('.upload-item');
+                    const previewDiv = container.querySelector('.preview');
+                    const placeholder = previewDiv.querySelector('.placeholder');
+                    if (placeholder) placeholder.remove();
+                    const img = document.createElement('img');
+                    img.id = 'favicon-preview';
+                    img.src = e.target.result;
+                    img.alt = 'Favicon';
+                    previewDiv.appendChild(img);
+                }
+            }.bind(this);
+            reader.readAsDataURL(file);
+        }
+    });
+    
+    // Image preview for login background
+    document.getElementById('login-bg-input')?.addEventListener('change', function() {
+        const file = this.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const preview = document.getElementById('login-bg-preview');
+                if (preview) {
+                    preview.src = e.target.result;
+                } else {
+                    const container = this.closest('.upload-item');
+                    const previewDiv = container.querySelector('.preview');
+                    const placeholder = previewDiv.querySelector('.placeholder');
+                    if (placeholder) placeholder.remove();
+                    const img = document.createElement('img');
+                    img.id = 'login-bg-preview';
+                    img.src = e.target.result;
+                    img.alt = 'Login Background';
+                    previewDiv.appendChild(img);
+                }
+            }.bind(this);
+            reader.readAsDataURL(file);
+        }
+    });
+    
+    // Show toast if saved
+    if (window.location.search.includes('saved=1')) {
+        showToast('success', 'Settings saved successfully!');
+    }
+});
+</script>
+{% endblock %}

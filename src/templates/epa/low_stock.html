@@ -1,0 +1,1040 @@
+{% extends 'base.html' %}
+
+{% block title %}RS{% endblock %}
+
+{% block page_title %}Low Stock Items{% endblock %}
+{% block page_subtitle %}Items that need restocking{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE TABLE STYLING
+    ============================================ */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    
+    .table-excel thead th {
+        background-color: #87CEEB !important; /* Sky Blue */
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    /* Zebra striping for Excel look */
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table-excel tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+
+    /* Sortable headers */
+    .sortable-header {
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        padding-right: 20px !important;
+    }
+    .sortable-header:hover {
+        background-color: #7bb8d8 !important;
+    }
+    .sortable-header .sort-icon {
+        position: absolute;
+        right: 6px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 10px;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+        color: #000000;
+    }
+    .sortable-header:hover .sort-icon {
+        opacity: 1;
+    }
+    .sortable-header.active .sort-icon {
+        opacity: 1;
+    }
+    .sortable-header.asc .sort-icon::after {
+        content: '▲';
+    }
+    .sortable-header.desc .sort-icon::after {
+        content: '▼';
+    }
+
+    /* ============================================
+       STOCK BADGES
+    ============================================ */
+    .stock-badge {
+        padding: 3px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    .stock-critical {
+        background: #dc3545;
+        color: white;
+    }
+    .stock-low {
+        background: #ffc107;
+        color: #000000;
+    }
+    .stock-medium {
+        background: #fd7e14;
+        color: white;
+    }
+    
+    /* ============================================
+       PRODUCT CODE
+    ============================================ */
+    .product-code {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        font-size: 13px;
+        color: #000000;
+        background: #f0f2f5;
+        padding: 3px 10px;
+        border-radius: 4px;
+        display: inline-block;
+        letter-spacing: 0.5px;
+        border: 2px solid #000000;
+        cursor: pointer;
+    }
+    .product-code:hover {
+        background: #87CEEB;
+    }
+    
+    /* ============================================
+       CATEGORY BADGES
+    ============================================ */
+    .category-badge {
+        padding: 4px 12px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    .category-phone { background: #dbeafe; color: #1e40af; }
+    .category-electronic { background: #d1fae5; color: #065f46; }
+    .category-accessory { background: #fef3c7; color: #92400e; }
+    
+    /* ============================================
+       COPY TOOLTIP
+    ============================================ */
+    .copy-tooltip {
+        position: fixed;
+        background: #000000;
+        color: white;
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        z-index: 9999;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.3s;
+        border: 1px solid #ffffff;
+    }
+    .copy-tooltip.show {
+        opacity: 1;
+    }
+    
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-body {
+        padding: 20px;
+    }
+    
+    .card-footer {
+        border-top: 2px solid #000000;
+        background-color: #f8f9fa;
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-primary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-primary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-secondary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-info {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-info:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    /* ============================================
+       FILTERS
+    ============================================ */
+    .header-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    
+    .filter-select {
+        padding: 8px 12px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        min-width: 150px;
+        font-weight: 500;
+    }
+    .filter-select:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    .search-input {
+        padding: 8px 12px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        min-width: 200px;
+        flex: 1;
+        background: white;
+    }
+    .search-input:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    /* ============================================
+       PAGINATION
+    ============================================ */
+    .pagination-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 12px 16px;
+        background: #f8f9fa;
+        border-top: 2px solid #000000;
+    }
+    .pagination-container .entries-info {
+        font-size: 14px;
+        color: #000000;
+    }
+    .pagination-container .entries-info strong {
+        color: #000000;
+    }
+    .pagination-container .pagination {
+        margin: 0;
+        gap: 4px;
+    }
+    .pagination-container .pagination .page-link {
+        padding: 6px 14px;
+        border-radius: 4px;
+        border: 2px solid #000000;
+        color: #000000;
+        font-size: 14px;
+        transition: all 0.3s;
+        background: white;
+        font-weight: 600;
+    }
+    .pagination-container .pagination .page-link:hover {
+        background: #87CEEB;
+        color: #000000;
+        border-color: #000000;
+    }
+    .pagination-container .pagination .page-item.active .page-link {
+        background: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    .pagination-container .pagination .page-item.disabled .page-link {
+        color: #adb5bd;
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+    .per-page-select {
+        padding: 4px 8px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 14px;
+        background: white;
+        margin-left: 8px;
+        font-weight: 600;
+    }
+    .per-page-select:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .pagination-label {
+        font-weight: 600;
+        color: #000000;
+    }
+    
+    /* ============================================
+       STOCK LEVEL
+    ============================================ */
+    .stock-level {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+    }
+    .stock-quantity {
+        font-weight: 700;
+        font-size: 18px;
+    }
+    .stock-quantity.critical {
+        color: #dc3545;
+    }
+    .stock-quantity.low {
+        color: #d69e2e;
+    }
+    .stock-quantity.medium {
+        color: #dd6b20;
+    }
+    
+    /* ============================================
+       EMPTY STATE
+    ============================================ */
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+    }
+    .empty-icon {
+        font-size: 48px;
+        display: block;
+        margin-bottom: 16px;
+    }
+    .empty-state h3 {
+        margin-bottom: 8px;
+        color: #000000;
+        font-weight: 700;
+    }
+    .empty-state p {
+        color: #000000;
+        margin-bottom: 20px;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 992px) {
+        .table-excel {
+            font-size: 13px;
+        }
+        .table-excel th,
+        .table-excel td {
+            padding: 6px 8px;
+        }
+        .product-code {
+            font-size: 11px;
+            padding: 2px 8px;
+        }
+        .stock-quantity {
+            font-size: 15px;
+        }
+        .stock-badge {
+            font-size: 10px;
+            padding: 2px 8px;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 11px;
+        }
+        .table-excel th {
+            font-size: 10px;
+        }
+        .btn-sm {
+            font-size: 9px;
+            padding: 2px 6px;
+        }
+        .product-code {
+            font-size: 10px;
+            padding: 1px 6px;
+        }
+        .stock-badge {
+            font-size: 9px;
+            padding: 1px 6px;
+        }
+        .stock-quantity {
+            font-size: 13px;
+        }
+        .filter-select {
+            min-width: 100px;
+            font-size: 12px;
+            padding: 6px 10px;
+        }
+        .search-input {
+            min-width: 150px;
+            font-size: 12px;
+            padding: 6px 10px;
+        }
+        .pagination-container {
+            flex-direction: column;
+            align-items: center;
+        }
+        .pagination-container .entries-info {
+            font-size: 12px;
+        }
+        .pagination-container .pagination .page-link {
+            padding: 4px 10px;
+            font-size: 12px;
+        }
+        .header-actions {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .header-actions .btn {
+            width: 100%;
+            text-align: center;
+        }
+        .d-flex.gap-3.flex-wrap {
+            flex-direction: column;
+        }
+        .d-flex.gap-3.flex-wrap .search-input {
+            width: 100%;
+        }
+        .d-flex.gap-3.flex-wrap .filter-select {
+            width: 100%;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 3px 4px;
+            font-size: 9px;
+        }
+        .table-excel th {
+            font-size: 8px;
+        }
+        .btn-sm {
+            font-size: 8px;
+            padding: 1px 4px;
+        }
+        .product-code {
+            font-size: 8px;
+            padding: 1px 4px;
+        }
+        .stock-badge {
+            font-size: 7px;
+            padding: 1px 4px;
+        }
+        .stock-quantity {
+            font-size: 11px;
+        }
+        .category-badge {
+            font-size: 8px;
+            padding: 2px 6px;
+        }
+        .card-body {
+            padding: 10px;
+        }
+        .pagination-container .pagination .page-link {
+            padding: 3px 8px;
+            font-size: 10px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center flex-wrap mb-4">
+            <div>
+                <h3><i class="fas fa-exclamation-triangle" style="color: #000000;"></i> Low Stock Items</h3>
+                <p class="text-muted" style="color: #000000 !important;">Total: {{ total_count }} items below minimum stock level</p>
+            </div>
+            <div class="header-actions">
+                <a href="/epa_shop/inventory/" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Inventory
+                </a>
+                <a href="/epa_shop/products/" class="btn btn-outline-primary">
+                    <i class="fas fa-box"></i> All Products
+                </a>
+            </div>
+        </div>
+
+        <!-- Search and Filters -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="d-flex gap-3 flex-wrap align-items-center">
+                    <input type="text" class="search-input" placeholder="Search by name, brand, or code..." id="searchInput" value="{{ search_query }}">
+                    <select class="filter-select" id="categoryFilter">
+                        <option value="">All Categories</option>
+                        <option value="Phone" {% if category_filter == 'Phone' %}selected{% endif %}>📱 Phones</option>
+                        <option value="Electronic" {% if category_filter == 'Electronic' %}selected{% endif %}>💻 Electronics</option>
+                        <option value="Accessory" {% if category_filter == 'Accessory' %}selected{% endif %}>🎧 Accessories</option>
+                    </select>
+                    <select class="filter-select" id="stockFilter">
+                        <option value="">All Stock Levels</option>
+                        <option value="critical" {% if stock_filter == 'critical' %}selected{% endif %}>🔴 Critical (0)</option>
+                        <option value="low" {% if stock_filter == 'low' %}selected{% endif %}>🟡 Low (1-5)</option>
+                        <option value="medium" {% if stock_filter == 'medium' %}selected{% endif %}>🟠 Medium (6-10)</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="applyFilters()">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="clearFilters()">
+                        <i class="fas fa-times"></i> Clear
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="location.reload()">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Low Stock Table -->
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive" style="border: 2px solid #000000;">
+                    <table class="table-excel table-hover mb-0" id="lowStockTable">
+                        <thead>
+                            <tr>
+                                <th style="width:5%;" class="sortable-header" data-sort="id" onclick="sortTable('id')">
+                                    #
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:15%;" class="sortable-header" data-sort="sku" onclick="sortTable('sku')">
+                                    Product SKU
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:20%;" class="sortable-header" data-sort="name" onclick="sortTable('name')">
+                                    Product Name
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:10%;" class="sortable-header" data-sort="category" onclick="sortTable('category')">
+                                    Category
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:12%;" class="sortable-header" data-sort="brand" onclick="sortTable('brand')">
+                                    Brand
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:10%;" class="sortable-header" data-sort="model" onclick="sortTable('model')">
+                                    Model
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:12%;" class="sortable-header" data-sort="stock" onclick="sortTable('stock')">
+                                    Stock Level
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:8%;" class="sortable-header" data-sort="minstock" onclick="sortTable('minstock')">
+                                    Min Stock
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:8%;" class="sortable-header" data-sort="price" onclick="sortTable('price')">
+                                    Price
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:10%;" class="text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in page_obj %}
+                            <tr data-product-code="{{ item.product_code }}" 
+                                data-product-type="{{ item.type }}"
+                                data-id="{{ forloop.counter|add:page_obj.start_index|add:-1 }}"
+                                data-sku="{{ item.product_code }}"
+                                data-name="{{ item.name }}"
+                                data-category="{{ item.type }}"
+                                data-brand="{{ item.brand }}"
+                                data-model="{{ item.model }}"
+                                data-stock="{{ item.quantity }}"
+                                data-minstock="{{ item.min_stock }}"
+                                data-price="{{ item.price }}">
+                                <td>
+                                    <span class="text-muted" style="color: #000000 !important;">#{{ forloop.counter|add:page_obj.start_index|add:-1 }}</span>
+                                </td>
+                                <td>
+                                    <span class="product-code" onclick="copyToClipboard('{{ item.product_code }}')" title="Click to copy product code">
+                                        {{ item.product_code }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="product-name-cell">
+                                        <span class="product-name">{{ item.name }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="category-badge category-{{ item.type|lower }}">
+                                        {{ item.type }}
+                                    </span>
+                                </td>
+                                <td>{{ item.brand }}</td>
+                                <td>{{ item.model }}</td>
+                                <td>
+                                    <div class="stock-level">
+                                        <span class="stock-quantity 
+                                            {% if item.quantity <= 0 %}critical
+                                            {% elif item.quantity <= 5 %}low
+                                            {% else %}medium{% endif %}">
+                                            {{ item.quantity }}
+                                        </span>
+                                        {% if item.quantity <= 0 %}
+                                            <span class="stock-badge stock-critical">Out of Stock</span>
+                                        {% elif item.quantity <= 5 %}
+                                            <span class="stock-badge stock-low">Very Low</span>
+                                        {% else %}
+                                            <span class="stock-badge stock-medium">Low</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>{{ item.min_stock }}</td>
+                                <td class="price-cell">KSh {{ item.price|floatformat:0 }}</td>
+                                <td class="text-center">
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="/epa_shop/products/{{ item.product_code }}/restock/" class="btn btn-primary" title="Restock">
+                                            <i class="fas fa-boxes"></i> Restock
+                                        </a>
+                                        <a href="/epa_shop/products/{{ item.product_code }}/" class="btn btn-outline-info" title="View">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="10" class="text-center py-4">
+                                    <div class="empty-state">
+                                        <span class="empty-icon">✅</span>
+                                        <h3>All Products Are Well Stocked!</h3>
+                                        <p>No items are currently below minimum stock level.</p>
+                                        <a href="/epa_shop/inventory/" class="btn btn-primary">
+                                            <i class="fas fa-arrow-left"></i> Back to Inventory
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination-container">
+                <div class="entries-info">
+                    Showing <strong>{{ page_obj.start_index }}</strong> to <strong>{{ page_obj.end_index }}</strong> of <strong>{{ total_count }}</strong> low stock items
+                </div>
+                <div class="d-flex align-items-center gap-3">
+                    <div class="d-flex align-items-center">
+                        <span class="pagination-label">Per page:</span>
+                        <select class="per-page-select" id="perPageSelect" onchange="changePerPage(this.value)">
+                            <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                            <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
+                            <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                            <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                        </select>
+                    </div>
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination">
+                            {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if stock_filter %}&stock={{ stock_filter }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}" aria-label="First">
+                                    <i class="fas fa-angle-double-left"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if stock_filter %}&stock={{ stock_filter }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}" aria-label="Previous">
+                                    <i class="fas fa-angle-left"></i>
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link"><i class="fas fa-angle-double-left"></i></span>
+                            </li>
+                            <li class="page-item disabled">
+                                <span class="page-link"><i class="fas fa-angle-left"></i></span>
+                            </li>
+                            {% endif %}
+                            
+                            {% for num in page_obj.paginator.page_range %}
+                                {% if num == page_obj.number %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                                {% elif num > page_obj.number|add:-3 and num < page_obj.number|add:3 %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if stock_filter %}&stock={{ stock_filter }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}">{{ num }}</a>
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if stock_filter %}&stock={{ stock_filter }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}" aria-label="Next">
+                                    <i class="fas fa-angle-right"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if stock_filter %}&stock={{ stock_filter }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}" aria-label="Last">
+                                    <i class="fas fa-angle-double-right"></i>
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link"><i class="fas fa-angle-right"></i></span>
+                            </li>
+                            <li class="page-item disabled">
+                                <span class="page-link"><i class="fas fa-angle-double-right"></i></span>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Copy Tooltip -->
+<div class="copy-tooltip" id="copyTooltip">Copied!</div>
+
+<script>
+// Sorting state
+let sortState = {
+    column: null,
+    direction: 'asc'
+};
+
+// Sort table function
+function sortTable(column) {
+    const table = document.getElementById('lowStockTable');
+    if (!table) return;
+    
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    // Skip if no rows or empty state
+    if (rows.length === 0 || rows[0].cells.length === 1) return;
+    
+    // Determine sort direction
+    let direction = 'asc';
+    if (sortState.column === column) {
+        direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+    }
+    sortState.column = column;
+    sortState.direction = direction;
+    
+    // Update header icons
+    table.querySelectorAll('.sortable-header').forEach(header => {
+        header.classList.remove('active', 'asc', 'desc');
+        const icon = header.querySelector('.sort-icon');
+        if (header.dataset.sort === column) {
+            header.classList.add('active', direction);
+        } else {
+            icon.textContent = '';
+        }
+    });
+    
+    // Sort rows
+    rows.sort((a, b) => {
+        let valueA, valueB;
+        
+        switch(column) {
+            case 'id':
+                valueA = parseInt(a.dataset.id) || 0;
+                valueB = parseInt(b.dataset.id) || 0;
+                break;
+            case 'sku':
+                valueA = a.dataset.sku || '';
+                valueB = b.dataset.sku || '';
+                break;
+            case 'name':
+                valueA = a.dataset.name || '';
+                valueB = b.dataset.name || '';
+                break;
+            case 'category':
+                valueA = a.dataset.category || '';
+                valueB = b.dataset.category || '';
+                break;
+            case 'brand':
+                valueA = a.dataset.brand || '';
+                valueB = b.dataset.brand || '';
+                break;
+            case 'model':
+                valueA = a.dataset.model || '';
+                valueB = b.dataset.model || '';
+                break;
+            case 'stock':
+                valueA = parseInt(a.dataset.stock) || 0;
+                valueB = parseInt(b.dataset.stock) || 0;
+                break;
+            case 'minstock':
+                valueA = parseInt(a.dataset.minstock) || 0;
+                valueB = parseInt(b.dataset.minstock) || 0;
+                break;
+            case 'price':
+                valueA = parseFloat(a.dataset.price) || 0;
+                valueB = parseFloat(b.dataset.price) || 0;
+                break;
+            default:
+                return 0;
+        }
+        
+        // Compare values
+        let comparison = 0;
+        if (typeof valueA === 'number' && typeof valueB === 'number') {
+            comparison = valueA - valueB;
+        } else {
+            comparison = String(valueA).localeCompare(String(valueB), undefined, { sensitivity: 'base' });
+        }
+        
+        return direction === 'asc' ? comparison : -comparison;
+    });
+    
+    // Re-append sorted rows
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+// Copy to clipboard function
+function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            showCopyTooltip('Copied: ' + text);
+        }).catch(() => {
+            fallbackCopy(text);
+        });
+    } else {
+        fallbackCopy(text);
+    }
+}
+
+function fallbackCopy(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        document.execCommand('copy');
+        showCopyTooltip('Copied: ' + text);
+    } catch (err) {
+        showCopyTooltip('Failed to copy');
+    }
+    document.body.removeChild(textarea);
+}
+
+function showCopyTooltip(message) {
+    const tooltip = document.getElementById('copyTooltip');
+    tooltip.textContent = message;
+    tooltip.classList.add('show');
+    tooltip.style.left = '50%';
+    tooltip.style.top = '50%';
+    tooltip.style.transform = 'translate(-50%, -50%)';
+    
+    clearTimeout(tooltip._timeout);
+    tooltip._timeout = setTimeout(() => {
+        tooltip.classList.remove('show');
+    }, 2000);
+}
+
+// Apply filters with pagination
+function applyFilters() {
+    const search = document.getElementById('searchInput').value;
+    const category = document.getElementById('categoryFilter').value;
+    const stock = document.getElementById('stockFilter').value;
+    const currentUrl = new URL(window.location.href);
+    
+    if (search) {
+        currentUrl.searchParams.set('search', search);
+    } else {
+        currentUrl.searchParams.delete('search');
+    }
+    
+    if (category) {
+        currentUrl.searchParams.set('category', category);
+    } else {
+        currentUrl.searchParams.delete('category');
+    }
+    
+    if (stock) {
+        currentUrl.searchParams.set('stock', stock);
+    } else {
+        currentUrl.searchParams.delete('stock');
+    }
+    
+    currentUrl.searchParams.set('page', 1);
+    window.location.href = currentUrl.toString();
+}
+
+function clearFilters() {
+    window.location.href = window.location.pathname;
+}
+
+// Change per page
+function changePerPage(value) {
+    const currentUrl = new URL(window.location.href);
+    currentUrl.searchParams.set('per_page', value);
+    currentUrl.searchParams.set('page', 1);
+    window.location.href = currentUrl.toString();
+}
+
+// Auto-submit on filter change
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    const categoryFilter = document.getElementById('categoryFilter');
+    const stockFilter = document.getElementById('stockFilter');
+    let searchTimeout;
+    
+    // Search with debounce
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(applyFilters, 500);
+        });
+    }
+    
+    // Category change
+    if (categoryFilter) {
+        categoryFilter.addEventListener('change', applyFilters);
+    }
+    
+    // Stock filter change
+    if (stockFilter) {
+        stockFilter.addEventListener('change', applyFilters);
+    }
+    
+    // Initialize sorting - sort by stock ascending (lowest first)
+    const table = document.getElementById('lowStockTable');
+    if (table) {
+        sortState.column = 'stock';
+        sortState.direction = 'asc';
+        const stockHeader = table.querySelector('[data-sort="stock"]');
+        if (stockHeader) {
+            stockHeader.classList.add('active', 'asc');
+            const icon = stockHeader.querySelector('.sort-icon');
+            icon.textContent = '▲';
+        }
+        sortTable('stock');
+    }
+});
+
+// Keyboard shortcut: Escape to clear filters
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput && document.activeElement === searchInput) {
+            searchInput.value = '';
+            applyFilters();
+        }
+    }
+});
+</script>
+
+<style>
+    .product-name-cell {
+        display: flex;
+        flex-direction: column;
+    }
+    .product-name {
+        font-weight: 600;
+        color: #000000;
+    }
+    .price-cell {
+        font-weight: 500;
+        color: #000000;
+    }
+    .text-muted {
+        color: #000000 !important;
+    }
+</style>
+{% endblock %}

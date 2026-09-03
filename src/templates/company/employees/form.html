@@ -1,0 +1,335 @@
+{% extends 'base.html' %}
+
+{% block title %}RS{% endblock %}
+
+{% block page_title %}{% if employee %}Edit{% else %}Add{% endif %} Employee{% endblock %}
+{% block page_subtitle %}{% if employee %}Update employee details{% else %}Add a new employee to your company{% endif %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-section {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        border: 1px solid #e9ecef;
+    }
+    .form-section-title {
+        font-weight: 600;
+        margin-bottom: 15px;
+        color: #2d3436;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .form-section-title i {
+        margin-right: 8px;
+        color: #667eea;
+    }
+    .required:after {
+        content: " *";
+        color: #dc3545;
+        font-weight: bold;
+    }
+    .password-strength {
+        height: 4px;
+        margin-top: 5px;
+        border-radius: 4px;
+        transition: all 0.3s;
+        background: #e9ecef;
+    }
+    .password-strength.weak { background: #dc3545; width: 25%; }
+    .password-strength.medium { background: #ffc107; width: 50%; }
+    .password-strength.strong { background: #28a745; width: 75%; }
+    .password-strength.very-strong { background: #17a2b8; width: 100%; }
+    
+    .form-control, .form-select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 1px solid #000000;
+        color: #000000;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-secondary {
+        background-color: #6c757d;
+        border: 1px solid #000000;
+        color: #ffffff;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #5a6268;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-danger {
+        background-color: #dc3545;
+        border: 1px solid #000000;
+        color: #ffffff;
+    }
+    
+    .btn-danger:hover {
+        background-color: #c82333;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card">
+            <div class="card-body p-4">
+                <form method="post" action="{% if employee %}{% url 'edit-employee' employee.id %}{% else %}{% url 'add-employee' %}{% endif %}">
+                    {% csrf_token %}
+                    
+                    <!-- Personal Information -->
+                    <div class="form-section">
+                        <h6 class="form-section-title"><i class="fas fa-user"></i> Personal Information</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label required">First Name</label>
+                                <input type="text" class="form-control" name="first_name" value="{{ employee.first_name|default:'' }}" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label required">Last Name</label>
+                                <input type="text" class="form-control" name="last_name" value="{{ employee.last_name|default:'' }}" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label required">Email</label>
+                                <input type="email" class="form-control" name="email" value="{{ employee.email|default:'' }}" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Phone</label>
+                                <input type="tel" class="form-control" name="phone" value="{{ employee.phone|default:'' }}">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Staff ID</label>
+                                <input type="text" class="form-control" name="staff_id" value="{{ employee.staff_id|default:'' }}" placeholder="e.g., EMP-001">
+                                <small class="text-muted">Optional internal staff identifier</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Employment Information -->
+                    <div class="form-section">
+                        <h6 class="form-section-title"><i class="fas fa-briefcase"></i> Employment Information</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label required">Role</label>
+                                <select class="form-select" name="role" required>
+                                    <option value="">Select Role...</option>
+                                    {% for role_value, role_label in roles %}
+                                    <option value="{{ role_value }}" {% if employee.role == role_value %}selected{% endif %}>
+                                        {{ role_label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Department</label>
+                                <input type="text" class="form-control" name="department" value="{{ employee.department|default:'' }}" placeholder="e.g., Sales, IT, Management">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Position</label>
+                                <input type="text" class="form-control" name="position" value="{{ employee.position|default:'' }}" placeholder="e.g., Manager, Staff, Intern">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Hire Date</label>
+                                <input type="date" class="form-control" name="hire_date" value="{{ employee.hire_date|date:'Y-m-d'|default:'' }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Branch Assignment -->
+                    <div class="form-section">
+                        <h6 class="form-section-title"><i class="fas fa-store"></i> Branch Assignment</h6>
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label">Branch</label>
+                                <select class="form-select" name="branch_id">
+                                    <option value="">Select Branch...</option>
+                                    {% for branch in branches %}
+                                    <option value="{{ branch.id }}" {% if employee.branch_id == branch.id %}selected{% endif %}>
+                                        {{ branch.name }} ({{ branch.code }})
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted">Assign employee to a specific branch</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Account Information -->
+                    <div class="form-section">
+                        <h6 class="form-section-title"><i class="fas fa-lock"></i> Account Information</h6>
+                        
+                        {% if not employee %}
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label required">Username</label>
+                                <input type="text" class="form-control" name="username" required placeholder="Choose a username">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label required">Password</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control" name="password" id="password" required placeholder="Create a password">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePassword()" style="border: 2px solid #000000;">
+                                        <i class="fas fa-eye" id="passwordToggleIcon"></i>
+                                    </button>
+                                </div>
+                                <div class="password-strength" id="passwordStrength"></div>
+                                <small class="text-muted">Minimum 8 characters with a mix of letters, numbers, and symbols</small>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label required">Confirm Password</label>
+                                <input type="password" class="form-control" name="confirm_password" id="confirmPassword" required placeholder="Confirm your password">
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> 
+                            Password cannot be changed here. Use the password reset feature if needed.
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Username</label>
+                                <input type="text" class="form-control" value="{{ employee.username }}" disabled>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" value="{{ employee.email }}" disabled>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Staff ID</label>
+                                <input type="text" class="form-control" value="{{ employee.staff_id|default:'Not set' }}" disabled>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check mt-4">
+                                    <input class="form-check-input" type="checkbox" name="is_active" id="isActive" {% if employee.is_active %}checked{% endif %}>
+                                    <label class="form-check-label" for="isActive">
+                                        <i class="fas fa-user-check text-success"></i> Active
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> {% if employee %}Update{% else %}Create{% endif %} Employee
+                        </button>
+                        <a href="{% url 'employee-list' %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                        {% if employee %}
+                        <a href="{% url 'delete-employee' employee.id %}" class="btn btn-danger ms-auto">
+                            <i class="fas fa-trash"></i> Delete Employee
+                        </a>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function togglePassword() {
+        const passwordInput = document.getElementById('password');
+        const icon = document.getElementById('passwordToggleIcon');
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            icon.className = 'fas fa-eye-slash';
+        } else {
+            passwordInput.type = 'password';
+            icon.className = 'fas fa-eye';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const passwordInput = document.getElementById('password');
+        const confirmInput = document.getElementById('confirmPassword');
+        const strengthBar = document.getElementById('passwordStrength');
+        
+        if (passwordInput) {
+            passwordInput.addEventListener('input', function() {
+                const password = this.value;
+                let strength = 0;
+                
+                if (password.length >= 8) strength += 1;
+                if (password.length >= 12) strength += 1;
+                if (/[A-Z]/.test(password)) strength += 1;
+                if (/\d/.test(password)) strength += 1;
+                if (/[^A-Za-z0-9]/.test(password)) strength += 1;
+                
+                strengthBar.className = 'password-strength';
+                if (password.length === 0) {
+                    strengthBar.style.width = '0%';
+                    strengthBar.className = 'password-strength';
+                } else if (strength <= 2) {
+                    strengthBar.classList.add('weak');
+                } else if (strength <= 3) {
+                    strengthBar.classList.add('medium');
+                } else if (strength <= 4) {
+                    strengthBar.classList.add('strong');
+                } else {
+                    strengthBar.classList.add('very-strong');
+                }
+            });
+        }
+        
+        // Password confirmation validation
+        if (confirmInput) {
+            confirmInput.addEventListener('input', function() {
+                const password = document.getElementById('password').value;
+                const confirm = this.value;
+                if (password && confirm && password !== confirm) {
+                    this.style.borderColor = '#dc3545';
+                    this.style.boxShadow = '0 0 0 3px rgba(220,53,69,0.3)';
+                } else if (password && confirm && password === confirm) {
+                    this.style.borderColor = '#28a745';
+                    this.style.boxShadow = '0 0 0 3px rgba(40,167,69,0.3)';
+                } else {
+                    this.style.borderColor = '';
+                    this.style.boxShadow = '';
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

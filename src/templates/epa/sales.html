@@ -1,0 +1,849 @@
+{% extends 'base.html' %}
+
+{% block title %}Sales - RonoSystems{% endblock %}
+
+{% block page_title %}Sales{% endblock %}
+{% block page_subtitle %}Sales history{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Excel-like table styling */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    
+    .table-excel thead th {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table-excel tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+
+    /* Sortable headers */
+    .sortable-header {
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        padding-right: 20px !important;
+    }
+    .sortable-header:hover {
+        background-color: #7bb8d8 !important;
+    }
+    .sortable-header .sort-icon {
+        position: absolute;
+        right: 6px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 10px;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+        color: #000000;
+    }
+    .sortable-header:hover .sort-icon {
+        opacity: 1;
+    }
+    .sortable-header.active .sort-icon {
+        opacity: 1;
+    }
+    .sortable-header.asc .sort-icon::after {
+        content: '▲';
+    }
+    .sortable-header.desc .sort-icon::after {
+        content: '▼';
+    }
+    
+    /* Card styling */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-footer {
+        border-top: 2px solid #000000;
+        background-color: #f8f9fa;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    /* Badge styling with black borders */
+    .badge {
+        border: 1px solid #000000;
+        padding: 4px 10px;
+        font-weight: 600;
+        border-radius: 50px;
+    }
+    
+    .badge.bg-success {
+        background-color: #d4edda !important;
+        color: #155724;
+    }
+    
+    .badge.bg-warning {
+        background-color: #fff3cd !important;
+        color: #856404;
+    }
+    
+    .badge.bg-danger {
+        background-color: #f8d7da !important;
+        color: #721c24;
+    }
+    
+    .badge.bg-secondary {
+        background-color: #e9ecef !important;
+        color: #000000;
+    }
+    
+    /* Button styling */
+    .btn-outline-info {
+        border: 2px solid #000000;
+        color: #000000;
+        background-color: #ffffff;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-outline-info:hover {
+        background-color: #87CEEB;
+        color: #000000;
+        border-color: #000000;
+    }
+    
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-danger {
+        background-color: #dc3545;
+        border: 2px solid #000000;
+        color: #ffffff;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-danger:hover {
+        background-color: #c82333;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-success {
+        background-color: #28a745;
+        border: 2px solid #000000;
+        color: #ffffff;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-success:hover {
+        background-color: #218838;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-reverse {
+        background-color: #fd7e14;
+        border: 2px solid #000000;
+        color: #ffffff;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-reverse:hover {
+        background-color: #e06b0a;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-sm {
+        padding: 4px 10px;
+        font-size: 12px;
+    }
+    
+    /* Search box */
+    .search-box {
+        padding: 8px 14px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 14px;
+        min-width: 250px;
+        background: #ffffff;
+        color: #000000;
+    }
+    .search-box:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .search-box::placeholder {
+        color: #6c757d;
+    }
+    
+    /* Entries selector */
+    .entries-selector {
+        padding: 8px 14px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: #ffffff;
+        font-size: 14px;
+        color: #000000;
+        cursor: pointer;
+    }
+    
+    .entries-selector:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    .top-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .top-bar .left-section {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    
+    .top-bar .right-section {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    
+    .entries-label {
+        font-size: 14px;
+        color: #000000;
+        white-space: nowrap;
+        font-weight: 500;
+    }
+    
+    .entries-label strong {
+        color: #000000;
+    }
+    
+    .company-sale-id {
+        font-family: 'Courier New', monospace;
+        font-weight: 600;
+        font-size: 13px;
+        color: #000000;
+        background: #f8f9fa;
+        padding: 2px 8px;
+        border-radius: 4px;
+        border: 1px solid #000000;
+        display: inline-block;
+    }
+    
+    /* Text colors */
+    .text-muted {
+        color: #000000 !important;
+    }
+    
+    /* Pagination */
+    .pagination-info {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        flex-wrap: wrap;
+        color: #000000;
+    }
+    
+    .pagination-controls {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .pagination-controls .page-link {
+        border: 2px solid #000000;
+        color: #000000;
+        background: #ffffff;
+        padding: 4px 12px;
+        text-decoration: none;
+        border-radius: 4px;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+    
+    .pagination-controls .page-link:hover {
+        background: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .pagination-controls .page-link.active {
+        background: #87CEEB;
+        font-weight: 700;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .pagination-controls .page-link.disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+    
+    .btn-outline-info.btn-sm {
+        border: 2px solid #000000;
+        color: #000000;
+        background: transparent;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-outline-info.btn-sm:hover {
+        background: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 11px;
+        }
+        .table-excel th {
+            font-size: 10px;
+        }
+        .btn-sm {
+            font-size: 9px;
+            padding: 2px 6px;
+        }
+        .btn-sm i {
+            font-size: 10px;
+        }
+        .badge {
+            font-size: 9px;
+            padding: 2px 6px;
+        }
+        .top-bar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .top-bar .left-section,
+        .top-bar .right-section {
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .search-box {
+            min-width: 100%;
+            font-size: 13px;
+            padding: 6px 10px;
+        }
+        .entries-selector {
+            font-size: 13px;
+            padding: 6px 10px;
+        }
+        .card-footer {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        .pagination-info {
+            justify-content: center;
+            font-size: 13px;
+        }
+        .pagination-controls .page-link {
+            padding: 3px 8px;
+            font-size: 12px;
+        }
+        .company-sale-id {
+            font-size: 11px;
+            padding: 1px 6px;
+        }
+        .entries-label {
+            font-size: 13px;
+        }
+        .d-flex.gap-1 {
+            gap: 2px !important;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 3px 4px;
+            font-size: 9px;
+        }
+        .table-excel th {
+            font-size: 8px;
+        }
+        .btn-sm {
+            font-size: 8px;
+            padding: 1px 4px;
+        }
+        .btn-sm i {
+            font-size: 8px;
+        }
+        .badge {
+            font-size: 8px;
+            padding: 1px 4px;
+        }
+        .company-sale-id {
+            font-size: 9px;
+            padding: 1px 4px;
+        }
+        .search-box {
+            font-size: 12px;
+            padding: 4px 8px;
+            min-width: 100%;
+        }
+        .entries-selector {
+            font-size: 12px;
+            padding: 4px 8px;
+        }
+        .top-bar .left-section {
+            gap: 5px;
+        }
+        .top-bar .right-section {
+            gap: 5px;
+        }
+        .btn-primary, .btn-danger {
+            font-size: 11px;
+            padding: 4px 8px;
+        }
+        .pagination-controls .page-link {
+            padding: 2px 6px;
+            font-size: 10px;
+        }
+        .pagination-info {
+            font-size: 11px;
+            gap: 8px;
+        }
+        .entries-label {
+            font-size: 11px;
+        }
+    }
+    
+    /* Scrollable table container */
+    .table-responsive {
+        overflow-x: auto;
+        border: 2px solid #000000;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        
+        <!-- Top Bar with Entries, Search, and Buttons -->
+        <div class="top-bar">
+            <div class="left-section">
+                <span class="entries-label">Show</span>
+                <select class="entries-selector" id="entriesSelect" onchange="changeEntries()">
+                    <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                    <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
+                    <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                    <option value="all" {% if per_page == 'all' or per_page >= total_count %}selected{% endif %}>All</option>
+                </select>
+                <span class="entries-label">entries</span>
+                <span class="entries-label" style="margin-left: 15px;">
+                    Total: <strong>{{ total_count }}</strong> sales
+                </span>
+            </div>
+            <div class="right-section">
+                <input type="text" class="search-box" id="searchSales" placeholder="Search by customer, sale ID, or company ID..." 
+                       value="{{ search_query }}" oninput="filterSales()">
+                <a href="/epa_shop/sales/single/" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> New Sale
+                </a>
+                <a href="/epa_shop/sales/pending/" class="btn btn-danger">
+                    <i class="fas fa-clock"></i> Pending
+                </a>
+            </div>
+        </div>
+
+        <!-- Sales Table -->
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-excel table-hover mb-0" id="salesTable">
+                        <thead>
+                            <tr>
+                                <th style="width:5%;" class="sortable-header" data-sort="id" onclick="sortTable('id')">
+                                    #
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:10%;" class="sortable-header" data-sort="company_sale_id" onclick="sortTable('company_sale_id')">
+                                    Sale ID
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:15%;" class="sortable-header" data-sort="customer" onclick="sortTable('customer')">
+                                    Customer
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:5%;" class="sortable-header" data-sort="items" onclick="sortTable('items')">
+                                    Items
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:10%;" class="sortable-header" data-sort="total" onclick="sortTable('total')">
+                                    Total
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:10%;" class="sortable-header" data-sort="payment" onclick="sortTable('payment')">
+                                    Payment
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:10%;" class="sortable-header" data-sort="status" onclick="sortTable('status')">
+                                    Status
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:13%;" class="sortable-header" data-sort="date" onclick="sortTable('date')">
+                                    Date
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:12%;" class="sortable-header" data-sort="soldby" onclick="sortTable('soldby')">
+                                    Sold By
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:13%;" class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sale in sales %}
+                            <tr data-sale-id="{{ sale.id }}" 
+                                data-company-sale-id="{{ sale.company_sale_id }}"
+                                data-customer="{{ sale.customer_name }}" 
+                                data-items="{{ sale.item_count }}" 
+                                data-total="{{ sale.net_amount }}" 
+                                data-payment="{{ sale.payment_method }}" 
+                                data-status="{{ sale.payment_status }}" 
+                                data-date="{{ sale.sale_date|date:'Y-m-d H:i' }}" 
+                                data-soldby="{{ sale.sold_by.get_full_name|default:sale.sold_by.username|default:'' }}">
+                                <td>#{{ sale.id }}</td>
+                                <td>
+                                    <span class="company-sale-id">{{ sale.company_sale_id }}</span>
+                                </td>
+                                <td>{{ sale.customer_name }}</td>
+                                <td>{{ sale.item_count }}</td>
+                                <td>KSh {{ sale.net_amount|floatformat:0 }}</td>
+                                <td>{{ sale.payment_method|title }}</td>
+                                <td>
+                                    <span class="badge bg-{% if sale.payment_status == 'paid' %}success{% elif sale.payment_status == 'pending' %}warning{% elif sale.payment_status == 'refunded' %}secondary{% else %}danger{% endif %}">
+                                        {{ sale.payment_status|title }}
+                                    </span>
+                                </td>
+                                <td>{{ sale.sale_date|date:"Y-m-d H:i" }}</td>
+                                <td>
+                                    {% if sale.sold_by %}
+                                        {{ sale.sold_by.get_full_name|default:sale.sold_by.username }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="d-flex gap-1 justify-content-center">
+                                        <a href="/epa_shop/sales/{{ sale.id }}/" class="btn btn-outline-info btn-sm" title="View Sale">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="/epa_shop/sale/receipt/{{ sale.id }}/" class="btn btn-outline-info btn-sm" title="View Receipt">
+                                            <i class="fas fa-receipt"></i>
+                                        </a>
+                                        
+                                        <!-- Actions based on payment status -->
+                                        {% if sale.payment_status == 'refunded' %}
+                                            <!-- Refunded: Show Delete Button -->
+                                            {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' %}
+                                                <a href="/epa_shop/sale/{{ sale.id }}/delete/" 
+                                                   class="btn btn-danger btn-sm" 
+                                                   title="Delete Sale" 
+                                                   onclick="return confirm('Are you sure you want to delete this sale? This action cannot be undone.')">
+                                                    <i class="fas fa-trash"></i>
+                                                </a>
+                                            {% endif %}
+                                        {% elif sale.payment_status == 'pending' %}
+                                            <!-- Pending: Show Reverse and Complete -->
+                                            {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' %}
+                                                {% if sale.items.exists %}
+                                                    <a href="/epa_shop/sale/{{ sale.id }}/reverse/?next={{ request.path }}" 
+                                                       class="btn btn-reverse btn-sm" 
+                                                       title="Reverse Sale (Return to Available)" 
+                                                       onclick="return confirm('Are you sure you want to reverse this sale? This will return the unit to inventory.')">
+                                                        <i class="fas fa-undo"></i>
+                                                    </a>
+                                                {% endif %}
+                                            {% endif %}
+                                            <a href="/epa_shop/sale/{{ sale.id }}/complete/" class="btn btn-success btn-sm" title="Complete Sale">
+                                                <i class="fas fa-check"></i>
+                                            </a>
+                                        {% else %}
+                                            <!-- Paid: Show Reverse only -->
+                                            {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' %}
+                                                {% if sale.items.exists %}
+                                                    <a href="/epa_shop/sale/{{ sale.id }}/reverse/?next={{ request.path }}" 
+                                                       class="btn btn-reverse btn-sm" 
+                                                       title="Reverse Sale (Return to Available)" 
+                                                       onclick="return confirm('Are you sure you want to reverse this sale? This will return the unit to inventory.')">
+                                                        <i class="fas fa-undo"></i>
+                                                    </a>
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="10" class="text-center py-5">
+                                    <i class="fas fa-shopping-cart fa-3x d-block mb-3" style="color: #000000;"></i>
+                                    <h5 style="color: #000000;">No Sales Recorded</h5>
+                                    <p style="color: #000000;">Start by creating your first sale.</p>
+                                    <a href="/epa_shop/sales/single/" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-plus"></i> Create First Sale
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer">
+                <div class="pagination-info">
+                    <span>
+                        Showing <strong>{{ sales|length }}</strong> of <strong>{{ total_count }}</strong> entries
+                    </span>
+                    <div class="pagination-controls">
+                        {% if sales.has_previous %}
+                            <a href="?page={{ sales.previous_page_number }}&per_page={{ per_page }}&search={{ search_query }}" class="page-link">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                        {% else %}
+                            <span class="page-link disabled">
+                                <i class="fas fa-chevron-left"></i>
+                            </span>
+                        {% endif %}
+                        
+                        {% for num in sales.paginator.page_range %}
+                            {% if num == sales.number %}
+                                <span class="page-link active">{{ num }}</span>
+                            {% elif num > sales.number|add:'-3' and num < sales.number|add:'3' %}
+                                <a href="?page={{ num }}&per_page={{ per_page }}&search={{ search_query }}" class="page-link">{{ num }}</a>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if sales.has_next %}
+                            <a href="?page={{ sales.next_page_number }}&per_page={{ per_page }}&search={{ search_query }}" class="page-link">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        {% else %}
+                            <span class="page-link disabled">
+                                <i class="fas fa-chevron-right"></i>
+                            </span>
+                        {% endif %}
+                    </div>
+                    <span>
+                        Page {{ sales.number }} of {{ sales.paginator.num_pages }}
+                    </span>
+                </div>
+                <span>
+                    <a href="/epa_shop/dashboard/" class="btn btn-outline-info btn-sm">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </a>
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Sorting state
+let sortState = {
+    column: null,
+    direction: 'asc'
+};
+
+// Change entries per page
+function changeEntries() {
+    const perPage = document.getElementById('entriesSelect').value;
+    const currentUrl = new URL(window.location.href);
+    currentUrl.searchParams.set('per_page', perPage);
+    currentUrl.searchParams.set('page', 1);
+    window.location.href = currentUrl.toString();
+}
+
+// Filter sales by search with URL update
+function filterSales() {
+    const search = document.getElementById('searchSales').value.trim();
+    const currentUrl = new URL(window.location.href);
+    
+    if (search) {
+        currentUrl.searchParams.set('search', search);
+    } else {
+        currentUrl.searchParams.delete('search');
+    }
+    currentUrl.searchParams.set('page', 1);
+    window.location.href = currentUrl.toString();
+}
+
+// Sort table function
+function sortTable(column) {
+    const tbody = document.querySelector('#salesTable tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    if (rows.length === 0 || rows[0].cells.length === 1) return;
+    
+    let direction = 'asc';
+    if (sortState.column === column) {
+        direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+    }
+    sortState.column = column;
+    sortState.direction = direction;
+    
+    document.querySelectorAll('.sortable-header').forEach(header => {
+        header.classList.remove('active', 'asc', 'desc');
+        const icon = header.querySelector('.sort-icon');
+        if (header.dataset.sort === column) {
+            header.classList.add('active', direction);
+        } else {
+            icon.textContent = '';
+        }
+    });
+    
+    rows.sort((a, b) => {
+        let valueA, valueB;
+        
+        switch(column) {
+            case 'id':
+                valueA = parseInt(a.dataset.saleId) || 0;
+                valueB = parseInt(b.dataset.saleId) || 0;
+                break;
+            case 'company_sale_id':
+                valueA = a.dataset.companySaleId || '';
+                valueB = b.dataset.companySaleId || '';
+                break;
+            case 'customer':
+                valueA = a.dataset.customer || '';
+                valueB = b.dataset.customer || '';
+                break;
+            case 'items':
+                valueA = parseInt(a.dataset.items) || 0;
+                valueB = parseInt(b.dataset.items) || 0;
+                break;
+            case 'total':
+                valueA = parseFloat(a.dataset.total) || 0;
+                valueB = parseFloat(b.dataset.total) || 0;
+                break;
+            case 'payment':
+                valueA = a.dataset.payment || '';
+                valueB = b.dataset.payment || '';
+                break;
+            case 'status':
+                valueA = a.dataset.status || '';
+                valueB = b.dataset.status || '';
+                break;
+            case 'date':
+                valueA = new Date(a.dataset.date) || new Date(0);
+                valueB = new Date(b.dataset.date) || new Date(0);
+                break;
+            case 'soldby':
+                valueA = a.dataset.soldby || '';
+                valueB = b.dataset.soldby || '';
+                break;
+            default:
+                return 0;
+        }
+        
+        let comparison = 0;
+        if (typeof valueA === 'number' && typeof valueB === 'number') {
+            comparison = valueA - valueB;
+        } else if (valueA instanceof Date && valueB instanceof Date) {
+            comparison = valueA.getTime() - valueB.getTime();
+        } else {
+            comparison = String(valueA).localeCompare(String(valueB), undefined, { sensitivity: 'base' });
+        }
+        
+        return direction === 'asc' ? comparison : -comparison;
+    });
+    
+    rows.forEach(row => tbody.appendChild(row));
+    
+    rows.forEach((row, index) => {
+        row.cells[0].textContent = '#' + (index + 1);
+    });
+}
+
+// Keyboard shortcut: Escape to clear search
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const searchInput = document.getElementById('searchSales');
+        if (searchInput) {
+            searchInput.value = '';
+            filterSales();
+            searchInput.blur();
+        }
+    }
+});
+
+// Initialize: set default sort to date descending (newest first)
+document.addEventListener('DOMContentLoaded', function() {
+    sortState.column = 'date';
+    sortState.direction = 'desc';
+    const dateHeader = document.querySelector('[data-sort="date"]');
+    if (dateHeader) {
+        dateHeader.classList.add('active', 'desc');
+        const icon = dateHeader.querySelector('.sort-icon');
+        icon.textContent = '▼';
+    }
+    sortTable('date');
+});
+</script>
+{% endblock %}

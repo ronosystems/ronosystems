@@ -1,0 +1,640 @@
+{% extends 'base.html' %}
+
+{% block title %}RS{% endblock %}
+
+{% block page_title %}Inventory{% endblock %}
+{% block page_subtitle %}Manage your stock{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE TABLE STYLING
+    ============================================ */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    
+    .table-excel thead th {
+        background-color: #87CEEB !important; /* Sky Blue */
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    /* Zebra striping for Excel look */
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table-excel tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+
+    /* ============================================
+       STAT CARDS
+    ============================================ */
+    .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+        margin-bottom: 25px;
+    }
+    
+    .stat-card {
+        background: white;
+        border-radius: 4px;
+        padding: 20px 24px;
+        border: 2px solid #000000;
+        transition: all 0.3s;
+    }
+    .stat-card:hover {
+        box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+        transform: translateY(-2px);
+    }
+    .stat-card .stat-number {
+        font-size: 28px;
+        font-weight: 700;
+        color: #000000;
+        margin-bottom: 2px;
+    }
+    .stat-card .stat-number.text-danger {
+        color: #dc3545 !important;
+    }
+    .stat-card .stat-label {
+        font-size: 13px;
+        color: #000000;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+    .stat-card .stat-trend {
+        font-size: 12px;
+        margin-top: 6px;
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 20px;
+        border: 1px solid #000000;
+        font-weight: 600;
+    }
+    .stat-card .stat-trend.up { background: #c6f6d5; color: #22543d; }
+    .stat-card .stat-trend.down { background: #fed7d7; color: #9b2c2c; }
+    .stat-card .stat-trend.neutral { background: #e2e8f0; color: #000000; }
+    
+    /* ============================================
+       QUICK ACTIONS
+    ============================================ */
+    .actions-bar {
+        background: white;
+        border-radius: 4px;
+        padding: 16px 20px;
+        border: 2px solid #000000;
+        margin-bottom: 25px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+    }
+    .actions-bar .action-btn {
+        padding: 8px 16px;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 13px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+        border: 2px solid #000000;
+    }
+    .actions-bar .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    .actions-bar .action-btn.primary { background: #ebf4ff; color: #000000; }
+    .actions-bar .action-btn.primary:hover { background: #87CEEB; }
+    .actions-bar .action-btn.warning { background: #fffbeb; color: #000000; }
+    .actions-bar .action-btn.warning:hover { background: #fef3c7; }
+    .actions-bar .action-btn.info { background: #e6fffa; color: #000000; }
+    .actions-bar .action-btn.info:hover { background: #87CEEB; }
+    .actions-bar .action-btn.success { background: #f0fff4; color: #000000; }
+    .actions-bar .action-btn.success:hover { background: #c6f6d5; }
+    .actions-bar .action-btn.secondary { background: #f7fafc; color: #000000; }
+    .actions-bar .action-btn.secondary:hover { background: #87CEEB; }
+    .actions-bar .divider {
+        width: 1px;
+        height: 30px;
+        background: #000000;
+    }
+    .actions-bar .action-badge {
+        font-size: 10px;
+        padding: 1px 8px;
+        border-radius: 20px;
+        background: #dc3545;
+        color: white;
+        border: 1px solid #000000;
+    }
+    
+    /* ============================================
+       CATEGORY CARDS
+    ============================================ */
+    .category-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+        margin-bottom: 25px;
+    }
+    .category-card {
+        background: white;
+        border-radius: 4px;
+        padding: 24px 20px;
+        text-align: center;
+        border: 2px solid #000000;
+        transition: all 0.3s;
+        text-decoration: none;
+        color: inherit;
+        display: block;
+    }
+    .category-card:hover {
+        box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+        transform: translateY(-3px);
+        text-decoration: none;
+        color: inherit;
+        border-color: #87CEEB;
+    }
+    .category-card .category-icon {
+        font-size: 28px;
+        display: block;
+        margin-bottom: 6px;
+        color: #000000;
+    }
+    .category-card .category-count {
+        font-size: 24px;
+        font-weight: 700;
+        color: #000000;
+    }
+    .category-card .category-label {
+        font-size: 13px;
+        color: #000000;
+        font-weight: 600;
+    }
+    .category-card .category-link {
+        font-size: 12px;
+        color: #000000;
+        margin-top: 8px;
+        display: inline-block;
+        font-weight: 600;
+        border-bottom: 2px solid #000000;
+    }
+    .category-card:hover .category-link {
+        color: #000000;
+        border-bottom-color: #87CEEB;
+    }
+    
+    /* ============================================
+       LOW STOCK SECTION
+    ============================================ */
+    .low-stock-section {
+        background: white;
+        border-radius: 4px;
+        border: 2px solid #000000;
+        overflow: hidden;
+    }
+    .low-stock-header {
+        padding: 16px 24px;
+        background: #fffbeb;
+        border-bottom: 2px solid #000000;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .low-stock-header h6 {
+        margin: 0;
+        font-weight: 700;
+        color: #000000;
+    }
+    .low-stock-header .badge-count {
+        background: #dc3545;
+        color: white;
+        padding: 2px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    
+    .stock-critical { color: #dc3545; font-weight: 700; }
+    .stock-low { color: #d69e2e; font-weight: 700; }
+    .stock-medium { color: #dd6b20; font-weight: 700; }
+    .stock-badge {
+        font-size: 11px;
+        padding: 2px 10px;
+        border-radius: 20px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    .stock-badge.danger { background: #fed7d7; color: #9b2c2c; }
+    .stock-badge.warning { background: #fef3c7; color: #92400e; }
+    .stock-badge.success { background: #c6f6d5; color: #22543d; }
+    
+    .product-code {
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        color: #000000;
+        background: #f7fafc;
+        padding: 2px 10px;
+        border-radius: 4px;
+        border: 1px solid #000000;
+    }
+    
+    /* ============================================
+       NO LOW STOCK
+    ============================================ */
+    .no-low-stock {
+        padding: 40px 20px;
+        text-align: center;
+        background: white;
+        border-radius: 4px;
+        border: 2px solid #000000;
+    }
+    .no-low-stock i {
+        font-size: 36px;
+        color: #28a745;
+        display: block;
+        margin-bottom: 12px;
+    }
+    .no-low-stock h5 {
+        color: #000000;
+        margin-bottom: 4px;
+        font-weight: 700;
+    }
+    .no-low-stock p {
+        color: #000000;
+        margin: 0;
+    }
+    
+    /* ============================================
+       BADGES
+    ============================================ */
+    .badge.bg-secondary {
+        background-color: #f8f9fa !important;
+        color: #000000 !important;
+        border: 1px solid #000000;
+        padding: 4px 10px;
+        font-weight: 600;
+    }
+    
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-warning {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-warning:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 992px) {
+        .stat-grid,
+        .category-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .stat-grid,
+        .category-grid {
+            grid-template-columns: 1fr;
+        }
+        .actions-bar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .actions-bar .divider {
+            width: 100%;
+            height: 1px;
+        }
+        .table-excel {
+            font-size: 13px;
+        }
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 11px;
+        }
+        .table-excel th {
+            font-size: 10px;
+        }
+        .btn-sm {
+            font-size: 9px;
+            padding: 2px 6px;
+        }
+        .product-code {
+            font-size: 10px;
+            padding: 1px 6px;
+        }
+        .stock-badge {
+            font-size: 9px;
+            padding: 1px 6px;
+        }
+        .low-stock-header h6 {
+            font-size: 0.9rem;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .stat-card .stat-number {
+            font-size: 20px;
+        }
+        .stat-card .stat-label {
+            font-size: 11px;
+        }
+        .category-card .category-count {
+            font-size: 20px;
+        }
+        .category-card .category-label {
+            font-size: 11px;
+        }
+        .actions-bar .action-btn {
+            font-size: 11px;
+            padding: 6px 12px;
+        }
+        .table-excel th,
+        .table-excel td {
+            padding: 3px 4px;
+            font-size: 9px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        
+        <!-- Stats Cards -->
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-number">{{ total_products|default:0 }}</div>
+                <div class="stat-label">Total Products</div>
+                <span class="stat-trend neutral">{{ total_products|default:0 }} items</span>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ total_stock|default:0 }}</div>
+                <div class="stat-label">Total Stock</div>
+                <span class="stat-trend up">{{ total_stock|default:0 }} units</span>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number {% if low_stock_count > 0 %}text-danger{% endif %}">{{ low_stock_count|default:0 }}</div>
+                <div class="stat-label">Low Stock</div>
+                <span class="stat-trend {% if low_stock_count > 0 %}down{% else %}neutral{% endif %}">
+                    {% if low_stock_count > 0 %}{{ low_stock_count }} items need attention{% else %}All good{% endif %}
+                </span>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ electronics_count|add:phones_count|add:accessories_count|default:0 }}</div>
+                <div class="stat-label">Categories</div>
+                <span class="stat-trend neutral">{{ electronics_count|default:0 }} Electronics · {{ phones_count|default:0 }} Phones · {{ accessories_count|default:0 }} Accessories</span>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="actions-bar">
+            <a href="/epa_shop/products/add/" class="action-btn primary">
+                <i class="fas fa-plus"></i> Add Product
+            </a>
+            <a href="/epa_shop/inventory/low-stock/" class="action-btn warning">
+                <i class="fas fa-exclamation-triangle"></i> Low Stock
+                {% if low_stock_count > 0 %}
+                <span class="action-badge">{{ low_stock_count }}</span>
+                {% endif %}
+            </a>
+            <a href="/epa_shop/inventory/movement/" class="action-btn info">
+                <i class="fas fa-history"></i> Movements
+            </a>
+            <a href="/epa_shop/categories/" class="action-btn secondary">
+                <i class="fas fa-tags"></i> Categories
+            </a>
+        </div>
+
+        <!-- Category Cards -->
+        <div class="category-grid">
+            <a href="/epa_shop/products/" class="category-card">
+                <span class="category-icon">📦</span>
+                <div class="category-count">{{ total_products|default:0 }}</div>
+                <div class="category-label">Products</div>
+                <span class="category-link">View All →</span>
+            </a>
+            <a href="/epa_shop/units/electronics/" class="category-card">
+                <span class="category-icon">💻</span>
+                <div class="category-count">{{ electronics_count|default:0 }}</div>
+                <div class="category-label">Electronics</div>
+                <span class="category-link">View Serial</span>
+            </a>
+            <a href="/epa_shop/units/phones/" class="category-card">
+                <span class="category-icon">📱</span>
+                <div class="category-count">{{ phones_count|default:0 }}</div>
+                <div class="category-label">Phones</div>
+                <span class="category-link">View IMEI</span>
+            </a>
+            <a href="/epa_shop/accessories/" class="category-card">
+                <span class="category-icon">🎧</span>
+                <div class="category-count">{{ accessories_count|default:0 }}</div>
+                <div class="category-label">Accessories</div>
+                <span class="category-link">View All →</span>
+            </a>
+        </div>
+
+        <!-- Low Stock Items -->
+        {% if low_stock_items %}
+        <div class="low-stock-section">
+            <div class="low-stock-header">
+                <h6><i class="fas fa-exclamation-triangle"></i> Low Stock Items</h6>
+                <span class="badge-count">{{ low_stock_count }} items</span>
+            </div>
+            <div class="table-responsive" style="border: 2px solid #000000;">
+                <table class="table-excel mb-0" id="lowStockTable">
+                    <thead>
+                        <tr>
+                            <th style="width:5%;">#</th>
+                            <th style="width:15%;">Product Code</th>
+                            <th style="width:20%;">Product Name</th>
+                            <th style="width:12%;">Category</th>
+                            <th style="width:10%;">Stock</th>
+                            <th style="width:10%;">Min Stock</th>
+                            <th style="width:13%;">Price</th>
+                            <th style="width:15%;" class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in low_stock_items %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td><span class="product-code">{{ item.product_code }}</span></td>
+                            <td>{{ item.name }}</td>
+                            <td><span class="badge bg-secondary">{{ item.type }}</span></td>
+                            <td>
+                                <span class="{% if item.quantity <= 0 %}stock-critical{% elif item.quantity <= 5 %}stock-low{% else %}stock-medium{% endif %}">
+                                    {{ item.quantity }}
+                                </span>
+                                {% if item.quantity <= 0 %}
+                                <span class="stock-badge danger ms-1">Out of Stock</span>
+                                {% elif item.quantity <= 3 %}
+                                <span class="stock-badge warning ms-1">Critical</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ item.min_stock }}</td>
+                            <td>KSh {{ item.price|floatformat:0 }}</td>
+                            <td class="text-center">
+                                <a href="/epa_shop/products/{{ item.product_code }}/restock/" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-boxes"></i> Restock
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if low_stock_count > 10 %}
+            <div class="text-center py-2 border-top" style="border-top: 2px solid #000000 !important;">
+                <a href="/epa_shop/inventory/low-stock/" class="btn btn-outline-warning btn-sm">
+                    View All {{ low_stock_count }} Low Stock Items
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="no-low-stock">
+            <i class="fas fa-check-circle"></i>
+            <h5>All Products Are Well Stocked</h5>
+            <p>No items are currently below minimum stock level.</p>
+        </div>
+        {% endif %}
+        
+    </div>
+</div>
+
+<script>
+// Add sort functionality to low stock table
+document.addEventListener('DOMContentLoaded', function() {
+    const table = document.getElementById('lowStockTable');
+    if (!table) return;
+    
+    // Get all headers except the last one (Actions)
+    const headers = table.querySelectorAll('thead th');
+    
+    headers.forEach((header, index) => {
+        // Skip the Actions column (last column)
+        if (index === headers.length - 1) return;
+        
+        header.style.cursor = 'pointer';
+        header.title = 'Click to sort';
+        
+        header.addEventListener('click', function() {
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            // Skip if no rows
+            if (rows.length === 0) return;
+            
+            // Determine sort direction
+            const isAsc = this.classList.contains('asc');
+            
+            // Reset all headers
+            headers.forEach(h => {
+                h.classList.remove('asc', 'desc');
+                h.style.color = '';
+            });
+            
+            // Toggle direction
+            this.classList.add(isAsc ? 'desc' : 'asc');
+            
+            // Sort rows
+            rows.sort((a, b) => {
+                let valueA = a.cells[index].textContent.trim();
+                let valueB = b.cells[index].textContent.trim();
+                
+                // Special handling for stock column
+                if (index === 4) { // Stock column
+                    // Extract numeric value
+                    const stockA = valueA.match(/\d+/);
+                    const stockB = valueB.match(/\d+/);
+                    valueA = stockA ? parseInt(stockA[0]) : 0;
+                    valueB = stockB ? parseInt(stockB[0]) : 0;
+                    return isAsc ? valueA - valueB : valueB - valueA;
+                }
+                
+                // Special handling for price column
+                if (index === 6) { // Price column
+                    const priceA = valueA.replace(/[^0-9.]/g, '');
+                    const priceB = valueB.replace(/[^0-9.]/g, '');
+                    valueA = parseFloat(priceA) || 0;
+                    valueB = parseFloat(priceB) || 0;
+                    return isAsc ? valueA - valueB : valueB - valueA;
+                }
+                
+                // String comparison for other columns
+                valueA = valueA.toLowerCase();
+                valueB = valueB.toLowerCase();
+                
+                if (valueA < valueB) return isAsc ? -1 : 1;
+                if (valueA > valueB) return isAsc ? 1 : -1;
+                return 0;
+            });
+            
+            // Re-append sorted rows
+            rows.forEach(row => tbody.appendChild(row));
+        });
+    });
+    
+    // Set default sort on Product Code (index 1) ascending
+    if (headers.length > 1) {
+        headers[1].click();
+    }
+});
+</script>
+{% endblock %}

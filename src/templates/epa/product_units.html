@@ -1,0 +1,542 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title }} - RonoSystems{% endblock %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_subtitle %}{{ page_subtitle }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        background: white;
+        border-radius: 10px;
+        padding: 15px 18px;
+        text-align: center;
+        border: 1px solid #e9ecef;
+        transition: all 0.3s;
+    }
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+    .stat-card .stat-number {
+        font-size: 24px;
+        font-weight: 700;
+    }
+    .stat-card .stat-label {
+        font-size: 12px;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+    .stat-card .stat-icon {
+        font-size: 20px;
+        display: block;
+        margin-bottom: 4px;
+    }
+    .stat-card .stat-number.available { color: #28a745; }
+    .stat-card .stat-number.sold { color: #004085; }
+    .stat-card .stat-number.reserved { color: #856404; }
+    .stat-card .stat-number.repair { color: #721c24; }
+    
+    .unit-status-badge {
+        padding: 3px 14px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: capitalize;
+        display: inline-block;
+    }
+    .unit-status-badge.available { background: #d4edda; color: #155724; }
+    .unit-status-badge.sold { background: #cce5ff; color: #004085; }
+    .unit-status-badge.reserved { background: #fff3cd; color: #856404; }
+    .unit-status-badge.repair { background: #f8d7da; color: #721c24; }
+    
+    .unit-identifier {
+        font-family: 'Courier New', monospace;
+        font-weight: 600;
+        font-size: 13px;
+        color: #2d3436;
+    }
+    
+    .copy-tooltip {
+        position: fixed;
+        background: #2d3748;
+        color: white;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        z-index: 9999;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+    .copy-tooltip.show {
+        opacity: 1;
+    }
+    
+    .product-code-badge {
+        font-family: 'Courier New', monospace;
+        background: #f0f2f5;
+        padding: 2px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+    }
+    
+    .search-box {
+        padding: 8px 14px;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        font-size: 14px;
+        min-width: 250px;
+    }
+    .search-box:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+    }
+    
+    .product-link {
+        color: #2d3436;
+        text-decoration: none;
+        font-weight: 600;
+    }
+    .product-link:hover {
+        color: #667eea;
+        text-decoration: underline;
+    }
+    
+    .unit-owner-info .owner-name {
+        font-weight: 600;
+        color: #2d3436;
+    }
+    .unit-owner-info .owner-phone {
+        font-size: 12px;
+        color: #6c757d;
+    }
+    
+    /* Days Since Update */
+    .days-badge {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    .days-badge.recent {
+        background: #d4edda;
+        color: #155724;
+    }
+    .days-badge.medium {
+        background: #fff3cd;
+        color: #856404;
+    }
+    .days-badge.old {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    /* Unit Action Buttons */
+    .unit-action-btn {
+        padding: 4px 12px;
+        font-size: 12px;
+        border-radius: 4px;
+        margin: 0 2px;
+        text-decoration: none;
+        display: inline-block;
+        transition: all 0.2s;
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+    }
+    .unit-action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .unit-action-btn.btn-sell {
+        background: #28a745;
+        color: white;
+    }
+    .unit-action-btn.btn-sell:hover {
+        background: #218838;
+    }
+    .unit-action-btn.btn-edit {
+        background: #ffc107;
+        color: #212529;
+    }
+    .unit-action-btn.btn-edit:hover {
+        background: #e0a800;
+    }
+    .unit-action-btn.btn-transfer {
+        background: #17a2b8;
+        color: white;
+    }
+    .unit-action-btn.btn-transfer:hover {
+        background: #138496;
+    }
+    .unit-action-btn.btn-receipt {
+        background: #28a745;
+        color: white;
+    }
+    .unit-action-btn.btn-receipt:hover {
+        background: #218838;
+    }
+    .unit-action-btn.btn-reverse {
+        background: #fd7e14;
+        color: white;
+    }
+    .unit-action-btn.btn-reverse:hover {
+        background: #e06b0a;
+    }
+    .unit-action-btn.btn-delete {
+        background: #dc3545;
+        color: white;
+    }
+    .unit-action-btn.btn-delete:hover {
+        background: #c82333;
+    }
+    
+    .action-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 3px;
+        justify-content: center;
+    }
+    
+    .unit-info-box {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
+        margin-bottom: 15px;
+    }
+    .unit-info-box .info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 0;
+        border-bottom: 1px solid #f1f2f6;
+    }
+    .unit-info-box .info-row:last-child {
+        border-bottom: none;
+    }
+    .unit-info-box .info-label {
+        color: #6c757d;
+        font-weight: 500;
+    }
+    .unit-info-box .info-value {
+        font-weight: 600;
+        color: #2d3436;
+    }
+    
+    @media (max-width: 768px) {
+        .stat-card .stat-number {
+            font-size: 20px;
+        }
+        .action-group {
+            flex-direction: column;
+            align-items: center;
+        }
+        .unit-action-btn {
+            width: 100%;
+            text-align: center;
+        }
+        .days-badge {
+            font-size: 10px;
+            padding: 2px 8px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center flex-wrap mb-4">
+            <div>
+                <h4 class="mb-0">
+                    <i class="fas fa-qrcode text-primary"></i> 
+                    {% if product_type == 'Phone' %}IMEI Numbers{% else %}Serial Numbers{% endif %}
+                </h4>
+                <p class="text-muted small mb-0">
+                    {{ product.name }} 
+                    <span class="product-code-badge">{{ product.product_code }}</span>
+                </p>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="/epa_shop/products/{{ product.product_code }}/" class="btn btn-secondary btn-sm">
+                    <i class="fas fa-arrow-left"></i> Back to Product
+                </a>
+                <a href="/epa_shop/products/{{ product.product_code }}/restock/" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus"></i> Add {% if product_type == 'Phone' %}IMEI{% else %}Serial{% endif %}
+                </a>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3 col-6">
+                <div class="stat-card">
+                    <span class="stat-icon">📊</span>
+                    <div class="stat-number">{{ unit_count }}</div>
+                    <div class="stat-label">Total Units</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-card">
+                    <span class="stat-icon">✅</span>
+                    <div class="stat-number available">{{ available_count }}</div>
+                    <div class="stat-label">Available</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-card">
+                    <span class="stat-icon">💰</span>
+                    <div class="stat-number sold">{{ sold_count }}</div>
+                    <div class="stat-label">Sold</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-card">
+                    <span class="stat-icon">🔧</span>
+                    <div class="stat-number repair">{{ repair_count }}</div>
+                    <div class="stat-label">In Repair</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search -->
+        <div class="mb-3">
+            <input type="text" class="search-box" id="searchUnits" placeholder="Search by identifier, owner, or days..." oninput="filterUnits()">
+        </div>
+
+        <!-- Units Table -->
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0" id="unitsTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:4%;">#</th>
+                                <th style="width:16%;">
+                                    {% if product_type == 'Phone' %}IMEI Number{% else %}Serial Number{% endif %}
+                                </th>
+                                <th style="width:10%;">Branch</th>
+                                <th style="width:10%;">Status</th>
+                                <th style="width:15%;">Owner</th>
+                                <th style="width:10%;">Added</th>
+                                <th style="width:10%;">Days Since</th>
+                                <th style="width:20%;" class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for unit in units %}
+                            <tr data-unit-id="{{ unit.id }}" data-identifier="{{ unit.identifier }}" data-owner="{{ unit.owner_name|default:'' }}" data-days="{{ unit.days_since_update|default:0 }}">
+                                <td>{{ forloop.counter }}</td>
+                                <td>
+                                    <span class="unit-identifier" onclick="copyToClipboard('{{ unit.identifier }}')" style="cursor:pointer;" title="Click to copy">
+                                        {{ unit.identifier }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if unit.phone %}
+                                        {{ unit.phone.branch.name|default:"-" }}
+                                    {% elif unit.electronic %}
+                                        {{ unit.electronic.branch.name|default:"-" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="unit-status-badge {{ unit.status }}">
+                                        {{ unit.status|title }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="unit-owner-info">
+                                        {% if unit.owner_name %}
+                                            <div class="owner-name">{{ unit.owner_name }}</div>
+                                            {% if unit.owner_phone %}
+                                            <div class="owner-phone"><i class="fas fa-phone"></i> {{ unit.owner_phone }}</div>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">Not assigned</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>{{ unit.created_at|date:"Y-m-d" }}</td>
+                                <td>
+                                    {% if unit.days_since_update %}
+                                        <span class="days-badge 
+                                            {% if unit.days_since_update <= 7 %}recent
+                                            {% elif unit.days_since_update <= 30 %}medium
+                                            {% else %}old{% endif %}">
+                                            {{ unit.days_since_update }} day{% if unit.days_since_update > 1 %}s{% endif %}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="action-group">
+                                        {% if unit.status == 'available' %}
+                                            <!-- Available: Sell, Edit, Transfer, Delete -->
+                                            <a href="/epa_shop/sales/add/?unit={{ unit.id }}&product={{ product.product_code }}" 
+                                               class="unit-action-btn btn-sell" title="Sell Unit">
+                                                <i class="fas fa-shopping-cart"></i> Sell
+                                            </a>
+                                            <a href="/epa_shop/unit/{{ unit.id }}/edit/?next={{ request.path }}" class="unit-action-btn btn-edit" title="Edit Unit">
+                                                <i class="fas fa-edit"></i> Edit
+                                            </a>
+                                            <a href="/epa_shop/unit/{{ unit.id }}/transfer/?next={{ request.path }}" class="unit-action-btn btn-transfer" title="Transfer Ownership">
+                                                <i class="fas fa-exchange-alt"></i> Transfer
+                                            </a>
+                                            <a href="/epa_shop/products/{{ product.product_code }}/unit/{{ unit.identifier }}/delete/" 
+                                               class="unit-action-btn btn-delete" 
+                                               title="Delete Unit"
+                                               onclick="return confirm('Are you sure you want to delete this unit?')">
+                                                <i class="fas fa-trash"></i> Delete
+                                            </a>
+                                            
+                                        {% elif unit.status == 'sold' %}
+                                            <!-- Sold: Receipt, Reverse, Delete -->
+                                            {% if unit.sale %}
+                                                <a href="/epa_shop/sale/{{ unit.sale.id }}/receipt/" class="unit-action-btn btn-receipt" title="View Receipt" target="_blank">
+                                                    <i class="fas fa-receipt"></i> Receipt
+                                                </a>
+                                                <a href="/epa_shop/sale/{{ unit.sale.id }}/reverse/" class="unit-action-btn btn-reverse" title="Reverse Sale (Return to Available)" 
+                                                   onclick="return confirm('Are you sure you want to reverse this sale? This will return the unit to inventory.')">
+                                                    <i class="fas fa-undo"></i> Reverse
+                                                </a>
+                                            {% else %}
+                                                <span class="text-muted">No sale record</span>
+                                            {% endif %}
+                                            <a href="/epa_shop/products/{{ product.product_code }}/unit/{{ unit.identifier }}/delete/" 
+                                               class="unit-action-btn btn-delete" 
+                                               title="Delete Unit"
+                                               onclick="return confirm('Are you sure you want to delete this unit?')">
+                                                <i class="fas fa-trash"></i> Delete
+                                            </a>
+                                            
+                                        {% else %}
+                                            <!-- Other statuses: Edit, Delete -->
+                                            <a href="/epa_shop/unit/{{ unit.id }}/edit/?next={{ request.path }}" class="unit-action-btn btn-edit" title="Edit Unit">
+                                                <i class="fas fa-edit"></i> Edit
+                                            </a>
+                                            <a href="/epa_shop/products/{{ product.product_code }}/unit/{{ unit.identifier }}/delete/" 
+                                               class="unit-action-btn btn-delete" 
+                                               title="Delete Unit"
+                                               onclick="return confirm('Are you sure you want to delete this unit?')">
+                                                <i class="fas fa-trash"></i> Delete
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" class="text-center py-5">
+                                    <i class="fas fa-qrcode fa-3x text-muted d-block mb-3"></i>
+                                    <h5 class="text-muted">No Units Found</h5>
+                                    <p class="text-muted">No {% if product_type == 'Phone' %}IMEI numbers{% else %}serial numbers{% endif %} have been added yet.</p>
+                                    <a href="/epa_shop/products/{{ product.product_code }}/restock/" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-plus"></i> Add First Unit
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer text-muted">
+                <small>Showing {{ units|length }} {% if product_type == 'Phone' %}IMEI numbers{% else %}serial numbers{% endif %}</small>
+                <span class="float-end">
+                    <a href="/epa_shop/products/{{ product.product_code }}/" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Product
+                    </a>
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Copy Tooltip -->
+<div class="copy-tooltip" id="copyTooltip">Copied!</div>
+
+<script>
+// Copy to clipboard
+function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            showCopyTooltip('Copied: ' + text);
+        }).catch(() => {
+            fallbackCopy(text);
+        });
+    } else {
+        fallbackCopy(text);
+    }
+}
+
+function fallbackCopy(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        document.execCommand('copy');
+        showCopyTooltip('Copied: ' + text);
+    } catch (err) {
+        showCopyTooltip('Failed to copy');
+    }
+    document.body.removeChild(textarea);
+}
+
+function showCopyTooltip(message) {
+    const tooltip = document.getElementById('copyTooltip');
+    tooltip.textContent = message;
+    tooltip.classList.add('show');
+    tooltip.style.left = '50%';
+    tooltip.style.top = '50%';
+    tooltip.style.transform = 'translate(-50%, -50%)';
+    
+    clearTimeout(tooltip._timeout);
+    tooltip._timeout = setTimeout(() => {
+        tooltip.classList.remove('show');
+    }, 2000);
+}
+
+// Filter units by search
+function filterUnits() {
+    const search = document.getElementById('searchUnits').value.toLowerCase().trim();
+    const rows = document.querySelectorAll('#unitsTable tbody tr');
+    
+    rows.forEach(row => {
+        const identifier = row.dataset.identifier || '';
+        const owner = row.dataset.owner || '';
+        const days = row.dataset.days || '';
+        const text = row.textContent.toLowerCase();
+        
+        if (search === '') {
+            row.style.display = '';
+        } else if (identifier.includes(search) || owner.includes(search) || days.includes(search) || text.includes(search)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+// Keyboard shortcut: Escape to clear search
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const searchInput = document.getElementById('searchUnits');
+        if (searchInput) {
+            searchInput.value = '';
+            filterUnits();
+        }
+    }
+});
+</script>
+{% endblock %}

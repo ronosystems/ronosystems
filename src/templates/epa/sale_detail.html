@@ -1,0 +1,1504 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title }} - RonoSystems{% endblock %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_subtitle %}{{ page_subtitle }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .receipt-wrapper {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .receipt-container {
+        background: #ffffff;
+        border: 2px solid #2d3436;
+        border-radius: 8px;
+        padding: 30px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+    
+    /* Header Section */
+    .receipt-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 20px;
+        border-bottom: 3px solid #2d3436;
+        margin-bottom: 20px;
+    }
+    
+    .company-section {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+    
+    .company-logo {
+        width: 80px;
+        height: 80px;
+        border: 2px solid #2d3436;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f8f9fa;
+        font-size: 40px;
+        font-weight: 700;
+        color: #036a77;
+    }
+    
+    .company-logo img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
+    
+    .company-info .company-name {
+        font-size: 22px;
+        font-weight: 700;
+        color: #2d3436;
+    }
+    
+    .company-info .company-details {
+        font-size: 13px;
+        color: #6c757d;
+    }
+    
+    .company-info .company-details i {
+        width: 18px;
+        color: #036a77;
+    }
+    
+    .invoice-section {
+        text-align: right;
+    }
+    
+    .invoice-section .invoice-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .invoice-section .invoice-number {
+        font-size: 28px;
+        font-weight: 700;
+        color: #036a77;
+    }
+    
+    /* Info Grid */
+    .info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        gap: 15px;
+        padding: 15px;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        margin-bottom: 20px;
+    }
+    
+    .info-item .info-label {
+        font-size: 11px;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+    
+    .info-item .info-value {
+        font-size: 15px;
+        font-weight: 600;
+        color: #2d3436;
+    }
+    
+    .info-item .info-value .badge {
+        font-size: 11px;
+        padding: 3px 12px;
+    }
+    
+    /* Customer & Next of Keen Grid */
+    .details-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .detail-section {
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 15px;
+        background: #fafafa;
+    }
+    
+    .detail-section .section-title {
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #036a77;
+        border-bottom: 2px solid #036a77;
+        padding-bottom: 8px;
+        margin-bottom: 10px;
+    }
+    
+    .detail-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 0;
+        font-size: 14px;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .detail-row:last-child {
+        border-bottom: none;
+    }
+    
+    .detail-row .label {
+        color: #6c757d;
+        font-weight: 500;
+    }
+    
+    .detail-row .value {
+        font-weight: 600;
+        color: #2d3436;
+    }
+    
+    .detail-row .value.identifier {
+        font-family: 'Courier New', monospace;
+        color: #036a77;
+        font-size: 16px;
+    }
+    
+    /* Product Info Section */
+    .product-section {
+        border: 2px solid #036a77;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 20px;
+        background: #f0f8ff;
+    }
+    
+    .product-section .product-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 15px;
+    }
+    
+    .product-section .product-item .label {
+        font-size: 11px;
+        color: #6c757d;
+        text-transform: uppercase;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+    
+    .product-section .product-item .value {
+        font-size: 15px;
+        font-weight: 600;
+        color: #2d3436;
+    }
+    
+    .product-section .product-item .value.model {
+        font-family: 'Courier New', monospace;
+        color: #036a77;
+        font-size: 18px;
+        font-weight: 700;
+    }
+    
+    /* Items Table */
+    .items-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+    }
+    
+    .items-table thead th {
+        background: #f8f9fa;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+        color: #6c757d;
+        border-bottom: 2px solid #2d3436;
+        padding: 10px 12px;
+        text-align: left;
+    }
+    
+    .items-table thead th.text-end {
+        text-align: right;
+    }
+    
+    .items-table thead th.text-center {
+        text-align: center;
+    }
+    
+    .items-table tbody td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #f0f0f0;
+        vertical-align: middle;
+    }
+    
+    .items-table tbody td.text-end {
+        text-align: right;
+    }
+    
+    .items-table tbody td.text-center {
+        text-align: center;
+    }
+    
+    .items-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+    
+    .items-table .item-desc {
+        font-weight: 500;
+        font-size: 14px;
+    }
+    
+    .items-table .item-specs {
+        font-size: 12px;
+        color: #6c757d;
+    }
+    
+    /* Totals Section */
+    .totals-section {
+        border-top: 2px solid #2d3436;
+        padding-top: 15px;
+        margin-top: 10px;
+        display: flex;
+        justify-content: flex-end;
+    }
+    
+    .totals-table {
+        width: 350px;
+        border-collapse: collapse;
+    }
+    
+    .totals-table td {
+        padding: 6px 12px;
+        font-size: 14px;
+    }
+    
+    .totals-table .label {
+        color: #6c757d;
+        font-weight: 500;
+    }
+    
+    .totals-table .value {
+        font-weight: 600;
+        text-align: right;
+    }
+    
+    .totals-table .grand-total td {
+        font-size: 20px;
+        font-weight: 700;
+        color: #036a77;
+        border-top: 2px solid #2d3436;
+        padding-top: 10px;
+        margin-top: 5px;
+    }
+    
+    .totals-table .grand-total .label {
+        color: #2d3436;
+    }
+    
+    /* Footer */
+    .receipt-footer {
+        text-align: center;
+        padding-top: 20px;
+        border-top: 2px solid #2d3436;
+        margin-top: 20px;
+        color: #6c757d;
+        font-size: 13px;
+    }
+    
+    .receipt-footer .thankyou {
+        font-size: 16px;
+        font-weight: 600;
+        color: #2d3436;
+    }
+    
+    /* Action Buttons */
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 20px;
+        justify-content: center;
+    }
+    
+    .action-buttons .btn {
+        padding: 10px 24px;
+        font-weight: 600;
+        border-radius: 4px;
+        border: 2px solid #2d3436;
+    }
+    
+    .btn-fiscal {
+        background: #036a77;
+        color: white;
+        border-color: #036a77 !important;
+    }
+    
+    .btn-fiscal:hover {
+        background: #02515b;
+        color: white;
+    }
+    
+    .btn-complete {
+        background: #28a745;
+        color: white;
+        border-color: #28a745 !important;
+    }
+    
+    .btn-complete:hover {
+        background: #218838;
+        color: white;
+    }
+    
+    .btn-complete:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    
+    /* ETR Modal */
+    .etr-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        z-index: 9999;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .etr-modal.show {
+        display: flex;
+    }
+    
+    .etr-modal-content {
+        background: #ffffff;
+        border: 3px solid #2d3436;
+        border-radius: 8px;
+        padding: 20px;
+        max-width: 450px;
+        width: 95%;
+        max-height: 90vh;
+        overflow-y: auto;
+        position: relative;
+    }
+    
+    .etr-modal-content .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 2px solid #2d3436;
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .etr-modal-content .modal-header .modal-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #036a77;
+    }
+    
+    .etr-modal-content .modal-header .close-btn {
+        background: none;
+        border: none;
+        font-size: 28px;
+        cursor: pointer;
+        color: #6c757d;
+    }
+    
+    .etr-modal-content .modal-header .close-btn:hover {
+        color: #dc3545;
+    }
+    
+    /* ETR Receipt - Exact match to your image */
+    .etr-receipt {
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        line-height: 1.5;
+        padding: 15px;
+        background: #ffffff;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-header {
+        text-align: center;
+        border-bottom: 2px dashed #000000;
+        padding-bottom: 12px;
+        margin-bottom: 10px;
+    }
+    
+    .etr-receipt .etr-header .etr-company {
+        font-size: 16px;
+        font-weight: 700;
+        color: #000000;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .etr-receipt .etr-header .etr-details {
+        font-size: 11px;
+        color: #000000;
+        margin-top: 2px;
+    }
+    
+    .etr-receipt .etr-header .etr-title {
+        font-size: 14px;
+        font-weight: 700;
+        margin-top: 8px;
+        padding: 3px;
+        letter-spacing: 2px;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-header .etr-receipt-no {
+        font-size: 18px;
+        font-weight: 700;
+        color: #000000;
+        margin-top: 3px;
+    }
+    
+    .etr-receipt .etr-info {
+        display: flex;
+        justify-content: space-between;
+        padding: 2px 0;
+        font-size: 11px;
+        flex-wrap: wrap;
+        gap: 3px;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-info .label {
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-info .value {
+        font-weight: 600;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-items {
+        border-bottom: 2px dashed #000000;
+        padding-bottom: 8px;
+        margin-bottom: 8px;
+    }
+    
+    .etr-receipt .etr-items .item-header {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr;
+        font-weight: 700;
+        border-bottom: 1px solid #000000;
+        padding-bottom: 3px;
+        margin-bottom: 3px;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-item {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr;
+        padding: 2px 0;
+        font-size: 11px;
+        border-bottom: 1px dotted #e0e0e0;
+        gap: 5px;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-item:last-child {
+        border-bottom: none;
+    }
+    
+    .etr-receipt .etr-item .item-name {
+        font-weight: 500;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-item .item-qty {
+        text-align: center;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-item .item-total {
+        text-align: right;
+        font-weight: 600;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-item .item-identifier {
+        grid-column: 1 / -1;
+        font-size: 10px;
+        color: #6c757d;
+        padding-left: 15px;
+    }
+    
+    .etr-receipt .etr-totals {
+        border-top: 2px solid #000000;
+        padding-top: 6px;
+        margin-top: 6px;
+    }
+    
+    .etr-receipt .etr-total-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 2px 0;
+        font-size: 12px;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-total-row .label {
+        color: #000000;
+        font-weight: 500;
+    }
+    
+    .etr-receipt .etr-total-row .value {
+        font-weight: 600;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-total-row.grand-total {
+        border-top: 2px solid #000000;
+        padding-top: 5px;
+        margin-top: 3px;
+        font-size: 15px;
+    }
+    
+    .etr-receipt .etr-total-row.grand-total .label {
+        font-weight: 700;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-total-row.grand-total .value {
+        font-weight: 700;
+        color: #000000;
+        font-size: 15px;
+    }
+    
+    .etr-receipt .etr-footer {
+        text-align: center;
+        border-top: 2px dashed #000000;
+        padding-top: 10px;
+        margin-top: 10px;
+        font-size: 10px;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-footer .etr-thankyou {
+        font-size: 12px;
+        font-weight: 600;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-footer .etr-stamp {
+        margin-top: 4px;
+        font-size: 9px;
+        color: #6c757d;
+        letter-spacing: 1px;
+    }
+    
+    .etr-receipt .etr-footer .etr-serial {
+        font-size: 10px;
+        color: #6c757d;
+        margin-top: 3px;
+    }
+    
+    .etr-receipt .etr-identifier-box {
+        text-align: center;
+        font-size: 11px;
+        color: #000000;
+        margin: 3px 0;
+        padding: 2px;
+        background: #f8f9fa;
+        border: 1px dashed #000000;
+    }
+    
+    .modal-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+        justify-content: center;
+    }
+    
+    .modal-actions .btn {
+        padding: 8px 20px;
+        font-weight: 600;
+        border-radius: 4px;
+        border: 2px solid #2d3436;
+    }
+    
+    .btn-etr-print {
+        background: #036a77;
+        color: white;
+        border-color: #036a77 !important;
+    }
+    
+    .btn-etr-print:hover {
+        background: #02515b;
+        color: white;
+    }
+    
+    .btn-etr-close {
+        background: #6c757d;
+        color: white;
+        border-color: #6c757d !important;
+    }
+    
+    .btn-etr-close:hover {
+        background: #5a6268;
+        color: white;
+    }
+    
+    /* Print Styles */
+    @media print {
+        .navbar, .sidebar, .sidebar-overlay, .sidebar-footer,
+        .sidebar-toggle-btn, .top-navbar, .footer, .action-buttons,
+        .btn, .alert, .breadcrumb, .page-title small,
+        .notification-btn, .search-wrapper, .user-profile,
+        .dropdown-menu, #sidebarToggleBtn, #sidebarToggleMobile,
+        .sidebar-toggle-mobile, .etr-modal {
+            display: none !important;
+        }
+        
+        .main-content {
+            margin-left: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+        }
+        
+        .sidebar {
+            display: none !important;
+        }
+        
+        .content-area {
+            padding: 10px !important;
+            margin: 0 !important;
+            width: 100% !important;
+        }
+        
+        .receipt-wrapper {
+            max-width: 100% !important;
+            padding: 10px !important;
+        }
+        
+        .receipt-container {
+            border: 1px solid #ddd !important;
+            padding: 20px !important;
+            box-shadow: none !important;
+        }
+        
+        .receipt-header {
+            border-bottom-color: #ddd !important;
+        }
+        
+        .company-logo {
+            border-color: #ddd !important;
+        }
+        
+        .info-grid {
+            background: #f8f9fa !important;
+        }
+        
+        .detail-section {
+            background: #fafafa !important;
+        }
+        
+        .product-section {
+            background: #f0f8ff !important;
+            border-color: #036a77 !important;
+        }
+        
+        .items-table thead th {
+            background: #f8f9fa !important;
+            border-bottom-color: #2d3436 !important;
+        }
+        
+        .totals-section {
+            border-top-color: #2d3436 !important;
+        }
+        
+        .receipt-footer {
+            border-top-color: #ddd !important;
+        }
+        
+        * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+    }
+    
+    @media (max-width: 992px) {
+        .receipt-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 15px;
+        }
+        
+        .invoice-section {
+            text-align: left;
+            width: 100%;
+        }
+        
+        .info-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+        
+        .details-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .product-section .product-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+        
+        .totals-table {
+            width: 100%;
+        }
+        
+        .totals-section {
+            justify-content: flex-start;
+        }
+    }
+    
+    @media (max-width: 576px) {
+        .info-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .product-section .product-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .company-section {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        
+        .company-logo {
+            width: 60px;
+            height: 60px;
+            font-size: 30px;
+        }
+        
+        .receipt-container {
+            padding: 15px;
+        }
+        
+        .action-buttons .btn {
+            width: 100%;
+            text-align: center;
+        }
+        
+        .etr-modal-content {
+            padding: 15px;
+        }
+        
+        .etr-receipt .etr-item {
+            grid-template-columns: 1fr 1fr 1fr;
+            font-size: 10px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="receipt-wrapper">
+    <div class="receipt-container">
+        
+        <!-- ============================================ -->
+        <!-- HEADER - Company & Invoice -->
+        <!-- ============================================ -->
+        <div class="receipt-header">
+            <div class="company-section">
+                <div class="company-logo">
+                    {% if sale.company.logo %}
+                        <img src="{{ sale.company.logo.url }}" alt="Logo">
+                    {% else %}
+                        {{ sale.company.name|slice:":2"|upper }}
+                    {% endif %}
+                </div>
+                <div class="company-info">
+                    <div class="company-name">{{ sale.company.name }}</div>
+                    <div class="company-details">
+                        <div><i class="fas fa-map-marker-alt"></i> {{ sale.company.address }}</div>
+                        <div><i class="fas fa-envelope"></i> {{ sale.company.email }}</div>
+                        <div><i class="fas fa-phone"></i> {{ sale.company.phone }}</div>
+                        <div><i class="fas fa-id-card"></i> PIN: {{ sale.company.pin|default:"N/A" }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="invoice-section">
+                <div class="invoice-label">Invoice</div>
+                <div class="invoice-number">#{{ sale.company_sale_id }}</div>
+            </div>
+        </div>
+        
+        <!-- ============================================ -->
+        <!-- INFO GRID - Date, Time, User, Status -->
+        <!-- ============================================ -->
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="info-label"><i class="fas fa-calendar"></i> Date &amp; Time</div>
+                <div class="info-value">{{ sale.sale_date|date:"Y-m-d H:i" }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label"><i class="fas fa-user"></i> Served By</div>
+                <div class="info-value">{{ sale.sold_by.get_full_name|default:sale.sold_by.username|title }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label"><i class="fas fa-credit-card"></i> Payment</div>
+                <div class="info-value">{{ sale.payment_method|title }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label"><i class="fas fa-tag"></i> Status</div>
+                <div class="info-value">
+                    <span class="badge bg-{% if sale.payment_status == 'paid' %}success{% elif sale.payment_status == 'pending' %}warning{% elif sale.payment_status == 'refunded' %}danger{% else %}secondary{% endif %}">
+                        {{ sale.payment_status|title }}
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ============================================ -->
+        <!-- CUSTOMER & NEXT OF KEEN -->
+        <!-- ============================================ -->
+        <div class="details-grid">
+            <div class="detail-section">
+                <div class="section-title"><i class="fas fa-user"></i> Customer Details</div>
+                <div class="detail-row">
+                    <span class="label">Full Name</span>
+                    <span class="value">{{ sale.customer_name }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Phone Number</span>
+                    <span class="value">{{ sale.customer_phone|default:"-" }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">ID Number</span>
+                    <span class="value">{{ sale.customer.id_number|default:"-" }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Email</span>
+                    <span class="value">{{ sale.customer_email|default:"-" }}</span>
+                </div>
+            </div>
+            
+            <div class="detail-section">
+                <div class="section-title"><i class="fas fa-users"></i> Next of Keen</div>
+                {% if sale.customer.next_of_keen_name or sale.customer.next_of_keen_phone %}
+                    <div class="detail-row">
+                        <span class="label">Full Name</span>
+                        <span class="value">{{ sale.customer.next_of_keen_name|default:"-" }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Phone Number</span>
+                        <span class="value">{{ sale.customer.next_of_keen_phone|default:"-" }}</span>
+                    </div>
+                {% else %}
+                    <div class="detail-row">
+                        <span class="value text-muted">No next of keen provided</span>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- ============================================ -->
+        <!-- PRODUCT INFO -->
+        <!-- ============================================ -->
+        <div class="product-section">
+            <div class="product-grid">
+                <div class="product-item">
+                    <div class="label"><i class="fas fa-qrcode"></i> Unit Identifier</div>
+                    <div class="value model">
+                        {% for item in items %}
+                            {% if item.unit %}
+                                {% if item.unit.unit_type == 'imei' %}
+                                    IMEI: {{ item.unit.identifier }}
+                                {% elif item.unit.unit_type == 'serial' %}
+                                    Serial: {{ item.unit.identifier }}
+                                {% else %}
+                                    {{ item.unit.identifier }}
+                                {% endif %}
+                            {% endif %}
+                        {% empty %}
+                            N/A
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="product-item">
+                    <div class="label"><i class="fas fa-box"></i> Product Model</div>
+                    <div class="value">
+                        {% for item in items %}
+                            {{ item.item_name }}
+                        {% empty %}
+                            N/A
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="product-item">
+                    <div class="label"><i class="fas fa-microchip"></i> Specifications</div>
+                    <div class="value">
+                        {% for item in items %}
+                            {% if item.item.specs %}
+                                {{ item.item.specs }}
+                            {% elif item.item.ram and item.item.storage %}
+                                {{ item.item.ram }} RAM, {{ item.item.storage }} Storage
+                            {% elif item.item.ram and item.item.storage_capacity %}
+                                {{ item.item.ram }} RAM, {{ item.item.storage_capacity }} Storage
+                            {% else %}
+                                -
+                            {% endif %}
+                        {% empty %}
+                            -
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ============================================ -->
+        <!-- ITEMS TABLE -->
+        <!-- ============================================ -->
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th style="width:5%;">#</th>
+                    <th style="width:50%;">Description</th>
+                    <th style="width:15%;" class="text-center">Qty</th>
+                    <th style="width:15%;" class="text-end">Unit Price</th>
+                    <th style="width:15%;" class="text-end">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>
+                        <div class="item-desc">{{ item.item_name }}</div>
+                        <div class="item-specs">
+                            {% if item.unit %}
+                                <i class="fas fa-qrcode"></i> 
+                                {% if item.unit.unit_type == 'imei' %}
+                                    IMEI: {{ item.unit.identifier }}
+                                {% elif item.unit.unit_type == 'serial' %}
+                                    Serial: {{ item.unit.identifier }}
+                                {% else %}
+                                    {{ item.unit.identifier }}
+                                {% endif %}
+                            {% endif %}
+                            {% if item.item_sku %}
+                                | SKU: {{ item.item_sku }}
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="text-center">{{ item.quantity }}</td>
+                    <td class="text-end">KSh {{ item.unit_price|floatformat:0 }}</td>
+                    <td class="text-end">KSh {{ item.total_price|floatformat:0 }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-3">No items found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <!-- ============================================ -->
+        <!-- TOTALS -->
+        <!-- ============================================ -->
+        <div class="totals-section">
+            <table class="totals-table">
+                <tr>
+                    <td class="label">Subtotal</td>
+                    <td class="value">KSh {{ sale.total_amount|floatformat:0 }}</td>
+                </tr>
+                {% if sale.discount > 0 %}
+                <tr>
+                    <td class="label" style="color:#dc3545;">Discount</td>
+                    <td class="value" style="color:#dc3545;">- KSh {{ sale.discount|floatformat:0 }}</td>
+                </tr>
+                {% endif %}
+                {% if sale.tax > 0 %}
+                <tr>
+                    <td class="label">VAT / Tax</td>
+                    <td class="value">KSh {{ sale.tax|floatformat:0 }}</td>
+                </tr>
+                {% endif %}
+                <tr class="grand-total">
+                    <td class="label">GRAND TOTAL</td>
+                    <td class="value">KSh {{ sale.net_amount|floatformat:0 }}</td>
+                </tr>
+            </table>
+        </div>
+        
+        <!-- ============================================ -->
+        <!-- FOOTER -->
+        <!-- ============================================ -->
+        <div class="receipt-footer">
+            <div class="thankyou">{{ sale.company.receipt_footer|default:"Thank you for your business!" }}</div>
+            <div class="mt-1">
+                <i class="fas fa-print"></i> Printed on {% now "Y-m-d H:i" %}
+                {% if sale.branch %}
+                    | <i class="fas fa-store"></i> {{ sale.branch.name }}
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- ============================================ -->
+        <!-- ACTION BUTTONS -->
+        <!-- ============================================ -->
+        <div class="action-buttons">
+            <a href="/epa_shop/sales/single/" class="btn btn-success">
+                <i class="fas fa-plus-circle"></i> New Sale
+            </a>
+            <a href="/epa_shop/sales/" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Sales
+            </a>
+            <button class="btn btn-primary" onclick="printReceipt()">
+                <i class="fas fa-print"></i> Print Receipt
+            </button>
+            <button class="btn btn-fiscal" onclick="openETRModal()">
+                <i class="fas fa-receipt"></i> Fiscal Receipt (ETR)
+            </button>
+            
+            <!-- Mark Sale Completed - Company Admin & Manager Only -->
+            {% if request.user.is_company_admin or request.user.is_company_manager or request.user.is_super_admin or request.user.is_superuser or request.user.is_staff %}
+                {% if sale.payment_status != 'paid' %}
+                    <form method="POST" action="/epa_shop/sale/{{ sale.company_sale_id }}/complete/" style="display:inline;" 
+                          onsubmit="return confirm('Are you sure you want to mark this sale as completed? This action will verify the sale and cannot be undone.')">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="complete">
+                        <button type="submit" class="btn btn-complete">
+                            <i class="fas fa-check-circle"></i> Mark Sale Completed
+                        </button>
+                    </form>
+                {% endif %}
+            {% endif %}
+        </div>
+        
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- ETR MODAL - Fiscal Receipt Style -->
+<!-- ============================================ -->
+<div class="etr-modal" id="etrModal">
+    <div class="etr-modal-content">
+        <div class="modal-header">
+            <span class="modal-title"><i class="fas fa-receipt"></i> Fiscal Receipt (ETR)</span>
+            <button class="close-btn" onclick="closeETRModal()">&times;</button>
+        </div>
+        
+        <div class="etr-receipt" id="etrReceiptContent">
+            <div id="etrContent"></div>
+        </div>
+        
+        <div class="modal-actions">
+            <button class="btn btn-etr-print" onclick="printETRReceipt()">
+                <i class="fas fa-print"></i> Print
+            </button>
+            <button class="btn btn-etr-close" onclick="closeETRModal()">
+                <i class="fas fa-times"></i> Close
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+function printReceipt() {
+    window.print();
+}
+
+function openETRModal() {
+    const modal = document.getElementById('etrModal');
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+    renderETRReceipt();
+}
+
+function closeETRModal() {
+    const modal = document.getElementById('etrModal');
+    modal.classList.remove('show');
+    document.body.style.overflow = '';
+}
+
+function printETRReceipt() {
+    const content = document.getElementById('etrContent').innerHTML;
+    const printWindow = window.open('', '_blank', 'width=450,height=700');
+    
+    if (!printWindow) {
+        alert('Please allow popups to print the receipt.');
+        return;
+    }
+    
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <title>Fiscal Receipt - #{{ sale.company_sale_id }}</title>
+                <style>
+                    * { margin:0; padding:0; box-sizing:border-box; }
+                    body { 
+                        font-family: 'Courier New', monospace; 
+                        font-size: 12px; 
+                        padding: 20px; 
+                        max-width: 450px; 
+                        margin: 0 auto; 
+                        background: white; 
+                        line-height: 1.5;
+                    }
+                    .etr-receipt {
+                        border: 2px solid #000000;
+                        padding: 15px;
+                        background: #ffffff;
+                        color: #000000;
+                    }
+                    .etr-receipt .etr-header {
+                        text-align: center;
+                        border-bottom: 2px dashed #000000;
+                        padding-bottom: 12px;
+                        margin-bottom: 10px;
+                    }
+                    .etr-receipt .etr-header .etr-company {
+                        font-size: 16px;
+                        font-weight: 700;
+                        color: #000000;
+                        text-transform: uppercase;
+                        letter-spacing: 1px;
+                    }
+                    .etr-receipt .etr-header .etr-details {
+                        font-size: 11px;
+                        color: #000000;
+                        margin-top: 2px;
+                    }
+                    .etr-receipt .etr-header .etr-title {
+                        font-size: 14px;
+                        font-weight: 700;
+                        margin-top: 8px;
+                        padding: 3px;
+                        letter-spacing: 2px;
+                        color: #000000;
+                    }
+                    .etr-receipt .etr-header .etr-receipt-no {
+                        font-size: 18px;
+                        font-weight: 700;
+                        color: #000000;
+                        margin-top: 3px;
+                    }
+                    .etr-receipt .etr-info {
+                        display: flex;
+                        justify-content: space-between;
+                        padding: 2px 0;
+                        font-size: 11px;
+                        flex-wrap: wrap;
+                        gap: 3px;
+                        color: #000000;
+                    }
+                    .etr-receipt .etr-info .label {
+                        color: #000000;
+                    }
+                    .etr-receipt .etr-info .value {
+                        font-weight: 600;
+                        color: #000000;
+                    }
+                    .etr-receipt .etr-items {
+                        border-bottom: 2px dashed #000000;
+                        padding-bottom: 8px;
+                        margin-bottom: 8px;
+                    }
+                    .etr-receipt .etr-items .item-header {
+                        display: grid;
+                        grid-template-columns: 2fr 1fr 1fr;
+                        font-weight: 700;
+                        border-bottom: 1px solid #000000;
+                        padding-bottom: 3px;
+                        margin-bottom: 3px;
+                        font-size: 10px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                        color: #000000;
+                    }
+                    .etr-receipt .etr-item {
+                        display: grid;
+                        grid-template-columns: 2fr 1fr 1fr;
+                        padding: 2px 0;
+                        font-size: 11px;
+                        border-bottom: 1px dotted #e0e0e0;
+                        gap: 5px;
+                        color: #000000;
+                    }
+                    .etr-receipt .etr-item:last-child {
+                        border-bottom: none;
+                    }
+                    .etr-receipt .etr-item .item-name {
+                        font-weight: 500;
+                        color: #000000;
+                    }
+                    .etr-receipt .etr-item .item-qty {
+                        text-align: center;
+                        color: #000000;
+                    }
+                    .etr-receipt .etr-item .item-total {
+                        text-align: right;
+                        font-weight: 600;
+                        color: #000000;
+                    }
+                    .etr-receipt .etr-item .item-identifier {
+                        grid-column: 1 / -1;
+                        font-size: 10px;
+                        color: #6c757d;
+                        padding-left: 15px;
+                    }
+                    .etr-receipt .etr-totals {
+                        border-top: 2px solid #000000;
+                        padding-top: 6px;
+                        margin-top: 6px;
+                    }
+                    .etr-receipt .etr-total-row {
+                        display: flex;
+                        justify-content: space-between;
+                        padding: 2px 0;
+                        font-size: 12px;
+                        color: #000000;
+                    }
+                    .etr-receipt .etr-total-row .label {
+                        color: #000000;
+                        font-weight: 500;
+                    }
+                    .etr-receipt .etr-total-row .value {
+                        font-weight: 600;
+                        color: #000000;
+                    }
+                    .etr-receipt .etr-total-row.grand-total {
+                        border-top: 2px solid #000000;
+                        padding-top: 5px;
+                        margin-top: 3px;
+                        font-size: 15px;
+                    }
+                    .etr-receipt .etr-total-row.grand-total .label {
+                        font-weight: 700;
+                        color: #000000;
+                    }
+                    .etr-receipt .etr-total-row.grand-total .value {
+                        font-weight: 700;
+                        color: #000000;
+                        font-size: 15px;
+                    }
+                    .etr-receipt .etr-footer {
+                        text-align: center;
+                        border-top: 2px dashed #000000;
+                        padding-top: 10px;
+                        margin-top: 10px;
+                        font-size: 10px;
+                        color: #000000;
+                    }
+                    .etr-receipt .etr-footer .etr-thankyou {
+                        font-size: 12px;
+                        font-weight: 600;
+                        color: #000000;
+                    }
+                    .etr-receipt .etr-footer .etr-stamp {
+                        margin-top: 4px;
+                        font-size: 9px;
+                        color: #6c757d;
+                        letter-spacing: 1px;
+                    }
+                    .etr-receipt .etr-footer .etr-serial {
+                        font-size: 10px;
+                        color: #6c757d;
+                        margin-top: 3px;
+                    }
+                    .etr-receipt .etr-identifier-box {
+                        text-align: center;
+                        font-size: 11px;
+                        color: #000000;
+                        margin: 3px 0;
+                        padding: 2px;
+                        background: #f8f9fa;
+                        border: 1px dashed #000000;
+                    }
+                    @media print { 
+                        body { padding: 10px; } 
+                        .etr-receipt { border: 1px solid #000000; } 
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="etr-receipt">
+                    ${content}
+                </div>
+                <script>
+                    window.onload = function() {
+                        window.print();
+                        window.close();
+                    };
+                <\/script>
+            </body>
+        </html>
+    `);
+    printWindow.document.close();
+}
+
+function renderETRReceipt() {
+    const saleData = {
+        company_sale_id: "{{ sale.company_sale_id }}",
+        date: "{{ sale.sale_date|date:'Y-m-d H:i' }}",
+        customer_name: "{{ sale.customer_name }}",
+        customer_phone: "{{ sale.customer_phone|default:'N/A' }}",
+        customer_id: "{{ sale.customer.id_number|default:'N/A' }}",
+        payment_method: "{{ sale.payment_method|title }}",
+        served_by: "{{ sale.sold_by.get_full_name|default:sale.sold_by.username|title }}",
+        branch: "{{ sale.branch.name|default:'N/A' }}",
+        unit_identifier: "{% for item in items %}{% if item.unit %}{{ item.unit.identifier }}{% endif %}{% endfor %}",
+        unit_type: "{% for item in items %}{% if item.unit %}{{ item.unit.unit_type }}{% endif %}{% endfor %}",
+        items: [
+            {% for item in items %}
+            {
+                name: "{{ item.item_name }}",
+                identifier: "{% if item.unit %}{{ item.unit.identifier }}{% else %}{{ '' }}{% endif %}",
+                unit_type: "{% if item.unit %}{{ item.unit.unit_type }}{% else %}{{ '' }}{% endif %}",
+                quantity: {{ item.quantity }},
+                unit_price: {{ item.unit_price }},
+                total_price: {{ item.total_price }}
+            },
+            {% endfor %}
+        ],
+        subtotal: {{ sale.total_amount }},
+        discount: {{ sale.discount|default:0 }},
+        tax: {{ sale.tax|default:0 }},
+        grand_total: {{ sale.net_amount }},
+        company_name: "{{ sale.company.name }}",
+        company_address: "{{ sale.company.address }}",
+        company_phone: "{{ sale.company.phone }}",
+        company_email: "{{ sale.company.email }}",
+        company_pin: "{{ sale.company.pin|default:'N/A' }}",
+        etr_serial: "{{ sale.company.etr_serial|default:'N/A' }}",
+        receipt_footer: "{{ sale.company.receipt_footer|default:'Thank you for your business!' }}"
+    };
+
+    let itemsHTML = '';
+    saleData.items.forEach(function(item, index) {
+        let identifierLabel = '';
+        if (item.identifier) {
+            if (item.unit_type === 'imei') {
+                identifierLabel = `IMEI: ${item.identifier}`;
+            } else if (item.unit_type === 'serial') {
+                identifierLabel = `Serial: ${item.identifier}`;
+            } else {
+                identifierLabel = `Identifier: ${item.identifier}`;
+            }
+        }
+        itemsHTML += `
+            <div class="etr-item">
+                <span class="item-name">${index + 1}. ${item.name}</span>
+                <span class="item-qty">${item.quantity} × KSh ${item.unit_price.toFixed(0)}</span>
+                <span class="item-total">KSh ${item.total_price.toFixed(0)}</span>
+                ${identifierLabel ? `<div class="item-identifier">${identifierLabel}</div>` : ''}
+            </div>
+        `;
+    });
+
+    const html = `
+        <!-- Header -->
+        <div class="etr-header">
+            <div class="etr-company">${saleData.company_name}</div>
+            <div class="etr-details">${saleData.company_address}</div>
+            <div class="etr-details">Tel: ${saleData.company_phone} | Email: ${saleData.company_email}</div>
+            <div class="etr-details">PIN: ${saleData.company_pin} | Branch: ${saleData.branch}</div>
+            <div class="etr-title">★ FISCAL RECEIPT ★</div>
+            <div class="etr-receipt-no">#${saleData.company_sale_id}</div>
+            ${saleData.unit_identifier ? `<div class="etr-identifier-box">${saleData.unit_type === 'imei' ? 'IMEI' : saleData.unit_type === 'serial' ? 'Serial' : 'Identifier'}: ${saleData.unit_identifier}</div>` : ''}
+        </div>
+
+        <!-- Info -->
+        <div class="etr-info">
+            <span><span class="label">Date:</span> ${saleData.date}</span>
+            <span><span class="label">Payment:</span> ${saleData.payment_method}</span>
+        </div>
+        <div class="etr-info" style="border-bottom: none;">
+            <span><span class="label">Served By:</span> ${saleData.served_by}</span>
+            <span><span class="label">Customer:</span> ${saleData.customer_name}</span>
+        </div>
+
+        <!-- Items -->
+        <div class="etr-items">
+            <div class="item-header">
+                <span>Description</span>
+                <span>Qty × Price</span>
+                <span>Total</span>
+            </div>
+            ${itemsHTML}
+        </div>
+
+        <!-- Totals -->
+        <div class="etr-totals">
+            <div class="etr-total-row">
+                <span class="label">Subtotal</span>
+                <span class="value">KSh ${saleData.subtotal.toFixed(0)}</span>
+            </div>
+            ${saleData.discount > 0 ? `
+            <div class="etr-total-row" style="color:#dc3545;">
+                <span class="label">Discount</span>
+                <span class="value">- KSh ${saleData.discount.toFixed(0)}</span>
+            </div>` : ''}
+            ${saleData.tax > 0 ? `
+            <div class="etr-total-row">
+                <span class="label">VAT</span>
+                <span class="value">KSh ${saleData.tax.toFixed(0)}</span>
+            </div>` : ''}
+            <div class="etr-total-row grand-total">
+                <span class="label">TOTAL</span>
+                <span class="value">KSh ${saleData.grand_total.toFixed(0)}</span>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="etr-footer">
+            <div class="etr-thankyou">${saleData.receipt_footer}</div>
+            <div class="etr-serial">ETR Serial: ${saleData.etr_serial}</div>
+            <div>Printed: ${new Date().toLocaleString()}</div>
+            <div class="etr-stamp">✦ System Generated Fiscal Receipt ✦</div>
+        </div>
+    `;
+
+    document.getElementById('etrContent').innerHTML = html;
+}
+
+// Auto-print when page loads with print parameter
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.location.search.includes('print=1')) {
+        setTimeout(function() {
+            window.print();
+        }, 500);
+    }
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeETRModal();
+    }
+});
+
+// Close modal on outside click
+document.getElementById('etrModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeETRModal();
+    }
+});
+</script>
+{% endblock %}

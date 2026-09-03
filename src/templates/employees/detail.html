@@ -1,0 +1,209 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ user.get_full_name|default:user.username }} - Employee Details{% endblock %}
+{% block page_title %}{{ user.get_full_name|default:user.username }}{% endblock %}
+{% block page_subtitle %}Employee Details{% endblock %}
+
+{% block extra_css %}
+<style>
+    .detail-card {
+        background: white;
+        border-radius: 12px;
+        padding: 25px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-bottom: 20px;
+    }
+    .detail-label {
+        font-weight: 600;
+        color: #6c757d;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .detail-value {
+        font-size: 1.1rem;
+        font-weight: 500;
+        margin-top: 5px;
+    }
+    .avatar-large {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 3rem;
+        font-weight: 700;
+        margin: 0 auto 15px;
+    }
+    .status-badge {
+        padding: 5px 15px;
+        border-radius: 50px;
+        font-size: 14px;
+        font-weight: 600;
+    }
+    .status-badge.active { background: #d4edda; color: #155724; }
+    .status-badge.inactive { background: #f8d7da; color: #721c24; }
+    .status-badge.verified { background: #cce5ff; color: #004085; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Navigation -->
+    <div class="mb-3">
+        <a href="/emplyees/" class="btn btn-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i> Back to Employees
+        </a>
+        <a href="{% url 'employees:superadmin-employee-edit' user.id %}" class="btn btn-primary btn-sm">
+            <i class="fas fa-edit"></i> Edit Employee
+        </a>
+        <a href="{% url 'employees:superadmin-employee-delete' user.id %}" 
+            class="btn btn-outline-danger" 
+            title="Delete" 
+            onclick="return confirm('Are you sure you want to delete {{ user.get_full_name|default:user.username }}?')">
+            <i class="fas fa-trash"></i> Delete
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4">
+            <!-- Profile Card -->
+            <div class="detail-card text-center">
+                <div class="avatar-large">
+                    {{ user.first_name|default:user.username|make_list|first|upper }}
+                </div>
+                <h4>{{ user.get_full_name|default:user.username }}</h4>
+                <p class="text-muted">{{ user.role|title }}</p>
+                <div>
+                    {% if user.is_active %}
+                    <span class="status-badge active">Active</span>
+                    {% else %}
+                    <span class="status-badge inactive">Inactive</span>
+                    {% endif %}
+                    {% if user.is_verified %}
+                    <span class="status-badge verified">Verified</span>
+                    {% endif %}
+                </div>
+                <hr>
+                <div class="text-start">
+                    <div class="detail-label">Employee ID</div>
+                    <div class="detail-value">{{ user.employee_id|default:"Not set" }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <!-- Personal Information -->
+            <div class="detail-card">
+                <h6 class="mb-3"><i class="fas fa-user"></i> Personal Information</h6>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="detail-label">First Name</div>
+                        <div class="detail-value">{{ user.first_name|default:"-" }}</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="detail-label">Last Name</div>
+                        <div class="detail-value">{{ user.last_name|default:"-" }}</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="detail-label">Email</div>
+                        <div class="detail-value">{{ user.email }}</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="detail-label">Phone</div>
+                        <div class="detail-value">{{ user.phone|default:"-" }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Employment Information -->
+            <div class="detail-card">
+                <h6 class="mb-3"><i class="fas fa-briefcase"></i> Employment Information</h6>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="detail-label">Company</div>
+                        <div class="detail-value">
+                            {% if user.company %}
+                            <span class="badge bg-info">{{ user.company.name }}</span>
+                            {% else %}
+                            <span class="text-muted">Not assigned</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="detail-label">Branch</div>
+                        <div class="detail-value">
+                            {% if user.branch %}
+                            <span class="badge bg-primary">{{ user.branch.name }}</span>
+                            {% else %}
+                            <span class="text-muted">Not assigned</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="detail-label">Role</div>
+                        <div class="detail-value"><span class="badge badge-role badge-{{ user.role }}">{{ user.role|title }}</span></div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="detail-label">Department</div>
+                        <div class="detail-value">{{ user.department|default:"-" }}</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="detail-label">Position</div>
+                        <div class="detail-value">{{ user.position|default:"-" }}</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="detail-label">Hire Date</div>
+                        <div class="detail-value">{{ user.hire_date|date:"Y-m-d"|default:"-" }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Account Information -->
+            <div class="detail-card">
+                <h6 class="mb-3"><i class="fas fa-shield-alt"></i> Account Information</h6>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="detail-label">Username</div>
+                        <div class="detail-value">{{ user.username }}</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="detail-label">Joined</div>
+                        <div class="detail-value">{{ user.date_joined|date:"Y-m-d H:i" }}</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="detail-label">Last Login</div>
+                        <div class="detail-value">{{ user.last_login|date:"Y-m-d H:i"|default:"Never" }}</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="detail-label">Two-Factor Auth</div>
+                        <div class="detail-value">
+                            {% if user.two_factor_enabled %}
+                            <span class="badge bg-success">Enabled</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Disabled</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .badge-role {
+        padding: 5px 12px;
+        border-radius: 50px;
+        font-size: 12px;
+    }
+    .badge-company_admin { background: #2ed573; color: white; }
+    .badge-company_manager { background: #1e90ff; color: white; }
+    .badge-company_staff { background: #ffa502; color: white; }
+    .badge-employee { background: #a29bfe; color: white; }
+    .badge-super_admin { background: #ff4757; color: white; }
+</style>
+{% endblock %}

@@ -1,0 +1,590 @@
+{% extends 'base.html' %}
+
+{% block title %}RS{% endblock %}
+
+{% block page_title %}{{ product.name }}{% endblock %}
+{% block page_subtitle %}Product Details - Code: {{ product.product_code }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .unit-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 14px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        margin-bottom: 6px;
+        border: 1px solid #e9ecef;
+        transition: all 0.2s;
+    }
+    .unit-item:hover {
+        border-color: #667eea;
+        background: #f0f3ff;
+    }
+    .unit-identifier {
+        font-weight: 500;
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+        color: #2d3436;
+    }
+    .unit-status-badge {
+        padding: 2px 12px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: capitalize;
+    }
+    .unit-status-badge.available { background: #d4edda; color: #155724; }
+    .unit-status-badge.sold { background: #cce5ff; color: #004085; }
+    .unit-status-badge.reserved { background: #fff3cd; color: #856404; }
+    .unit-status-badge.repair { background: #f8d7da; color: #721c24; }
+    
+    .stat-number {
+        font-size: 24px;
+        font-weight: 700;
+    }
+    .stat-label {
+        font-size: 12px;
+        color: #6c757d;
+    }
+    
+    /* Accessory Preview Section */
+    .accessory-preview-section {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border: 1px solid #e9ecef;
+    }
+    .accessory-preview-section .product-image-container {
+        max-width: 200px;
+        margin: 0 auto;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #dee2e6;
+        background: white;
+    }
+    .accessory-preview-section .product-image-container img {
+        width: 100%;
+        height: auto;
+        max-height: 200px;
+        object-fit: contain;
+        display: block;
+        padding: 10px;
+    }
+    .accessory-preview-section .product-image-container .no-image {
+        padding: 30px 20px;
+        text-align: center;
+        color: #adb5bd;
+    }
+    .accessory-preview-section .product-image-container .no-image i {
+        font-size: 3rem;
+        display: block;
+        margin-bottom: 10px;
+        opacity: 0.5;
+    }
+    .accessory-preview-section .barcode-display {
+        font-family: 'Courier New', monospace;
+        font-size: 16px;
+        letter-spacing: 3px;
+        background: white;
+        padding: 10px 15px;
+        border-radius: 8px;
+        border: 1px dashed #dee2e6;
+        text-align: center;
+        margin-top: 15px;
+    }
+    .accessory-preview-section .barcode-display i {
+        color: #667eea;
+        margin-right: 10px;
+    }
+    .accessory-preview-section .accessory-stock-info {
+        display: flex;
+        justify-content: center;
+        gap: 30px;
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #e9ecef;
+    }
+    .accessory-preview-section .accessory-stock-info .stat-item {
+        text-align: center;
+    }
+    .accessory-preview-section .accessory-stock-info .stat-item .number {
+        font-size: 20px;
+        font-weight: 700;
+        color: #2d3436;
+    }
+    .accessory-preview-section .accessory-stock-info .stat-item .label {
+        font-size: 12px;
+        color: #6c757d;
+    }
+    
+    /* Branch Stock Card */
+    .branch-stock-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        border-left: 4px solid #667eea;
+        transition: all 0.2s;
+    }
+    .branch-stock-item:hover {
+        background: #f0f3ff;
+        transform: translateX(4px);
+    }
+    .branch-stock-item .branch-name {
+        font-weight: 600;
+        color: #2d3436;
+    }
+    .branch-stock-item .stock-count {
+        font-weight: 700;
+        font-size: 18px;
+        color: #2d3436;
+    }
+    .branch-stock-item .stock-count.low {
+        color: #dc3545;
+    }
+    .branch-stock-item .stock-count.medium {
+        color: #ffc107;
+    }
+    .branch-stock-item .stock-count.high {
+        color: #28a745;
+    }
+    .branch-stock-item .branch-code {
+        font-size: 11px;
+        color: #6c757d;
+        font-family: monospace;
+    }
+    .branch-stock-item .stock-status-badge {
+        font-size: 11px;
+        padding: 2px 10px;
+        border-radius: 50px;
+        font-weight: 600;
+    }
+    .branch-stock-item .stock-status-badge.in-stock {
+        background: #d4edda;
+        color: #155724;
+    }
+    .branch-stock-item .stock-status-badge.low-stock {
+        background: #fff3cd;
+        color: #856404;
+    }
+    .branch-stock-item .stock-status-badge.out-of-stock {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    .no-branches {
+        text-align: center;
+        padding: 30px 20px;
+        color: #6c757d;
+    }
+    .no-branches i {
+        font-size: 2.5rem;
+        display: block;
+        margin-bottom: 10px;
+        opacity: 0.4;
+    }
+
+    /* Unit Stats Cards */
+    .unit-stat-card {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+        text-align: center;
+        border: 1px solid #e9ecef;
+        transition: all 0.2s;
+    }
+    .unit-stat-card:hover {
+        border-color: #667eea;
+        background: #f0f3ff;
+    }
+    .unit-stat-card .number {
+        font-size: 28px;
+        font-weight: 700;
+    }
+    .unit-stat-card .number.available { color: #28a745; }
+    .unit-stat-card .number.sold { color: #004085; }
+    .unit-stat-card .number.reserved { color: #ffc107; }
+    .unit-stat-card .number.repair { color: #dc3545; }
+    .unit-stat-card .number.total { color: #667eea; }
+    .unit-stat-card .label {
+        font-size: 12px;
+        color: #6c757d;
+        margin-top: 4px;
+    }
+
+    /* Unit Summary Button */
+    .unit-summary-btn {
+        border: 2px dashed #667eea;
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+        transition: all 0.3s;
+        cursor: pointer;
+        text-decoration: none;
+        display: block;
+        color: #2d3436;
+    }
+    .unit-summary-btn:hover {
+        background: #f0f3ff;
+        border-color: #667eea;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        text-decoration: none;
+        color: #2d3436;
+    }
+    .unit-summary-btn i {
+        font-size: 2rem;
+        color: #667eea;
+        display: block;
+        margin-bottom: 8px;
+    }
+    .unit-summary-btn .count {
+        font-size: 24px;
+        font-weight: 700;
+        color: #667eea;
+    }
+    .unit-summary-btn .label {
+        font-size: 14px;
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <!-- Product Info Card -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-info-circle"></i> Product Information</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Name:</strong> {{ product.name }}</p>
+                        <p><strong>Category:</strong> {{ product_type }}</p>
+                        <p><strong>Brand:</strong> {{ product.brand }}</p>
+                        <p><strong>Model:</strong> 
+                            {% if product_type == 'Phone' %}{{ product.model }}
+                            {% elif product_type == 'Electronic' %}{{ product.model_number }}
+                            {% else %}{{ product.model }}{% endif %}
+                        </p>
+                        <p><strong>Product Code:</strong> 
+                            <span class="badge bg-dark" style="font-family: monospace; font-size: 14px;">
+                                {{ product.product_code }}
+                            </span>
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Total Stock:</strong> {{ product.quantity_in_stock }}</p>
+                        <p><strong>Available Units:</strong> {{ total_available_units }}</p>
+                        <p><strong>Buying Price:</strong> KSh {{ product.purchase_price|floatformat:0 }}</p>
+                        <p><strong>Selling Price:</strong> KSh {{ product.selling_price|floatformat:0 }}</p>
+                        <p><strong>Status:</strong> 
+                            {% if product.is_active %}
+                            <span class="badge bg-success">Active</span>
+                            {% else %}
+                            <span class="badge bg-danger">Inactive</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                
+                {% if product_type == 'Phone' %}
+                <hr>
+                <h6>Phone Specifications</h6>
+                <div class="row">
+                    <div class="col-md-3"><strong>RAM:</strong> {{ product.ram|default:"-" }}</div>
+                    <div class="col-md-3"><strong>ROM:</strong> {{ product.storage_capacity|default:"-" }}</div>
+                    <div class="col-md-3"><strong>Screen:</strong> {{ product.screen_size|default:"-" }}</div>
+                    <div class="col-md-3"><strong>Color:</strong> {{ product.color|default:"-" }}</div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-6"><strong>Condition:</strong> {{ product.condition|title }}</div>
+                </div>
+                {% endif %}
+                
+                {% if product_type == 'Electronic' %}
+                <hr>
+                <h6>Electronic Specifications</h6>
+                <div class="row">
+                    <div class="col-md-4"><strong>RAM:</strong> {{ product.ram|default:"-" }}</div>
+                    <div class="col-md-4"><strong>Storage:</strong> {{ product.storage|default:"-" }}</div>
+                    <div class="col-md-4"><strong>Processor:</strong> {{ product.processor|default:"-" }}</div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-6"><strong>Device Type:</strong> {{ product.device_type|title }}</div>
+                </div>
+                {% endif %}
+                
+                {% if product_type == 'Accessory' %}
+                <hr>
+                <h6>Accessory Details</h6>
+                <div class="row">
+                    <div class="col-md-6"><strong>Type:</strong> {{ product.accessory_type|title }}</div>
+                    <div class="col-md-6"><strong>Barcode:</strong> {{ product.compatible_phone_models|default:"-" }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- ============================================
+        UNIT STATS & NAVIGATION (For Phones and Electronics)
+        ============================================ -->
+        {% if product_type == 'Phone' or product_type == 'Electronic' %}
+        <div class="card mt-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">
+                    <i class="fas fa-qrcode"></i> 
+                    {% if product_type == 'Phone' %}
+                        Units (IMEI Numbers)
+                    {% else %}
+                        Units (Serial Numbers)
+                    {% endif %}
+                </h6>
+                <span class="badge bg-primary">{{ unit_count }} total</span>
+            </div>
+            <div class="card-body">
+                <!-- Unit Stats -->
+                <div class="row mb-3">
+                    <div class="col-3">
+                        <div class="unit-stat-card">
+                            <div class="number total">{{ unit_count }}</div>
+                            <div class="label">Total Units</div>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="unit-stat-card">
+                            <div class="number available">{{ available_count|default:0 }}</div>
+                            <div class="label">Available</div>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="unit-stat-card">
+                            <div class="number reserved">{{ reserved_count|default:0 }}</div>
+                            <div class="label">Reserved</div>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="unit-stat-card">
+                            <div class="number repair">{{ repair_count|default:0 }}</div>
+                            <div class="label">Repair</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Navigate to Units Page -->
+                <a href="/epa_shop/products/{{ product.product_code }}/units/" class="unit-summary-btn">
+                    <i class="fas fa-list-ul"></i>
+                    <div class="count">{{ unit_count }}</div>
+                    <div class="label">
+                        View All {% if product_type == 'Phone' %}IMEI{% else %}Serial{% endif %} Numbers
+                        <i class="fas fa-arrow-right ms-1"></i>
+                    </div>
+                </a>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Accessory Preview Section (Only for Accessories) -->
+        {% if product_type == 'Accessory' %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-image"></i> Accessory Preview</h6>
+            </div>
+            <div class="card-body">
+                <div class="accessory-preview-section">
+                    <!-- Product Image -->
+                    <div class="product-image-container">
+                        {% if product.image %}
+                            <img src="{{ product.image.url }}" alt="{{ product.name }}" onclick="openImageModal('{{ product.image.url }}', '{{ product.name }}')" style="cursor:pointer;" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'no-image\'><i class=\'fas fa-image\'></i><p>Image failed to load</p></div>';">
+                        {% else %}
+                            <div class="no-image">
+                                <i class="fas fa-image"></i>
+                                <p>No image uploaded</p>
+                                <small class="text-muted">Upload via edit mode</small>
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Barcode Display -->
+                    <div class="barcode-display">
+                        <i class="fas fa-barcode"></i>
+                        {{ product.compatible_phone_models|default:"No barcode assigned" }}
+                    </div>
+                    
+                    <!-- Stock Information -->
+                    <div class="accessory-stock-info">
+                        <div class="stat-item">
+                            <div class="number text-primary">{{ product.quantity_in_stock }}</div>
+                            <div class="label">In Stock</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="number text-warning">{{ product.minimum_stock_level|default:10 }}</div>
+                            <div class="label">Min Level</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="number text-success">{{ product.maximum_stock_level|default:100 }}</div>
+                            <div class="label">Max Level</div>
+                        </div>
+                    </div>
+                    
+                    {% if product.quantity_in_stock <= product.minimum_stock_level %}
+                    <div class="alert alert-warning mt-3 mb-0">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Low Stock Alert!</strong> Current stock ({{ product.quantity_in_stock }}) is below minimum level ({{ product.minimum_stock_level }}). Please restock.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Right Column - Quick Actions & Branch Stock -->
+    <div class="col-md-4">
+        <!-- Quick Actions -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-cog"></i> Quick Actions</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="/epa_shop/products/{{ product.product_code }}/edit/" class="btn btn-primary">
+                        <i class="fas fa-edit"></i> Edit Product
+                    </a>
+                    <a href="/epa_shop/products/{{ product.product_code }}/restock/" class="btn btn-warning">
+                        <i class="fas fa-boxes"></i> Restock
+                    </a>
+                    {% if product_type == 'Phone' or product_type == 'Electronic' %}
+                    <a href="/epa_shop/products/{{ product.product_code }}/units/" class="btn btn-info">
+                        <i class="fas fa-list-ul"></i> View All Units
+                    </a>
+                    {% endif %}
+                    <a href="/epa_shop/products/{{ product.product_code }}/delete/" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Delete
+                    </a>
+                    <a href="/epa_shop/products/" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Products
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Branch Stock Information -->
+        <div class="card mt-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="fas fa-store"></i> Branch Stock</h6>
+                <span class="badge bg-primary">{{ branches|length }} branches</span>
+            </div>
+            <div class="card-body p-0">
+                {% if branches %}
+                    <div class="p-2">
+                        {% for branch in branches %}
+                        <div class="branch-stock-item" style="border-left-color: {% if branch.unit_count > 0 %}#28a745{% else %}#dc3545{% endif %};">
+                            <div>
+                                <div class="branch-name">
+                                    {{ branch.name }}
+                                    {% if branch.is_primary %}
+                                        <span class="badge bg-info" style="font-size: 9px;">Primary</span>
+                                    {% endif %}
+                                </div>
+                                <div class="branch-code">{{ branch.code }}</div>
+                            </div>
+                            <div class="text-end">
+                                <div class="stock-count 
+                                    {% if branch.unit_count <= 0 %}low
+                                    {% elif branch.unit_count <= 5 %}medium
+                                    {% else %}high{% endif %}">
+                                    {{ branch.unit_count }}
+                                </div>
+                                <span class="stock-status-badge 
+                                    {% if branch.unit_count > 0 %}in-stock
+                                    {% else %}out-of-stock{% endif %}">
+                                    {% if branch.unit_count > 0 %}
+                                        {{ branch.unit_count }} units
+                                    {% else %}
+                                        Out of Stock
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="no-branches">
+                        <i class="fas fa-store"></i>
+                        <p>No branches available</p>
+                        <small class="text-muted">Add branches to track stock by location</small>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="card-footer">
+                <small class="text-muted">
+                    <i class="fas fa-info-circle"></i> 
+                    Total available units: <strong>{{ total_available_units }}</strong>
+                    {% if product_type == 'Accessory' %}
+                        (Accessory stock)
+                    {% else %}
+                        (IMEI/Serial units)
+                    {% endif %}
+                </small>
+            </div>
+        </div>
+        
+        <!-- Product Info -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-clock"></i> Product Info</h6>
+            </div>
+            <div class="card-body">
+                <p><strong>Created:</strong> {{ product.created_at|date:"Y-m-d H:i" }}</p>
+                <p><strong>Last Updated:</strong> {{ product.updated_at|date:"Y-m-d H:i" }}</p>
+                <p><strong>Code:</strong> <span class="badge bg-dark" style="font-family: monospace;">{{ product.product_code }}</span></p>
+                {% if product.owner %}
+                <p><strong>Owner:</strong> {{ product.owner.name }}</p>
+                {% endif %}
+                <p><strong>Branch:</strong> {{ product.branch.name|default:"Not assigned" }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Image Modal for Full Size View -->
+<div class="modal fade" id="imageModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{ product.name }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img src="" alt="{{ product.name }}" class="img-fluid" id="modalImage">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Open image modal
+function openImageModal(imageUrl, productName) {
+    document.getElementById('modalImage').src = imageUrl;
+    const modal = new bootstrap.Modal(document.getElementById('imageModal'));
+    modal.show();
+}
+
+// Click image to view full size (only if image exists)
+document.addEventListener('DOMContentLoaded', function() {
+    const imageContainer = document.querySelector('.product-image-container img');
+    if (imageContainer && imageContainer.src) {
+        imageContainer.style.cursor = 'pointer';
+    }
+});
+</script>
+{% endblock %}

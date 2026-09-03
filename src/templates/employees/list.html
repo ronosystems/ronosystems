@@ -1,0 +1,663 @@
+{% extends 'base.html' %}
+
+{% block title %}Employees - RonoSystems{% endblock %}
+{% block page_title %}Employees{% endblock %}
+{% block page_subtitle %}Manage all employees{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE TABLE STYLING
+    ============================================ */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    
+    .table-excel thead th {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table-excel tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+
+    /* ============================================
+       STAT CARDS
+    ============================================ */
+    .stat-card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        transition: transform 0.2s;
+        cursor: default;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .stat-card.bg-primary {
+        background: #87CEEB !important;
+        color: #000000 !important;
+    }
+    .stat-card.bg-primary h3 {
+        color: #000000 !important;
+    }
+    .stat-card.bg-primary small {
+        color: #000000 !important;
+    }
+    .stat-card.bg-success {
+        background: #d4edda !important;
+        color: #155724 !important;
+    }
+    .stat-card.bg-success h3 {
+        color: #155724 !important;
+    }
+    .stat-card.bg-success small {
+        color: #155724 !important;
+    }
+    .stat-card.bg-warning {
+        background: #fff3cd !important;
+        color: #000000 !important;
+    }
+    .stat-card.bg-warning h3 {
+        color: #856404 !important;
+    }
+    .stat-card.bg-warning small {
+        color: #856404 !important;
+    }
+    .stat-card.bg-info {
+        background: #cce5ff !important;
+        color: #004085 !important;
+    }
+    .stat-card.bg-info h3 {
+        color: #004085 !important;
+    }
+    .stat-card.bg-info small {
+        color: #004085 !important;
+    }
+
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-body {
+        color: #000000;
+    }
+    
+    .card-footer {
+        border-top: 2px solid #000000;
+        background-color: #f8f9fa;
+    }
+    
+    /* ============================================
+       FORM ELEMENTS
+    ============================================ */
+    .form-control, .form-select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        color: #000000;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    .input-group-text {
+        border: 2px solid #000000;
+        border-right: none;
+        border-radius: 4px 0 0 4px;
+        background: #f8f9fa;
+        color: #000000;
+    }
+    
+    .input-group .form-control {
+        border-radius: 0 4px 4px 0;
+        border-left: none;
+    }
+    
+    .input-group .form-control:focus {
+        border-color: #000000;
+        box-shadow: none;
+    }
+    
+    .input-group:focus-within {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    .input-group:focus-within .input-group-text {
+        border-color: #87CEEB;
+    }
+    
+    .input-group:focus-within .form-control {
+        border-color: #87CEEB;
+    }
+
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-info {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-info:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-primary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-primary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-warning {
+        border: 2px solid #000000;
+        color: #856404;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-warning:hover {
+        background-color: #ffc107;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-success {
+        border: 2px solid #000000;
+        color: #155724;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-success:hover {
+        background-color: #28a745;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-outline-danger {
+        border: 2px solid #000000;
+        color: #dc3545;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-danger:hover {
+        background-color: #dc3545;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-outline-secondary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-sm {
+        padding: 4px 12px;
+        font-size: 12px;
+    }
+    
+    /* ============================================
+       AVATAR
+    ============================================ */
+    .avatar-sm {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #87CEEB, #7bb8d8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #000000;
+        font-weight: 700;
+        flex-shrink: 0;
+        border: 2px solid #000000;
+    }
+    
+    /* ============================================
+       BADGES
+    ============================================ */
+    .badge {
+        padding: 4px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    
+    .badge.bg-success {
+        background: #d4edda !important;
+        color: #155724 !important;
+    }
+    
+    .badge.bg-danger {
+        background: #f8d7da !important;
+        color: #721c24 !important;
+    }
+    
+    .badge.bg-info {
+        background: #cce5ff !important;
+        color: #004085 !important;
+    }
+    
+    .badge.bg-secondary {
+        background: #f8f9fa !important;
+        color: #000000 !important;
+    }
+    
+    .badge-role {
+        padding: 5px 12px;
+        border-radius: 50px;
+        font-size: 12px;
+        border: 1px solid #000000;
+    }
+    .badge-company_admin { background: #2ed573; color: white; }
+    .badge-company_manager { background: #1e90ff; color: white; }
+    .badge-company_staff { background: #ffa502; color: white; }
+    .badge-employee { background: #a29bfe; color: white; }
+    .badge-super_admin { background: #ff4757; color: white; }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 11px;
+        }
+        .table-excel th {
+            font-size: 10px;
+        }
+        .btn-sm {
+            font-size: 9px;
+            padding: 2px 6px;
+        }
+        .badge {
+            font-size: 9px;
+            padding: 2px 6px;
+        }
+        .badge-role {
+            font-size: 9px;
+            padding: 3px 8px;
+        }
+        .avatar-sm {
+            width: 30px;
+            height: 30px;
+            font-size: 12px;
+        }
+        .stat-card h3 {
+            font-size: 1.3rem;
+        }
+        .stat-card small {
+            font-size: 0.75rem;
+        }
+        .card-body {
+            padding: 12px;
+        }
+        .form-control, .form-select {
+            font-size: 12px;
+            padding: 6px 10px;
+        }
+        .btn-primary {
+            font-size: 12px;
+            padding: 6px 10px;
+        }
+        .input-group-text {
+            font-size: 12px;
+            padding: 6px 10px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 3px 4px;
+            font-size: 9px;
+        }
+        .table-excel th {
+            font-size: 8px;
+        }
+        .btn-sm {
+            font-size: 8px;
+            padding: 1px 4px;
+        }
+        .btn-sm i {
+            font-size: 10px;
+        }
+        .badge {
+            font-size: 8px;
+            padding: 1px 4px;
+        }
+        .badge-role {
+            font-size: 8px;
+            padding: 2px 6px;
+        }
+        .avatar-sm {
+            width: 25px;
+            height: 25px;
+            font-size: 10px;
+        }
+        .stat-card h3 {
+            font-size: 1.1rem;
+        }
+        .stat-card small {
+            font-size: 0.65rem;
+        }
+        .card-body {
+            padding: 10px;
+        }
+        .form-control, .form-select {
+            font-size: 11px;
+            padding: 4px 8px;
+        }
+        .btn-primary {
+            font-size: 11px;
+            padding: 4px 8px;
+        }
+        .input-group-text {
+            font-size: 11px;
+            padding: 4px 8px;
+        }
+        .row.g-3 {
+            gap: 5px;
+        }
+        .col-md-2, .col-md-3, .col-md-1 {
+            padding: 0 4px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Stats -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card stat-card bg-primary">
+                    <div class="card-body">
+                        <h3>{{ total_users }}</h3>
+                        <small>Total Employees</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card bg-success">
+                    <div class="card-body">
+                        <h3>{{ active_count|default:0 }}</h3>
+                        <small>Active</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card bg-warning">
+                    <div class="card-body">
+                        <h3>{{ inactive_count|default:0 }}</h3>
+                        <small>Inactive</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card bg-info">
+                    <div class="card-body">
+                        <h3>{{ verified_count|default:0 }}</h3>
+                        <small>Verified</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-3">
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            <input type="text" class="form-control" name="search" placeholder="Search by name, email, phone..." value="{{ search_query }}">
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" name="role">
+                            <option value="">All Roles</option>
+                            {% for role in roles %}
+                            <option value="{{ role.0 }}" {% if role_filter == role.0 %}selected{% endif %}>
+                                {{ role.1 }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" name="company">
+                            <option value="">All Companies</option>
+                            {% for company in companies %}
+                            <option value="{{ company.id }}" {% if company_filter == company.id|stringformat:"s" %}selected{% endif %}>
+                                {{ company.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" name="business_type">
+                            <option value="">All Business Types</option>
+                            {% for business_type in business_types %}
+                            <option value="{{ business_type.id }}" {% if business_type_filter == business_type.id|stringformat:"s" %}selected{% endif %}>
+                                {{ business_type.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" name="status">
+                            <option value="">All Status</option>
+                            <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                            <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+                        </select>
+                    </div>
+                    <div class="col-md-1">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Employee Table -->
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive" style="border: 2px solid #000000;">
+                    <table class="table-excel table-hover mb-0" id="employeeTable">
+                        <thead>
+                            <tr>
+                                <th style="width:4%;">#</th>
+                                <th style="width:18%;">Employee Name</th>
+                                <th style="width:16%;">Email</th>
+                                <th style="width:12%;">Phone</th>
+                                <th style="width:14%;">Company</th>
+                                <th style="width:12%;">Role</th>
+                                <th style="width:10%;">Status</th>
+                                <th style="width:14%;" class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar-sm me-2">
+                                            {{ user.first_name|default:user.username|make_list|first|upper }}
+                                        </div>
+                                        <div>
+                                            <strong>{{ user.get_full_name|default:user.username }}</strong>
+                                            {% if user.employee_id %}
+                                            <br><small style="color: #000000;">ID: {{ user.employee_id }}</small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div><i class="fas fa-envelope" style="color: #000000;"></i> {{ user.email }}</div>
+                                </td>
+                                <td>
+                                    {% if user.phone %}
+                                    <div><i class="fas fa-phone" style="color: #000000;"></i> {{ user.phone }}</div>
+                                    {% else %}
+                                    <span style="color: #000000;">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if user.company %}
+                                    <span class="badge bg-info">{{ user.company.name }}</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">None</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge-role badge-{{ user.role }}">
+                                        {{ user.get_role_display|default:user.role|title }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-column gap-1">
+                                        {% if user.is_active %}
+                                        <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                        <span class="badge bg-danger">Inactive</span>
+                                        {% endif %}
+                                        {% if user.is_verified %}
+                                        <span class="badge bg-info">Verified</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'employees:superadmin-employee-detail' user.id %}" class="btn btn-outline-info" title="View">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{% url 'employees:superadmin-employee-edit' user.id %}" class="btn btn-outline-primary" title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form method="post" action="{% url 'employees:superadmin-employee-toggle-status' user.id %}" style="display:inline;" 
+                                              onsubmit="return confirm('Are you sure you want to {% if user.is_active %}deactivate{% else %}activate{% endif %} {{ user.get_full_name|default:user.username }}?')">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-outline-{% if user.is_active %}warning{% else %}success{% endif %}" 
+                                                    title="{% if user.is_active %}Deactivate{% else %}Activate{% endif %}">
+                                                <i class="fas {% if user.is_active %}fa-user-slash{% else %}fa-user-check{% endif %}"></i>
+                                            </button>
+                                        </form>
+                                        <a href="{% url 'employees:superadmin-employee-delete' user.id %}" 
+                                           class="btn btn-outline-danger" 
+                                           title="Delete" 
+                                           onclick="return confirm('Are you sure you want to delete {{ user.get_full_name|default:user.username }}?')">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" class="text-center py-4">
+                                    <i class="fas fa-users fa-3x d-block mb-3" style="color: #000000;"></i>
+                                    <p style="color: #000000;">No employees found.</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer text-muted" style="color: #000000 !important;">
+                Showing {{ users|length }} employees
+                {% if search_query or role_filter or company_filter or business_type_filter or branch_filter or status_filter %}
+                <span class="float-end">
+                    <a href="{% url 'employees:superadmin-employee-list' %}" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-times"></i> Clear Filters
+                    </a>
+                </span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

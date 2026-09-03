@@ -1,0 +1,814 @@
+{% extends 'base.html' %}
+
+{% block title %}RS{% endblock %}
+
+{% block page_title %}Company Reports{% endblock %}
+{% block page_subtitle %}All Business Types{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE TABLE STYLING
+    ============================================ */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    
+    .table-excel thead th {
+        background-color: #87CEEB !important; /* Sky Blue */
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    /* Zebra striping for Excel look */
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table-excel tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+    
+    /* Table Footer Styling */
+    .table-excel tfoot td {
+        background-color: #e8f4f8 !important;
+        font-weight: 700 !important;
+        border-top: 3px solid #000000 !important;
+        border-bottom: 2px solid #000000 !important;
+        color: #000000 !important;
+    }
+    
+    .table-excel tfoot td:first-child {
+        background-color: #d4e8f0 !important;
+        font-weight: 700;
+        color: #000000;
+    }
+    
+    .table-excel tfoot tr:hover td {
+        background-color: #e8f4f8 !important;
+    }
+
+    /* Sortable headers */
+    .sortable-header {
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        padding-right: 20px !important;
+    }
+    .sortable-header:hover {
+        background-color: #7bb8d8 !important;
+    }
+    .sortable-header .sort-icon {
+        position: absolute;
+        right: 6px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 10px;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+        color: #000000;
+    }
+    .sortable-header:hover .sort-icon {
+        opacity: 1;
+    }
+    .sortable-header.active .sort-icon {
+        opacity: 1;
+    }
+    .sortable-header.asc .sort-icon::after {
+        content: '▲';
+    }
+    .sortable-header.desc .sort-icon::after {
+        content: '▼';
+    }
+
+    /* ============================================
+       STAT CARDS
+    ============================================ */
+    .stat-card {
+        background: white;
+        border-radius: 4px;
+        padding: 20px;
+        border: 2px solid #000000;
+        transition: all 0.3s;
+        height: 100%;
+    }
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+    .stat-card .stat-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #000000;
+    }
+    .stat-card .stat-label {
+        font-size: 0.85rem;
+        color: #000000;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+    .stat-card small {
+        color: #000000;
+    }
+    .stat-card.profit { border-left: 6px solid #28a745; }
+    .stat-card.revenue { border-left: 6px solid #007bff; }
+    .stat-card.expenses { border-left: 6px solid #dc3545; }
+    .stat-card.balance { border-left: 6px solid #6f42c1; }
+    .stat-card.cogs { border-left: 6px solid #fd7e14; }
+    
+    /* ============================================
+       FILTER FORM
+    ============================================ */
+    .filter-form {
+        background: #f8f9fa;
+        padding: 15px 20px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        border: 2px solid #000000;
+    }
+    
+    .filter-form .form-label {
+        color: #000000;
+        font-weight: 600;
+    }
+    
+    .filter-form .form-control {
+        border: 2px solid #000000;
+        border-radius: 4px;
+    }
+    
+    .filter-form .form-control:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-primary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-outline-primary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+    }
+    
+    .card-header h5 {
+        color: #000000;
+        font-weight: 600;
+    }
+    
+    .card-footer {
+        border-top: 2px solid #000000;
+        background-color: #f8f9fa;
+    }
+    
+    /* ============================================
+       TABLE ROW HIGHLIGHTS
+    ============================================ */
+    .table-excel tbody tr.table-primary td {
+        background-color: #e3f2fd !important;
+    }
+    
+    .table-excel tbody tr.table-primary:hover td {
+        background-color: #d4e8f7 !important;
+    }
+    
+    .table-excel tbody tr.table-primary:nth-child(even) td {
+        background-color: #e3f2fd !important;
+    }
+    
+    /* ============================================
+       BADGES
+    ============================================ */
+    .badge.bg-primary {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        border: 1px solid #000000;
+        padding: 4px 10px;
+        font-weight: 600;
+    }
+    
+    .business-badge {
+        padding: 2px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    .business-badge.epa { background: #dbeafe; color: #1e40af; }
+    .business-badge.supermarket { background: #d1fae5; color: #065f46; }
+    
+    /* ============================================
+       TEXT COLORS
+    ============================================ */
+    .text-success {
+        color: #28a745 !important;
+        font-weight: 600;
+    }
+    .text-danger {
+        color: #dc3545 !important;
+        font-weight: 600;
+    }
+    .text-warning {
+        color: #fd7e14 !important;
+        font-weight: 600;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 12px;
+        }
+        .table-excel th {
+            font-size: 11px;
+        }
+        .btn-sm {
+            font-size: 10px;
+            padding: 2px 6px;
+        }
+        .stat-card .stat-value {
+            font-size: 1.3rem;
+        }
+        .stat-card .stat-label {
+            font-size: 0.7rem;
+        }
+        .card-header h5 {
+            font-size: 0.9rem;
+        }
+    }
+    
+    @media (max-width: 576px) {
+        .stat-card {
+            padding: 12px;
+        }
+        .stat-card .stat-value {
+            font-size: 1.1rem;
+        }
+        .table-excel th,
+        .table-excel td {
+            padding: 3px 4px;
+            font-size: 10px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            <i class="fas fa-chart-bar" style="color: #000000;"></i> Company Reports
+            <small class="text-muted fs-6" style="color: #000000 !important;">All Business Types</small>
+        </h1>
+
+        <div>
+            <a href="/epa_shop/finance/" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left"></i> Back to Finance Overview
+            </a>
+        </div>
+
+        <div>
+            <a href="{% url 'company-reports-dashboard' %}" class="btn btn-outline-primary">
+                <i class="fas fa-sync"></i> Refresh
+            </a>
+        </div>
+    </div>
+    
+    <!-- Filter Form -->
+    <div class="filter-form">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Date From</label>
+                <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Date To</label>
+                <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+            </div>
+
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-filter"></i> Apply Filter
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Today's Summary -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="stat-card revenue">
+                <div class="stat-label">Today's Revenue</div>
+                <div class="stat-value">KSh {{ today_summary.total_revenue|floatformat:2|default:"0.00" }}</div>
+                <small>{{ today_summary.total_sales }} sales</small>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="stat-card cogs">
+                <div class="stat-label">Today's COGS</div>
+                <div class="stat-value">KSh {{ today_summary.total_cogs|floatformat:2|default:"0.00" }}</div>
+                <small>Cost of Goods Sold</small>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="stat-card profit">
+                <div class="stat-label">Today's Profit</div>
+                <div class="stat-value">KSh {{ today_summary.total_profit|floatformat:2|default:"0.00" }}</div>
+                <small>Margin: {% if today_summary.total_revenue > 0 %}{{ today_summary.total_profit|floatformat:0|default:"0" }}%{% else %}0%{% endif %}</small>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="stat-card expenses">
+                <div class="stat-label">Today's Expenses</div>
+                <div class="stat-value">KSh {{ today_summary.total_expenses|floatformat:2|default:"0.00" }}</div>
+                <small>To be recorded</small>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Daily Records -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-calendar-day"></i> Daily Records</h5>
+                <span class="badge bg-primary">{{ daily_records|length }} days</span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="border: 2px solid #000000;">
+                <table class="table-excel table-hover mb-0" id="dailyTable">
+                    <thead>
+                        <tr>
+                            <th class="sortable-header" data-sort="date" onclick="sortTable('dailyTable', 'date')">
+                                Date
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="sortable-header" data-sort="day" onclick="sortTable('dailyTable', 'day')">
+                                Day
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="sales" onclick="sortTable('dailyTable', 'sales')">
+                                Sales
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="revenue" onclick="sortTable('dailyTable', 'revenue')">
+                                Revenue
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="cogs" onclick="sortTable('dailyTable', 'cogs')">
+                                COGS
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="profit" onclick="sortTable('dailyTable', 'profit')">
+                                Profit
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="expenses" onclick="sortTable('dailyTable', 'expenses')">
+                                Expenses
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="balance" onclick="sortTable('dailyTable', 'balance')">
+                                Closing Balance
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in daily_records %}
+                        <tr class="{% if record.is_today %}table-primary{% endif %}" 
+                            data-date="{{ record.date|date:'Y-m-d' }}" 
+                            data-day="{{ record.day_name }}" 
+                            data-sales="{{ record.sales_count }}" 
+                            data-revenue="{{ record.revenue }}" 
+                            data-cogs="{{ record.cogs }}" 
+                            data-profit="{{ record.profit }}" 
+                            data-expenses="{{ record.expenses }}" 
+                            data-balance="{{ record.closing_balance }}">
+                            <td>{{ record.date|date:"Y-m-d" }}</td>
+                            <td>{{ record.day_name }}</td>
+                            <td class="text-end">{{ record.sales_count }}</td>
+                            <td class="text-end">KSh {{ record.revenue|floatformat:2|default:"0.00" }}</td>
+                            <td class="text-end text-warning">KSh {{ record.cogs|floatformat:2|default:"0.00" }}</td>
+                            <td class="text-end {% if record.profit > 0 %}text-success{% else %}text-danger{% endif %}">
+                                KSh {{ record.profit|floatformat:2|default:"0.00" }}
+                            </td>
+                            <td class="text-end text-danger">KSh {{ record.expenses|floatformat:2|default:"0.00" }}</td>
+                            <td class="text-end fw-bold">
+                                KSh {{ record.closing_balance|floatformat:2|default:"0.00" }}
+                            </td>
+                            <td class="text-center">
+                                <a href="{% url 'company-reports-daily-detail' record.date|date:'Y-m-d' %}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="text-center py-4">
+                                <i class="fas fa-calendar-times fa-2x text-muted d-block mb-3"></i>
+                                <p class="text-muted">No records found</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="2" class="text-end"><strong>TOTALS</strong></td>
+                            <td class="text-end"><strong>{{ daily_totals.sales_count }}</strong></td>
+                            <td class="text-end"><strong>KSh {{ daily_totals.revenue|floatformat:2 }}</strong></td>
+                            <td class="text-end"><strong>KSh {{ daily_totals.cogs|floatformat:2 }}</strong></td>
+                            <td class="text-end"><strong>KSh {{ daily_totals.profit|floatformat:2 }}</strong></td>
+                            <td class="text-end"><strong>KSh {{ daily_totals.expenses|floatformat:2 }}</strong></td>
+                            <td class="text-end"><strong>KSh {{ daily_totals.closing_balance|floatformat:2 }}</strong></td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer">
+            <small>Showing {{ daily_records|length }} days with records</small>
+        </div>
+    </div>
+    
+    <!-- Weekly Records -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-calendar-week"></i> Weekly Records</h5>
+                <span class="badge bg-primary">{{ weekly_records|length }} weeks</span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="border: 2px solid #000000;">
+                <table class="table-excel table-hover mb-0" id="weeklyTable">
+                    <thead>
+                        <tr>
+                            <th class="sortable-header" data-sort="week" onclick="sortTable('weeklyTable', 'week')">
+                                Week
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="sortable-header" data-sort="period" onclick="sortTable('weeklyTable', 'period')">
+                                Period
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="sales" onclick="sortTable('weeklyTable', 'sales')">
+                                Sales
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="revenue" onclick="sortTable('weeklyTable', 'revenue')">
+                                Revenue
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="cogs" onclick="sortTable('weeklyTable', 'cogs')">
+                                COGS
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="profit" onclick="sortTable('weeklyTable', 'profit')">
+                                Profit
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in weekly_records %}
+                        <tr data-week="Week {{ record.week }}, {{ record.year }}" 
+                            data-period="{{ record.week_start|date:'M d' }} - {{ record.week_end|date:'M d, Y' }}" 
+                            data-sales="{{ record.sales_count }}" 
+                            data-revenue="{{ record.revenue }}" 
+                            data-cogs="{{ record.cogs }}" 
+                            data-profit="{{ record.profit }}">
+                            <td>Week {{ record.week }}, {{ record.year }}</td>
+                            <td>{{ record.week_start|date:"M d" }} - {{ record.week_end|date:"M d, Y" }}</td>
+                            <td class="text-end">{{ record.sales_count }}</td>
+                            <td class="text-end">KSh {{ record.revenue|floatformat:2|default:"0.00" }}</td>
+                            <td class="text-end text-warning">KSh {{ record.cogs|floatformat:2|default:"0.00" }}</td>
+                            <td class="text-end {% if record.profit > 0 %}text-success{% else %}text-danger{% endif %}">
+                                KSh {{ record.profit|floatformat:2|default:"0.00" }}
+                            </td>
+                            <td class="text-center">
+                                <a href="{% url 'company-reports-weekly-detail' record.year record.week %}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-4">
+                                <i class="fas fa-calendar-times fa-2x text-muted d-block mb-3"></i>
+                                <p class="text-muted">No weekly records</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="2" class="text-end"><strong>TOTALS</strong></td>
+                            <td class="text-end"><strong>{{ weekly_totals.sales_count }}</strong></td>
+                            <td class="text-end"><strong>KSh {{ weekly_totals.revenue|floatformat:2 }}</strong></td>
+                            <td class="text-end"><strong>KSh {{ weekly_totals.cogs|floatformat:2 }}</strong></td>
+                            <td class="text-end"><strong>KSh {{ weekly_totals.profit|floatformat:2 }}</strong></td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer">
+            <small>Showing {{ weekly_records|length }} weeks</small>
+        </div>
+    </div>
+    
+    <!-- Monthly Records -->
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-calendar-alt"></i> Monthly Records - {{ current_date|date:"Y" }}</h5>
+                <span class="badge bg-primary">{{ monthly_records|length }} months</span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="border: 2px solid #000000;">
+                <table class="table-excel table-hover mb-0" id="monthlyTable">
+                    <thead>
+                        <tr>
+                            <th class="sortable-header" data-sort="month" onclick="sortTable('monthlyTable', 'month')">
+                                Month
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="sales" onclick="sortTable('monthlyTable', 'sales')">
+                                Sales
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="revenue" onclick="sortTable('monthlyTable', 'revenue')">
+                                Revenue
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="cogs" onclick="sortTable('monthlyTable', 'cogs')">
+                                COGS
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="profit" onclick="sortTable('monthlyTable', 'profit')">
+                                Profit
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="expenses" onclick="sortTable('monthlyTable', 'expenses')">
+                                Expenses
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="balance" onclick="sortTable('monthlyTable', 'balance')">
+                                Closing Balance
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in monthly_records %}
+                        <tr {% if record.month == current_date.month %}class="table-primary"{% endif %}
+                            data-month="{{ record.month_name }}" 
+                            data-sales="{{ record.sales_count }}" 
+                            data-revenue="{{ record.revenue }}" 
+                            data-cogs="{{ record.cogs }}" 
+                            data-profit="{{ record.profit }}" 
+                            data-expenses="{{ record.expenses }}" 
+                            data-balance="{{ record.closing_balance }}">
+                            <td>{{ record.month_name }}</td>
+                            <td class="text-end">{{ record.sales_count }}</td>
+                            <td class="text-end">KSh {{ record.revenue|floatformat:2|default:"0.00" }}</td>
+                            <td class="text-end text-warning">KSh {{ record.cogs|floatformat:2|default:"0.00" }}</td>
+                            <td class="text-end {% if record.profit > 0 %}text-success{% else %}text-danger{% endif %}">
+                                KSh {{ record.profit|floatformat:2|default:"0.00" }}
+                            </td>
+                            <td class="text-end text-danger">KSh {{ record.expenses|floatformat:2|default:"0.00" }}</td>
+                            <td class="text-end fw-bold">
+                                KSh {{ record.closing_balance|floatformat:2|default:"0.00" }}
+                            </td>
+                            <td class="text-center">
+                                <a href="{% url 'company-reports-monthly-detail' current_date.year record.month %}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-4">
+                                <i class="fas fa-calendar-times fa-2x text-muted d-block mb-3"></i>
+                                <p class="text-muted">No monthly records</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td class="text-end"><strong>TOTALS</strong></td>
+                            <td class="text-end"><strong>{{ monthly_totals.sales_count }}</strong></td>
+                            <td class="text-end"><strong>KSh {{ monthly_totals.revenue|floatformat:2 }}</strong></td>
+                            <td class="text-end"><strong>KSh {{ monthly_totals.cogs|floatformat:2 }}</strong></td>
+                            <td class="text-end"><strong>KSh {{ monthly_totals.profit|floatformat:2 }}</strong></td>
+                            <td class="text-end"><strong>KSh {{ monthly_totals.expenses|floatformat:2 }}</strong></td>
+                            <td class="text-end"><strong>KSh {{ monthly_totals.closing_balance|floatformat:2 }}</strong></td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer">
+            <small>Showing all months for {{ current_date|date:"Y" }}</small>
+        </div>
+    </div>
+</div>
+
+<script>
+// Sorting state for each table
+let sortStates = {
+    dailyTable: { column: null, direction: 'asc' },
+    weeklyTable: { column: null, direction: 'asc' },
+    monthlyTable: { column: null, direction: 'asc' }
+};
+
+// Sort table function
+function sortTable(tableId, column) {
+    const table = document.getElementById(tableId);
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    // Skip if no rows or empty state row
+    if (rows.length === 0 || rows[0].cells.length === 1) return;
+    
+    // Determine sort direction
+    let direction = 'asc';
+    if (sortStates[tableId].column === column) {
+        direction = sortStates[tableId].direction === 'asc' ? 'desc' : 'asc';
+    }
+    sortStates[tableId].column = column;
+    sortStates[tableId].direction = direction;
+    
+    // Update header icons for this table only
+    table.querySelectorAll('.sortable-header').forEach(header => {
+        header.classList.remove('active', 'asc', 'desc');
+        const icon = header.querySelector('.sort-icon');
+        if (header.dataset.sort === column) {
+            header.classList.add('active', direction);
+        } else {
+            icon.textContent = '';
+        }
+    });
+    
+    // Sort rows
+    rows.sort((a, b) => {
+        let valueA, valueB;
+        
+        switch(column) {
+            case 'date':
+                valueA = new Date(a.dataset.date) || new Date(0);
+                valueB = new Date(b.dataset.date) || new Date(0);
+                break;
+            case 'day':
+                valueA = a.dataset.day || '';
+                valueB = b.dataset.day || '';
+                break;
+            case 'sales':
+                valueA = parseInt(a.dataset.sales) || 0;
+                valueB = parseInt(b.dataset.sales) || 0;
+                break;
+            case 'revenue':
+                valueA = parseFloat(a.dataset.revenue) || 0;
+                valueB = parseFloat(b.dataset.revenue) || 0;
+                break;
+            case 'cogs':
+                valueA = parseFloat(a.dataset.cogs) || 0;
+                valueB = parseFloat(b.dataset.cogs) || 0;
+                break;
+            case 'profit':
+                valueA = parseFloat(a.dataset.profit) || 0;
+                valueB = parseFloat(b.dataset.profit) || 0;
+                break;
+            case 'expenses':
+                valueA = parseFloat(a.dataset.expenses) || 0;
+                valueB = parseFloat(b.dataset.expenses) || 0;
+                break;
+            case 'balance':
+                valueA = parseFloat(a.dataset.balance) || 0;
+                valueB = parseFloat(b.dataset.balance) || 0;
+                break;
+            case 'week':
+                valueA = a.dataset.week || '';
+                valueB = b.dataset.week || '';
+                break;
+            case 'period':
+                valueA = a.dataset.period || '';
+                valueB = b.dataset.period || '';
+                break;
+            case 'month':
+                valueA = a.dataset.month || '';
+                valueB = b.dataset.month || '';
+                break;
+            default:
+                return 0;
+        }
+        
+        // Compare values
+        let comparison = 0;
+        if (typeof valueA === 'number' && typeof valueB === 'number') {
+            comparison = valueA - valueB;
+        } else if (valueA instanceof Date && valueB instanceof Date) {
+            comparison = valueA.getTime() - valueB.getTime();
+        } else {
+            comparison = String(valueA).localeCompare(String(valueB), undefined, { sensitivity: 'base' });
+        }
+        
+        return direction === 'asc' ? comparison : -comparison;
+    });
+    
+    // Re-append sorted rows
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+// Initialize sorting for all tables
+document.addEventListener('DOMContentLoaded', function() {
+    // Daily table - sort by date descending
+    const dailyTable = document.getElementById('dailyTable');
+    if (dailyTable) {
+        sortStates.dailyTable.column = 'date';
+        sortStates.dailyTable.direction = 'desc';
+        const dateHeader = dailyTable.querySelector('[data-sort="date"]');
+        if (dateHeader) {
+            dateHeader.classList.add('active', 'desc');
+            const icon = dateHeader.querySelector('.sort-icon');
+            icon.textContent = '▼';
+        }
+        sortTable('dailyTable', 'date');
+    }
+});
+</script>
+{% endblock %}

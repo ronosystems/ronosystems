@@ -1,0 +1,256 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Company - RonoSystems{% endblock %}
+{% block page_title %}Create Company{% endblock %}
+{% block page_subtitle %}Add a new company{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-body {
+        color: #000000;
+    }
+    
+    /* ============================================
+       FORM ELEMENTS
+    ============================================ */
+    .form-control, .form-select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        color: #000000;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    .form-label {
+        color: #000000;
+        font-weight: 600;
+    }
+    
+    .form-label.required:after {
+        content: " *";
+        color: #dc3545;
+        font-weight: bold;
+    }
+    
+    textarea.form-control {
+        border: 2px solid #000000;
+        border-radius: 4px;
+    }
+    
+    textarea.form-control:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(135,206,235,0.3);
+    }
+    
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .card-body {
+            padding: 15px;
+        }
+        .form-control, .form-select {
+            font-size: 13px;
+            padding: 6px 10px;
+        }
+        .form-label {
+            font-size: 13px;
+        }
+        .btn {
+            font-size: 12px;
+            padding: 6px 12px;
+        }
+        .d-flex.gap-2 {
+            flex-wrap: wrap;
+        }
+        .d-flex.gap-2 .btn {
+            flex: 1;
+            min-width: 100px;
+            text-align: center;
+        }
+        .row {
+            margin: 0 -5px;
+        }
+        .col-md-4, .col-md-6 {
+            padding: 0 5px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .card-body {
+            padding: 12px;
+        }
+        .form-control, .form-select {
+            font-size: 12px;
+            padding: 4px 8px;
+            height: 32px;
+        }
+        .form-label {
+            font-size: 12px;
+        }
+        .btn {
+            font-size: 11px;
+            padding: 4px 10px;
+        }
+        textarea.form-control {
+            font-size: 12px;
+            padding: 4px 8px;
+        }
+        .d-flex.gap-2 .btn {
+            font-size: 11px;
+            padding: 4px 8px;
+        }
+        .col-md-4, .col-md-6 {
+            padding: 0 3px;
+        }
+        .row {
+            margin: 0 -3px;
+        }
+        .mb-3 {
+            margin-bottom: 8px !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-10 mx-auto">
+        <div class="card">
+            <div class="card-body p-4">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">Company Name</label>
+                            <input type="text" class="form-control" name="name" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Business Type</label>
+                            <select class="form-select" name="business_type">
+                                <option value="">Select Business Type...</option>
+                                {% for bt in business_types %}
+                                <option value="{{ bt.id }}">{{ bt.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Registration Number</label>
+                            <input type="text" class="form-control" name="registration_number">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Plan</label>
+                            <select class="form-select" name="plan">
+                                {% for plan in plans %}
+                                <option value="{{ plan.name }}" {% if plan.name == 'free' %}selected{% endif %}>
+                                    {{ plan.display_name }} - {{ plan.currency }} {{ plan.price }}/{{ plan.billing_cycle }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="email">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Phone</label>
+                            <input type="text" class="form-control" name="phone">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Website</label>
+                            <input type="url" class="form-control" name="website" placeholder="https://example.com">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Postal Code</label>
+                            <input type="text" class="form-control" name="postal_code">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Address</label>
+                        <textarea class="form-control" name="address" rows="2"></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">City</label>
+                            <input type="text" class="form-control" name="city">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">State/Province</label>
+                            <input type="text" class="form-control" name="state">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Country</label>
+                            <input type="text" class="form-control" name="country">
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Create Company
+                        </button>
+                        <a href="/companies/" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

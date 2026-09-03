@@ -1,0 +1,526 @@
+{% extends 'base.html' %}
+
+{% block title %}RS{% endblock %}
+
+{% block page_title %}Branches{% endblock %}
+{% block page_subtitle %}Manage your branches{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE TABLE STYLING
+    ============================================ */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    
+    .table-excel thead th {
+        background-color: #87CEEB !important; /* Sky Blue */
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    /* Zebra striping for Excel look */
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table-excel tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+
+    /* Sortable headers */
+    .sortable-header {
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        padding-right: 20px !important;
+    }
+    .sortable-header:hover {
+        background-color: #7bb8d8 !important;
+    }
+    .sortable-header .sort-icon {
+        position: absolute;
+        right: 6px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 10px;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+        color: #000000;
+    }
+    .sortable-header:hover .sort-icon {
+        opacity: 1;
+    }
+    .sortable-header.active .sort-icon {
+        opacity: 1;
+    }
+    .sortable-header.asc .sort-icon::after {
+        content: '▲';
+    }
+    .sortable-header.desc .sort-icon::after {
+        content: '▼';
+    }
+
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-footer {
+        border-top: 2px solid #000000;
+        background-color: #f8f9fa;
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-primary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-primary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-danger {
+        border: 2px solid #000000;
+        color: #dc3545;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-danger:hover {
+        background-color: #dc3545;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    /* ============================================
+       BADGES
+    ============================================ */
+    .badge {
+        padding: 4px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    
+    .badge.bg-secondary {
+        background-color: #f8f9fa !important;
+        color: #000000 !important;
+    }
+    
+    .badge.bg-info {
+        background-color: #dbeafe !important;
+        color: #1e40af !important;
+    }
+    
+    .badge.bg-success {
+        background-color: #d4edda !important;
+        color: #155724 !important;
+    }
+    
+    .badge.bg-danger {
+        background-color: #f8d7da !important;
+        color: #721c24 !important;
+    }
+    
+    /* ============================================
+       SEARCH
+    ============================================ */
+    .search-box {
+        padding: 8px 14px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 14px;
+        min-width: 250px;
+        background: #ffffff;
+    }
+    
+    .search-box:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 12px;
+        }
+        .table-excel th {
+            font-size: 11px;
+        }
+        .btn-sm {
+            font-size: 10px;
+            padding: 2px 6px;
+        }
+        .badge {
+            font-size: 9px;
+            padding: 2px 6px;
+        }
+        .search-box {
+            min-width: 150px;
+            font-size: 12px;
+            padding: 6px 10px;
+        }
+        .d-flex {
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+    }
+    
+    @media (max-width: 576px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 3px 4px;
+            font-size: 10px;
+        }
+        .table-excel th {
+            font-size: 9px;
+        }
+        .badge {
+            font-size: 8px;
+            padding: 1px 4px;
+        }
+        .btn-sm {
+            font-size: 8px;
+            padding: 1px 4px;
+        }
+        .btn-sm i {
+            font-size: 10px;
+        }
+        .search-box {
+            min-width: 100%;
+            font-size: 11px;
+            padding: 5px 8px;
+        }
+        .d-flex {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .d-flex h5 {
+            text-align: center;
+        }
+        .d-flex a {
+            text-align: center;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h5>Total: {{ total_count }} branches</h5>
+            <div class="d-flex gap-2">
+                <input type="text" class="search-box" id="searchBranches" placeholder="Search branches by name, code, or location..." oninput="filterBranches()">
+                <a href="/company/branches/create/" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Add Branch
+                </a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive" style="border: 2px solid #000000;">
+                    <table class="table-excel table-hover mb-0" id="branchesTable">
+                        <thead>
+                            <tr>
+                                <th style="width:5%;" class="sortable-header" data-sort="id" onclick="sortTable('id')">
+                                    #
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:15%;" class="sortable-header" data-sort="name" onclick="sortTable('name')">
+                                    Name
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:10%;" class="sortable-header" data-sort="code" onclick="sortTable('code')">
+                                    Code
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:20%;" class="sortable-header" data-sort="location" onclick="sortTable('location')">
+                                    Location
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:12%;" class="sortable-header" data-sort="phone" onclick="sortTable('phone')">
+                                    Phone
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:13%;" class="sortable-header" data-sort="currency" onclick="sortTable('currency')">
+                                    Currency
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:10%;" class="sortable-header" data-sort="status" onclick="sortTable('status')">
+                                    Status
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:15%;" class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for branch in branches %}
+                            <tr data-branch-id="{{ branch.id }}"
+                                data-id="{{ forloop.counter }}"
+                                data-name="{{ branch.name }}"
+                                data-code="{{ branch.code }}"
+                                data-location="{% if branch.city %}{{ branch.city }}{% if branch.country %}, {% endif %}{% endif %}{{ branch.country }}"
+                                data-phone="{{ branch.phone|default:'-' }}"
+                                data-currency="{{ branch.currency }}"
+                                data-status="{% if branch.is_active %}Active{% else %}Inactive{% endif %}">
+                                <td>{{ forloop.counter }}</td>
+                                <td><strong>{{ branch.name }}</strong></td>
+                                <td><span class="badge bg-secondary">{{ branch.code }}</span></td>
+                                <td>
+                                    {{ branch.city }}{% if branch.city and branch.country %}, {% endif %}{{ branch.country }}
+                                </td>
+                                <td>{{ branch.phone|default:"-" }}</td>
+                                <td>
+                                    <span class="badge bg-info">{{ branch.currency_symbol }} ({{ branch.currency }})</span>
+                                </td>
+                                <td>
+                                    {% if branch.is_active %}
+                                    <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="/company/branches/{{ branch.id }}/edit/" class="btn btn-outline-primary">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a href="/company/branches/{{ branch.id }}/delete/" class="btn btn-outline-danger" onclick="return confirm('Are you sure you want to delete this branch?')">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" class="text-center py-4">
+                                    <i class="fas fa-store fa-3x text-muted d-block mb-3"></i>
+                                    <p class="text-muted">No branches found.</p>
+                                    <a href="/company/branches/create/" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-plus"></i> Add First Branch
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer text-muted">
+                <small>Showing {{ branches|length }} of {{ total_count }} branches</small>
+                <span class="float-end">
+                    <a href="/company/branches/" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-sync"></i> Refresh
+                    </a>
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Sorting state
+let sortState = {
+    column: null,
+    direction: 'asc'
+};
+
+// Sort table function
+function sortTable(column) {
+    const table = document.getElementById('branchesTable');
+    if (!table) return;
+    
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    // Skip if no rows or empty state
+    if (rows.length === 0 || rows[0].cells.length === 1) return;
+    
+    // Determine sort direction
+    let direction = 'asc';
+    if (sortState.column === column) {
+        direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+    }
+    sortState.column = column;
+    sortState.direction = direction;
+    
+    // Update header icons
+    table.querySelectorAll('.sortable-header').forEach(header => {
+        header.classList.remove('active', 'asc', 'desc');
+        const icon = header.querySelector('.sort-icon');
+        if (header.dataset.sort === column) {
+            header.classList.add('active', direction);
+        } else {
+            icon.textContent = '';
+        }
+    });
+    
+    // Sort rows
+    rows.sort((a, b) => {
+        let valueA, valueB;
+        
+        switch(column) {
+            case 'id':
+                valueA = parseInt(a.dataset.id) || 0;
+                valueB = parseInt(b.dataset.id) || 0;
+                break;
+            case 'name':
+                valueA = a.dataset.name || '';
+                valueB = b.dataset.name || '';
+                break;
+            case 'code':
+                valueA = a.dataset.code || '';
+                valueB = b.dataset.code || '';
+                break;
+            case 'location':
+                valueA = a.dataset.location || '';
+                valueB = b.dataset.location || '';
+                break;
+            case 'phone':
+                valueA = a.dataset.phone || '';
+                valueB = b.dataset.phone || '';
+                break;
+            case 'currency':
+                valueA = a.dataset.currency || '';
+                valueB = b.dataset.currency || '';
+                break;
+            case 'status':
+                valueA = a.dataset.status || '';
+                valueB = b.dataset.status || '';
+                break;
+            default:
+                return 0;
+        }
+        
+        // Compare values
+        let comparison = 0;
+        if (typeof valueA === 'number' && typeof valueB === 'number') {
+            comparison = valueA - valueB;
+        } else {
+            comparison = String(valueA).localeCompare(String(valueB), undefined, { sensitivity: 'base' });
+        }
+        
+        return direction === 'asc' ? comparison : -comparison;
+    });
+    
+    // Re-append sorted rows
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+// Filter branches by search
+function filterBranches() {
+    const search = document.getElementById('searchBranches').value.toLowerCase().trim();
+    const rows = document.querySelectorAll('#branchesTable tbody tr');
+    
+    // Skip if empty state row
+    if (rows.length === 0 || rows[0].cells.length === 1) return;
+    
+    rows.forEach(row => {
+        const name = row.dataset.name || '';
+        const code = row.dataset.code || '';
+        const location = row.dataset.location || '';
+        const text = row.textContent.toLowerCase();
+        
+        if (search === '') {
+            row.style.display = '';
+        } else if (name.includes(search) || 
+                   code.includes(search) || 
+                   location.includes(search) || 
+                   text.includes(search)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+// Keyboard shortcut: Escape to clear search
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const searchInput = document.getElementById('searchBranches');
+        if (searchInput) {
+            searchInput.value = '';
+            filterBranches();
+        }
+    }
+});
+
+// Initialize: sort by name ascending (default)
+document.addEventListener('DOMContentLoaded', function() {
+    const table = document.getElementById('branchesTable');
+    if (table) {
+        sortState.column = 'name';
+        sortState.direction = 'asc';
+        const nameHeader = table.querySelector('[data-sort="name"]');
+        if (nameHeader) {
+            nameHeader.classList.add('active', 'asc');
+            const icon = nameHeader.querySelector('.sort-icon');
+            icon.textContent = '▲';
+        }
+        sortTable('name');
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,492 @@
+{% extends 'base.html' %}
+
+{% block title %}Plans - RonoSystems{% endblock %}
+{% block page_title %}Subscription Plans{% endblock %}
+{% block page_subtitle %}Manage subscription plans{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       PLAN CARDS
+    ============================================ */
+    .plan-card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    .plan-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+    .plan-card.featured {
+        border-color: #87CEEB;
+        border-width: 3px;
+    }
+    .plan-card .plan-price {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #000000;
+    }
+    .plan-card .plan-price small {
+        font-size: 0.9rem;
+        color: #000000;
+        font-weight: 400;
+    }
+    .plan-card .feature-list li {
+        padding: 6px 0;
+        border-bottom: 1px solid #000000;
+        color: #000000;
+    }
+    .plan-card .feature-list li:last-child {
+        border-bottom: none;
+    }
+    .plan-card .feature-list i {
+        width: 20px;
+        margin-right: 8px;
+    }
+    .plan-card .feature-list .text-success {
+        color: #28a745 !important;
+    }
+    .plan-status-badge {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+    }
+    .plan-status-badge .badge {
+        font-size: 0.7rem;
+        padding: 4px 12px;
+        border: 1px solid #000000;
+    }
+    
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-body {
+        color: #000000;
+    }
+    
+    .card-footer {
+        border-top: 2px solid #000000;
+        background-color: #f8f9fa;
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-primary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-primary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-info {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-info:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-danger {
+        border: 2px solid #000000;
+        color: #dc3545;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-danger:hover {
+        background-color: #dc3545;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-outline-warning {
+        border: 2px solid #000000;
+        color: #856404;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-warning:hover {
+        background-color: #ffc107;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-success {
+        border: 2px solid #000000;
+        color: #155724;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-success:hover {
+        background-color: #28a745;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-sm {
+        padding: 4px 12px;
+        font-size: 12px;
+    }
+    
+    /* ============================================
+       BADGES
+    ============================================ */
+    .badge {
+        padding: 4px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    .badge.bg-warning {
+        background: #fff3cd !important;
+        color: #856404 !important;
+    }
+    .badge.bg-danger {
+        background: #f8d7da !important;
+        color: #721c24 !important;
+    }
+    .badge.bg-light {
+        background: #f8f9fa !important;
+        color: #000000 !important;
+    }
+    
+    /* ============================================
+       TEXT MUTED OVERRIDE
+    ============================================ */
+    .text-muted {
+        color: #000000 !important;
+    }
+    small.text-muted {
+        color: #000000 !important;
+    }
+    p.text-muted {
+        color: #000000 !important;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 992px) {
+        .plan-card .plan-price {
+            font-size: 2rem;
+        }
+        .col-md-3 {
+            flex: 0 0 50%;
+            max-width: 50%;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .col-md-3 {
+            flex: 0 0 100%;
+            max-width: 100%;
+        }
+        .plan-card .plan-price {
+            font-size: 1.8rem;
+        }
+        .plan-card .feature-list li {
+            font-size: 13px;
+            padding: 4px 0;
+        }
+        .btn-sm {
+            font-size: 10px;
+            padding: 3px 8px;
+        }
+        .badge {
+            font-size: 10px;
+            padding: 2px 8px;
+        }
+        .d-flex.justify-content-between {
+            flex-direction: column;
+            gap: 10px;
+            align-items: flex-start;
+        }
+        .d-flex.justify-content-between .btn {
+            width: 100%;
+            text-align: center;
+        }
+        .d-flex.gap-2 {
+            flex-wrap: wrap;
+        }
+        .d-flex.gap-2 .btn {
+            flex: 1;
+            min-width: 60px;
+            text-align: center;
+        }
+        .card-footer .d-flex.gap-2 {
+            flex-direction: column;
+        }
+        .card-footer .d-flex.gap-2 .btn {
+            width: 100%;
+        }
+        .plan-status-badge {
+            top: 10px;
+            right: 10px;
+        }
+        .plan-status-badge .badge {
+            font-size: 0.6rem;
+            padding: 2px 8px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .plan-card .plan-price {
+            font-size: 1.5rem;
+        }
+        .plan-card .plan-price small {
+            font-size: 0.75rem;
+        }
+        .plan-card .feature-list li {
+            font-size: 12px;
+            padding: 3px 0;
+        }
+        .plan-card .card-body {
+            padding: 12px;
+        }
+        .plan-card .card-footer {
+            padding: 10px 12px;
+        }
+        .btn-sm {
+            font-size: 9px;
+            padding: 2px 6px;
+        }
+        .btn-sm i {
+            font-size: 10px;
+        }
+        .badge {
+            font-size: 9px;
+            padding: 1px 6px;
+        }
+        .card-title {
+            font-size: 1.1rem;
+        }
+        .text-muted.small {
+            font-size: 0.7rem;
+        }
+        .d-flex.gap-2 .btn {
+            font-size: 9px;
+            padding: 2px 6px;
+            min-width: 40px;
+        }
+        .plan-status-badge {
+            top: 8px;
+            right: 8px;
+        }
+        .plan-status-badge .badge {
+            font-size: 0.5rem;
+            padding: 1px 6px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+            <div>
+                <p class="text-muted mb-0">
+                    <i class="fas fa-crown" style="color: #000000;"></i> Total: {{ total_count|default:plans|length }} plans
+                </p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{% url 'plans:subscription-list' %}" class="btn btn-outline-primary">
+                    <i class="fas fa-list"></i> Subscriptions
+                </a>
+                <a href="{% url 'plans:plan-create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Add Plan
+                </a>
+            </div>
+        </div>
+
+        <!-- Plans Grid -->
+        <div class="row">
+            {% for plan in plans %}
+            <div class="col-md-3 col-lg-3 mb-4">
+                <div class="card plan-card h-100 {% if plan.is_featured %}featured{% endif %} position-relative">
+                    <!-- Status Badge -->
+                    <div class="plan-status-badge">
+                        {% if plan.is_featured %}
+                        <span class="badge bg-warning text-dark">⭐ Featured</span>
+                        {% endif %}
+                        {% if not plan.is_active %}
+                        <span class="badge bg-danger">Inactive</span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Plan Body -->
+                    <div class="card-body text-center">
+                        <h4 class="card-title mt-2" style="color: #000000;">{{ plan.display_name }}</h4>
+                        <p class="text-muted small">{{ plan.get_name_display }}</p>
+                        
+                        <div class="plan-price">
+                            {{ plan.currency }} {{ plan.price|floatformat:0 }}
+                            <small>/ {{ plan.billing_cycle }}</small>
+                        </div>
+                        
+                        <p class="text-muted small mt-2">{{ plan.description|default:"No description" }}</p>
+                        
+                        <hr style="border-top: 2px solid #000000; opacity: 1;">
+                        
+                        <!-- Features List -->
+                        <ul class="list-unstyled text-start feature-list">
+                            <li>
+                                <i class="fas fa-user-check text-success"></i>
+                                {{ plan.max_employees }} Employees
+                            </li>
+                            <li>
+                                <i class="fas fa-building text-success"></i>
+                                {{ plan.max_companies }} Company
+                            </li>
+                            <li>
+                                <i class="fas fa-database text-success"></i>
+                                {{ plan.max_storage }} MB Storage
+                            </li>
+                            <li>
+                                <i class="fas fa-store text-success"></i>
+                                {{ plan.max_branches }} Branches
+                            </li>
+                            {% if plan.has_api_access %}
+                            <li>
+                                <i class="fas fa-code text-success"></i>
+                                API Access
+                            </li>
+                            {% endif %}
+                            {% if plan.has_advanced_reports %}
+                            <li>
+                                <i class="fas fa-chart-bar text-success"></i>
+                                Advanced Reports
+                            </li>
+                            {% endif %}
+                            {% if plan.has_custom_branding %}
+                            <li>
+                                <i class="fas fa-paint-brush text-success"></i>
+                                Custom Branding
+                            </li>
+                            {% endif %}
+                            {% if plan.has_priority_support %}
+                            <li>
+                                <i class="fas fa-headset text-success"></i>
+                                Priority Support
+                            </li>
+                            {% endif %}
+                            {% if plan.has_bulk_import %}
+                            <li>
+                                <i class="fas fa-file-import text-success"></i>
+                                Bulk Import
+                            </li>
+                            {% endif %}
+                            {% if plan.has_custom_domain %}
+                            <li>
+                                <i class="fas fa-globe text-success"></i>
+                                Custom Domain
+                            </li>
+                            {% endif %}
+                            {% if plan.has_mpesa_intergration %}
+                            <li>
+                                <i class="fas fa-dollar text-success"></i>
+                                Mpesa Intergration
+                            </li>
+                            {% endif %}
+                        </ul>
+                        
+                        <!-- Allowed Business Types -->
+                        {% if plan.allowed_business_types.all %}
+                        <div class="mt-2">
+                            <small class="text-muted">Allowed for:</small>
+                            {% for bt in plan.allowed_business_types.all|slice:":3" %}
+                            <span class="badge bg-light text-dark">{{ bt.name }}</span>
+                            {% endfor %}
+                            {% if plan.allowed_business_types.count > 3 %}
+                            <span class="badge bg-light text-dark">+{{ plan.allowed_business_types.count|add:"-3" }} more</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Plan Footer -->
+                    <div class="card-footer bg-white border-0" style="border-top: 2px solid #000000 !important; background: #f8f9fa !important;">
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'plans:plan-detail' plan.id %}" class="btn btn-outline-info btn-sm flex-grow-1">
+                                <i class="fas fa-eye"></i> View
+                            </a>
+                            <a href="{% url 'plans:plan-edit' plan.id %}" class="btn btn-outline-primary btn-sm flex-grow-1">
+                                <i class="fas fa-edit"></i> Edit
+                            </a>
+                            <a href="{% url 'plans:plan-delete' plan.id %}" class="btn btn-outline-danger btn-sm" 
+                               onclick="return confirm('Are you sure you want to delete {{ plan.display_name }}?')">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </div>
+                        <div class="mt-2 d-flex gap-2">
+                            <form method="post" action="{% url 'plans:plan-toggle-status' plan.id %}" style="display:inline; width:100%;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm w-100 {% if plan.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                                        onclick="return confirm('Are you sure you want to {% if plan.is_active %}deactivate{% else %}activate{% endif %} {{ plan.display_name }}?')">
+                                    <i class="fas {% if plan.is_active %}fa-pause{% else %}fa-play{% endif %}"></i>
+                                    {% if plan.is_active %}Deactivate{% else %}Activate{% endif %}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-12">
+                <div class="text-center py-5">
+                    <i class="fas fa-crown fa-4x d-block mb-3" style="color: #000000;"></i>
+                    <h4 style="color: #000000;">No Plans Found</h4>
+                    <p style="color: #000000;">Start by creating your first subscription plan.</p>
+                    <a href="{% url 'plans:plan-create' %}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Add First Plan
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

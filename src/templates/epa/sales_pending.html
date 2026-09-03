@@ -1,0 +1,587 @@
+{% extends 'base.html' %}
+
+{% block title %}Pending Sales - RonoSystems{% endblock %}
+
+{% block page_title %}Pending Sales{% endblock %}
+{% block page_subtitle %}Sales awaiting completion verification{% endblock %}
+
+{% block extra_css %}
+<style>
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    
+    .table-excel thead th {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table-excel tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+
+    .badge {
+        border: 1px solid #000000;
+        padding: 4px 10px;
+        font-weight: 600;
+    }
+    
+    .badge.bg-warning {
+        background-color: #fff3cd !important;
+        color: #856404;
+    }
+    
+    .badge.bg-success {
+        background-color: #d4edda !important;
+        color: #155724;
+    }
+    
+    .btn-complete {
+        background: #28a745;
+        color: white;
+        border: 1px solid #000000 !important;
+        padding: 4px 12px;
+        font-size: 12px;
+        border-radius: 4px;
+        transition: all 0.2s;
+    }
+    
+    .btn-complete:hover {
+        background: #218838;
+        color: white;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    
+    .btn-complete:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    
+    .btn-outline-info {
+        border: 1px solid #000000;
+        color: #000000;
+        background-color: #ffffff;
+    }
+    
+    .btn-outline-info:hover {
+        background-color: #87CEEB;
+        color: #000000;
+        border-color: #000000;
+    }
+    
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 1px solid #000000;
+        color: #000000;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .search-box {
+        padding: 8px 14px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 14px;
+        min-width: 250px;
+        background: #ffffff;
+    }
+    
+    .search-box:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-footer {
+        border-top: 2px solid #000000;
+        background-color: #f8f9fa;
+    }
+    
+    .stats-bar {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border: 2px solid #000000;
+        border-radius: 4px;
+    }
+    
+    .stats-bar .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .stats-bar .stat-item .stat-number {
+        font-size: 20px;
+        font-weight: 700;
+        color: #2d3436;
+    }
+    
+    .stats-bar .stat-item .stat-label {
+        font-size: 14px;
+        color: #6c757d;
+    }
+    
+    .stats-bar .stat-item .stat-number.pending {
+        color: #856404;
+    }
+    
+    .stats-bar .stat-item .stat-number.completed {
+        color: #155724;
+    }
+    
+    .stats-bar .stat-item .stat-number.total {
+        color: #036a77;
+    }
+    
+    .unit-identifier {
+        font-family: 'Courier New', monospace;
+        font-weight: 600;
+        font-size: 13px;
+        color: #036a77;
+    }
+    
+    .table-responsive {
+        overflow-x: auto;
+        border: 2px solid #000000;
+    }
+    
+    .sortable-header {
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        padding-right: 20px !important;
+    }
+    
+    .sortable-header:hover {
+        background-color: #7bb8d8 !important;
+    }
+    
+    .sortable-header .sort-icon {
+        position: absolute;
+        right: 6px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 10px;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+        color: #000000;
+    }
+    
+    .sortable-header:hover .sort-icon {
+        opacity: 1;
+    }
+    
+    .sortable-header.active .sort-icon {
+        opacity: 1;
+    }
+    
+    .sortable-header.asc .sort-icon::after {
+        content: '▲';
+    }
+    
+    .sortable-header.desc .sort-icon::after {
+        content: '▼';
+    }
+    
+    .action-group {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    @media (max-width: 768px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 12px;
+        }
+        .table-excel th {
+            font-size: 11px;
+        }
+        .btn-sm {
+            font-size: 10px;
+            padding: 2px 6px;
+        }
+        .badge {
+            font-size: 10px;
+            padding: 2px 6px;
+        }
+        .stats-bar {
+            flex-direction: column;
+            gap: 10px;
+        }
+        .search-box {
+            min-width: 100%;
+        }
+        .action-group {
+            flex-direction: column;
+            align-items: center;
+        }
+        .btn-complete {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        
+        <!-- Stats Bar -->
+        <div class="stats-bar">
+            <div class="stat-item">
+                <span class="stat-number total">{{ total_sales }}</span>
+                <span class="stat-label">Total Sales</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number pending">{{ total_pending }}</span>
+                <span class="stat-label">Pending</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number completed">{{ total_completed }}</span>
+                <span class="stat-label">Completed</span>
+            </div>
+        </div>
+        
+        <!-- Actions Bar -->
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+            <h5>Pending Sales</h5>
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="/epa_shop/sales/single/" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> New Sale
+                </a>
+                <a href="/epa_shop/sales/" class="btn btn-outline-info">
+                    <i class="fas fa-list"></i> All Sales
+                </a>
+                <div>
+                    <input type="text" class="search-box" id="searchSales" placeholder="Search by customer, ID, or identifier..." oninput="filterSales()">
+                </div>
+            </div>
+        </div>
+
+        <!-- Pending Sales Table -->
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-excel table-hover mb-0" id="salesTable">
+                        <thead>
+                            <tr>
+                                <th style="width:5%;" class="sortable-header" data-sort="id" onclick="sortTable('id')">
+                                    #
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:15%;" class="sortable-header" data-sort="identifier" onclick="sortTable('identifier')">
+                                    Unit Identifier
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:12%;" class="sortable-header" data-sort="customer" onclick="sortTable('customer')">
+                                    Customer Name
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:10%;" class="sortable-header" data-sort="idnumber" onclick="sortTable('idnumber')">
+                                    ID Number
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:12%;" class="sortable-header" data-sort="phone" onclick="sortTable('phone')">
+                                    Phone Number
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:10%;" class="sortable-header" data-sort="soldby" onclick="sortTable('soldby')">
+                                    User Name
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:12%;" class="sortable-header" data-sort="total" onclick="sortTable('total')">
+                                    Amount
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:12%;" class="sortable-header" data-sort="date" onclick="sortTable('date')">
+                                    Date
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:12%;" class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sale in sales %}
+                            <tr data-sale-id="{{ sale.id }}" 
+                                data-customer="{{ sale.customer_name }}" 
+                                data-identifier="{% for item in sale.items.all %}{% if item.unit %}{{ item.unit.identifier }}{% endif %}{% endfor %}"
+                                data-idnumber="{% if sale.customer %}{{ sale.customer.id_number|default:'-' }}{% else %}-{% endif %}"
+                                data-phone="{{ sale.customer_phone }}"
+                                data-soldby="{{ sale.sold_by.get_full_name|default:sale.sold_by.username|default:'N/A' }}"
+                                data-total="{{ sale.net_amount }}"
+                                data-date="{{ sale.sale_date|date:'Y-m-d H:i' }}">
+                                <td>#{{ sale.id }}</td>
+                                <td>
+                                    <span class="unit-identifier">
+                                        {% for item in sale.items.all %}
+                                            {% if item.unit %}
+                                                {{ item.unit.identifier }}
+                                            {% endif %}
+                                        {% empty %}
+                                            <span class="text-muted">-</span>
+                                        {% endfor %}
+                                    </span>
+                                </td>
+                                <td>{{ sale.customer_name }}</td>
+                                <td>
+                                    {% if sale.customer and sale.customer.id_number %}
+                                        {{ sale.customer.id_number }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>{{ sale.customer_phone|default:"-" }}</td>
+                                <td>
+                                    {% if sale.sold_by %}
+                                        {{ sale.sold_by.get_full_name|default:sale.sold_by.username }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>KSh {{ sale.net_amount|floatformat:0 }}</td>
+                                <td>{{ sale.sale_date|date:"Y-m-d H:i" }}</td>
+                                <td>
+                                    <div class="action-group">
+                                        <a href="/epa_shop/sales/{{ sale.id }}/" class="btn btn-sm btn-outline-info">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                        {% if is_authorized %}
+                                            <form method="POST" action="/epa_shop/sale/{{ sale.id }}/complete/" style="display:inline;" 
+                                                  onsubmit="return confirm('Are you sure you want to mark this sale as completed? This action will verify the sale and cannot be undone.')">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="complete">
+                                                <button type="submit" class="btn btn-complete btn-sm">
+                                                    <i class="fas fa-check-circle"></i> Complete
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="9" class="text-center py-4">
+                                    <i class="fas fa-check-circle fa-3x text-success d-block mb-3"></i>
+                                    <h5 class="text-muted">No Pending Sales</h5>
+                                    <p class="text-muted">All sales have been completed and verified.</p>
+                                    <a href="/epa_shop/sales/single/" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-plus"></i> Create New Sale
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer">
+                <small>Showing {{ sales|length }} pending sales</small>
+                <span class="float-end">
+                    <a href="/epa_shop/sales/" class="btn btn-sm btn-outline-info">
+                        <i class="fas fa-arrow-left"></i> Back to All Sales
+                    </a>
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Sorting state
+let sortState = {
+    column: null,
+    direction: 'asc'
+};
+
+// Filter sales by search
+function filterSales() {
+    const search = document.getElementById('searchSales').value.toLowerCase().trim();
+    const rows = document.querySelectorAll('#salesTable tbody tr');
+    
+    if (rows.length === 0 || rows[0].cells.length === 1) return;
+    
+    rows.forEach(row => {
+        const id = row.dataset.saleId || '';
+        const customer = row.dataset.customer || '';
+        const identifier = row.dataset.identifier || '';
+        const idnumber = row.dataset.idnumber || '';
+        const phone = row.dataset.phone || '';
+        const soldby = row.dataset.soldby || '';
+        const total = row.dataset.total || '';
+        const date = row.dataset.date || '';
+        const text = row.textContent.toLowerCase();
+        
+        if (search === '') {
+            row.style.display = '';
+        } else if (customer.includes(search) || 
+                   id.toString().includes(search) || 
+                   identifier.includes(search) || 
+                   idnumber.includes(search) || 
+                   phone.includes(search) || 
+                   soldby.includes(search) || 
+                   total.toString().includes(search) || 
+                   date.includes(search) || 
+                   text.includes(search)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+// Sort table function
+function sortTable(column) {
+    const tbody = document.querySelector('#salesTable tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    if (rows.length === 0 || rows[0].cells.length === 1) return;
+    
+    let direction = 'asc';
+    if (sortState.column === column) {
+        direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+    }
+    sortState.column = column;
+    sortState.direction = direction;
+    
+    document.querySelectorAll('.sortable-header').forEach(header => {
+        header.classList.remove('active', 'asc', 'desc');
+        const icon = header.querySelector('.sort-icon');
+        if (header.dataset.sort === column) {
+            header.classList.add('active', direction);
+        } else {
+            icon.textContent = '';
+        }
+    });
+    
+    rows.sort((a, b) => {
+        let valueA, valueB;
+        
+        switch(column) {
+            case 'id':
+                valueA = parseInt(a.dataset.saleId) || 0;
+                valueB = parseInt(b.dataset.saleId) || 0;
+                break;
+            case 'identifier':
+                valueA = a.dataset.identifier || '';
+                valueB = b.dataset.identifier || '';
+                break;
+            case 'customer':
+                valueA = a.dataset.customer || '';
+                valueB = b.dataset.customer || '';
+                break;
+            case 'idnumber':
+                valueA = a.dataset.idnumber || '';
+                valueB = b.dataset.idnumber || '';
+                break;
+            case 'phone':
+                valueA = a.dataset.phone || '';
+                valueB = b.dataset.phone || '';
+                break;
+            case 'soldby':
+                valueA = a.dataset.soldby || '';
+                valueB = b.dataset.soldby || '';
+                break;
+            case 'total':
+                valueA = parseFloat(a.dataset.total) || 0;
+                valueB = parseFloat(b.dataset.total) || 0;
+                break;
+            case 'date':
+                valueA = new Date(a.dataset.date) || new Date(0);
+                valueB = new Date(b.dataset.date) || new Date(0);
+                break;
+            default:
+                return 0;
+        }
+        
+        let comparison = 0;
+        if (typeof valueA === 'number' && typeof valueB === 'number') {
+            comparison = valueA - valueB;
+        } else if (valueA instanceof Date && valueB instanceof Date) {
+            comparison = valueA.getTime() - valueB.getTime();
+        } else {
+            comparison = String(valueA).localeCompare(String(valueB), undefined, { sensitivity: 'base' });
+        }
+        
+        return direction === 'asc' ? comparison : -comparison;
+    });
+    
+    rows.forEach(row => tbody.appendChild(row));
+    
+    rows.forEach((row, index) => {
+        row.cells[0].textContent = '#' + (index + 1);
+    });
+}
+
+// Keyboard shortcut: Escape to clear search
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const searchInput = document.getElementById('searchSales');
+        if (searchInput) {
+            searchInput.value = '';
+            filterSales();
+        }
+    }
+});
+
+// Initialize: set default sort to date descending
+document.addEventListener('DOMContentLoaded', function() {
+    sortState.column = 'date';
+    sortState.direction = 'desc';
+    const dateHeader = document.querySelector('[data-sort="date"]');
+    if (dateHeader) {
+        dateHeader.classList.add('active', 'desc');
+        const icon = dateHeader.querySelector('.sort-icon');
+        icon.textContent = '▼';
+    }
+    sortTable('date');
+});
+</script>
+{% endblock %}

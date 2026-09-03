@@ -1,0 +1,644 @@
+{% extends 'base.html' %}
+
+{% block title %}RS{% endblock %}
+
+{% block page_title %}Daily Report{% endblock %}
+{% block page_subtitle %}{{ report_date|date:"l, F d, Y" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE TABLE STYLING
+    ============================================ */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    
+    .table-excel thead th {
+        background-color: #87CEEB !important; /* Sky Blue */
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    /* Zebra striping for Excel look */
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table-excel tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+
+    /* Sortable headers */
+    .sortable-header {
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        padding-right: 20px !important;
+    }
+    .sortable-header:hover {
+        background-color: #7bb8d8 !important;
+    }
+    .sortable-header .sort-icon {
+        position: absolute;
+        right: 6px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 10px;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+        color: #000000;
+    }
+    .sortable-header:hover .sort-icon {
+        opacity: 1;
+    }
+    .sortable-header.active .sort-icon {
+        opacity: 1;
+    }
+    .sortable-header.asc .sort-icon::after {
+        content: '▲';
+    }
+    .sortable-header.desc .sort-icon::after {
+        content: '▼';
+    }
+
+    /* ============================================
+       SUMMARY CARDS
+    ============================================ */
+    .summary-card {
+        background: white;
+        border-radius: 4px;
+        padding: 25px 20px;
+        border: 2px solid #000000;
+        height: 100%;
+        text-align: center;
+        transition: all 0.3s;
+    }
+    .summary-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+    .summary-card .value {
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin: 10px 0 5px;
+        color: #000000;
+    }
+    .summary-card .label {
+        font-size: 0.85rem;
+        color: #000000;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+    .summary-card .icon {
+        font-size: 2rem;
+        opacity: 0.3;
+        color: #000000;
+    }
+    .summary-card.revenue { border-left: 6px solid #007bff; }
+    .summary-card.profit { border-left: 6px solid #28a745; }
+    .summary-card.expenses { border-left: 6px solid #dc3545; }
+    .summary-card.sales { border-left: 6px solid #6f42c1; }
+    .summary-card.cog { border-left: 6px solid #17a2b8; }
+    .summary-card.balance { 
+        border-left: 6px solid #fd7e14;
+        background: linear-gradient(135deg, #fff8f0 0%, #ffffff 100%);
+    }
+    .summary-card.balance .value { 
+        color: #fd7e14;
+        font-size: 2.5rem;
+    }
+    .summary-card.balance .icon {
+        color: #fd7e14;
+        opacity: 0.5;
+    }
+    .summary-card small {
+        color: #000000;
+    }
+    
+    /* ============================================
+       FILTER FORM
+    ============================================ */
+    .filter-form {
+        background: #f8f9fa;
+        padding: 15px 20px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        border: 2px solid #000000;
+    }
+    
+    .filter-form .form-label {
+        color: #000000;
+        font-weight: 600;
+    }
+    
+    .filter-form .form-select,
+    .filter-form .form-control {
+        border: 2px solid #000000;
+        border-radius: 4px;
+    }
+    
+    .filter-form .form-select:focus,
+    .filter-form .form-control:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    /* ============================================
+       REPORT HEADER
+    ============================================ */
+    .report-header {
+        background: linear-gradient(135deg, #87CEEB 0%, #7bb8d8 100%);
+        color: #000000;
+        border-radius: 4px;
+        border: 2px solid #000000;
+        padding: 25px 30px;
+        margin-bottom: 25px;
+    }
+    .report-header h4 {
+        margin: 0;
+        font-weight: 700;
+        color: #000000;
+    }
+    .report-header small {
+        opacity: 0.8;
+        color: #000000;
+    }
+    .report-header .badge {
+        background: #ffffff !important;
+        color: #000000 !important;
+        border: 1px solid #000000;
+        padding: 4px 12px;
+        font-weight: 600;
+    }
+    
+    /* ============================================
+       SUMMARY GRID
+    ============================================ */
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+    }
+    
+    .card-header h5 {
+        color: #000000;
+        font-weight: 600;
+    }
+    
+    .card-footer {
+        border-top: 2px solid #000000;
+        background-color: #f8f9fa;
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-secondary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-outline-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    /* ============================================
+       BADGE
+    ============================================ */
+    .badge.bg-light {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        border: 1px solid #000000;
+        padding: 4px 10px;
+        font-weight: 600;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .summary-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .summary-card .value {
+            font-size: 1.5rem;
+        }
+        .summary-card.balance .value {
+            font-size: 1.8rem;
+        }
+        .summary-card .label {
+            font-size: 0.7rem;
+        }
+        .report-header h4 {
+            font-size: 1.1rem;
+        }
+        .report-header {
+            padding: 15px;
+        }
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 12px;
+        }
+        .table-excel th {
+            font-size: 11px;
+        }
+        .btn-sm {
+            font-size: 10px;
+            padding: 2px 6px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .summary-grid {
+            grid-template-columns: 1fr;
+        }
+        .filter-form .row {
+            gap: 10px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Navigation -->
+    <div class="mb-3">
+        <a href="{% url 'company-reports-dashboard' %}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i> Back to Reports
+        </a>
+        <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-print"></i> Print
+        </button>
+    </div>
+
+    <!-- Report Header -->
+    <div class="report-header">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <h4><i class="fas fa-calendar-day"></i> Daily Report</h4>
+                <small>{{ report_date|date:"l, F d, Y" }}</small>
+            </div>
+            <div class="col-md-6 text-md-end">
+                <span class="badge">Generated: {% now "Y-m-d H:i" %}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Date Filter -->
+    <div class="filter-form">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Branch</label>
+                <select name="branch" class="form-select form-select-sm">
+                    <option value="">All Branches</option>
+                    {% for branch in branches %}
+                    <option value="{{ branch.id }}" {% if selected_branch == branch.id|stringformat:"s" %}selected{% endif %}>
+                        {{ branch.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Date</label>
+                <input type="date" name="date" class="form-control form-control-sm" value="{{ report_date|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-6">
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="fas fa-filter"></i> Apply Filter
+                </button>
+                <a href="{% url 'company-reports-daily-detail' report_date|date:'Y-m-d' %}" class="btn btn-secondary btn-sm">
+                    <i class="fas fa-sync"></i> Reset
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="summary-grid">
+
+        <!-- Total Sales -->
+        <div class="summary-card sales">
+            <div class="icon"><i class="fas fa-shopping-cart"></i></div>
+            <div class="label">Total Sales</div>
+            <div class="value">{{ combined_summary.total_sales|default:"0" }}</div>
+            <small class="text-muted">Transactions today</small>
+        </div>
+
+        <!-- Total Revenue -->
+        <div class="summary-card revenue">
+            <div class="icon"><i class="fas fa-coins"></i></div>
+            <div class="label">Total Revenue</div>
+            <div class="value">KSh {{ combined_summary.total_revenue|floatformat:2|default:"0.00" }}</div>
+            <small class="text-muted">Sales total</small>
+        </div>
+
+        <!-- Total COGS - FIXED: Changed from total_cog to total_cogs -->
+        <div class="summary-card cog">
+            <div class="icon"><i class="fas fa-sack-dollar"></i></div>
+            <div class="label">Total COGS</div>
+            <div class="value">KSh {{ combined_summary.total_cogs|floatformat:2|default:"0.00" }}</div>
+            <small class="text-muted">Cost of Goods Sold</small>
+        </div>
+
+        <!-- Gross Profit - NEW: Shows profit before expenses -->
+        <div class="summary-card profit">
+            <div class="icon"><i class="fas fa-chart-line"></i></div>
+            <div class="label">Gross Profit</div>
+            <div class="value">KSh {{ combined_summary.gross_profit|floatformat:2|default:"0.00" }}</div>
+            <small class="text-muted">Revenue - COGS</small>
+        </div>
+
+        <!-- Total Expenses -->
+        <div class="summary-card expenses">
+            <div class="icon"><i class="fas fa-receipt"></i></div>
+            <div class="label">Total Expenses</div>
+            <div class="value">KSh {{ combined_summary.total_expenses|floatformat:2|default:"0.00" }}</div>
+            <small class="text-muted">Operating costs</small>
+        </div>
+
+        <!-- Net Profit - NEW: Shows profit after expenses -->
+        <div class="summary-card balance">
+            <div class="icon"><i class="fas fa-wallet"></i></div>
+            <div class="label">Net Profit</div>
+            <div class="value">KSh {{ combined_summary.net_profit|floatformat:2|default:"0.00" }}</div>
+            <small class="text-muted">Gross Profit - Expenses</small>
+        </div>
+    </div>
+
+    <!-- Sales Table (if epa_sales exists) -->
+    {% if epa_sales %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-shopping-cart"></i> Sales Details</h5>
+                <span class="badge" style="background-color: #87CEEB; color: #000000; border: 1px solid #000000; padding: 4px 10px; font-weight: 600;">{{ epa_sales|length }} transactions</span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="border: 2px solid #000000;">
+                <table class="table-excel table-hover mb-0" id="salesTable">
+                    <thead>
+                        <tr>
+                            <th class="sortable-header" data-sort="id" onclick="sortTable('id')">
+                                Sale ID
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="sortable-header" data-sort="customer" onclick="sortTable('customer')">
+                                Customer
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="sortable-header" data-sort="items" onclick="sortTable('items')">
+                                Items
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="amount" onclick="sortTable('amount')">
+                                Amount
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="sortable-header" data-sort="payment" onclick="sortTable('payment')">
+                                Payment
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="sortable-header" data-sort="status" onclick="sortTable('status')">
+                                Status
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="sortable-header" data-sort="time" onclick="sortTable('time')">
+                                Time
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sale in epa_sales %}
+                        <tr data-id="{{ sale.id }}"
+                            data-customer="{{ sale.customer_name }}"
+                            data-items="{{ sale.item_count }}"
+                            data-amount="{{ sale.net_amount }}"
+                            data-payment="{{ sale.payment_method }}"
+                            data-status="{{ sale.payment_status }}"
+                            data-time="{{ sale.sale_date|date:'H:i' }}">
+                            <td>#{{ sale.id }}</td>
+                            <td>{{ sale.customer_name }}</td>
+                            <td>{{ sale.item_count }}</td>
+                            <td class="text-end">KSh {{ sale.net_amount|floatformat:2 }}</td>
+                            <td>{{ sale.payment_method|title }}</td>
+                            <td>
+                                <span class="badge" style="background-color: {% if sale.payment_status == 'paid' %}#d4edda{% elif sale.payment_status == 'pending' %}#fff3cd{% else %}#f8d7da{% endif %}; color: {% if sale.payment_status == 'paid' %}#155724{% elif sale.payment_status == 'pending' %}#856404{% else %}#721c24{% endif %}; border: 1px solid #000000; padding: 4px 10px; font-weight: 600;">
+                                    {{ sale.payment_status|title }}
+                                </span>
+                            </td>
+                            <td>{{ sale.sale_date|date:"H:i" }}</td>
+                            <td class="text-center">
+                                <a href="/epa_shop/sales/{{ sale.id }}/" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer">
+            <small>Showing {{ epa_sales|length }} transactions for {{ report_date|date:"F d, Y" }}</small>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- No Sales Message -->
+    {% if not epa_sales %}
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-calendar-times fa-3x text-muted d-block mb-3"></i>
+            <h5 class="mt-3">No Sales Recorded</h5>
+            <p class="text-muted">There were no sales on {{ report_date|date:"F d, Y" }}</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Sorting state
+let sortState = {
+    column: null,
+    direction: 'asc'
+};
+
+// Sort table function
+function sortTable(column) {
+    const table = document.getElementById('salesTable');
+    if (!table) return;
+    
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    // Skip if no rows
+    if (rows.length === 0) return;
+    
+    // Determine sort direction
+    let direction = 'asc';
+    if (sortState.column === column) {
+        direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+    }
+    sortState.column = column;
+    sortState.direction = direction;
+    
+    // Update header icons
+    table.querySelectorAll('.sortable-header').forEach(header => {
+        header.classList.remove('active', 'asc', 'desc');
+        const icon = header.querySelector('.sort-icon');
+        if (header.dataset.sort === column) {
+            header.classList.add('active', direction);
+        } else {
+            icon.textContent = '';
+        }
+    });
+    
+    // Sort rows
+    rows.sort((a, b) => {
+        let valueA, valueB;
+        
+        switch(column) {
+            case 'id':
+                valueA = parseInt(a.dataset.id) || 0;
+                valueB = parseInt(b.dataset.id) || 0;
+                break;
+            case 'customer':
+                valueA = a.dataset.customer || '';
+                valueB = b.dataset.customer || '';
+                break;
+            case 'items':
+                valueA = parseInt(a.dataset.items) || 0;
+                valueB = parseInt(b.dataset.items) || 0;
+                break;
+            case 'amount':
+                valueA = parseFloat(a.dataset.amount) || 0;
+                valueB = parseFloat(b.dataset.amount) || 0;
+                break;
+            case 'payment':
+                valueA = a.dataset.payment || '';
+                valueB = b.dataset.payment || '';
+                break;
+            case 'status':
+                valueA = a.dataset.status || '';
+                valueB = b.dataset.status || '';
+                break;
+            case 'time':
+                valueA = a.dataset.time || '00:00';
+                valueB = b.dataset.time || '00:00';
+                break;
+            default:
+                return 0;
+        }
+        
+        // Compare values
+        let comparison = 0;
+        if (typeof valueA === 'number' && typeof valueB === 'number') {
+            comparison = valueA - valueB;
+        } else {
+            comparison = String(valueA).localeCompare(String(valueB), undefined, { sensitivity: 'base' });
+        }
+        
+        return direction === 'asc' ? comparison : -comparison;
+    });
+    
+    // Re-append sorted rows
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+// Initialize: sort by time ascending (earliest first)
+document.addEventListener('DOMContentLoaded', function() {
+    const table = document.getElementById('salesTable');
+    if (table) {
+        sortState.column = 'time';
+        sortState.direction = 'asc';
+        const timeHeader = table.querySelector('[data-sort="time"]');
+        if (timeHeader) {
+            timeHeader.classList.add('active', 'asc');
+            const icon = timeHeader.querySelector('.sort-icon');
+            icon.textContent = '▲';
+        }
+        sortTable('time');
+    }
+});
+</script>
+{% endblock %}

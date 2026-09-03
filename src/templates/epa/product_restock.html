@@ -1,0 +1,427 @@
+{% extends 'base.html' %}
+
+{% block title %}Restock - {{ product.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-section {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        border: 1px solid #e9ecef;
+    }
+    .form-section-title {
+        font-weight: 600;
+        margin-bottom: 15px;
+        color: #2d3436;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .form-section-title i {
+        margin-right: 8px;
+        color: #667eea;
+    }
+    .required:after {
+        content: " *";
+        color: #ff4757;
+        font-weight: bold;
+    }
+    
+    .add-unit-form {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+    }
+    .add-unit-form input {
+        flex: 1;
+        min-width: 150px;
+    }
+    .add-unit-form select {
+        width: 130px;
+        flex-shrink: 0;
+    }
+    .add-unit-form .btn {
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    
+    .bulk-add-section {
+        background: #fff;
+        padding: 15px;
+        border-radius: 8px;
+        border: 2px dashed #667eea;
+        margin-bottom: 15px;
+        display: none;
+    }
+    .bulk-add-section.visible {
+        display: block;
+    }
+    .bulk-add-section textarea {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+        resize: vertical;
+    }
+    
+    .unit-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 14px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        margin-bottom: 6px;
+        border: 1px solid #e9ecef;
+    }
+    .unit-item:hover {
+        border-color: #667eea;
+        background: #f0f3ff;
+    }
+    .unit-identifier {
+        font-weight: 500;
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+        color: #2d3436;
+    }
+    .unit-status-badge {
+        padding: 2px 12px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: capitalize;
+    }
+    .unit-status-badge.available { background: #d4edda; color: #155724; }
+    .unit-status-badge.reserved { background: #fff3cd; color: #856404; }
+    .unit-status-badge.repair { background: #f8d7da; color: #721c24; }
+    .unit-status-badge.sold { background: #cce5ff; color: #004085; }
+    
+    .unit-actions button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 4px;
+        transition: all 0.3s;
+        color: #dc3545;
+        font-size: 14px;
+    }
+    .unit-actions button:hover { 
+        background: #f1f2f6;
+        color: #c82333;
+    }
+    
+    .form-actions {
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 2px solid #e9ecef;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    
+    .no-units {
+        text-align: center;
+        padding: 20px;
+        color: #6c757d;
+    }
+    .no-units i { 
+        font-size: 2rem; 
+        display: block; 
+        margin-bottom: 10px;
+        opacity: 0.4;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            <i class="fas fa-boxes text-success"></i> Restock - {{ product.name }}
+        </h1>
+        <a href="/epa_shop/products/{{ product.product_code }}/" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Product
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-info-circle"></i> Product Information</h6>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Product Info -->
+                        <div class="form-section">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p><strong>Product Code:</strong> {{ product.product_code }}</p>
+                                    <p><strong>Brand:</strong> {{ product.brand }}</p>
+                                    <p><strong>Model:</strong> 
+                                        {% if product_type == 'Phone' %}{{ product.model }}
+                                        {% elif product_type == 'Electronic' %}{{ product.model_number }}
+                                        {% else %}{{ product.model }}{% endif %}
+                                    </p>
+                                    <p><strong>Category:</strong> {{ product_type }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>Current Stock:</strong> <span class="badge bg-primary">{{ product.quantity_in_stock }}</span></p>
+                                    <p><strong>Branch:</strong> {{ product.branch.name }}</p>
+                                    <p><strong>Type:</strong> 
+                                        {% if product_type == 'Phone' %}📱 Smartphone
+                                        {% elif product_type == 'Electronic' %}💻 Electronics
+                                        {% else %}🎧 Accessory{% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ============================================
+                        PHONES & ELECTRONICS - Add Units
+                        ============================================ -->
+                        {% if product_type == 'Phone' or product_type == 'Electronic' %}
+                        <div class="form-section">
+                            <h6 class="form-section-title"><i class="fas fa-qrcode"></i> 
+                                Add {% if product_type == 'Phone' %}IMEI{% else %}Serial{% endif %} Numbers
+                            </h6>
+                            
+                            <div class="add-unit-form">
+                                <input type="text" class="form-control" id="unitInput" 
+                                    placeholder="Enter {% if product_type == 'Phone' %}IMEI{% else %}Serial{% endif %} number">
+                                <select class="form-select" id="unitStatus" style="width:130px;">
+                                    <option value="available">Available</option>
+                                    <option value="reserved">Reserved</option>
+                                    <option value="repair">Repair</option>
+                                </select>
+                                <button type="button" class="btn btn-primary" onclick="addUnit()">
+                                    <i class="fas fa-plus"></i> Add
+                                </button>
+                                <button type="button" class="btn btn-secondary" onclick="toggleBulk()">
+                                    <i class="fas fa-list"></i> Bulk
+                                </button>
+                            </div>
+
+                            <!-- Bulk Add -->
+                            <div class="bulk-add-section" id="bulkAdd">
+                                <textarea id="bulkInput" rows="3" placeholder="Enter one {% if product_type == 'Phone' %}IMEI{% else %}Serial{% endif %} per line..."></textarea>
+                                <div class="mt-2">
+                                    <button type="button" class="btn btn-success btn-sm" onclick="bulkAdd()">
+                                        <i class="fas fa-check"></i> Add All
+                                    </button>
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleBulk()">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <input type="hidden" name="units" id="unitsData" value="[]">
+                        </div>
+
+                        <!-- Current Units List -->
+                        <div class="form-section">
+                            <h6 class="form-section-title"><i class="fas fa-list-ul"></i> 
+                                Current {% if product_type == 'Phone' %}IMEI{% else %}Serial{% endif %} Numbers
+                                <span class="badge bg-primary ms-2">{{ existing_units|length }}</span>
+                            </h6>
+                            <div id="unitsList">
+                                {% if existing_units %}
+                                    {% for unit in existing_units %}
+                                    <div class="unit-item">
+                                        <span class="unit-identifier">{{ unit.identifier }}</span>
+                                        <span class="unit-status-badge {{ unit.status }}">{{ unit.status }}</span>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="no-units">
+                                        <i class="fas fa-qrcode"></i>
+                                        <p>No {% if product_type == 'Phone' %}IMEI{% else %}Serial{% endif %} numbers added yet.</p>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- ============================================
+                        ACCESSORIES - Add Quantity
+                        ============================================ -->
+                        {% if product_type == 'Accessory' %}
+                        <div class="form-section">
+                            <h6 class="form-section-title"><i class="fas fa-box"></i> Add Stock Quantity</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label class="form-label required">Quantity to Add</label>
+                                    <input type="number" class="form-control" name="quantity" required min="1" placeholder="Enter quantity" value="1">
+                                    <small class="text-muted">Current stock: {{ product.quantity_in_stock }} units</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Form Actions -->
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-save"></i> 
+                                {% if product_type == 'Accessory' %}Add Stock{% else %}Add Units{% endif %}
+                            </button>
+                            <a href="/epa_shop/products/{{ product.product_code }}/" class="btn btn-secondary btn-lg">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================
+JAVASCRIPT
+============================================ -->
+<script>
+let units = [];
+
+// ============================================
+// UNIT MANAGEMENT
+// ============================================
+function addUnit() {
+    const input = document.getElementById('unitInput');
+    const status = document.getElementById('unitStatus');
+    const identifier = input.value.trim();
+    
+    if (!identifier) {
+        alert('Please enter an identifier');
+        return;
+    }
+    
+    if (units.some(u => u.identifier === identifier)) {
+        alert('Identifier already exists in the list!');
+        return;
+    }
+    
+    units.push({ identifier: identifier, status: status.value });
+    input.value = '';
+    input.focus();
+    renderUnits();
+}
+
+function bulkAdd() {
+    const textarea = document.getElementById('bulkInput');
+    const lines = textarea.value.split('\n').map(s => s.trim()).filter(s => s);
+    
+    if (lines.length === 0) {
+        alert('Please enter at least one identifier');
+        return;
+    }
+    
+    const existing = units.map(u => u.identifier);
+    const newUnits = lines.filter(id => existing.indexOf(id) === -1);
+    
+    if (newUnits.length === 0) {
+        alert('All identifiers already exist in the list!');
+        return;
+    }
+    
+    if (newUnits.length !== lines.length) {
+        if (!confirm(`${lines.length - newUnits.length} identifier(s) already exist. Add ${newUnits.length} new ones?`)) {
+            return;
+        }
+    }
+    
+    newUnits.forEach(id => {
+        units.push({ identifier: id, status: 'available' });
+    });
+    
+    textarea.value = '';
+    toggleBulk();
+    renderUnits();
+    alert(`✅ ${newUnits.length} units added successfully!`);
+}
+
+function removeUnit(index) {
+    if (!confirm('Remove this unit?')) return;
+    units.splice(index, 1);
+    renderUnits();
+}
+
+function toggleBulk() {
+    const bulk = document.getElementById('bulkAdd');
+    bulk.classList.toggle('visible');
+}
+
+function renderUnits() {
+    const list = document.getElementById('unitsList');
+    const hidden = document.getElementById('unitsData');
+    
+    if (hidden) hidden.value = JSON.stringify(units);
+    
+    // Check if there are existing units from the server
+    const hasExistingUnits = list.querySelectorAll('.unit-item:not(.new-unit)').length > 0;
+    
+    // Clear only the new units section
+    const newUnitsContainer = document.getElementById('newUnitsList');
+    if (!newUnitsContainer) {
+        // Create a container for new units if it doesn't exist
+        const container = document.createElement('div');
+        container.id = 'newUnitsList';
+        container.innerHTML = '<h6 class="mt-3">New Units to Add:</h6>';
+        list.appendChild(container);
+    }
+    
+    const container = document.getElementById('newUnitsList');
+    
+    if (units.length === 0) {
+        container.innerHTML = '<h6 class="mt-3">New Units to Add:</h6><p class="text-muted">No new units added yet.</p>';
+        return;
+    }
+    
+    let html = '<h6 class="mt-3">New Units to Add:</h6>';
+    units.forEach((unit, index) => {
+        html += `<div class="unit-item new-unit">
+            <span class="unit-identifier">${unit.identifier}</span>
+            <span class="unit-status-badge ${unit.status}">${unit.status}</span>
+            <div class="unit-actions">
+                <button onclick="removeUnit(${index})" title="Remove">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            </div>
+        </div>`;
+    });
+    container.innerHTML = html;
+}
+
+// Enter key support
+document.addEventListener('DOMContentLoaded', function() {
+    const input = document.getElementById('unitInput');
+    if (input) {
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addUnit();
+            }
+        });
+    }
+});
+
+// Load existing units if editing
+document.addEventListener('DOMContentLoaded', function() {
+    const unitsData = document.getElementById('unitsData');
+    if (unitsData && unitsData.value && unitsData.value !== '[]') {
+        try {
+            units = JSON.parse(unitsData.value);
+            renderUnits();
+        } catch(e) {
+            units = [];
+        }
+    }
+});
+</script>
+{% endblock %}

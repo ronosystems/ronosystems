@@ -1,0 +1,404 @@
+{% extends 'base.html' %}
+
+{% block title %}Purchase Detail{% endblock %}
+
+{% block page_title %}Purchase Detail{% endblock %}
+{% block page_subtitle %}View purchase receipt{% endblock %}
+
+{% block extra_css %}
+<style>
+    .receipt-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: white;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 30px;
+    }
+    
+    .receipt-header {
+        border-bottom: 3px solid #000000;
+        padding-bottom: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .receipt-header .purchase-number {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #000000;
+    }
+    
+    .receipt-header .purchase-date {
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+    
+    /* Two Column Layout */
+    .receipt-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+        margin-top: 20px;
+    }
+    
+    /* Left Side - Receipt Image */
+    .receipt-image-section {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 20px;
+        background: #f8f9fa;
+        min-height: 400px;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .receipt-image-section .section-title {
+        font-weight: 700;
+        font-size: 1rem;
+        color: #000000;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #000000;
+    }
+    
+    .receipt-image-section .image-container {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 350px;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    
+    .receipt-image-section .image-container img {
+        max-width: 100%;
+        max-height: 500px;
+        object-fit: contain;
+    }
+    
+    .receipt-image-section .image-container .no-receipt {
+        color: #6c757d;
+        text-align: center;
+    }
+    
+    .receipt-image-section .image-container .no-receipt i {
+        font-size: 4rem;
+        display: block;
+        margin-bottom: 10px;
+        opacity: 0.3;
+    }
+    
+    .receipt-image-section .image-actions {
+        margin-top: 15px;
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    /* Right Side - Purchase Details */
+    .purchase-details-section {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 20px;
+        background: white;
+    }
+    
+    .purchase-details-section .section-title {
+        font-weight: 700;
+        font-size: 1rem;
+        color: #000000;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #000000;
+    }
+    
+    .detail-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .detail-row:last-child {
+        border-bottom: none;
+    }
+    
+    .detail-row .label {
+        font-weight: 600;
+        color: #000000;
+    }
+    
+    .detail-row .value {
+        color: #000000;
+        text-align: right;
+    }
+    
+    /* Total Amount Box */
+    .total-amount-box {
+        background: #f8f9fa;
+        border: 2px solid #28a745;
+        border-radius: 4px;
+        padding: 15px 20px;
+        margin-top: 15px;
+        text-align: center;
+    }
+    
+    .total-amount-box .label {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #000000;
+        display: block;
+    }
+    
+    .total-amount-box .amount {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #28a745;
+    }
+    
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 0.8rem;
+        border: 1px solid #000000;
+        display: inline-block;
+    }
+    .status-completed { background: #d4edda; color: #155724; }
+    .status-pending { background: #fff3cd; color: #856404; }
+    .status-cancelled { background: #f8d7da; color: #721c24; }
+    
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-success {
+        background-color: #28a745;
+        border: 2px solid #000000;
+        color: #ffffff;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-success:hover {
+        background-color: #218838;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-outline-primary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-outline-primary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    @media (max-width: 992px) {
+        .receipt-grid {
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        
+        .receipt-image-section {
+            min-height: 300px;
+        }
+        
+        .receipt-image-section .image-container {
+            min-height: 250px;
+        }
+        
+        .receipt-image-section .image-container img {
+            max-height: 350px;
+        }
+        
+        .total-amount-box .amount {
+            font-size: 2rem;
+        }
+    }
+    
+    @media (max-width: 576px) {
+        .receipt-container {
+            padding: 15px;
+        }
+        
+        .receipt-grid {
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+        
+        .detail-row {
+            flex-direction: column;
+            padding: 8px 0;
+        }
+        
+        .detail-row .value {
+            text-align: left;
+            margin-top: 2px;
+        }
+        
+        .total-amount-box .amount {
+            font-size: 1.8rem;
+        }
+        
+        .receipt-image-section .image-container img {
+            max-height: 250px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Navigation -->
+    <div class="mb-3">
+        <a href="{% url 'finance-purchase-create' %}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i> New Purchases
+        </a>
+        <a href="{% url 'finance-dashboard' %}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-home"></i> Back to Dashboard
+        </a>
+        <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-print"></i> Print
+        </button>
+    </div>
+
+    <!-- Receipt Container -->
+    <div class="receipt-container">
+        <!-- Header -->
+        <div class="receipt-header">
+            <div class="d-flex justify-content-between align-items-center flex-wrap">
+                <div>
+                    <div class="purchase-number">Purchase #{{ purchase.purchase_number }}</div>
+                    <div class="purchase-date">{{ purchase.purchase_date|date:"l, F d, Y" }}</div>
+                </div>
+                <div>
+                    <span class="status-badge status-{{ purchase.status }}">
+                        {{ purchase.get_status_display }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Two Column Grid -->
+        <div class="receipt-grid">
+            <!-- LEFT SIDE - Receipt Image -->
+            <div class="receipt-image-section">
+                <div class="section-title">
+                    <i class="fas fa-image"></i> Receipt Image
+                </div>
+                <div class="image-container">
+                    {% if purchase.receipt_image %}
+                        <img src="{{ purchase.receipt_image.url }}" alt="Receipt for Purchase #{{ purchase.purchase_number }}">
+                    {% else %}
+                        <div class="no-receipt">
+                            <i class="fas fa-file-image"></i>
+                            <p>No receipt image uploaded</p>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="image-actions">
+                    {% if purchase.receipt_image %}
+                        <a href="{{ purchase.receipt_image.url }}" target="_blank" class="btn btn-primary btn-sm">
+                            <i class="fas fa-expand"></i> View Full Size
+                        </a>
+                        <a href="{{ purchase.receipt_image.url }}" download class="btn btn-success btn-sm">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- RIGHT SIDE - Purchase Details -->
+            <div class="purchase-details-section">
+                <div class="section-title">
+                    <i class="fas fa-info-circle"></i> Purchase Details
+                </div>
+
+                <div class="detail-row">
+                    <span class="label">Branch</span>
+                    <span class="value">{{ purchase.branch.name }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Purchase Type</span>
+                    <span class="value">{{ purchase.get_purchase_type_display }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Supplier</span>
+                    <span class="value">{{ purchase.supplier_name }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Reference</span>
+                    <span class="value">{{ purchase.payment_reference|default:"-" }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Description</span>
+                    <span class="value">{{ purchase.description|truncatechars:50 }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Created By</span>
+                    <span class="value">{{ purchase.created_by.get_full_name|default:purchase.created_by.username }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Created At</span>
+                    <span class="value">{{ purchase.created_at|date:"Y-m-d H:i" }}</span>
+                </div>
+
+                <!-- Total Amount Box -->
+                <div class="total-amount-box">
+                    <span class="label">TOTAL AMOUNT</span>
+                    <div class="amount">KSh {{ purchase.total_amount|floatformat:2 }}</div>
+                </div>
+
+                <!-- Notes -->
+                {% if purchase.notes %}
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 2px solid #000000;">
+                    <div class="detail-row">
+                        <span class="label">Notes</span>
+                        <span class="value">{{ purchase.notes }}</span>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="margin-top: 20px; text-align: center; border-top: 2px solid #000000; padding-top: 15px;">
+            <small class="text-muted">Generated: {% now "Y-m-d H:i" %}</small>
+        </div>
+    </div>
+</div>
+{% endblock %}

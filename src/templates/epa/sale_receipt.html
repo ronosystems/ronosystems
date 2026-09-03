@@ -1,0 +1,643 @@
+{% extends 'base.html' %}
+
+{% block title %}Fiscal Receipt #{{ sale.id }} - RonoSystems{% endblock %}
+
+{% block page_title %}Fiscal Receipt{% endblock %}
+{% block page_subtitle %}Receipt #{{ sale.id }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .receipt-wrapper {
+        max-width: 450px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .receipt-container {
+        background: #ffffff;
+        border: 2px solid #2d3436;
+        border-radius: 4px;
+        padding: 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    }
+    
+    /* ETR Receipt - Fiscal Style */
+    .etr-receipt {
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-header {
+        text-align: center;
+        border-bottom: 2px dashed #000000;
+        padding-bottom: 12px;
+        margin-bottom: 10px;
+    }
+    
+    .etr-receipt .etr-header .etr-company {
+        font-size: 16px;
+        font-weight: 700;
+        color: #000000;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .etr-receipt .etr-header .etr-details {
+        font-size: 11px;
+        color: #000000;
+        margin-top: 2px;
+    }
+    
+    .etr-receipt .etr-header .etr-title {
+        font-size: 14px;
+        font-weight: 700;
+        margin-top: 8px;
+        padding: 3px;
+        letter-spacing: 2px;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-header .etr-receipt-no {
+        font-size: 18px;
+        font-weight: 700;
+        color: #000000;
+        margin-top: 3px;
+    }
+    
+    .etr-receipt .etr-info {
+        display: flex;
+        justify-content: space-between;
+        padding: 2px 0;
+        font-size: 11px;
+        flex-wrap: wrap;
+        gap: 3px;
+        color: #000000;
+        border-bottom: 1px solid #000000;
+        padding-bottom: 4px;
+        margin-bottom: 4px;
+    }
+    
+    .etr-receipt .etr-info .label {
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-info .value {
+        font-weight: 600;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-customer-section {
+        border-bottom: 1px solid #000000;
+        padding: 6px 0;
+        margin-bottom: 6px;
+    }
+    
+    .etr-receipt .etr-customer-section .etr-customer-title {
+        font-weight: 700;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 3px;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-customer-section .etr-customer-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 1px 0;
+        font-size: 11px;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-customer-section .etr-customer-row .clabel {
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-customer-section .etr-customer-row .cvalue {
+        font-weight: 600;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-items {
+        border-bottom: 2px dashed #000000;
+        padding-bottom: 8px;
+        margin-bottom: 8px;
+    }
+    
+    .etr-receipt .etr-items .item-header {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr;
+        font-weight: 700;
+        border-bottom: 1px solid #000000;
+        padding-bottom: 3px;
+        margin-bottom: 3px;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-item {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr;
+        padding: 2px 0;
+        font-size: 11px;
+        border-bottom: 1px dotted #e0e0e0;
+        gap: 5px;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-item:last-child {
+        border-bottom: none;
+    }
+    
+    .etr-receipt .etr-item .item-name {
+        font-weight: 500;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-item .item-qty {
+        text-align: center;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-item .item-total {
+        text-align: right;
+        font-weight: 600;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-item .item-identifier {
+        grid-column: 1 / -1;
+        font-size: 10px;
+        color: #6c757d;
+        padding-left: 15px;
+    }
+    
+    .etr-receipt .etr-totals {
+        border-top: 2px solid #000000;
+        padding-top: 6px;
+        margin-top: 6px;
+    }
+    
+    .etr-receipt .etr-total-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 2px 0;
+        font-size: 12px;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-total-row .label {
+        color: #000000;
+        font-weight: 500;
+    }
+    
+    .etr-receipt .etr-total-row .value {
+        font-weight: 600;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-total-row.grand-total {
+        border-top: 2px solid #000000;
+        padding-top: 5px;
+        margin-top: 3px;
+        font-size: 15px;
+    }
+    
+    .etr-receipt .etr-total-row.grand-total .label {
+        font-weight: 700;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-total-row.grand-total .value {
+        font-weight: 700;
+        color: #000000;
+        font-size: 15px;
+    }
+    
+    .etr-receipt .etr-footer {
+        text-align: center;
+        border-top: 2px dashed #000000;
+        padding-top: 10px;
+        margin-top: 10px;
+        font-size: 10px;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-footer .etr-thankyou {
+        font-size: 12px;
+        font-weight: 600;
+        color: #000000;
+    }
+    
+    .etr-receipt .etr-footer .etr-stamp {
+        margin-top: 4px;
+        font-size: 9px;
+        color: #6c757d;
+        letter-spacing: 1px;
+    }
+    
+    .etr-receipt .etr-footer .etr-serial {
+        font-size: 10px;
+        color: #6c757d;
+        margin-top: 3px;
+    }
+    
+    .etr-receipt .etr-identifier-box {
+        text-align: center;
+        font-size: 11px;
+        color: #000000;
+        margin: 3px 0;
+        padding: 2px;
+        background: #f8f9fa;
+        border: 1px dashed #000000;
+    }
+    
+    /* Action Buttons - Outside Container */
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 20px;
+        justify-content: center;
+    }
+    
+    .action-buttons .btn {
+        padding: 10px 24px;
+        font-weight: 600;
+        border-radius: 4px;
+        border: 2px solid #2d3436;
+        font-size: 14px;
+        text-decoration: none;
+        display: inline-block;
+        cursor: pointer;
+    }
+    
+    .btn-print {
+        background: #036a77;
+        color: white;
+        border-color: #036a77 !important;
+    }
+    
+    .btn-print:hover {
+        background: #02515b;
+        color: white;
+    }
+    
+    .btn-back {
+        background: #6c757d;
+        color: white;
+        border-color: #6c757d !important;
+    }
+    
+    .btn-back:hover {
+        background: #5a6268;
+        color: white;
+    }
+    
+    .btn-back-dashboard {
+        background: #036a77;
+        color: white;
+        border-color: #036a77 !important;
+    }
+    
+    .btn-back-dashboard:hover {
+        background: #02515b;
+        color: white;
+    }
+    
+    .btn-success {
+        background: #28a745;
+        color: white;
+        border-color: #28a745 !important;
+    }
+    
+    .btn-success:hover {
+        background: #218838;
+        color: white;
+    }
+    
+    .btn-complete {
+        background: #28a745;
+        color: white;
+        border-color: #28a745 !important;
+    }
+    
+    .btn-complete:hover {
+        background: #218838;
+        color: white;
+    }
+    
+    /* Unauthorized Access Message */
+    .unauthorized-container {
+        max-width: 500px;
+        margin: 50px auto;
+        text-align: center;
+        padding: 40px;
+        background: #f8d7da;
+        border: 2px solid #dc3545;
+        border-radius: 4px;
+    }
+    
+    .unauthorized-container i {
+        font-size: 4rem;
+        color: #dc3545;
+        display: block;
+        margin-bottom: 20px;
+    }
+    
+    .unauthorized-container h2 {
+        color: #721c24;
+        margin-bottom: 10px;
+    }
+    
+    .unauthorized-container p {
+        color: #721c24;
+        margin-bottom: 20px;
+    }
+    
+    /* Print Styles */
+    @media print {
+        .navbar, .sidebar, .sidebar-overlay, .sidebar-footer,
+        .sidebar-toggle-btn, .top-navbar, .footer, .action-buttons,
+        .btn, .alert, .breadcrumb, .page-title small,
+        .notification-btn, .search-wrapper, .user-profile,
+        .dropdown-menu, #sidebarToggleBtn, #sidebarToggleMobile,
+        .sidebar-toggle-mobile {
+            display: none !important;
+        }
+        
+        .main-content {
+            margin-left: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+        }
+        
+        .sidebar {
+            display: none !important;
+        }
+        
+        .content-area {
+            padding: 10px !important;
+            margin: 0 !important;
+            width: 100% !important;
+        }
+        
+        .receipt-wrapper {
+            max-width: 100% !important;
+            padding: 10px !important;
+        }
+        
+        .receipt-container {
+            border: 1px solid #ddd !important;
+            padding: 15px !important;
+            box-shadow: none !important;
+        }
+        
+        .etr-receipt .etr-header {
+            border-bottom-color: #000000 !important;
+        }
+        
+        .etr-receipt .etr-items {
+            border-bottom-color: #000000 !important;
+        }
+        
+        .etr-receipt .etr-totals {
+            border-top-color: #000000 !important;
+        }
+        
+        .etr-receipt .etr-footer {
+            border-top-color: #000000 !important;
+        }
+        
+        .etr-receipt .etr-customer-section {
+            border-color: #000000 !important;
+        }
+        
+        .etr-receipt .etr-info {
+            border-color: #000000 !important;
+        }
+        
+        * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+    }
+    
+    @media (max-width: 576px) {
+        .receipt-wrapper {
+            padding: 10px;
+        }
+        
+        .receipt-container {
+            padding: 15px;
+        }
+        
+        .etr-receipt .etr-item {
+            grid-template-columns: 1fr 1fr 1fr;
+            font-size: 10px;
+        }
+        
+        .etr-receipt .etr-customer-section .etr-customer-row {
+            flex-direction: column;
+            gap: 0;
+        }
+        
+        .action-buttons .btn {
+            width: 100%;
+            text-align: center;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- ============================================ -->
+<!-- UNAUTHORIZED ACCESS CHECK -->
+<!-- ============================================ -->
+{% if not sale or sale.company != request.user.company %}
+<div class="unauthorized-container">
+    <i class="fas fa-lock"></i>
+    <h2>Unauthorized Access</h2>
+    <p>You do not have permission to view this receipt.</p>
+    <a href="/dashboard/" class="btn btn-back-dashboard">
+        <i class="fas fa-tachometer-alt"></i> Return to Dashboard
+    </a>
+</div>
+{% else %}
+
+<div class="receipt-wrapper">
+    
+    <!-- ============================================ -->
+    <!-- FISCAL RECEIPT - ETR STYLE -->
+    <!-- ============================================ -->
+    <div class="receipt-container">
+        <div class="etr-receipt">
+            
+            <!-- Header -->
+            <div class="etr-header">
+                <div class="etr-company">{{ sale.company.name }}</div>
+                <div class="etr-details">{{ sale.company.address }}</div>
+                <div class="etr-details">Tel: {{ sale.company.phone }} | Email: {{ sale.company.email }}</div>
+                <div class="etr-details">PIN: {{ sale.company.pin|default:"N/A" }} | Branch: {{ sale.branch.name|default:"N/A" }}</div>
+            </div>
+
+            <!-- Receipt Info - Row 1: User | Receipt No, Row 2: Time | Date -->
+            <div class="etr-info">
+                <span><span class="label">User:</span> {{ sale.sold_by.get_full_name|default:sale.sold_by.username|title }}</span>
+                <span><span class="label">RCPT:</span> #{{ sale.company_sale_id }}</span>
+            </div>
+            <div class="etr-info" style="border-bottom: 1px solid #000000; padding-bottom: 4px; margin-bottom: 6px;">
+                <span><span class="label">Time:</span> {{ sale.sale_date|date:"H:i" }}</span>
+                <span><span class="label">Date:</span> {{ sale.sale_date|date:"Y-m-d" }}</span>
+            </div>
+            
+            <!-- Customer Details -->
+            <div class="etr-customer-section">
+                <div class="etr-customer-title">Customer Details</div>
+                <div class="etr-customer-row">
+                    <span class="clabel">Full Name:</span>
+                    <span class="cvalue">{{ sale.customer_name }}</span>
+                </div>
+                <div class="etr-customer-row">
+                    <span class="clabel">Phone:</span>
+                    <span class="cvalue">{{ sale.customer_phone|default:"-" }}</span>
+                </div>
+                <div class="etr-customer-row">
+                    <span class="clabel">ID Number:</span>
+                    <span class="cvalue">{{ sale.customer.id_number|default:"-" }}</span>
+                </div>
+            </div>
+            
+            <!-- Next of Keen -->
+            {% if sale.customer.next_of_keen_name or sale.customer.next_of_keen_phone %}
+                <div class="etr-customer-section" style="border-top: none; padding-top: 4px; margin-top: 0;">
+                    <div class="etr-customer-title">Next of Keen</div>
+                    <div class="etr-customer-row">
+                        <span class="clabel">Full Name:</span>
+                        <span class="cvalue">{{ sale.customer.next_of_keen_name|default:"-" }}</span>
+                    </div>
+                    <div class="etr-customer-row">
+                        <span class="clabel">Phone:</span>
+                        <span class="cvalue">{{ sale.customer.next_of_keen_phone|default:"-" }}</span>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Items -->
+            <div class="etr-items">
+                <div class="item-header">
+                    <span>Description</span>
+                    <span>Qty × Price</span>
+                    <span>Total</span>
+                </div>
+                {% for item in items %}
+                <div class="etr-item">
+                    <span class="item-name">{{ forloop.counter }}. {{ item.item_name }}</span>
+                    <span class="item-qty">{{ item.quantity }} × KSh {{ item.unit_price|floatformat:0 }}</span>
+                    <span class="item-total">KSh {{ item.total_price|floatformat:0 }}</span>
+                    {% if item.unit %}
+                        <div class="item-identifier">
+                            {% if item.unit.unit_type == 'imei' %}
+                                IMEI: {{ item.unit.identifier }}
+                            {% elif item.unit.unit_type == 'serial' %}
+                                Serial: {{ item.unit.identifier }}
+                            {% else %}
+                                Identifier: {{ item.unit.identifier }}
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <div class="etr-item">
+                    <span colspan="3" style="text-align:center; padding:5px;">No items found</span>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Totals -->
+            <div class="etr-totals">
+                <div class="etr-total-row">
+                    <span class="label">Subtotal</span>
+                    <span class="value">KSh {{ sale.total_amount|floatformat:0 }}</span>
+                </div>
+                {% if sale.discount > 0 %}
+                <div class="etr-total-row" style="color:#dc3545;">
+                    <span class="label">Discount</span>
+                    <span class="value">- KSh {{ sale.discount|floatformat:0 }}</span>
+                </div>
+                {% endif %}
+                {% if sale.tax > 0 %}
+                <div class="etr-total-row">
+                    <span class="label">VAT</span>
+                    <span class="value">KSh {{ sale.tax|floatformat:0 }}</span>
+                </div>
+                {% endif %}
+                <div class="etr-total-row grand-total">
+                    <span class="label">TOTAL</span>
+                    <span class="value">KSh {{ sale.net_amount|floatformat:0 }}</span>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="etr-footer">
+                <div class="etr-thankyou">{{ sale.company.receipt_footer|default:"Thank you for your business!" }}</div>
+            </div>
+            
+        </div>
+    </div>
+    
+    <!-- ============================================ -->
+    <!-- ACTION BUTTONS -->
+    <!-- ============================================ -->
+    <div class="action-buttons">
+        <!-- New Sale Button - Only for users with AGENT access -->
+        {% if user.role == 'company_agent' %}
+       <a href="/epa_shop/sales/single/" class="btn btn-success">
+            <i class="fas fa-plus-circle"></i> New Sale
+        </a>
+        {% endif %}
+
+        <!-- New Sale Button - Only for users with CASHIER access -->
+        {% if user.role == 'company_cashier' %}
+        <a href="/epa_shop/pos/" class="btn btn-success">
+            <i class="fas fa-plus-circle"></i> New Sale
+        </a>
+        {% endif %}
+        
+        <!-- Print Button -->
+        <button class="btn btn-print" onclick="window.print()">
+            <i class="fas fa-print"></i> Print ETR
+        </button>
+    </div>
+    
+</div>
+{% endif %}
+
+<script>
+// Auto-print when page loads with print parameter
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.location.search.includes('print=1')) {
+        setTimeout(function() {
+            window.print();
+        }, 500);
+    }
+});
+
+// Prevent unauthorized access via JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if user has permission to view this page
+    // This is a client-side check, server-side is already enforced
+    const unauthorized = document.querySelector('.unauthorized-container');
+    if (unauthorized) {
+        // If unauthorized, disable print and other actions
+        document.querySelectorAll('.action-buttons .btn').forEach(function(btn) {
+            btn.style.display = 'none';
+        });
+    }
+});
+</script>
+{% endblock %}

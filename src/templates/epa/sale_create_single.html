@@ -1,0 +1,954 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Create Single Sale - RonoSystems{% endblock %}
+
+{% block page_title %}Sell Single Item{% endblock %}
+{% block page_subtitle %}Scan IMEI / Serial Number or type to search{% endblock %}
+
+{% block extra_css %}
+<style>
+    .sale-card {
+        border: 2px solid #000000;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        background: #ffffff;
+    }
+    
+    .sale-card .card-title {
+        font-weight: 600;
+        border-bottom: 2px solid #000000;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .product-details-box {
+        background: #f8f9fa;
+        border: 2px solid #000000;
+        border-radius: 8px;
+        padding: 15px;
+        min-height: 100px;
+    }
+    
+    .product-details-box .detail-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 5px 0;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .product-details-box .detail-row:last-child {
+        border-bottom: none;
+    }
+    
+    .product-details-box .label {
+        font-weight: 500;
+        color: #6c757d;
+    }
+    
+    .product-details-box .value {
+        font-weight: 600;
+    }
+    
+    .unit-status-badge {
+        padding: 4px 16px;
+        border-radius: 50px;
+        font-size: 13px;
+        font-weight: 600;
+        display: inline-block;
+        border: 1px solid #000000;
+    }
+    .unit-status-badge.available { background: #d4edda; color: #155724; }
+    .unit-status-badge.sold { background: #cce5ff; color: #004085; }
+    .unit-status-badge.reserved { background: #fff3cd; color: #856404; }
+    .unit-status-badge.repair { background: #f8d7da; color: #721c24; }
+    
+    .search-container {
+        position: relative;
+    }
+    
+    .search-input-group {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+    
+    .search-input-group input {
+        flex: 1;
+        padding: 12px 16px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 18px;
+        font-family: 'Courier New', monospace;
+        letter-spacing: 0.5px;
+    }
+    
+    .search-input-group input:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    .search-input-group input::placeholder {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 14px;
+        letter-spacing: normal;
+    }
+    
+    .search-input-group button {
+        padding: 12px 28px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: #87CEEB;
+        color: #000000;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+        font-size: 16px;
+    }
+    
+    .search-input-group button:hover {
+        background: #6bb3d4;
+        transform: translateY(-2px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    
+    .search-input-group button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+    }
+    
+    .scan-hint {
+        font-size: 12px;
+        color: #6c757d;
+        margin-top: 8px;
+        padding: 8px 12px;
+        background: #f8f9fa;
+        border: 1px dashed #000000;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .scan-hint .key {
+        background: #000000;
+        color: #ffffff;
+        padding: 2px 8px;
+        border-radius: 3px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    
+    /* Autocomplete dropdown */
+    .autocomplete-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: #ffffff;
+        border: 2px solid #000000;
+        border-top: none;
+        border-radius: 0 0 4px 4px;
+        max-height: 400px;
+        overflow-y: auto;
+        z-index: 1000;
+        display: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .autocomplete-dropdown.show {
+        display: block;
+    }
+    
+    .autocomplete-item {
+        padding: 12px 16px;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: background 0.2s;
+    }
+    
+    .autocomplete-item:hover {
+        background: #f5f5f5;
+    }
+    
+    .autocomplete-item .item-info {
+        flex: 1;
+    }
+    
+    .autocomplete-item .item-identifier {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        font-size: 15px;
+        color: #000000;
+    }
+    
+    .autocomplete-item .item-product {
+        font-size: 13px;
+        color: #495057;
+    }
+    
+    .autocomplete-item .item-details {
+        font-size: 12px;
+        color: #6c757d;
+    }
+    
+    .autocomplete-item .item-badge {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        margin-left: 8px;
+    }
+    
+    .autocomplete-item .item-badge.phone {
+        background: #cce5ff;
+        color: #004085;
+    }
+    
+    .autocomplete-item .item-badge.electronic {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .autocomplete-item .item-price {
+        font-weight: 700;
+        font-size: 14px;
+        margin-left: 10px;
+        white-space: nowrap;
+    }
+    
+    .no-results {
+        padding: 20px;
+        text-align: center;
+        color: #6c757d;
+    }
+    
+    .no-results i {
+        font-size: 24px;
+        display: block;
+        margin-bottom: 8px;
+    }
+    
+    .form-control-custom {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 8px 12px;
+        width: 100%;
+    }
+    
+    .form-control-custom:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    .form-label {
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+    
+    .required-field::after {
+        content: ' *';
+        color: #dc3545;
+        font-weight: 700;
+    }
+    
+    .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid #000000;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    .btn-primary-custom {
+        background: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        font-weight: 600;
+        padding: 12px 30px;
+        border-radius: 4px;
+        transition: all 0.2s;
+        width: 100%;
+        font-size: 16px;
+    }
+    
+    .btn-primary-custom:hover {
+        background: #6bb3d4;
+        transform: translateY(-2px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    
+    .btn-primary-custom:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+    }
+    
+    .customer-history-box {
+        background: #e8f4f8;
+        border: 2px solid #000000;
+        border-radius: 8px;
+        padding: 12px 15px;
+        margin-top: 10px;
+    }
+    
+    .customer-history-box .history-title {
+        font-weight: 600;
+        font-size: 14px;
+        margin-bottom: 5px;
+    }
+    
+    .customer-history-box .history-item {
+        font-size: 13px;
+        padding: 2px 0;
+    }
+    
+    .sale-type-select {
+        padding: 8px 12px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        width: 100%;
+    }
+    
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+    }
+    
+    .unit-found-alert {
+        background: #d4edda;
+        border: 2px solid #155724;
+        border-radius: 4px;
+        padding: 10px 15px;
+        margin-top: 10px;
+        display: none;
+    }
+    
+    .unit-found-alert.show {
+        display: block;
+    }
+    
+    .unit-found-alert .found-text {
+        font-weight: 600;
+        color: #155724;
+    }
+    
+    .product-image-thumb {
+        max-width: 80px;
+        max-height: 80px;
+        border: 1px solid #000000;
+        border-radius: 4px;
+        padding: 4px;
+        background: #ffffff;
+    }
+    
+    .pending-notice {
+        background: #fff3cd;
+        border: 2px solid #856404;
+        border-radius: 6px;
+        padding: 12px 15px;
+        color: #856404;
+        text-align: center;
+    }
+    
+    .pending-notice i {
+        font-size: 20px;
+    }
+    
+    .pending-notice strong {
+        color: #856404;
+    }
+    
+    @media (max-width: 768px) {
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+        .search-input-group {
+            flex-direction: column;
+        }
+        .search-input-group button {
+            width: 100%;
+        }
+        .search-input-group input {
+            font-size: 16px;
+        }
+        .autocomplete-item {
+            flex-wrap: wrap;
+        }
+        .autocomplete-item .item-price {
+            margin-left: 0;
+            margin-top: 5px;
+        }
+        .product-image-thumb {
+            max-width: 50px;
+            max-height: 50px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        
+        <!-- Search Section - Unit Focused -->
+        <div class="sale-card">
+            <h5 class="card-title">
+                <i class="fas fa-qrcode"></i> Step 1: Scan or Enter Unit
+            </h5>
+            
+            <div class="search-container">
+                <div class="search-input-group">
+                    <input type="text" 
+                           id="unitSearch" 
+                           placeholder="Scan IMEI, Serial Number, or Barcode..."
+                           autofocus
+                           oninput="onSearchInput()"
+                           onkeydown="handleSearchKeydown(event)">
+                    <button type="button" onclick="searchUnits()">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                </div>
+                
+                <!-- Scan Hints -->
+                <div class="scan-hint">
+                    <span><i class="fas fa-barcode"></i> Use barcode scanner or type manually</span>
+                    <span class="key">Enter</span> to search
+                    <span class="key">Esc</span> to clear
+                </div>
+                
+                <!-- Autocomplete Dropdown -->
+                <div class="autocomplete-dropdown" id="autocompleteDropdown">
+                    <div id="autocompleteResults"></div>
+                </div>
+            </div>
+            
+            <!-- Unit Found Alert -->
+            <div class="unit-found-alert" id="unitFoundAlert">
+                <span class="found-text"><i class="fas fa-check-circle"></i> Unit found!</span>
+                <span id="unitFoundInfo"></span>
+            </div>
+            
+            <div id="searchError" class="text-danger mt-2" style="display:none;"></div>
+        </div>
+        
+        <!-- Product Details -->
+        <div class="sale-card" id="productDetails" style="display:none;">
+            <h5 class="card-title">Step 2: Product Details</h5>
+            
+            <div class="product-details-box" id="productInfo">
+                <div class="detail-row">
+                    <span class="label">Unit (IMEI/Serial):</span>
+                    <span class="value" id="unitIdentifier" style="font-family: 'Courier New', monospace;"></span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Product Type:</span>
+                    <span class="value" id="productType"></span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Product Code:</span>
+                    <span class="value" id="productCode"></span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Product Name:</span>
+                    <span class="value" id="productName"></span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Brand:</span>
+                    <span class="value" id="productBrand"></span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Model:</span>
+                    <span class="value" id="productModel"></span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Specifications:</span>
+                    <span class="value" id="productSpecs"></span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Color:</span>
+                    <span class="value" id="productColor"></span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Branch:</span>
+                    <span class="value" id="productBranch"></span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Status:</span>
+                    <span class="value">
+                        <span class="unit-status-badge available" id="unitStatus">Available</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sale Form -->
+        <form id="saleForm" style="display:none;" onsubmit="processSale(event)">
+            {% csrf_token %}
+            <input type="hidden" name="unit_id" id="unitId">
+            <input type="hidden" name="branch_id" id="branchId">
+            
+            <div class="sale-card">
+                <h5 class="card-title">Step 3: Sale Information</h5>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label required-field">Sale Price (KSh)</label>
+                        <input type="number" 
+                               class="form-control-custom" 
+                               name="sale_price" 
+                               id="salePrice" 
+                               step="0.01" 
+                               min="0.01" 
+                               required>
+                        <small class="text-muted">Recommended: <span id="recommendedPrice"></span></small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label required-field">Sale Type</label>
+                        <select class="sale-type-select" name="sale_type" id="saleType" required>
+                            <option value="credit" selected>Credit</option>
+                            <option value="cash">Cash</option>
+                            <option value="m-pesa">M-Pesa</option>
+                            <option value="bank_transfer">Bank Transfer</option>
+                        </select>
+                        <small class="text-muted"><i class="fas fa-info-circle"></i> Default: Credit - Requires admin/manager approval</small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="sale-card">
+                <h5 class="card-title">Step 4: Customer Details</h5>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label required-field">Full Name</label>
+                        <input type="text" class="form-control-custom" name="customer_name" id="customerName" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label required-field">Phone Number</label>
+                        <input type="text" class="form-control-custom" name="customer_phone" id="customerPhone" required>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label required-field">ID Number</label>
+                        <input type="text" class="form-control-custom" name="customer_id_number" id="customerIdNumber" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Email (Optional)</label>
+                        <input type="email" class="form-control-custom" name="customer_email" id="customerEmail">
+                    </div>
+                </div>
+                
+                <div id="customerHistory" style="display:none;"></div>
+            </div>
+            
+            <div class="sale-card">
+                <h5 class="card-title">Step 5: Next of Keen (Optional)</h5>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" class="form-control-custom" name="next_of_keen_name" id="nextOfKeenName">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Phone Number</label>
+                        <input type="text" class="form-control-custom" name="next_of_keen_phone" id="nextOfKeenPhone">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pending Approval Notice -->
+            <div class="sale-card pending-notice">
+                <i class="fas fa-clock"></i>
+                <p class="mb-0 mt-2">
+                    This sale will be marked as <strong>PENDING</strong> 
+                    and requires admin/manager approval to complete.
+                </p>
+            </div>
+            
+            <div class="sale-card text-center">
+                <button type="submit" class="btn-primary-custom" id="submitBtn">
+                    <i class="fas fa-check-circle"></i> Complete Sale
+                </button>
+            </div>
+        </form>
+        
+    </div>
+</div>
+
+<script>
+// State
+let currentUnit = null;
+let currentProduct = null;
+let searchTimeout = null;
+let selectedIndex = -1;
+
+// Search units (autocomplete)
+function searchUnits() {
+    const query = document.getElementById('unitSearch').value.trim();
+    const errorDiv = document.getElementById('searchError');
+    
+    if (query.length < 2) {
+        return;
+    }
+    
+    fetch(`/epa_shop/sale/search-units/?q=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+            const dropdown = document.getElementById('autocompleteDropdown');
+            const resultsContainer = document.getElementById('autocompleteResults');
+            
+            if (data.results && data.results.length > 0) {
+                resultsContainer.innerHTML = data.results.map((item, index) => `
+                    <div class="autocomplete-item" data-index="${index}" onclick="selectUnit('${item.identifier}')">
+                        <div class="item-info">
+                            <div class="item-identifier">
+                                ${item.identifier}
+                                <span class="item-badge ${item.product_type.toLowerCase()}">${item.product_type}</span>
+                            </div>
+                            <div class="item-product">
+                                ${item.product.brand} ${item.product.name}
+                            </div>
+                            <div class="item-details">
+                                Code: ${item.product.product_code} | ${item.product.specs}
+                            </div>
+                        </div>
+                        <div class="item-price">KSh ${item.product.selling_price.toFixed(2)}</div>
+                    </div>
+                `).join('');
+                dropdown.classList.add('show');
+                selectedIndex = -1;
+                errorDiv.style.display = 'none';
+            } else {
+                resultsContainer.innerHTML = `
+                    <div class="no-results">
+                        <i class="fas fa-search"></i>
+                        No available units found matching "${query}"
+                        <div style="font-size:12px;margin-top:5px;">Try scanning the barcode or IMEI number</div>
+                    </div>
+                `;
+                dropdown.classList.add('show');
+            }
+        })
+        .catch(error => {
+            console.error('Search error:', error);
+        });
+}
+
+// Handle search input with debounce
+function onSearchInput() {
+    clearTimeout(searchTimeout);
+    const query = document.getElementById('unitSearch').value.trim();
+    
+    if (query.length < 2) {
+        document.getElementById('autocompleteDropdown').classList.remove('show');
+        return;
+    }
+    
+    // If query looks like a complete identifier (long), search immediately
+    if (query.length >= 8) {
+        searchTimeout = setTimeout(() => {
+            searchUnits();
+        }, 200);
+    } else {
+        searchTimeout = setTimeout(() => {
+            searchUnits();
+        }, 400);
+    }
+}
+
+// Handle keyboard navigation
+function handleSearchKeydown(event) {
+    const dropdown = document.getElementById('autocompleteDropdown');
+    const items = dropdown.querySelectorAll('.autocomplete-item');
+    
+    if (!dropdown.classList.contains('show') || items.length === 0) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            searchUnits();
+        }
+        return;
+    }
+    
+    if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+        highlightItem(items);
+    } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        selectedIndex = Math.max(selectedIndex - 1, -1);
+        highlightItem(items);
+    } else if (event.key === 'Enter') {
+        event.preventDefault();
+        if (selectedIndex >= 0 && selectedIndex < items.length) {
+            items[selectedIndex].click();
+        } else if (items.length > 0) {
+            items[0].click();
+        }
+    } else if (event.key === 'Escape') {
+        dropdown.classList.remove('show');
+        selectedIndex = -1;
+        document.getElementById('unitSearch').value = '';
+        document.getElementById('unitSearch').focus();
+    }
+}
+
+function highlightItem(items) {
+    items.forEach((item, index) => {
+        item.style.background = index === selectedIndex ? '#e8f4f8' : '';
+    });
+    if (selectedIndex >= 0 && items[selectedIndex]) {
+        items[selectedIndex].scrollIntoView({ block: 'nearest' });
+    }
+}
+
+// Select unit from autocomplete
+function selectUnit(identifier) {
+    document.getElementById('autocompleteDropdown').classList.remove('show');
+    document.getElementById('unitSearch').value = identifier;
+    getUnitDetails(identifier);
+}
+
+// Get unit details by identifier
+function getUnitDetails(identifier) {
+    const errorDiv = document.getElementById('searchError');
+    const alertDiv = document.getElementById('unitFoundAlert');
+    const alertInfo = document.getElementById('unitFoundInfo');
+    
+    fetch(`/epa_shop/sale/get-unit/?identifier=${encodeURIComponent(identifier)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                errorDiv.textContent = data.error;
+                errorDiv.style.display = 'block';
+                document.getElementById('productDetails').style.display = 'none';
+                document.getElementById('saleForm').style.display = 'none';
+                alertDiv.classList.remove('show');
+                return;
+            }
+            
+            if (data.success) {
+                displayUnitDetails(data);
+                errorDiv.style.display = 'none';
+                
+                // Show found alert
+                alertInfo.textContent = `${data.unit.identifier} - ${data.product.brand} ${data.product.name}`;
+                alertDiv.classList.add('show');
+                setTimeout(() => {
+                    alertDiv.classList.remove('show');
+                }, 3000);
+            }
+        })
+        .catch(error => {
+            errorDiv.textContent = 'Error searching for unit. Please try again.';
+            errorDiv.style.display = 'block';
+        });
+}
+
+// Display unit details
+function displayUnitDetails(data) {
+    currentUnit = data.unit;
+    currentProduct = data.product;
+    
+    // Show product details
+    document.getElementById('unitIdentifier').textContent = data.unit.identifier;
+    document.getElementById('productType').textContent = data.product_type;
+    document.getElementById('productCode').textContent = data.product.product_code;
+    document.getElementById('productName').textContent = data.product.name;
+    document.getElementById('productBrand').textContent = data.product.brand;
+    document.getElementById('productModel').textContent = data.product.model;
+    document.getElementById('productSpecs').textContent = data.product.specs || 'N/A';
+    document.getElementById('productColor').textContent = data.product.color || 'N/A';
+    document.getElementById('productBranch').textContent = data.product.branch_name || 'N/A';
+    
+    // Set hidden fields
+    document.getElementById('unitId').value = data.unit.id;
+    document.getElementById('branchId').value = data.product.branch_id;
+    
+    // Set sale price
+    document.getElementById('salePrice').value = data.product.selling_price;
+    document.getElementById('recommendedPrice').textContent = `KSh ${data.product.selling_price.toFixed(2)}`;
+    
+    // Show sections
+    document.getElementById('productDetails').style.display = 'block';
+    document.getElementById('saleForm').style.display = 'block';
+    document.getElementById('searchError').style.display = 'none';
+    document.getElementById('autocompleteDropdown').classList.remove('show');
+    
+    // Auto-fill customer if history exists
+    if (data.owner_history) {
+        const history = data.owner_history;
+        document.getElementById('customerName').value = history.name || '';
+        document.getElementById('customerPhone').value = history.phone || '';
+        document.getElementById('customerEmail').value = history.email || '';
+        
+        // Show customer history
+        const historyDiv = document.getElementById('customerHistory');
+        historyDiv.innerHTML = `
+            <div class="customer-history-box">
+                <div class="history-title">🔄 Returning Customer</div>
+                <div class="history-item">Name: ${history.name}</div>
+                <div class="history-item">Phone: ${history.phone}</div>
+                ${history.email ? `<div class="history-item">Email: ${history.email}</div>` : ''}
+                <div class="history-item">Total Purchases: KSh ${history.total_purchases.toFixed(2)}</div>
+                <div class="history-item">Purchase Count: ${history.purchase_count}</div>
+            </div>
+        `;
+        historyDiv.style.display = 'block';
+    } else {
+        document.getElementById('customerHistory').style.display = 'none';
+    }
+    
+    // Focus on sale price
+    document.getElementById('salePrice').focus();
+    document.getElementById('salePrice').select();
+}
+
+// Process sale
+function processSale(event) {
+    event.preventDefault();
+    
+    const submitBtn = document.getElementById('submitBtn');
+    const form = document.getElementById('saleForm');
+    const formData = new FormData(form);
+    
+    // Validate
+    const customerName = formData.get('customer_name').trim();
+    const customerPhone = formData.get('customer_phone').trim();
+    const customerIdNumber = formData.get('customer_id_number').trim();
+    const salePrice = parseFloat(formData.get('sale_price'));
+    const saleType = formData.get('sale_type');
+    
+    if (!customerName) {
+        alert('Please enter the customer\'s full name.');
+        return;
+    }
+    
+    if (!customerPhone) {
+        alert('Please enter the customer\'s phone number.');
+        return;
+    }
+    
+    if (!customerIdNumber) {
+        alert('Please enter the customer\'s ID number.');
+        return;
+    }
+    
+    if (!salePrice || salePrice <= 0) {
+        alert('Please enter a valid sale price.');
+        return;
+    }
+    
+    if (!saleType) {
+        alert('Please select a sale type.');
+        return;
+    }
+    
+    // Confirm sale
+    if (!confirm(`Confirm sale of ${currentProduct.name} (${currentUnit.identifier}) for KSh ${salePrice.toFixed(2)}?\n\nNote: This sale will be marked as PENDING and requires admin/manager approval.`)) {
+        return;
+    }
+    
+    // Show loading
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="loading-spinner"></span> Processing...';
+    
+    // Submit
+    fetch('/epa_shop/sale/process-single/', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error: ' + data.error);
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Complete Sale';
+            return;
+        }
+        
+        if (data.success) {
+            // Show pending approval message
+            if (data.payment_status === 'pending') {
+                alert('✅ Sale #' + data.sale_id + ' created successfully!\n\n' +
+                      '📋 This sale is PENDING APPROVAL.\n' +
+                      'An administrator or manager must verify and complete this sale.\n\n' +
+                      'You will be redirected to the receipt page.');
+            } else {
+                alert('✅ Sale #' + data.sale_id + ' completed successfully!');
+            }
+            window.location.href = data.redirect_url;
+        }
+    })
+    .catch(error => {
+        alert('An error occurred while processing the sale. Please try again.');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Complete Sale';
+    });
+}
+
+// Close autocomplete on click outside
+document.addEventListener('click', function(e) {
+    const container = document.querySelector('.search-container');
+    if (container && !container.contains(e.target)) {
+        document.getElementById('autocompleteDropdown').classList.remove('show');
+    }
+});
+
+// Keyboard shortcut: Escape to clear all
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.getElementById('unitSearch').value = '';
+        document.getElementById('autocompleteDropdown').classList.remove('show');
+        document.getElementById('productDetails').style.display = 'none';
+        document.getElementById('saleForm').style.display = 'none';
+        document.getElementById('searchError').style.display = 'none';
+        document.getElementById('unitFoundAlert').classList.remove('show');
+        document.getElementById('unitSearch').focus();
+    }
+});
+
+// Auto-search on paste (for barcode scanners)
+document.getElementById('unitSearch').addEventListener('paste', function(e) {
+    setTimeout(() => {
+        const value = this.value.trim();
+        if (value.length >= 4) {
+            // If it looks like a complete identifier, search immediately
+            getUnitDetails(value);
+        } else if (value.length >= 2) {
+            searchUnits();
+        }
+    }, 100);
+});
+
+// Focus the search input on page load
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('unitSearch').focus();
+});
+</script>
+{% endblock %}

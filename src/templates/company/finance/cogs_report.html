@@ -1,0 +1,715 @@
+{% extends 'base.html' %}
+
+{% block title %}COGS Report{% endblock %}
+
+{% block page_title %}COGS Report{% endblock %}
+{% block page_subtitle %}Cost of Goods Sold Records{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE TABLE STYLING
+    ============================================ */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    
+    .table-excel thead th {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table-excel tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+    
+    .table-excel tfoot td {
+        background-color: #e8f4f8 !important;
+        font-weight: 700 !important;
+        border-top: 3px solid #000000 !important;
+        border-bottom: 2px solid #000000 !important;
+        color: #000000 !important;
+    }
+    
+    .table-excel tfoot td:first-child {
+        background-color: #d4e8f0 !important;
+        font-weight: 700;
+        color: #000000;
+    }
+    
+    .table-excel tfoot tr:hover td {
+        background-color: #e8f4f8 !important;
+    }
+
+    /* Sortable headers */
+    .sortable-header {
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        padding-right: 20px !important;
+    }
+    .sortable-header:hover {
+        background-color: #7bb8d8 !important;
+    }
+    .sortable-header .sort-icon {
+        position: absolute;
+        right: 6px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 10px;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+        color: #000000;
+    }
+    .sortable-header:hover .sort-icon {
+        opacity: 1;
+    }
+    .sortable-header.active .sort-icon {
+        opacity: 1;
+    }
+    .sortable-header.asc .sort-icon::after {
+        content: '▲';
+    }
+    .sortable-header.desc .sort-icon::after {
+        content: '▼';
+    }
+
+    /* ============================================
+       STAT CARDS
+    ============================================ */
+    .stat-card {
+        background: white;
+        border-radius: 4px;
+        padding: 20px;
+        border: 2px solid #000000;
+        transition: all 0.3s;
+        height: 100%;
+    }
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+    .stat-card .stat-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #000000;
+    }
+    .stat-card .stat-label {
+        font-size: 0.85rem;
+        color: #000000;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+    .stat-card small {
+        color: #000000;
+    }
+    .stat-card.cogs-generated { border-left: 6px solid #007bff; }
+    .stat-card.cogs-used { border-left: 6px solid #dc3545; }
+    .stat-card.cogs-balance { border-left: 6px solid #28a745; }
+    .stat-card.cogs-net { border-left: 6px solid #fd7e14; }
+    
+    /* ============================================
+       FILTER FORM
+    ============================================ */
+    .filter-form {
+        background: #f8f9fa;
+        padding: 15px 20px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        border: 2px solid #000000;
+    }
+    
+    .filter-form .form-label {
+        color: #000000;
+        font-weight: 600;
+    }
+    
+    .filter-form .form-select,
+    .filter-form .form-control {
+        border: 2px solid #000000;
+        border-radius: 4px;
+    }
+    
+    .filter-form .form-select:focus,
+    .filter-form .form-control:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-primary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-outline-primary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+    }
+    
+    .card-header h5 {
+        color: #000000;
+        font-weight: 600;
+    }
+    
+    .card-footer {
+        border-top: 2px solid #000000;
+        background-color: #f8f9fa;
+    }
+    
+    /* ============================================
+       TABLE ROW HIGHLIGHTS
+    ============================================ */
+    .table-excel tbody tr.table-primary td {
+        background-color: #e3f2fd !important;
+    }
+    
+    .table-excel tbody tr.table-primary:hover td {
+        background-color: #d4e8f7 !important;
+    }
+    
+    .table-excel tbody tr.table-primary:nth-child(even) td {
+        background-color: #e3f2fd !important;
+    }
+    
+    /* ============================================
+       BADGES
+    ============================================ */
+    .badge.bg-primary {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        border: 1px solid #000000;
+        padding: 4px 10px;
+        font-weight: 600;
+    }
+    
+    /* ============================================
+       TEXT COLORS
+    ============================================ */
+    .text-success {
+        color: #28a745 !important;
+        font-weight: 600;
+    }
+    .text-danger {
+        color: #dc3545 !important;
+        font-weight: 600;
+    }
+    .text-warning {
+        color: #fd7e14 !important;
+        font-weight: 600;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 12px;
+        }
+        .table-excel th {
+            font-size: 11px;
+        }
+        .btn-sm {
+            font-size: 10px;
+            padding: 2px 6px;
+        }
+        .stat-card .stat-value {
+            font-size: 1.3rem;
+        }
+        .stat-card .stat-label {
+            font-size: 0.7rem;
+        }
+        .card-header h5 {
+            font-size: 0.9rem;
+        }
+    }
+    
+    @media (max-width: 576px) {
+        .stat-card {
+            padding: 12px;
+        }
+        .stat-card .stat-value {
+            font-size: 1.1rem;
+        }
+        .table-excel th,
+        .table-excel td {
+            padding: 3px 4px;
+            font-size: 10px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            <i class="fas fa-chart-bar" style="color: #000000;"></i> COGS Report
+            <small class="text-muted fs-6" style="color: #000000 !important;">Cost of Goods Sold Records</small>
+        </h1>
+        <div>
+            <a href="/epa_shop/finance/" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left"></i> Back to Finance Overview
+            </a>
+        </div>
+        <div>
+            <a href="{% url 'finance-cogs-report' %}" class="btn btn-outline-primary">
+                <i class="fas fa-sync"></i> Refresh
+            </a>
+        </div>
+    </div>
+    
+    <!-- Filter Form -->
+    <div class="filter-form">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Branch</label>
+                <select name="branch" class="form-select form-select-sm">
+                    <option value="">All Branches</option>
+                    {% for branch in branches %}
+                    <option value="{{ branch.id }}" {% if selected_branch == branch.id|stringformat:"s" %}selected{% endif %}>
+                        {{ branch.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Date From</label>
+                <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Date To</label>
+                <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary btn-sm w-100">
+                    <i class="fas fa-filter"></i> Apply Filter
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    
+    <!-- ============================================
+    DAILY COGS RECORDS TABLE
+    ============================================ -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-calendar-day"></i> Daily COGS Records</h5>
+                <span class="badge bg-primary">{{ daily_records|length }} days</span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="border: 2px solid #000000;">
+                <table class="table-excel table-hover mb-0" id="dailyTable">
+                    <thead>
+                        <tr>
+                            <th class="sortable-header" data-sort="date" onclick="sortTable('dailyTable', 'date')">
+                                Date
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="sortable-header" data-sort="day" onclick="sortTable('dailyTable', 'day')">
+                                Day
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="purchases" onclick="sortTable('dailyTable', 'purchases')">
+                                Total Purchases
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="cogs" onclick="sortTable('dailyTable', 'cogs')">
+                                Total COGS Received
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="used" onclick="sortTable('dailyTable', 'used')">
+                                Total Purchase Value
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in daily_records %}
+                        <tr class="{% if record.is_today %}table-primary{% endif %}" 
+                            data-date="{{ record.date|date:'Y-m-d' }}" 
+                            data-day="{{ record.day_name }}" 
+                            data-purchases="{{ record.purchases_count }}" 
+                            data-cogs="{{ record.cogs }}" 
+                            data-used="{{ record.purchases_value }}">
+                            <td>{{ record.date|date:"Y-m-d" }}</td>
+                            <td>{{ record.day_name }}</td>
+                            <td class="text-end">{{ record.purchases_count }}</td>
+                            <td class="text-end text-warning">KSh {{ record.cogs|floatformat:2|default:"0.00" }}</td>
+                            <td class="text-end text-danger">KSh {{ record.purchases_value|floatformat:2|default:"0.00" }}</td>
+                            <td class="text-center">
+                                <a href="{% url 'finance-cogs-daily-detail' record.date|date:'Y-m-d' %}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-4">
+                                <i class="fas fa-calendar-times fa-2x text-muted d-block mb-3"></i>
+                                <p class="text-muted">No daily COGS records found</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="2" class="text-end"><strong>TOTALS</strong></td>
+                            <td class="text-end"><strong>{{ daily_totals.purchases_count }}</strong></td>
+                            <td class="text-end"><strong>KSh {{ daily_totals.cogs|floatformat:2 }}</strong></td>
+                            <td class="text-end"><strong>KSh {{ daily_totals.purchases_value|floatformat:2 }}</strong></td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer">
+            <small>Showing {{ daily_records|length }} days with COGS records</small>
+        </div>
+    </div>
+    
+    <!-- ============================================
+    WEEKLY COGS RECORDS TABLE
+    ============================================ -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-calendar-week"></i> Weekly COGS Records</h5>
+                <span class="badge bg-primary">{{ weekly_records|length }} weeks</span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="border: 2px solid #000000;">
+                <table class="table-excel table-hover mb-0" id="weeklyTable">
+                    <thead>
+                        <tr>
+                            <th class="sortable-header" data-sort="week" onclick="sortTable('weeklyTable', 'week')">
+                                Week
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="sortable-header" data-sort="period" onclick="sortTable('weeklyTable', 'period')">
+                                Period
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="purchases" onclick="sortTable('weeklyTable', 'purchases')">
+                                Total Purchases
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="cogs" onclick="sortTable('weeklyTable', 'cogs')">
+                                Total COGS Received
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="used" onclick="sortTable('weeklyTable', 'used')">
+                                Total Purchase Value
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in weekly_records %}
+                        <tr data-week="Week {{ record.week }}, {{ record.year }}" 
+                            data-period="{{ record.week_start|date:'M d' }} - {{ record.week_end|date:'M d, Y' }}" 
+                            data-purchases="{{ record.purchases_count }}" 
+                            data-cogs="{{ record.cogs }}" 
+                            data-used="{{ record.purchases_value }}">
+                            <td>Week {{ record.week }}, {{ record.year }}</td>
+                            <td>{{ record.week_start|date:"M d" }} - {{ record.week_end|date:"M d, Y" }}</td>
+                            <td class="text-end">{{ record.purchases_count }}</td>
+                            <td class="text-end text-warning">KSh {{ record.cogs|floatformat:2|default:"0.00" }}</td>
+                            <td class="text-end text-danger">KSh {{ record.purchases_value|floatformat:2|default:"0.00" }}</td>
+                            <td class="text-center">
+                                <a href="{% url 'finance-cogs-weekly-detail' record.year record.week %}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-4">
+                                <i class="fas fa-calendar-times fa-2x text-muted d-block mb-3"></i>
+                                <p class="text-muted">No weekly COGS records found</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="2" class="text-end"><strong>TOTALS</strong></td>
+                            <td class="text-end"><strong>{{ weekly_totals.purchases_count }}</strong></td>
+                            <td class="text-end"><strong>KSh {{ weekly_totals.cogs|floatformat:2 }}</strong></td>
+                            <td class="text-end"><strong>KSh {{ weekly_totals.purchases_value|floatformat:2 }}</strong></td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer">
+            <small>Showing {{ weekly_records|length }} weeks with COGS records</small>
+        </div>
+    </div>
+    
+    <!-- ============================================
+    MONTHLY COGS RECORDS TABLE
+    ============================================ -->
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-calendar-alt"></i> Monthly COGS Records - {{ current_year }}</h5>
+                <span class="badge bg-primary">{{ monthly_records|length }} months</span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="border: 2px solid #000000;">
+                <table class="table-excel table-hover mb-0" id="monthlyTable">
+                    <thead>
+                        <tr>
+                            <th class="sortable-header" data-sort="month" onclick="sortTable('monthlyTable', 'month')">
+                                Month
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="purchases" onclick="sortTable('monthlyTable', 'purchases')">
+                                Total Purchases
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="cogs" onclick="sortTable('monthlyTable', 'cogs')">
+                                Total COGS Received
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-end sortable-header" data-sort="used" onclick="sortTable('monthlyTable', 'used')">
+                                Total Purchase Value
+                                <span class="sort-icon"></span>
+                            </th>
+                            <th class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in monthly_records %}
+                        <tr {% if record.month == current_month %}class="table-primary"{% endif %}
+                            data-month="{{ record.month_name }}" 
+                            data-purchases="{{ record.purchases_count }}" 
+                            data-cogs="{{ record.cogs }}" 
+                            data-used="{{ record.purchases_value }}">
+                            <td>{{ record.month_name }}</td>
+                            <td class="text-end">{{ record.purchases_count }}</td>
+                            <td class="text-end text-warning">KSh {{ record.cogs|floatformat:2|default:"0.00" }}</td>
+                            <td class="text-end text-danger">KSh {{ record.purchases_value|floatformat:2|default:"0.00" }}</td>
+                            <td class="text-center">
+                                <a href="{% url 'finance-cogs-monthly-detail' current_year record.month %}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4">
+                                <i class="fas fa-calendar-times fa-2x text-muted d-block mb-3"></i>
+                                <p class="text-muted">No monthly COGS records found</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td class="text-end"><strong>TOTALS</strong></td>
+                            <td class="text-end"><strong>{{ monthly_totals.purchases_count }}</strong></td>
+                            <td class="text-end"><strong>KSh {{ monthly_totals.cogs|floatformat:2 }}</strong></td>
+                            <td class="text-end"><strong>KSh {{ monthly_totals.purchases_value|floatformat:2 }}</strong></td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer">
+            <small>Showing all months for {{ current_year }}</small>
+        </div>
+    </div>
+</div>
+
+<script>
+// Sorting state for each table
+let sortStates = {
+    dailyTable: { column: null, direction: 'asc' },
+    weeklyTable: { column: null, direction: 'asc' },
+    monthlyTable: { column: null, direction: 'asc' }
+};
+
+// Sort table function
+function sortTable(tableId, column) {
+    const table = document.getElementById(tableId);
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    // Skip if no rows or empty state row
+    if (rows.length === 0 || rows[0].cells.length === 1) return;
+    
+    // Determine sort direction
+    let direction = 'asc';
+    if (sortStates[tableId].column === column) {
+        direction = sortStates[tableId].direction === 'asc' ? 'desc' : 'asc';
+    }
+    sortStates[tableId].column = column;
+    sortStates[tableId].direction = direction;
+    
+    // Update header icons for this table only
+    table.querySelectorAll('.sortable-header').forEach(header => {
+        header.classList.remove('active', 'asc', 'desc');
+        const icon = header.querySelector('.sort-icon');
+        if (header.dataset.sort === column) {
+            header.classList.add('active', direction);
+        } else {
+            icon.textContent = '';
+        }
+    });
+    
+    // Sort rows
+    rows.sort((a, b) => {
+        let valueA, valueB;
+        
+        switch(column) {
+            case 'date':
+                valueA = new Date(a.dataset.date) || new Date(0);
+                valueB = new Date(b.dataset.date) || new Date(0);
+                break;
+            case 'day':
+                valueA = a.dataset.day || '';
+                valueB = b.dataset.day || '';
+                break;
+            case 'purchases':
+                valueA = parseInt(a.dataset.purchases) || 0;
+                valueB = parseInt(b.dataset.purchases) || 0;
+                break;
+            case 'cogs':
+                valueA = parseFloat(a.dataset.cogs) || 0;
+                valueB = parseFloat(b.dataset.cogs) || 0;
+                break;
+            case 'used':
+                valueA = parseFloat(a.dataset.used) || 0;
+                valueB = parseFloat(b.dataset.used) || 0;
+                break;
+            case 'week':
+                valueA = a.dataset.week || '';
+                valueB = b.dataset.week || '';
+                break;
+            case 'period':
+                valueA = a.dataset.period || '';
+                valueB = b.dataset.period || '';
+                break;
+            case 'month':
+                valueA = a.dataset.month || '';
+                valueB = b.dataset.month || '';
+                break;
+            default:
+                return 0;
+        }
+        
+        // Compare values
+        let comparison = 0;
+        if (typeof valueA === 'number' && typeof valueB === 'number') {
+            comparison = valueA - valueB;
+        } else if (valueA instanceof Date && valueB instanceof Date) {
+            comparison = valueA.getTime() - valueB.getTime();
+        } else {
+            comparison = String(valueA).localeCompare(String(valueB), undefined, { sensitivity: 'base' });
+        }
+        
+        return direction === 'asc' ? comparison : -comparison;
+    });
+    
+    // Re-append sorted rows
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+// Initialize sorting for all tables
+document.addEventListener('DOMContentLoaded', function() {
+    // Daily table - sort by date descending
+    const dailyTable = document.getElementById('dailyTable');
+    if (dailyTable) {
+        sortStates.dailyTable.column = 'date';
+        sortStates.dailyTable.direction = 'desc';
+        const dateHeader = dailyTable.querySelector('[data-sort="date"]');
+        if (dateHeader) {
+            dateHeader.classList.add('active', 'desc');
+            const icon = dateHeader.querySelector('.sort-icon');
+            icon.textContent = '▼';
+        }
+        sortTable('dailyTable', 'date');
+    }
+});
+</script>
+{% endblock %}

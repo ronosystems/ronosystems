@@ -1,0 +1,325 @@
+{% extends 'base.html' %}
+
+{% block title %}RS{% endblock %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block page_subtitle %}{{ page_subtitle }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .info-box {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        border: 1px solid #e9ecef;
+        margin-bottom: 20px;
+    }
+    .info-box .info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #f1f2f6;
+    }
+    .info-box .info-row:last-child {
+        border-bottom: none;
+    }
+    .info-box .info-label {
+        font-size: 13px;
+        color: #6c757d;
+        font-weight: 500;
+    }
+    .info-box .info-value {
+        font-size: 14px;
+        font-weight: 600;
+        color: #2d3436;
+        font-family: monospace;
+    }
+    .info-box .info-value .product-name {
+        font-family: inherit;
+    }
+    
+    .current-owner-box {
+        background: #e7f1ff;
+        border-radius: 10px;
+        padding: 15px 20px;
+        border-left: 4px solid #667eea;
+        margin-bottom: 20px;
+    }
+    .current-owner-box .owner-label {
+        font-size: 11px;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+    .current-owner-box .owner-name {
+        font-size: 18px;
+        font-weight: 700;
+        color: #2d3436;
+        margin-top: 4px;
+    }
+    .current-owner-box .owner-phone {
+        font-size: 14px;
+        color: #6c757d;
+        margin-top: 2px;
+    }
+    .current-owner-box .no-owner {
+        font-size: 16px;
+        color: #6c757d;
+        font-style: italic;
+        margin-top: 4px;
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 4px 16px;
+        border-radius: 50px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: capitalize;
+    }
+    .status-badge.available { background: #d4edda; color: #155724; }
+    .status-badge.sold { background: #cce5ff; color: #004085; }
+    .status-badge.reserved { background: #fff3cd; color: #856404; }
+    .status-badge.repair { background: #f8d7da; color: #721c24; }
+    
+    .selected-owner-display {
+        background: #f0f3ff;
+        border-radius: 10px;
+        padding: 15px 20px;
+        border: 2px solid #667eea;
+        margin-top: 15px;
+        display: none;
+        animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .selected-owner-display .selected-label {
+        font-size: 11px;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+    .selected-owner-display .selected-name {
+        font-weight: 700;
+        color: #2d3436;
+        font-size: 18px;
+        margin-top: 4px;
+    }
+    .selected-owner-display .selected-email {
+        font-size: 13px;
+        color: #6c757d;
+        margin-top: 2px;
+    }
+    .selected-owner-display .selected-phone {
+        font-size: 13px;
+        color: #6c757d;
+        margin-top: 2px;
+    }
+    .selected-owner-display .selected-role {
+        display: inline-block;
+        font-size: 12px;
+        color: #667eea;
+        font-weight: 600;
+        background: rgba(102, 126, 234, 0.1);
+        padding: 2px 14px;
+        border-radius: 50px;
+        margin-top: 4px;
+    }
+    
+    .alert-info {
+        background: #d1ecf1;
+        border-color: #bee5eb;
+        color: #0c5460;
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    .alert-info i {
+        margin-right: 8px;
+    }
+    
+    .form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .btn-transfer {
+        background: #667eea;
+        color: white;
+        border: none;
+        padding: 10px 30px;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: all 0.3s;
+    }
+    .btn-transfer:hover {
+        background: #5a6fd6;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        color: white;
+    }
+    .btn-transfer:disabled {
+        background: #b0b8c9;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+    
+    .btn-cancel {
+        background: #f8f9fa;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+        padding: 10px 30px;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: all 0.3s;
+    }
+    .btn-cancel:hover {
+        background: #e9ecef;
+        color: #343a40;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-6 mx-auto">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                <h5 class="mb-0">
+                    <i class="fas fa-exchange-alt text-primary"></i> Transfer Unit
+                </h5>
+                <p class="text-muted small mb-0">Change ownership of this unit to another employee</p>
+            </div>
+            <div class="card-body">
+                <!-- Product & Unit Info -->
+                <div class="info-box">
+                    <div class="info-row">
+                        <span class="info-label"><i class="fas fa-box"></i> Product</span>
+                        <span class="info-value product-name">{{ product.name }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label"><i class="fas fa-barcode"></i> Product Code</span>
+                        <span class="info-value">{{ product.product_code }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label"><i class="fas fa-qrcode"></i> Unit Identifier</span>
+                        <span class="info-value">{{ unit.identifier }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label"><i class="fas fa-tag"></i> Current Status</span>
+                        <span class="info-value">
+                            <span class="status-badge {{ unit.status }}">
+                                {{ unit.status|title }}
+                            </span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Current Owner -->
+                <div class="current-owner-box">
+                    <div class="owner-label"><i class="fas fa-user"></i> Current Owner</div>
+                    {% if unit.owner_name %}
+                        <div class="owner-name">{{ unit.owner_name }}</div>
+                        <div class="owner-phone"><i class="fas fa-phone"></i> {{ unit.owner_phone|default:"No phone" }}</div>
+                    {% else %}
+                        <div class="no-owner">Not assigned to anyone</div>
+                    {% endif %}
+                </div>
+
+                <!-- Transfer Form -->
+                <form method="post" id="transferForm">
+                    {% csrf_token %}
+                    
+                    <div class="alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        Transfer ownership to another employee. The unit's status will remain <strong>"{{ unit.status|title }}"</strong>.
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Select New Owner <span class="text-danger">*</span></label>
+                        <select class="form-select" id="ownerSelect" name="owner_id" required>
+                            <option value="">-- Select an employee --</option>
+                            {% for employee in employees %}
+                            <option value="{{ employee.id }}" 
+                                    data-name="{{ employee.get_full_name|default:employee.username }}"
+                                    data-email="{{ employee.email }}"
+                                    data-phone="{{ employee.phone|default:'' }}"
+                                    data-role="{{ employee.get_role_display|default:employee.role|title }}">
+                                {{ employee.get_full_name|default:employee.username }} 
+                                ({{ employee.email }})
+                                {% if employee.phone %} - {{ employee.phone }}{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">Choose the employee who will become the new owner</small>
+                    </div>
+
+                    <!-- Selected Owner Display -->
+                    <div class="selected-owner-display" id="selectedOwnerDisplay">
+                        <div class="selected-label">New Owner</div>
+                        <div class="selected-name" id="selectedName">-</div>
+                        <div class="selected-email" id="selectedEmail">-</div>
+                        <div class="selected-phone" id="selectedPhone">-</div>
+                        <div class="selected-role" id="selectedRole">-</div>
+                    </div>
+
+                    <div class="d-flex gap-3 mt-4">
+                        <button type="submit" class="btn-transfer" id="submitBtn" disabled>
+                            <i class="fas fa-exchange-alt"></i> Transfer Ownership
+                        </button>
+                        <a href="{% url 'epa-product-detail' product.product_code %}" class="btn-cancel">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const select = document.getElementById('ownerSelect');
+    const display = document.getElementById('selectedOwnerDisplay');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    // Update display when selection changes
+    select.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        
+        if (this.value && selectedOption) {
+            const name = selectedOption.text.split(' (')[0];
+            const email = selectedOption.dataset.email || '-';
+            const phone = selectedOption.dataset.phone || '-';
+            const role = selectedOption.dataset.role || '-';
+            
+            document.getElementById('selectedName').textContent = name || '-';
+            document.getElementById('selectedEmail').textContent = email;
+            document.getElementById('selectedPhone').textContent = phone;
+            document.getElementById('selectedRole').textContent = role;
+            
+            display.style.display = 'block';
+            submitBtn.disabled = false;
+        } else {
+            display.style.display = 'none';
+            submitBtn.disabled = true;
+        }
+    });
+    
+    // Handle form submission
+    document.getElementById('transferForm').addEventListener('submit', function(e) {
+        if (!select.value) {
+            e.preventDefault();
+            alert('Please select an owner before transferring.');
+            return false;
+        }
+        return true;
+    });
+});
+</script>
+{% endblock %}

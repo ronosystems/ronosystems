@@ -1,0 +1,873 @@
+{% extends 'base.html' %}
+
+{% block title %}Stock Movements - RonoSystems{% endblock %}
+
+{% block page_title %}Stock Movements{% endblock %}
+{% block page_subtitle %}Inventory transaction history{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE TABLE STYLING
+    ============================================ */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    
+    .table-excel thead th {
+        background-color: #87CEEB !important; /* Sky Blue */
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    /* Zebra striping for Excel look */
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table-excel tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+
+    /* Sortable headers */
+    .sortable-header {
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        padding-right: 20px !important;
+    }
+    .sortable-header:hover {
+        background-color: #7bb8d8 !important;
+    }
+    .sortable-header .sort-icon {
+        position: absolute;
+        right: 6px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 10px;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+        color: #000000;
+    }
+    .sortable-header:hover .sort-icon {
+        opacity: 1;
+    }
+    .sortable-header.active .sort-icon {
+        opacity: 1;
+    }
+    .sortable-header.asc .sort-icon::after {
+        content: '▲';
+    }
+    .sortable-header.desc .sort-icon::after {
+        content: '▼';
+    }
+
+    /* ============================================
+       MOVEMENT TYPE BADGES
+    ============================================ */
+    .movement-type-badge {
+        padding: 4px 12px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        display: inline-block;
+        border: 1px solid #000000;
+    }
+    .movement-purchase { background: #d4edda; color: #155724; }
+    .movement-sale { background: #f8d7da; color: #721c24; }
+    .movement-return { background: #cce5ff; color: #004085; }
+    .movement-adjustment { background: #fff3cd; color: #856404; }
+    .movement-transfer { background: #d1ecf1; color: #0c5460; }
+    .movement-damage { background: #f5c6cb; color: #721c24; }
+    
+    .quantity-positive { color: #28a745; font-weight: 700; }
+    .quantity-negative { color: #dc3545; font-weight: 700; }
+    
+    /* ============================================
+       FILTER ROW
+    ============================================ */
+    .filter-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+        padding: 10px 15px;
+        background: #f8f9fa;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        border: 2px solid #000000;
+    }
+    .filter-row .search-input {
+        flex: 1;
+        min-width: 180px;
+        padding: 6px 12px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 13px;
+        height: 36px;
+        background: white;
+    }
+    .filter-row .search-input:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .filter-row .filter-select {
+        padding: 6px 10px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 13px;
+        background: white;
+        min-width: 120px;
+        height: 36px;
+        font-weight: 500;
+    }
+    .filter-row .filter-select:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .filter-row .btn-filter {
+        padding: 6px 16px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.3s;
+        height: 36px;
+        white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .filter-row .btn-filter.btn-primary {
+        background: #87CEEB;
+        color: #000000;
+    }
+    .filter-row .btn-filter.btn-primary:hover {
+        background: #7bb8d8;
+    }
+    .filter-row .btn-filter.btn-secondary {
+        background: #f8f9fa;
+        color: #000000;
+        border: 2px solid #000000;
+    }
+    .filter-row .btn-filter.btn-secondary:hover {
+        background: #87CEEB;
+    }
+    
+    /* ============================================
+       STATISTICS BADGES
+    ============================================ */
+    .stat-badge {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        margin-left: 4px;
+        border: 1px solid #000000;
+    }
+    .stat-badge.total { background: #e9ecef; color: #000000; }
+    .stat-badge.purchase { background: #d4edda; color: #155724; }
+    .stat-badge.sale { background: #f8d7da; color: #721c24; }
+    
+    /* ============================================
+       PAGINATION
+    ============================================ */
+    .pagination-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 12px 16px;
+        background: #f8f9fa;
+        border-top: 2px solid #000000;
+    }
+    .pagination-container .entries-info {
+        font-size: 13px;
+        color: #000000;
+    }
+    .pagination-container .entries-info strong {
+        color: #000000;
+    }
+    .pagination-container .pagination {
+        margin: 0;
+        gap: 3px;
+    }
+    .pagination-container .pagination .page-link {
+        padding: 5px 12px;
+        border-radius: 4px;
+        border: 2px solid #000000;
+        color: #000000;
+        font-size: 13px;
+        transition: all 0.3s;
+        background: white;
+        font-weight: 600;
+    }
+    .pagination-container .pagination .page-link:hover {
+        background: #87CEEB;
+        color: #000000;
+        border-color: #000000;
+    }
+    .pagination-container .pagination .page-item.active .page-link {
+        background: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    .pagination-container .pagination .page-item.disabled .page-link {
+        color: #adb5bd;
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+    .per-page-select {
+        padding: 3px 8px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 13px;
+        background: white;
+        margin-left: 6px;
+        height: 32px;
+        font-weight: 600;
+    }
+    .per-page-select:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .pagination-label {
+        font-size: 13px;
+        color: #000000;
+        margin-right: 4px;
+        font-weight: 600;
+    }
+    
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-body {
+        padding: 0;
+    }
+    
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    /* ============================================
+       PRODUCT NAME CELL
+    ============================================ */
+    .product-name-cell {
+        display: flex;
+        flex-direction: column;
+    }
+    .product-name {
+        font-weight: 600;
+        color: #000000;
+    }
+    .product-identifier {
+        font-size: 11px;
+        color: #000000;
+    }
+    
+    /* ============================================
+       EMPTY STATE
+    ============================================ */
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+    }
+    .empty-icon {
+        font-size: 48px;
+        display: block;
+        margin-bottom: 16px;
+    }
+    .empty-state h3 {
+        margin-bottom: 8px;
+        color: #000000;
+        font-weight: 700;
+    }
+    .empty-state p {
+        color: #000000;
+        margin-bottom: 20px;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 992px) {
+        .filter-row {
+            flex-wrap: wrap;
+        }
+        .filter-row .search-input {
+            min-width: 150px;
+        }
+        .table-excel {
+            font-size: 13px;
+        }
+        .table-excel th,
+        .table-excel td {
+            padding: 6px 8px;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .filter-row {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .filter-row .search-input,
+        .filter-row .filter-select,
+        .filter-row .btn-filter {
+            width: 100%;
+        }
+        .pagination-container {
+            flex-direction: column;
+            text-align: center;
+        }
+        .pagination-container .pagination {
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 11px;
+        }
+        .table-excel th {
+            font-size: 10px;
+        }
+        .movement-type-badge {
+            font-size: 9px;
+            padding: 2px 8px;
+        }
+        .stat-badge {
+            font-size: 9px;
+            padding: 1px 6px;
+        }
+        .product-identifier {
+            font-size: 9px;
+        }
+        .filter-row .search-input {
+            font-size: 12px;
+            height: 32px;
+        }
+        .filter-row .filter-select {
+            font-size: 12px;
+            height: 32px;
+        }
+        .filter-row .btn-filter {
+            font-size: 12px;
+            height: 32px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 3px 4px;
+            font-size: 9px;
+        }
+        .table-excel th {
+            font-size: 8px;
+        }
+        .movement-type-badge {
+            font-size: 7px;
+            padding: 1px 4px;
+        }
+        .quantity-positive,
+        .quantity-negative {
+            font-size: 9px;
+        }
+        .product-name {
+            font-size: 9px;
+        }
+        .product-identifier {
+            font-size: 8px;
+        }
+        .pagination-container .pagination .page-link {
+            padding: 3px 8px;
+            font-size: 10px;
+        }
+        .per-page-select {
+            font-size: 10px;
+            height: 26px;
+            padding: 2px 4px;
+        }
+        .pagination-label {
+            font-size: 10px;
+        }
+        .empty-state h3 {
+            font-size: 1rem;
+        }
+        .empty-state p {
+            font-size: 0.85rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center flex-wrap mb-3">
+            <div>
+                <h4 class="mb-0"><i class="fas fa-history" style="color: #000000;"></i> Stock Movements</h4>
+                <p class="text-muted small mb-0" style="color: #000000 !important;">Total: {{ total_count }} movements recorded</p>
+            </div>
+            <div>
+                <a href="/epa_shop/inventory/" class="btn btn-secondary btn-sm">
+                    <i class="fas fa-arrow-left"></i> Back to Inventory
+                </a>
+            </div>
+        </div>
+
+        <!-- Compact Filter Row -->
+        <div class="filter-row">
+            <input type="text" class="search-input" placeholder="Search by product..." id="searchInput" value="{{ search_query }}">
+            <select class="filter-select" id="typeFilter">
+                <option value="">All Types</option>
+                <option value="purchase" {% if movement_type == 'purchase' %}selected{% endif %}>📦 Purchase</option>
+                <option value="sale" {% if movement_type == 'sale' %}selected{% endif %}>🛒 Sale</option>
+                <option value="return" {% if movement_type == 'return' %}selected{% endif %}>↩️ Return</option>
+                <option value="adjustment" {% if movement_type == 'adjustment' %}selected{% endif %}>⚖️ Adjustment</option>
+                <option value="transfer" {% if movement_type == 'transfer' %}selected{% endif %}>🔄 Transfer</option>
+                <option value="damage" {% if movement_type == 'damage' %}selected{% endif %}>💔 Damage</option>
+            </select>
+            <button class="btn-filter btn-primary" onclick="applyFilters()">
+                <i class="fas fa-search"></i> Filter
+            </button>
+            <button class="btn-filter btn-secondary" onclick="clearFilters()">
+                <i class="fas fa-times"></i> Clear
+            </button>
+            {% if total_count > 0 %}
+            <span style="margin-left:auto; font-size:12px; color:#000000; white-space:nowrap;">
+                <span class="stat-badge total">{{ total_count }} total</span>
+                {% if purchase_count %}
+                <span class="stat-badge purchase">+{{ purchase_count }}</span>
+                {% endif %}
+                {% if sale_count %}
+                <span class="stat-badge sale">-{{ sale_count }}</span>
+                {% endif %}
+            </span>
+            {% endif %}
+        </div>
+
+        <!-- Movements Table -->
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive" style="border: 2px solid #000000;">
+                    <table class="table-excel table-hover mb-0" id="movementsTable">
+                        <thead>
+                            <tr>
+                                <th style="width:5%;" class="sortable-header" data-sort="id" onclick="sortTable('id')">
+                                    #
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:18%;" class="sortable-header" data-sort="product" onclick="sortTable('product')">
+                                    Product
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:12%;" class="sortable-header" data-sort="type" onclick="sortTable('type')">
+                                    Type
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:10%;" class="sortable-header" data-sort="qty" onclick="sortTable('qty')">
+                                    Qty
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:10%;" class="sortable-header" data-sort="prev" onclick="sortTable('prev')">
+                                    Prev
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:10%;" class="sortable-header" data-sort="new" onclick="sortTable('new')">
+                                    New
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:15%;" class="sortable-header" data-sort="date" onclick="sortTable('date')">
+                                    Date &amp; Time
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:20%;" class="sortable-header" data-sort="notes" onclick="sortTable('notes')">
+                                    Notes / Reference
+                                    <span class="sort-icon"></span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for movement in page_obj %}
+                            <tr data-id="{{ forloop.counter|add:page_obj.start_index|add:-1 }}"
+                                data-product="{{ movement.product.name|default:'-' }}"
+                                data-type="{{ movement.movement_type }}"
+                                data-qty="{{ movement.quantity }}"
+                                data-prev="{{ movement.previous_quantity }}"
+                                data-new="{{ movement.new_quantity }}"
+                                data-date="{{ movement.created_at|date:'Y-m-d H:i' }}"
+                                data-notes="{{ movement.notes|default:'-' }}">
+                                <td>{{ forloop.counter|add:page_obj.start_index|add:-1 }}</td>
+                                <td>
+                                    <div class="product-name-cell">
+                                        <span class="product-name">{{ movement.product.name|default:"-" }}</span>
+                                        <span class="product-identifier">ID: {{ movement.product.display_id|default:"-" }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="movement-type-badge movement-{{ movement.movement_type }}">
+                                        {{ movement.movement_type|title }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="{% if movement.quantity > 0 %}quantity-positive{% else %}quantity-negative{% endif %}">
+                                        {{ movement.quantity }}
+                                    </span>
+                                </td>
+                                <td>{{ movement.previous_quantity }}</td>
+                                <td>{{ movement.new_quantity }}</td>
+                                <td>{{ movement.created_at|date:"Y-m-d H:i" }}</td>
+                                <td>
+                                    <div>
+                                        {{ movement.notes|default:"-" }}
+                                        {% if movement.reference_id %}
+                                        <br>
+                                        <span class="badge" style="background: #f8f9fa; color: #000000; border: 1px solid #000000; padding: 2px 8px; font-size: 10px; font-weight: 600;">
+                                            <i class="fas fa-link"></i> Ref: {{ movement.reference_id }}
+                                            {% if movement.reference_model %}
+                                            ({{ movement.reference_model }})
+                                            {% endif %}
+                                        </span>
+                                        {% endif %}
+                                        {% if movement.performed_by %}
+                                        <br>
+                                        <small style="color: #000000;">
+                                            <i class="fas fa-user"></i> {{ movement.performed_by.get_full_name|default:movement.performed_by.username }}
+                                        </small>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" class="text-center py-4">
+                                    <div class="empty-state">
+                                        <span class="empty-icon">📭</span>
+                                        <h3>No Stock Movements Found</h3>
+                                        <p>No stock movements have been recorded yet.</p>
+                                        <a href="/epa_shop/inventory/" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-arrow-left"></i> Back to Inventory
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination-container">
+                <div class="entries-info">
+                    Showing <strong>{{ page_obj.start_index }}</strong> to <strong>{{ page_obj.end_index }}</strong> of <strong>{{ total_count }}</strong> movements
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="d-flex align-items-center">
+                        <span class="pagination-label">Per page:</span>
+                        <select class="per-page-select" id="perPageSelect" onchange="changePerPage(this.value)">
+                            <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+                            <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                            <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                        </select>
+                    </div>
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination">
+                            {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if movement_type %}&type={{ movement_type }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}" aria-label="First">
+                                    <i class="fas fa-angle-double-left"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if movement_type %}&type={{ movement_type }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}" aria-label="Previous">
+                                    <i class="fas fa-angle-left"></i>
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link"><i class="fas fa-angle-double-left"></i></span>
+                            </li>
+                            <li class="page-item disabled">
+                                <span class="page-link"><i class="fas fa-angle-left"></i></span>
+                            </li>
+                            {% endif %}
+                            
+                            {% for num in page_obj.paginator.page_range %}
+                                {% if num == page_obj.number %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                                {% elif num > page_obj.number|add:-3 and num < page_obj.number|add:3 %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if movement_type %}&type={{ movement_type }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}">{{ num }}</a>
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if movement_type %}&type={{ movement_type }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}" aria-label="Next">
+                                    <i class="fas fa-angle-right"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if movement_type %}&type={{ movement_type }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}" aria-label="Last">
+                                    <i class="fas fa-angle-double-right"></i>
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link"><i class="fas fa-angle-right"></i></span>
+                            </li>
+                            <li class="page-item disabled">
+                                <span class="page-link"><i class="fas fa-angle-double-right"></i></span>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Sorting state
+let sortState = {
+    column: null,
+    direction: 'asc'
+};
+
+// Sort table function
+function sortTable(column) {
+    const table = document.getElementById('movementsTable');
+    if (!table) return;
+    
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    // Skip if no rows or empty state
+    if (rows.length === 0 || rows[0].cells.length === 1) return;
+    
+    // Determine sort direction
+    let direction = 'asc';
+    if (sortState.column === column) {
+        direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+    }
+    sortState.column = column;
+    sortState.direction = direction;
+    
+    // Update header icons
+    table.querySelectorAll('.sortable-header').forEach(header => {
+        header.classList.remove('active', 'asc', 'desc');
+        const icon = header.querySelector('.sort-icon');
+        if (header.dataset.sort === column) {
+            header.classList.add('active', direction);
+        } else {
+            icon.textContent = '';
+        }
+    });
+    
+    // Sort rows
+    rows.sort((a, b) => {
+        let valueA, valueB;
+        
+        switch(column) {
+            case 'id':
+                valueA = parseInt(a.dataset.id) || 0;
+                valueB = parseInt(b.dataset.id) || 0;
+                break;
+            case 'product':
+                valueA = a.dataset.product || '';
+                valueB = b.dataset.product || '';
+                break;
+            case 'type':
+                valueA = a.dataset.type || '';
+                valueB = b.dataset.type || '';
+                break;
+            case 'qty':
+                valueA = parseInt(a.dataset.qty) || 0;
+                valueB = parseInt(b.dataset.qty) || 0;
+                break;
+            case 'prev':
+                valueA = parseInt(a.dataset.prev) || 0;
+                valueB = parseInt(b.dataset.prev) || 0;
+                break;
+            case 'new':
+                valueA = parseInt(a.dataset.new) || 0;
+                valueB = parseInt(b.dataset.new) || 0;
+                break;
+            case 'date':
+                valueA = a.dataset.date || '';
+                valueB = b.dataset.date || '';
+                break;
+            case 'notes':
+                valueA = a.dataset.notes || '';
+                valueB = b.dataset.notes || '';
+                break;
+            default:
+                return 0;
+        }
+        
+        // Compare values
+        let comparison = 0;
+        if (typeof valueA === 'number' && typeof valueB === 'number') {
+            comparison = valueA - valueB;
+        } else {
+            comparison = String(valueA).localeCompare(String(valueB), undefined, { sensitivity: 'base' });
+        }
+        
+        return direction === 'asc' ? comparison : -comparison;
+    });
+    
+    // Re-append sorted rows
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+// Apply filters
+function applyFilters() {
+    const search = document.getElementById('searchInput').value;
+    const type = document.getElementById('typeFilter').value;
+    const currentUrl = new URL(window.location.href);
+    
+    if (search) {
+        currentUrl.searchParams.set('search', search);
+    } else {
+        currentUrl.searchParams.delete('search');
+    }
+    
+    if (type) {
+        currentUrl.searchParams.set('type', type);
+    } else {
+        currentUrl.searchParams.delete('type');
+    }
+    
+    currentUrl.searchParams.set('page', 1);
+    window.location.href = currentUrl.toString();
+}
+
+function clearFilters() {
+    window.location.href = window.location.pathname;
+}
+
+function changePerPage(value) {
+    const currentUrl = new URL(window.location.href);
+    currentUrl.searchParams.set('per_page', value);
+    currentUrl.searchParams.set('page', 1);
+    window.location.href = currentUrl.toString();
+}
+
+// Auto-submit on filter change with debounce
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    const typeFilter = document.getElementById('typeFilter');
+    let searchTimeout;
+    
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(applyFilters, 500);
+        });
+    }
+    
+    if (typeFilter) {
+        typeFilter.addEventListener('change', function() {
+            applyFilters();
+        });
+    }
+    
+    // Initialize sorting - sort by date descending (newest first)
+    const table = document.getElementById('movementsTable');
+    if (table) {
+        sortState.column = 'date';
+        sortState.direction = 'desc';
+        const dateHeader = table.querySelector('[data-sort="date"]');
+        if (dateHeader) {
+            dateHeader.classList.add('active', 'desc');
+            const icon = dateHeader.querySelector('.sort-icon');
+            icon.textContent = '▼';
+        }
+        sortTable('date');
+    }
+});
+
+// Keyboard shortcut: Enter to search
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        const activeElement = document.activeElement;
+        if (activeElement && activeElement.id === 'searchInput') {
+            e.preventDefault();
+            applyFilters();
+        }
+    }
+});
+</script>
+{% endblock %}
