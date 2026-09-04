@@ -2,7 +2,6 @@
 
 {% block title %}RS{% endblock %}
 
-
 {% block extra_css %}
 <style>
     /* ============================================
@@ -308,6 +307,33 @@
         display: block;
         margin-bottom: 8px;
     }
+    
+    /* Accessory type badge */
+    .accessory-type-badge {
+        display: inline-block;
+        padding: 3px 12px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    .accessory-type-badge.phone { background: #dbeafe; color: #1e40af; }
+    .accessory-type-badge.electronic { background: #d1fae5; color: #065f46; }
+    .accessory-type-badge.other { background: #fef3c7; color: #92400e; }
+    
+    /* Current image in edit mode */
+    .current-image {
+        display: inline-block;
+        padding: 5px 10px;
+        background: #e9ecef;
+        border-radius: 4px;
+        font-size: 12px;
+        color: #495057;
+        margin-top: 5px;
+    }
+    .current-image i {
+        margin-right: 5px;
+    }
 </style>
 {% endblock %}
 
@@ -315,8 +341,19 @@
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>
-            <i class="fas fa-plus-circle text-success"></i> Add Product
+            <i class="fas {% if is_edit %}fa-edit text-warning{% else %}fa-plus-circle text-success{% endif %}"></i> 
+            {% if is_edit %}Edit Product{% else %}Add Product{% endif %}
         </h1>
+        <div>
+            {% if is_edit %}
+            <a href="/epa_shop/products/{{ product.id }}/" class="btn btn-secondary">
+                <i class="fas fa-eye"></i> View Product
+            </a>
+            {% endif %}
+            <a href="/epa_shop/products/" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Products
+            </a>
+        </div>
     </div>
 
     <form method="post" enctype="multipart/form-data">
@@ -335,10 +372,10 @@
                             <label class="form-label required">Category</label>
                             <select class="form-select" name="category" id="categorySelect" required>
                                 <option value="">Select Category...</option>
-                                <option value="smartphone">📱 Smartphone</option>
-                                <option value="feature_phone">📞 Feature Phone</option>
-                                <option value="electronics">💻 Electronics</option>
-                                <option value="accessory">🎧 Accessory</option>
+                                <option value="smartphone" {% if category_value == 'smartphone' %}selected{% endif %}>📱 Smartphone</option>
+                                <option value="feature_phone" {% if category_value == 'feature_phone' %}selected{% endif %}>📞 Feature Phone</option>
+                                <option value="electronics" {% if category_value == 'electronics' %}selected{% endif %}>💻 Electronics</option>
+                                <option value="accessory" {% if category_value == 'accessory' %}selected{% endif %}>🎧 Accessory</option>
                             </select>
                         </div>
                         <div class="col-md-6 mb-3">
@@ -346,7 +383,9 @@
                             <select class="form-select" name="branch">
                                 <option value="">Select Branch</option>
                                 {% for branch in branches %}
-                                <option value="{{ branch.id }}">{{ branch.name }}</option>
+                                <option value="{{ branch.id }}" {% if product.branch_id == branch.id %}selected{% endif %}>
+                                    {{ branch.name }}
+                                </option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -359,67 +398,122 @@
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label class="form-label required">Brand</label>
-                            <input type="text" class="form-control" name="brand" required placeholder="e.g., Samsung">
+                            <input type="text" class="form-control" name="brand" value="{{ product.brand|default:'' }}" required placeholder="e.g., Samsung">
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label required">Model</label>
-                            <input type="text" class="form-control" name="model" required placeholder="e.g., Galaxy S24">
+                            <input type="text" class="form-control" name="model" 
+                                   value="{% if product_type == 'Phone' %}{{ product.model|default:'' }}{% elif product_type == 'Electronic' %}{{ product.model_number|default:'' }}{% elif product_type == 'Accessory' %}{{ product.model|default:'' }}{% endif %}" 
+                                   required placeholder="e.g., Galaxy S24">
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label">Product Name</label>
-                            <input type="text" class="form-control" name="name" placeholder="Auto-generated if empty">
+                            <input type="text" class="form-control" name="name" value="{{ product.name|default:'' }}" placeholder="Auto-generated if empty">
                         </div>
                     </div>
 
                     <!-- Smartphone Specs -->
-                    <div id="smartphoneSpecs" style="display:none;">
+                    <div id="smartphoneSpecs" {% if category_value != 'smartphone' and category_value != 'feature_phone' %}style="display:none;"{% endif %}>
                         <div class="row">
                             <div class="col-md-3 mb-3">
                                 <label class="form-label">RAM</label>
-                                <input type="text" class="form-control" name="ram" placeholder="e.g., 8GB">
+                                <input type="text" class="form-control" name="ram" value="{{ product.ram|default:'' }}" placeholder="e.g., 8GB">
                             </div>
                             <div class="col-md-3 mb-3">
-                                <label class="form-label">ROM</label>
-                                <input type="text" class="form-control" name="rom" placeholder="e.g., 256GB">
+                                <label class="form-label">Storage (ROM)</label>
+                                <input type="text" class="form-control" name="rom" value="{{ product.storage_capacity|default:'' }}" placeholder="e.g., 256GB">
                             </div>
                             <div class="col-md-3 mb-3">
                                 <label class="form-label">Screen Size</label>
-                                <input type="text" class="form-control" name="screen_size" placeholder="e.g., 6.8 inches">
+                                <input type="text" class="form-control" name="screen_size" value="{{ product.screen_size|default:'' }}" placeholder="e.g., 6.8 inches">
                             </div>
                             <div class="col-md-3 mb-3">
                                 <label class="form-label">Color</label>
-                                <input type="text" class="form-control" name="color" placeholder="e.g., Black">
+                                <input type="text" class="form-control" name="color" value="{{ product.color|default:'' }}" placeholder="e.g., Black">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Battery Capacity</label>
+                                <input type="text" class="form-control" name="battery_capacity" value="{{ product.battery_capacity|default:'' }}" placeholder="e.g., 5000mAh">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Condition</label>
+                                <select class="form-select" name="condition">
+                                    <option value="new" {% if product.condition == 'new' %}selected{% endif %}>New</option>
+                                    <option value="used" {% if product.condition == 'used' %}selected{% endif %}>Used</option>
+                                    <option value="refurbished" {% if product.condition == 'refurbished' %}selected{% endif %}>Refurbished</option>
+                                </select>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Other Specs -->
-                    <div id="otherSpecs" style="display:none;">
-                        <div class="mb-3">
-                            <label class="form-label">Specifications</label>
-                            <textarea class="form-control" name="specs" rows="2" placeholder="Enter specifications..."></textarea>
+                    <!-- Electronics Specs -->
+                    <div id="electronicsSpecs" {% if category_value != 'electronics' %}style="display:none;"{% endif %}>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Device Type</label>
+                                <select class="form-select" name="device_type">
+                                    <option value="laptop" {% if product.device_type == 'laptop' %}selected{% endif %}>Laptop</option>
+                                    <option value="desktop" {% if product.device_type == 'desktop' %}selected{% endif %}>Desktop</option>
+                                    <option value="tablet" {% if product.device_type == 'tablet' %}selected{% endif %}>Tablet</option>
+                                    <option value="monitor" {% if product.device_type == 'monitor' %}selected{% endif %}>Monitor</option>
+                                    <option value="printer" {% if product.device_type == 'printer' %}selected{% endif %}>Printer</option>
+                                    <option value="camera" {% if product.device_type == 'camera' %}selected{% endif %}>Camera</option>
+                                    <option value="audio" {% if product.device_type == 'audio' %}selected{% endif %}>Audio Equipment</option>
+                                    <option value="other" {% if product.device_type == 'other' %}selected{% endif %}>Other</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Processor</label>
+                                <input type="text" class="form-control" name="processor" value="{{ product.processor|default:'' }}" placeholder="e.g., Intel Core i7">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Storage</label>
+                                <input type="text" class="form-control" name="storage" value="{{ product.storage|default:'' }}" placeholder="e.g., 512GB SSD">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">RAM</label>
+                                <input type="text" class="form-control" name="ram" value="{{ product.ram|default:'' }}" placeholder="e.g., 16GB">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Color</label>
+                                <input type="text" class="form-control" name="color" value="{{ product.color|default:'' }}" placeholder="e.g., Silver">
+                            </div>
                         </div>
                     </div>
 
                     <!-- Accessory Specs -->
-                    <div id="accessorySpecs" style="display:none;">
+                    <div id="accessorySpecs" {% if category_value != 'accessory' %}style="display:none;"{% endif %}>
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Product Type</label>
-                                <select class="form-select" name="accessory_type">
-                                    <option value="phone accessory">Phone Accessory</option>
-                                    <option value="electronic accessory">Electronic Accessory</option>
+                                <label class="form-label required">Accessory Type</label>
+                                <select class="form-select" name="accessory_type" required>
+                                    <option value="">Select Type...</option>
+                                    <option value="phone_accessory" {% if product.accessory_type == 'phone_accessory' %}selected{% endif %}>📱 Phone Accessory</option>
+                                    <option value="electronic_accessory" {% if product.accessory_type == 'electronic_accessory' %}selected{% endif %}>💻 Electronic Accessory</option>
+                                    <option value="other" {% if product.accessory_type == 'other' %}selected{% endif %}>🔧 Other</option>
                                 </select>
+                                <small class="field-hint">Choose the category of accessory</small>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Barcode</label>
-                                <input type="text" class="form-control" name="barcode" placeholder="Enter barcode" id="barcodeInput" oninput="updateAccessoryPreview()">
+                                <input type="text" class="form-control" name="barcode" value="{{ product.compatible_phone_models|default:'' }}" placeholder="Enter barcode" id="barcodeInput" oninput="updateAccessoryPreview()">
+                                <small class="field-hint">Optional barcode for scanning</small>
                             </div>
                         </div>
                         <div class="row">
                             <div class="col-md-12 mb-3">
                                 <label class="form-label">Product Image</label>
                                 <input type="file" class="form-control" name="product_image" accept="image/*" id="productImage" onchange="updateAccessoryPreview()">
+                                {% if product.image %}
+                                <div class="current-image">
+                                    <i class="fas fa-image"></i> Current: {{ product.image.name }}
+                                </div>
+                                {% endif %}
+                                <small class="field-hint">Upload a new image to replace the current one</small>
                             </div>
                         </div>
                     </div>
@@ -431,39 +525,39 @@
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label class="form-label required">Buying Price</label>
-                            <input type="number" class="form-control" name="purchase_price" required step="0.01" min="0" placeholder="0.00">
+                            <input type="number" class="form-control" name="purchase_price" value="{{ product.purchase_price|floatformat:2|default:'' }}" required step="0.01" min="0" placeholder="0.00">
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label required">Selling Price</label>
-                            <input type="number" class="form-control" name="selling_price" required step="0.01" min="0" placeholder="0.00">
+                            <input type="number" class="form-control" name="selling_price" value="{{ product.selling_price|floatformat:2|default:'' }}" required step="0.01" min="0" placeholder="0.00">
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label">Best Price</label>
-                            <input type="number" class="form-control" name="best_price" step="0.01" min="0" placeholder="Optional">
+                            <input type="number" class="form-control" name="best_price" value="{{ product.best_price|floatformat:2|default:'' }}" step="0.01" min="0" placeholder="Optional">
                         </div>
                     </div>
                 </div>
 
-                <!-- Step 4: Identifiers / Stock -->
+                <!-- Step 4: Stock & Identifiers -->
                 <div class="form-section" id="identifiersSection">
-                    <h6 class="form-section-title"><i class="fas fa-qrcode"></i> 4. Identifiers</h6>
+                    <h6 class="form-section-title"><i class="fas fa-qrcode"></i> 4. Stock & Identifiers</h6>
                     
                     <!-- Accessory Stock (simple quantity) -->
-                    <div id="accessoryStock" style="display:none;">
+                    <div id="accessoryStock" {% if category_value != 'accessory' %}style="display:none;"{% endif %}>
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label required">Quantity in Stock</label>
-                                <input type="number" class="form-control" name="quantity" min="0" placeholder="0" id="accessoryQuantity" oninput="updateAccessoryPreview()">
+                                <input type="number" class="form-control" name="quantity" value="{{ product.quantity_in_stock|default:0 }}" min="0" placeholder="0" id="accessoryQuantity" oninput="updateAccessoryPreview()">
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Min Stock Level</label>
-                                <input type="number" class="form-control" name="min_stock" min="0" placeholder="5">
+                                <input type="number" class="form-control" name="min_stock" value="{{ product.minimum_stock_level|default:5 }}" min="0" placeholder="5">
                             </div>
                         </div>
                     </div>
 
                     <!-- Add Identifier Form -->
-                    <div id="identifierInputArea">
+                    <div id="identifierInputArea" {% if category_value == 'accessory' %}style="display:none;"{% endif %}>
                         <div class="add-unit-form">
                             <input type="text" class="form-control" id="unitInput" 
                                 placeholder="Enter IMEI or Serial Number">
@@ -494,7 +588,7 @@
                         </div>
                     </div>
                     
-                    <input type="hidden" name="units" id="unitsData" value="[]">
+                    <input type="hidden" name="units" id="unitsData" value="{{ units_json|default:'[]' }}">
                 </div>
             </div>
 
@@ -504,57 +598,100 @@
             <div class="split-right" id="previewPanel">
                 <div class="panel-header">
                     <h6><i class="fas fa-list-ul text-primary"></i> 
-                        <span id="previewTitle">Identifiers List</span>
+                        <span id="previewTitle">
+                            {% if category_value == 'smartphone' or category_value == 'feature_phone' %}IMEI Numbers
+                            {% elif category_value == 'electronics' %}Serial Numbers
+                            {% elif category_value == 'accessory' %}Accessory Details
+                            {% else %}Identifiers List{% endif %}
+                        </span>
                     </h6>
-                    <span class="badge bg-primary" id="countBadge">0</span>
+                    <span class="badge bg-primary" id="countBadge">
+                        {% if category_value == 'accessory' %}{{ product.quantity_in_stock|default:0 }}{% else %}{{ units|length }}{% endif %}
+                    </span>
                 </div>
 
                 <!-- Stats -->
-                <div class="unit-stats" id="unitStats">
+                <div class="unit-stats" id="unitStats" {% if category_value == 'accessory' %}style="display:none;"{% endif %}>
                     <div class="unit-stat">
-                        <strong class="count-total" id="totalCount">0</strong>
+                        <strong class="count-total" id="totalCount">{{ units|length }}</strong>
                         Total
                     </div>
                     <div class="unit-stat">
-                        <strong class="count-available" id="availableCount">0</strong>
+                        <strong class="count-available" id="availableCount">
+                            {% for unit in units %}{% if unit.status == 'available' %}{{ forloop.counter }}{% endif %}{% endfor %}
+                        </strong>
                         Available
                     </div>
                     <div class="unit-stat">
-                        <strong class="count-reserved" id="reservedCount">0</strong>
+                        <strong class="count-reserved" id="reservedCount">
+                            {% for unit in units %}{% if unit.status == 'reserved' %}{{ forloop.counter }}{% endif %}{% endfor %}
+                        </strong>
                         Reserved
                     </div>
                     <div class="unit-stat">
-                        <strong class="count-repair" id="repairCount">0</strong>
+                        <strong class="count-repair" id="repairCount">
+                            {% for unit in units %}{% if unit.status == 'repair' %}{{ forloop.counter }}{% endif %}{% endfor %}
+                        </strong>
                         Repair
                     </div>
                 </div>
 
                 <!-- Accessory Preview (shown for accessories) -->
-                <div id="accessoryPreview" style="display:none;">
+                <div id="accessoryPreview" {% if category_value != 'accessory' %}style="display:none;"{% endif %}>
                     <div class="accessory-preview">
                         <div class="image-preview" id="imagePreview">
+                            {% if product.image %}
+                            <img src="{{ product.image.url }}" alt="{{ product.name }}">
+                            {% else %}
                             <div class="no-image">
                                 <i class="fas fa-image"></i>
-                                <span>No image selected</span>
+                                <span>No image</span>
                             </div>
+                            {% endif %}
                         </div>
                         <div class="barcode-placeholder">
                             <i class="fas fa-barcode"></i>
                         </div>
-                        <div class="barcode-number" id="barcodeDisplay">No Barcode</div>
+                        <div class="barcode-number" id="barcodeDisplay">
+                            {{ product.compatible_phone_models|default:'No Barcode' }}
+                        </div>
                         <div class="mt-2">
-                            <small class="text-muted">Stock: <span id="stockDisplay">0</span> units</small>
+                            <small class="text-muted">Stock: <span id="stockDisplay">{{ product.quantity_in_stock|default:0 }}</span> units</small>
+                        </div>
+                        <div class="mt-1">
+                            <span class="accessory-type-badge 
+                                {% if product.accessory_type == 'phone_accessory' %}phone
+                                {% elif product.accessory_type == 'electronic_accessory' %}electronic
+                                {% else %}other{% endif %}">
+                                {{ product.get_accessory_type_display|default:'Uncategorized' }}
+                            </span>
                         </div>
                     </div>
                 </div>
 
                 <!-- List -->
                 <div id="unitsList">
-                    <div class="no-units">
-                        <i class="fas fa-qrcode"></i>
-                        <p>No identifiers added yet</p>
-                        <small>Add IMEI/Serial numbers from the left panel</small>
-                    </div>
+                    {% if units %}
+                        {% for unit in units %}
+                        <div class="unit-item" data-index="{{ forloop.counter0 }}">
+                            <div>
+                                <span class="unit-identifier">{{ unit.identifier }}</span>
+                                <span class="unit-status-badge {{ unit.status }}">{{ unit.status }}</span>
+                            </div>
+                            <div class="unit-actions">
+                                <button onclick="removeUnit({{ forloop.counter0 }})" title="Remove">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="no-units">
+                            <i class="fas fa-qrcode"></i>
+                            <p>No identifiers added yet</p>
+                            <small>Add IMEI/Serial numbers from the left panel</small>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -562,11 +699,13 @@
         <!-- Form Actions -->
         <div class="form-actions">
             <button type="submit" class="btn btn-success btn-lg">
-                <i class="fas fa-save"></i> Save Product
+                <i class="fas fa-save"></i> {% if is_edit %}Update Product{% else %}Save Product{% endif %}
             </button>
+            {% if not is_edit %}
             <button type="reset" class="btn btn-secondary btn-lg">
                 <i class="fas fa-undo"></i> Reset
             </button>
+            {% endif %}
             <a href="/epa_shop/products/" class="btn btn-secondary btn-lg">
                 <i class="fas fa-times"></i> Cancel
             </a>
@@ -581,6 +720,28 @@ JAVASCRIPT
 let units = [];
 
 // ============================================
+// LOAD EXISTING UNITS
+// ============================================
+document.addEventListener('DOMContentLoaded', function() {
+    const unitsData = document.getElementById('unitsData');
+    if (unitsData && unitsData.value && unitsData.value !== '[]') {
+        try {
+            units = JSON.parse(unitsData.value);
+            renderUnits();
+            updateStats();
+        } catch(e) {
+            units = [];
+        }
+    }
+    
+    // Set initial category toggle
+    const categorySelect = document.getElementById('categorySelect');
+    if (categorySelect) {
+        categorySelect.dispatchEvent(new Event('change'));
+    }
+});
+
+// ============================================
 // CATEGORY TOGGLE
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
@@ -591,7 +752,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Hide all
         document.getElementById('smartphoneSpecs').style.display = 'none';
-        document.getElementById('otherSpecs').style.display = 'none';
+        document.getElementById('electronicsSpecs').style.display = 'none';
         document.getElementById('accessorySpecs').style.display = 'none';
         document.getElementById('accessoryStock').style.display = 'none';
         document.getElementById('identifierInputArea').style.display = 'block';
@@ -602,12 +763,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (value === 'smartphone' || value === 'feature_phone') {
             document.getElementById('smartphoneSpecs').style.display = 'block';
             document.getElementById('unitInput').placeholder = 'Enter IMEI number';
-            document.getElementById('identifierInputArea').style.display = 'block';
             document.getElementById('previewTitle').textContent = 'IMEI Numbers';
         } else if (value === 'electronics') {
-            document.getElementById('otherSpecs').style.display = 'block';
+            document.getElementById('electronicsSpecs').style.display = 'block';
             document.getElementById('unitInput').placeholder = 'Enter Serial Number';
-            document.getElementById('identifierInputArea').style.display = 'block';
             document.getElementById('previewTitle').textContent = 'Serial Numbers';
         } else if (value === 'accessory') {
             document.getElementById('accessorySpecs').style.display = 'block';
@@ -619,6 +778,7 @@ document.addEventListener('DOMContentLoaded', function() {
             updateAccessoryPreview();
         } else {
             document.getElementById('identifierInputArea').style.display = 'none';
+            document.getElementById('unitStats').style.display = 'none';
         }
     });
 });
@@ -627,22 +787,30 @@ document.addEventListener('DOMContentLoaded', function() {
 // ACCESSORY PREVIEW
 // ============================================
 function updateAccessoryPreview() {
-    const barcode = document.getElementById('barcodeInput').value;
-    const quantity = document.getElementById('accessoryQuantity').value || 0;
+    const barcode = document.getElementById('barcodeInput');
+    const quantity = document.getElementById('accessoryQuantity');
     const imageInput = document.getElementById('productImage');
     
     // Update barcode display
     const barcodeDisplay = document.getElementById('barcodeDisplay');
-    if (barcode) {
-        barcodeDisplay.textContent = barcode;
+    if (barcode && barcode.value) {
+        barcodeDisplay.textContent = barcode.value;
         barcodeDisplay.style.color = '#2d3436';
     } else {
-        barcodeDisplay.textContent = 'No Barcode';
-        barcodeDisplay.style.color = '#adb5bd';
+        const existingBarcode = '{{ product.compatible_phone_models|default:"" }}';
+        if (existingBarcode) {
+            barcodeDisplay.textContent = existingBarcode;
+        } else {
+            barcodeDisplay.textContent = 'No Barcode';
+            barcodeDisplay.style.color = '#adb5bd';
+        }
     }
     
     // Update stock display
-    document.getElementById('stockDisplay').textContent = quantity || 0;
+    const stockDisplay = document.getElementById('stockDisplay');
+    if (quantity) {
+        stockDisplay.textContent = quantity.value || 0;
+    }
     
     // Update image preview
     const imagePreview = document.getElementById('imagePreview');
@@ -652,13 +820,6 @@ function updateAccessoryPreview() {
             imagePreview.innerHTML = `<img src="${e.target.result}" alt="Product Image">`;
         };
         reader.readAsDataURL(imageInput.files[0]);
-    } else {
-        imagePreview.innerHTML = `
-            <div class="no-image">
-                <i class="fas fa-image"></i>
-                <span>No image selected</span>
-            </div>
-        `;
     }
 }
 
@@ -788,20 +949,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 addUnit();
             }
         });
-    }
-});
-
-// Load existing units if editing
-document.addEventListener('DOMContentLoaded', function() {
-    const unitsData = document.getElementById('unitsData');
-    if (unitsData && unitsData.value && unitsData.value !== '[]') {
-        try {
-            units = JSON.parse(unitsData.value);
-            renderUnits();
-            updateStats();
-        } catch(e) {
-            units = [];
-        }
     }
 });
 </script>

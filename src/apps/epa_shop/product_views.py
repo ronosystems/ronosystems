@@ -1499,108 +1499,145 @@ def product_edit(request, product_code):
         units = Unit.objects.filter(electronic=product).order_by('-created_at')
         units_json = json.dumps([{'identifier': u.identifier, 'status': u.status} for u in units])
     
-    # Get branches and categories
+    # Get branches
     branches = Branch.objects.filter(company=company, is_active=True)
     if not request.user.is_super_admin and not request.user.is_company_admin:
         user_branch = get_user_branch(request.user)
         if user_branch:
             branches = branches.filter(id=user_branch.id)
     
-    categories = Category.objects.filter(company=company, is_active=True)
+    # Determine category for the form
+    if product_type == 'Phone':
+        category_value = 'smartphone'
+    elif product_type == 'Electronic':
+        category_value = 'electronics'
+    elif product_type == 'Accessory':
+        category_value = 'accessory'
+    else:
+        category_value = ''
     
     if request.method == 'POST':
         try:
-            # Get form data
+            # Get form data (same as product_create)
             category_type = request.POST.get('category', '').strip()
             branch_id = request.POST.get('branch')
             name = request.POST.get('name', '').strip()
             brand = request.POST.get('brand', '').strip()
             model = request.POST.get('model', '').strip()
+            
+            # Smartphone/Phone specific fields
             ram = request.POST.get('ram', '').strip()
             rom = request.POST.get('rom', '').strip()
             screen_size = request.POST.get('screen_size', '').strip()
             color = request.POST.get('color', '').strip()
-            specs = request.POST.get('specs', '').strip()
+            battery_capacity = request.POST.get('battery_capacity', '').strip()
+            condition = request.POST.get('condition', 'new')
+            
+            # Electronic specific fields
+            device_type = request.POST.get('device_type', 'other')
+            processor = request.POST.get('processor', '').strip()
+            storage = request.POST.get('storage', '').strip()
+            
+            # Accessory specific fields
             accessory_type = request.POST.get('accessory_type', 'other')
             barcode = request.POST.get('barcode', '').strip()
             
             # Handle image upload
             image = request.FILES.get('product_image')
             
+            # Parse prices
             try:
-                purchase_price = float(request.POST.get('purchase_price', 0) or 0)
-            except ValueError:
-                purchase_price = 0
+                purchase_price = Decimal(str(request.POST.get('purchase_price', 0) or 0))
+            except:
+                purchase_price = Decimal('0')
                 
             try:
-                selling_price = float(request.POST.get('selling_price', 0) or 0)
-            except ValueError:
-                selling_price = 0
-                
+                selling_price = Decimal(str(request.POST.get('selling_price', 0) or 0))
+            except:
+                selling_price = Decimal('0')
+            
             try:
-                best_price = float(request.POST.get('best_price', 0) or 0)
-            except ValueError:
-                best_price = 0
+                best_price = Decimal(str(request.POST.get('best_price', 0) or 0))
+            except:
+                best_price = Decimal('0')
             
             try:
                 quantity = int(request.POST.get('quantity', 0) or 0)
-            except ValueError:
+            except:
                 quantity = 0
                 
             try:
                 min_stock = int(request.POST.get('min_stock', 5) or 5)
-            except ValueError:
+            except:
                 min_stock = 5
             
             # Validate
-            if not brand:
-                messages.error(request, 'Brand is required.')
-                return render(request, 'epa/product_edit.html', {
+            if not branch_id:
+                messages.error(request, 'Please select a branch.')
+                return render(request, 'epa/product_form.html', {
+                    'branches': branches,
                     'product': product,
                     'product_type': product_type,
                     'units': units,
                     'units_json': units_json,
+                    'category_value': category_value,
+                    'is_edit': True,
+                    'page_title': f'Edit {product.name}',
+                    'page_subtitle': f'Code: {product.product_code}',
+                })
+            
+            if not brand:
+                messages.error(request, 'Brand is required.')
+                return render(request, 'epa/product_form.html', {
                     'branches': branches,
-                    'categories': categories,
+                    'product': product,
+                    'product_type': product_type,
+                    'units': units,
+                    'units_json': units_json,
+                    'category_value': category_value,
+                    'is_edit': True,
                     'page_title': f'Edit {product.name}',
                     'page_subtitle': f'Code: {product.product_code}',
                 })
             
             if not model:
                 messages.error(request, 'Model is required.')
-                return render(request, 'epa/product_edit.html', {
+                return render(request, 'epa/product_form.html', {
+                    'branches': branches,
                     'product': product,
                     'product_type': product_type,
                     'units': units,
                     'units_json': units_json,
-                    'branches': branches,
-                    'categories': categories,
+                    'category_value': category_value,
+                    'is_edit': True,
                     'page_title': f'Edit {product.name}',
                     'page_subtitle': f'Code: {product.product_code}',
                 })
             
             if purchase_price <= 0:
                 messages.error(request, 'Buying price must be greater than 0.')
-                return render(request, 'epa/product_edit.html', {
+                return render(request, 'epa/product_form.html', {
+                    'branches': branches,
                     'product': product,
                     'product_type': product_type,
                     'units': units,
                     'units_json': units_json,
-                    'branches': branches,
-                    'categories': categories,
+                    'category_value': category_value,
+                    'is_edit': True,
                     'page_title': f'Edit {product.name}',
                     'page_subtitle': f'Code: {product.product_code}',
                 })
             
             if selling_price <= 0:
                 messages.error(request, 'Selling price must be greater than 0.')
-                return render(request, 'epa/product_edit.html', {
+                return render(request, 'epa/product_form.html', {
+                    'branches': branches,
                     'product': product,
                     'product_type': product_type,
                     'units': units,
                     'units_json': units_json,
-                    'branches': branches,
-                    'categories': categories,
+                    'category_value': category_value,
+                    'is_edit': True,
                     'page_title': f'Edit {product.name}',
                     'page_subtitle': f'Code: {product.product_code}',
                 })
@@ -1608,22 +1645,32 @@ def product_edit(request, product_code):
             # Auto-generate name if empty
             if not name:
                 if product_type == 'Phone':
-                    name = f"{brand} {model}".strip()
+                    name = f"{brand} {model} {rom} {ram}".strip()
                 elif product_type == 'Electronic':
-                    name = f"{brand} {model}".strip()
+                    name = f"{brand} {model} {ram} {storage}".strip()
                 else:
                     name = f"{brand} {model} {accessory_type}".strip()
             
-            # Update product based on type
+            # Get or create owner
+            owner = get_or_create_owner_from_user(request.user)
+            
+            # ============================================
+            # UPDATE BASED ON CATEGORY
+            # ============================================
+            
+            # Update common fields
             product.name = name
             product.brand = brand
-            product.purchase_price = Decimal(str(purchase_price))
-            product.selling_price = Decimal(str(selling_price))
+            product.purchase_price = purchase_price
+            product.selling_price = selling_price
+            
+            if hasattr(product, 'best_price'):
+                product.best_price = best_price
             
             if branch_id:
                 product.branch_id = branch_id
             
-            # Handle image upload
+            # Handle image
             if image:
                 if product.image:
                     try:
@@ -1633,46 +1680,25 @@ def product_edit(request, product_code):
                         pass
                 product.image = image
             
-            # Update type-specific fields
+            # Update based on type
             if product_type == 'Phone':
                 product.model = model
                 product.ram = ram or ''
                 product.storage_capacity = rom or ''
                 product.screen_size = screen_size or ''
                 product.color = color or ''
+                product.battery_capacity = battery_capacity or ''
+                product.condition = condition
+                product.save()
                 
-            elif product_type == 'Electronic':
-                product.model_number = model
-                product.ram = ram or ''
-                product.storage = rom or ''
-                product.processor = specs or ''
-                product.screen_size = screen_size or ''
-                product.color = color or ''
-                
-            elif product_type == 'Accessory':
-                product.model = model or ''
-                product.accessory_type = accessory_type
-                product.compatible_phone_models = barcode or ''
-                product.quantity_in_stock = quantity
-            
-            # Save product
-            product.save()
-            
-            # Update units for Phone/Electronic
-            if product_type in ['Phone', 'Electronic']:
-                # Get units from form
+                # Update units
                 units_data = request.POST.get('units', '[]')
                 try:
                     new_units = json.loads(units_data)
                 except:
                     new_units = []
                 
-                # Get existing units
-                if product_type == 'Phone':
-                    existing_units = Unit.objects.filter(phone=product)
-                else:
-                    existing_units = Unit.objects.filter(electronic=product)
-                
+                existing_units = Unit.objects.filter(phone=product)
                 existing_identifiers = set(existing_units.values_list('identifier', flat=True))
                 new_identifiers = set()
                 
@@ -1680,15 +1706,10 @@ def product_edit(request, product_code):
                     if 'identifier' in unit_data:
                         new_identifiers.add(unit_data['identifier'])
                 
-                # Delete removed units
                 units_to_delete = existing_identifiers - new_identifiers
                 if units_to_delete:
-                    if product_type == 'Phone':
-                        Unit.objects.filter(phone=product, identifier__in=units_to_delete).delete()
-                    else:
-                        Unit.objects.filter(electronic=product, identifier__in=units_to_delete).delete()
+                    Unit.objects.filter(phone=product, identifier__in=units_to_delete).delete()
                 
-                # Create or update units
                 for unit_data in new_units:
                     identifier = unit_data.get('identifier')
                     status = unit_data.get('status', 'available')
@@ -1696,65 +1717,122 @@ def product_edit(request, product_code):
                     if not identifier:
                         continue
                     
-                    if product_type == 'Phone':
-                        existing_unit = Unit.objects.filter(phone=product, identifier=identifier).first()
-                        if existing_unit:
-                            existing_unit.status = status
-                            existing_unit.save()
-                        else:
-                            Unit.objects.create(
-                                phone=product,
-                                identifier=identifier,
-                                unit_type='imei',
-                                status=status
-                            )
-                    else:  # Electronic
-                        existing_unit = Unit.objects.filter(electronic=product, identifier=identifier).first()
-                        if existing_unit:
-                            existing_unit.status = status
-                            existing_unit.save()
-                        else:
-                            Unit.objects.create(
-                                electronic=product,
-                                identifier=identifier,
-                                unit_type='serial',
-                                status=status
-                            )
+                    existing_unit = Unit.objects.filter(phone=product, identifier=identifier).first()
+                    if existing_unit:
+                        existing_unit.status = status
+                        existing_unit.save()
+                    else:
+                        Unit.objects.create(
+                            phone=product,
+                            identifier=identifier,
+                            unit_type='imei',
+                            status=status,
+                            owner=owner
+                        )
                 
-                # Update stock count
-                total_units = Unit.objects.filter(phone=product).count() if product_type == 'Phone' else Unit.objects.filter(electronic=product).count()
+                total_units = Unit.objects.filter(phone=product).count()
                 product.quantity_in_stock = total_units
                 product.save()
+                
+                messages.success(request, f'Phone "{product.name}" updated successfully! Product Code: {product.product_code}')
+                
+            elif product_type == 'Electronic':
+                product.model_number = model
+                product.device_type = device_type
+                product.processor = processor or ''
+                product.ram = ram or ''
+                product.storage = storage or ''
+                product.screen_size = screen_size or ''
+                product.color = color or ''
+                product.save()
+                
+                # Update units
+                units_data = request.POST.get('units', '[]')
+                try:
+                    new_units = json.loads(units_data)
+                except:
+                    new_units = []
+                
+                existing_units = Unit.objects.filter(electronic=product)
+                existing_identifiers = set(existing_units.values_list('identifier', flat=True))
+                new_identifiers = set()
+                
+                for unit_data in new_units:
+                    if 'identifier' in unit_data:
+                        new_identifiers.add(unit_data['identifier'])
+                
+                units_to_delete = existing_identifiers - new_identifiers
+                if units_to_delete:
+                    Unit.objects.filter(electronic=product, identifier__in=units_to_delete).delete()
+                
+                for unit_data in new_units:
+                    identifier = unit_data.get('identifier')
+                    status = unit_data.get('status', 'available')
+                    
+                    if not identifier:
+                        continue
+                    
+                    existing_unit = Unit.objects.filter(electronic=product, identifier=identifier).first()
+                    if existing_unit:
+                        existing_unit.status = status
+                        existing_unit.save()
+                    else:
+                        Unit.objects.create(
+                            electronic=product,
+                            identifier=identifier,
+                            unit_type='serial',
+                            status=status,
+                            owner=owner
+                        )
+                
+                total_units = Unit.objects.filter(electronic=product).count()
+                product.quantity_in_stock = total_units
+                product.save()
+                
+                messages.success(request, f'Electronics "{product.name}" updated successfully! Product Code: {product.product_code}')
+                
+            elif product_type == 'Accessory':
+                product.model = model or ''
+                product.accessory_type = accessory_type
+                product.compatible_phone_models = barcode or ''
+                product.quantity_in_stock = quantity
+                product.minimum_stock_level = min_stock
+                product.save()
+                
+                messages.success(request, f'Accessory "{product.name}" updated successfully! Product Code: {product.product_code}')
             
-            messages.success(request, f'Product "{product.name}" updated successfully!')
             return redirect('/epa_shop/products/')
             
         except Exception as e:
             messages.error(request, f'Error updating product: {str(e)}')
             import traceback
             traceback.print_exc()
-            return render(request, 'epa/product_edit.html', {
+            return render(request, 'epa/product_form.html', {
+                'branches': branches,
                 'product': product,
                 'product_type': product_type,
                 'units': units,
                 'units_json': units_json,
-                'branches': branches,
-                'categories': categories,
+                'category_value': category_value,
+                'is_edit': True,
+                'form_data': request.POST,
                 'page_title': f'Edit {product.name}',
                 'page_subtitle': f'Code: {product.product_code}',
             })
     
     context = {
+        'branches': branches,
         'product': product,
         'product_type': product_type,
         'units': units,
         'units_json': units_json,
-        'branches': branches,
-        'categories': categories,
+        'category_value': category_value,
+        'is_edit': True,
         'page_title': f'Edit {product.name}',
         'page_subtitle': f'Code: {product.product_code}',
     }
-    return render(request, 'epa/product_edit.html', context)
+    return render(request, 'epa/product_form.html', context)
+
 
 
 # ============================================
