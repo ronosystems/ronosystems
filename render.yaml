@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: ronosystems
+    runtime: python
+    repo: https://github.com/ronosystems/ronosystems
+    plan: starter
+    region: oregon
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      cd src && python manage.py collectstatic --noinput
+    startCommand: cd src && gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --workers 4 --timeout 120
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: false
+      - key: ALLOWED_HOSTS
+        value: ronosystems.onrender.com
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://ronosystems.onrender.com
+      - key: PYTHON_VERSION
+        value: 3.12.3

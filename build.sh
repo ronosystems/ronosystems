@@ -3,25 +3,17 @@ set -o errexit
 
 echo "=== Building RonoSystems for Render ==="
 
-# Install system dependencies
-apt-get update -y
-apt-get install -y --no-install-recommends \
-    gcc \
-    python3-dev \
-    libjpeg-dev \
-    libpng-dev \
-    zlib1g-dev \
-    libffi-dev
+# Upgrade pip
+pip install --upgrade pip
 
-# Navigate to src
+# Install dependencies
+pip install -r requirements.txt
+
+# Navigate to src directory
 cd src
 
-# Upgrade pip and install with pre-built wheels
-pip install --upgrade pip
-pip install --only-binary :all: -r ../requirements.txt
-
 # Run migrations
-python manage.py makemigrations --noinput
+python manage.py makemigrations --noinput || true
 python manage.py migrate --noinput
 
 # Collect static files
