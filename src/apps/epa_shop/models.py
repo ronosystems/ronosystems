@@ -435,14 +435,8 @@ class Electronic(BaseProduct):
 class Accessory(BaseProduct):
     """Accessories like cases, chargers, headphones"""
     ACCESSORY_TYPES = (
-        ('case', 'Phone Case'),
-        ('charger', 'Charger'),
-        ('cable', 'Cable'),
-        ('headphone', 'Headphone'),
-        ('earphone', 'Earphone'),
-        ('screen_protector', 'Screen Protector'),
-        ('power_bank', 'Power Bank'),
-        ('other', 'Other'),
+        ('electronic accessory', 'Electronic Accessory'),
+        ('phone accessory', 'Phone Accessory'),
     )
     
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='epa_accessory_products')
