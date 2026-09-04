@@ -15,18 +15,32 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-ronosystems-key-12345')
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-# Allow hosts from environment or default for Render
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
-# Add Render domain if not in env
+# ALLOWED_HOSTS - Fixed
+ALLOWED_HOSTS = []
+allowed = os.getenv('ALLOWED_HOSTS', '')
+if allowed:
+    ALLOWED_HOSTS = [host.strip() for host in allowed.split(',') if host.strip()]
+else:
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+
 if 'RENDER' in os.environ:
     ALLOWED_HOSTS.append('ronosystems.onrender.com')
     ALLOWED_HOSTS.append('*.onrender.com')
 
-# CSRF Trusted Origins
-CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',')
+# CSRF Trusted Origins - Fixed
+CSRF_TRUSTED_ORIGINS = []
+csrf_origins = os.getenv('CSRF_TRUSTED_ORIGINS', '')
+if csrf_origins:
+    CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_origins.split(',') if origin.strip()]
+else:
+    CSRF_TRUSTED_ORIGINS = ['http://localhost:8000', 'http://127.0.0.1:8000']
+
 if 'RENDER' in os.environ:
     CSRF_TRUSTED_ORIGINS.append('https://ronosystems.onrender.com')
     CSRF_TRUSTED_ORIGINS.append('https://*.onrender.com')
+
+# Filter out any origins that don't start with http:// or https://
+CSRF_TRUSTED_ORIGINS = [origin for origin in CSRF_TRUSTED_ORIGINS if origin.startswith('http')]
 
 # ============================================
 # INSTALLED APPS
@@ -41,7 +55,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
-    'whitenoise.runserver_nostatic',  # For static files in production
+    'whitenoise.runserver_nostatic',
     
     # Custom Apps
     'apps.accounts',
@@ -59,11 +73,11 @@ INSTALLED_APPS = [
 ]
 
 # ============================================
-# MIDDLEWARE (Whitenoise for static files)
+# MIDDLEWARE
 # ============================================
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # Add this for static files
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -99,12 +113,11 @@ TEMPLATES = [
 WSGI_APPLICATION = 'core.wsgi.application'
 
 # ============================================
-# DATABASE - Neon PostgreSQL (Production)
+# DATABASE - Neon PostgreSQL
 # ============================================
 DATABASE_URL = os.getenv('DATABASE_URL')
 
 if DATABASE_URL:
-    # Production - Neon PostgreSQL
     DATABASES = {
         'default': dj_database_url.config(
             default=DATABASE_URL,
@@ -114,7 +127,6 @@ if DATABASE_URL:
         )
     }
 else:
-    # Development - Local PostgreSQL
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -152,8 +164,6 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-
-# Whitenoise storage for static files
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # ============================================
@@ -165,7 +175,7 @@ AUTH_USER_MODEL = 'accounts.User'
 # ============================================
 # CORS
 # ============================================
-CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only in development
+CORS_ALLOW_ALL_ORIGINS = DEBUG
 if not DEBUG:
     CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', '').split(',')
     CORS_ALLOW_CREDENTIALS = True
@@ -205,12 +215,12 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
 # ============================================
-# LOGGING (Optional)
+# LOGGING
 # ============================================
 LOGGING = {
     'version': 1,
