@@ -113,30 +113,72 @@ TEMPLATES = [
 WSGI_APPLICATION = 'core.wsgi.application'
 
 # ============================================
-# DATABASE - Neon PostgreSQL
+# DATABASE - SQLite for Local, PostgreSQL for Production
 # ============================================
-DATABASE_URL = os.getenv('DATABASE_URL')
 
-if DATABASE_URL:
-    DATABASES = {
-        'default': dj_database_url.config(
-            default=DATABASE_URL,
-            conn_max_age=600,
-            conn_health_checks=True,
-            ssl_require=True,
-        )
-    }
-else:
+# Check if we should use SQLite (local development)
+USE_SQLITE = os.getenv('USE_SQLITE', 'False') == 'True'
+
+# Check if we're on Render (production)
+ON_RENDER = 'RENDER' in os.environ
+
+if ON_RENDER:
+    # Production on Render - Use PostgreSQL
+    DATABASE_URL = os.getenv('DATABASE_URL')
+    if DATABASE_URL:
+        DATABASES = {
+            'default': dj_database_url.config(
+                default=DATABASE_URL,
+                conn_max_age=600,
+                conn_health_checks=True,
+                ssl_require=True,
+            )
+        }
+    else:
+        # Fallback if DATABASE_URL not set
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': os.getenv('DATABASE_NAME', 'rono_db'),
+                'USER': os.getenv('DATABASE_USER', 'rono_user'),
+                'PASSWORD': os.getenv('DATABASE_PASSWORD', 'rono_secure_password'),
+                'HOST': os.getenv('DATABASE_HOST', 'localhost'),
+                'PORT': os.getenv('DATABASE_PORT', '5432'),
+            }
+        }
+        
+elif USE_SQLITE:
+    # Local development with SQLite
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.getenv('DATABASE_NAME', 'rono_db'),
-            'USER': os.getenv('DATABASE_USER', 'rono_user'),
-            'PASSWORD': os.getenv('DATABASE_PASSWORD', 'rono_secure_password'),
-            'HOST': os.getenv('DATABASE_HOST', 'localhost'),
-            'PORT': os.getenv('DATABASE_PORT', '5432'),
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+    print("✅ Using SQLite database for local development")
+    
+else:
+    # Local development with PostgreSQL (default)
+    DATABASE_URL = os.getenv('DATABASE_URL')
+    if DATABASE_URL:
+        DATABASES = {
+            'default': dj_database_url.config(
+                default=DATABASE_URL,
+                conn_max_age=600,
+                conn_health_checks=True,
+            )
+        }
+    else:
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': os.getenv('DATABASE_NAME', 'rono_db'),
+                'USER': os.getenv('DATABASE_USER', 'rono_user'),
+                'PASSWORD': os.getenv('DATABASE_PASSWORD', 'rono_secure_password'),
+                'HOST': os.getenv('DATABASE_HOST', 'localhost'),
+                'PORT': os.getenv('DATABASE_PORT', '5432'),
+            }
+        }
 
 # ============================================
 # AUTHENTICATION
@@ -164,7 +206,10 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Use WhiteNoise for static files in production
+if ON_RENDER:
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # ============================================
 # DEFAULT SETTINGS
@@ -210,7 +255,7 @@ LOGOUT_REDIRECT_URL = '/auth/login/'
 # ============================================
 # SECURITY SETTINGS (Production)
 # ============================================
-if not DEBUG:
+if not DEBUG and ON_RENDER:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True

@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}RS{% endblock %}
+{% block title %}{% if is_edit %}Edit{% else %}Add{% endif %} Product - RS{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -264,6 +264,26 @@
         background: #a8b0b8;
     }
 
+    /* Category spec sections */
+    .spec-section {
+        transition: all 0.3s ease;
+    }
+    .spec-section.hidden {
+        display: none !important;
+    }
+
+    /* Image preview */
+    .image-preview-container {
+        margin-top: 10px;
+    }
+    .image-preview-container img {
+        max-width: 200px;
+        max-height: 200px;
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
+        padding: 5px;
+    }
+
     /* Accessory Preview */
     .accessory-preview {
         text-align: center;
@@ -321,7 +341,6 @@
     .accessory-type-badge.electronic { background: #d1fae5; color: #065f46; }
     .accessory-type-badge.other { background: #fef3c7; color: #92400e; }
     
-    /* Current image in edit mode */
     .current-image {
         display: inline-block;
         padding: 5px 10px;
@@ -333,6 +352,16 @@
     }
     .current-image i {
         margin-right: 5px;
+    }
+
+    /* Force hide for accessories */
+    #identifierInputArea.hidden,
+    #identifierInputArea.accessory-mode {
+        display: none !important;
+    }
+    
+    #accessoryStock.hidden {
+        display: none !important;
     }
 </style>
 {% endblock %}
@@ -346,7 +375,7 @@
         </h1>
         <div>
             {% if is_edit %}
-            <a href="/epa_shop/products/{{ product.id }}/" class="btn btn-secondary">
+            <a href="/epa_shop/products/{{ product.product_code }}/" class="btn btn-secondary">
                 <i class="fas fa-eye"></i> View Product
             </a>
             {% endif %}
@@ -356,7 +385,7 @@
         </div>
     </div>
 
-    <form method="post" enctype="multipart/form-data">
+    <form method="post" enctype="multipart/form-data" id="productForm">
         {% csrf_token %}
         
         <div class="split-container">
@@ -364,7 +393,7 @@
             LEFT COLUMN - INPUT FORM
             ========================================== -->
             <div class="split-left">
-                <!-- Step 1: Category & Branch -->
+                <!-- Section 1: Category & Branch -->
                 <div class="form-section">
                     <h6 class="form-section-title"><i class="fas fa-tag"></i> 1. Category & Branch</h6>
                     <div class="row">
@@ -380,10 +409,12 @@
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Branch</label>
-                            <select class="form-select" name="branch">
+                            <select class="form-select" name="branch" id="branchSelect">
                                 <option value="">Select Branch</option>
                                 {% for branch in branches %}
-                                <option value="{{ branch.id }}" {% if product.branch_id == branch.id %}selected{% endif %}>
+                                <option value="{{ branch.id }}" 
+                                    {% if product.branch_id == branch.id %}selected{% endif %}
+                                    {% if not product and branch.is_default %}selected{% endif %}>
                                     {{ branch.name }}
                                 </option>
                                 {% endfor %}
@@ -392,50 +423,78 @@
                     </div>
                 </div>
 
-                <!-- Step 2: Product Details -->
+                <!-- Section 2: Product Details -->
                 <div class="form-section">
                     <h6 class="form-section-title"><i class="fas fa-info-circle"></i> 2. Product Details</h6>
                     <div class="row">
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-3 mb-3">
                             <label class="form-label required">Brand</label>
-                            <input type="text" class="form-control" name="brand" value="{{ product.brand|default:'' }}" required placeholder="e.g., Samsung">
+                            <input type="text" class="form-control" name="brand" 
+                                   value="{% if product %}{{ product.brand|default:'' }}{% else %}{{ form_data.brand|default:'' }}{% endif %}" 
+                                   required placeholder="e.g., Samsung">
                         </div>
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-3 mb-3">
                             <label class="form-label required">Model</label>
                             <input type="text" class="form-control" name="model" 
-                                   value="{% if product_type == 'Phone' %}{{ product.model|default:'' }}{% elif product_type == 'Electronic' %}{{ product.model_number|default:'' }}{% elif product_type == 'Accessory' %}{{ product.model|default:'' }}{% endif %}" 
+                                   value="{% if product %}{% if product_type == 'Phone' %}{{ product.model|default:'' }}{% elif product_type == 'Electronic' %}{{ product.model_number|default:'' }}{% elif product_type == 'Accessory' %}{{ product.model|default:'' }}{% endif %}{% else %}{{ form_data.model|default:'' }}{% endif %}" 
                                    required placeholder="e.g., Galaxy S24">
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Product Name</label>
-                            <input type="text" class="form-control" name="name" value="{{ product.name|default:'' }}" placeholder="Auto-generated if empty">
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Display Name</label>
+                            <input type="text" class="form-control" name="name" 
+                                   value="{% if product %}{{ product.name|default:'' }}{% else %}{{ form_data.name|default:'' }}{% endif %}" 
+                                   placeholder="Auto-generated if empty">
+                            <small class="field-hint">Leave empty to auto-generate</small>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Product Image</label>
+                            <input type="file" class="form-control" name="product_image" accept="image/*">
+                            {% if product and product.image %}
+                            <div class="current-image">
+                                <i class="fas fa-image"></i> Current: {{ product.image.name }}
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
 
-                    <!-- Smartphone Specs -->
-                    <div id="smartphoneSpecs" {% if category_value != 'smartphone' and category_value != 'feature_phone' %}style="display:none;"{% endif %}>
+                    <!-- ==========================================
+                    SMARTPHONE SPECS
+                    ========================================== -->
+                    <div id="smartphoneSpecs" class="spec-section {% if category_value != 'smartphone' %}hidden{% endif %}">
+                        <hr>
+                        <h6 class="text-primary"><i class="fas fa-mobile-alt"></i> Smartphone Specifications</h6>
                         <div class="row">
                             <div class="col-md-3 mb-3">
-                                <label class="form-label">RAM</label>
-                                <input type="text" class="form-control" name="ram" value="{{ product.ram|default:'' }}" placeholder="e.g., 8GB">
+                                <label class="form-label required">RAM</label>
+                                <input type="text" class="form-control" name="ram" 
+                                       value="{% if product %}{{ product.ram|default:'' }}{% else %}{{ form_data.ram|default:'' }}{% endif %}" 
+                                       placeholder="e.g., 8GB" id="smartphoneRam">
                             </div>
                             <div class="col-md-3 mb-3">
-                                <label class="form-label">Storage (ROM)</label>
-                                <input type="text" class="form-control" name="rom" value="{{ product.storage_capacity|default:'' }}" placeholder="e.g., 256GB">
-                            </div>
-                            <div class="col-md-3 mb-3">
-                                <label class="form-label">Screen Size</label>
-                                <input type="text" class="form-control" name="screen_size" value="{{ product.screen_size|default:'' }}" placeholder="e.g., 6.8 inches">
+                                <label class="form-label required">Storage (ROM)</label>
+                                <input type="text" class="form-control" name="rom" 
+                                       value="{% if product %}{{ product.storage_capacity|default:'' }}{% else %}{{ form_data.rom|default:'' }}{% endif %}" 
+                                       placeholder="e.g., 256GB" id="smartphoneRom">
                             </div>
                             <div class="col-md-3 mb-3">
                                 <label class="form-label">Color</label>
-                                <input type="text" class="form-control" name="color" value="{{ product.color|default:'' }}" placeholder="e.g., Black">
+                                <input type="text" class="form-control" name="color" 
+                                       value="{% if product %}{{ product.color|default:'' }}{% else %}{{ form_data.color|default:'' }}{% endif %}" 
+                                       placeholder="e.g., Black">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">Screen Size</label>
+                                <input type="text" class="form-control" name="screen_size" 
+                                       value="{% if product %}{{ product.screen_size|default:'' }}{% else %}{{ form_data.screen_size|default:'' }}{% endif %}" 
+                                       placeholder="e.g., 6.8 inches">
                             </div>
                         </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Battery Capacity</label>
-                                <input type="text" class="form-control" name="battery_capacity" value="{{ product.battery_capacity|default:'' }}" placeholder="e.g., 5000mAh">
+                                <input type="text" class="form-control" name="battery_capacity" 
+                                       value="{% if product %}{{ product.battery_capacity|default:'' }}{% else %}{{ form_data.battery_capacity|default:'' }}{% endif %}" 
+                                       placeholder="e.g., 5000mAh">
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Condition</label>
@@ -448,8 +507,59 @@
                         </div>
                     </div>
 
-                    <!-- Electronics Specs -->
-                    <div id="electronicsSpecs" {% if category_value != 'electronics' %}style="display:none;"{% endif %}>
+                    <!-- ==========================================
+                    FEATURE PHONE SPECS
+                    ========================================== -->
+                    <div id="featurePhoneSpecs" class="spec-section {% if category_value != 'feature_phone' %}hidden{% endif %}">
+                        <hr>
+                        <h6 class="text-warning"><i class="fas fa-phone"></i> Feature Phone Specifications</h6>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Network Type</label>
+                                <select class="form-select" name="network_type">
+                                    <option value="">Select Network...</option>
+                                    <option value="2g" {% if form_data.network_type == '2g' %}selected{% endif %}>2G</option>
+                                    <option value="3g" {% if form_data.network_type == '3g' %}selected{% endif %}>3G</option>
+                                    <option value="4g" {% if form_data.network_type == '4g' %}selected{% endif %}>4G</option>
+                                    <option value="dual_sim" {% if form_data.network_type == 'dual_sim' %}selected{% endif %}>Dual SIM</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Screen Size</label>
+                                <input type="text" class="form-control" name="screen_size" 
+                                       value="{% if product %}{{ product.screen_size|default:'' }}{% else %}{{ form_data.screen_size|default:'' }}{% endif %}" 
+                                       placeholder="e.g., 2.4 inches">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Battery Capacity</label>
+                                <input type="text" class="form-control" name="battery_capacity" 
+                                       value="{% if product %}{{ product.battery_capacity|default:'' }}{% else %}{{ form_data.battery_capacity|default:'' }}{% endif %}" 
+                                       placeholder="e.g., 1200mAh">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Color</label>
+                                <input type="text" class="form-control" name="color" 
+                                       value="{% if product %}{{ product.color|default:'' }}{% else %}{{ form_data.color|default:'' }}{% endif %}" 
+                                       placeholder="e.g., Blue">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Features</label>
+                                <input type="text" class="form-control" name="features" 
+                                       value="{% if product %}{{ product.features|default:'' }}{% else %}{{ form_data.features|default:'' }}{% endif %}" 
+                                       placeholder="e.g., FM Radio, Torch, Camera">
+                                <small class="field-hint">Separate features with commas</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ==========================================
+                    ELECTRONICS SPECS
+                    ========================================== -->
+                    <div id="electronicsSpecs" class="spec-section {% if category_value != 'electronics' %}hidden{% endif %}">
+                        <hr>
+                        <h6 class="text-success"><i class="fas fa-laptop"></i> Electronics Specifications</h6>
                         <div class="row">
                             <div class="col-md-4 mb-3">
                                 <label class="form-label">Device Type</label>
@@ -465,99 +575,131 @@
                                 </select>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label class="form-label">Processor</label>
-                                <input type="text" class="form-control" name="processor" value="{{ product.processor|default:'' }}" placeholder="e.g., Intel Core i7">
+                                <label class="form-label required">RAM</label>
+                                <input type="text" class="form-control" name="ram" 
+                                       value="{% if product %}{{ product.ram|default:'' }}{% else %}{{ form_data.ram|default:'' }}{% endif %}" 
+                                       placeholder="e.g., 16GB" id="electronicRam">
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label class="form-label">Storage</label>
-                                <input type="text" class="form-control" name="storage" value="{{ product.storage|default:'' }}" placeholder="e.g., 512GB SSD">
+                                <label class="form-label required">Storage (ROM)</label>
+                                <input type="text" class="form-control" name="storage" 
+                                       value="{% if product %}{{ product.storage|default:'' }}{% else %}{{ form_data.storage|default:'' }}{% endif %}" 
+                                       placeholder="e.g., 512GB SSD" id="electronicRom">
                             </div>
                         </div>
                         <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">RAM</label>
-                                <input type="text" class="form-control" name="ram" value="{{ product.ram|default:'' }}" placeholder="e.g., 16GB">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label required">Processor</label>
+                                <input type="text" class="form-control" name="processor" 
+                                       value="{% if product %}{{ product.processor|default:'' }}{% else %}{{ form_data.processor|default:'' }}{% endif %}" 
+                                       placeholder="e.g., Intel Core i7">
                             </div>
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Screen Size</label>
+                                <input type="text" class="form-control" name="screen_size" 
+                                       value="{% if product %}{{ product.screen_size|default:'' }}{% else %}{{ form_data.screen_size|default:'' }}{% endif %}" 
+                                       placeholder="e.g., 15.6 inches">
+                            </div>
+                            <div class="col-md-4 mb-3">
                                 <label class="form-label">Color</label>
-                                <input type="text" class="form-control" name="color" value="{{ product.color|default:'' }}" placeholder="e.g., Silver">
+                                <input type="text" class="form-control" name="color" 
+                                       value="{% if product %}{{ product.color|default:'' }}{% else %}{{ form_data.color|default:'' }}{% endif %}" 
+                                       placeholder="e.g., Silver">
                             </div>
                         </div>
                     </div>
 
-                    <!-- Accessory Specs -->
-                    <div id="accessorySpecs" {% if category_value != 'accessory' %}style="display:none;"{% endif %}>
+                    <!-- ==========================================
+                    ACCESSORY SPECS
+                    ========================================== -->
+                    <div id="accessorySpecs" class="spec-section {% if category_value != 'accessory' %}hidden{% endif %}">
+                        <hr>
+                        <h6 class="text-info"><i class="fas fa-headphones"></i> Accessory Specifications</h6>
                         <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label ">Accessory Type</label>
-                                <select class="form-select" name="accessory_type">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label required">Accessory Type</label>
+                                <select class="form-select" name="accessory_type" id="accessoryType">
                                     <option value="">Select Type...</option>
                                     <option value="phone_accessory" {% if product.accessory_type == 'phone_accessory' %}selected{% endif %}>📱 Phone Accessory</option>
                                     <option value="electronic_accessory" {% if product.accessory_type == 'electronic_accessory' %}selected{% endif %}>💻 Electronic Accessory</option>
                                     <option value="other" {% if product.accessory_type == 'other' %}selected{% endif %}>🔧 Other</option>
                                 </select>
-                                <small class="field-hint">Choose the category of accessory</small>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Barcode</label>
-                                <input type="text" class="form-control" name="barcode" value="{{ product.compatible_phone_models|default:'' }}" placeholder="Enter barcode" id="barcodeInput" oninput="updateAccessoryPreview()">
-                                <small class="field-hint">Optional barcode for scanning</small>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Size</label>
+                                <input type="text" class="form-control" name="size" 
+                                       value="{% if product %}{{ product.size|default:'' }}{% else %}{{ form_data.size|default:'' }}{% endif %}" 
+                                       placeholder="e.g., Large, Medium, Small">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Color</label>
+                                <input type="text" class="form-control" name="color" 
+                                       value="{% if product %}{{ product.color|default:'' }}{% else %}{{ form_data.color|default:'' }}{% endif %}" 
+                                       placeholder="e.g., Black">
                             </div>
                         </div>
                         <div class="row">
                             <div class="col-md-12 mb-3">
-                                <label class="form-label">Product Image</label>
-                                <input type="file" class="form-control" name="product_image" accept="image/*" id="productImage" onchange="updateAccessoryPreview()">
-                                {% if product.image %}
-                                <div class="current-image">
-                                    <i class="fas fa-image"></i> Current: {{ product.image.name }}
-                                </div>
-                                {% endif %}
-                                <small class="field-hint">Upload a new image to replace the current one</small>
+                                <label class="form-label">Barcode</label>
+                                <input type="text" class="form-control" name="barcode" 
+                                       value="{% if product %}{{ product.compatible_phone_models|default:'' }}{% else %}{{ form_data.barcode|default:'' }}{% endif %}" 
+                                       placeholder="Enter barcode" id="barcodeInput">
+                                <small class="field-hint">Optional barcode for scanning</small>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Step 3: Pricing -->
+                <!-- Section 3: Pricing -->
                 <div class="form-section">
                     <h6 class="form-section-title"><i class="fas fa-money-bill-wave"></i> 3. Pricing</h6>
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label class="form-label required">Buying Price</label>
-                            <input type="number" class="form-control" name="purchase_price" value="{{ product.purchase_price|floatformat:2|default:'' }}" required step="0.01" min="0" placeholder="0.00">
+                            <input type="number" class="form-control" name="purchase_price" 
+                                   value="{% if product %}{{ product.purchase_price|floatformat:2 }}{% else %}{{ form_data.purchase_price|default:'' }}{% endif %}" 
+                                   required step="0.01" min="0" placeholder="0.00">
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label required">Selling Price</label>
-                            <input type="number" class="form-control" name="selling_price" value="{{ product.selling_price|floatformat:2|default:'' }}" required step="0.01" min="0" placeholder="0.00">
+                            <input type="number" class="form-control" name="selling_price" 
+                                   value="{% if product %}{{ product.selling_price|floatformat:2 }}{% else %}{{ form_data.selling_price|default:'' }}{% endif %}" 
+                                   required step="0.01" min="0" placeholder="0.00">
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label">Best Price</label>
-                            <input type="number" class="form-control" name="best_price" value="{{ product.best_price|floatformat:2|default:'' }}" step="0.01" min="0" placeholder="Optional">
+                            <input type="number" class="form-control" name="best_price" 
+                                   value="{% if product and product.best_price %}{{ product.best_price|floatformat:2 }}{% else %}{{ form_data.best_price|default:'' }}{% endif %}" 
+                                   step="0.01" min="0" placeholder="Optional">
+                            <small class="field-hint">Minimum price you can sell at</small>
                         </div>
                     </div>
                 </div>
 
-                <!-- Step 4: Stock & Identifiers -->
+                <!-- Section 4: Stock & Identifiers -->
                 <div class="form-section" id="identifiersSection">
                     <h6 class="form-section-title"><i class="fas fa-qrcode"></i> 4. Stock & Identifiers</h6>
                     
                     <!-- Accessory Stock (simple quantity) -->
-                    <div id="accessoryStock" {% if category_value != 'accessory' %}style="display:none;"{% endif %}>
+                    <div id="accessoryStock" class="{% if category_value != 'accessory' %}hidden{% endif %}">
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label required">Quantity in Stock</label>
-                                <input type="number" class="form-control" name="quantity" value="{{ product.quantity_in_stock|default:0 }}" min="0" placeholder="0" id="accessoryQuantity" oninput="updateAccessoryPreview()">
+                                <input type="number" class="form-control" name="quantity" 
+                                       value="{% if product %}{{ product.quantity_in_stock|default:0 }}{% else %}{{ form_data.quantity|default:0 }}{% endif %}" 
+                                       min="0" placeholder="0" id="accessoryQuantity">
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Min Stock Level</label>
-                                <input type="number" class="form-control" name="min_stock" value="{{ product.minimum_stock_level|default:5 }}" min="0" placeholder="5">
+                                <input type="number" class="form-control" name="min_stock" 
+                                       value="{% if product %}{{ product.minimum_stock_level|default:5 }}{% else %}{{ form_data.min_stock|default:5 }}{% endif %}" 
+                                       min="0" placeholder="5">
                             </div>
                         </div>
                     </div>
 
-                    <!-- Add Identifier Form -->
-                    <div id="identifierInputArea" {% if category_value == 'accessory' %}style="display:none;"{% endif %}>
+                    <!-- Add Identifier Form (IMEI/Serial) -->
+                    <div id="identifierInputArea" class="{% if category_value == 'accessory' or category_value == '' %}hidden{% endif %}">
                         <div class="add-unit-form">
                             <input type="text" class="form-control" id="unitInput" 
                                 placeholder="Enter IMEI or Serial Number">
@@ -586,6 +728,7 @@
                                 </button>
                             </div>
                         </div>
+                        <small class="field-hint">Add individual units or bulk add multiple at once</small>
                     </div>
                     
                     <input type="hidden" name="units" id="unitsData" value="{{ units_json|default:'[]' }}">
@@ -599,14 +742,19 @@
                 <div class="panel-header">
                     <h6><i class="fas fa-list-ul text-primary"></i> 
                         <span id="previewTitle">
-                            {% if category_value == 'smartphone' or category_value == 'feature_phone' %}IMEI Numbers
+                            {% if category_value == 'smartphone' %}IMEI Numbers (Smartphone)
+                            {% elif category_value == 'feature_phone' %}IMEI Numbers (Feature Phone)
                             {% elif category_value == 'electronics' %}Serial Numbers
                             {% elif category_value == 'accessory' %}Accessory Details
                             {% else %}Identifiers List{% endif %}
                         </span>
                     </h6>
                     <span class="badge bg-primary" id="countBadge">
-                        {% if category_value == 'accessory' %}{{ product.quantity_in_stock|default:0 }}{% else %}{{ units|length }}{% endif %}
+                        {% if category_value == 'accessory' %}
+                            {% if product %}{{ product.quantity_in_stock|default:0 }}{% else %}{{ form_data.quantity|default:0 }}{% endif %}
+                        {% else %}
+                            {{ units|length }}
+                        {% endif %}
                     </span>
                 </div>
 
@@ -636,40 +784,7 @@
                     </div>
                 </div>
 
-                <!-- Accessory Preview (shown for accessories) -->
-                <div id="accessoryPreview" {% if category_value != 'accessory' %}style="display:none;"{% endif %}>
-                    <div class="accessory-preview">
-                        <div class="image-preview" id="imagePreview">
-                            {% if product.image %}
-                            <img src="{{ product.image.url }}" alt="{{ product.name }}">
-                            {% else %}
-                            <div class="no-image">
-                                <i class="fas fa-image"></i>
-                                <span>No image</span>
-                            </div>
-                            {% endif %}
-                        </div>
-                        <div class="barcode-placeholder">
-                            <i class="fas fa-barcode"></i>
-                        </div>
-                        <div class="barcode-number" id="barcodeDisplay">
-                            {{ product.compatible_phone_models|default:'No Barcode' }}
-                        </div>
-                        <div class="mt-2">
-                            <small class="text-muted">Stock: <span id="stockDisplay">{{ product.quantity_in_stock|default:0 }}</span> units</small>
-                        </div>
-                        <div class="mt-1">
-                            <span class="accessory-type-badge 
-                                {% if product.accessory_type == 'phone_accessory' %}phone
-                                {% elif product.accessory_type == 'electronic_accessory' %}electronic
-                                {% else %}other{% endif %}">
-                                {{ product.get_accessory_type_display|default:'Uncategorized' }}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- List -->
+                <!-- Units List -->
                 <div id="unitsList">
                     {% if units %}
                         {% for unit in units %}
@@ -698,7 +813,7 @@
 
         <!-- Form Actions -->
         <div class="form-actions">
-            <button type="submit" class="btn btn-success btn-lg">
+            <button type="submit" class="btn btn-success btn-lg" id="submitBtn">
                 <i class="fas fa-save"></i> {% if is_edit %}Update Product{% else %}Save Product{% endif %}
             </button>
             {% if not is_edit %}
@@ -717,19 +832,25 @@
 JAVASCRIPT
 ============================================ -->
 <script>
+// Global variables
 let units = [];
+let categoryValue = '{{ category_value|default:"" }}';
 
 // ============================================
 // LOAD EXISTING UNITS
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
     const unitsData = document.getElementById('unitsData');
-    if (unitsData && unitsData.value && unitsData.value !== '[]') {
+    if (unitsData && unitsData.value) {
         try {
-            units = JSON.parse(unitsData.value);
-            renderUnits();
-            updateStats();
+            const parsedUnits = JSON.parse(unitsData.value);
+            if (Array.isArray(parsedUnits) && parsedUnits.length > 0) {
+                units = parsedUnits;
+                renderUnits();
+                updateStats();
+            }
         } catch(e) {
+            console.error('Error parsing units data:', e);
             units = [];
         }
     }
@@ -737,12 +858,18 @@ document.addEventListener('DOMContentLoaded', function() {
     // Set initial category toggle
     const categorySelect = document.getElementById('categorySelect');
     if (categorySelect) {
+        if (categoryValue) {
+            categorySelect.value = categoryValue;
+        }
         categorySelect.dispatchEvent(new Event('change'));
     }
+    
+    // Auto-generate name on input change
+    setupAutoNameGeneration();
 });
 
 // ============================================
-// CATEGORY TOGGLE
+// CATEGORY TOGGLE - FULLY FIXED
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
     const categorySelect = document.getElementById('categorySelect');
@@ -750,77 +877,280 @@ document.addEventListener('DOMContentLoaded', function() {
     categorySelect.addEventListener('change', function() {
         const value = this.value;
         
-        // Hide all
-        document.getElementById('smartphoneSpecs').style.display = 'none';
-        document.getElementById('electronicsSpecs').style.display = 'none';
-        document.getElementById('accessorySpecs').style.display = 'none';
-        document.getElementById('accessoryStock').style.display = 'none';
-        document.getElementById('identifierInputArea').style.display = 'block';
-        document.getElementById('unitStats').style.display = 'flex';
-        document.getElementById('accessoryPreview').style.display = 'none';
-        document.getElementById('previewTitle').textContent = 'Identifiers List';
+        // Hide all spec sections
+        document.querySelectorAll('.spec-section').forEach(el => {
+            el.classList.add('hidden');
+        });
         
-        if (value === 'smartphone' || value === 'feature_phone') {
-            document.getElementById('smartphoneSpecs').style.display = 'block';
-            document.getElementById('unitInput').placeholder = 'Enter IMEI number';
-            document.getElementById('previewTitle').textContent = 'IMEI Numbers';
+        // Get references
+        const smartphoneSpecs = document.getElementById('smartphoneSpecs');
+        const featurePhoneSpecs = document.getElementById('featurePhoneSpecs');
+        const electronicsSpecs = document.getElementById('electronicsSpecs');
+        const accessorySpecs = document.getElementById('accessorySpecs');
+        const identifierArea = document.getElementById('identifierInputArea');
+        const unitStats = document.getElementById('unitStats');
+        const accessoryStock = document.getElementById('accessoryStock');
+        const unitInput = document.getElementById('unitInput');
+        const previewTitle = document.getElementById('previewTitle');
+        
+        // Smartphone RAM and ROM fields
+        const smartphoneRam = document.getElementById('smartphoneRam');
+        const smartphoneRom = document.getElementById('smartphoneRom');
+        const electronicRam = document.getElementById('electronicRam');
+        const electronicRom = document.getElementById('electronicRom');
+        const processorField = document.querySelector('input[name="processor"]');
+        
+        if (value === 'smartphone') {
+            // Show smartphone specs
+            if (smartphoneSpecs) smartphoneSpecs.classList.remove('hidden');
+            
+            // Show identifier area
+            if (identifierArea) {
+                identifierArea.classList.remove('hidden');
+                identifierArea.style.display = 'block';
+            }
+            if (unitStats) unitStats.style.display = 'flex';
+            if (accessoryStock) accessoryStock.classList.add('hidden');
+            if (previewTitle) previewTitle.textContent = 'IMEI Numbers (Smartphone)';
+            if (unitInput) {
+                unitInput.placeholder = 'Enter IMEI number';
+                unitInput.disabled = false;
+            }
+            
+            // ENABLE and REQUIRE smartphone RAM/ROM
+            if (smartphoneRam) {
+                smartphoneRam.disabled = false;
+                smartphoneRam.required = true;
+                smartphoneRam.style.display = 'block';
+            }
+            if (smartphoneRom) {
+                smartphoneRom.disabled = false;
+                smartphoneRom.required = true;
+                smartphoneRom.style.display = 'block';
+            }
+            // DISABLE electronics fields
+            if (electronicRam) {
+                electronicRam.disabled = true;
+                electronicRam.required = false;
+                electronicRam.style.display = 'none';
+            }
+            if (electronicRom) {
+                electronicRom.disabled = true;
+                electronicRom.required = false;
+                electronicRom.style.display = 'none';
+            }
+            if (processorField) {
+                processorField.disabled = true;
+                processorField.required = false;
+            }
+            
+        } else if (value === 'feature_phone') {
+            if (featurePhoneSpecs) featurePhoneSpecs.classList.remove('hidden');
+            
+            if (identifierArea) {
+                identifierArea.classList.remove('hidden');
+                identifierArea.style.display = 'block';
+            }
+            if (unitStats) unitStats.style.display = 'flex';
+            if (accessoryStock) accessoryStock.classList.add('hidden');
+            if (previewTitle) previewTitle.textContent = 'IMEI Numbers (Feature Phone)';
+            if (unitInput) {
+                unitInput.placeholder = 'Enter IMEI number';
+                unitInput.disabled = false;
+            }
+            
+            // ENABLE but NOT REQUIRE smartphone RAM/ROM (optional)
+            if (smartphoneRam) {
+                smartphoneRam.disabled = false;
+                smartphoneRam.required = false;
+                smartphoneRam.style.display = 'block';
+            }
+            if (smartphoneRom) {
+                smartphoneRom.disabled = false;
+                smartphoneRom.required = false;
+                smartphoneRom.style.display = 'block';
+            }
+            // DISABLE electronics fields
+            if (electronicRam) {
+                electronicRam.disabled = true;
+                electronicRam.required = false;
+                electronicRam.style.display = 'none';
+            }
+            if (electronicRom) {
+                electronicRom.disabled = true;
+                electronicRom.required = false;
+                electronicRom.style.display = 'none';
+            }
+            if (processorField) {
+                processorField.disabled = true;
+                processorField.required = false;
+            }
+            
         } else if (value === 'electronics') {
-            document.getElementById('electronicsSpecs').style.display = 'block';
-            document.getElementById('unitInput').placeholder = 'Enter Serial Number';
-            document.getElementById('previewTitle').textContent = 'Serial Numbers';
+            if (electronicsSpecs) electronicsSpecs.classList.remove('hidden');
+            
+            if (identifierArea) {
+                identifierArea.classList.remove('hidden');
+                identifierArea.style.display = 'block';
+            }
+            if (unitStats) unitStats.style.display = 'flex';
+            if (accessoryStock) accessoryStock.classList.add('hidden');
+            if (previewTitle) previewTitle.textContent = 'Serial Numbers';
+            if (unitInput) {
+                unitInput.placeholder = 'Enter Serial Number';
+                unitInput.disabled = false;
+            }
+            
+            // DISABLE smartphone fields
+            if (smartphoneRam) {
+                smartphoneRam.disabled = true;
+                smartphoneRam.required = false;
+                smartphoneRam.style.display = 'none';
+            }
+            if (smartphoneRom) {
+                smartphoneRom.disabled = true;
+                smartphoneRom.required = false;
+                smartphoneRom.style.display = 'none';
+            }
+            // ENABLE and REQUIRE electronics fields
+            if (electronicRam) {
+                electronicRam.disabled = false;
+                electronicRam.required = true;
+                electronicRam.style.display = 'block';
+            }
+            if (electronicRom) {
+                electronicRom.disabled = false;
+                electronicRom.required = true;
+                electronicRom.style.display = 'block';
+            }
+            if (processorField) {
+                processorField.disabled = false;
+                processorField.required = true;
+            }
+            
         } else if (value === 'accessory') {
-            document.getElementById('accessorySpecs').style.display = 'block';
-            document.getElementById('accessoryStock').style.display = 'block';
-            document.getElementById('identifierInputArea').style.display = 'none';
-            document.getElementById('unitStats').style.display = 'none';
-            document.getElementById('accessoryPreview').style.display = 'block';
-            document.getElementById('previewTitle').textContent = 'Accessory Details';
-            updateAccessoryPreview();
+            if (accessorySpecs) accessorySpecs.classList.remove('hidden');
+            
+            // CRITICAL: HIDE the IMEI/Serial input area
+            if (identifierArea) {
+                identifierArea.classList.add('hidden');
+                identifierArea.style.display = 'none';
+            }
+            
+            if (accessoryStock) {
+                accessoryStock.classList.remove('hidden');
+                accessoryStock.style.display = 'block';
+            }
+            if (unitStats) unitStats.style.display = 'none';
+            if (previewTitle) previewTitle.textContent = 'Accessory Details';
+            if (unitInput) {
+                unitInput.disabled = true;
+            }
+            
+            // DISABLE ALL RAM/ROM fields
+            if (smartphoneRam) {
+                smartphoneRam.disabled = true;
+                smartphoneRam.required = false;
+                smartphoneRam.style.display = 'none';
+            }
+            if (smartphoneRom) {
+                smartphoneRom.disabled = true;
+                smartphoneRom.required = false;
+                smartphoneRom.style.display = 'none';
+            }
+            if (electronicRam) {
+                electronicRam.disabled = true;
+                electronicRam.required = false;
+                electronicRam.style.display = 'none';
+            }
+            if (electronicRom) {
+                electronicRom.disabled = true;
+                electronicRom.required = false;
+                electronicRom.style.display = 'none';
+            }
+            if (processorField) {
+                processorField.disabled = true;
+                processorField.required = false;
+            }
+            
         } else {
-            document.getElementById('identifierInputArea').style.display = 'none';
-            document.getElementById('unitStats').style.display = 'none';
+            // No category selected
+            if (identifierArea) {
+                identifierArea.classList.add('hidden');
+                identifierArea.style.display = 'none';
+            }
+            if (unitStats) unitStats.style.display = 'none';
+            if (accessoryStock) accessoryStock.classList.add('hidden');
+            if (previewTitle) previewTitle.textContent = 'Select a category first';
+            if (unitInput) unitInput.disabled = true;
         }
+        
+        // Update the units data
+        updateUnitsData();
     });
 });
 
 // ============================================
-// ACCESSORY PREVIEW
+// AUTO-GENERATE PRODUCT NAME - FIXED
 // ============================================
-function updateAccessoryPreview() {
-    const barcode = document.getElementById('barcodeInput');
-    const quantity = document.getElementById('accessoryQuantity');
-    const imageInput = document.getElementById('productImage');
+function setupAutoNameGeneration() {
+    const brandInput = document.querySelector('input[name="brand"]');
+    const modelInput = document.querySelector('input[name="model"]');
+    const nameInput = document.querySelector('input[name="name"]');
+    const categorySelect = document.getElementById('categorySelect');
     
-    // Update barcode display
-    const barcodeDisplay = document.getElementById('barcodeDisplay');
-    if (barcode && barcode.value) {
-        barcodeDisplay.textContent = barcode.value;
-        barcodeDisplay.style.color = '#2d3436';
-    } else {
-        const existingBarcode = '{{ product.compatible_phone_models|default:"" }}';
-        if (existingBarcode) {
-            barcodeDisplay.textContent = existingBarcode;
-        } else {
-            barcodeDisplay.textContent = 'No Barcode';
-            barcodeDisplay.style.color = '#adb5bd';
+    function generateName() {
+        const brand = brandInput ? brandInput.value.trim() : '';
+        const model = modelInput ? modelInput.value.trim() : '';
+        const category = categorySelect ? categorySelect.value : '';
+        
+        // Only auto-generate if name is empty
+        if (nameInput && nameInput.value.trim() === '') {
+            if (brand && model) {
+                let name = `${brand} ${model}`;
+                
+                // Add specs based on category
+                if (category === 'smartphone') {
+                    const ram = document.getElementById('smartphoneRam');
+                    const rom = document.getElementById('smartphoneRom');
+                    if (ram && ram.value && ram.value.trim()) {
+                        name += ` ${ram.value.trim()}`;
+                    }
+                    if (rom && rom.value && rom.value.trim()) {
+                        name += ` ${rom.value.trim()}`;
+                    }
+                } else if (category === 'feature_phone') {
+                    const network = document.querySelector('select[name="network_type"]');
+                    if (network && network.value && network.value !== '') {
+                        name += ` (${network.value.toUpperCase()})`;
+                    }
+                } else if (category === 'electronics') {
+                    const ram = document.getElementById('electronicRam');
+                    const rom = document.getElementById('electronicRom');
+                    if (ram && ram.value && ram.value.trim()) {
+                        name += ` ${ram.value.trim()}`;
+                    }
+                    if (rom && rom.value && rom.value.trim()) {
+                        name += ` ${rom.value.trim()}`;
+                    }
+                }
+                
+                nameInput.value = name.trim();
+            }
         }
     }
     
-    // Update stock display
-    const stockDisplay = document.getElementById('stockDisplay');
-    if (quantity) {
-        stockDisplay.textContent = quantity.value || 0;
-    }
+    // Listen to changes on brand and model
+    if (brandInput) brandInput.addEventListener('input', generateName);
+    if (modelInput) modelInput.addEventListener('input', generateName);
     
-    // Update image preview
-    const imagePreview = document.getElementById('imagePreview');
-    if (imageInput && imageInput.files && imageInput.files[0]) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            imagePreview.innerHTML = `<img src="${e.target.result}" alt="Product Image">`;
-        };
-        reader.readAsDataURL(imageInput.files[0]);
-    }
+    // Also listen to spec changes for auto-generation
+    document.querySelectorAll('#smartphoneRam, #smartphoneRom, #electronicRam, #electronicRom, select[name="network_type"]').forEach(el => {
+        if (el) {
+            el.addEventListener('input', generateName);
+            el.addEventListener('change', generateName);
+        }
+    });
 }
 
 // ============================================
@@ -846,6 +1176,7 @@ function addUnit() {
     input.focus();
     renderUnits();
     updateStats();
+    updateUnitsData();
 }
 
 function bulkAdd() {
@@ -879,6 +1210,7 @@ function bulkAdd() {
     toggleBulk();
     renderUnits();
     updateStats();
+    updateUnitsData();
     alert(`✅ ${newUnits.length} units added successfully!`);
 }
 
@@ -887,18 +1219,20 @@ function removeUnit(index) {
     units.splice(index, 1);
     renderUnits();
     updateStats();
+    updateUnitsData();
 }
 
 function toggleBulk() {
     const bulk = document.getElementById('bulkAdd');
-    bulk.classList.toggle('visible');
+    if (bulk) {
+        bulk.classList.toggle('visible');
+    }
 }
 
 function renderUnits() {
     const list = document.getElementById('unitsList');
-    const hidden = document.getElementById('unitsData');
     
-    if (hidden) hidden.value = JSON.stringify(units);
+    if (!list) return;
     
     if (units.length === 0) {
         list.innerHTML = `<div class="no-units">
@@ -913,7 +1247,7 @@ function renderUnits() {
     units.forEach((unit, index) => {
         html += `<div class="unit-item">
             <div>
-                <span class="unit-identifier">${unit.identifier}</span>
+                <span class="unit-identifier">${escapeHtml(unit.identifier)}</span>
                 <span class="unit-status-badge ${unit.status}">${unit.status}</span>
             </div>
             <div class="unit-actions">
@@ -932,14 +1266,33 @@ function updateStats() {
     const reserved = units.filter(u => u.status === 'reserved').length;
     const repair = units.filter(u => u.status === 'repair').length;
     
-    document.getElementById('totalCount').textContent = total;
-    document.getElementById('availableCount').textContent = available;
-    document.getElementById('reservedCount').textContent = reserved;
-    document.getElementById('repairCount').textContent = repair;
-    document.getElementById('countBadge').textContent = total;
+    const totalEl = document.getElementById('totalCount');
+    const availableEl = document.getElementById('availableCount');
+    const reservedEl = document.getElementById('reservedCount');
+    const repairEl = document.getElementById('repairCount');
+    const badgeEl = document.getElementById('countBadge');
+    
+    if (totalEl) totalEl.textContent = total;
+    if (availableEl) availableEl.textContent = available;
+    if (reservedEl) reservedEl.textContent = reserved;
+    if (repairEl) repairEl.textContent = repair;
+    if (badgeEl) badgeEl.textContent = total;
 }
 
-// Enter key support
+function updateUnitsData() {
+    const hidden = document.getElementById('unitsData');
+    if (hidden) {
+        hidden.value = JSON.stringify(units);
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Enter key support for adding units
 document.addEventListener('DOMContentLoaded', function() {
     const input = document.getElementById('unitInput');
     if (input) {
@@ -949,6 +1302,122 @@ document.addEventListener('DOMContentLoaded', function() {
                 addUnit();
             }
         });
+    }
+});
+
+// ============================================
+// FORM VALIDATION BEFORE SUBMIT
+// ============================================
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('productForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const category = document.getElementById('categorySelect').value;
+            
+            // For smartphones - validate RAM and ROM
+            if (category === 'smartphone') {
+                const ram = document.getElementById('smartphoneRam');
+                const rom = document.getElementById('smartphoneRom');
+                
+                if (!ram || !ram.value || ram.value.trim() === '') {
+                    e.preventDefault();
+                    alert('RAM is required for smartphones.');
+                    ram.focus();
+                    return false;
+                }
+                
+                if (!rom || !rom.value || rom.value.trim() === '') {
+                    e.preventDefault();
+                    alert('Storage (ROM) is required for smartphones.');
+                    rom.focus();
+                    return false;
+                }
+                
+                if (units.length === 0) {
+                    e.preventDefault();
+                    alert('Please add at least one IMEI number before saving.');
+                    return false;
+                }
+            }
+            
+            // For feature phones - only check units
+            if (category === 'feature_phone') {
+                if (units.length === 0) {
+                    e.preventDefault();
+                    alert('Please add at least one IMEI number before saving.');
+                    return false;
+                }
+            }
+            
+            // For electronics - validate RAM, Storage, Processor
+            if (category === 'electronics') {
+                const ram = document.getElementById('electronicRam');
+                const rom = document.getElementById('electronicRom');
+                const processor = document.querySelector('input[name="processor"]');
+                
+                if (!ram || !ram.value || ram.value.trim() === '') {
+                    e.preventDefault();
+                    alert('RAM is required for electronics.');
+                    ram.focus();
+                    return false;
+                }
+                
+                if (!rom || !rom.value || rom.value.trim() === '') {
+                    e.preventDefault();
+                    alert('Storage is required for electronics.');
+                    rom.focus();
+                    return false;
+                }
+                
+                if (!processor || !processor.value || processor.value.trim() === '') {
+                    e.preventDefault();
+                    alert('Processor is required for electronics.');
+                    processor.focus();
+                    return false;
+                }
+                
+                if (units.length === 0) {
+                    e.preventDefault();
+                    alert('Please add at least one Serial number before saving.');
+                    return false;
+                }
+            }
+            
+            // For accessories - validate accessory-specific fields
+            if (category === 'accessory') {
+                const accessoryType = document.getElementById('accessoryType');
+                const quantity = document.getElementById('accessoryQuantity');
+                
+                if (!accessoryType || !accessoryType.value) {
+                    e.preventDefault();
+                    alert('Please select an accessory type.');
+                    accessoryType.focus();
+                    return false;
+                }
+                
+                if (quantity && parseInt(quantity.value) <= 0) {
+                    e.preventDefault();
+                    alert('Please enter a quantity greater than 0 for this accessory.');
+                    quantity.focus();
+                    return false;
+                }
+            }
+            
+            return true;
+        });
+    }
+});
+
+// ============================================
+// ADDITIONAL SAFETY: Force hide on page load if accessory
+// ============================================
+document.addEventListener('DOMContentLoaded', function() {
+    if (categoryValue === 'accessory') {
+        const identifierArea = document.getElementById('identifierInputArea');
+        if (identifierArea) {
+            identifierArea.classList.add('hidden');
+            identifierArea.style.display = 'none';
+        }
     }
 });
 </script>
