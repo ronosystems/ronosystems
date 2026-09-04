@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}RS{% endblock %}
+{% block title %}Edit Product - RonoSystems{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -115,7 +115,6 @@
         color: #c82333;
     }
     
-    /* Empty State */
     .no-units {
         text-align: center;
         padding: 40px 20px;
@@ -248,7 +247,6 @@
         }
     }
     
-    /* Scrollbar styling */
     .split-right::-webkit-scrollbar {
         width: 6px;
     }
@@ -308,7 +306,20 @@
         margin-bottom: 8px;
     }
     
-    /* Existing image in edit mode */
+    /* Accessory type badge */
+    .accessory-type-badge {
+        display: inline-block;
+        padding: 3px 12px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    .accessory-type-badge.phone { background: #dbeafe; color: #1e40af; }
+    .accessory-type-badge.electronic { background: #d1fae5; color: #065f46; }
+    .accessory-type-badge.other { background: #fef3c7; color: #92400e; }
+    
+    /* Current image in edit mode */
     .current-image {
         display: inline-block;
         padding: 5px 10px;
@@ -473,21 +484,19 @@
                     <div id="accessorySpecs" {% if product_type != 'Accessory' %}style="display:none;"{% endif %}>
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Accessory Type</label>
-                                <select class="form-select" name="accessory_type">
-                                    <option value="case" {% if product.accessory_type == 'case' %}selected{% endif %}>Phone Case</option>
-                                    <option value="charger" {% if product.accessory_type == 'charger' %}selected{% endif %}>Charger</option>
-                                    <option value="cable" {% if product.accessory_type == 'cable' %}selected{% endif %}>Cable</option>
-                                    <option value="headphone" {% if product.accessory_type == 'headphone' %}selected{% endif %}>Headphone</option>
-                                    <option value="earphone" {% if product.accessory_type == 'earphone' %}selected{% endif %}>Earphone</option>
-                                    <option value="screen_protector" {% if product.accessory_type == 'screen_protector' %}selected{% endif %}>Screen Protector</option>
-                                    <option value="power_bank" {% if product.accessory_type == 'power_bank' %}selected{% endif %}>Power Bank</option>
-                                    <option value="other" {% if product.accessory_type == 'other' %}selected{% endif %}>Other</option>
+                                <label class="form-label required">Accessory Type</label>
+                                <select class="form-select" name="accessory_type" required>
+                                    <option value="">Select Type...</option>
+                                    <option value="phone_accessory" {% if product.accessory_type == 'phone_accessory' %}selected{% endif %}>📱 Phone Accessory</option>
+                                    <option value="electronic_accessory" {% if product.accessory_type == 'electronic_accessory' %}selected{% endif %}>💻 Electronic Accessory</option>
+                                    <option value="other" {% if product.accessory_type == 'other' %}selected{% endif %}>🔧 Other</option>
                                 </select>
+                                <small class="field-hint">Choose the category of accessory</small>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Barcode</label>
                                 <input type="text" class="form-control" name="barcode" value="{{ product.compatible_phone_models|default:'' }}" placeholder="Enter barcode" id="barcodeInput" oninput="updateAccessoryPreview()">
+                                <small class="field-hint">Optional barcode for scanning</small>
                             </div>
                         </div>
                         <div class="row">
@@ -499,6 +508,7 @@
                                     <i class="fas fa-image"></i> Current: {{ product.image.name }}
                                 </div>
                                 {% endif %}
+                                <small class="field-hint">Upload a new image to replace the current one</small>
                             </div>
                         </div>
                     </div>
@@ -523,7 +533,7 @@
                     </div>
                 </div>
 
-                <!-- Step 4: Stock / Identifiers -->
+                <!-- Step 4: Stock & Identifiers -->
                 <div class="form-section" id="identifiersSection">
                     <h6 class="form-section-title"><i class="fas fa-qrcode"></i> 4. Stock & Identifiers</h6>
                     
@@ -603,21 +613,22 @@
                     </div>
                     <div class="unit-stat">
                         <strong class="count-available" id="availableCount">
-                            {% for unit in units %}{% if unit.status == 'available' %}{% with count=forloop.counter %}{% endwith %}{% endif %}{% endfor %}
-                            {% with available=0 %}{% for unit in units %}{% if unit.status == 'available' %}{% with available=available|add:1 %}{% endwith %}{% endif %}{% endfor %}{% endwith %}
-                            0
+                            {% with available=0 %}
+                            {% for unit in units %}{% if unit.status == 'available' %}{% with available=available|add:1 %}{% endwith %}{% endif %}{% endfor %}
+                            {% endwith %}
+                            {{ units|selectattr:"status"|equalto:"available"|length }}
                         </strong>
                         Available
                     </div>
                     <div class="unit-stat">
                         <strong class="count-reserved" id="reservedCount">
-                            {% for unit in units %}{% if unit.status == 'reserved' %}{{ forloop.counter }}{% endif %}{% endfor %}
+                            {{ units|selectattr:"status"|equalto:"reserved"|length }}
                         </strong>
                         Reserved
                     </div>
                     <div class="unit-stat">
                         <strong class="count-repair" id="repairCount">
-                            {% for unit in units %}{% if unit.status == 'repair' %}{{ forloop.counter }}{% endif %}{% endfor %}
+                            {{ units|selectattr:"status"|equalto:"repair"|length }}
                         </strong>
                         Repair
                     </div>
@@ -644,6 +655,14 @@
                         </div>
                         <div class="mt-2">
                             <small class="text-muted">Stock: <span id="stockDisplay">{{ product.quantity_in_stock|default:0 }}</span> units</small>
+                        </div>
+                        <div class="mt-1">
+                            <span class="accessory-type-badge 
+                                {% if product.accessory_type == 'phone_accessory' %}phone
+                                {% elif product.accessory_type == 'electronic_accessory' %}electronic
+                                {% else %}other{% endif %}">
+                                {{ product.get_accessory_type_display|default:'Uncategorized' }}
+                            </span>
                         </div>
                     </div>
                 </div>
