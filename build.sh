@@ -3,13 +3,20 @@ set -o errexit
 
 echo "=== Building RonoSystems for Render ==="
 
-# Upgrade pip
-pip install --upgrade pip
+# Install system dependencies for Pillow
+apt-get update -y
+apt-get install -y --no-install-recommends \
+    libjpeg-dev \
+    libpng-dev \
+    libfreetype6-dev \
+    zlib1g-dev
 
-# Install dependencies
+# Install Python packages
+pip install --upgrade pip
+pip install setuptools wheel
 pip install -r requirements.txt
 
-# Navigate to src directory
+# Navigate to src
 cd src
 
 # Run migrations
