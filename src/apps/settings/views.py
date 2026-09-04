@@ -11,6 +11,10 @@ import os
 
 from .settings_data import get_settings, save_settings, DEFAULT_SETTINGS, CATEGORIES, SETTINGS_META
 
+# Define SETTINGS_FILE for use in this module
+SETTINGS_FILE = os.path.join(os.path.dirname(__file__), 'settings.json')
+
+
 @login_required
 @staff_member_required
 def settings_dashboard(request):
@@ -61,6 +65,7 @@ def settings_dashboard(request):
         'active_tab': 'settings',
     }
     return render(request, 'admin/settings_dashboard.html', context)
+
 
 @login_required
 @staff_member_required
@@ -165,6 +170,7 @@ def settings_update(request):
     
     return redirect('/settings/?saved=1')
 
+
 @login_required
 @staff_member_required
 def settings_reset(request):
@@ -184,12 +190,14 @@ def settings_reset(request):
     
     return redirect('/settings/')
 
+
 @login_required
 @staff_member_required
 def settings_export(request):
     """Export settings as JSON"""
     current_settings = get_settings()
     return JsonResponse(current_settings, safe=False)
+
 
 @login_required
 @staff_member_required
@@ -214,6 +222,7 @@ def settings_import(request):
             messages.error(request, f'❌ Error importing settings: {str(e)}')
     
     return redirect('/settings/')
+
 
 @login_required
 @staff_member_required
@@ -254,6 +263,7 @@ def settings_test_email(request):
     
     return redirect('/settings/')
 
+
 @login_required
 @staff_member_required
 def settings_debug(request):
@@ -265,3 +275,20 @@ def settings_debug(request):
         'file_path': SETTINGS_FILE,
         'settings_keys': list(current_settings.keys()),
     })
+
+
+def create_default_settings():
+    """Create default system settings if they don't exist"""
+    import os
+    import json
+    from .settings_data import DEFAULT_SETTINGS, SETTINGS_FILE
+    
+    try:
+        if not os.path.exists(SETTINGS_FILE):
+            with open(SETTINGS_FILE, 'w') as f:
+                json.dump(DEFAULT_SETTINGS, f, indent=2)
+            print("✅ Created default settings file!")
+        return True
+    except Exception as e:
+        print(f"❌ Error creating default settings: {e}")
+        return False
