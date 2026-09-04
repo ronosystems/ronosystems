@@ -3,26 +3,22 @@ set -o errexit
 
 echo "=== Building RonoSystems for Render ==="
 
-# Install system dependencies for Pillow
+# Install system dependencies
 apt-get update -y
 apt-get install -y --no-install-recommends \
     gcc \
     python3-dev \
     libjpeg-dev \
     libpng-dev \
-    libfreetype6-dev \
-    libtiff-dev \
-    libwebp-dev \
     zlib1g-dev \
-    libffi-dev \
-    libssl-dev
+    libffi-dev
 
-# Navigate to src directory
+# Navigate to src
 cd src
 
-# Install dependencies
+# Upgrade pip and install with pre-built wheels
 pip install --upgrade pip
-pip install -r ../requirements.txt
+pip install --only-binary :all: -r ../requirements.txt
 
 # Run migrations
 python manage.py makemigrations --noinput
