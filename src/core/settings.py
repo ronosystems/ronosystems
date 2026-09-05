@@ -56,6 +56,8 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
     'whitenoise.runserver_nostatic',
+    'cloudinary_storage',  # Must be BEFORE cloudinary
+    'cloudinary',
     
     # Custom Apps
     'apps.accounts',
@@ -199,25 +201,34 @@ USE_I18N = True
 USE_TZ = True
 
 # ============================================
-# STATIC & MEDIA FILES - COMPLETE FIX
+# CLOUDINARY STORAGE CONFIGURATION
+# ============================================
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME', 'dg9it0ut8'),
+    'API_KEY': os.getenv('CLOUDINARY_API_KEY', ''),
+    'API_SECRET': os.getenv('CLOUDINARY_API_SECRET', ''),
+}
+
+# ============================================
+# STATIC & MEDIA FILES - CLOUDINARY
 # ============================================
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Media files - with persistent disk support
+# Use Cloudinary for media files in production
 if ON_RENDER:
-    # Use persistent disk on Render
-    MEDIA_ROOT = '/var/data/media'
-    print("✅ Using persistent disk for media files on Render")
+    # Use Cloudinary for media storage
+    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+    print("✅ Using Cloudinary for media files on Render")
 else:
+    # Local development - use local media
+    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
     MEDIA_ROOT = BASE_DIR / 'media'
-    print("✅ Using local media directory")
+    MEDIA_URL = '/media/'
+    print("✅ Using local media storage")
 
-MEDIA_URL = '/media/'
-
-# Ensure directories exist
-os.makedirs(MEDIA_ROOT, exist_ok=True)
+# Ensure static directory exists
 os.makedirs(STATIC_ROOT, exist_ok=True)
 
 # Use WhiteNoise for static files in production
