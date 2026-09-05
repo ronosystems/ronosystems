@@ -1133,7 +1133,7 @@ def product_detail(request, product_code):
 
 
 # ============================================
-# PRODUCT CREATE - WITH IMAGE UPLOAD
+# PRODUCT CREATE - WITH IMAGE UPLOAD (FULLY FIXED)
 # ============================================
 
 @login_required
@@ -1176,13 +1176,6 @@ def product_create(request):
             name = request.POST.get('name', '').strip()
             brand = request.POST.get('brand', '').strip()
             model = request.POST.get('model', '').strip()
-            
-            # DEBUG: Check what's being submitted
-            print("=" * 50)
-            print("ALL POST KEYS:", request.POST.keys())
-            print("STORAGE VALUE:", request.POST.get('storage', 'NOT FOUND'))
-            print("ROM VALUE:", request.POST.get('rom', 'NOT FOUND'))
-            print("=" * 50)
             
             # Get RAM and ROM from the list, use first non-empty value
             ram_list = request.POST.getlist('ram')
@@ -1276,14 +1269,6 @@ def product_create(request):
                 quantity = int(request.POST.get('quantity', 0) or 0)
             except:
                 quantity = 0
-            
-            # DEBUG - Print extracted values
-            print("=" * 50)
-            print(f"Extracted RAM: '{ram}'")
-            print(f"Extracted ROM: '{rom}'")
-            print(f"Extracted Storage: '{storage}'")
-            print(f"Category: '{category_type}'")
-            print("=" * 50)
             
             # ============================================
             # VALIDATIONS
@@ -1667,21 +1652,19 @@ def product_create(request):
             if category_type in ['smartphone', 'feature_phone']:
                 # For feature phones, store extra data
                 if category_type == 'feature_phone':
-                    feature_specs = []
-                    if network_type:
-                        feature_specs.append(f"Network: {network_type.upper()}")
-                    if memory_card == 'yes':
-                        feature_specs.append("Memory Card: Yes")
-                    if features:
-                        feature_specs.append(f"Features: {features}")
-                    
-                    combined_specs = " | ".join(feature_specs) if feature_specs else ""
                     ram_value = ram or 'N/A'
                     rom_value = rom or 'N/A'
+                    phone_type_value = 'feature'
+                    network_type_value = network_type if network_type else None
+                    memory_card_value = memory_card
+                    features_value = features if features else None
                 else:
-                    combined_specs = ''
                     ram_value = ram
                     rom_value = rom
+                    phone_type_value = 'smartphone'
+                    network_type_value = None
+                    memory_card_value = 'no'
+                    features_value = None
                 
                 # Create Phone
                 product = Phone.objects.create(
@@ -1695,14 +1678,19 @@ def product_create(request):
                     color=color or '',
                     storage_capacity=rom_value,
                     ram=ram_value,
-                    screen_size=screen_size or combined_specs,
+                    screen_size=screen_size or '',
                     battery_capacity=battery_capacity or '',
                     condition=condition,
                     purchase_price=purchase_price,
                     selling_price=selling_price,
                     quantity_in_stock=len(units),
                     image=image,
-                    owner=owner
+                    owner=owner,
+                    # Feature phone fields
+                    phone_type=phone_type_value,
+                    network_type=network_type_value,
+                    memory_card=memory_card_value,
+                    features=features_value
                 )
                 # Create units for this phone
                 for unit_data in units:
@@ -1825,7 +1813,7 @@ def product_create(request):
 
 
 # ============================================
-# PRODUCT EDIT - Using Product Code
+# PRODUCT EDIT - Using Product Code (FULLY FIXED)
 # ============================================
 
 @login_required
@@ -1881,7 +1869,17 @@ def product_edit(request, product_code):
     
     # Determine category for the form
     if product_type == 'Phone':
-        category_value = 'smartphone'
+        # Check if it's a feature phone or smartphone using the new phone_type field
+        if hasattr(product, 'phone_type') and product.phone_type == 'feature':
+            category_value = 'feature_phone'
+        else:
+            # Fallback: Detect by RAM/ROM values
+            ram_empty = not product.ram or product.ram == 'N/A' or product.ram == ''
+            rom_empty = not product.storage_capacity or product.storage_capacity == 'N/A' or product.storage_capacity == ''
+            if ram_empty and rom_empty:
+                category_value = 'feature_phone'
+            else:
+                category_value = 'smartphone'
     elif product_type == 'Electronic':
         category_value = 'electronics'
     elif product_type == 'Accessory':
@@ -1891,7 +1889,7 @@ def product_edit(request, product_code):
     
     if request.method == 'POST':
         try:
-            # Get form data (same as product_create)
+            # Get form data
             category_type = request.POST.get('category', '').strip()
             branch_id = request.POST.get('branch')
             name = request.POST.get('name', '').strip()
@@ -1906,6 +1904,11 @@ def product_edit(request, product_code):
             battery_capacity = request.POST.get('battery_capacity', '').strip()
             condition = request.POST.get('condition', 'new')
             
+            # Feature phone specific fields - FIXED: Get these from POST
+            network_type = request.POST.get('network_type', '').strip()
+            memory_card = request.POST.get('memory_card', 'no')
+            features = request.POST.get('features', '').strip()
+            
             # Electronic specific fields
             device_type = request.POST.get('device_type', 'other')
             processor = request.POST.get('processor', '').strip()
@@ -1914,6 +1917,7 @@ def product_edit(request, product_code):
             # Accessory specific fields
             accessory_type = request.POST.get('accessory_type', 'other')
             barcode = request.POST.get('barcode', '').strip()
+            size = request.POST.get('size', '').strip()
             
             # Handle image upload
             image = request.FILES.get('product_image')
@@ -2055,6 +2059,7 @@ def product_edit(request, product_code):
             
             # Update based on type
             if product_type == 'Phone':
+                # Common phone fields
                 product.model = model
                 product.ram = ram or ''
                 product.storage_capacity = rom or ''
@@ -2062,6 +2067,19 @@ def product_edit(request, product_code):
                 product.color = color or ''
                 product.battery_capacity = battery_capacity or ''
                 product.condition = condition
+                
+                # FIXED: Save feature phone specific fields
+                if category_type == 'feature_phone':
+                    product.phone_type = 'feature'
+                    product.network_type = network_type if network_type else None
+                    product.memory_card = memory_card
+                    product.features = features if features else None
+                else:
+                    product.phone_type = 'smartphone'
+                    product.network_type = None
+                    product.memory_card = 'no'
+                    product.features = None
+                
                 product.save()
                 
                 # Update units
@@ -2107,7 +2125,8 @@ def product_edit(request, product_code):
                 product.quantity_in_stock = total_units
                 product.save()
                 
-                messages.success(request, f'Phone "{product.name}" updated successfully! Product Code: {product.product_code}')
+                phone_type_label = "Feature Phone" if category_type == 'feature_phone' else "Smartphone"
+                messages.success(request, f'{phone_type_label} "{product.name}" updated successfully! Product Code: {product.product_code}')
                 
             elif product_type == 'Electronic':
                 product.model_number = model
@@ -2193,6 +2212,7 @@ def product_edit(request, product_code):
                 'page_subtitle': f'Code: {product.product_code}',
             })
     
+    # GET request - Pass existing data to template
     context = {
         'branches': branches,
         'product': product,
@@ -2203,9 +2223,15 @@ def product_edit(request, product_code):
         'is_edit': True,
         'page_title': f'Edit {product.name}',
         'page_subtitle': f'Code: {product.product_code}',
+        # Pass feature phone data to template for pre-population
+        'form_data': {
+            'network_type': getattr(product, 'network_type', ''),
+            'features': getattr(product, 'features', ''),
+            'memory_card': getattr(product, 'memory_card', 'no'),
+            'phone_type': getattr(product, 'phone_type', 'smartphone'),
+        }
     }
     return render(request, 'epa/product_form.html', context)
-
 
 # ============================================
 # PRODUCT DELETE - Using Product Code

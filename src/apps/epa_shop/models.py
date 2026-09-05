@@ -307,6 +307,30 @@ class Phone(BaseProduct):
     # Generic relation for sale items
     sale_items = GenericRelation('SaleItem', content_type_field='content_type', object_id_field='object_id')
     
+    # Add these new fields for Feature Phone support
+    PHONE_TYPE_CHOICES = (
+        ('smartphone', 'Smartphone'),
+        ('feature', 'Feature Phone'),
+    )
+    
+    NETWORK_CHOICES = (
+        ('2g', '2G'),
+        ('3g', '3G'),
+        ('4g', '4G'),
+        ('dual_sim', 'Dual SIM'),
+    )
+    
+    MEMORY_CARD_CHOICES = (
+        ('yes', 'Yes'),
+        ('no', 'No'),
+    )
+    
+    # Feature phone specific fields
+    phone_type = models.CharField(max_length=20, choices=PHONE_TYPE_CHOICES, default='smartphone')
+    network_type = models.CharField(max_length=20, choices=NETWORK_CHOICES, blank=True, null=True)
+    memory_card = models.CharField(max_length=10, choices=MEMORY_CARD_CHOICES, default='no')
+    features = models.TextField(blank=True, null=True, help_text="Feature phone features like FM Radio, Torch, etc.")
+
     class Meta:
         db_table = 'epa_phones'
         ordering = ['-created_at']
