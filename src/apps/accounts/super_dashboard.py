@@ -18,6 +18,18 @@ def super_admin_dashboard(request):
         messages.warning(request, 'Access denied. Super Admin only.')
         return redirect('/dashboard/')
     
+    # Check if super admin is viewing a specific company
+    if 'viewing_company_id' in request.session:
+        try:
+            company = Company.objects.get(id=request.session['viewing_company_id'])
+            # Redirect to company dashboard
+            return redirect('/company/dashboard/')
+        except Company.DoesNotExist:
+            # If company not found, clear session
+            if 'viewing_company_id' in request.session:
+                del request.session['viewing_company_id']
+            messages.warning(request, 'Company not found. Returning to your dashboard.')
+    
     # Get stats
     total_companies = Company.objects.count()
     active_companies = Company.objects.filter(is_active=True).count()
@@ -50,6 +62,10 @@ def super_admin_dashboard(request):
         'users_by_role': users_by_role,
         'companies_by_plan': companies_by_plan,
         'recent_companies': recent_companies,
+        'is_super_admin': True,
+        'is_viewing_company': False,
+        'page_title': 'Super Admin Dashboard',
+        'page_subtitle': 'Manage all companies and system settings',
     }
     
     return render(request, 'admin/super_dashboard.html', context)

@@ -70,7 +70,7 @@ def settings_dashboard(request):
 @login_required
 @staff_member_required
 def settings_update(request):
-    """Update system settings"""
+    """Update system settings with Cloudinary support"""
     
     print("=" * 50)
     print("SETTINGS UPDATE REQUEST")
@@ -115,7 +115,7 @@ def settings_update(request):
             updated_count += 1
             print(f"Updated {key} = {current_settings[key]}")
     
-    # Handle file uploads
+    # Handle file uploads - with Cloudinary support
     for key, file_obj in request.FILES.items():
         if key in current_settings:
             # Delete old file if exists
@@ -123,20 +123,20 @@ def settings_update(request):
             if old_value:
                 # Remove any /media/ prefix for storage path
                 old_path = old_value.replace('/media/', '').replace('media/', '')
-                if default_storage.exists(old_path):
-                    default_storage.delete(old_path)
-                    print(f"Deleted old file: {old_path}")
-            
-            # Create upload directory
-            upload_dir = os.path.join(django_settings.MEDIA_ROOT, 'settings')
-            if not os.path.exists(upload_dir):
-                os.makedirs(upload_dir)
+                try:
+                    if default_storage.exists(old_path):
+                        default_storage.delete(old_path)
+                        print(f"Deleted old file: {old_path}")
+                except Exception as e:
+                    print(f"Error deleting old file: {e}")
             
             # Save file - store path WITHOUT /media/ prefix
+            # Cloudinary will handle the storage
             file_name = file_obj.name.replace(' ', '_')
             file_path = default_storage.save(f'settings/{file_name}', ContentFile(file_obj.read()))
             
             # Store just the relative path (without /media/)
+            # Cloudinary storage will return the full URL when accessed
             current_settings[key] = file_path
             updated_count += 1
             label = SETTINGS_META.get(key, {}).get('label', key)
@@ -152,9 +152,12 @@ def settings_update(request):
                 old_value = current_settings.get(setting_key, '')
                 if old_value:
                     old_path = old_value.replace('/media/', '').replace('media/', '')
-                    if default_storage.exists(old_path):
-                        default_storage.delete(old_path)
-                        print(f"Deleted removed file: {old_path}")
+                    try:
+                        if default_storage.exists(old_path):
+                            default_storage.delete(old_path)
+                            print(f"Deleted removed file: {old_path}")
+                    except Exception as e:
+                        print(f"Error deleting file: {e}")
                 
                 current_settings[setting_key] = ''
                 updated_count += 1
@@ -181,6 +184,18 @@ def settings_reset(request):
         current_settings = get_settings()
         
         if setting_key in DEFAULT_SETTINGS:
+            # If it's an image, delete the file
+            meta = SETTINGS_META.get(setting_key, {})
+            if meta.get('type') == 'image' and current_settings.get(setting_key):
+                old_value = current_settings.get(setting_key, '')
+                if old_value:
+                    old_path = old_value.replace('/media/', '').replace('media/', '')
+                    try:
+                        if default_storage.exists(old_path):
+                            default_storage.delete(old_path)
+                    except Exception as e:
+                        print(f"Error deleting file on reset: {e}")
+            
             current_settings[setting_key] = DEFAULT_SETTINGS[setting_key]
             save_settings(current_settings)
             label = SETTINGS_META.get(setting_key, {}).get('label', setting_key)
@@ -269,11 +284,26 @@ def settings_test_email(request):
 def settings_debug(request):
     """Debug view to check settings"""
     current_settings = get_settings()
+    
+    # Check if images exist
+    image_status = {}
+    for key, value in current_settings.items():
+        meta = SETTINGS_META.get(key, {})
+        if meta.get('type') == 'image' and value:
+            file_path = value.replace('/media/', '').replace('media/', '')
+            image_status[key] = {
+                'path': file_path,
+                'exists': default_storage.exists(file_path) if file_path else False,
+                'url': default_storage.url(file_path) if file_path else None,
+            }
+    
     return JsonResponse({
         'settings': current_settings,
         'file_exists': os.path.exists(SETTINGS_FILE),
         'file_path': SETTINGS_FILE,
         'settings_keys': list(current_settings.keys()),
+        'image_status': image_status,
+        'storage_type': str(type(default_storage)),
     })
 
 
@@ -292,3 +322,71 @@ def create_default_settings():
     except Exception as e:
         print(f"❌ Error creating default settings: {e}")
         return False
+
+
+# ============================================
+# CLOUDINARY HELPER FUNCTIONS
+# ============================================
+
+def get_cloudinary_url(file_path):
+    """
+    Get the full Cloudinary URL for a file path
+    Works with both Cloudinary and local storage
+    """
+    if not file_path:
+        return None
+    
+    # If it's already a full URL
+    if file_path.startswith('http://') or file_path.startswith('https://'):
+        return file_path
+    
+    # Clean the path
+    clean_path = file_path.replace('/media/', '').replace('media/', '')
+    
+    try:
+        # Try to get URL from storage
+        return default_storage.url(clean_path)
+    except Exception:
+        # Fallback: construct URL manually
+        media_url = django_settings.MEDIA_URL
+        if media_url:
+            if media_url.endswith('/') and clean_path.startswith('/'):
+                return f"{media_url}{clean_path[1:]}"
+            elif media_url.endswith('/') or clean_path.startswith('/'):
+                return f"{media_url}{clean_path}"
+            else:
+                return f"{media_url}/{clean_path}"
+        return file_path
+
+
+def delete_setting_file(setting_key, settings_dict):
+    """Delete the file associated with a setting"""
+    if setting_key not in settings_dict:
+        return False
+    
+    file_path = settings_dict.get(setting_key, '')
+    if not file_path:
+        return False
+    
+    clean_path = file_path.replace('/media/', '').replace('media/', '')
+    
+    try:
+        if default_storage.exists(clean_path):
+            default_storage.delete(clean_path)
+            return True
+    except Exception as e:
+        print(f"Error deleting file for {setting_key}: {e}")
+    
+    return False
+
+
+def get_setting_display_value(setting_key, settings_dict):
+    """Get the display value for a setting, handling images properly"""
+    value = settings_dict.get(setting_key, '')
+    meta = SETTINGS_META.get(setting_key, {})
+    setting_type = meta.get('type', 'text')
+    
+    if setting_type == 'image' and value:
+        return get_cloudinary_url(value)
+    
+    return value

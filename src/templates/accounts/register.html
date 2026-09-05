@@ -10,24 +10,57 @@
     <style>
         body {
             min-height: 100vh;
-            background: linear-gradient(135deg, #032ff5 0%, #0039f5 100%);
+            background: linear-gradient(135deg, #032ff50e 0%, #0039f509 100%);
             display: flex;
             align-items: center;
             justify-content: center;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            position: relative;
         }
+        
+        /* Background Image from Settings */
+        {% if login_background_url %}
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('{{ login_background_url }}') center center / cover no-repeat;
+            opacity: 0.3;
+            z-index: 0;
+        }
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(3, 47, 245, 0.021) 0%, rgba(0, 57, 245, 0.034) 100%);
+            z-index: 0;
+        }
+        {% endif %}
+        
         .register-container {
             width: 100%;
             max-width: 600px;
             padding: 15px;
+            position: relative;
+            z-index: 1;
         }
+        
         .register-card {
-            background: white;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
             border-radius: 20px;
             padding: 40px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.986);
             animation: slideUp 0.5s ease;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
+        
         @keyframes slideUp {
             from {
                 opacity: 0;
@@ -38,54 +71,66 @@
                 transform: translateY(0);
             }
         }
+        
         .register-header {
             text-align: center;
             margin-bottom: 30px;
         }
+        
         .register-header .logo {
             margin-bottom: 10px;
             display: flex;
             justify-content: center;
             align-items: center;
         }
+        
         .register-header .logo img {
-            max-width: 80px;
+            max-width: 120px;
             max-height: 80px;
             border-radius: 12px;
+            object-fit: contain;
         }
+        
         .register-header .logo .logo-icon {
             font-size: 3rem;
             color: #667eea;
         }
+        
         .register-header h3 {
             font-weight: 700;
             color: #2d3436;
             margin-top: 10px;
         }
+        
         .register-header p {
             color: #636e72;
             font-size: 14px;
         }
+        
         .form-control {
             border-radius: 12px;
             padding: 12px 15px;
             border: 2px solid #dfe6e9;
             transition: all 0.3s;
         }
+        
         .form-control:focus {
             border-color: #00030e;
             box-shadow: 0 0 0 0.2rem rgba(11, 12, 12, 0.966);
         }
+        
         .input-group-text {
             border-radius: 12px 0 0 12px;
             border: 2px solid #dfe6e9;
             border-right: none;
             background: #f8f9fa;
         }
+        
         .input-group .form-control {
             border-radius: 0 12px 12px 0;
             border-left: none;
         }
+        
         .btn-register {
             width: 100%;
             padding: 14px;
@@ -97,36 +142,44 @@
             font-size: 16px;
             transition: all 0.3s;
         }
+        
         .btn-register:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 30px rgba(18, 18, 19, 0.973);
         }
+        
         .btn-register:active {
             transform: translateY(0);
         }
+        
         .alert {
             border-radius: 12px;
         }
+        
         .footer-text {
             text-align: center;
             margin-top: 20px;
             color: rgba(255,255,255,0.8);
             font-size: 14px;
         }
+        
         .footer-text a {
             color: white;
             font-weight: 600;
             text-decoration: none;
         }
+        
         .footer-text a:hover {
             text-decoration: underline;
         }
+        
         .auth-links {
             text-align: center;
             margin-top: 20px;
             padding-top: 20px;
             border-top: 1px solid #e9ecef;
         }
+        
         .auth-links a {
             color: #667eea;
             text-decoration: none;
@@ -134,27 +187,53 @@
             font-size: 14px;
             transition: color 0.3s;
         }
+        
         .auth-links a:hover {
             color: #0c08f1;
             text-decoration: underline;
         }
+        
         .auth-links .separator {
             color: #dfe6e9;
             margin: 0 10px;
         }
+        
         .password-toggle {
             border-radius: 0 12px 12px 0;
             border: 2px solid #dfe6e9;
             border-left: none;
             background: white;
         }
+        
         .password-toggle:hover {
             background: #f8f9fa;
         }
+        
         .required:after {
             content: " *";
             color: #dc3545;
             font-weight: bold;
+        }
+
+        /* Responsive */
+        @media (max-width: 576px) {
+            .register-card {
+                padding: 25px 20px;
+            }
+            .register-header .logo img {
+                max-width: 80px;
+                max-height: 60px;
+            }
+            .register-header h3 {
+                font-size: 1.5rem;
+            }
+            .btn-register {
+                font-size: 14px;
+                padding: 12px;
+            }
+            .row .col-md-6 {
+                margin-bottom: 10px;
+            }
         }
     </style>
 </head>
@@ -163,7 +242,11 @@
         <div class="register-card">
             <div class="register-header">
                 <div class="logo">
-                    {% if site_logo %}
+                    {% if user.company.logo %}
+                        <img src="{{ user.company.logo.url }}" alt="{{ system_name|default:'RonoSystems' }}">
+                    {% elif site_logo_url %}
+                        <img src="{{ site_logo_url }}" alt="{{ system_name|default:'RonoSystems' }}">
+                    {% elif site_logo %}
                         <img src="/media/{{ site_logo }}" alt="{{ system_name|default:'RonoSystems' }}">
                     {% else %}
                         <div class="logo-icon">
@@ -172,7 +255,7 @@
                     {% endif %}
                 </div>
                 <h3>SIGN UP WITH RONOSYSTEMS</h3>
-                <p>Fill In The Link Bellow To Create Account</p>
+                <p>Fill In The Link Below To Create Account</p>
             </div>
 
             {% if messages %}
@@ -289,24 +372,31 @@
             }, 5000);
         });
 
-        // Password strength indicator (optional)
+        // Password strength indicator
         document.getElementById('password').addEventListener('input', function() {
             const password = this.value;
+            let strengthText = '';
+            let strengthClass = '';
+            
+            if (password.length === 0) {
+                strengthText = '';
+                strengthClass = '';
+            } else if (password.length < 6) {
+                strengthText = 'Weak';
+                strengthClass = 'text-danger';
+            } else if (password.length < 10) {
+                strengthText = 'Medium';
+                strengthClass = 'text-warning';
+            } else {
+                strengthText = 'Strong';
+                strengthClass = 'text-success';
+            }
+            
+            // Show strength indicator if element exists
             const strengthIndicator = document.getElementById('passwordStrength');
             if (strengthIndicator) {
-                if (password.length === 0) {
-                    strengthIndicator.textContent = '';
-                    strengthIndicator.className = '';
-                } else if (password.length < 6) {
-                    strengthIndicator.textContent = 'Weak';
-                    strengthIndicator.className = 'text-danger';
-                } else if (password.length < 10) {
-                    strengthIndicator.textContent = 'Medium';
-                    strengthIndicator.className = 'text-warning';
-                } else {
-                    strengthIndicator.textContent = 'Strong';
-                    strengthIndicator.className = 'text-success';
-                }
+                strengthIndicator.textContent = strengthText;
+                strengthIndicator.className = strengthClass;
             }
         });
     </script>

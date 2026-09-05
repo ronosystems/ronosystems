@@ -1,5 +1,6 @@
 from django.urls import path
 from . import web_views
+from . import views
 
 app_name = 'companies'
 
@@ -12,4 +13,5 @@ urlpatterns = [
     path('<int:pk>/', web_views.company_detail, name='company-detail'),
     path('<int:pk>/edit/', web_views.company_edit, name='company-edit'),
     path('<int:pk>/delete/', web_views.company_delete, name='company-delete'),
+    path('<int:pk>/support/', views.support_mode, name='support-mode'),
 ]

@@ -84,9 +84,10 @@ def profile_picture_upload(request):
         # Delete old profile picture if exists
         if user.profile_picture:
             try:
-                default_storage.delete(user.profile_picture.path)
-            except:
-                pass
+                # Cloudinary will handle deletion automatically
+                default_storage.delete(user.profile_picture.name)
+            except Exception as e:
+                print(f"Error deleting old profile picture: {e}")
         
         # Save new profile picture
         filename = f"profile_{user.id}_{profile_pic.name}"
@@ -100,6 +101,7 @@ def profile_picture_upload(request):
     messages.error(request, 'Please select a file to upload.')
     return redirect('/profile/')
 
+    
 @login_required
 def profile_picture_remove(request):
     """Remove profile picture"""
