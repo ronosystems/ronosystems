@@ -121,11 +121,15 @@ def epa_dashboard(request):
     
     # Week sales
     week_ago = today - timedelta(days=7)
-    week_sales = sales.filter(sale_date__date__gte=week_ago).count()
+    week_sales = sales.filter(sale_date__date__gte=week_ago)
+    week_count = week_sales.count()
+    week_revenue = week_sales.aggregate(total=Sum('net_amount'))['total'] or 0
     
     # Month sales
     month_ago = today - timedelta(days=30)
-    month_sales = sales.filter(sale_date__date__gte=month_ago).count()
+    month_sales = sales.filter(sale_date__date__gte=month_ago)
+    month_count = month_sales.count()
+    month_revenue = month_sales.aggregate(total=Sum('net_amount'))['total'] or 0
     
     # ============================================
     # Low stock items (filtered by branch)
@@ -217,8 +221,10 @@ def epa_dashboard(request):
         'total_revenue': total_revenue,
         'today_sales': today_count,
         'today_revenue': today_revenue,
-        'week_sales': week_sales,
-        'month_sales': month_sales,
+        'week_sales': week_count,
+        'week_revenue': week_revenue,  # Added
+        'month_sales': month_count,
+        'month_revenue': month_revenue,  # Added
         'low_stock': len(low_stock_products),
         # Agent-specific stats
         'agent_units': agent_units_count,

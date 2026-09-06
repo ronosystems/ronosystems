@@ -421,6 +421,19 @@
                 </div>
             </div>
             <div class="col-md-3 col-6 mb-3">
+                <div class="card stat-card bg-danger">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h2 class="mb-0">{{ stats.low_stock }}</h2>
+                                <small>Low Stock Items</small>
+                            </div>
+                            <div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6 mb-3">
                 <div class="card stat-card bg-success">
                     <div class="card-body">
                         <div class="d-flex justify-content-between">
@@ -442,19 +455,6 @@
                                 <small>Total Revenue</small>
                             </div>
                             <div class="stat-icon"><i class="fas fa-money-bill-wave"></i></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3 col-6 mb-3">
-                <div class="card stat-card bg-danger">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <h2 class="mb-0">{{ stats.low_stock }}</h2>
-                                <small>Low Stock Items</small>
-                            </div>
-                            <div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div>
                         </div>
                     </div>
                 </div>
@@ -531,7 +531,7 @@
                         <h5>This Week</h5>
                         <h3>{{ stats.week_sales }}</h3>
                         <small class="text-muted">Sales</small>
-                        <h5 class="mt-2">KSh {{ stats.total_revenue|floatformat:0 }}</h5>
+                        <h5 class="mt-2">KSh {{ stats.week_revenue|floatformat:0 }}</h5>
                         <small class="text-muted">Revenue</small>
                     </div>
                 </div>
@@ -540,24 +540,11 @@
             <div class="col-md-4 mb-3">
                 <div class="card">
                     <div class="card-body text-center">
-                        <h5>Products</h5>
-                        <div class="row">
-                            <div class="col-4">
-                                <i class="fas fa-laptop" style="color: #000000;"></i>
-                                <h6>{{ stats.electronics }}</h6>
-                                <small>Electronics</small>
-                            </div>
-                            <div class="col-4">
-                                <i class="fas fa-mobile-alt" style="color: #000000;"></i>
-                                <h6>{{ stats.phones }}</h6>
-                                <small>Phones</small>
-                            </div>
-                            <div class="col-4">
-                                <i class="fas fa-headphones" style="color: #000000;"></i>
-                                <h6>{{ stats.accessories }}</h6>
-                                <small>Accessories</small>
-                            </div>
-                        </div>
+                        <h5>This Month</h5>
+                        <h3>{{ stats.month_sales }}</h3>
+                        <small class="text-muted">Sales</small>
+                        <h5 class="mt-2">KSh {{ stats.month_revenue|floatformat:0 }}</h5>
+                        <small class="text-muted">Revenue</small>
                     </div>
                 </div>
             </div>
@@ -574,18 +561,17 @@
             </div>
             <div class="card-body">
                 <div class="quick-actions">
-                    
-                    <!-- New Sale -->
-                    {% if user.role == 'company_agent' %}
-                    <a href="/epa_shop/sales/single/" class="btn btn-success btn-sm">
-                        <i class="fas fa-cart-plus"></i> New Sale
+                    <!-- POS -->
+                    {% if user.role == 'company_cashier' or  user.role == 'company_manager' or user.role == 'company_admin'%}
+                    <a href="/epa_shop/pos/" class="btn btn-info btn-sm">
+                        <i class="fas fa-shopping-cart"></i> POS
                     </a>
                     {% endif %}
                     
-                    <!-- POS -->
-                    {% if user.role == 'company_cashier'%}
-                    <a href="/epa_shop/pos/" class="btn btn-info btn-sm">
-                        <i class="fas fa-shopping-cart"></i> POS
+                    <!-- New Sale -->
+                    {% if user.role == 'company_agent' or user.role == 'company_manager' or user.role == 'company_admin' %}
+                    <a href="/epa_shop/sales/single/" class="btn btn-success btn-sm">
+                        <i class="fas fa-cart-plus"></i> New Sale
                     </a>
                     {% endif %}
 
@@ -627,6 +613,7 @@
         <!-- ============================================
         RECENT SALES & LOW STOCK
         ============================================ -->
+        {% if user.role == 'company_manager' or user.role == 'company_admin'%}
         <div class="row">
             <div class="{% if is_admin or user_role == 'company_cashier' or user_role == 'company_staff' %}col-md-8{% else %}col-md-12{% endif %}">
                 <div class="card">
@@ -676,7 +663,6 @@
             </div>
 
             <!-- Low Stock Alerts - Only for Admins, Managers, Cashiers -->
-            {% if user.role == 'company_manager' or user.role == 'company_admin'%}
             <div class="col-md-4">
                 <div class="card">
                     <div class="card-header">
