@@ -1,16 +1,420 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Treasury Dashboard - {{ company.name }}{% endblock %}
+{% block title %} {{ company.name }}{% endblock %}
 
 {% block page_title %} {% if show_all_branches %}{{ company.name }}{% else %}{{ user_branch.name }}{% endif %}  {% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE TABLE STYLING
+    ============================================ */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    
+    .table-excel thead th {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table-excel tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+
+    /* ============================================
+       STAT CARDS
+    ============================================ */
+    .stat-card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        transition: transform 0.2s;
+        cursor: default;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .stat-card.bg-primary {
+        background: #87CEEB !important;
+        color: #000000 !important;
+    }
+    .stat-card.bg-primary h3 {
+        color: #000000 !important;
+    }
+    .stat-card.bg-primary h6 {
+        color: #000000 !important;
+    }
+    .stat-card.bg-info {
+        background: #cce5ff !important;
+        color: #004085 !important;
+    }
+    .stat-card.bg-info h3 {
+        color: #004085 !important;
+    }
+    .stat-card.bg-info h6 {
+        color: #004085 !important;
+    }
+    .stat-card.bg-success {
+        background: #d4edda !important;
+        color: #155724 !important;
+    }
+    .stat-card.bg-success h3 {
+        color: #155724 !important;
+    }
+    .stat-card.bg-success h6 {
+        color: #155724 !important;
+    }
+    .stat-card.bg-warning {
+        background: #fff3cd !important;
+        color: #000000 !important;
+    }
+    .stat-card.bg-warning h3 {
+        color: #856404 !important;
+    }
+    .stat-card.bg-warning h6 {
+        color: #856404 !important;
+    }
+    .stat-card.bg-dark {
+        background: #2d3436 !important;
+        color: #ffffff !important;
+    }
+    .stat-card.bg-dark h2 {
+        color: #ffffff !important;
+    }
+    .stat-card.bg-dark h5 {
+        color: #ffffff !important;
+    }
+    .stat-card.bg-dark small {
+        color: #ffffff !important;
+    }
+    .stat-card.bg-secondary {
+        background: #f8f9fa !important;
+        color: #000000 !important;
+        border-color: #000000;
+    }
+    .stat-card.bg-secondary h2 {
+        color: #000000 !important;
+    }
+    .stat-card.bg-secondary h5 {
+        color: #000000 !important;
+    }
+    .stat-card.bg-secondary small {
+        color: #000000 !important;
+    }
+
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-body {
+        color: #000000;
+    }
+    
+    .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+        color: #000000 !important;
+        border-radius: 0 !important;
+    }
+    
+    .card-header h5 {
+        color: #000000 !important;
+        font-weight: 700;
+        margin: 0;
+    }
+    
+    .card-header h5 i {
+        color: #000000;
+        margin-right: 8px;
+    }
+
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-success {
+        background-color: #28a745;
+        border: 2px solid #000000;
+        color: #ffffff;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-success:hover {
+        background-color: #218838;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-info {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-info:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-warning {
+        background-color: #ffc107;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-warning:hover {
+        background-color: #e0a800;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-primary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-primary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-sm {
+        padding: 4px 12px;
+        font-size: 12px;
+    }
+
+    /* ============================================
+       BADGES
+    ============================================ */
+    .badge {
+        padding: 4px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    
+    .badge.bg-dark {
+        background: #2d3436 !important;
+        color: #ffffff !important;
+    }
+    
+    .badge.bg-success {
+        background: #d4edda !important;
+        color: #155724 !important;
+    }
+    
+    .badge.bg-info {
+        background: #cce5ff !important;
+        color: #004085 !important;
+    }
+
+    /* ============================================
+       ALERTS
+    ============================================ */
+    .alert {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        color: #000000;
+    }
+    
+    .alert.alert-warning {
+        background: #fff3cd !important;
+        color: #856404 !important;
+    }
+
+    /* ============================================
+       TEXT COLORS
+    ============================================ */
+    .text-muted {
+        color: #000000 !important;
+    }
+    .text-center {
+        text-align: center;
+    }
+
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 11px;
+        }
+        .table-excel th {
+            font-size: 10px;
+        }
+        .btn-sm {
+            font-size: 9px;
+            padding: 2px 6px;
+        }
+        .btn-sm i {
+            font-size: 10px;
+        }
+        .badge {
+            font-size: 9px;
+            padding: 2px 6px;
+        }
+        .stat-card h3 {
+            font-size: 1.2rem;
+        }
+        .stat-card h6 {
+            font-size: 0.8rem;
+        }
+        .stat-card.bg-dark h2 {
+            font-size: 1.5rem;
+        }
+        .stat-card.bg-secondary h2 {
+            font-size: 1.5rem;
+        }
+        .card-header h5 {
+            font-size: 0.9rem;
+        }
+        .d-flex.flex-wrap.gap-2 {
+            flex-direction: column;
+        }
+        .d-flex.flex-wrap.gap-2 .btn {
+            width: 100%;
+            text-align: center;
+        }
+        .row.mt-3 {
+            margin-top: 10px !important;
+        }
+        .row.mt-4 {
+            margin-top: 15px !important;
+        }
+        .col-md-3, .col-md-6 {
+            margin-bottom: 10px;
+        }
+        .card-body {
+            padding: 12px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 3px 4px;
+            font-size: 9px;
+        }
+        .table-excel th {
+            font-size: 8px;
+        }
+        .btn-sm {
+            font-size: 8px;
+            padding: 1px 4px;
+        }
+        .btn-sm i {
+            font-size: 8px;
+        }
+        .badge {
+            font-size: 8px;
+            padding: 1px 4px;
+        }
+        .stat-card h3 {
+            font-size: 1rem;
+        }
+        .stat-card h6 {
+            font-size: 0.7rem;
+        }
+        .stat-card .card-body {
+            padding: 10px;
+        }
+        .stat-card.bg-dark h2 {
+            font-size: 1.2rem;
+        }
+        .stat-card.bg-secondary h2 {
+            font-size: 1.2rem;
+        }
+        .card-header h5 {
+            font-size: 0.8rem;
+        }
+        .card-header {
+            padding: 8px 12px;
+        }
+        .btn {
+            font-size: 11px;
+            padding: 4px 8px;
+        }
+        .alert {
+            font-size: 12px;
+            padding: 10px;
+        }
+        .card-body {
+            padding: 10px;
+        }
+    }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
     <!-- Summary Cards -->
     <div class="row">
         <div class="col-md-3">
-            <div class="card bg-primary text-white">
+            <div class="card stat-card bg-primary">
                 <div class="card-body">
                     <h6 class="card-title">Total Bank</h6>
                     <h3 class="mb-0">KES {{ total_bank|floatformat:2 }}</h3>
@@ -18,7 +422,7 @@
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card bg-info text-white">
+            <div class="card stat-card bg-info">
                 <div class="card-body">
                     <h6 class="card-title">Total M-Pesa</h6>
                     <h3 class="mb-0">KES {{ total_mpesa|floatformat:2 }}</h3>
@@ -26,7 +430,7 @@
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card bg-success text-white">
+            <div class="card stat-card bg-success">
                 <div class="card-body">
                     <h6 class="card-title">Total Cash</h6>
                     <h3 class="mb-0">KES {{ total_cash|floatformat:2 }}</h3>
@@ -34,7 +438,7 @@
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card bg-warning text-white">
+            <div class="card stat-card bg-warning">
                 <div class="card-body">
                     <h6 class="card-title">Total Credit</h6>
                     <h3 class="mb-0">KES {{ total_credit|floatformat:2 }}</h3>
@@ -46,7 +450,7 @@
     <!-- Net Balance -->
     <div class="row mt-3">
         <div class="col-md-6">
-            <div class="card bg-dark text-white">
+            <div class="card stat-card bg-dark">
                 <div class="card-body">
                     <h5 class="card-title">Net Balance (All Accounts)</h5>
                     <h2 class="mb-0">KES {{ total_net|floatformat:2 }}</h2>
@@ -55,7 +459,7 @@
             </div>
         </div>
         <div class="col-md-6">
-            <div class="card bg-secondary text-white">
+            <div class="card stat-card bg-secondary">
                 <div class="card-body">
                     <h5 class="card-title">Liquid Balance</h5>
                     <h2 class="mb-0">KES {{ total_net|floatformat:2 }}</h2>
@@ -115,44 +519,45 @@
                         {% endif %}
                     </h5>
                 </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover">
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="border: 2px solid #000000;">
+                        <table class="table-excel table-hover mb-0" id="treasuryTable">
                             <thead>
                                 <tr>
-                                    <th>Branch</th>
-                                    <th>Bank</th>
-                                    <th>M-Pesa</th>
-                                    <th>Cash</th>
-                                    <th>Credit</th>
-                                    <th>Net Balance</th>
-                                    <th>Actions</th>
+                                    <th style="width: 15%;">Branch</th>
+                                    <th style="width: 17%;" class="text-right">Bank</th>
+                                    <th style="width: 17%;" class="text-right">M-Pesa</th>
+                                    <th style="width: 17%;" class="text-right">Cash</th>
+                                    <th style="width: 17%;" class="text-right">Credit</th>
+                                    <th style="width: 12%;" class="text-right">Net Balance</th>
+                                    <th style="width: 5%;" class="text-center">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for data in treasury_data %}
                                 <tr>
                                     <td><strong>{{ data.branch.name }}</strong></td>
-                                    <td>KES {{ data.treasury.total_bank_balance|floatformat:2 }}</td>
-                                    <td>KES {{ data.treasury.total_mpesa_balance|floatformat:2 }}</td>
-                                    <td>KES {{ data.treasury.cash_balance|floatformat:2 }}</td>
-                                    <td>KES {{ data.treasury.credit_balance|floatformat:2 }}</td>
-                                    <td>
+                                    <td class="text-right" style="color: #000000;">KES {{ data.treasury.total_bank_balance|floatformat:2 }}</td>
+                                    <td class="text-right" style="color: #155724;">KES {{ data.treasury.total_mpesa_balance|floatformat:2 }}</td>
+                                    <td class="text-right" style="color: #856404;">KES {{ data.treasury.cash_balance|floatformat:2 }}</td>
+                                    <td class="text-right" style="color: #721c24;">KES {{ data.treasury.credit_balance|floatformat:2 }}</td>
+                                    <td class="text-right">
                                         <span class="badge bg-dark">
                                             KES {{ data.treasury.net_balance|floatformat:2 }}
                                         </span>
                                     </td>
-                                    <td>
+                                    <td class="text-center">
                                         <a href="{% url 'treasury:branch_treasury' company.id data.branch.id %}" 
                                            class="btn btn-sm btn-outline-primary">
-                                            <i class="fas fa-eye"></i> View
+                                            <i class="fas fa-eye"></i>
                                         </a>
                                     </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="7" class="text-center text-muted">
-                                        <i class="fas fa-info-circle"></i> No branches found
+                                    <td colspan="7" class="text-center">
+                                        <i class="fas fa-info-circle" style="color: #000000;"></i>
+                                        <span style="color: #000000;"> No branches found</span>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -171,19 +576,19 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0">Recent Movements</h5>
+                    <h5 class="mb-0"><i class="fas fa-history"></i> Recent Movements</h5>
                 </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-sm">
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="border: 2px solid #000000;">
+                        <table class="table-excel table-sm mb-0" id="movementsTable">
                             <thead>
                                 <tr>
-                                    <th>Branch</th>
-                                    <th>Type</th>
-                                    <th>From</th>
-                                    <th>To</th>
-                                    <th>Amount</th>
-                                    <th>Time</th>
+                                    <th style="width: 15%;">Branch</th>
+                                    <th style="width: 12%;">Type</th>
+                                    <th style="width: 18%;">From</th>
+                                    <th style="width: 18%;">To</th>
+                                    <th style="width: 17%;" class="text-right">Amount</th>
+                                    <th style="width: 20%;">Time</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -199,13 +604,14 @@
                                     </td>
                                     <td>{{ movement.get_from_account_display }}</td>
                                     <td>{{ movement.get_to_account_display }}</td>
-                                    <td>KES {{ movement.amount|floatformat:2 }}</td>
+                                    <td class="text-right" style="color: #155724;">KES {{ movement.amount|floatformat:2 }}</td>
                                     <td>{{ movement.created_at|date:"H:i" }}</td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted">
-                                        <i class="fas fa-info-circle"></i> No movements yet
+                                    <td colspan="6" class="text-center">
+                                        <i class="fas fa-info-circle" style="color: #000000;"></i>
+                                        <span style="color: #000000;"> No movements yet</span>
                                     </td>
                                 </tr>
                                 {% endfor %}

@@ -5,12 +5,531 @@
 
 {% block page_title %}{{ branch.name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE TABLE STYLING
+    ============================================ */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    
+    .table-excel thead th {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+    
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    
+    .table-excel tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+    
+    .table-excel tfoot td {
+        background-color: #f8f9fa !important;
+        border-top: 3px solid #000000 !important;
+        font-weight: 700;
+        color: #000000;
+    }
+    
+    .table-excel tfoot tr:nth-child(even) td {
+        background-color: #f8f9fa !important;
+    }
+
+    /* ============================================
+       STAT CARDS
+    ============================================ */
+    .stat-card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        transition: transform 0.2s;
+        cursor: default;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .stat-card.bg-primary {
+        background: #87CEEB !important;
+        color: #000000 !important;
+    }
+    .stat-card.bg-primary h3 {
+        color: #000000 !important;
+    }
+    .stat-card.bg-primary h6 {
+        color: #000000 !important;
+    }
+    .stat-card.bg-info {
+        background: #cce5ff !important;
+        color: #004085 !important;
+    }
+    .stat-card.bg-info h3 {
+        color: #004085 !important;
+    }
+    .stat-card.bg-info h6 {
+        color: #004085 !important;
+    }
+    .stat-card.bg-success {
+        background: #d4edda !important;
+        color: #155724 !important;
+    }
+    .stat-card.bg-success h3 {
+        color: #155724 !important;
+    }
+    .stat-card.bg-success h6 {
+        color: #155724 !important;
+    }
+    .stat-card.bg-warning {
+        background: #fff3cd !important;
+        color: #000000 !important;
+    }
+    .stat-card.bg-warning h3 {
+        color: #856404 !important;
+    }
+    .stat-card.bg-warning h6 {
+        color: #856404 !important;
+    }
+    .stat-card.bg-dark {
+        background: #2d3436 !important;
+        color: #ffffff !important;
+    }
+    .stat-card.bg-dark h2 {
+        color: #ffffff !important;
+    }
+    .stat-card.bg-dark h5 {
+        color: #ffffff !important;
+    }
+    .stat-card.bg-dark small {
+        color: #ffffff !important;
+    }
+
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    
+    .card-body {
+        color: #000000;
+    }
+    
+    .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+        color: #000000 !important;
+        border-radius: 0 !important;
+    }
+    
+    .card-header h5 {
+        color: #000000 !important;
+        font-weight: 700;
+        margin: 0;
+    }
+    
+    .card-header h5 i {
+        color: #000000;
+        margin-right: 8px;
+    }
+    
+    .card.border-success {
+        border-color: #28a745 !important;
+        border-width: 2px !important;
+    }
+    
+    .card.border-warning {
+        border-color: #ffc107 !important;
+        border-width: 2px !important;
+    }
+    
+    .card-header.bg-success {
+        background: #28a745 !important;
+        color: #ffffff !important;
+        border-bottom: 2px solid #000000 !important;
+    }
+    
+    .card-header.bg-success h5 {
+        color: #ffffff !important;
+    }
+    
+    .card-header.bg-warning {
+        background: #ffc107 !important;
+        color: #000000 !important;
+        border-bottom: 2px solid #000000 !important;
+    }
+    
+    .card-header.bg-warning h5 {
+        color: #000000 !important;
+    }
+
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-success {
+        background-color: #28a745;
+        border: 2px solid #000000;
+        color: #ffffff;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-success:hover {
+        background-color: #218838;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-info {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-info:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-warning {
+        background-color: #ffc107;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-warning:hover {
+        background-color: #e0a800;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-dark {
+        background-color: #2d3436;
+        border: 2px solid #000000;
+        color: #ffffff;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-dark:hover {
+        background-color: #1e2325;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-primary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-primary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    
+    .btn-outline-danger {
+        border: 2px solid #000000;
+        color: #dc3545;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    
+    .btn-outline-danger:hover {
+        background-color: #dc3545;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    
+    .btn-sm {
+        padding: 4px 12px;
+        font-size: 12px;
+    }
+    
+    .btn-lg {
+        padding: 10px 24px;
+        font-size: 16px;
+    }
+
+    /* ============================================
+       BADGES
+    ============================================ */
+    .badge {
+        padding: 4px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    
+    .badge.bg-success {
+        background: #d4edda !important;
+        color: #155724 !important;
+    }
+    
+    .badge.bg-info {
+        background: #cce5ff !important;
+        color: #004085 !important;
+    }
+
+    /* ============================================
+       ALERTS
+    ============================================ */
+    .alert {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        color: #000000;
+    }
+    
+    .alert.alert-info {
+        background: #cce5ff !important;
+        color: #004085 !important;
+    }
+
+    /* ============================================
+       TEXT COLORS
+    ============================================ */
+    .text-muted {
+        color: #000000 !important;
+    }
+    .text-center {
+        text-align: center;
+    }
+    .text-end {
+        text-align: right;
+    }
+    .fw-bold {
+        font-weight: 700;
+    }
+
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 11px;
+        }
+        .table-excel th {
+            font-size: 10px;
+        }
+        .btn-sm {
+            font-size: 9px;
+            padding: 2px 6px;
+        }
+        .btn-sm i {
+            font-size: 10px;
+        }
+        .badge {
+            font-size: 9px;
+            padding: 2px 6px;
+        }
+        .stat-card h3 {
+            font-size: 1.2rem;
+        }
+        .stat-card h6 {
+            font-size: 0.8rem;
+        }
+        .stat-card.bg-dark h2 {
+            font-size: 1.5rem;
+        }
+        .card-header h5 {
+            font-size: 0.9rem;
+        }
+        .btn-group {
+            flex-wrap: wrap;
+        }
+        .btn-group .btn {
+            flex: 1;
+            min-width: 60px;
+            text-align: center;
+            font-size: 11px;
+            padding: 6px 8px;
+        }
+        .row.mt-3 {
+            margin-top: 10px !important;
+        }
+        .row.mt-4 {
+            margin-top: 15px !important;
+        }
+        .col-md-3, .col-md-6, .col-md-12 {
+            margin-bottom: 10px;
+        }
+        .card-body {
+            padding: 12px;
+        }
+        .btn-lg {
+            font-size: 14px;
+            padding: 8px 16px;
+        }
+        .table-excel tfoot td {
+            font-size: 11px;
+        }
+        .p-3 {
+            padding: 10px !important;
+        }
+        .p-3 h4 {
+            font-size: 1.1rem;
+        }
+        .p-3 h6 {
+            font-size: 0.7rem;
+        }
+        .bg-dark .h2 {
+            font-size: 1.5rem;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 3px 4px;
+            font-size: 9px;
+        }
+        .table-excel th {
+            font-size: 8px;
+        }
+        .btn-sm {
+            font-size: 8px;
+            padding: 1px 4px;
+        }
+        .btn-sm i {
+            font-size: 8px;
+        }
+        .badge {
+            font-size: 8px;
+            padding: 1px 4px;
+        }
+        .stat-card h3 {
+            font-size: 1rem;
+        }
+        .stat-card h6 {
+            font-size: 0.7rem;
+        }
+        .stat-card .card-body {
+            padding: 10px;
+        }
+        .stat-card.bg-dark h2 {
+            font-size: 1.2rem;
+        }
+        .card-header h5 {
+            font-size: 0.8rem;
+        }
+        .card-header {
+            padding: 8px 12px;
+        }
+        .btn {
+            font-size: 11px;
+            padding: 4px 8px;
+        }
+        .btn-lg {
+            font-size: 12px;
+            padding: 6px 12px;
+        }
+        .alert {
+            font-size: 12px;
+            padding: 10px;
+        }
+        .card-body {
+            padding: 10px;
+        }
+        .btn-group .btn {
+            font-size: 9px;
+            padding: 4px 6px;
+            min-width: 40px;
+        }
+        .p-3 {
+            padding: 8px !important;
+        }
+        .p-3 h4 {
+            font-size: 0.9rem;
+        }
+        .p-3 h6 {
+            font-size: 0.6rem;
+        }
+        .bg-dark .h2 {
+            font-size: 1.2rem;
+        }
+        .table-excel tfoot td {
+            font-size: 9px;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
     <!-- Branch Summary -->
     <div class="row">
         <div class="col-md-3">
-            <div class="card bg-primary text-white">
+            <div class="card stat-card bg-primary">
                 <div class="card-body">
                     <h6 class="card-title">Total Bank</h6>
                     <h3 class="mb-0">KES {{ treasury.total_bank_balance|floatformat:2 }}</h3>
@@ -18,7 +537,7 @@
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card bg-info text-white">
+            <div class="card stat-card bg-info">
                 <div class="card-body">
                     <h6 class="card-title">Total M-Pesa</h6>
                     <h3 class="mb-0">KES {{ treasury.total_mpesa_balance|floatformat:2 }}</h3>
@@ -26,7 +545,7 @@
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card bg-success text-white">
+            <div class="card stat-card bg-success">
                 <div class="card-body">
                     <h6 class="card-title">Cash Balance</h6>
                     <h3 class="mb-0">KES {{ treasury.cash_balance|floatformat:2 }}</h3>
@@ -34,7 +553,7 @@
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card bg-warning text-white">
+            <div class="card stat-card bg-warning">
                 <div class="card-body">
                     <h6 class="card-title">Credit Balance</h6>
                     <h3 class="mb-0">KES {{ treasury.credit_balance|floatformat:2 }}</h3>
@@ -46,7 +565,7 @@
     <!-- Net Balance -->
     <div class="row mt-3">
         <div class="col-md-12">
-            <div class="card bg-dark text-white">
+            <div class="card stat-card bg-dark">
                 <div class="card-body text-center">
                     <h5 class="card-title">Net Balance</h5>
                     <h2 class="mb-0">KES {{ treasury.net_balance|floatformat:2 }}</h2>
@@ -91,7 +610,7 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
-                        <i class="fas fa-university text-primary"></i> Bank Accounts
+                        <i class="fas fa-university"></i> Bank Accounts
                     </h5>
 
                     {% if user.role == 'company_admin' or user.role == 'super_admin' %}
@@ -100,16 +619,16 @@
                     </a>
                     {% endif %}
                 </div>
-                <div class="card-body">
+                <div class="card-body p-0">
                     {% if bank_accounts %}
-                        <div class="table-responsive">
-                            <table class="table table-sm table-hover">
+                        <div class="table-responsive" style="border: 2px solid #000000;">
+                            <table class="table-excel table-sm mb-0">
                                 <thead>
                                     <tr>
-                                        <th>Account Name</th>
-                                        <th>Bank</th>
-                                        <th>Balance</th>
-                                        <th>Actions</th>
+                                        <th style="width: 30%;">Account Name</th>
+                                        <th style="width: 25%;">Bank</th>
+                                        <th style="width: 25%;" class="text-right">Balance</th>
+                                        <th style="width: 20%;" class="text-center">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -117,10 +636,10 @@
                                     <tr>
                                         <td><strong>{{ account.account_name }}</strong></td>
                                         <td>{{ account.get_bank_type_display }}</td>
-                                        <td>KES {{ account.current_balance|floatformat:2 }}</td>
+                                        <td class="text-right" style="color: #000000;">KES {{ account.current_balance|floatformat:2 }}</td>
 
                                         {% if user.role == 'company_admin' or user.role == 'super_admin' %}
-                                        <td>
+                                        <td class="text-center">
                                             <a href="{% url 'treasury:bank_account_edit' company.id branch.id account.id %}" 
                                                class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-edit"></i>
@@ -131,23 +650,23 @@
                                             </a>
                                         </td>
                                         {% else %}
-                                        <td class="text-muted">N/A</td>
+                                        <td class="text-center" style="color: #000000;">N/A</td>
                                         {% endif %}
                                     </tr>
                                     {% endfor %}
                                 </tbody>
                                 <tfoot>
-                                    <tr class="table-active">
+                                    <tr>
                                         <td colspan="2" class="text-end fw-bold">Total:</td>
-                                        <td colspan="2"><strong>KES {{ treasury.total_bank_balance|floatformat:2 }}</strong></td>
+                                        <td colspan="2" class="text-right" style="color: #000000;"><strong>KES {{ treasury.total_bank_balance|floatformat:2 }}</strong></td>
                                     </tr>
                                 </tfoot>
                             </table>
                         </div>
                     {% else %}
-                        <div class="text-center text-muted py-3">
-                            <i class="fas fa-university fa-2x d-block mb-2"></i>
-                            <p>No bank accounts found</p>
+                        <div class="text-center py-3" style="color: #000000;">
+                            <i class="fas fa-university fa-2x d-block mb-2" style="color: #000000;"></i>
+                            <p style="color: #000000;">No bank accounts found</p>
 
                             {% if user.role == 'company_admin' or user.role == 'super_admin' %}
                             <a href="{% url 'treasury:bank_account_create' company.id branch.id %}" class="btn btn-sm btn-primary">
@@ -165,7 +684,7 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
-                        <i class="fas fa-mobile-alt text-success"></i> M-Pesa Accounts
+                        <i class="fas fa-mobile-alt" style="color: #155724;"></i> M-Pesa Accounts
                     </h5>
                     {% if user.role == 'company_admin' or user.role == 'super_admin' %}
                     <a href="{% url 'treasury:mpesa_account_create' company.id branch.id %}" class="btn btn-sm btn-success">
@@ -173,16 +692,16 @@
                     </a>
                     {% endif %}
                 </div>
-                <div class="card-body">
+                <div class="card-body p-0">
                     {% if mpesa_accounts %}
-                        <div class="table-responsive">
-                            <table class="table table-sm table-hover">
+                        <div class="table-responsive" style="border: 2px solid #000000;">
+                            <table class="table-excel table-sm mb-0">
                                 <thead>
                                     <tr>
-                                        <th>Merchant Name</th>
-                                        <th>Till Number</th>
-                                        <th>Balance</th>
-                                        <th>Actions</th>
+                                        <th style="width: 30%;">Merchant Name</th>
+                                        <th style="width: 25%;">Till Number</th>
+                                        <th style="width: 25%;" class="text-right">Balance</th>
+                                        <th style="width: 20%;" class="text-center">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -190,9 +709,9 @@
                                     <tr>
                                         <td><strong>{{ account.till_name }}</strong></td>
                                         <td>{{ account.till_number }}</td>
-                                        <td>KES {{ account.current_balance|floatformat:2 }}</td>
+                                        <td class="text-right" style="color: #155724;">KES {{ account.current_balance|floatformat:2 }}</td>
                                         {% if user.role == 'company_admin' or user.role == 'super_admin' %}
-                                        <td>
+                                        <td class="text-center">
                                             <a href="{% url 'treasury:mpesa_account_edit' company.id branch.id account.id %}" 
                                                class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-edit"></i>
@@ -203,23 +722,23 @@
                                             </a>
                                         </td>
                                         {% else %}
-                                        <td class="text-muted">N/A</td>
+                                        <td class="text-center" style="color: #000000;">N/A</td>
                                         {% endif %}
                                     </tr>
                                     {% endfor %}
                                 </tbody>
                                 <tfoot>
-                                    <tr class="table-active">
+                                    <tr>
                                         <td colspan="2" class="text-end fw-bold">Total:</td>
-                                        <td colspan="2"><strong>KES {{ treasury.total_mpesa_balance|floatformat:2 }}</strong></td>
+                                        <td colspan="2" class="text-right" style="color: #155724;"><strong>KES {{ treasury.total_mpesa_balance|floatformat:2 }}</strong></td>
                                     </tr>
                                 </tfoot>
                             </table>
                         </div>
                     {% else %}
-                        <div class="text-center text-muted py-3">
-                            <i class="fas fa-mobile-alt fa-2x d-block mb-2"></i>
-                            <p>No M-Pesa accounts found</p>
+                        <div class="text-center py-3" style="color: #000000;">
+                            <i class="fas fa-mobile-alt fa-2x d-block mb-2" style="color: #000000;"></i>
+                            <p style="color: #000000;">No M-Pesa accounts found</p>
                             {% if user.role == 'company_admin' or user.role == 'super_admin' %}
                             <a href="{% url 'treasury:mpesa_account_create' company.id branch.id %}" class="btn btn-sm btn-success">
                                 <i class="fas fa-plus"></i> Add M-Pesa Account
@@ -249,33 +768,33 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-3">
-                            <div class="p-3 bg-light rounded">
-                                <h6 class="text-muted">Cash</h6>
-                                <h4 class="text-warning">KES {{ today_record.cash_balance|floatformat:2 }}</h4>
+                            <div class="p-3" style="background: #f8f9fa; border: 2px solid #000000; border-radius: 4px;">
+                                <h6 style="color: #000000;">Cash</h6>
+                                <h4 style="color: #856404;">KES {{ today_record.cash_balance|floatformat:2 }}</h4>
                             </div>
                         </div>
                         <div class="col-md-3">
-                            <div class="p-3 bg-light rounded">
-                                <h6 class="text-muted">Credit</h6>
-                                <h4 class="text-danger">KES {{ today_record.credit_balance|floatformat:2 }}</h4>
+                            <div class="p-3" style="background: #f8f9fa; border: 2px solid #000000; border-radius: 4px;">
+                                <h6 style="color: #000000;">Credit</h6>
+                                <h4 style="color: #721c24;">KES {{ today_record.credit_balance|floatformat:2 }}</h4>
                             </div>
                         </div>
                         <div class="col-md-3">
-                            <div class="p-3 bg-light rounded">
-                                <h6 class="text-muted">Total Bank</h6>
-                                <h4 class="text-primary">KES {{ today_record.total_bank_balance|floatformat:2 }}</h4>
+                            <div class="p-3" style="background: #f8f9fa; border: 2px solid #000000; border-radius: 4px;">
+                                <h6 style="color: #000000;">Total Bank</h6>
+                                <h4 style="color: #000000;">KES {{ today_record.total_bank_balance|floatformat:2 }}</h4>
                             </div>
                         </div>
                         <div class="col-md-3">
-                            <div class="p-3 bg-light rounded">
-                                <h6 class="text-muted">Total M-Pesa</h6>
-                                <h4 class="text-success">KES {{ today_record.total_mpesa_balance|floatformat:2 }}</h4>
+                            <div class="p-3" style="background: #f8f9fa; border: 2px solid #000000; border-radius: 4px;">
+                                <h6 style="color: #000000;">Total M-Pesa</h6>
+                                <h4 style="color: #155724;">KES {{ today_record.total_mpesa_balance|floatformat:2 }}</h4>
                             </div>
                         </div>
                     </div>
                     <div class="row mt-3">
                         <div class="col-12">
-                            <div class="p-3 bg-dark text-white rounded text-center">
+                            <div class="p-3 bg-dark text-white rounded text-center" style="border: 2px solid #000000;">
                                 <h5>Net Balance</h5>
                                 <h2>KES {{ today_record.net_balance|floatformat:2 }}</h2>
                                 <small>Bank + M-Pesa + Cash + Credit</small>
@@ -305,11 +824,11 @@
                     </h5>
                 </div>
                 <div class="card-body text-center py-4">
-                    <h5 class="text-muted">
-                        <i class="fas fa-calendar-day fa-3x d-block mb-3"></i>
+                    <h5 style="color: #000000;">
+                        <i class="fas fa-calendar-day fa-3x d-block mb-3" style="color: #000000;"></i>
                         No daily record found for {{ today }}
                     </h5>
-                    <p class="text-muted">Record today's balances to keep track of your treasury.</p>
+                    <p style="color: #000000;">Record today's balances to keep track of your treasury.</p>
                     <a href="{% url 'treasury:daily_record_create' company.id branch.id %}" class="btn btn-primary btn-lg">
                         <i class="fas fa-plus"></i> Record Today's Balances
                     </a>
@@ -333,18 +852,18 @@
                         View All
                     </a>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-0">
                     {% if movements %}
-                        <div class="table-responsive">
-                            <table class="table table-hover">
+                        <div class="table-responsive" style="border: 2px solid #000000;">
+                            <table class="table-excel table-hover mb-0">
                                 <thead>
                                     <tr>
-                                        <th>Date/Time</th>
-                                        <th>Type</th>
-                                        <th>From</th>
-                                        <th>To</th>
-                                        <th>Amount</th>
-                                        <th>Reason</th>
+                                        <th style="width: 18%;">Date/Time</th>
+                                        <th style="width: 12%;">Type</th>
+                                        <th style="width: 18%;">From</th>
+                                        <th style="width: 18%;">To</th>
+                                        <th style="width: 17%;" class="text-right">Amount</th>
+                                        <th style="width: 17%;">Reason</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -360,7 +879,7 @@
                                         </td>
                                         <td>{{ movement.get_from_account_display }}</td>
                                         <td>{{ movement.get_to_account_display }}</td>
-                                        <td><strong>KES {{ movement.amount|floatformat:2 }}</strong></td>
+                                        <td class="text-right" style="color: #155724;"><strong>KES {{ movement.amount|floatformat:2 }}</strong></td>
                                         <td>{{ movement.reason|truncatechars:30 }}</td>
                                     </tr>
                                     {% endfor %}
@@ -368,9 +887,9 @@
                             </table>
                         </div>
                     {% else %}
-                        <div class="text-center text-muted py-3">
-                            <i class="fas fa-exchange-alt fa-2x d-block mb-2"></i>
-                            <p>No movements yet</p>
+                        <div class="text-center py-3" style="color: #000000;">
+                            <i class="fas fa-exchange-alt fa-2x d-block mb-2" style="color: #000000;"></i>
+                            <p style="color: #000000;">No movements yet</p>
                             <a href="{% url 'treasury:movement_create' company.id branch.id %}" class="btn btn-sm btn-success">
                                 <i class="fas fa-plus"></i> Create Movement
                             </a>

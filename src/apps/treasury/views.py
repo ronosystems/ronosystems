@@ -342,6 +342,7 @@ def branch_treasury(request, company_id=None, branch_id=None):
     return render(request, 'treasury/branch_treasury.html', context)
 
 
+
 # ============================================
 # BANK ACCOUNT CRUD
 # ============================================
@@ -354,7 +355,40 @@ def bank_account_create(request, company_id=None, branch_id=None):
     if not company:
         return redirect('dashboard')
     
-    branch = get_object_or_404(Branch, id=branch_id, company=company)
+    # Get the user's branch
+    user_branch = get_user_branch(request.user)
+    
+    # Determine which branch to use
+    branch = None
+    
+    # Super admin and company admin can access any branch
+    if request.user.role in ['super_admin', 'company_admin']:
+        if branch_id:
+            branch = get_object_or_404(Branch, id=branch_id, company=company)
+        else:
+            # If no branch specified, use first active branch
+            branch = Branch.objects.filter(company=company, is_active=True).first()
+        
+        if not branch:
+            messages.error(request, 'No branch available. Please create a branch first.')
+            return redirect('treasury:dashboard', company_id=company.id)
+    else:
+        # Other roles must use their own branch
+        if not user_branch:
+            messages.error(request, 'You are not assigned to any branch. Please contact your administrator.')
+            return redirect('treasury:dashboard', company_id=company.id)
+        
+        # If branch_id in URL doesn't match user's branch, redirect to user's branch
+        if branch_id and int(branch_id) != user_branch.id:
+            messages.error(request, f'You can only create bank accounts for your assigned branch: {user_branch.name}')
+            return redirect('treasury:bank_account_create', company_id=company.id, branch_id=user_branch.id)
+        
+        branch = user_branch
+    
+    if not branch:
+        messages.error(request, 'No branch available. Please create a branch first.')
+        return redirect('treasury:dashboard', company_id=company.id)
+    
     treasury = get_treasury(company, branch)
     
     # Check if user has permission (admin or manager only)
@@ -404,12 +438,20 @@ def bank_account_create(request, company_id=None, branch_id=None):
         messages.success(request, f'Bank account {account_name} created successfully!')
         return redirect('treasury:branch_treasury', company_id=company.id, branch_id=branch.id)
     
+    # Get all branches for the branch selector (for admins)
+    all_branches = Branch.objects.filter(company=company, is_active=True)
+    
+    # Determine if user is admin (can switch branches)
+    is_admin = request.user.role in ['super_admin', 'company_admin']
+    
     context = {
         'company': company,
         'branch': branch,
         'treasury': treasury,
         'bank_types': BankAccount.BankType.choices,
-        'is_admin': is_admin_or_manager(request.user),
+        'is_admin': is_admin,
+        'all_branches': all_branches,
+        'user_branch': user_branch,
     }
     return render(request, 'treasury/bank_account_form.html', context)
 
@@ -422,7 +464,34 @@ def bank_account_edit(request, company_id=None, branch_id=None, account_id=None)
     if not company:
         return redirect('dashboard')
     
-    branch = get_object_or_404(Branch, id=branch_id, company=company)
+    # Get the user's branch
+    user_branch = get_user_branch(request.user)
+    
+    # Determine which branch to use
+    branch = None
+    
+    # Super admin and company admin can access any branch
+    if request.user.role in ['super_admin', 'company_admin']:
+        if branch_id:
+            branch = get_object_or_404(Branch, id=branch_id, company=company)
+        else:
+            branch = user_branch or Branch.objects.filter(company=company, is_active=True).first()
+    else:
+        # Other roles must use their own branch
+        if not user_branch:
+            messages.error(request, 'You are not assigned to any branch. Please contact your administrator.')
+            return redirect('treasury:dashboard', company_id=company.id)
+        
+        if branch_id and int(branch_id) != user_branch.id:
+            messages.error(request, f'You can only edit bank accounts for your assigned branch: {user_branch.name}')
+            return redirect('treasury:bank_account_edit', company_id=company.id, branch_id=user_branch.id, account_id=account_id)
+        
+        branch = user_branch
+    
+    if not branch:
+        messages.error(request, 'No branch available.')
+        return redirect('treasury:dashboard', company_id=company.id)
+    
     bank_account = get_object_or_404(BankAccount, id=account_id, company=company, branch=branch)
     
     # Check if user has permission (admin or manager only)
@@ -444,12 +513,20 @@ def bank_account_edit(request, company_id=None, branch_id=None, account_id=None)
         messages.success(request, f'Bank account {bank_account.account_name} updated successfully!')
         return redirect('treasury:branch_treasury', company_id=company.id, branch_id=branch.id)
     
+    # Get all branches for the branch selector (for admins)
+    all_branches = Branch.objects.filter(company=company, is_active=True)
+    
+    # Determine if user is admin (can switch branches)
+    is_admin = request.user.role in ['super_admin', 'company_admin']
+    
     context = {
         'company': company,
         'branch': branch,
         'bank_account': bank_account,
         'bank_types': BankAccount.BankType.choices,
-        'is_admin': is_admin_or_manager(request.user),
+        'is_admin': is_admin,
+        'all_branches': all_branches,
+        'user_branch': user_branch,
     }
     return render(request, 'treasury/bank_account_form.html', context)
 
@@ -462,7 +539,34 @@ def bank_account_delete(request, company_id=None, branch_id=None, account_id=Non
     if not company:
         return redirect('dashboard')
     
-    branch = get_object_or_404(Branch, id=branch_id, company=company)
+    # Get the user's branch
+    user_branch = get_user_branch(request.user)
+    
+    # Determine which branch to use
+    branch = None
+    
+    # Super admin and company admin can access any branch
+    if request.user.role in ['super_admin', 'company_admin']:
+        if branch_id:
+            branch = get_object_or_404(Branch, id=branch_id, company=company)
+        else:
+            branch = user_branch or Branch.objects.filter(company=company, is_active=True).first()
+    else:
+        # Other roles must use their own branch
+        if not user_branch:
+            messages.error(request, 'You are not assigned to any branch. Please contact your administrator.')
+            return redirect('treasury:dashboard', company_id=company.id)
+        
+        if branch_id and int(branch_id) != user_branch.id:
+            messages.error(request, f'You can only delete bank accounts for your assigned branch: {user_branch.name}')
+            return redirect('treasury:bank_account_delete', company_id=company.id, branch_id=user_branch.id, account_id=account_id)
+        
+        branch = user_branch
+    
+    if not branch:
+        messages.error(request, 'No branch available.')
+        return redirect('treasury:dashboard', company_id=company.id)
+    
     bank_account = get_object_or_404(BankAccount, id=account_id, company=company, branch=branch)
     
     # Check if user has permission (admin or manager only)
@@ -476,28 +580,68 @@ def bank_account_delete(request, company_id=None, branch_id=None, account_id=Non
         messages.success(request, f'Bank account {account_name} deleted successfully!')
         return redirect('treasury:branch_treasury', company_id=company.id, branch_id=branch.id)
     
+    # Get all branches for the branch selector (for admins)
+    all_branches = Branch.objects.filter(company=company, is_active=True)
+    
+    # Determine if user is admin (can switch branches)
+    is_admin = request.user.role in ['super_admin', 'company_admin']
+    
     context = {
         'company': company,
         'branch': branch,
         'bank_account': bank_account,
-        'is_admin': is_admin_or_manager(request.user),
+        'is_admin': is_admin,
+        'all_branches': all_branches,
+        'user_branch': user_branch,
     }
     return render(request, 'treasury/confirm_delete.html', context)
-
+    
 
 # ============================================
 # MPESA ACCOUNT CRUD
 # ============================================
 
 @login_required
-@branch_access_required
 def mpesa_account_create(request, company_id=None, branch_id=None):
     """Create an M-Pesa account for a branch"""
     company = get_user_company(request, company_id)
     if not company:
         return redirect('dashboard')
     
-    branch = get_object_or_404(Branch, id=branch_id, company=company)
+    # Get the user's branch
+    user_branch = get_user_branch(request.user)
+    
+    # Determine which branch to use
+    branch = None
+    
+    # Super admin and company admin can access any branch
+    if request.user.role in ['super_admin', 'company_admin']:
+        if branch_id:
+            branch = get_object_or_404(Branch, id=branch_id, company=company)
+        else:
+            # If no branch specified, use first active branch
+            branch = Branch.objects.filter(company=company, is_active=True).first()
+        
+        if not branch:
+            messages.error(request, 'No branch available. Please create a branch first.')
+            return redirect('treasury:dashboard', company_id=company.id)
+    else:
+        # Other roles must use their own branch
+        if not user_branch:
+            messages.error(request, 'You are not assigned to any branch. Please contact your administrator.')
+            return redirect('treasury:dashboard', company_id=company.id)
+        
+        # If branch_id in URL doesn't match user's branch, redirect to user's branch
+        if branch_id and int(branch_id) != user_branch.id:
+            messages.error(request, f'You can only create M-Pesa accounts for your assigned branch: {user_branch.name}')
+            return redirect('treasury:mpesa_account_create', company_id=company.id, branch_id=user_branch.id)
+        
+        branch = user_branch
+    
+    if not branch:
+        messages.error(request, 'No branch available. Please create a branch first.')
+        return redirect('treasury:dashboard', company_id=company.id)
+    
     treasury = get_treasury(company, branch)
     
     # Check if user has permission (admin or manager only)
@@ -545,25 +689,59 @@ def mpesa_account_create(request, company_id=None, branch_id=None):
         messages.success(request, f'M-Pesa account {till_name} created successfully!')
         return redirect('treasury:branch_treasury', company_id=company.id, branch_id=branch.id)
     
+    # Get all branches for the branch selector (for admins)
+    all_branches = Branch.objects.filter(company=company, is_active=True)
+    
+    # Determine if user is admin (can switch branches)
+    is_admin = request.user.role in ['super_admin', 'company_admin']
+    
     context = {
         'company': company,
         'branch': branch,
         'treasury': treasury,
         'mpesa_types': MpesaAccount.MpesaType.choices,
-        'is_admin': is_admin_or_manager(request.user),
+        'is_admin': is_admin,
+        'all_branches': all_branches,
+        'user_branch': user_branch,
     }
     return render(request, 'treasury/mpesa_account_form.html', context)
 
 
 @login_required
-@branch_access_required
 def mpesa_account_edit(request, company_id=None, branch_id=None, account_id=None):
     """Edit an M-Pesa account"""
     company = get_user_company(request, company_id)
     if not company:
         return redirect('dashboard')
     
-    branch = get_object_or_404(Branch, id=branch_id, company=company)
+    # Get the user's branch
+    user_branch = get_user_branch(request.user)
+    
+    # Determine which branch to use
+    branch = None
+    
+    # Super admin and company admin can access any branch
+    if request.user.role in ['super_admin', 'company_admin']:
+        if branch_id:
+            branch = get_object_or_404(Branch, id=branch_id, company=company)
+        else:
+            branch = user_branch or Branch.objects.filter(company=company, is_active=True).first()
+    else:
+        # Other roles must use their own branch
+        if not user_branch:
+            messages.error(request, 'You are not assigned to any branch. Please contact your administrator.')
+            return redirect('treasury:dashboard', company_id=company.id)
+        
+        if branch_id and int(branch_id) != user_branch.id:
+            messages.error(request, f'You can only edit M-Pesa accounts for your assigned branch: {user_branch.name}')
+            return redirect('treasury:mpesa_account_edit', company_id=company.id, branch_id=user_branch.id, account_id=account_id)
+        
+        branch = user_branch
+    
+    if not branch:
+        messages.error(request, 'No branch available.')
+        return redirect('treasury:dashboard', company_id=company.id)
+    
     mpesa_account = get_object_or_404(MpesaAccount, id=account_id, company=company, branch=branch)
     
     # Check if user has permission (admin or manager only)
@@ -584,25 +762,59 @@ def mpesa_account_edit(request, company_id=None, branch_id=None, account_id=None
         messages.success(request, f'M-Pesa account {mpesa_account.till_name} updated successfully!')
         return redirect('treasury:branch_treasury', company_id=company.id, branch_id=branch.id)
     
+    # Get all branches for the branch selector (for admins)
+    all_branches = Branch.objects.filter(company=company, is_active=True)
+    
+    # Determine if user is admin (can switch branches)
+    is_admin = request.user.role in ['super_admin', 'company_admin']
+    
     context = {
         'company': company,
         'branch': branch,
         'mpesa_account': mpesa_account,
         'mpesa_types': MpesaAccount.MpesaType.choices,
-        'is_admin': is_admin_or_manager(request.user),
+        'is_admin': is_admin,
+        'all_branches': all_branches,
+        'user_branch': user_branch,
     }
     return render(request, 'treasury/mpesa_account_form.html', context)
 
 
 @login_required
-@branch_access_required
 def mpesa_account_delete(request, company_id=None, branch_id=None, account_id=None):
     """Delete an M-Pesa account"""
     company = get_user_company(request, company_id)
     if not company:
         return redirect('dashboard')
     
-    branch = get_object_or_404(Branch, id=branch_id, company=company)
+    # Get the user's branch
+    user_branch = get_user_branch(request.user)
+    
+    # Determine which branch to use
+    branch = None
+    
+    # Super admin and company admin can access any branch
+    if request.user.role in ['super_admin', 'company_admin']:
+        if branch_id:
+            branch = get_object_or_404(Branch, id=branch_id, company=company)
+        else:
+            branch = user_branch or Branch.objects.filter(company=company, is_active=True).first()
+    else:
+        # Other roles must use their own branch
+        if not user_branch:
+            messages.error(request, 'You are not assigned to any branch. Please contact your administrator.')
+            return redirect('treasury:dashboard', company_id=company.id)
+        
+        if branch_id and int(branch_id) != user_branch.id:
+            messages.error(request, f'You can only delete M-Pesa accounts for your assigned branch: {user_branch.name}')
+            return redirect('treasury:mpesa_account_delete', company_id=company.id, branch_id=user_branch.id, account_id=account_id)
+        
+        branch = user_branch
+    
+    if not branch:
+        messages.error(request, 'No branch available.')
+        return redirect('treasury:dashboard', company_id=company.id)
+    
     mpesa_account = get_object_or_404(MpesaAccount, id=account_id, company=company, branch=branch)
     
     # Check if user has permission (admin or manager only)
@@ -616,14 +828,23 @@ def mpesa_account_delete(request, company_id=None, branch_id=None, account_id=No
         messages.success(request, f'M-Pesa account {till_name} deleted successfully!')
         return redirect('treasury:branch_treasury', company_id=company.id, branch_id=branch.id)
     
+    # Get all branches for the branch selector (for admins)
+    all_branches = Branch.objects.filter(company=company, is_active=True)
+    
+    # Determine if user is admin (can switch branches)
+    is_admin = request.user.role in ['super_admin', 'company_admin']
+    
     context = {
         'company': company,
         'branch': branch,
         'mpesa_account': mpesa_account,
-        'is_admin': is_admin_or_manager(request.user),
+        'is_admin': is_admin,
+        'all_branches': all_branches,
+        'user_branch': user_branch,
     }
     return render(request, 'treasury/confirm_delete.html', context)
 
+    
 
 # ============================================
 # DAILY RECORD CRUD
@@ -805,15 +1026,42 @@ def daily_record_create(request, company_id=None, branch_id=None):
 
 
 @login_required
-@branch_access_required
 def daily_record_edit(request, company_id=None, branch_id=None, record_id=None):
     """Edit a daily record with individual account balances"""
     company = get_user_company(request, company_id)
     if not company:
         return redirect('dashboard')
     
-    branch = get_object_or_404(Branch, id=branch_id, company=company)
+    # Get the user's branch
+    user_branch = get_user_branch(request.user)
+    
+    # Determine which branch to use
+    branch = None
+    
+    # Super admin and company admin can access any branch
+    if request.user.role in ['super_admin', 'company_admin']:
+        if branch_id:
+            branch = get_object_or_404(Branch, id=branch_id, company=company)
+        else:
+            branch = user_branch or Branch.objects.filter(company=company, is_active=True).first()
+    else:
+        # Other roles must use their own branch
+        if not user_branch:
+            messages.error(request, 'You are not assigned to any branch. Please contact your administrator.')
+            return redirect('treasury:dashboard', company_id=company.id)
+        
+        if branch_id and int(branch_id) != user_branch.id:
+            messages.error(request, f'You can only edit records for your assigned branch: {user_branch.name}')
+            return redirect('treasury:daily_record_edit', company_id=company.id, branch_id=user_branch.id, record_id=record_id)
+        
+        branch = user_branch
+    
+    if not branch:
+        messages.error(request, 'No branch available.')
+        return redirect('treasury:dashboard', company_id=company.id)
+    
     daily_record = get_object_or_404(DailyRecord, id=record_id, company=company, branch=branch)
+    treasury = get_treasury(company, branch)
     
     # Get all active bank and M-Pesa accounts
     bank_accounts = BankAccount.objects.filter(
@@ -916,33 +1164,67 @@ def daily_record_edit(request, company_id=None, branch_id=None, record_id=None):
                 request.user
             )
         
-        messages.success(request, f'Daily record for {daily_record.date} updated successfully!')
+        messages.success(request, f'✅ Daily record for {daily_record.date} updated successfully!')
         return redirect('treasury:branch_treasury', company_id=company.id, branch_id=branch.id)
+    
+    # Get all branches for the branch selector (for admins)
+    all_branches = Branch.objects.filter(company=company, is_active=True)
+    
+    # Determine if user is admin (can switch branches)
+    is_admin = request.user.role in ['super_admin', 'company_admin']
     
     context = {
         'company': company,
         'branch': branch,
-        'treasury': daily_record.treasury,
+        'treasury': treasury,
         'bank_accounts': bank_accounts,
         'mpesa_accounts': mpesa_accounts,
         'record': daily_record,
         'bank_balance_dict': bank_balance_dict,
         'mpesa_balance_dict': mpesa_balance_dict,
         'today': timezone.now().date(),
-        'is_admin': is_admin_or_manager(request.user),
+        'is_admin': is_admin,
+        'user_branch': user_branch,
+        'all_branches': all_branches,
     }
     return render(request, 'treasury/daily_record_form.html', context)
 
 
 @login_required
-@branch_access_required
 def daily_record_delete(request, company_id=None, branch_id=None, record_id=None):
     """Delete a daily record"""
     company = get_user_company(request, company_id)
     if not company:
         return redirect('dashboard')
     
-    branch = get_object_or_404(Branch, id=branch_id, company=company)
+    # Get the user's branch
+    user_branch = get_user_branch(request.user)
+    
+    # Determine which branch to use
+    branch = None
+    
+    # Super admin and company admin can access any branch
+    if request.user.role in ['super_admin', 'company_admin']:
+        if branch_id:
+            branch = get_object_or_404(Branch, id=branch_id, company=company)
+        else:
+            branch = user_branch or Branch.objects.filter(company=company, is_active=True).first()
+    else:
+        # Other roles must use their own branch
+        if not user_branch:
+            messages.error(request, 'You are not assigned to any branch. Please contact your administrator.')
+            return redirect('treasury:dashboard', company_id=company.id)
+        
+        if branch_id and int(branch_id) != user_branch.id:
+            messages.error(request, f'You can only delete records for your assigned branch: {user_branch.name}')
+            return redirect('treasury:daily_record_delete', company_id=company.id, branch_id=user_branch.id, record_id=record_id)
+        
+        branch = user_branch
+    
+    if not branch:
+        messages.error(request, 'No branch available.')
+        return redirect('treasury:dashboard', company_id=company.id)
+    
     record = get_object_or_404(DailyRecord, id=record_id, company=company, branch=branch)
     
     # Check if user has permission (admin or manager only)
@@ -982,17 +1264,24 @@ def daily_record_delete(request, company_id=None, branch_id=None, record_id=None
                 treasury.credit_balance = 0
             treasury.save()
         
-        messages.success(request, f'Daily record for {date} deleted successfully!')
+        messages.success(request, f'✅ Daily record for {date} deleted successfully!')
         return redirect('treasury:daily_records_list', company_id=company.id, branch_id=branch.id)
+    
+    # Get all branches for the branch selector (for admins)
+    all_branches = Branch.objects.filter(company=company, is_active=True)
+    
+    # Determine if user is admin (can switch branches)
+    is_admin = request.user.role in ['super_admin', 'company_admin']
     
     context = {
         'company': company,
         'branch': branch,
         'record': record,
-        'is_admin': is_admin_or_manager(request.user),
+        'is_admin': is_admin,
+        'all_branches': all_branches,
+        'user_branch': user_branch,
     }
     return render(request, 'treasury/confirm_delete.html', context)
-
 
 # ============================================
 # DAILY RECORDS LIST
@@ -1382,6 +1671,7 @@ def movement_create(request, company_id=None, branch_id=None):
     return render(request, 'treasury/movement_form.html', context)
 
     
+        
 # ============================================
 # MOVEMENTS LIST
 # ============================================
