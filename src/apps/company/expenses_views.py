@@ -20,6 +20,9 @@ from .models import Expense
 
 EXPENSE_CATEGORIES = Expense.EXPENSE_CATEGORIES
 
+
+
+
 # ============================================
 # EXPENSE DASHBOARD
 # ============================================
@@ -28,12 +31,26 @@ EXPENSE_CATEGORIES = Expense.EXPENSE_CATEGORIES
 def expenses_dashboard(request):
     """Main expenses dashboard with daily, weekly, monthly views"""
     company = request.user.company
-    branch_id = request.GET.get('branch')
-    date_from = request.GET.get('date_from')
-    date_to = request.GET.get('date_to')
+    user_branch = get_user_branch(request.user)
+    
+    # Check if user is admin
+    is_admin = request.user.role in ['super_admin', 'company_admin']
     
     # Base queryset
     expenses_qs = Expense.objects.filter(company=company)
+    
+    # Filter by branch for non-admin users
+    if not is_admin:
+        if user_branch:
+            expenses_qs = expenses_qs.filter(branch=user_branch)
+        else:
+            messages.warning(request, 'You are not assigned to any branch.')
+            expenses_qs = expenses_qs.none()
+    
+    # Apply filters from GET parameters
+    branch_id = request.GET.get('branch')
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
     
     if branch_id:
         expenses_qs = expenses_qs.filter(branch_id=branch_id)
@@ -43,8 +60,10 @@ def expenses_dashboard(request):
     if date_to:
         expenses_qs = expenses_qs.filter(expense_date__lte=date_to)
     
-    # Get branches for filter
+    # Get branches for filter (only show accessible branches)
     branches = Branch.objects.filter(company=company, is_active=True)
+    if not is_admin and user_branch:
+        branches = branches.filter(id=user_branch.id)
     
     # Today's summary
     today = timezone.now().date()
@@ -90,8 +109,11 @@ def expenses_dashboard(request):
         'date_to': date_to,
         'expense_categories': EXPENSE_CATEGORIES,
         'is_expenses': True,
+        'is_admin': is_admin,
+        'user_branch': user_branch,
     }
     return render(request, 'company/expenses/dashboard.html', context)
+
 
 # ============================================
 # EXPENSE CRUD OPERATIONS
@@ -101,7 +123,13 @@ def expenses_dashboard(request):
 def expense_create(request):
     """Create a new expense record"""
     company = request.user.company
+    user_branch = get_user_branch(request.user)
+    is_admin = request.user.role in ['super_admin', 'company_admin']
+    
+    # Get branches user has access to
     branches = Branch.objects.filter(company=company, is_active=True)
+    if not is_admin and user_branch:
+        branches = branches.filter(id=user_branch.id)
     
     if request.method == 'POST':
         try:
@@ -132,10 +160,18 @@ def expense_create(request):
                 messages.error(request, 'Amount must be greater than 0.')
                 return redirect('company-expenses-create')
             
-            # Get branch
+            # Get branch - enforce branch access
             branch = None
             if branch_id:
                 branch = Branch.objects.get(id=branch_id, company=company)
+                # Check if user has access to this branch
+                if not is_admin and user_branch and branch.id != user_branch.id:
+                    messages.error(request, 'You do not have access to this branch.')
+                    return redirect('company-expenses-create')
+            else:
+                # If no branch selected and user is not admin, use their branch
+                if not is_admin and user_branch:
+                    branch = user_branch
             
             # Create expense
             expense = Expense.objects.create(
@@ -155,6 +191,9 @@ def expense_create(request):
             messages.success(request, f'✅ Expense "{expense.description}" recorded successfully!')
             return redirect('company-expenses-dashboard')
             
+        except Branch.DoesNotExist:
+            messages.error(request, 'Selected branch does not exist.')
+            return redirect('company-expenses-create')
         except Exception as e:
             messages.error(request, f'❌ Error saving expense: {str(e)}')
             return redirect('company-expenses-create')
@@ -164,15 +203,30 @@ def expense_create(request):
         'expense_categories': EXPENSE_CATEGORIES,
         'today': timezone.now().date(),
         'is_expenses': True,
+        'is_admin': is_admin,
+        'user_branch': user_branch,
     }
     return render(request, 'company/expenses/form.html', context)
+
 
 @login_required
 def expense_edit(request, pk):
     """Edit an existing expense record"""
     company = request.user.company
+    user_branch = get_user_branch(request.user)
+    is_admin = request.user.role in ['super_admin', 'company_admin']
+    
     expense = get_object_or_404(Expense, id=pk, company=company)
+    
+    # Check if user has access to this expense's branch
+    if not is_admin and user_branch and expense.branch and expense.branch.id != user_branch.id:
+        messages.error(request, 'You do not have permission to edit this expense.')
+        return redirect('company-expenses-dashboard')
+    
+    # Get branches user has access to
     branches = Branch.objects.filter(company=company, is_active=True)
+    if not is_admin and user_branch:
+        branches = branches.filter(id=user_branch.id)
     
     if request.method == 'POST':
         try:
@@ -187,7 +241,12 @@ def expense_edit(request, pk):
             
             branch_id = request.POST.get('branch')
             if branch_id:
-                expense.branch = Branch.objects.get(id=branch_id, company=company)
+                branch = Branch.objects.get(id=branch_id, company=company)
+                # Check if user has access to this branch
+                if not is_admin and user_branch and branch.id != user_branch.id:
+                    messages.error(request, 'You do not have access to this branch.')
+                    return redirect('company-expenses-edit', pk=pk)
+                expense.branch = branch
             else:
                 expense.branch = None
             
@@ -196,6 +255,9 @@ def expense_edit(request, pk):
             messages.success(request, f'✅ Expense "{expense.description}" updated successfully!')
             return redirect('company-expenses-dashboard')
             
+        except Branch.DoesNotExist:
+            messages.error(request, 'Selected branch does not exist.')
+            return redirect('company-expenses-edit', pk=pk)
         except Exception as e:
             messages.error(request, f'❌ Error updating expense: {str(e)}')
     
@@ -205,14 +267,25 @@ def expense_edit(request, pk):
         'expense_categories': EXPENSE_CATEGORIES,
         'is_expenses': True,
         'is_edit': True,
+        'is_admin': is_admin,
+        'user_branch': user_branch,
     }
     return render(request, 'company/expenses/form.html', context)
+
 
 @login_required
 def expense_delete(request, pk):
     """Delete an expense record"""
     company = request.user.company
+    user_branch = get_user_branch(request.user)
+    is_admin = request.user.role in ['super_admin', 'company_admin']
+    
     expense = get_object_or_404(Expense, id=pk, company=company)
+    
+    # Check if user has access to this expense's branch
+    if not is_admin and user_branch and expense.branch and expense.branch.id != user_branch.id:
+        messages.error(request, 'You do not have permission to delete this expense.')
+        return redirect('company-expenses-dashboard')
     
     if request.method == 'POST':
         try:
@@ -226,20 +299,32 @@ def expense_delete(request, pk):
     context = {
         'expense': expense,
         'is_expenses': True,
+        'is_admin': is_admin,
     }
     return render(request, 'company/expenses_confirm_delete.html', context)
+
 
 @login_required
 def expense_detail(request, pk):
     """View expense details"""
     company = request.user.company
+    user_branch = get_user_branch(request.user)
+    is_admin = request.user.role in ['super_admin', 'company_admin']
+    
     expense = get_object_or_404(Expense, id=pk, company=company)
+    
+    # Check if user has access to this expense's branch
+    if not is_admin and user_branch and expense.branch and expense.branch.id != user_branch.id:
+        messages.error(request, 'You do not have permission to view this expense.')
+        return redirect('company-expenses-dashboard')
     
     context = {
         'expense': expense,
         'is_expenses': True,
+        'is_admin': is_admin,
     }
     return render(request, 'company/expenses/detail.html', context)
+
 
 # ============================================
 # EXPENSE DETAIL REPORTS
@@ -317,9 +402,16 @@ def expense_reject(request, pk):
     }
     return render(request, 'company/expenses/reject.html', context)
 
+
 # ============================================
 # HELPER FUNCTIONS
 # ============================================
+
+def get_user_branch(user):
+    """Get the user's branch"""
+    if hasattr(user, 'branch') and user.branch:
+        return user.branch
+    return None
 
 def get_expenses_summary(expenses_qs):
     """Calculate summary for expenses queryset"""

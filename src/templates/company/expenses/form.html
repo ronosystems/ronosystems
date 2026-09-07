@@ -23,6 +23,12 @@
         color: #dc3545;
         font-weight: bold;
     }
+    .branch-info {
+        background: #e3f2fd;
+        padding: 10px 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+    }
 </style>
 {% endblock %}
 
@@ -38,6 +44,17 @@
                         <div class="form-section">
                             <h6 class="form-section-title"><i class="fas fa-info-circle"></i> Expense Details</h6>
                             
+                            <!-- Branch Information for non-admins -->
+                            {% if not is_admin and user_branch %}
+                            <div class="branch-info">
+                                <i class="fas fa-store"></i> 
+                                <strong>Branch:</strong> {{ user_branch.name }} ({{ user_branch.code }})
+                                <br>
+                                <small class="text-muted">You are recording expenses for your assigned branch</small>
+                                <input type="hidden" name="branch" value="{{ user_branch.id }}">
+                            </div>
+                            {% endif %}
+                            
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label required">Date</label>
@@ -46,12 +63,18 @@
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Branch</label>
+                                    {% if is_admin %}
                                     <select class="form-select" name="branch">
                                         <option value="">Select Branch</option>
                                         {% for branch in branches %}
                                         <option value="{{ branch.id }}" {% if expense.branch_id == branch.id %}selected{% endif %}>{{ branch.name }}</option>
                                         {% endfor %}
                                     </select>
+                                    {% else %}
+                                    <input type="text" class="form-control" value="{{ user_branch.name }}" disabled>
+                                    <input type="hidden" name="branch" value="{{ user_branch.id }}">
+                                    <small class="text-muted">You are assigned to this branch</small>
+                                    {% endif %}
                                 </div>
                             </div>
                             
