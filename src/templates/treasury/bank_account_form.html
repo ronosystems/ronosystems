@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if bank_account %}Edit{% else %}Create{% endif %} Bank Account{% endblock %}
+
+{% block page_title %} {{ branch.name }}  {% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-university"></i> 
+                        {% if bank_account %}Edit{% else %}Create{% endif %} Bank Account
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Branch Info -->
+                        <div class="alert alert-info">
+                            <i class="fas fa-store"></i> 
+                            <strong>Branch:</strong> {{ branch.name }} ({{ branch.code }})
+                        </div>
+
+                        <!-- Bank Type -->
+                        <div class="form-group mb-3">
+                            <label for="bank_type" class="fw-bold">Bank Type <span class="text-danger">*</span></label>
+                            <select class="form-control form-control-lg" id="bank_type" name="bank_type" required>
+                                <option value="">Select Bank...</option>
+                                {% for value, label in bank_types %}
+                                    <option value="{{ value }}" {% if bank_account and bank_account.bank_type == value %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Select the bank for this account</small>
+                        </div>
+
+                        <!-- Account Name -->
+                        <div class="form-group mb-3">
+                            <label for="account_name" class="fw-bold">Account Name <span class="text-danger">*</span></label>
+                            <input type="text" 
+                                   class="form-control form-control-lg" 
+                                   id="account_name" 
+                                   name="account_name" 
+                                   value="{% if bank_account %}{{ bank_account.account_name }}{% endif %}"
+                                   placeholder="e.g., KCB A, KCB B, ABSA A"
+                                   required>
+                            <small class="text-muted">Enter a descriptive name for this account (e.g., KCB A, KCB B, ABSA A)</small>
+                        </div>
+
+                        <!-- Account Number -->
+                        <div class="form-group mb-3">
+                            <label for="account_number" class="fw-bold">Account Number <span class="text-danger">*</span></label>
+                            <input type="text" 
+                                   class="form-control form-control-lg" 
+                                   id="account_number" 
+                                   name="account_number" 
+                                   value="{% if bank_account %}{{ bank_account.account_number }}{% endif %}"
+                                   placeholder="Enter bank account number"
+                                   required>
+                            <small class="text-muted">Enter the actual bank account number</small>
+                        </div>
+
+                        <!-- Branch Code -->
+                        <div class="form-group mb-3">
+                            <label for="branch_code">Branch Code</label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="branch_code" 
+                                   name="branch_code" 
+                                   value="{% if bank_account %}{{ bank_account.branch_code }}{% endif %}"
+                                   placeholder="Enter bank branch code (optional)">
+                            <small class="text-muted">Optional: Enter the bank branch code</small>
+                        </div>
+
+                        <!-- Swift Code -->
+                        <div class="form-group mb-3">
+                            <label for="swift_code">SWIFT/BIC Code</label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="swift_code" 
+                                   name="swift_code" 
+                                   value="{% if bank_account %}{{ bank_account.swift_code }}{% endif %}"
+                                   placeholder="Enter SWIFT/BIC code (optional)">
+                            <small class="text-muted">Optional: Enter the SWIFT/BIC code for international transfers</small>
+                        </div>
+
+                        <!-- Checkboxes -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input type="checkbox" 
+                                           class="form-check-input" 
+                                           id="is_primary" 
+                                           name="is_primary" 
+                                           {% if bank_account and bank_account.is_primary %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold" for="is_primary">
+                                        <i class="fas fa-star text-warning"></i> Primary Account
+                                    </label>
+                                    <br>
+                                    <small class="text-muted">Mark as the primary bank account for this branch</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input type="checkbox" 
+                                           class="form-check-input" 
+                                           id="is_active" 
+                                           name="is_active" 
+                                           {% if bank_account and bank_account.is_active or not bank_account %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold" for="is_active">
+                                        <i class="fas fa-check-circle text-success"></i> Active
+                                    </label>
+                                    <br>
+                                    <small class="text-muted">Account is active and available for use</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Notes -->
+                        <div class="form-group mb-4">
+                            <label for="notes">Notes</label>
+                            <textarea class="form-control" 
+                                      id="notes" 
+                                      name="notes" 
+                                      rows="2"
+                                      placeholder="Add any additional notes about this account...">{% if bank_account %}{{ bank_account.notes }}{% endif %}</textarea>
+                        </div>
+
+                        <!-- Submit Buttons -->
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <a href="{% url 'treasury:branch_treasury' company.id branch.id %}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left"></i> Cancel
+                                </a>
+                            </div>
+                            <div>
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-save"></i> 
+                                    {% if bank_account %}Update{% else %}Create{% endif %} Account
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Help Card -->
+            <div class="card mt-3">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0"><i class="fas fa-info-circle"></i> Tips</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li><strong>Account Name:</strong> Use a descriptive name like "KCB A", "KCB B", "ABSA A", etc.</li>
+                        <li><strong>Account Number:</strong> Enter the actual bank account number.</li>
+                        <li><strong>Primary Account:</strong> Only one account can be primary per branch.</li>
+                        <li><strong>Balance:</strong> Balances are updated when you record daily records.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Auto-format account number (remove spaces)
+        document.getElementById('account_number').addEventListener('input', function() {
+            this.value = this.value.replace(/\s/g, '');
+        });
+
+        // If primary is checked, show warning
+        document.getElementById('is_primary').addEventListener('change', function() {
+            if (this.checked) {
+                if (!confirm('Setting this as the primary account will unset any other primary account for this branch. Continue?')) {
+                    this.checked = false;
+                }
+            }
+        });
+
+        // Form validation
+        document.querySelector('form').addEventListener('submit', function(e) {
+            let bankType = document.getElementById('bank_type').value;
+            let accountName = document.getElementById('account_name').value.trim();
+            let accountNumber = document.getElementById('account_number').value.trim();
+
+            if (!bankType) {
+                e.preventDefault();
+                alert('Please select a bank type.');
+                document.getElementById('bank_type').focus();
+                return false;
+            }
+
+            if (!accountName) {
+                e.preventDefault();
+                alert('Please enter an account name.');
+                document.getElementById('account_name').focus();
+                return false;
+            }
+
+            if (!accountNumber) {
+                e.preventDefault();
+                alert('Please enter an account number.');
+                document.getElementById('account_number').focus();
+                return false;
+            }
+        });
+
+        console.log('✅ Bank Account Form loaded');
+    });
+</script>
+{% endblock %}

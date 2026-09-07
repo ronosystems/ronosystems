@@ -1,0 +1,209 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if mpesa_account %}Edit{% else %}Create{% endif %} M-Pesa Account{% endblock %}
+
+{% block page_title %} {{ branch.name }}  {% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-mobile-alt"></i> 
+                        {% if mpesa_account %}Edit{% else %}Create{% endif %} M-Pesa Account
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Branch Info -->
+                        <div class="alert alert-info">
+                            <i class="fas fa-store"></i> 
+                            <strong>Branch:</strong> {{ branch.name }} ({{ branch.code }})
+                        </div>
+
+                        <!-- Account Type -->
+                        <div class="form-group mb-3">
+                            <label for="account_type" class="fw-bold">Account Type <span class="text-danger">*</span></label>
+                            <select class="form-control form-control-lg" id="account_type" name="account_type" required>
+                                <option value="">Select Account Type...</option>
+                                {% for value, label in mpesa_types %}
+                                    <option value="{{ value }}" {% if mpesa_account and mpesa_account.account_type == value %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Select the type of M-Pesa account</small>
+                        </div>
+
+                        <!-- Till/Account Name -->
+                        <div class="form-group mb-3">
+                            <label for="till_name" class="fw-bold">Merchant/Till Name <span class="text-danger">*</span></label>
+                            <input type="text" 
+                                   class="form-control form-control-lg" 
+                                   id="till_name" 
+                                   name="till_name" 
+                                   value="{% if mpesa_account %}{{ mpesa_account.till_name }}{% endif %}"
+                                   placeholder="e.g., MPESA A, MPESA B"
+                                   required>
+                            <small class="text-muted">Enter a descriptive name for this M-Pesa account (e.g., MPESA A, MPESA B)</small>
+                        </div>
+
+                        <!-- Till Number -->
+                        <div class="form-group mb-3">
+                            <label for="till_number" class="fw-bold">Till Number <span class="text-danger">*</span></label>
+                            <input type="text" 
+                                   class="form-control form-control-lg" 
+                                   id="till_number" 
+                                   name="till_number" 
+                                   value="{% if mpesa_account %}{{ mpesa_account.till_number }}{% endif %}"
+                                   placeholder="Enter M-Pesa till number"
+                                   required>
+                            <small class="text-muted">Enter the actual M-Pesa till number</small>
+                        </div>
+
+                        <!-- Store Number -->
+                        <div class="form-group mb-3">
+                            <label for="store_number">Store Number</label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="store_number" 
+                                   name="store_number" 
+                                   value="{% if mpesa_account %}{{ mpesa_account.store_number }}{% endif %}"
+                                   placeholder="Enter store number (optional)">
+                            <small class="text-muted">Optional: Enter the store number if applicable</small>
+                        </div>
+
+                        <!-- Checkboxes -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input type="checkbox" 
+                                           class="form-check-input" 
+                                           id="is_primary" 
+                                           name="is_primary" 
+                                           {% if mpesa_account and mpesa_account.is_primary %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold" for="is_primary">
+                                        <i class="fas fa-star text-warning"></i> Primary Account
+                                    </label>
+                                    <br>
+                                    <small class="text-muted">Mark as the primary M-Pesa account for this branch</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input type="checkbox" 
+                                           class="form-check-input" 
+                                           id="is_active" 
+                                           name="is_active" 
+                                           {% if mpesa_account and mpesa_account.is_active or not mpesa_account %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold" for="is_active">
+                                        <i class="fas fa-check-circle text-success"></i> Active
+                                    </label>
+                                    <br>
+                                    <small class="text-muted">Account is active and available for use</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Notes -->
+                        <div class="form-group mb-4">
+                            <label for="notes">Notes</label>
+                            <textarea class="form-control" 
+                                      id="notes" 
+                                      name="notes" 
+                                      rows="2"
+                                      placeholder="Add any additional notes about this account...">{% if mpesa_account %}{{ mpesa_account.notes }}{% endif %}</textarea>
+                        </div>
+
+                        <!-- Submit Buttons -->
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <a href="{% url 'treasury:branch_treasury' company.id branch.id %}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left"></i> Cancel
+                                </a>
+                            </div>
+                            <div>
+                                <button type="submit" class="btn btn-success btn-lg">
+                                    <i class="fas fa-save"></i> 
+                                    {% if mpesa_account %}Update{% else %}Create{% endif %} Account
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Help Card -->
+            <div class="card mt-3">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0"><i class="fas fa-info-circle"></i> Tips</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li><strong>Account Type:</strong> Choose between Paybill, Till Number, or Send Money.</li>
+                        <li><strong>Merchant Name:</strong> Use a descriptive name like "MPESA A", "MPESA B", etc.</li>
+                        <li><strong>Till Number:</strong> Enter the actual M-Pesa till number.</li>
+                        <li><strong>Primary Account:</strong> Only one account can be primary per branch.</li>
+                        <li><strong>Balance:</strong> Balances are updated when you record daily records.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Auto-format till number (remove spaces)
+        document.getElementById('till_number').addEventListener('input', function() {
+            this.value = this.value.replace(/\s/g, '');
+        });
+
+        // If primary is checked, show warning
+        document.getElementById('is_primary').addEventListener('change', function() {
+            if (this.checked) {
+                if (!confirm('Setting this as the primary account will unset any other primary M-Pesa account for this branch. Continue?')) {
+                    this.checked = false;
+                }
+            }
+        });
+
+        // Form validation
+        document.querySelector('form').addEventListener('submit', function(e) {
+            let accountType = document.getElementById('account_type').value;
+            let tillName = document.getElementById('till_name').value.trim();
+            let tillNumber = document.getElementById('till_number').value.trim();
+
+            if (!accountType) {
+                e.preventDefault();
+                alert('Please select an account type.');
+                document.getElementById('account_type').focus();
+                return false;
+            }
+
+            if (!tillName) {
+                e.preventDefault();
+                alert('Please enter a merchant/till name.');
+                document.getElementById('till_name').focus();
+                return false;
+            }
+
+            if (!tillNumber) {
+                e.preventDefault();
+                alert('Please enter a till number.');
+                document.getElementById('till_number').focus();
+                return false;
+            }
+        });
+
+        console.log('✅ M-Pesa Account Form loaded');
+    });
+</script>
+{% endblock %}

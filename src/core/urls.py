@@ -24,6 +24,10 @@ urlpatterns = [
     path('business-types/', include('apps.business_types.urls')),
     path('companies/', include('apps.companies.web_urls')),
     path('employees/', include('apps.employees.web_urls')),
+    
+    # Treasury - follows same pattern as other apps
+    path('treasury/', include('apps.treasury.urls')),
+    
     path('plans/', include('apps.plans.urls')),
     path('reports/', include('apps.reports.urls')),
     path('settings/', include('apps.settings.urls')),

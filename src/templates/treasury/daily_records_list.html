@@ -1,0 +1,230 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Daily Records{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Stats Cards -->
+    <div class="row">
+        <div class="col-md-2">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Total Records</h6>
+                    <h3 class="mb-0">{{ total_records }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Total Net</h6>
+                    <h3 class="mb-0">KES {{ total_net|floatformat:0 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Avg Net</h6>
+                    <h3 class="mb-0">KES {{ avg_net|floatformat:0 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Total Bank</h6>
+                    <h3 class="mb-0">KES {{ total_bank|floatformat:0 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-secondary text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Total M-Pesa</h6>
+                    <h3 class="mb-0">KES {{ total_mpesa|floatformat:0 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-dark text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Total Cash</h6>
+                    <h3 class="mb-0">KES {{ total_cash|floatformat:0 }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-4">
+                            <label for="date_from" class="form-label">Date From</label>
+                            <input type="date" class="form-control" id="date_from" name="date_from" value="{{ date_from|default:'' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="date_to" class="form-label">Date To</label>
+                            <input type="date" class="form-control" id="date_to" name="date_to" value="{{ date_to|default:'' }}">
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary me-2">
+                                <i class="fas fa-search"></i> Filter
+                            </button>
+                            <a href="{% url 'treasury:daily_records_list' company.id branch.id %}" class="btn btn-secondary me-2">
+                                <i class="fas fa-undo"></i> Reset
+                            </a>
+                            <a href="{% url 'treasury:export_daily_records_csv' company.id branch.id %}" class="btn btn-success ms-auto">
+                                <i class="fas fa-file-csv"></i> Export
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Records Table -->
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list"></i> Daily Records
+                    </h5>
+                    <a href="{% url 'treasury:daily_record_create' company.id branch.id %}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus"></i> New Record
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Bank</th>
+                                    <th>M-Pesa</th>
+                                    <th>Cash</th>
+                                    <th>Credit</th>
+                                    <th>Net Balance</th>
+                                    <th>Notes</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for record in records %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ record.date|date:"Y-m-d" }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ record.date|date:"l" }}</small>
+                                    </td>
+                                    <td>KES {{ record.total_bank_balance|floatformat:2 }}</td>
+                                    <td>KES {{ record.total_mpesa_balance|floatformat:2 }}</td>
+                                    <td>KES {{ record.cash_balance|floatformat:2 }}</td>
+                                    <td>KES {{ record.credit_balance|floatformat:2 }}</td>
+                                    <td>
+                                        <span class="badge bg-dark">
+                                            KES {{ record.net_balance|floatformat:2 }}
+                                        </span>
+                                    </td>
+                                    <td>{{ record.notes|default:"-"|truncatechars:30 }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'treasury:daily_record_detail' company.id branch.id record.id %}" 
+                                               class="btn btn-outline-info">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{% url 'treasury:daily_record_edit' company.id branch.id record.id %}" 
+                                               class="btn btn-outline-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            {% if is_admin %}
+                                            <a href="{% url 'treasury:daily_record_delete' company.id branch.id record.id %}" 
+                                               class="btn btn-outline-danger">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted py-4">
+                                        <i class="fas fa-calendar-day fa-3x d-block mb-2"></i>
+                                        <h5>No daily records found</h5>
+                                        <p>Start recording your daily balances.</p>
+                                        <a href="{% url 'treasury:daily_record_create' company.id branch.id %}" class="btn btn-primary">
+                                            <i class="fas fa-plus"></i> Record Daily Balances
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-active">
+                                <tr>
+                                    <td><strong>Totals</strong></td>
+                                    <td><strong>KES {{ total_bank|floatformat:2 }}</strong></td>
+                                    <td><strong>KES {{ total_mpesa|floatformat:2 }}</strong></td>
+                                    <td><strong>KES {{ total_cash|floatformat:2 }}</strong></td>
+                                    <td><strong>KES {{ total_credit|floatformat:2 }}</strong></td>
+                                    <td><strong>KES {{ total_net|floatformat:2 }}</strong></td>
+                                    <td colspan="2"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    {% if records.has_other_pages %}
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination justify-content-center">
+                            {% if records.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ records.previous_page_number }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+
+                            {% for num in records.paginator.page_range %}
+                                {% if records.number == num %}
+                                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                                {% elif num > records.number|add:'-3' and num < records.number|add:'3' %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ num }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">
+                                            {{ num }}
+                                        </a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if records.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ records.next_page_number }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Back to Branch -->
+    <div class="row mt-3">
+        <div class="col-12">
+            <a href="{% url 'treasury:branch_treasury' company.id branch.id %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Branch Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

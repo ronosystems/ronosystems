@@ -56,7 +56,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
     'whitenoise.runserver_nostatic',
-    'cloudinary_storage',  # Must be BEFORE cloudinary
+    'cloudinary_storage',
     'cloudinary',
     
     # Custom Apps
@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     'apps.business_types',
     'apps.companies',
     'apps.company', 
+    'apps.treasury',
     'apps.plans',
     'apps.reports',
     'apps.settings', 
@@ -107,6 +108,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'apps.settings.context_processors.system_settings',
                 'apps.epa_shop.context_processors.user_context',
+                'apps.company.context_processors.company_context',
             ],
         },
     },

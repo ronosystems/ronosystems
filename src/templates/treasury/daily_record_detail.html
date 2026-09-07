@@ -1,0 +1,301 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ record.date }}{% endblock %}
+
+{% block page_title %} {{ branch.name }}  {% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Record Summary -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-calendar-day"></i> Record for {{ record.date|date:"l, F d, Y" }}
+                    </h5>
+                    <div>
+                        <a href="{% url 'treasury:daily_record_edit' company.id branch.id record.id %}" 
+                           class="btn btn-sm btn-warning">
+                            <i class="fas fa-edit"></i> Edit
+                        </a>
+                        <a href="{% url 'treasury:daily_records_list' company.id branch.id %}" 
+                           class="btn btn-sm btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Summary Cards -->
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Total Bank</h6>
+                                    <h3 class="mb-0">KES {{ total_bank|floatformat:2 }}</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Total M-Pesa</h6>
+                                    <h3 class="mb-0">KES {{ total_mpesa|floatformat:2 }}</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-dark">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Cash Balance</h6>
+                                    <h3 class="mb-0">KES {{ record.cash_balance|floatformat:2 }}</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-danger text-white">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Credit Balance</h6>
+                                    <h3 class="mb-0">KES {{ record.credit_balance|floatformat:2 }}</h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Net Balance -->
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="card bg-dark text-white">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">Net Balance</h5>
+                                    <h2 class="mb-0">KES {{ net_balance|floatformat:2 }}</h2>
+                                    <small>Bank + M-Pesa + Cash + Credit</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    {% if record.notes %}
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-sticky-note"></i> Notes</h6>
+                                </div>
+                                <div class="card-body">
+                                    {{ record.notes }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bank Account Details -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-university text-primary"></i> Bank Account Balances
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if bank_balances %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Account Name</th>
+                                        <th>Bank</th>
+                                        <th>Balance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for balance in bank_balances %}
+                                    <tr>
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>
+                                            <strong>{{ balance.bank_account.account_name }}</strong>
+                                        </td>
+                                        <td>{{ balance.bank_account.get_bank_type_display }}</td>
+                                        <td>
+                                            <span class="badge bg-primary">
+                                                KES {{ balance.closing_balance|floatformat:2 }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot class="table-active">
+                                    <tr>
+                                        <td colspan="3" class="text-end fw-bold">Total Bank:</td>
+                                        <td><strong>KES {{ total_bank|floatformat:2 }}</strong></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-3">
+                            <i class="fas fa-university fa-2x d-block mb-2"></i>
+                            <p>No bank accounts recorded for this day</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- M-Pesa Account Details -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-mobile-alt text-success"></i> M-Pesa Account Balances
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if mpesa_balances %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Merchant Name</th>
+                                        <th>Till Number</th>
+                                        <th>Balance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for balance in mpesa_balances %}
+                                    <tr>
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>
+                                            <strong>{{ balance.mpesa_account.till_name }}</strong>
+                                        </td>
+                                        <td>{{ balance.mpesa_account.till_number }}</td>
+                                        <td>
+                                            <span class="badge bg-success">
+                                                KES {{ balance.closing_balance|floatformat:2 }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot class="table-active">
+                                    <tr>
+                                        <td colspan="3" class="text-end fw-bold">Total M-Pesa:</td>
+                                        <td><strong>KES {{ total_mpesa|floatformat:2 }}</strong></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-3">
+                            <i class="fas fa-mobile-alt fa-2x d-block mb-2"></i>
+                            <p>No M-Pesa accounts recorded for this day</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cash & Credit Details -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-money-bill-wave"></i> Cash Balance
+                    </h5>
+                </div>
+                <div class="card-body text-center py-4">
+                    <h2 class="text-warning">KES {{ record.cash_balance|floatformat:2 }}</h2>
+                    <p class="text-muted">Physical cash in shop</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-hand-holding-usd"></i> Credit Balance
+                    </h5>
+                </div>
+                <div class="card-body text-center py-4">
+                    <h2 class="text-danger">KES {{ record.credit_balance|floatformat:2 }}</h2>
+                    <p class="text-muted">Credit / Loans balance</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Total Summary -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card bg-dark text-white">
+                <div class="card-body text-center py-4">
+                    <h4>Total Summary for {{ record.date|date:"l, F d, Y" }}</h4>
+                    <div class="row mt-3">
+                        <div class="col-md-3">
+                            <h6>Bank</h6>
+                            <h4>KES {{ total_bank|floatformat:2 }}</h4>
+                        </div>
+                        <div class="col-md-3">
+                            <h6>M-Pesa</h6>
+                            <h4>KES {{ total_mpesa|floatformat:2 }}</h4>
+                        </div>
+                        <div class="col-md-3">
+                            <h6>Cash</h6>
+                            <h4>KES {{ record.cash_balance|floatformat:2 }}</h4>
+                        </div>
+                        <div class="col-md-3">
+                            <h6>Credit</h6>
+                            <h4>KES {{ record.credit_balance|floatformat:2 }}</h4>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <h3 class="text-warning">Net Balance: KES {{ net_balance|floatformat:2 }}</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <a href="{% url 'treasury:daily_records_list' company.id branch.id %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to List
+                    </a>
+                    {% if user.role == 'company_admin' or user.role == 'super_admin' %}
+                    <a href="{% url 'treasury:branch_treasury' company.id branch.id %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-store"></i> Branch Treasury
+                    </a>
+                    {% endif %}
+                </div>
+                <div>
+                    <a href="{% url 'treasury:daily_record_edit' company.id branch.id record.id %}" class="btn btn-warning">
+                        <i class="fas fa-edit"></i> Edit Record
+                    </a>
+                    {% if is_admin %}
+                    <a href="{% url 'treasury:daily_record_delete' company.id branch.id record.id %}" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Delete Record
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

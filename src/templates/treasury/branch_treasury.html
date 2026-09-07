@@ -1,0 +1,369 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Treasury - {{ branch.name }}{% endblock %}
+
+{% block page_title %}{{ branch.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Branch Summary -->
+    <div class="row">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Total Bank</h6>
+                    <h3 class="mb-0">KES {{ treasury.total_bank_balance|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Total M-Pesa</h6>
+                    <h3 class="mb-0">KES {{ treasury.total_mpesa_balance|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Cash Balance</h6>
+                    <h3 class="mb-0">KES {{ treasury.cash_balance|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Credit Balance</h6>
+                    <h3 class="mb-0">KES {{ treasury.credit_balance|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Net Balance -->
+    <div class="row mt-3">
+        <div class="col-md-12">
+            <div class="card bg-dark text-white">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Net Balance</h5>
+                    <h2 class="mb-0">KES {{ treasury.net_balance|floatformat:2 }}</h2>
+                    <small>Bank + M-Pesa + Cash + Credit</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="btn-group w-100" role="group">
+                <a href="{% url 'treasury:daily_record_create' company.id branch.id %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Record Daily Balances
+                </a>
+                <a href="{% url 'treasury:movement_create' company.id branch.id %}" class="btn btn-success">
+                    <i class="fas fa-exchange-alt"></i> New Movement
+                </a>
+                <a href="{% url 'treasury:bank_account_create' company.id branch.id %}" class="btn btn-info text-white">
+                    <i class="fas fa-university"></i> Add Bank Account
+                </a>
+                <a href="{% url 'treasury:mpesa_account_create' company.id branch.id %}" class="btn btn-warning text-white">
+                    <i class="fas fa-mobile-alt"></i> Add M-Pesa Account
+                </a>
+                <a href="{% url 'treasury:daily_records_list' company.id branch.id %}" class="btn btn-secondary">
+                    <i class="fas fa-list"></i> View All Records
+                </a>
+                <a href="{% url 'treasury:movements_list' company.id branch.id %}" class="btn btn-dark">
+                    <i class="fas fa-history"></i> All Movements
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bank Accounts -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-university text-primary"></i> Bank Accounts
+                    </h5>
+                    <a href="{% url 'treasury:bank_account_create' company.id branch.id %}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus"></i> Add
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if bank_accounts %}
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Account Name</th>
+                                        <th>Bank</th>
+                                        <th>Balance</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for account in bank_accounts %}
+                                    <tr>
+                                        <td><strong>{{ account.account_name }}</strong></td>
+                                        <td>{{ account.get_bank_type_display }}</td>
+                                        <td>KES {{ account.current_balance|floatformat:2 }}</td>
+                                        <td>
+                                            <a href="{% url 'treasury:bank_account_edit' company.id branch.id account.id %}" 
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="{% url 'treasury:bank_account_delete' company.id branch.id account.id %}" 
+                                               class="btn btn-sm btn-outline-danger">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-active">
+                                        <td colspan="2" class="text-end fw-bold">Total:</td>
+                                        <td colspan="2"><strong>KES {{ treasury.total_bank_balance|floatformat:2 }}</strong></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-3">
+                            <i class="fas fa-university fa-2x d-block mb-2"></i>
+                            <p>No bank accounts found</p>
+                            <a href="{% url 'treasury:bank_account_create' company.id branch.id %}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-plus"></i> Add Bank Account
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- M-Pesa Accounts -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-mobile-alt text-success"></i> M-Pesa Accounts
+                    </h5>
+                    <a href="{% url 'treasury:mpesa_account_create' company.id branch.id %}" class="btn btn-sm btn-success">
+                        <i class="fas fa-plus"></i> Add
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if mpesa_accounts %}
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Merchant Name</th>
+                                        <th>Till Number</th>
+                                        <th>Balance</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for account in mpesa_accounts %}
+                                    <tr>
+                                        <td><strong>{{ account.till_name }}</strong></td>
+                                        <td>{{ account.till_number }}</td>
+                                        <td>KES {{ account.current_balance|floatformat:2 }}</td>
+                                        <td>
+                                            <a href="{% url 'treasury:mpesa_account_edit' company.id branch.id account.id %}" 
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="{% url 'treasury:mpesa_account_delete' company.id branch.id account.id %}" 
+                                               class="btn btn-sm btn-outline-danger">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-active">
+                                        <td colspan="2" class="text-end fw-bold">Total:</td>
+                                        <td colspan="2"><strong>KES {{ treasury.total_mpesa_balance|floatformat:2 }}</strong></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-3">
+                            <i class="fas fa-mobile-alt fa-2x d-block mb-2"></i>
+                            <p>No M-Pesa accounts found</p>
+                            <a href="{% url 'treasury:mpesa_account_create' company.id branch.id %}" class="btn btn-sm btn-success">
+                                <i class="fas fa-plus"></i> Add M-Pesa Account
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Today's Record -->
+    {% if today_record %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-calendar-check"></i> Today's Record - {{ today }}
+                    </h5>
+                    <a href="{% url 'treasury:daily_record_edit' company.id branch.id today_record.id %}" 
+                       class="btn btn-sm btn-warning text-dark">
+                        <i class="fas fa-edit"></i> Edit
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="p-3 bg-light rounded">
+                                <h6 class="text-muted">Cash</h6>
+                                <h4 class="text-warning">KES {{ today_record.cash_balance|floatformat:2 }}</h4>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-3 bg-light rounded">
+                                <h6 class="text-muted">Credit</h6>
+                                <h4 class="text-danger">KES {{ today_record.credit_balance|floatformat:2 }}</h4>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-3 bg-light rounded">
+                                <h6 class="text-muted">Total Bank</h6>
+                                <h4 class="text-primary">KES {{ today_record.total_bank_balance|floatformat:2 }}</h4>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-3 bg-light rounded">
+                                <h6 class="text-muted">Total M-Pesa</h6>
+                                <h4 class="text-success">KES {{ today_record.total_mpesa_balance|floatformat:2 }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="p-3 bg-dark text-white rounded text-center">
+                                <h5>Net Balance</h5>
+                                <h2>KES {{ today_record.net_balance|floatformat:2 }}</h2>
+                                <small>Bank + M-Pesa + Cash + Credit</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% if today_record.notes %}
+                    <div class="row mt-2">
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <i class="fas fa-sticky-note"></i> <strong>Notes:</strong> {{ today_record.notes }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle"></i> No Record for Today
+                    </h5>
+                </div>
+                <div class="card-body text-center py-4">
+                    <h5 class="text-muted">
+                        <i class="fas fa-calendar-day fa-3x d-block mb-3"></i>
+                        No daily record found for {{ today }}
+                    </h5>
+                    <p class="text-muted">Record today's balances to keep track of your treasury.</p>
+                    <a href="{% url 'treasury:daily_record_create' company.id branch.id %}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-plus"></i> Record Today's Balances
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recent Movements -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history"></i> Recent Movements
+                    </h5>
+                    <a href="{% url 'treasury:movements_list' company.id branch.id %}" class="btn btn-sm btn-secondary">
+                        View All
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if movements %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Date/Time</th>
+                                        <th>Type</th>
+                                        <th>From</th>
+                                        <th>To</th>
+                                        <th>Amount</th>
+                                        <th>Reason</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for movement in movements %}
+                                    <tr>
+                                        <td>{{ movement.created_at|date:"Y-m-d H:i" }}</td>
+                                        <td>
+                                            {% if movement.movement_type == 'BOOST' %}
+                                                <span class="badge bg-success">BOOST</span>
+                                            {% else %}
+                                                <span class="badge bg-info">Transfer</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ movement.get_from_account_display }}</td>
+                                        <td>{{ movement.get_to_account_display }}</td>
+                                        <td><strong>KES {{ movement.amount|floatformat:2 }}</strong></td>
+                                        <td>{{ movement.reason|truncatechars:30 }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-3">
+                            <i class="fas fa-exchange-alt fa-2x d-block mb-2"></i>
+                            <p>No movements yet</p>
+                            <a href="{% url 'treasury:movement_create' company.id branch.id %}" class="btn btn-sm btn-success">
+                                <i class="fas fa-plus"></i> Create Movement
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Back to Dashboard -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <a href="{% url 'treasury:dashboard' company.id %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

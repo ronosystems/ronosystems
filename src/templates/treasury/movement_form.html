@@ -1,0 +1,411 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Create Movement{% endblock %}
+
+{% block page_title %}{{ branch.name }}{% endblock %}
+
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exchange-alt"></i> Create Movement
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="movementForm">
+                        {% csrf_token %}
+                        
+                        <!-- Branch Selection (Only for Admins) -->
+                        {% if is_admin %}
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="card border-info">
+                                    <div class="card-header bg-info text-white">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-store"></i> Select Branch
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            {% for b in all_branches %}
+                                                <div class="col-md-3 col-sm-6 mb-2">
+                                                    <a href="{% url 'treasury:movement_create' company.id b.id %}" 
+                                                       class="btn btn-outline-primary w-100 {% if branch.id == b.id %}active{% endif %}"
+                                                       style="border-radius: 8px; padding: 12px; {% if branch.id == b.id %}background-color: #007bff; color: white;{% endif %}">
+                                                        <i class="fas fa-store"></i>
+                                                        <br>
+                                                        <strong>{{ b.name }}</strong>
+                                                        <br>
+                                                        <small class="{% if branch.id == b.id %}text-light{% else %}text-muted{% endif %}">{{ b.code }}</small>
+                                                        {% if branch.id == b.id %}
+                                                            <br>
+                                                            <span class="badge bg-success">Selected</span>
+                                                        {% endif %}
+                                                    </a>
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                        <small class="text-muted">Click on a branch to switch</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <!-- Display user's branch for non-admins -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="alert alert-secondary">
+                                    <i class="fas fa-store"></i> 
+                                    <strong>Branch:</strong> {{ branch.name }} ({{ branch.code }})
+                                    <br>
+                                    <small class="text-muted">You are creating movements for your assigned branch</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Branch Info -->
+                        <div class="alert alert-info">
+                            <i class="fas fa-store"></i> 
+                            <strong>Branch:</strong> {{ branch.name }} ({{ branch.code }})
+                            <br>
+                            <strong>Current Net Balance:</strong> KES {{ treasury.net_balance|floatformat:2 }}
+                        </div>
+
+                        <!-- Movement Type -->
+                        <div class="form-group mb-3">
+                            <label for="movement_type" class="fw-bold">Movement Type <span class="text-danger">*</span></label>
+                            <select class="form-control form-control-lg" id="movement_type" name="movement_type" required>
+                                <option value="">Select Movement Type...</option>
+                                {% for value, label in movement_types %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Select the type of movement</small>
+                        </div>
+
+                        <!-- BOOST Section (hidden by default) -->
+                        <div id="boostSection" style="display: none;">
+                            <div class="card border-success mb-3">
+                                <div class="card-header bg-success text-white">
+                                    <h6 class="mb-0"><i class="fas fa-plus-circle"></i> BOOST Details</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="form-group mb-3">
+                                        <label for="boost_source" class="fw-bold">Boost Source <span class="text-danger">*</span></label>
+                                        <select class="form-control" id="boost_source" name="boost_source">
+                                            <option value="">Select Source...</option>
+                                            {% for value, label in boost_sources %}
+                                                <option value="{{ value }}">{{ label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <small class="text-muted">Where is this money coming from?</small>
+                                    </div>
+
+                                    <div class="form-group mb-3">
+                                        <label for="boost_destination" class="fw-bold">Destination Account <span class="text-danger">*</span></label>
+                                        <select class="form-control" id="boost_destination" name="boost_destination">
+                                            <option value="">Select Destination...</option>
+                                            {% for value, label in account_types %}
+                                                {% if value != 'EXTERNAL' %}
+                                                    <option value="{{ value }}">{{ label }}</option>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </select>
+                                        <small class="text-muted">Where should the money go?</small>
+                                    </div>
+
+                                    <div class="form-group mb-3">
+                                        <label for="boost_reference">Reference Number</label>
+                                        <input type="text" class="form-control" id="boost_reference" name="boost_reference" placeholder="Enter reference number (optional)">
+                                        <small class="text-muted">Optional: Reference number for this boost</small>
+                                    </div>
+
+                                    <div class="form-group mb-3">
+                                        <label for="boost_notes">Notes</label>
+                                        <textarea class="form-control" id="boost_notes" name="boost_notes" rows="2" placeholder="Add any notes about this boost..."></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Transfer Section (hidden by default) -->
+                        <div id="transferSection" style="display: none;">
+                            <div class="card border-primary mb-3">
+                                <div class="card-header bg-primary text-white">
+                                    <h6 class="mb-0"><i class="fas fa-arrows-alt-h"></i> Transfer Details</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-group mb-3">
+                                                <label for="transfer_from" class="fw-bold">From Account <span class="text-danger">*</span></label>
+                                                <select class="form-control" id="transfer_from" name="transfer_from">
+                                                    <option value="">Select Source...</option>
+                                                    {% for value, label in account_types %}
+                                                        {% if value != 'EXTERNAL' %}
+                                                            <option value="{{ value }}">{{ label }}</option>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </select>
+                                                <small class="text-muted">Where is the money coming from?</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-group mb-3">
+                                                <label for="transfer_to" class="fw-bold">To Account <span class="text-danger">*</span></label>
+                                                <select class="form-control" id="transfer_to" name="transfer_to">
+                                                    <option value="">Select Destination...</option>
+                                                    {% for value, label in account_types %}
+                                                        {% if value != 'EXTERNAL' %}
+                                                            <option value="{{ value }}">{{ label }}</option>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </select>
+                                                <small class="text-muted">Where should the money go?</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Common Fields -->
+                        <div class="card border-warning mb-3">
+                            <div class="card-header bg-warning text-dark">
+                                <h6 class="mb-0"><i class="fas fa-money-bill-wave"></i> Amount & Reason</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group mb-3">
+                                    <label for="amount" class="fw-bold">Amount (KES) <span class="text-danger">*</span></label>
+                                    <input type="number" 
+                                           step="0.01" 
+                                           class="form-control form-control-lg" 
+                                           id="amount" 
+                                           name="amount" 
+                                           placeholder="0.00"
+                                           required>
+                                    <small class="text-muted">Enter the amount to move</small>
+                                </div>
+
+                                <div class="form-group mb-3">
+                                    <label for="reason">Reason</label>
+                                    <input type="text" 
+                                           class="form-control" 
+                                           id="reason" 
+                                           name="reason" 
+                                           placeholder="Why are you moving this money?">
+                                    <small class="text-muted">Optional: Reason for this movement</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Current Balances -->
+                        <div class="card border-dark mb-3">
+                            <div class="card-header bg-dark text-white">
+                                <h6 class="mb-0"><i class="fas fa-chart-pie"></i> Current Balances</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row text-center">
+                                    <div class="col-md-3">
+                                        <div class="p-2 bg-light rounded">
+                                            <h6>Bank</h6>
+                                            <h5 class="text-primary">KES {{ treasury.total_bank_balance|floatformat:2 }}</h5>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="p-2 bg-light rounded">
+                                            <h6>M-Pesa</h6>
+                                            <h5 class="text-success">KES {{ treasury.total_mpesa_balance|floatformat:2 }}</h5>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="p-2 bg-light rounded">
+                                            <h6>Cash</h6>
+                                            <h5 class="text-warning">KES {{ treasury.cash_balance|floatformat:2 }}</h5>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="p-2 bg-light rounded">
+                                            <h6>Credit</h6>
+                                            <h5 class="text-danger">KES {{ treasury.credit_balance|floatformat:2 }}</h5>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    <div class="col-12">
+                                        <div class="p-2 bg-dark text-white rounded text-center">
+                                            <h6>Net Balance: KES {{ treasury.net_balance|floatformat:2 }}</h6>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Submit Buttons -->
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <a href="{% url 'treasury:branch_treasury' company.id branch.id %}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left"></i> Cancel
+                                </a>
+                            </div>
+                            <div>
+                                <button type="submit" class="btn btn-success btn-lg">
+                                    <i class="fas fa-exchange-alt"></i> Create Movement
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Help Card -->
+            <div class="card mt-3">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0"><i class="fas fa-info-circle"></i> Tips</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li><strong>BOOST:</strong> Used to inject external money into your treasury (e.g., personal savings, investor funds, commissions).</li>
+                        <li><strong>Transfer:</strong> Used to move money between your accounts (e.g., Bank → M-Pesa, Cash → Bank).</li>
+                        <li><strong>Amount:</strong> Enter the amount in KES (Kenyan Shillings).</li>
+                        <li><strong>Balance Check:</strong> The system will check if you have sufficient balance before processing.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const movementType = document.getElementById('movement_type');
+        const boostSection = document.getElementById('boostSection');
+        const transferSection = document.getElementById('transferSection');
+
+        // Show/hide sections based on movement type
+        movementType.addEventListener('change', function() {
+            const value = this.value;
+            boostSection.style.display = 'none';
+            transferSection.style.display = 'none';
+
+            if (value === 'BOOST') {
+                boostSection.style.display = 'block';
+                // Make boost fields required
+                document.getElementById('boost_source').required = true;
+                document.getElementById('boost_destination').required = true;
+                document.getElementById('transfer_from').required = false;
+                document.getElementById('transfer_to').required = false;
+            } else if (value === 'TRANSFER') {
+                transferSection.style.display = 'block';
+                // Make transfer fields required
+                document.getElementById('transfer_from').required = true;
+                document.getElementById('transfer_to').required = true;
+                document.getElementById('boost_source').required = false;
+                document.getElementById('boost_destination').required = false;
+            } else {
+                // Reset required fields
+                document.getElementById('boost_source').required = false;
+                document.getElementById('boost_destination').required = false;
+                document.getElementById('transfer_from').required = false;
+                document.getElementById('transfer_to').required = false;
+            }
+        });
+
+        // Form validation
+        document.getElementById('movementForm').addEventListener('submit', function(e) {
+            const type = document.getElementById('movement_type').value;
+            const amount = parseFloat(document.getElementById('amount').value) || 0;
+
+            if (!type) {
+                e.preventDefault();
+                alert('Please select a movement type.');
+                return false;
+            }
+
+            if (amount <= 0) {
+                e.preventDefault();
+                alert('Please enter a valid amount greater than 0.');
+                document.getElementById('amount').focus();
+                return false;
+            }
+
+            if (type === 'BOOST') {
+                const source = document.getElementById('boost_source').value;
+                const destination = document.getElementById('boost_destination').value;
+
+                if (!source) {
+                    e.preventDefault();
+                    alert('Please select a boost source.');
+                    document.getElementById('boost_source').focus();
+                    return false;
+                }
+
+                if (!destination) {
+                    e.preventDefault();
+                    alert('Please select a destination account.');
+                    document.getElementById('boost_destination').focus();
+                    return false;
+                }
+            } else if (type === 'TRANSFER') {
+                const from = document.getElementById('transfer_from').value;
+                const to = document.getElementById('transfer_to').value;
+
+                if (!from) {
+                    e.preventDefault();
+                    alert('Please select a source account.');
+                    document.getElementById('transfer_from').focus();
+                    return false;
+                }
+
+                if (!to) {
+                    e.preventDefault();
+                    alert('Please select a destination account.');
+                    document.getElementById('transfer_to').focus();
+                    return false;
+                }
+
+                if (from === to) {
+                    e.preventDefault();
+                    alert('Source and destination accounts cannot be the same.');
+                    return false;
+                }
+            }
+
+            // Confirm with user
+            const confirmMsg = 'Are you sure you want to create this movement?\n\n' +
+                              'Type: ' + document.getElementById('movement_type').options[document.getElementById('movement_type').selectedIndex].text + '\n' +
+                              'Amount: KES ' + amount.toFixed(2);
+
+            if (!confirm(confirmMsg)) {
+                e.preventDefault();
+                return false;
+            }
+        });
+
+        // Auto-format amount
+        document.getElementById('amount').addEventListener('blur', function() {
+            let val = parseFloat(this.value);
+            if (!isNaN(val) && val > 0) {
+                this.value = val.toFixed(2);
+            }
+        });
+
+        // Prevent negative amounts
+        document.getElementById('amount').addEventListener('input', function() {
+            if (this.value < 0) {
+                this.value = 0;
+            }
+        });
+
+        console.log('✅ Movement Form loaded');
+    });
+</script>
+{% endblock %}

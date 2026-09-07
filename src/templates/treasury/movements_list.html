@@ -1,0 +1,258 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Movements - {{ branch.name }}{% endblock %}
+
+{% block page_title %} {{ branch.name }}  {% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Stats Cards -->
+    <div class="row">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Total Movements</h6>
+                    <h3 class="mb-0">{{ movements.paginator.count }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Total BOOST</h6>
+                    <h3 class="mb-0">KES {{ total_boost|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Total Transfers</h6>
+                    <h3 class="mb-0">KES {{ total_transfers|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-dark text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Net Balance</h6>
+                    <h3 class="mb-0">KES {{ treasury.net_balance|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-2">
+                            <label for="movement_type" class="form-label">Movement Type</label>
+                            <select class="form-control" id="movement_type" name="movement_type">
+                                <option value="">All Types</option>
+                                {% for value, label in movement_types %}
+                                    <option value="{{ value }}" {% if selected_movement_type == value %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="from_account" class="form-label">From Account</label>
+                            <select class="form-control" id="from_account" name="from_account">
+                                <option value="">All</option>
+                                {% for value, label in account_types %}
+                                    {% if value != 'EXTERNAL' %}
+                                        <option value="{{ value }}" {% if selected_from_account == value %}selected{% endif %}>
+                                            {{ label }}
+                                        </option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="to_account" class="form-label">To Account</label>
+                            <select class="form-control" id="to_account" name="to_account">
+                                <option value="">All</option>
+                                {% for value, label in account_types %}
+                                    {% if value != 'EXTERNAL' %}
+                                        <option value="{{ value }}" {% if selected_to_account == value %}selected{% endif %}>
+                                            {{ label }}
+                                        </option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="date_from" class="form-label">Date From</label>
+                            <input type="date" class="form-control" id="date_from" name="date_from" value="{{ date_from|default:'' }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="date_to" class="form-label">Date To</label>
+                            <input type="date" class="form-control" id="date_to" name="date_to" value="{{ date_to|default:'' }}">
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary me-2">
+                                <i class="fas fa-search"></i> Filter
+                            </button>
+                            <a href="{% url 'treasury:movements_list' company.id branch.id %}" class="btn btn-secondary me-2">
+                                <i class="fas fa-undo"></i> Reset
+                            </a>
+                            <a href="{% url 'treasury:movement_create' company.id branch.id %}" class="btn btn-success">
+                                <i class="fas fa-plus"></i> New
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Movements Table -->
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history"></i> Movement History
+                    </h5>
+                    <a href="{% url 'treasury:export_movements_csv' company.id branch.id %}" class="btn btn-sm btn-success">
+                        <i class="fas fa-file-csv"></i> Export
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date/Time</th>
+                                    <th>Type</th>
+                                    <th>From</th>
+                                    <th>To</th>
+                                    <th>Amount</th>
+                                    <th>Reason</th>
+                                    <th>Boost Source</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for movement in movements %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ movement.created_at|date:"Y-m-d" }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ movement.created_at|date:"H:i" }}</small>
+                                    </td>
+                                    <td>
+                                        {% if movement.movement_type == 'BOOST' %}
+                                            <span class="badge bg-success">BOOST</span>
+                                        {% elif movement.movement_type == 'TRANSFER' %}
+                                            <span class="badge bg-primary">Transfer</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ movement.movement_type }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info text-dark">
+                                            {{ movement.get_from_account_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-warning text-dark">
+                                            {{ movement.get_to_account_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <strong>KES {{ movement.amount|floatformat:2 }}</strong>
+                                    </td>
+                                    <td>{{ movement.reason|default:"-"|truncatechars:30 }}</td>
+                                    <td>
+                                        {% if movement.boost_source %}
+                                            <span class="badge bg-secondary">
+                                                {{ movement.get_boost_source_display }}
+                                            </span>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{% if movement.status == 'COMPLETED' %}success{% elif movement.status == 'PENDING' %}warning{% elif movement.status == 'CANCELLED' %}danger{% else %}secondary{% endif %}">
+                                            {{ movement.get_status_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted py-4">
+                                        <i class="fas fa-exchange-alt fa-3x d-block mb-2"></i>
+                                        <h5>No movements found</h5>
+                                        <p>Start by creating your first movement.</p>
+                                        <a href="{% url 'treasury:movement_create' company.id branch.id %}" class="btn btn-success">
+                                            <i class="fas fa-plus"></i> Create Movement
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-active">
+                                <tr>
+                                    <td colspan="4" class="text-end fw-bold">Totals:</td>
+                                    <td><strong>KES {{ total_boost|add:total_transfers|floatformat:2 }}</strong></td>
+                                    <td colspan="3"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    {% if movements.has_other_pages %}
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination justify-content-center">
+                            {% if movements.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ movements.previous_page_number }}{% if selected_movement_type %}&movement_type={{ selected_movement_type }}{% endif %}{% if selected_from_account %}&from_account={{ selected_from_account }}{% endif %}{% if selected_to_account %}&to_account={{ selected_to_account }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+
+                            {% for num in movements.paginator.page_range %}
+                                {% if movements.number == num %}
+                                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                                {% elif num > movements.number|add:'-3' and num < movements.number|add:'3' %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ num }}{% if selected_movement_type %}&movement_type={{ selected_movement_type }}{% endif %}{% if selected_from_account %}&from_account={{ selected_from_account }}{% endif %}{% if selected_to_account %}&to_account={{ selected_to_account }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">
+                                            {{ num }}
+                                        </a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if movements.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ movements.next_page_number }}{% if selected_movement_type %}&movement_type={{ selected_movement_type }}{% endif %}{% if selected_from_account %}&from_account={{ selected_from_account }}{% endif %}{% if selected_to_account %}&to_account={{ selected_to_account }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Back to Branch -->
+    <div class="row mt-3">
+        <div class="col-12">
+            <a href="{% url 'treasury:branch_treasury' company.id branch.id %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Branch Treasury
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

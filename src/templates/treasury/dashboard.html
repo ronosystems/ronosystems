@@ -1,0 +1,218 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Treasury Dashboard - {{ company.name }}{% endblock %}
+
+{% block page_title %} {% if show_all_branches %}{{ company.name }}{% else %}{{ user_branch.name }}{% endif %}  {% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Summary Cards -->
+    <div class="row">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Total Bank</h6>
+                    <h3 class="mb-0">KES {{ total_bank|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Total M-Pesa</h6>
+                    <h3 class="mb-0">KES {{ total_mpesa|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Total Cash</h6>
+                    <h3 class="mb-0">KES {{ total_cash|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Total Credit</h6>
+                    <h3 class="mb-0">KES {{ total_credit|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Net Balance -->
+    <div class="row mt-3">
+        <div class="col-md-6">
+            <div class="card bg-dark text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Net Balance (All Accounts)</h5>
+                    <h2 class="mb-0">KES {{ total_net|floatformat:2 }}</h2>
+                    <small>Bank + M-Pesa + Cash + Credit</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card bg-secondary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Liquid Balance</h5>
+                    <h2 class="mb-0">KES {{ total_net|floatformat:2 }}</h2>
+                    <small>Bank + M-Pesa + Cash (Excluding Credit)</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-bolt"></i> Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap gap-2">
+                        {% if branches %}
+                            {% with first_branch=branches|first %}
+                                <a href="{% url 'treasury:daily_record_create' company.id first_branch.id %}" class="btn btn-primary">
+                                    <i class="fas fa-calendar-plus"></i> Record Daily Balances
+                                </a>
+                                {% if is_admin %}
+                                <a href="{% url 'treasury:movement_create' company.id first_branch.id %}" class="btn btn-success">
+                                    <i class="fas fa-exchange-alt"></i> New Movement
+                                </a>
+                                <a href="{% url 'treasury:bank_account_create' company.id first_branch.id %}" class="btn btn-info text-white">
+                                    <i class="fas fa-university"></i> Add Bank Account
+                                </a>
+                                <a href="{% url 'treasury:mpesa_account_create' company.id first_branch.id %}" class="btn btn-warning text-white">
+                                    <i class="fas fa-mobile-alt"></i> Add M-Pesa Account
+                                </a>
+                                {% endif %}
+                            {% endwith %}
+                        {% else %}
+                            <div class="alert alert-warning mb-0">
+                                <i class="fas fa-exclamation-triangle"></i> No branches available.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Branch Details -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        {% if show_all_branches %}
+                            All Branch Treasury Details
+                        {% else %}
+                            Your Branch Treasury Details
+                        {% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Branch</th>
+                                    <th>Bank</th>
+                                    <th>M-Pesa</th>
+                                    <th>Cash</th>
+                                    <th>Credit</th>
+                                    <th>Net Balance</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for data in treasury_data %}
+                                <tr>
+                                    <td><strong>{{ data.branch.name }}</strong></td>
+                                    <td>KES {{ data.treasury.total_bank_balance|floatformat:2 }}</td>
+                                    <td>KES {{ data.treasury.total_mpesa_balance|floatformat:2 }}</td>
+                                    <td>KES {{ data.treasury.cash_balance|floatformat:2 }}</td>
+                                    <td>KES {{ data.treasury.credit_balance|floatformat:2 }}</td>
+                                    <td>
+                                        <span class="badge bg-dark">
+                                            KES {{ data.treasury.net_balance|floatformat:2 }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'treasury:branch_treasury' company.id data.branch.id %}" 
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted">
+                                        <i class="fas fa-info-circle"></i> No branches found
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Movements -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Recent Movements</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Branch</th>
+                                    <th>Type</th>
+                                    <th>From</th>
+                                    <th>To</th>
+                                    <th>Amount</th>
+                                    <th>Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for movement in recent_movements_all %}
+                                <tr>
+                                    <td>{{ movement.branch.name }}</td>
+                                    <td>
+                                        {% if movement.movement_type == 'BOOST' %}
+                                            <span class="badge bg-success">BOOST</span>
+                                        {% else %}
+                                            <span class="badge bg-info">Transfer</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ movement.get_from_account_display }}</td>
+                                    <td>{{ movement.get_to_account_display }}</td>
+                                    <td>KES {{ movement.amount|floatformat:2 }}</td>
+                                    <td>{{ movement.created_at|date:"H:i" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">
+                                        <i class="fas fa-info-circle"></i> No movements yet
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
