@@ -122,6 +122,7 @@ class UserRoleUpdateSerializer(serializers.Serializer):
         ('company_cashier', 'Company Cashier'),
         ('company_agent', 'Company Agent'),
         ('company_staff', 'Company Staff'),
+        ('mpesa_agent', 'M-Pesa Agent'),
     ])
 
 
@@ -133,6 +134,7 @@ class UserCompanyUpdateSerializer(serializers.Serializer):
         ('company_cashier', 'Company Cashier'),
         ('company_agent', 'Company Agent'),
         ('company_staff', 'Company Staff'),
+        ('mpesa_agent', 'M-Pesa Agent'),
     ], required=False)
 
 

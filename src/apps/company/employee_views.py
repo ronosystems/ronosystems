@@ -65,6 +65,7 @@ def employee_list(request):
         'staff': User.objects.filter(company=company, role='company_staff').count(),
         'cashiers': User.objects.filter(company=company, role='company_cashier').count(),
         'agents': User.objects.filter(company=company, role='company_agent').count(),
+        'mpesa_agents': User.objects.filter(company=company, role='mpesa_agent').count(),
     }
     
     # Get branches for filter
@@ -77,6 +78,7 @@ def employee_list(request):
         ('company_cashier', 'Cashier'),
         ('company_agent', 'Agent'),
         ('company_staff', 'Staff'),
+        ('mpesa_agent', 'M-Pesa Agent'),
     ]
     
     context = {
@@ -220,7 +222,7 @@ def employee_create(request):
                 company=company,
                 department=department,
                 position=position,
-                staff_id=staff_id,  # Changed from employee_id
+                staff_id=staff_id, 
                 branch_id=branch_id if branch_id else None,
                 is_active=True,
                 is_verified=True,
@@ -278,7 +280,7 @@ def employee_edit(request, pk):
             employee.role = request.POST.get('role', 'company_staff')
             employee.department = request.POST.get('department', '').strip()
             employee.position = request.POST.get('position', '').strip()
-            employee.staff_id = request.POST.get('staff_id', '').strip()  # Changed from employee_id
+            employee.staff_id = request.POST.get('staff_id', '').strip()
             employee.branch_id = request.POST.get('branch_id', None) or None
             employee.is_active = request.POST.get('is_active') == 'on'
             
@@ -384,6 +386,7 @@ def get_roles():
         ('company_cashier', 'Cashier'),
         ('company_agent', 'Agent'),
         ('company_staff', 'Staff'),
+        ('mpesa_agent', 'M-Pesa Agent'),
     ]
 
 

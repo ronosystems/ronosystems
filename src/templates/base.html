@@ -694,7 +694,7 @@
                     EPA SHOP MENU - Check user access
                     ============================================ -->
                     {% if user.is_authenticated %}
-                        {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'company_cashier' or user.role == 'company_agent' or user.role == 'company_staff' %}
+                        {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'company_cashier' or user.role == 'company_agent' or user.role == 'company_staff' or user.role == 'mpesa_agent' %}
                             {% if user.company and user.company.business_type %}
                                 {% if 'epa' in user.company.business_type.name.lower or 'electronics' in user.company.business_type.name.lower %}
                                 <li class="nav-label">EPA Shop</li>
@@ -707,14 +707,21 @@
                                 </li>
                                 {% endif %}
 
-                                {% if user.role == 'company_cashier'%}
+                                {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' or user.role == 'mpesa_agent' %}   
                                 <li class="nav-item">
                                     <a class="nav-link {% if '/company/expenses/' in request.path %}active{% endif %}" href="{% url 'company-expenses-create' %}">
                                         <i class="fas fa-plus"></i> Expense
                                     </a>
                                 </li>
+                                 
+                                {% if company %}
+                                <li class="nav-item">
+                                    <a class="nav-link {% if '/company/treasury/' in request.path %}active{% endif %}" href="{% url 'treasury:dashboard' company.id %}">
+                                        <i class="fas fa-money-bill"></i> <span>M-Pesa</span> 
+                                    </a>
+                                </li>
                                 {% endif %}
-                                
+                                {% endif %}
 
                                 <!-- For Sales Agents  SINGLE SALES  -->
                                 {% if user.role == 'company_agent'%}
@@ -743,15 +750,6 @@
 
                                 <!-- Employee management - Only for Admins and Managers -->
                                 {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' %}    
-                                {% if company %}
-                                <li class="nav-item">
-                                    <a class="nav-link {% if '/company/treasury/' in request.path %}active{% endif %}" href="{% url 'treasury:dashboard' company.id %}">
-                                        <i class="fas fa-money-bill"></i> <span>M-Pesa</span> 
-                                    </a>
-                                </li>
-                                {% endif %}
-                                
-
                                 <li class="nav-item">
                                     <a class="nav-link {% if '/epa_shop/products/' in request.path %}active{% endif %}" href="/epa_shop/products/">
                                         <i class="fas fa-box"></i> <span>Products</span>

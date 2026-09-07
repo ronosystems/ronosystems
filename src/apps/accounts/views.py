@@ -333,6 +333,7 @@ class UserRoleInfoView(APIView):
                 'is_company_manager': request.user.role == 'company_manager',
                 'is_company_cashier': request.user.role == 'company_cashier',
                 'is_company_agent': request.user.role == 'company_agent',
+                'is_mpesa_agent': request.user.role == 'mpesa_agent',
                 'is_company_staff': request.user.role == 'company_staff',
                 'can_manage_users': request.user.role in ['super_admin', 'company_admin'],
                 'can_manage_sales': request.user.role in ['super_admin', 'company_admin', 'company_manager', 'company_cashier'],

@@ -39,6 +39,12 @@ class IsCompanyStaff(permissions.BasePermission):
         return request.user.is_authenticated and request.user.role == 'company_staff'
 
 
+class IsMpesaAgent(permissions.BasePermission):
+    """Allow only M-Pesa agents"""
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.role == 'mpesa_agent'
+
+
 class IsAdminOrManager(permissions.BasePermission):
     """Allow company admins, managers, and super admins"""
     def has_permission(self, request, view):

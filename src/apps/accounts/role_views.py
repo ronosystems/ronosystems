@@ -22,9 +22,9 @@ class UserRoleUpdateView(APIView):
             )
         
         role = request.data.get('role')
-        if role not in ['super_admin', 'company_admin', 'company_manager', 'company_cashier', 'company_agent', 'company_staff', 'guest']:
+        if role not in ['super_admin', 'company_admin', 'company_manager', 'company_cashier', 'company_agent', 'company_staff', 'mpesa_agent', 'guest']:
             return Response(
-                {'error': 'Invalid role. Choose: super_admin, company_admin, company_manager, company_cashier, company_agent, company_staff, guest'},
+                {'error': 'Invalid role. Choose: super_admin, company_admin, company_manager, company_cashier, company_agent, company_staff, mpesa_agent, guest'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -64,6 +64,7 @@ class UserRoleInfoView(APIView):
                 'is_company_cashier': request.user.role == 'company_cashier',
                 'is_company_agent': request.user.role == 'company_agent',
                 'is_company_staff': request.user.role == 'company_staff',
+                'is_mpesa_agent': request.user.role == 'mpesa_agent',
                 'is_guest': request.user.role == 'guest',
             }
         })
