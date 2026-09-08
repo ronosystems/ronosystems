@@ -42,7 +42,9 @@ def inventory_list(request):
     for item in electronics.filter(quantity_in_stock__lte=5):
         low_stock_items.append({
             'id': item.id,
-            'name': f"{item.brand} {item.name}",
+            'name': f"{item.name}",
+            'brand': f"{item.brand}",
+            'model': f"{item.model_number}",
             'type': 'Electronic',
             'quantity': item.quantity_in_stock,
             'min_stock': item.minimum_stock_level,
@@ -54,7 +56,9 @@ def inventory_list(request):
     for item in phones.filter(quantity_in_stock__lte=5):
         low_stock_items.append({
             'id': item.id,
-            'name': f"{item.brand} {item.model}",
+            'name': f"{item.name}",
+            'brand': f"{item.brand}",
+            'model': f"{item.model}",
             'type': 'Phone',
             'quantity': item.quantity_in_stock,
             'min_stock': item.minimum_stock_level,
@@ -66,7 +70,9 @@ def inventory_list(request):
     for item in accessories.filter(quantity_in_stock__lte=10):
         low_stock_items.append({
             'id': item.id,
-            'name': f"{item.brand} {item.name}",
+            'name': f"{item.name}",
+            'brand': f"{item.brand}",
+            'model': f"{item.model}",
             'type': 'Accessory',
             'quantity': item.quantity_in_stock,
             'min_stock': item.minimum_stock_level,
