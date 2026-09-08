@@ -44,11 +44,13 @@ def inventory_list(request):
             'id': item.id,
             'name': f"{item.name}",
             'brand': f"{item.brand}",
+            'specs': f"{item.ram} {item.storage}".strip() or '-',
             'model': f"{item.model_number}",
             'type': 'Electronic',
             'quantity': item.quantity_in_stock,
             'min_stock': item.minimum_stock_level,
             'price': item.selling_price,
+            'purchase_price': item.purchase_price,
             'product_code': item.product_code or '-'
         })
     
@@ -59,10 +61,12 @@ def inventory_list(request):
             'name': f"{item.name}",
             'brand': f"{item.brand}",
             'model': f"{item.model}",
+            'specs': f"{item.ram} {item.storage_capacity}".strip() or '-',
             'type': 'Phone',
             'quantity': item.quantity_in_stock,
             'min_stock': item.minimum_stock_level,
             'price': item.selling_price,
+            'purchase_price': item.purchase_price,
             'product_code': item.product_code or '-'
         })
     
@@ -73,10 +77,12 @@ def inventory_list(request):
             'name': f"{item.name}",
             'brand': f"{item.brand}",
             'model': f"{item.model}",
+            'specs': item.accessory_type or '-',
             'type': 'Accessory',
             'quantity': item.quantity_in_stock,
             'min_stock': item.minimum_stock_level,
             'price': item.selling_price,
+            'purchase_price': item.purchase_price,
             'product_code': item.product_code or '-'
         })
     
@@ -90,7 +96,7 @@ def inventory_list(request):
         'phones_count': phones_count,
         'accessories_count': accessories_count,
         'low_stock_count': len(low_stock_items),
-        'low_stock_items': low_stock_items[:10],  # Show only top 10
+        'low_stock_items': low_stock_items[:10], 
         'page_title': 'Inventory',
         'page_subtitle': 'Manage your stock',
     }

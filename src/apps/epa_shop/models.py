@@ -283,6 +283,7 @@ class Phone(BaseProduct):
     # Pricing
     purchase_price = models.DecimalField(max_digits=10, decimal_places=2)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
+    best_price = models.DecimalField(max_digits=10, decimal_places=2)
     
     # Stock
     quantity_in_stock = models.IntegerField(default=0)
@@ -397,6 +398,7 @@ class Electronic(BaseProduct):
     # Pricing
     purchase_price = models.DecimalField(max_digits=10, decimal_places=2)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
+    best_price = models.DecimalField(max_digits=10, decimal_places=2)
     
     # Stock
     quantity_in_stock = models.IntegerField(default=0)
@@ -481,6 +483,7 @@ class Accessory(BaseProduct):
     # Pricing
     purchase_price = models.DecimalField(max_digits=10, decimal_places=2)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
+    best_price = models.DecimalField(max_digits=10, decimal_places=2)
     
     # Stock
     quantity_in_stock = models.IntegerField(default=0)
