@@ -385,7 +385,7 @@
         </div>
     </div>
 
-    <form method="post" enctype="multipart/form-data" id="productForm">
+    <form method="post" enctype="multipart/form-data" id="productForm" novalidate>
         {% csrf_token %}
         
         <div class="split-container">
@@ -640,10 +640,10 @@
                         </div>
                         <div class="row">
                             <div class="col-md-12 mb-3">
-                                <label class="form-label required">Barcode</label>
+                                <label class="form-label">Barcode</label>
                                 <input type="text" class="form-control" name="barcode" 
                                        value="{% if product %}{{ product.compatible_phone_models|default:'' }}{% else %}{{ form_data.barcode|default:'' }}{% endif %}" 
-                                       placeholder="Enter barcode" id="barcodeInput" required>
+                                       placeholder="Enter barcode" id="barcodeInput">
                                 <small class="field-hint">Optional barcode for scanning</small>
                             </div>
                         </div>
@@ -829,82 +829,71 @@
 </div>
 
 <!-- ============================================
-JAVASCRIPT
+JAVASCRIPT - COMPLETE REWRITE WITH FIXES
 ============================================ -->
 <script>
-// Global variables
-let units = [];
-let categoryValue = '{{ category_value|default:"" }}';
+(function() {
+    'use strict';
 
-// ============================================
-// LOAD EXISTING UNITS
-// ============================================
-document.addEventListener('DOMContentLoaded', function() {
-    const unitsData = document.getElementById('unitsData');
-    if (unitsData && unitsData.value) {
-        try {
-            const parsedUnits = JSON.parse(unitsData.value);
-            if (Array.isArray(parsedUnits) && parsedUnits.length > 0) {
-                units = parsedUnits;
-                renderUnits();
-                updateStats();
-            }
-        } catch(e) {
-            console.error('Error parsing units data:', e);
-            units = [];
-        }
-    }
-    
-    // Set initial category toggle
-    const categorySelect = document.getElementById('categorySelect');
-    if (categorySelect) {
-        if (categoryValue) {
-            categorySelect.value = categoryValue;
-        }
-        categorySelect.dispatchEvent(new Event('change'));
-    }
-    
-    // Auto-generate name on input change
-    setupAutoNameGeneration();
-});
+    // ============================================
+    // GLOBAL VARIABLES
+    // ============================================
+    var units = [];
+    var categoryValue = '{{ category_value|default:"" }}';
 
-// ============================================
-// CATEGORY TOGGLE - FULLY FIXED
-// ============================================
-document.addEventListener('DOMContentLoaded', function() {
-    const categorySelect = document.getElementById('categorySelect');
-    
-    categorySelect.addEventListener('change', function() {
-        const value = this.value;
-        
+    // ============================================
+    // SAFE ELEMENT GETTER
+    // ============================================
+    function safeGetElement(id) {
+        var el = document.getElementById(id);
+        if (!el) {
+            console.warn('Element not found:', id);
+        }
+        return el;
+    }
+
+    function safeQuerySelector(selector) {
+        var el = document.querySelector(selector);
+        if (!el) {
+            console.warn('Element not found:', selector);
+        }
+        return el;
+    }
+
+    // ============================================
+    // CATEGORY CHANGE HANDLER
+    // ============================================
+    function handleCategoryChange(value) {
         // Hide all spec sections
-        document.querySelectorAll('.spec-section').forEach(el => {
+        document.querySelectorAll('.spec-section').forEach(function(el) {
             el.classList.add('hidden');
         });
         
-        // Get references
-        const smartphoneSpecs = document.getElementById('smartphoneSpecs');
-        const featurePhoneSpecs = document.getElementById('featurePhoneSpecs');
-        const electronicsSpecs = document.getElementById('electronicsSpecs');
-        const accessorySpecs = document.getElementById('accessorySpecs');
-        const identifierArea = document.getElementById('identifierInputArea');
-        const unitStats = document.getElementById('unitStats');
-        const accessoryStock = document.getElementById('accessoryStock');
-        const unitInput = document.getElementById('unitInput');
-        const previewTitle = document.getElementById('previewTitle');
+        // Get references with safe checks
+        var smartphoneSpecs = safeGetElement('smartphoneSpecs');
+        var featurePhoneSpecs = safeGetElement('featurePhoneSpecs');
+        var electronicsSpecs = safeGetElement('electronicsSpecs');
+        var accessorySpecs = safeGetElement('accessorySpecs');
+        var identifierArea = safeGetElement('identifierInputArea');
+        var unitStats = safeGetElement('unitStats');
+        var accessoryStock = safeGetElement('accessoryStock');
+        var unitInput = safeGetElement('unitInput');
+        var previewTitle = safeGetElement('previewTitle');
         
-        // Smartphone RAM and ROM fields
-        const smartphoneRam = document.getElementById('smartphoneRam');
-        const smartphoneRom = document.getElementById('smartphoneRom');
-        const electronicRam = document.getElementById('electronicRam');
-        const electronicRom = document.getElementById('electronicRom');
-        const processorField = document.querySelector('input[name="processor"]');
+        // Smartphone/Electronic fields
+        var smartphoneRam = safeGetElement('smartphoneRam');
+        var smartphoneRom = safeGetElement('smartphoneRom');
+        var electronicRam = safeGetElement('electronicRam');
+        var electronicRom = safeGetElement('electronicRom');
+        var processorField = safeQuerySelector('input[name="processor"]');
+        
+        // Accessory fields
+        var accessoryType = safeGetElement('accessoryType');
+        var barcodeInput = safeGetElement('barcodeInput');
+        var accessoryQuantity = safeGetElement('accessoryQuantity');
         
         if (value === 'smartphone') {
-            // Show smartphone specs
             if (smartphoneSpecs) smartphoneSpecs.classList.remove('hidden');
-            
-            // Show identifier area
             if (identifierArea) {
                 identifierArea.classList.remove('hidden');
                 identifierArea.style.display = 'block';
@@ -917,7 +906,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 unitInput.disabled = false;
             }
             
-            // ENABLE and REQUIRE smartphone RAM/ROM
             if (smartphoneRam) {
                 smartphoneRam.disabled = false;
                 smartphoneRam.required = true;
@@ -928,7 +916,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 smartphoneRom.required = true;
                 smartphoneRom.style.display = 'block';
             }
-            // DISABLE electronics fields
             if (electronicRam) {
                 electronicRam.disabled = true;
                 electronicRam.required = false;
@@ -944,9 +931,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 processorField.required = false;
             }
             
+            if (accessoryType) {
+                accessoryType.required = false;
+                accessoryType.disabled = true;
+            }
+            if (barcodeInput) {
+                barcodeInput.required = false;
+                barcodeInput.disabled = true;
+            }
+            if (accessoryQuantity) {
+                accessoryQuantity.disabled = true;
+            }
+            
         } else if (value === 'feature_phone') {
             if (featurePhoneSpecs) featurePhoneSpecs.classList.remove('hidden');
-            
             if (identifierArea) {
                 identifierArea.classList.remove('hidden');
                 identifierArea.style.display = 'block';
@@ -959,7 +957,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 unitInput.disabled = false;
             }
             
-            // ENABLE but NOT REQUIRE smartphone RAM/ROM (optional)
             if (smartphoneRam) {
                 smartphoneRam.disabled = false;
                 smartphoneRam.required = false;
@@ -970,7 +967,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 smartphoneRom.required = false;
                 smartphoneRom.style.display = 'block';
             }
-            // DISABLE electronics fields
             if (electronicRam) {
                 electronicRam.disabled = true;
                 electronicRam.required = false;
@@ -986,9 +982,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 processorField.required = false;
             }
             
+            if (accessoryType) {
+                accessoryType.required = false;
+                accessoryType.disabled = true;
+            }
+            if (barcodeInput) {
+                barcodeInput.required = false;
+                barcodeInput.disabled = true;
+            }
+            if (accessoryQuantity) {
+                accessoryQuantity.disabled = true;
+            }
+            
         } else if (value === 'electronics') {
             if (electronicsSpecs) electronicsSpecs.classList.remove('hidden');
-            
             if (identifierArea) {
                 identifierArea.classList.remove('hidden');
                 identifierArea.style.display = 'block';
@@ -1001,7 +1008,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 unitInput.disabled = false;
             }
             
-            // DISABLE smartphone fields
             if (smartphoneRam) {
                 smartphoneRam.disabled = true;
                 smartphoneRam.required = false;
@@ -1012,7 +1018,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 smartphoneRom.required = false;
                 smartphoneRom.style.display = 'none';
             }
-            // ENABLE and REQUIRE electronics fields
             if (electronicRam) {
                 electronicRam.disabled = false;
                 electronicRam.required = true;
@@ -1028,10 +1033,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 processorField.required = true;
             }
             
+            if (accessoryType) {
+                accessoryType.required = false;
+                accessoryType.disabled = true;
+            }
+            if (barcodeInput) {
+                barcodeInput.required = false;
+                barcodeInput.disabled = true;
+            }
+            if (accessoryQuantity) {
+                accessoryQuantity.disabled = true;
+            }
+            
         } else if (value === 'accessory') {
             if (accessorySpecs) accessorySpecs.classList.remove('hidden');
             
-            // CRITICAL: HIDE the IMEI/Serial input area
             if (identifierArea) {
                 identifierArea.classList.add('hidden');
                 identifierArea.style.display = 'none';
@@ -1047,7 +1063,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 unitInput.disabled = true;
             }
             
-            // DISABLE ALL RAM/ROM fields
             if (smartphoneRam) {
                 smartphoneRam.disabled = true;
                 smartphoneRam.required = false;
@@ -1073,8 +1088,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 processorField.required = false;
             }
             
+            if (accessoryType) {
+                accessoryType.required = true;
+                accessoryType.disabled = false;
+            }
+            if (barcodeInput) {
+                barcodeInput.required = false;
+                barcodeInput.disabled = false;
+            }
+            if (accessoryQuantity) {
+                accessoryQuantity.required = true;
+                accessoryQuantity.disabled = false;
+            }
+            
         } else {
-            // No category selected
             if (identifierArea) {
                 identifierArea.classList.add('hidden');
                 identifierArea.style.display = 'none';
@@ -1083,342 +1110,409 @@ document.addEventListener('DOMContentLoaded', function() {
             if (accessoryStock) accessoryStock.classList.add('hidden');
             if (previewTitle) previewTitle.textContent = 'Select a category first';
             if (unitInput) unitInput.disabled = true;
-        }
-        
-        // Update the units data
-        updateUnitsData();
-    });
-});
-
-// ============================================
-// AUTO-GENERATE PRODUCT NAME - FIXED
-// ============================================
-function setupAutoNameGeneration() {
-    const brandInput = document.querySelector('input[name="brand"]');
-    const modelInput = document.querySelector('input[name="model"]');
-    const nameInput = document.querySelector('input[name="name"]');
-    const categorySelect = document.getElementById('categorySelect');
-    
-    function generateName() {
-        const brand = brandInput ? brandInput.value.trim() : '';
-        const model = modelInput ? modelInput.value.trim() : '';
-        const category = categorySelect ? categorySelect.value : '';
-        
-        // Only auto-generate if name is empty
-        if (nameInput && nameInput.value.trim() === '') {
-            if (brand && model) {
-                let name = `${brand} ${model}`;
-                
-                // Add specs based on category
-                if (category === 'smartphone') {
-                    const ram = document.getElementById('smartphoneRam');
-                    const rom = document.getElementById('smartphoneRom');
-                    if (ram && ram.value && ram.value.trim()) {
-                        name += ` ${ram.value.trim()}`;
-                    }
-                    if (rom && rom.value && rom.value.trim()) {
-                        name += ` ${rom.value.trim()}`;
-                    }
-                } else if (category === 'feature_phone') {
-                    const network = document.querySelector('select[name="network_type"]');
-                    if (network && network.value && network.value !== '') {
-                        name += ` (${network.value.toUpperCase()})`;
-                    }
-                } else if (category === 'electronics') {
-                    const ram = document.getElementById('electronicRam');
-                    const rom = document.getElementById('electronicRom');
-                    if (ram && ram.value && ram.value.trim()) {
-                        name += ` ${ram.value.trim()}`;
-                    }
-                    if (rom && rom.value && rom.value.trim()) {
-                        name += ` ${rom.value.trim()}`;
-                    }
-                }
-                
-                nameInput.value = name.trim();
+            
+            if (smartphoneRam) {
+                smartphoneRam.disabled = true;
+                smartphoneRam.required = false;
+            }
+            if (smartphoneRom) {
+                smartphoneRom.disabled = true;
+                smartphoneRom.required = false;
+            }
+            if (electronicRam) {
+                electronicRam.disabled = true;
+                electronicRam.required = false;
+            }
+            if (electronicRom) {
+                electronicRom.disabled = true;
+                electronicRom.required = false;
+            }
+            if (processorField) {
+                processorField.disabled = true;
+                processorField.required = false;
+            }
+            if (accessoryType) {
+                accessoryType.required = false;
+                accessoryType.disabled = true;
+            }
+            if (barcodeInput) {
+                barcodeInput.required = false;
+                barcodeInput.disabled = true;
+            }
+            if (accessoryQuantity) {
+                accessoryQuantity.required = false;
+                accessoryQuantity.disabled = true;
             }
         }
+        
+        updateUnitsData();
     }
-    
-    // Listen to changes on brand and model
-    if (brandInput) brandInput.addEventListener('input', generateName);
-    if (modelInput) modelInput.addEventListener('input', generateName);
-    
-    // Also listen to spec changes for auto-generation
-    document.querySelectorAll('#smartphoneRam, #smartphoneRom, #electronicRam, #electronicRom, select[name="network_type"]').forEach(el => {
-        if (el) {
-            el.addEventListener('input', generateName);
-            el.addEventListener('change', generateName);
+
+    // ============================================
+    // AUTO-GENERATE PRODUCT NAME
+    // ============================================
+    function setupAutoNameGeneration() {
+        var brandInput = safeQuerySelector('input[name="brand"]');
+        var modelInput = safeQuerySelector('input[name="model"]');
+        var nameInput = safeQuerySelector('input[name="name"]');
+        var categorySelect = safeGetElement('categorySelect');
+        
+        function generateName() {
+            var brand = brandInput ? brandInput.value.trim() : '';
+            var model = modelInput ? modelInput.value.trim() : '';
+            var category = categorySelect ? categorySelect.value : '';
+            
+            if (nameInput && nameInput.value.trim() === '') {
+                if (brand && model) {
+                    var name = brand + ' ' + model;
+                    
+                    if (category === 'smartphone') {
+                        var ram = safeGetElement('smartphoneRam');
+                        var rom = safeGetElement('smartphoneRom');
+                        if (ram && ram.value && ram.value.trim()) {
+                            name += ' ' + ram.value.trim();
+                        }
+                        if (rom && rom.value && rom.value.trim()) {
+                            name += ' ' + rom.value.trim();
+                        }
+                    } else if (category === 'feature_phone') {
+                        var network = safeQuerySelector('select[name="network_type"]');
+                        if (network && network.value && network.value !== '') {
+                            name += ' (' + network.value.toUpperCase() + ')';
+                        }
+                    } else if (category === 'electronics') {
+                        var ram = safeGetElement('electronicRam');
+                        var rom = safeGetElement('electronicRom');
+                        if (ram && ram.value && ram.value.trim()) {
+                            name += ' ' + ram.value.trim();
+                        }
+                        if (rom && rom.value && rom.value.trim()) {
+                            name += ' ' + rom.value.trim();
+                        }
+                    }
+                    
+                    nameInput.value = name.trim();
+                }
+            }
         }
-    });
-}
+        
+        if (brandInput) brandInput.addEventListener('input', generateName);
+        if (modelInput) modelInput.addEventListener('input', generateName);
+        
+        document.querySelectorAll('#smartphoneRam, #smartphoneRom, #electronicRam, #electronicRom, select[name="network_type"]').forEach(function(el) {
+            if (el) {
+                el.addEventListener('input', generateName);
+                el.addEventListener('change', generateName);
+            }
+        });
+    }
 
-// ============================================
-// UNIT MANAGEMENT
-// ============================================
-function addUnit() {
-    const input = document.getElementById('unitInput');
-    const status = document.getElementById('unitStatus');
-    const identifier = input.value.trim();
-    
-    if (!identifier) {
-        alert('Please enter an identifier');
-        return;
-    }
-    
-    if (units.some(u => u.identifier === identifier)) {
-        alert('Identifier already exists!');
-        return;
-    }
-    
-    units.push({ identifier: identifier, status: status.value });
-    input.value = '';
-    input.focus();
-    renderUnits();
-    updateStats();
-    updateUnitsData();
-}
-
-function bulkAdd() {
-    const textarea = document.getElementById('bulkInput');
-    const lines = textarea.value.split('\n').map(s => s.trim()).filter(s => s);
-    
-    if (lines.length === 0) {
-        alert('Please enter at least one identifier');
-        return;
-    }
-    
-    const existing = units.map(u => u.identifier);
-    const newUnits = lines.filter(id => existing.indexOf(id) === -1);
-    
-    if (newUnits.length === 0) {
-        alert('All identifiers already exist');
-        return;
-    }
-    
-    if (newUnits.length !== lines.length) {
-        if (!confirm(`${lines.length - newUnits.length} identifier(s) already exist. Add ${newUnits.length} new ones?`)) {
+    // ============================================
+    // UNIT MANAGEMENT
+    // ============================================
+    window.addUnit = function() {
+        var input = safeGetElement('unitInput');
+        var status = safeGetElement('unitStatus');
+        if (!input || !status) return;
+        
+        var identifier = input.value.trim();
+        
+        if (!identifier) {
+            alert('Please enter an identifier');
             return;
         }
-    }
-    
-    newUnits.forEach(id => {
-        units.push({ identifier: id, status: 'available' });
-    });
-    
-    textarea.value = '';
-    toggleBulk();
-    renderUnits();
-    updateStats();
-    updateUnitsData();
-    alert(`✅ ${newUnits.length} units added successfully!`);
-}
+        
+        if (units.some(function(u) { return u.identifier === identifier; })) {
+            alert('Identifier already exists!');
+            return;
+        }
+        
+        units.push({ identifier: identifier, status: status.value });
+        input.value = '';
+        input.focus();
+        renderUnits();
+        updateStats();
+        updateUnitsData();
+    };
 
-function removeUnit(index) {
-    if (!confirm('Remove this unit?')) return;
-    units.splice(index, 1);
-    renderUnits();
-    updateStats();
-    updateUnitsData();
-}
-
-function toggleBulk() {
-    const bulk = document.getElementById('bulkAdd');
-    if (bulk) {
-        bulk.classList.toggle('visible');
-    }
-}
-
-function renderUnits() {
-    const list = document.getElementById('unitsList');
-    
-    if (!list) return;
-    
-    if (units.length === 0) {
-        list.innerHTML = `<div class="no-units">
-            <i class="fas fa-qrcode"></i>
-            <p>No identifiers added yet</p>
-            <small>Add IMEI/Serial numbers from the left panel</small>
-        </div>`;
-        return;
-    }
-    
-    let html = '';
-    units.forEach((unit, index) => {
-        html += `<div class="unit-item">
-            <div>
-                <span class="unit-identifier">${escapeHtml(unit.identifier)}</span>
-                <span class="unit-status-badge ${unit.status}">${unit.status}</span>
-            </div>
-            <div class="unit-actions">
-                <button onclick="removeUnit(${index})" title="Remove">
-                    <i class="fas fa-trash-alt"></i>
-                </button>
-            </div>
-        </div>`;
-    });
-    list.innerHTML = html;
-}
-
-function updateStats() {
-    const total = units.length;
-    const available = units.filter(u => u.status === 'available').length;
-    const reserved = units.filter(u => u.status === 'reserved').length;
-    const repair = units.filter(u => u.status === 'repair').length;
-    
-    const totalEl = document.getElementById('totalCount');
-    const availableEl = document.getElementById('availableCount');
-    const reservedEl = document.getElementById('reservedCount');
-    const repairEl = document.getElementById('repairCount');
-    const badgeEl = document.getElementById('countBadge');
-    
-    if (totalEl) totalEl.textContent = total;
-    if (availableEl) availableEl.textContent = available;
-    if (reservedEl) reservedEl.textContent = reserved;
-    if (repairEl) repairEl.textContent = repair;
-    if (badgeEl) badgeEl.textContent = total;
-}
-
-function updateUnitsData() {
-    const hidden = document.getElementById('unitsData');
-    if (hidden) {
-        hidden.value = JSON.stringify(units);
-    }
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// Enter key support for adding units
-document.addEventListener('DOMContentLoaded', function() {
-    const input = document.getElementById('unitInput');
-    if (input) {
-        input.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                addUnit();
+    window.bulkAdd = function() {
+        var textarea = safeGetElement('bulkInput');
+        if (!textarea) return;
+        
+        var lines = textarea.value.split('\n').map(function(s) { return s.trim(); }).filter(function(s) { return s; });
+        
+        if (lines.length === 0) {
+            alert('Please enter at least one identifier');
+            return;
+        }
+        
+        var existing = units.map(function(u) { return u.identifier; });
+        var newUnits = lines.filter(function(id) { return existing.indexOf(id) === -1; });
+        
+        if (newUnits.length === 0) {
+            alert('All identifiers already exist');
+            return;
+        }
+        
+        if (newUnits.length !== lines.length) {
+            if (!confirm((lines.length - newUnits.length) + ' identifier(s) already exist. Add ' + newUnits.length + ' new ones?')) {
+                return;
             }
+        }
+        
+        newUnits.forEach(function(id) {
+            units.push({ identifier: id, status: 'available' });
         });
-    }
-});
+        
+        textarea.value = '';
+        window.toggleBulk();
+        renderUnits();
+        updateStats();
+        updateUnitsData();
+        alert('\u2714 ' + newUnits.length + ' units added successfully!');
+    };
 
-// ============================================
-// FORM VALIDATION BEFORE SUBMIT
-// ============================================
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('productForm');
-    if (form) {
-        form.addEventListener('submit', function(e) {
-            const category = document.getElementById('categorySelect').value;
-            
-            // For smartphones - validate RAM and ROM
-            if (category === 'smartphone') {
-                const ram = document.getElementById('smartphoneRam');
-                const rom = document.getElementById('smartphoneRom');
-                
-                if (!ram || !ram.value || ram.value.trim() === '') {
-                    e.preventDefault();
-                    alert('RAM is required for smartphones.');
-                    ram.focus();
-                    return false;
-                }
-                
-                if (!rom || !rom.value || rom.value.trim() === '') {
-                    e.preventDefault();
-                    alert('Storage (ROM) is required for smartphones.');
-                    rom.focus();
-                    return false;
-                }
-                
-                if (units.length === 0) {
-                    e.preventDefault();
-                    alert('Please add at least one IMEI number before saving.');
-                    return false;
-                }
-            }
-            
-            // For feature phones - only check units
-            if (category === 'feature_phone') {
-                if (units.length === 0) {
-                    e.preventDefault();
-                    alert('Please add at least one IMEI number before saving.');
-                    return false;
-                }
-            }
-            
-            // For electronics - validate RAM, Storage, Processor
-            if (category === 'electronics') {
-                const ram = document.getElementById('electronicRam');
-                const rom = document.getElementById('electronicRom');
-                const processor = document.querySelector('input[name="processor"]');
-                
-                if (!ram || !ram.value || ram.value.trim() === '') {
-                    e.preventDefault();
-                    alert('RAM is required for electronics.');
-                    ram.focus();
-                    return false;
-                }
-                
-                if (!rom || !rom.value || rom.value.trim() === '') {
-                    e.preventDefault();
-                    alert('Storage is required for electronics.');
-                    rom.focus();
-                    return false;
-                }
-                
-                if (!processor || !processor.value || processor.value.trim() === '') {
-                    e.preventDefault();
-                    alert('Processor is required for electronics.');
-                    processor.focus();
-                    return false;
-                }
-                
-                if (units.length === 0) {
-                    e.preventDefault();
-                    alert('Please add at least one Serial number before saving.');
-                    return false;
-                }
-            }
-            
-            // For accessories - validate accessory-specific fields
-            if (category === 'accessory') {
-                const accessoryType = document.getElementById('accessoryType');
-                const quantity = document.getElementById('accessoryQuantity');
-                
-                if (!accessoryType || !accessoryType.value) {
-                    e.preventDefault();
-                    alert('Please select an accessory type.');
-                    accessoryType.focus();
-                    return false;
-                }
-                
-                if (quantity && parseInt(quantity.value) <= 0) {
-                    e.preventDefault();
-                    alert('Please enter a quantity greater than 0 for this accessory.');
-                    quantity.focus();
-                    return false;
-                }
-            }
-            
-            return true;
+    window.removeUnit = function(index) {
+        if (!confirm('Remove this unit?')) return;
+        units.splice(index, 1);
+        renderUnits();
+        updateStats();
+        updateUnitsData();
+    };
+
+    window.toggleBulk = function() {
+        var bulk = safeGetElement('bulkAdd');
+        if (bulk) {
+            bulk.classList.toggle('visible');
+        }
+    };
+
+    function renderUnits() {
+        var list = safeGetElement('unitsList');
+        if (!list) return;
+        
+        if (units.length === 0) {
+            list.innerHTML = '<div class="no-units">' +
+                '<i class="fas fa-qrcode"></i>' +
+                '<p>No identifiers added yet</p>' +
+                '<small>Add IMEI/Serial numbers from the left panel</small>' +
+                '</div>';
+            return;
+        }
+        
+        var html = '';
+        units.forEach(function(unit, index) {
+            html += '<div class="unit-item">' +
+                '<div>' +
+                '<span class="unit-identifier">' + escapeHtml(unit.identifier) + '</span>' +
+                '<span class="unit-status-badge ' + unit.status + '">' + unit.status + '</span>' +
+                '</div>' +
+                '<div class="unit-actions">' +
+                '<button onclick="removeUnit(' + index + ')" title="Remove">' +
+                '<i class="fas fa-trash-alt"></i>' +
+                '</button>' +
+                '</div>' +
+                '</div>';
         });
+        list.innerHTML = html;
     }
-});
 
-// ============================================
-// ADDITIONAL SAFETY: Force hide on page load if accessory
-// ============================================
-document.addEventListener('DOMContentLoaded', function() {
-    if (categoryValue === 'accessory') {
-        const identifierArea = document.getElementById('identifierInputArea');
-        if (identifierArea) {
-            identifierArea.classList.add('hidden');
-            identifierArea.style.display = 'none';
+    function updateStats() {
+        var total = units.length;
+        var available = units.filter(function(u) { return u.status === 'available'; }).length;
+        var reserved = units.filter(function(u) { return u.status === 'reserved'; }).length;
+        var repair = units.filter(function(u) { return u.status === 'repair'; }).length;
+        
+        var totalEl = safeGetElement('totalCount');
+        var availableEl = safeGetElement('availableCount');
+        var reservedEl = safeGetElement('reservedCount');
+        var repairEl = safeGetElement('repairCount');
+        var badgeEl = safeGetElement('countBadge');
+        
+        if (totalEl) totalEl.textContent = total;
+        if (availableEl) availableEl.textContent = available;
+        if (reservedEl) reservedEl.textContent = reserved;
+        if (repairEl) repairEl.textContent = repair;
+        if (badgeEl) badgeEl.textContent = total;
+    }
+
+    function updateUnitsData() {
+        var hidden = safeGetElement('unitsData');
+        if (hidden) {
+            hidden.value = JSON.stringify(units);
         }
     }
-});
+
+    function escapeHtml(text) {
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // ============================================
+    // FORM VALIDATION
+    // ============================================
+    function validateForm(e) {
+        var categorySelect = safeGetElement('categorySelect');
+        if (!categorySelect) return true;
+        
+        var category = categorySelect.value;
+        
+        if (category === 'smartphone') {
+            var ram = safeGetElement('smartphoneRam');
+            var rom = safeGetElement('smartphoneRom');
+            
+            if (!ram || !ram.value || ram.value.trim() === '') {
+                e.preventDefault();
+                alert('RAM is required for smartphones.');
+                if (ram) ram.focus();
+                return false;
+            }
+            
+            if (!rom || !rom.value || rom.value.trim() === '') {
+                e.preventDefault();
+                alert('Storage (ROM) is required for smartphones.');
+                if (rom) rom.focus();
+                return false;
+            }
+            
+            if (units.length === 0) {
+                e.preventDefault();
+                alert('Please add at least one IMEI number before saving.');
+                return false;
+            }
+        }
+        
+        if (category === 'feature_phone') {
+            if (units.length === 0) {
+                e.preventDefault();
+                alert('Please add at least one IMEI number before saving.');
+                return false;
+            }
+        }
+        
+        if (category === 'electronics') {
+            var ram = safeGetElement('electronicRam');
+            var rom = safeGetElement('electronicRom');
+            var processor = safeQuerySelector('input[name="processor"]');
+            
+            if (!ram || !ram.value || ram.value.trim() === '') {
+                e.preventDefault();
+                alert('RAM is required for electronics.');
+                if (ram) ram.focus();
+                return false;
+            }
+            
+            if (!rom || !rom.value || rom.value.trim() === '') {
+                e.preventDefault();
+                alert('Storage is required for electronics.');
+                if (rom) rom.focus();
+                return false;
+            }
+            
+            if (!processor || !processor.value || processor.value.trim() === '') {
+                e.preventDefault();
+                alert('Processor is required for electronics.');
+                if (processor) processor.focus();
+                return false;
+            }
+            
+            if (units.length === 0) {
+                e.preventDefault();
+                alert('Please add at least one Serial number before saving.');
+                return false;
+            }
+        }
+        
+        if (category === 'accessory') {
+            var accessoryType = safeGetElement('accessoryType');
+            var quantity = safeGetElement('accessoryQuantity');
+            
+            if (!accessoryType || !accessoryType.value) {
+                e.preventDefault();
+                alert('Please select an accessory type.');
+                if (accessoryType) accessoryType.focus();
+                return false;
+            }
+            
+            if (quantity && parseInt(quantity.value) <= 0) {
+                e.preventDefault();
+                alert('Please enter a quantity greater than 0 for this accessory.');
+                if (quantity) quantity.focus();
+                return false;
+            }
+        }
+        
+        return true;
+    }
+
+    // ============================================
+    // SINGLE DOMContentLoaded LISTENER
+    // ============================================
+    document.addEventListener('DOMContentLoaded', function() {
+        // --- Load existing units ---
+        var unitsData = safeGetElement('unitsData');
+        if (unitsData && unitsData.value) {
+            try {
+                var parsedUnits = JSON.parse(unitsData.value);
+                if (Array.isArray(parsedUnits) && parsedUnits.length > 0) {
+                    units = parsedUnits;
+                    renderUnits();
+                    updateStats();
+                }
+            } catch(e) {
+                console.error('Error parsing units data:', e);
+                units = [];
+            }
+        }
+        
+        // --- Setup Category Change Handler ---
+        var categorySelect = safeGetElement('categorySelect');
+        if (categorySelect) {
+            if (categoryValue) {
+                categorySelect.value = categoryValue;
+            }
+            categorySelect.addEventListener('change', function() {
+                handleCategoryChange(this.value);
+            });
+            // Trigger initial change to set up the form
+            categorySelect.dispatchEvent(new Event('change'));
+        } else {
+            console.error('Category select element not found!');
+        }
+        
+        // --- Setup Auto-Name Generation ---
+        setupAutoNameGeneration();
+        
+        // --- Setup Enter key for unit input ---
+        var unitInput = safeGetElement('unitInput');
+        if (unitInput) {
+            unitInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    window.addUnit();
+                }
+            });
+        }
+        
+        // --- Setup Form Validation ---
+        var form = safeGetElement('productForm');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                return validateForm(e);
+            });
+        }
+        
+        // --- Force hide identifier area if accessory ---
+        if (categoryValue === 'accessory') {
+            var identifierArea = safeGetElement('identifierInputArea');
+            if (identifierArea) {
+                identifierArea.classList.add('hidden');
+                identifierArea.style.display = 'none';
+            }
+        }
+    });
+
+})();
 </script>
 {% endblock %}

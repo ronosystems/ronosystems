@@ -2303,6 +2303,10 @@ def product_delete(request, product_code):
 # PRODUCT RESTOCK - Using Product Code
 # ============================================
 
+# ============================================
+# PRODUCT RESTOCK - Using Product Code (FIXED)
+# ============================================
+
 @login_required
 def product_restock(request, product_code):
     """Restock a product using product code"""
@@ -2348,6 +2352,11 @@ def product_restock(request, product_code):
         else:
             existing_units = Unit.objects.filter(electronic=product).order_by('-created_at')
     
+    # Initialize variables for form data preservation
+    form_units = []
+    form_units_json = '[]'
+    submitted_quantity = 0
+    
     if request.method == 'POST':
         try:
             # ============================================
@@ -2361,15 +2370,31 @@ def product_restock(request, product_code):
                 except:
                     new_units = []
                 
+                # Store for re-render if needed
+                form_units = new_units
+                form_units_json = units_data
+                
                 if not new_units:
                     messages.error(request, 'Please add at least one IMEI/Serial number.')
-                    return redirect(f'/epa_shop/products/{product_code}/restock/')
+                    # Re-render with the form data preserved
+                    context = {
+                        'product': product,
+                        'product_type': product_type,
+                        'existing_units': existing_units,
+                        'form_units': form_units,
+                        'form_units_json': form_units_json,
+                        'page_title': f'Restock - {product.name}',
+                        'page_subtitle': f'Code: {product.product_code}',
+                        'unit_label': 'IMEI' if product_type == 'Phone' else 'Serial',
+                    }
+                    return render(request, 'epa/product_restock.html', context)
                 
                 # Get or create owner from user
                 owner = get_or_create_owner_from_user(request.user)
                 
                 added_count = 0
                 skipped_count = 0
+                duplicate_identifiers = []
                 
                 # Create units
                 for unit_data in new_units:
@@ -2382,6 +2407,7 @@ def product_restock(request, product_code):
                     # Check if identifier already exists
                     if Unit.objects.filter(identifier=identifier).exists():
                         skipped_count += 1
+                        duplicate_identifiers.append(identifier)
                         continue
                     
                     # Create the unit
@@ -2404,8 +2430,29 @@ def product_restock(request, product_code):
                     added_count += 1
                 
                 if added_count == 0:
-                    messages.error(request, 'No new units were added. All identifiers already exist or were invalid.')
-                    return redirect(f'/epa_shop/products/{product_code}/restock/')
+                    # Build detailed error message
+                    error_msg = 'No new units were added. '
+                    if duplicate_identifiers:
+                        error_msg += f'The following identifiers already exist: {", ".join(duplicate_identifiers[:5])}'
+                        if len(duplicate_identifiers) > 5:
+                            error_msg += f' and {len(duplicate_identifiers) - 5} more.'
+                    else:
+                        error_msg += 'All identifiers were invalid or empty.'
+                    
+                    messages.error(request, error_msg)
+                    
+                    # Re-render with the form data preserved
+                    context = {
+                        'product': product,
+                        'product_type': product_type,
+                        'existing_units': existing_units,
+                        'form_units': form_units,
+                        'form_units_json': form_units_json,
+                        'page_title': f'Restock - {product.name}',
+                        'page_subtitle': f'Code: {product.product_code}',
+                        'unit_label': 'IMEI' if product_type == 'Phone' else 'Serial',
+                    }
+                    return render(request, 'epa/product_restock.html', context)
                 
                 # Update stock count
                 if product_type == 'Phone':
@@ -2428,10 +2475,21 @@ def product_restock(request, product_code):
             # ============================================
             elif product_type == 'Accessory':
                 quantity = int(request.POST.get('quantity', 0))
+                submitted_quantity = quantity
                 
                 if quantity <= 0:
                     messages.error(request, 'Quantity must be greater than 0.')
-                    return redirect(f'/epa_shop/products/{product_code}/restock/')
+                    # Re-render with the form data preserved
+                    context = {
+                        'product': product,
+                        'product_type': product_type,
+                        'existing_units': existing_units,
+                        'submitted_quantity': submitted_quantity,
+                        'page_title': f'Restock - {product.name}',
+                        'page_subtitle': f'Code: {product.product_code}',
+                        'unit_label': 'IMEI' if product_type == 'Phone' else 'Serial',
+                    }
+                    return render(request, 'epa/product_restock.html', context)
                 
                 # Update stock
                 product.quantity_in_stock += quantity
@@ -2448,7 +2506,19 @@ def product_restock(request, product_code):
             messages.error(request, f'Error restocking product: {str(e)}')
             import traceback
             traceback.print_exc()
-            return redirect(f'/epa_shop/products/{product_code}/restock/')
+            
+            # Re-render with form data preserved
+            context = {
+                'product': product,
+                'product_type': product_type,
+                'existing_units': existing_units,
+                'form_units': form_units,
+                'form_units_json': form_units_json,
+                'page_title': f'Restock - {product.name}',
+                'page_subtitle': f'Code: {product.product_code}',
+                'unit_label': 'IMEI' if product_type == 'Phone' else 'Serial',
+            }
+            return render(request, 'epa/product_restock.html', context)
     
     # ============================================
     # GET REQUEST - Show restock form
@@ -2457,12 +2527,14 @@ def product_restock(request, product_code):
         'product': product,
         'product_type': product_type,
         'existing_units': existing_units,
+        'form_units': form_units,
+        'form_units_json': form_units_json,
+        'submitted_quantity': submitted_quantity,
         'page_title': f'Restock - {product.name}',
         'page_subtitle': f'Code: {product.product_code}',
         'unit_label': 'IMEI' if product_type == 'Phone' else 'Serial',
     }
     return render(request, 'epa/product_restock.html', context)
-
 
 # ============================================
 # PRODUCT UNIT - Using Product Code
