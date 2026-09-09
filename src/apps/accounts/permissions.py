@@ -44,13 +44,17 @@ class IsMpesaAgent(permissions.BasePermission):
     def has_permission(self, request, view):
         return request.user.is_authenticated and request.user.role == 'mpesa_agent'
 
+class IsStockController(permissions.BasePermission):
+    """Allow only stock controller"""
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.role == 'stock_controller'
 
 class IsAdminOrManager(permissions.BasePermission):
     """Allow company admins, managers, and super admins"""
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-        return request.user.role in ['super_admin', 'company_admin', 'company_manager']
+        return request.user.role in ['super_admin', 'company_admin', 'company_manager', 'stock_controller']
 
 
 class IsSuperAdminOrCompanyAdmin(permissions.BasePermission):
@@ -132,7 +136,7 @@ class CanProcessSales(permissions.BasePermission):
             return False
         return request.user.role in [
             'super_admin', 'company_admin', 'company_manager', 
-            'company_cashier', 'company_agent'
+            'company_cashier', 'company_agent', 'stock_controller'
         ]
 
 
@@ -141,7 +145,7 @@ class CanApproveSales(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-        return request.user.role in ['super_admin', 'company_admin', 'company_manager']
+        return request.user.role in ['super_admin', 'company_admin', 'company_manager', 'stock_controller']
 
 
 class CanViewReports(permissions.BasePermission):
@@ -149,7 +153,7 @@ class CanViewReports(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-        return request.user.role in ['super_admin', 'company_admin', 'company_manager']
+        return request.user.role in ['super_admin', 'company_admin', 'company_manager', 'stock_controller']
 
 
 class CanManageUsers(permissions.BasePermission):

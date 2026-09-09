@@ -52,8 +52,8 @@ def get_product_by_code(company, product_code):
 # ============================================
 
 def is_admin_or_manager(user):
-    """Check if user is admin, manager, or super admin"""
-    return user.role in ['super_admin', 'company_admin', 'company_manager']
+    """Check if user is super admin, company admin, or stock controller"""
+    return user.role in ['super_admin', 'company_admin', 'stock_controller']
 
 
 def is_cashier(user):
@@ -69,6 +69,11 @@ def is_agent(user):
 def is_staff(user):
     """Check if user is staff"""
     return user.role == 'company_staff'
+
+
+def is_stock_controller(user):
+    """Check if user is a stock controller"""
+    return user.role == 'stock_controller'
 
 
 def get_user_branch(user):
@@ -501,9 +506,9 @@ def unit_reverse_sale(request, sale_id):
     
     sale = get_object_or_404(Sale, id=sale_id, company=company)
     
-    # Check if user has permission to reverse (admin/manager only)
+    # Check if user has permission to reverse (admin only)
     if not is_admin_or_manager(request.user):
-        messages.error(request, 'Only admins and managers can reverse sales.')
+        messages.error(request, 'Only administrators and stock controllers can reverse sales.')
         return redirect('/epa_shop/products/')
     
     # Get the referring page
@@ -1148,14 +1153,9 @@ def product_create(request):
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
     
-    # Agents cannot create products
-    if is_agent(request.user):
-        messages.error(request, 'Agents cannot create products. Please contact your manager.')
-        return redirect('/epa_shop/products/')
-    
-    # Only admins, managers, and cashiers can create products
-    if not is_admin_or_manager(request.user) and not is_cashier(request.user):
-        messages.error(request, 'You do not have permission to create products.')
+    # Only super admin, company admin, and stock controllers can create products
+    if not is_admin_or_manager(request.user):
+        messages.error(request, 'You do not have permission to create products. Only administrators and stock controllers can manage products.')
         return redirect('/epa_shop/products/')
     
     # Filter branches by user's branch for non-super-admin
@@ -1831,14 +1831,9 @@ def product_edit(request, product_code):
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
     
-    # Agents cannot edit products
-    if is_agent(request.user):
-        messages.error(request, 'Agents cannot edit products. Please contact your manager.')
-        return redirect('/epa_shop/products/')
-    
-    # Only admins, managers, and cashiers can edit products
-    if not is_admin_or_manager(request.user) and not is_cashier(request.user):
-        messages.error(request, 'You do not have permission to edit products.')
+    # Only super admin, company admin, and stock controllers can edit products
+    if not is_admin_or_manager(request.user):
+        messages.error(request, 'You do not have permission to edit products. Only administrators and stock controllers can manage products.')
         return redirect('/epa_shop/products/')
     
     product, product_type = get_product_by_code(company, product_code)
@@ -2088,8 +2083,7 @@ def product_edit(request, product_code):
                 
                 product.save()
                 
-                # Update units
-                units_data = request.POST.get('units', '[]')
+                # Update units                units_data = request.POST.get('units', '[]')
                 try:
                     new_units = json.loads(units_data)
                 except:
@@ -2239,6 +2233,7 @@ def product_edit(request, product_code):
     }
     return render(request, 'epa/product_form.html', context)
 
+
 # ============================================
 # PRODUCT DELETE - Using Product Code
 # ============================================
@@ -2252,14 +2247,9 @@ def product_delete(request, product_code):
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
     
-    # Agents cannot delete products
-    if is_agent(request.user):
-        messages.error(request, 'Agents cannot delete products. Please contact your manager.')
-        return redirect('/epa_shop/products/')
-    
-    # Only admins and managers can delete products
+    # Only super admin, company admin, and stock controllers can delete products
     if not is_admin_or_manager(request.user):
-        messages.error(request, 'You do not have permission to delete products.')
+        messages.error(request, 'You do not have permission to delete products. Only administrators and stock controllers can manage products.')
         return redirect('/epa_shop/products/')
     
     product, product_type = get_product_by_code(company, product_code)
@@ -2309,10 +2299,6 @@ def product_delete(request, product_code):
 # PRODUCT RESTOCK - Using Product Code
 # ============================================
 
-# ============================================
-# PRODUCT RESTOCK - Using Product Code (FIXED)
-# ============================================
-
 @login_required
 def product_restock(request, product_code):
     """Restock a product using product code"""
@@ -2338,8 +2324,8 @@ def product_restock(request, product_code):
         if product.owner != owner:
             messages.error(request, 'You can only restock products you own.')
             return redirect('/epa_shop/products/')
-    elif not is_admin_or_manager(request.user) and not is_cashier(request.user):
-        messages.error(request, 'You do not have permission to restock products.')
+    elif not is_admin_or_manager(request.user):
+        messages.error(request, 'You do not have permission to restock products. Only administrators and stock controllers can manage stock.')
         return redirect('/epa_shop/products/')
     
     # Check branch access for non-admin users
@@ -2541,6 +2527,7 @@ def product_restock(request, product_code):
         'unit_label': 'IMEI' if product_type == 'Phone' else 'Serial',
     }
     return render(request, 'epa/product_restock.html', context)
+
 
 # ============================================
 # PRODUCT UNIT - Using Product Code

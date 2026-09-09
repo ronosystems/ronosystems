@@ -9,6 +9,7 @@ class User(AbstractUser):
         ('company_admin', 'Company Admin'),
         ('company_manager', 'Company Manager'),
         ('company_cashier', 'Company Cashier'),
+        ('stock_controller', 'Stock Controller'),
         ('company_agent', 'Company Agent'),
         ('mpesa_agent', 'Mpesa Agent'),
         ('company_staff', 'Company Staff'),
@@ -56,7 +57,11 @@ class User(AbstractUser):
     @property
     def is_company_admin(self):
         return self.role == 'company_admin'
-    
+
+    @property
+    def is_stock_controller(self):
+        return self.role == 'stock_controller'
+
     @property
     def is_company_manager(self):
         return self.role == 'company_manager'

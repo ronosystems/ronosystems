@@ -76,7 +76,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"password": list(e.messages)})
         
         # Validate role
-        allowed_roles = ['company_admin', 'company_manager', 'company_cashier', 'company_agent', 'company_staff']
+        allowed_roles = ['company_admin', 'company_manager', 'company_cashier', 'company_agent', 'stock_controller', 'company_staff']
         if attrs.get('role') not in allowed_roles:
             raise serializers.ValidationError({"role": "Invalid role selected"})
         
@@ -122,6 +122,7 @@ class UserRoleUpdateSerializer(serializers.Serializer):
         ('company_cashier', 'Company Cashier'),
         ('company_agent', 'Company Agent'),
         ('company_staff', 'Company Staff'),
+        ('stock_controller', 'Stock Controller'),
         ('mpesa_agent', 'M-Pesa Agent'),
     ])
 
@@ -134,6 +135,7 @@ class UserCompanyUpdateSerializer(serializers.Serializer):
         ('company_cashier', 'Company Cashier'),
         ('company_agent', 'Company Agent'),
         ('company_staff', 'Company Staff'),
+        ('stock_controller', 'Stock Controller'),
         ('mpesa_agent', 'M-Pesa Agent'),
     ], required=False)
 

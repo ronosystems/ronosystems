@@ -65,6 +65,7 @@ def employee_list(request):
         'staff': User.objects.filter(company=company, role='company_staff').count(),
         'cashiers': User.objects.filter(company=company, role='company_cashier').count(),
         'agents': User.objects.filter(company=company, role='company_agent').count(),
+        'stock_controllers': User.objects.filter(company=company, role='stock_controller').count(),
         'mpesa_agents': User.objects.filter(company=company, role='mpesa_agent').count(),
     }
     
@@ -74,10 +75,11 @@ def employee_list(request):
     # Role choices
     roles = [
         ('company_admin', 'Company Admin'),
-        ('company_manager', 'Manager'),
-        ('company_cashier', 'Cashier'),
-        ('company_agent', 'Agent'),
-        ('company_staff', 'Staff'),
+        ('company_manager', 'Company Manager'),
+        ('company_cashier', 'Company Cashier'),
+        ('company_agent', 'Company Agent'),
+        ('company_staff', 'Company Staff'),
+        ('stock_controller', 'Stock Controller'),
         ('mpesa_agent', 'M-Pesa Agent'),
     ]
     
@@ -382,10 +384,11 @@ def get_roles():
     """Get role choices for dropdown"""
     return [
         ('company_admin', 'Company Admin'),
-        ('company_manager', 'Manager'),
-        ('company_cashier', 'Cashier'),
-        ('company_agent', 'Agent'),
-        ('company_staff', 'Staff'),
+        ('company_manager', 'Company Manager'),
+        ('company_cashier', 'Company Cashier'),
+        ('company_agent', 'Company Agent'),
+        ('company_staff', 'Company Staff'),
+        ('stock_controller', 'Stock Controller'),
         ('mpesa_agent', 'M-Pesa Agent'),
     ]
 
