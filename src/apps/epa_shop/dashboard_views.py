@@ -87,13 +87,16 @@ def epa_dashboard(request):
         phones = phones.filter(branch=user_branch)
         accessories = accessories.filter(branch=user_branch)
     
+    # Product counts
     electronics_count = electronics.count()
     phones_count = phones.count()
     accessories_count = accessories.count()
+    
+    # Total PRODUCTS (all product types - 1 product = 1 count)
     total_products = electronics_count + phones_count + accessories_count
     
     # ============================================
-    # Unit counts (all units in the company) - FIXED
+    # TOTAL UNITS (from Phone and Electronic only)
     # ============================================
     
     # Get total units across all products
@@ -108,6 +111,15 @@ def epa_dashboard(request):
         )
     
     total_unit_items = total_units.count()
+    
+    # ============================================
+    # TOTAL STOCK (Products + Accessories quantity)
+    # ============================================
+    # This counts accessories as their quantity, not 1
+    total_phone_stock = phones.aggregate(total=Sum('quantity_in_stock'))['total'] or 0
+    total_electronic_stock = electronics.aggregate(total=Sum('quantity_in_stock'))['total'] or 0
+    total_accessory_stock = accessories.aggregate(total=Sum('quantity_in_stock'))['total'] or 0
+    total_stock_items = total_phone_stock + total_electronic_stock + total_accessory_stock
     
     # ============================================
     # Sales data (filtered by branch/agent)
@@ -229,11 +241,19 @@ def epa_dashboard(request):
     # ============================================
     
     stats = {
+        # Product counts
         'total_products': total_products,
-        'total_unit_items': total_unit_items,  # ✅ ADDED
         'electronics': electronics_count,
         'phones': phones_count,
         'accessories': accessories_count,
+        
+        # Unit counts (individual IMEI/Serial numbers)
+        'total_unit_items': total_unit_items,
+        
+        # Total stock (including accessory quantities)
+        'total_stock_items': total_stock_items,
+        
+        # Sales stats
         'total_sales': total_sales,
         'total_revenue': total_revenue,
         'today_sales': today_count,
@@ -243,6 +263,7 @@ def epa_dashboard(request):
         'month_sales': month_count,
         'month_revenue': month_revenue,
         'low_stock': len(low_stock_products),
+        
         # Agent-specific stats
         'agent_units': agent_units_count,
         'agent_available': agent_available_units,
@@ -269,6 +290,7 @@ def epa_dashboard(request):
         'user_role': user.role,
         'user_branch': user_branch,
         'is_super_admin': user.role == 'super_admin',
+        'today': today,
         'page_title': f'EPA Dashboard - {company.name}' if is_viewing_company else 'EPA Dashboard',
         'page_subtitle': f'Welcome back, {user.get_full_name() or user.username}!',
     }
