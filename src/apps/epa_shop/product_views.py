@@ -1870,11 +1870,9 @@ def product_edit(request, product_code):
     
     # Determine category for the form
     if product_type == 'Phone':
-        # Check if it's a feature phone or smartphone using the new phone_type field
         if hasattr(product, 'phone_type') and product.phone_type == 'feature':
             category_value = 'feature_phone'
         else:
-            # Fallback: Detect by RAM/ROM values
             ram_empty = not product.ram or product.ram == 'N/A' or product.ram == ''
             rom_empty = not product.storage_capacity or product.storage_capacity == 'N/A' or product.storage_capacity == ''
             if ram_empty and rom_empty:
@@ -1905,7 +1903,7 @@ def product_edit(request, product_code):
             battery_capacity = request.POST.get('battery_capacity', '').strip()
             condition = request.POST.get('condition', 'new')
             
-            # Feature phone specific fields - FIXED: Get these from POST
+            # Feature phone specific fields
             network_type = request.POST.get('network_type', '').strip()
             memory_card = request.POST.get('memory_card', 'no')
             features = request.POST.get('features', '').strip()
@@ -2069,7 +2067,7 @@ def product_edit(request, product_code):
                 product.battery_capacity = battery_capacity or ''
                 product.condition = condition
                 
-                # FIXED: Save feature phone specific fields
+                # Save feature phone specific fields
                 if category_type == 'feature_phone':
                     product.phone_type = 'feature'
                     product.network_type = network_type if network_type else None
@@ -2083,7 +2081,10 @@ def product_edit(request, product_code):
                 
                 product.save()
                 
-                # Update units                units_data = request.POST.get('units', '[]')
+                # ============================================
+                # FIXED: Update units - Properly indented
+                # ============================================
+                units_data = request.POST.get('units', '[]')
                 try:
                     new_units = json.loads(units_data)
                 except:
@@ -2223,7 +2224,6 @@ def product_edit(request, product_code):
         'is_edit': True,
         'page_title': f'Edit {product.name}',
         'page_subtitle': f'Code: {product.product_code}',
-        # Pass feature phone data to template for pre-population
         'form_data': {
             'network_type': getattr(product, 'network_type', ''),
             'features': getattr(product, 'features', ''),
@@ -2232,7 +2232,6 @@ def product_edit(request, product_code):
         }
     }
     return render(request, 'epa/product_form.html', context)
-
 
 # ============================================
 # PRODUCT DELETE - Using Product Code
