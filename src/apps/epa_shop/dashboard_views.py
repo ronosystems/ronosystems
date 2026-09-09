@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.db.models import Sum, Count, F, Q
 from django.utils import timezone
 from datetime import timedelta
-from .models import Electronic, Phone, Accessory, Sale, Unit, SaleItem
+from .models import Electronic, Phone, Accessory, Sale, Unit, SaleItem, Owner
 from apps.companies.models import Company
 
 
@@ -93,6 +93,23 @@ def epa_dashboard(request):
     total_products = electronics_count + phones_count + accessories_count
     
     # ============================================
+    # Unit counts (all units in the company) - FIXED
+    # ============================================
+    
+    # Get total units across all products
+    total_units = Unit.objects.filter(
+        Q(phone__company=company) | Q(electronic__company=company)
+    )
+    
+    # Filter by branch for non-admins
+    if not is_admin and user_branch:
+        total_units = total_units.filter(
+            Q(phone__branch=user_branch) | Q(electronic__branch=user_branch)
+        )
+    
+    total_unit_items = total_units.count()
+    
+    # ============================================
     # Sales data (filtered by branch/agent)
     # ============================================
     
@@ -176,7 +193,6 @@ def epa_dashboard(request):
     # ============================================
     
     if user.role == 'company_agent' and not is_viewing_company:
-        from .models import Owner
         owner = Owner.objects.filter(company=company, phone=user.phone).first()
         if owner:
             agent_units = Unit.objects.filter(owner=owner)
@@ -214,6 +230,7 @@ def epa_dashboard(request):
     
     stats = {
         'total_products': total_products,
+        'total_unit_items': total_unit_items,  # ✅ ADDED
         'electronics': electronics_count,
         'phones': phones_count,
         'accessories': accessories_count,
@@ -222,9 +239,9 @@ def epa_dashboard(request):
         'today_sales': today_count,
         'today_revenue': today_revenue,
         'week_sales': week_count,
-        'week_revenue': week_revenue,  # Added
+        'week_revenue': week_revenue,
         'month_sales': month_count,
-        'month_revenue': month_revenue,  # Added
+        'month_revenue': month_revenue,
         'low_stock': len(low_stock_products),
         # Agent-specific stats
         'agent_units': agent_units_count,
