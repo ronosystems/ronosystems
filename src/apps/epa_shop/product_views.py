@@ -1686,6 +1686,7 @@ def product_create(request):
                     condition=condition,
                     purchase_price=purchase_price,
                     selling_price=selling_price,
+                    best_price=best_price,
                     quantity_in_stock=len(units),
                     image=image,
                     owner=owner,
@@ -1726,6 +1727,7 @@ def product_create(request):
                     color=color or '',
                     purchase_price=purchase_price,
                     selling_price=selling_price,
+                    best_price=best_price,
                     quantity_in_stock=len(units),
                     image=image,
                     owner=owner
@@ -1754,6 +1756,7 @@ def product_create(request):
                     compatible_phone_models=barcode or '',
                     purchase_price=purchase_price,
                     selling_price=selling_price,
+                    best_price=best_price,
                     quantity_in_stock=quantity,
                     image=image,
                     owner=owner

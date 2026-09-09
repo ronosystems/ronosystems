@@ -47,6 +47,8 @@
         font-size: 40px;
         font-weight: 700;
         color: #036a77;
+        overflow: hidden;
+        flex-shrink: 0;
     }
     
     .company-logo img {
@@ -440,6 +442,17 @@
         margin-bottom: 10px;
     }
     
+    .etr-receipt .etr-header .etr-logo {
+        max-width: 80px;
+        max-height: 80px;
+        margin-bottom: 8px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    
     .etr-receipt .etr-header .etr-company {
         font-size: 16px;
         font-weight: 700;
@@ -824,7 +837,11 @@
             <div class="company-section">
                 <div class="company-logo">
                     {% if sale.company.logo %}
-                        <img src="{{ sale.company.logo.url }}" alt="Logo">
+                        <img src="{{ sale.company.logo.url }}" alt="{{ sale.company.name }}">
+                    {% elif user.company.logo %}
+                        <img src="{{ user.company.logo.url }}" alt="{{ user.company.name }}">
+                    {% elif site_logo_url %}
+                        <img src="{{ site_logo_url }}" alt="{{ system_name }}">
                     {% else %}
                         {{ sale.company.name|slice:":2"|upper }}
                     {% endif %}
@@ -1171,6 +1188,16 @@ function printETRReceipt() {
                         padding-bottom: 12px;
                         margin-bottom: 10px;
                     }
+                    .etr-receipt .etr-header .etr-logo {
+                        max-width: 80px;
+                        max-height: 80px;
+                        margin-bottom: 8px;
+                        border: 2px solid #000000;
+                        border-radius: 4px;
+                        display: block;
+                        margin-left: auto;
+                        margin-right: auto;
+                    }
                     .etr-receipt .etr-header .etr-company {
                         font-size: 16px;
                         font-weight: 700;
@@ -1363,6 +1390,14 @@ function renderETRReceipt() {
         branch: "{{ sale.branch.name|default:'N/A' }}",
         unit_identifier: "{% for item in items %}{% if item.unit %}{{ item.unit.identifier }}{% endif %}{% endfor %}",
         unit_type: "{% for item in items %}{% if item.unit %}{{ item.unit.unit_type }}{% endif %}{% endfor %}",
+        company_name: "{{ sale.company.name }}",
+        company_address: "{{ sale.company.address }}",
+        company_phone: "{{ sale.company.phone }}",
+        company_email: "{{ sale.company.email }}",
+        company_pin: "{{ sale.company.pin|default:'N/A' }}",
+        company_logo_url: "{% if sale.company.logo %}{{ sale.company.logo.url }}{% elif user.company.logo %}{{ user.company.logo.url }}{% elif site_logo_url %}{{ site_logo_url }}{% else %}{% endif %}",
+        etr_serial: "{{ sale.company.etr_serial|default:'N/A' }}",
+        receipt_footer: "{{ sale.company.receipt_footer|default:'Thank you for your business!' }}",
         items: [
             {% for item in items %}
             {
@@ -1378,14 +1413,7 @@ function renderETRReceipt() {
         subtotal: {{ sale.total_amount }},
         discount: {{ sale.discount|default:0 }},
         tax: {{ sale.tax|default:0 }},
-        grand_total: {{ sale.net_amount }},
-        company_name: "{{ sale.company.name }}",
-        company_address: "{{ sale.company.address }}",
-        company_phone: "{{ sale.company.phone }}",
-        company_email: "{{ sale.company.email }}",
-        company_pin: "{{ sale.company.pin|default:'N/A' }}",
-        etr_serial: "{{ sale.company.etr_serial|default:'N/A' }}",
-        receipt_footer: "{{ sale.company.receipt_footer|default:'Thank you for your business!' }}"
+        grand_total: {{ sale.net_amount }}
     };
 
     let itemsHTML = '';
@@ -1410,9 +1438,18 @@ function renderETRReceipt() {
         `;
     });
 
+    // Logo HTML
+    let logoHTML = '';
+    if (saleData.company_logo_url) {
+        logoHTML = `<img src="${saleData.company_logo_url}" alt="${saleData.company_name}" class="etr-logo">`;
+    } else {
+        logoHTML = `<div style="font-size: 2rem; margin-bottom: 8px;"><i class="fas fa-rocket" style="color: #036a77;"></i></div>`;
+    }
+
     const html = `
         <!-- Header -->
         <div class="etr-header">
+            ${logoHTML}
             <div class="etr-company">${saleData.company_name}</div>
             <div class="etr-details">${saleData.company_address}</div>
             <div class="etr-details">Tel: ${saleData.company_phone} | Email: ${saleData.company_email}</div>

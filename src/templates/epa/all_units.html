@@ -359,7 +359,7 @@
         {% if is_agent %}
         <div class="agent-notice">
             <i class="fas fa-info-circle"></i>
-            <strong>My Stock:</strong>.
+            <strong>My Stock:</strong> Showing only available units assigned to you.
         </div>
         {% endif %}
 
@@ -465,21 +465,21 @@
                                                 <i class="fas fa-shopping-cart"></i> Sell
                                             </a>
 
-                                            <!-- Edit - Only Admins/Managers -->
+                                            <!-- Edit - Admins/Managers/Cashiers -->
                                             {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' or user.role == 'company_cashier' %}
                                             <a href="/epa_shop/unit/{{ unit.id }}/edit/?next={{ request.path }}" class="unit-action-btn btn-edit" title="Edit Unit">
                                                 <i class="fas fa-edit"></i> Edit
                                             </a>
                                             {% endif %}
 
-                                            <!-- Transfer - Only Admins/Managers -->
+                                            <!-- Transfer - Admins/Managers only -->
                                             {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' %}
                                             <a href="/epa_shop/unit/{{ unit.id }}/transfer/?next={{ request.path }}" class="unit-action-btn btn-transfer" title="Transfer Ownership">
                                                 <i class="fas fa-exchange-alt"></i> Transfer
                                             </a>
                                             {% endif %}
 
-                                            <!-- Delete - Only Admins/Managers -->
+                                            <!-- Delete - Admins/Managers only -->
                                             {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' %}
                                             <a href="/epa_shop/products/{{ product.product_code }}/unit/{{ unit.identifier }}/delete/"
                                                class="unit-action-btn btn-delete" 
@@ -493,33 +493,35 @@
                                             <!-- Sold: Edit Sale, Receipt, Reverse, Delete -->
                                             {% with sale_item=unit.sale_items.first %}
                                                 {% if sale_item and sale_item.sale %}
+                                                    {% with sale=sale_item.sale %}
 
-                                                    <!-- Edit Sale Button - Only Admins/Managers -->
-                                                    {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' %}
-                                                    <a href="/epa_shop/sales/{{ sale_item.sale.id }}/edit/" class="unit-action-btn btn-edit-sale" title="Edit Sale">
-                                                        <i class="fas fa-edit"></i> Edit
-                                                    </a>
-                                                    {% endif %}
+                                                        <!-- Edit Sale Button - Admins/Managers only -->
+                                                        {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' %}
+                                                        <a href="/epa_shop/sales/{{ sale.id }}/edit/" class="unit-action-btn btn-edit-sale" title="Edit Sale">
+                                                            <i class="fas fa-edit"></i> Edit Sale
+                                                        </a>
+                                                        {% endif %}
 
-                                                    <!-- Receipt Button - All roles -->
-                                                    <a href="/epa_shop/sale/receipt/{{ sale_item.sale.id }}/" class="unit-action-btn btn-receipt" title="View Receipt" target="_blank">
-                                                        <i class="fas fa-receipt"></i> Receipt
-                                                    </a>
+                                                        <!-- Receipt Button - All roles -->
+                                                        <a href="/epa_shop/sale/receipt/{{ sale.id }}/" class="unit-action-btn btn-receipt" title="View Receipt">
+                                                            <i class="fas fa-receipt"></i> Receipt
+                                                        </a>
 
-                                                    <!-- Reverse Button - Only Admins/Managers -->
-                                                    {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' %}
-                                                    <a href="/epa_shop/sale/{{ sale_item.sale.id }}/reverse/?next={{ request.path }}" class="unit-action-btn btn-reverse" title="Reverse Sale (Return to Available)" 
-                                                       onclick="return confirm('Are you sure you want to reverse this sale? This will return the unit to inventory.')">
-                                                        <i class="fas fa-undo"></i> Reverse
-                                                    </a>
-                                                    {% endif %}
+                                                        <!-- Reverse Button - Admins/Managers only -->
+                                                        {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' %}
+                                                        <a href="/epa_shop/sale/{{ sale.id }}/reverse/?next={{ request.path }}" class="unit-action-btn btn-reverse" title="Reverse Sale (Return to Available)" 
+                                                           onclick="return confirm('Are you sure you want to reverse this sale? This will return the unit to inventory.')">
+                                                            <i class="fas fa-undo"></i> Reverse
+                                                        </a>
+                                                        {% endif %}
 
+                                                    {% endwith %}
                                                 {% else %}
                                                     <span class="no-sale-record">No sale record</span>
                                                 {% endif %}
                                             {% endwith %}
                                             
-                                            <!-- Delete Unit Button - Only Admins/Managers -->
+                                            <!-- Delete Unit - Admins/Managers only -->
                                             {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' %}
                                             <a href="/epa_shop/products/{{ product.product_code }}/unit/{{ unit.identifier }}/delete/"
                                                class="unit-action-btn btn-delete" 
@@ -530,13 +532,15 @@
                                             {% endif %}
                                             
                                         {% else %}
-                                            <!-- Other statuses: Edit, Delete -->
+                                            <!-- Other statuses (Reserved, Repair): Edit, Delete -->
+                                            <!-- Edit - Admins/Managers/Cashiers -->
                                             {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' or user.role == 'company_cashier' %}
                                             <a href="/epa_shop/unit/{{ unit.id }}/edit/?next={{ request.path }}" class="unit-action-btn btn-edit" title="Edit Unit">
                                                 <i class="fas fa-edit"></i> Edit
                                             </a>
                                             {% endif %}
 
+                                            <!-- Delete - Admins/Managers only -->
                                             {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' %}
                                             <a href="/epa_shop/products/{{ product.product_code }}/unit/{{ unit.identifier }}/delete/"
                                                class="unit-action-btn btn-delete" 
@@ -581,7 +585,7 @@
                     {% endif %}
                 </small>
                 <span class="float-end">
-                    <a href="/epa_shop/inventory/" class="btn btn-sm btn-outline-secondary" style="border: 1px solid #000000;">
+                    <a href="/epa_shop/products/{{ product.product_code }}/" class="btn btn-sm btn-outline-secondary" style="border: 1px solid #000000;">
                         <i class="fas fa-arrow-left"></i> Back to Product
                     </a>
                 </span>

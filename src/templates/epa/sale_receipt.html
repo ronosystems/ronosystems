@@ -33,6 +33,17 @@
         margin-bottom: 10px;
     }
     
+    .etr-receipt .etr-header .etr-logo {
+        max-width: 80px;
+        max-height: 80px;
+        margin-bottom: 8px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    
     .etr-receipt .etr-header .etr-company {
         font-size: 16px;
         font-weight: 700;
@@ -474,8 +485,21 @@
     <div class="receipt-container">
         <div class="etr-receipt">
             
-            <!-- Header -->
+            <!-- Header with Logo -->
             <div class="etr-header">
+                <!-- Company Logo -->
+                {% if sale.company.logo %}
+                    <img src="{{ sale.company.logo.url }}" alt="{{ sale.company.name }}" class="etr-logo">
+                {% elif user.company.logo %}
+                    <img src="{{ user.company.logo.url }}" alt="{{ user.company.name }}" class="etr-logo">
+                {% elif site_logo_url %}
+                    <img src="{{ site_logo_url }}" alt="{{ system_name }}" class="etr-logo">
+                {% else %}
+                    <div style="font-size: 2rem; margin-bottom: 8px;">
+                        <i class="fas fa-rocket" style="color: #036a77;"></i>
+                    </div>
+                {% endif %}
+                
                 <div class="etr-company">{{ sale.company.name }}</div>
                 <div class="etr-details">{{ sale.company.address }}</div>
                 <div class="etr-details">Tel: {{ sale.company.phone }} | Email: {{ sale.company.email }}</div>
@@ -591,17 +615,24 @@
     <!-- ACTION BUTTONS -->
     <!-- ============================================ -->
     <div class="action-buttons">
-        <!-- New Sale Button - Only for users with AGENT access -->
+        <!-- New Sale Button - Agents -->
         {% if user.role == 'company_agent' %}
-       <a href="/epa_shop/sales/single/" class="btn btn-success">
+        <a href="/epa_shop/sales/single/" class="btn btn-success">
             <i class="fas fa-plus-circle"></i> New Sale
         </a>
         {% endif %}
 
-        <!-- New Sale Button - Only for users with CASHIER access -->
+        <!-- New Sale Button - Cashiers -->
         {% if user.role == 'company_cashier' %}
         <a href="/epa_shop/pos/" class="btn btn-success">
             <i class="fas fa-plus-circle"></i> New Sale
+        </a>
+        {% endif %}
+
+        <!-- Back to Sales Button - Admins/Managers -->
+        {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' %}
+        <a href="/epa_shop/sales/" class="btn btn-back">
+            <i class="fas fa-arrow-left"></i> Back to Sales
         </a>
         {% endif %}
         

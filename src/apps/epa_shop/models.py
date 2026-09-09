@@ -283,12 +283,12 @@ class Phone(BaseProduct):
     # Pricing
     purchase_price = models.DecimalField(max_digits=10, decimal_places=2)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
-    best_price = models.DecimalField(max_digits=10, decimal_places=2)
+    best_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     
     # Stock
     quantity_in_stock = models.IntegerField(default=0)
-    minimum_stock_level = models.IntegerField(default=3)
-    maximum_stock_level = models.IntegerField(default=30, null=True, blank=True)
+    minimum_stock_level = models.IntegerField(default=2, blank=True, null=True)
+    maximum_stock_level = models.IntegerField(default=100, null=True, blank=True)
     
     # Images
     image = models.ImageField(upload_to='epa/phones/%Y/%m/', blank=True, null=True)
@@ -398,12 +398,12 @@ class Electronic(BaseProduct):
     # Pricing
     purchase_price = models.DecimalField(max_digits=10, decimal_places=2)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
-    best_price = models.DecimalField(max_digits=10, decimal_places=2)
+    best_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     
     # Stock
     quantity_in_stock = models.IntegerField(default=0)
-    minimum_stock_level = models.IntegerField(default=5)
-    maximum_stock_level = models.IntegerField(default=50, null=True, blank=True)
+    minimum_stock_level = models.IntegerField(default=2)
+    maximum_stock_level = models.IntegerField(default=100, null=True, blank=True)
     
     # Images
     image = models.ImageField(upload_to='epa/electronics/%Y/%m/', blank=True, null=True)
@@ -483,7 +483,7 @@ class Accessory(BaseProduct):
     # Pricing
     purchase_price = models.DecimalField(max_digits=10, decimal_places=2)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
-    best_price = models.DecimalField(max_digits=10, decimal_places=2)
+    best_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     
     # Stock
     quantity_in_stock = models.IntegerField(default=0)
