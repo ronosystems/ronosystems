@@ -1085,75 +1085,93 @@ function changePerPage(value) {
     window.location.href = currentUrl.toString();
 }
 
+
+// Search and Filter functionality
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('searchInput');
     const categoryFilter = document.getElementById('categoryFilter');
     let searchTimeout;
-    
-    // Client-side filter that doesn't reload the page
-    function filterTableRows() {
-        const search = searchInput.value.toLowerCase().trim();
-        const category = categoryFilter.value.toLowerCase();
-        const rows = document.querySelectorAll('#productTable tbody tr[data-id]');
-        
-        rows.forEach(row => {
-            const name = (row.dataset.name || '').toLowerCase();
-            const sku = (row.dataset.sku || '').toLowerCase();
-            const brand = (row.dataset.brand || '').toLowerCase();
-            const model = (row.dataset.model || '').toLowerCase();
-            const rowCategory = (row.dataset.category || '').toLowerCase();
-            
-            const matchesSearch = !search || 
-                name.includes(search) || 
-                sku.includes(search) || 
-                brand.includes(search) || 
-                model.includes(search);
-            
-            let matchesCategory = true;
-            if (category) {
-                if (category === 'phone') {
-                    matchesCategory = rowCategory === 'smartphone' || rowCategory === 'feature phone';
-                } else {
-                    matchesCategory = rowCategory === category;
-                }
-            }
-            
-            row.style.display = (matchesSearch && matchesCategory) ? '' : 'none';
-        });
+
+    // ============================================
+    // RESTORE FOCUS AFTER PAGE RELOAD
+    // ============================================
+    const focusField = sessionStorage.getItem('focusField');
+    if (focusField === 'searchInput' && searchInput && searchInput.value) {
+        searchInput.focus();
+        const len = searchInput.value.length;
+        searchInput.setSelectionRange(len, len);
     }
-    
+    sessionStorage.removeItem('focusField');
+
+    // ============================================
+    // APPLY FILTERS (server-side, via URL params)
+    // ============================================
+    function applyFilters() {
+        // Remember which field had focus before navigating
+        if (document.activeElement === searchInput) {
+            sessionStorage.setItem('focusField', 'searchInput');
+        }
+
+        const search = searchInput.value;
+        const category = categoryFilter.value;
+        const currentUrl = new URL(window.location.href);
+
+        if (search) {
+            currentUrl.searchParams.set('search', search);
+        } else {
+            currentUrl.searchParams.delete('search');
+        }
+
+        if (category) {
+            currentUrl.searchParams.set('category', category);
+        } else {
+            currentUrl.searchParams.delete('category');
+        }
+
+        // Always reset to page 1 when filters change
+        currentUrl.searchParams.set('page', 1);
+        window.location.href = currentUrl.toString();
+    }
+
+    // Debounced search input
     if (searchInput) {
         searchInput.addEventListener('input', function() {
             clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                filterTableRows();
-                // Update URL without reloading (for shareable links)
-                const url = new URL(window.location.href);
-                if (searchInput.value) {
-                    url.searchParams.set('search', searchInput.value);
-                } else {
-                    url.searchParams.delete('search');
-                }
-                url.searchParams.set('page', 1);
-                history.replaceState(null, '', url.toString());
-            }, 300);
+            searchTimeout = setTimeout(applyFilters, 600);
+        });
+
+        // Immediate search on Enter key
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                clearTimeout(searchTimeout);
+                applyFilters();
+            }
         });
     }
-    
+
+    // Category filter — apply immediately
     if (categoryFilter) {
-        categoryFilter.addEventListener('change', function() {
-            filterTableRows();
-            const url = new URL(window.location.href);
-            if (categoryFilter.value) {
-                url.searchParams.set('category', categoryFilter.value);
-            } else {
-                url.searchParams.delete('category');
-            }
-            url.searchParams.set('page', 1);
-            history.replaceState(null, '', url.toString());
-        });
+        categoryFilter.addEventListener('change', applyFilters);
+    }
+
+    // ============================================
+    // INITIALIZE SORTING
+    // ============================================
+    const table = document.getElementById('productTable');
+    if (table) {
+        sortState.column = 'name';
+        sortState.direction = 'asc';
+        const nameHeader = table.querySelector('[data-sort="name"]');
+        if (nameHeader) {
+            nameHeader.classList.add('active', 'asc');
+            const icon = nameHeader.querySelector('.sort-icon');
+            if (icon) icon.textContent = '▲';
+        }
+        sortTable('name');
     }
 });
+
+
 
 // Keyboard shortcut: Escape to close modal
 document.addEventListener('keydown', function(e) {
