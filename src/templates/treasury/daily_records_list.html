@@ -392,10 +392,10 @@
         .row.g-3 {
             gap: 8px;
         }
-        .col-md-2, .col-md-4 {
+        .col-md-2, .col-md-3, .col-md-4 {
             padding: 0 5px;
         }
-        .form-control {
+        .form-control, .form-select {
             font-size: 12px;
             padding: 4px 8px;
         }
@@ -475,7 +475,7 @@
         .card-body {
             padding: 10px;
         }
-        .form-control {
+        .form-control, .form-select {
             font-size: 11px;
             padding: 3px 6px;
         }
@@ -493,7 +493,7 @@
         .table-excel tfoot td {
             font-size: 9px;
         }
-        .col-md-2, .col-md-4 {
+        .col-md-2, .col-md-3, .col-md-4 {
             padding: 0 3px;
         }
         .row.g-3 {
@@ -574,15 +574,30 @@
             <div class="card">
                 <div class="card-body">
                     <form method="get" class="row g-3">
-                        <div class="col-md-4">
+                        {% if is_admin %}
+                        <div class="col-md-3">
+                            <label for="branch_selector" class="form-label">Branch</label>
+                            <select class="form-select" id="branch_selector"
+                                    onchange="if(this.value) window.location.href=this.options[this.selectedIndex].getAttribute('data-url')">
+                                {% for b in all_branches %}
+                                    <option value="{{ b.id }}"
+                                            data-url="{% url 'treasury:daily_records_list' company.id b.id %}"
+                                            {% if b.id == branch.id %}selected{% endif %}>
+                                        {{ b.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
+                        <div class="col-md-3">
                             <label for="date_from" class="form-label">Date From</label>
                             <input type="date" class="form-control" id="date_from" name="date_from" value="{{ date_from|default:'' }}">
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label for="date_to" class="form-label">Date To</label>
                             <input type="date" class="form-control" id="date_to" name="date_to" value="{{ date_to|default:'' }}">
                         </div>
-                        <div class="col-md-4 d-flex align-items-end">
+                        <div class="col-md-3 d-flex align-items-end">
                             <button type="submit" class="btn btn-primary me-2">
                                 <i class="fas fa-search"></i> Filter
                             </button>
@@ -620,9 +635,9 @@
                                     <th style="width: 13%;" class="text-right">Bank</th>
                                     <th style="width: 13%;" class="text-right">M-Pesa</th>
                                     <th style="width: 13%;" class="text-right">Cash</th>
-                                    <th style="width: 13%;" class="text-right">Credit</th>
-                                    <th style="width: 13%;" class="text-right">Net Balance</th>
-                                    <th style="width: 13%;">Notes</th>
+                                    <th style="width: 14%;" class="text-right">Net Balance</th>
+                                    <th style="width: 15%;">Submitted By</th>
+                                    <th style="width: 10%;">Notes</th>
                                     <th style="width: 10%;" class="text-center">Actions</th>
                                 </tr>
                             </thead>
@@ -637,11 +652,17 @@
                                     <td class="text-right" style="color: #000000;">KES {{ record.total_bank_balance|floatformat:2 }}</td>
                                     <td class="text-right" style="color: #155724;">KES {{ record.total_mpesa_balance|floatformat:2 }}</td>
                                     <td class="text-right" style="color: #856404;">KES {{ record.cash_balance|floatformat:2 }}</td>
-                                    <td class="text-right" style="color: #721c24;">KES {{ record.credit_balance|floatformat:2 }}</td>
                                     <td class="text-right">
                                         <span class="badge bg-dark">
                                             KES {{ record.net_balance|floatformat:2 }}
                                         </span>
+                                    </td>
+                                    <td>
+                                        {% if record.created_by %}
+                                            <strong>{{ record.created_by.get_full_name|default:record.created_by.username }}</strong>
+                                        {% else %}
+                                            <span style="color: #000000;">-</span>
+                                        {% endif %}
                                     </td>
                                     <td>{{ record.notes|default:"-"|truncatechars:30 }}</td>
                                     <td class="text-center">
@@ -682,9 +703,8 @@
                                     <td class="text-right" style="color: #000000;"><strong>KES {{ total_bank|floatformat:2 }}</strong></td>
                                     <td class="text-right" style="color: #155724;"><strong>KES {{ total_mpesa|floatformat:2 }}</strong></td>
                                     <td class="text-right" style="color: #856404;"><strong>KES {{ total_cash|floatformat:2 }}</strong></td>
-                                    <td class="text-right" style="color: #721c24;"><strong>KES {{ total_credit|floatformat:2 }}</strong></td>
                                     <td class="text-right" style="color: #004085;"><strong>KES {{ total_net|floatformat:2 }}</strong></td>
-                                    <td colspan="2"></td>
+                                    <td colspan="3"></td>
                                 </tr>
                             </tfoot>
                         </table>
@@ -733,9 +753,14 @@
 
     <!-- Back to Branch -->
     <div class="row mt-3">
-        <div class="col-12">
+        <div class="col-10">
+            <a href="{% url 'treasury:dashboard' company.id %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Branch Home
+            </a>
+        </div>
+        <div class="col-2">
             <a href="{% url 'treasury:branch_treasury' company.id branch.id %}" class="btn btn-secondary">
-                <i class="fas fa-arrow-left"></i> Branch Dashboard
+                <i class="fas fa-arrow-left"></i> Branch Detail
             </a>
         </div>
     </div>

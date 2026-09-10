@@ -364,10 +364,10 @@
         .row.g-3 {
             gap: 8px;
         }
-        .col-md-2 {
+        .col-md-2, .col-md-3 {
             padding: 0 5px;
         }
-        .form-control {
+        .form-control, .form-select {
             font-size: 12px;
             padding: 4px 8px;
         }
@@ -439,7 +439,7 @@
         .card-body {
             padding: 10px;
         }
-        .form-control {
+        .form-control, .form-select {
             font-size: 11px;
             padding: 3px 6px;
         }
@@ -457,7 +457,7 @@
         .table-excel tfoot td {
             font-size: 9px;
         }
-        .col-md-2 {
+        .col-md-2, .col-md-3 {
             padding: 0 3px;
         }
         .row.g-3 {
@@ -479,6 +479,9 @@
                 <div class="card-body">
                     <h6 class="card-title">Total Movements</h6>
                     <h3 class="mb-0">{{ movements.paginator.count }}</h3>
+                    {% if latest_record %}
+                        <small style="color: #080000;">as of {{ latest_record.date|date:"Y-m-d" }}</small>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -487,6 +490,9 @@
                 <div class="card-body">
                     <h6 class="card-title">Total BOOST</h6>
                     <h3 class="mb-0">KES {{ total_boost|floatformat:2 }}</h3>
+                    {% if latest_record %}
+                        <small style="color: #16fd02;">as of {{ latest_record.date|date:"Y-m-d" }}</small>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -495,6 +501,9 @@
                 <div class="card-body">
                     <h6 class="card-title">Total Transfers</h6>
                     <h3 class="mb-0">KES {{ total_transfers|floatformat:2 }}</h3>
+                    {% if latest_record %}
+                        <small style="color: #3204ff;">as of {{ latest_record.date|date:"Y-m-d" }}</small>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -502,7 +511,10 @@
             <div class="card stat-card bg-dark">
                 <div class="card-body">
                     <h6 class="card-title">Net Balance</h6>
-                    <h3 class="mb-0">KES {{ treasury.net_balance|floatformat:2 }}</h3>
+                    <h3 class="mb-0">KES {{ total_net|floatformat:2 }}</h3>
+                    {% if latest_record %}
+                        <small style="color: #ffffff;">as of {{ latest_record.date|date:"Y-m-d" }}</small>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -514,6 +526,21 @@
             <div class="card">
                 <div class="card-body">
                     <form method="get" class="row g-3">
+                        {% if is_admin %}
+                        <div class="col-md-2">
+                            <label for="branch_selector" class="form-label">Branch</label>
+                            <select class="form-select" id="branch_selector"
+                                    onchange="if(this.value) window.location.href=this.options[this.selectedIndex].getAttribute('data-url')">
+                                {% for b in all_branches %}
+                                    <option value="{{ b.id }}"
+                                            data-url="{% url 'treasury:movements_list' company.id b.id %}"
+                                            {% if b.id == branch.id %}selected{% endif %}>
+                                        {{ b.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
                         <div class="col-md-2">
                             <label for="movement_type" class="form-label">Movement Type</label>
                             <select class="form-control" id="movement_type" name="movement_type">
@@ -559,7 +586,7 @@
                             <label for="date_to" class="form-label">Date To</label>
                             <input type="date" class="form-control" id="date_to" name="date_to" value="{{ date_to|default:'' }}">
                         </div>
-                        <div class="col-md-2 d-flex align-items-end">
+                        <div class="col-md-{% if is_admin %}4{% else %}6{% endif %} d-flex align-items-end">
                             <button type="submit" class="btn btn-primary me-2">
                                 <i class="fas fa-search"></i> Filter
                             </button>
@@ -656,7 +683,7 @@
                                         <h5 style="color: #000000;">No movements found</h5>
                                         <p style="color: #000000;">Start by creating your first movement.</p>
                                         <a href="{% url 'treasury:movement_create' company.id branch.id %}" class="btn btn-success">
-                                            <i class="fas fa-plus"></i> Create Movement
+                                            <i class="fas fa-plus"></i> New
                                         </a>
                                     </td>
                                 </tr>

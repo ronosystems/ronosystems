@@ -113,15 +113,6 @@
         color: #856404 !important;
     }
     
-    .card-header.bg-danger {
-        background: #f8d7da !important;
-        color: #721c24 !important;
-    }
-    
-    .card-header.bg-danger h5 {
-        color: #721c24 !important;
-    }
-    
     .card-header.bg-dark {
         background: #2d3436 !important;
         color: #ffffff !important;
@@ -149,10 +140,6 @@
     }
     
     .card.border-warning {
-        border-color: #000000 !important;
-    }
-    
-    .card.border-danger {
         border-color: #000000 !important;
     }
     
@@ -525,6 +512,9 @@
                     <form method="post" id="dailyRecordForm">
                         {% csrf_token %}
                         
+                        <!-- Hidden credit field: kept at 0 since credit is no longer tracked -->
+                        <input type="hidden" name="credit_balance" id="credit_balance" value="0">
+                        
                         <!-- Branch Selection (Only for Admins) -->
                         {% if is_admin %}
                         <div class="row mb-4">
@@ -624,28 +614,53 @@
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {% for bank in bank_accounts %}
-                                                        <tr>
-                                                            <td>{{ forloop.counter }}</td>
-                                                            <td>
-                                                                <strong>{{ bank.account_name }}</strong>
-                                                                <br>
-                                                                <small style="color: #000000;">{{ bank.get_bank_type_display }}</small>
-                                                            </td>
-                                                            <td>{{ bank.account_number }}</td>
-                                                            <td>
-                                                                <input type="number" 
-                                                                       step="0.01" 
-                                                                       class="form-control bank-balance" 
-                                                                       id="bank_{{ bank.id }}" 
-                                                                       name="bank_{{ bank.id }}" 
-                                                                       value="{% if record %}{% for b in bank_balances %}{% if b.bank_account_id == bank.id %}{{ b.closing_balance|default:'0.00' }}{% endif %}{% endfor %}{% else %}{{ bank.current_balance|default:'0.00' }}{% endif %}"
-                                                                       placeholder="0.00"
-                                                                       data-bank-id="{{ bank.id }}"
-                                                                       required>
-                                                            </td>
-                                                        </tr>
-                                                        {% endfor %}
+                                                        {% if record %}
+                                                            {% for bank, balance in bank_account_rows %}
+                                                            <tr>
+                                                                <td>{{ forloop.counter }}</td>
+                                                                <td>
+                                                                    <strong>{{ bank.account_name }}</strong>
+                                                                    <br>
+                                                                    <small style="color: #000000;">{{ bank.get_bank_type_display }}</small>
+                                                                </td>
+                                                                <td>{{ bank.account_number }}</td>
+                                                                <td>
+                                                                    <input type="number" 
+                                                                           step="0.01" 
+                                                                           class="form-control bank-balance" 
+                                                                           id="bank_{{ bank.id }}" 
+                                                                           name="bank_{{ bank.id }}" 
+                                                                           value="{{ balance|default:'' }}"
+                                                                           placeholder="0.00"
+                                                                           data-bank-id="{{ bank.id }}"
+                                                                           required>
+                                                                </td>
+                                                            </tr>
+                                                            {% endfor %}
+                                                        {% else %}
+                                                            {% for bank in bank_accounts %}
+                                                            <tr>
+                                                                <td>{{ forloop.counter }}</td>
+                                                                <td>
+                                                                    <strong>{{ bank.account_name }}</strong>
+                                                                    <br>
+                                                                    <small style="color: #000000;">{{ bank.get_bank_type_display }}</small>
+                                                                </td>
+                                                                <td>{{ bank.account_number }}</td>
+                                                                <td>
+                                                                    <input type="number" 
+                                                                           step="0.01" 
+                                                                           class="form-control bank-balance" 
+                                                                           id="bank_{{ bank.id }}" 
+                                                                           name="bank_{{ bank.id }}" 
+                                                                           value=""
+                                                                           placeholder="0.00"
+                                                                           data-bank-id="{{ bank.id }}"
+                                                                           required>
+                                                                </td>
+                                                            </tr>
+                                                            {% endfor %}
+                                                        {% endif %}
                                                     </tbody>
                                                     <tfoot>
                                                         <tr>
@@ -694,28 +709,53 @@
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {% for mpesa in mpesa_accounts %}
-                                                        <tr>
-                                                            <td>{{ forloop.counter }}</td>
-                                                            <td>
-                                                                <strong>{{ mpesa.till_name }}</strong>
-                                                                <br>
-                                                                <small style="color: #000000;">{{ mpesa.store_number }}</small>
-                                                            </td>
-                                                            <td>{{ mpesa.till_number }}</td>
-                                                            <td>
-                                                                <input type="number" 
-                                                                       step="0.01" 
-                                                                       class="form-control mpesa-balance" 
-                                                                       id="mpesa_{{ mpesa.id }}" 
-                                                                       name="mpesa_{{ mpesa.id }}" 
-                                                                       value="{% if record %}{% for m in mpesa_balances %}{% if m.mpesa_account_id == mpesa.id %}{{ m.closing_balance|default:'0.00' }}{% endif %}{% endfor %}{% else %}{{ mpesa.current_balance|default:'0.00' }}{% endif %}"
-                                                                       placeholder="0.00"
-                                                                       data-mpesa-id="{{ mpesa.id }}"
-                                                                       required>
-                                                            </td>
-                                                        </tr>
-                                                        {% endfor %}
+                                                        {% if record %}
+                                                            {% for mpesa, balance in mpesa_account_rows %}
+                                                            <tr>
+                                                                <td>{{ forloop.counter }}</td>
+                                                                <td>
+                                                                    <strong>{{ mpesa.till_name }}</strong>
+                                                                    <br>
+                                                                    <small style="color: #000000;">{{ mpesa.store_number }}</small>
+                                                                </td>
+                                                                <td>{{ mpesa.till_number }}</td>
+                                                                <td>
+                                                                    <input type="number" 
+                                                                           step="0.01" 
+                                                                           class="form-control mpesa-balance" 
+                                                                           id="mpesa_{{ mpesa.id }}" 
+                                                                           name="mpesa_{{ mpesa.id }}" 
+                                                                           value="{{ balance|default:'' }}"
+                                                                           placeholder="0.00"
+                                                                           data-mpesa-id="{{ mpesa.id }}"
+                                                                           required>
+                                                                </td>
+                                                            </tr>
+                                                            {% endfor %}
+                                                        {% else %}
+                                                            {% for mpesa in mpesa_accounts %}
+                                                            <tr>
+                                                                <td>{{ forloop.counter }}</td>
+                                                                <td>
+                                                                    <strong>{{ mpesa.till_name }}</strong>
+                                                                    <br>
+                                                                    <small style="color: #000000;">{{ mpesa.store_number }}</small>
+                                                                </td>
+                                                                <td>{{ mpesa.till_number }}</td>
+                                                                <td>
+                                                                    <input type="number" 
+                                                                           step="0.01" 
+                                                                           class="form-control mpesa-balance" 
+                                                                           id="mpesa_{{ mpesa.id }}" 
+                                                                           name="mpesa_{{ mpesa.id }}" 
+                                                                           value=""
+                                                                           placeholder="0.00"
+                                                                           data-mpesa-id="{{ mpesa.id }}"
+                                                                           required>
+                                                                </td>
+                                                            </tr>
+                                                            {% endfor %}
+                                                        {% endif %}
                                                     </tbody>
                                                     <tfoot>
                                                         <tr>
@@ -744,7 +784,7 @@
 
                         <!-- Cash Section -->
                         <div class="row mb-4">
-                            <div class="col-md-6">
+                            <div class="col-md-12">
                                 <div class="card border-warning">
                                     <div class="card-header bg-warning text-dark">
                                         <h5 class="mb-0">
@@ -759,35 +799,10 @@
                                                    class="form-control form-control-lg" 
                                                    id="cash_balance" 
                                                    name="cash_balance" 
-                                                   value="{% if record %}{{ record.cash_balance|default:'0.00' }}{% else %}{{ treasury.cash_balance|default:'0.00' }}{% endif %}"
+                                                   value="{% if record %}{{ record.cash_balance|default:'' }}{% else %}{% endif %}"
                                                    placeholder="0.00"
                                                    required>
                                             <small class="text-muted">Enter the physical cash available in the shop</small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Credit Section -->
-                            <div class="col-md-6">
-                                <div class="card border-danger">
-                                    <div class="card-header bg-danger text-white">
-                                        <h5 class="mb-0">
-                                            <i class="fas fa-hand-holding-usd"></i> Credit Balance
-                                        </h5>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="form-group">
-                                            <label for="credit_balance" class="fw-bold">Credit / Loans (KES)</label>
-                                            <input type="number" 
-                                                   step="0.01" 
-                                                   class="form-control form-control-lg" 
-                                                   id="credit_balance" 
-                                                   name="credit_balance" 
-                                                   value="{% if record %}{{ record.credit_balance|default:'0.00' }}{% else %}{{ treasury.credit_balance|default:'0.00' }}{% endif %}"
-                                                   placeholder="0.00"
-                                                   required>
-                                            <small class="text-muted">Enter the total credit/loans balance</small>
                                         </div>
                                     </div>
                                 </div>
@@ -805,28 +820,22 @@
                                     </div>
                                     <div class="card-body">
                                         <div class="row text-center">
-                                            <div class="col-md-3">
+                                            <div class="col-md-4">
                                                 <div class="p-3 bg-light rounded">
                                                     <h6>Total Bank</h6>
                                                     <h4 class="text-primary" id="summaryBank">KES 0.00</h4>
                                                 </div>
                                             </div>
-                                            <div class="col-md-3">
+                                            <div class="col-md-4">
                                                 <div class="p-3 bg-light rounded">
                                                     <h6>Total M-Pesa</h6>
                                                     <h4 class="text-success" id="summaryMpesa">KES 0.00</h4>
                                                 </div>
                                             </div>
-                                            <div class="col-md-3">
+                                            <div class="col-md-4">
                                                 <div class="p-3 bg-light rounded">
-                                                    <h6>Cash</h6>
+                                                    <h6>Total Cash</h6>
                                                     <h4 class="text-warning" id="summaryCash">KES 0.00</h4>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-3">
-                                                <div class="p-3 bg-light rounded">
-                                                    <h6>Credit</h6>
-                                                    <h4 class="text-danger" id="summaryCredit">KES 0.00</h4>
                                                 </div>
                                             </div>
                                         </div>
@@ -835,7 +844,7 @@
                                                 <div class="p-3 bg-dark text-white rounded text-center" style="border: 2px solid #000000;">
                                                     <h5>Total Net Balance</h5>
                                                     <h2 id="summaryNet">KES 0.00</h2>
-                                                    <small>Bank + M-Pesa + Cash + Credit</small>
+                                                    <small>Bank + M-Pesa + Cash</small>
                                                 </div>
                                             </div>
                                         </div>
@@ -850,7 +859,7 @@
                                 <div class="d-flex justify-content-between">
                                     <div>
                                         <a href="{% url 'treasury:branch_treasury' company.id branch.id %}" class="btn btn-secondary">
-                                            <i class="fas fa-arrow-left"></i> Branch Records
+                                            <i class="fas fa-dollar"></i> Current Balances
                                         </a>
                                     </div>
                                     <div>
@@ -893,15 +902,13 @@
             document.getElementById('totalMpesaBalance').textContent = 'KES ' + mpesaTotal.toFixed(2);
             document.getElementById('summaryMpesa').textContent = 'KES ' + mpesaTotal.toFixed(2);
 
-            // Get cash and credit
+            // Get cash (credit is now always 0)
             let cash = parseFloat(document.getElementById('cash_balance').value) || 0;
-            let credit = parseFloat(document.getElementById('credit_balance').value) || 0;
 
             document.getElementById('summaryCash').textContent = 'KES ' + cash.toFixed(2);
-            document.getElementById('summaryCredit').textContent = 'KES ' + credit.toFixed(2);
 
-            // Calculate net total
-            let netTotal = bankTotal + mpesaTotal + cash + credit;
+            // Calculate net total (credit removed)
+            let netTotal = bankTotal + mpesaTotal + cash;
             document.getElementById('summaryNet').textContent = 'KES ' + netTotal.toFixed(2);
         }
 
@@ -911,7 +918,6 @@
         });
 
         document.getElementById('cash_balance').addEventListener('input', updateTotals);
-        document.getElementById('credit_balance').addEventListener('input', updateTotals);
 
         // Initial calculation
         updateTotals();
@@ -959,16 +965,6 @@
                 document.getElementById('cash_balance').classList.remove('is-invalid');
             }
 
-            // Check credit
-            let credit = parseFloat(document.getElementById('credit_balance').value);
-            if (isNaN(credit) || credit < 0) {
-                hasError = true;
-                document.getElementById('credit_balance').classList.add('is-invalid');
-                errorMessages.push('Please enter a valid credit balance');
-            } else {
-                document.getElementById('credit_balance').classList.remove('is-invalid');
-            }
-
             if (hasError) {
                 e.preventDefault();
                 alert('Please fix the following errors:\n\n' + errorMessages.join('\n'));
@@ -976,7 +972,7 @@
         });
 
         // Auto-format numbers as user types
-        document.querySelectorAll('.bank-balance, .mpesa-balance, #cash_balance, #credit_balance').forEach(function(input) {
+        document.querySelectorAll('.bank-balance, .mpesa-balance, #cash_balance').forEach(function(input) {
             input.addEventListener('blur', function() {
                 let val = parseFloat(this.value);
                 if (!isNaN(val) && val >= 0) {

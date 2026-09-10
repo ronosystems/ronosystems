@@ -947,7 +947,8 @@ def daily_record_create(request, company_id=None, branch_id=None):
                 date=date,
                 cash_balance=cash_balance,
                 credit_balance=credit_balance,
-                notes=notes
+                notes=notes,
+                created_by=request.user
             )
             
             # Create daily bank balances
@@ -1024,7 +1025,6 @@ def daily_record_create(request, company_id=None, branch_id=None):
     return render(request, 'treasury/daily_record_form.html', context)
     
 
-
 @login_required
 def daily_record_edit(request, company_id=None, branch_id=None, record_id=None):
     """Edit a daily record with individual account balances"""
@@ -1088,6 +1088,16 @@ def daily_record_edit(request, company_id=None, branch_id=None, record_id=None):
     # Create lookup dicts
     bank_balance_dict = {b.bank_account_id: b.closing_balance for b in bank_balances}
     mpesa_balance_dict = {m.mpesa_account_id: m.closing_balance for m in mpesa_balances}
+    
+    # Build (account, balance) rows for the template so edit shows saved values
+    bank_account_rows = [
+        (bank, bank_balance_dict.get(bank.id, bank.current_balance))
+        for bank in bank_accounts
+    ]
+    mpesa_account_rows = [
+        (mpesa, mpesa_balance_dict.get(mpesa.id, mpesa.current_balance))
+        for mpesa in mpesa_accounts
+    ]
     
     if request.method == 'POST':
         cash_balance = Decimal(request.POST.get('cash_balance', 0))
@@ -1179,6 +1189,8 @@ def daily_record_edit(request, company_id=None, branch_id=None, record_id=None):
         'treasury': treasury,
         'bank_accounts': bank_accounts,
         'mpesa_accounts': mpesa_accounts,
+        'bank_account_rows': bank_account_rows,
+        'mpesa_account_rows': mpesa_account_rows,
         'record': daily_record,
         'bank_balance_dict': bank_balance_dict,
         'mpesa_balance_dict': mpesa_balance_dict,
@@ -1188,7 +1200,6 @@ def daily_record_edit(request, company_id=None, branch_id=None, record_id=None):
         'all_branches': all_branches,
     }
     return render(request, 'treasury/daily_record_form.html', context)
-
 
 @login_required
 def daily_record_delete(request, company_id=None, branch_id=None, record_id=None):
@@ -1288,51 +1299,83 @@ def daily_record_delete(request, company_id=None, branch_id=None, record_id=None
 # ============================================
 
 @login_required
-@branch_access_required
 def daily_records_list(request, company_id=None, branch_id=None):
-    """List all daily records for a branch"""
+    """List all daily records for a branch (with branch selector for admins)"""
     company = get_user_company(request, company_id)
     if not company:
         return redirect('dashboard')
-    
-    branch = get_object_or_404(Branch, id=branch_id, company=company)
+
+    # Get the user's branch
+    user_branch = get_user_branch(request.user)
+
+    # Determine which branch to use
+    branch = None
+
+    # Super admin and company admin can access any branch
+    if request.user.role in ['super_admin', 'company_admin']:
+        if branch_id:
+            branch = get_object_or_404(Branch, id=branch_id, company=company)
+        else:
+            # If no branch specified, use first active branch
+            branch = Branch.objects.filter(company=company, is_active=True).first()
+
+        if not branch:
+            messages.error(request, 'No branch available. Please create a branch first.')
+            return redirect('treasury:dashboard', company_id=company.id)
+    else:
+        # Other roles must use their own branch
+        if not user_branch:
+            messages.error(request, 'You are not assigned to any branch. Please contact your administrator.')
+            return redirect('treasury:dashboard', company_id=company.id)
+
+        # If branch_id in URL doesn't match user's branch, redirect to user's branch
+        if branch_id and int(branch_id) != user_branch.id:
+            messages.error(request, f'You can only view records for your assigned branch: {user_branch.name}')
+            return redirect('treasury:daily_records_list', company_id=company.id, branch_id=user_branch.id)
+
+        branch = user_branch
+
+    if not branch:
+        messages.error(request, 'No branch available.')
+        return redirect('treasury:dashboard', company_id=company.id)
+
     treasury = get_treasury(company, branch)
-    
+
     # Get date filter
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
-    
+
     records = DailyRecord.objects.filter(
         company=company,
         branch=branch
     )
-    
+
     if date_from:
         records = records.filter(date__gte=date_from)
     if date_to:
         records = records.filter(date__lte=date_to)
-    
+
     records = records.order_by('-date')
-    
+
     paginator = Paginator(records, 30)
     page = request.GET.get('page', 1)
     records_page = paginator.get_page(page)
-    
+
     # Calculate summary stats
     record_count = records.count()
-    
+
     # Get the most recent record (first one since ordered by -date)
     latest_record = records.first()
-    
+
     # Get the last day's closing balance (net balance of the most recent record)
     total_net = latest_record.net_balance if latest_record else 0
-    
+
     # Calculate total bank, mpesa, cash, credit from the latest record
     total_bank = latest_record.total_bank_balance if latest_record else 0
     total_mpesa = latest_record.total_mpesa_balance if latest_record else 0
     total_cash = latest_record.cash_balance if latest_record else 0
     total_credit = latest_record.credit_balance if latest_record else 0
-    
+
     # Calculate average net balance across all records
     avg_net = 0
     if record_count > 0:
@@ -1340,10 +1383,16 @@ def daily_records_list(request, company_id=None, branch_id=None):
         for record in records:
             total_net_sum += record.net_balance
         avg_net = total_net_sum / record_count
-    
+
     # Get the first and last record for comparison
     first_record = records.last()  # Oldest record
-    
+
+    # Get all branches for the branch selector (for admins)
+    all_branches = Branch.objects.filter(company=company, is_active=True)
+
+    # Determine if user is admin (can switch branches)
+    is_admin = request.user.role in ['super_admin', 'company_admin']
+
     context = {
         'company': company,
         'branch': branch,
@@ -1351,19 +1400,24 @@ def daily_records_list(request, company_id=None, branch_id=None):
         'records': records_page,
         'total_records': record_count,
         'avg_net': avg_net,
-        'total_net': total_net,  # This is now the closing balance of the last day
+        'total_net': total_net,
         'total_bank': total_bank,
         'total_mpesa': total_mpesa,
         'total_cash': total_cash,
         'total_credit': total_credit,
         'date_from': date_from,
         'date_to': date_to,
-        'is_admin': is_admin_or_manager(request.user),
+        'is_admin': is_admin,
         'latest_record': latest_record,
         'first_record': first_record,
+        'all_branches': all_branches,
+        'user_branch': user_branch,
     }
     return render(request, 'treasury/daily_records_list.html', context)
 
+
+
+    
 # ============================================
 # DAILY RECORD DETAIL VIEW
 # ============================================
@@ -1671,34 +1725,73 @@ def movement_create(request, company_id=None, branch_id=None):
     return render(request, 'treasury/movement_form.html', context)
 
     
-        
+# ============================================
+# MOVEMENTS LIST
+# ============================================
+
+# ============================================
+# MOVEMENTS LIST
+# ============================================
+
 # ============================================
 # MOVEMENTS LIST
 # ============================================
 
 @login_required
-@branch_access_required
 def movements_list(request, company_id=None, branch_id=None):
-    """List all movements for a branch"""
+    """List all movements for a branch (with branch selector for admins)"""
     company = get_user_company(request, company_id)
     if not company:
         return redirect('dashboard')
-    
-    branch = get_object_or_404(Branch, id=branch_id, company=company)
+
+    # Get the user's branch
+    user_branch = get_user_branch(request.user)
+
+    # Determine which branch to use
+    branch = None
+
+    # Super admin and company admin can access any branch
+    if request.user.role in ['super_admin', 'company_admin']:
+        if branch_id:
+            branch = get_object_or_404(Branch, id=branch_id, company=company)
+        else:
+            # If no branch specified, use first active branch
+            branch = Branch.objects.filter(company=company, is_active=True).first()
+
+        if not branch:
+            messages.error(request, 'No branch available. Please create a branch first.')
+            return redirect('treasury:dashboard', company_id=company.id)
+    else:
+        # Other roles must use their own branch
+        if not user_branch:
+            messages.error(request, 'You are not assigned to any branch. Please contact your administrator.')
+            return redirect('treasury:dashboard', company_id=company.id)
+
+        # If branch_id in URL doesn't match user's branch, redirect to user's branch
+        if branch_id and int(branch_id) != user_branch.id:
+            messages.error(request, f'You can only view movements for your assigned branch: {user_branch.name}')
+            return redirect('treasury:movements_list', company_id=company.id, branch_id=user_branch.id)
+
+        branch = user_branch
+
+    if not branch:
+        messages.error(request, 'No branch available.')
+        return redirect('treasury:dashboard', company_id=company.id)
+
     treasury = get_treasury(company, branch)
-    
+
     # Get filters
     movement_type = request.GET.get('movement_type')
     from_account = request.GET.get('from_account')
     to_account = request.GET.get('to_account')
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
-    
+
     movements = Movement.objects.filter(
         company=company,
         branch=branch
     )
-    
+
     if movement_type:
         movements = movements.filter(movement_type=movement_type)
     if from_account:
@@ -1709,22 +1802,43 @@ def movements_list(request, company_id=None, branch_id=None):
         movements = movements.filter(created_at__date__gte=date_from)
     if date_to:
         movements = movements.filter(created_at__date__lte=date_to)
-    
+
     movements = movements.order_by('-created_at')
-    
+
     paginator = Paginator(movements, 30)
     page = request.GET.get('page', 1)
     movements_page = paginator.get_page(page)
-    
+
     # Summary stats
     total_boost = movements.filter(movement_type=Movement.MovementType.BOOST).aggregate(
         total=Sum('amount')
     )['total'] or 0
-    
+
     total_transfers = movements.filter(movement_type=Movement.MovementType.TRANSFER).aggregate(
         total=Sum('amount')
     )['total'] or 0
-    
+
+    # ============================================
+    # CURRENT NET BALANCE - based on last day's report
+    # ============================================
+    # Use the most recent DailyRecord's net_balance as the true "current" balance.
+    # Fall back to treasury.net_balance if no daily record exists yet.
+    latest_record = DailyRecord.objects.filter(
+        company=company,
+        branch=branch
+    ).order_by('-date').first()
+
+    if latest_record:
+        total_net = latest_record.net_balance
+    else:
+        total_net = treasury.net_balance
+
+    # Get all branches for the branch selector (for admins)
+    all_branches = Branch.objects.filter(company=company, is_active=True)
+
+    # Determine if user is admin (can switch branches)
+    is_admin = request.user.role in ['super_admin', 'company_admin']
+
     context = {
         'company': company,
         'branch': branch,
@@ -1732,6 +1846,8 @@ def movements_list(request, company_id=None, branch_id=None):
         'movements': movements_page,
         'total_boost': total_boost,
         'total_transfers': total_transfers,
+        'total_net': total_net,
+        'latest_record': latest_record,
         'movement_types': Movement.MovementType.choices,
         'account_types': Movement.AccountType.choices,
         'selected_movement_type': movement_type,
@@ -1739,11 +1855,14 @@ def movements_list(request, company_id=None, branch_id=None):
         'selected_to_account': to_account,
         'date_from': date_from,
         'date_to': date_to,
-        'is_admin': is_admin_or_manager(request.user),
+        'is_admin': is_admin,
+        'all_branches': all_branches,
+        'user_branch': user_branch,
     }
     return render(request, 'treasury/movements_list.html', context)
 
 
+    
 # ============================================
 # API ENDPOINTS
 # ============================================

@@ -268,6 +268,7 @@ class MpesaAccount(models.Model):
 # ============================================
 # DAILY RECORD - INDIVIDUAL ACCOUNT BALANCES
 # ============================================
+
 class DailyRecord(models.Model):
     """
     Daily snapshot - records EACH individual account balance
@@ -306,6 +307,16 @@ class DailyRecord(models.Model):
         help_text="Money owed to you / Credit float"
     )
     
+    # User tracking
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='daily_records_created',
+        help_text="User who submitted this daily record"
+    )
+    
     # Notes for this day
     notes = models.TextField(blank=True)
     
@@ -341,7 +352,9 @@ class DailyRecord(models.Model):
         indexes = [
             models.Index(fields=['company', 'branch', 'date']),
             models.Index(fields=['company', 'date']),
+            models.Index(fields=['created_by']),
         ]
+
 
 
 # ============================================
