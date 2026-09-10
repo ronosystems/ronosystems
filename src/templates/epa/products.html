@@ -1085,56 +1085,73 @@ function changePerPage(value) {
     window.location.href = currentUrl.toString();
 }
 
-// Search and Filter functionality
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('searchInput');
     const categoryFilter = document.getElementById('categoryFilter');
     let searchTimeout;
     
-    function applyFilters() {
-        const search = searchInput.value;
-        const category = categoryFilter.value;
-        const currentUrl = new URL(window.location.href);
+    // Client-side filter that doesn't reload the page
+    function filterTableRows() {
+        const search = searchInput.value.toLowerCase().trim();
+        const category = categoryFilter.value.toLowerCase();
+        const rows = document.querySelectorAll('#productTable tbody tr[data-id]');
         
-        if (search) {
-            currentUrl.searchParams.set('search', search);
-        } else {
-            currentUrl.searchParams.delete('search');
-        }
-        
-        if (category) {
-            currentUrl.searchParams.set('category', category);
-        } else {
-            currentUrl.searchParams.delete('category');
-        }
-        
-        currentUrl.searchParams.set('page', 1);
-        window.location.href = currentUrl.toString();
+        rows.forEach(row => {
+            const name = (row.dataset.name || '').toLowerCase();
+            const sku = (row.dataset.sku || '').toLowerCase();
+            const brand = (row.dataset.brand || '').toLowerCase();
+            const model = (row.dataset.model || '').toLowerCase();
+            const rowCategory = (row.dataset.category || '').toLowerCase();
+            
+            const matchesSearch = !search || 
+                name.includes(search) || 
+                sku.includes(search) || 
+                brand.includes(search) || 
+                model.includes(search);
+            
+            let matchesCategory = true;
+            if (category) {
+                if (category === 'phone') {
+                    matchesCategory = rowCategory === 'smartphone' || rowCategory === 'feature phone';
+                } else {
+                    matchesCategory = rowCategory === category;
+                }
+            }
+            
+            row.style.display = (matchesSearch && matchesCategory) ? '' : 'none';
+        });
     }
     
     if (searchInput) {
         searchInput.addEventListener('input', function() {
             clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(applyFilters, 500);
+            searchTimeout = setTimeout(() => {
+                filterTableRows();
+                // Update URL without reloading (for shareable links)
+                const url = new URL(window.location.href);
+                if (searchInput.value) {
+                    url.searchParams.set('search', searchInput.value);
+                } else {
+                    url.searchParams.delete('search');
+                }
+                url.searchParams.set('page', 1);
+                history.replaceState(null, '', url.toString());
+            }, 300);
         });
     }
     
     if (categoryFilter) {
-        categoryFilter.addEventListener('change', applyFilters);
-    }
-    
-    // Initialize sorting
-    const table = document.getElementById('productTable');
-    if (table) {
-        sortState.column = 'name';
-        sortState.direction = 'asc';
-        const nameHeader = table.querySelector('[data-sort="name"]');
-        if (nameHeader) {
-            nameHeader.classList.add('active', 'asc');
-            const icon = nameHeader.querySelector('.sort-icon');
-            icon.textContent = '▲';
-        }
-        sortTable('name');
+        categoryFilter.addEventListener('change', function() {
+            filterTableRows();
+            const url = new URL(window.location.href);
+            if (categoryFilter.value) {
+                url.searchParams.set('category', categoryFilter.value);
+            } else {
+                url.searchParams.delete('category');
+            }
+            url.searchParams.set('page', 1);
+            history.replaceState(null, '', url.toString());
+        });
     }
 });
 
