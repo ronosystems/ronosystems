@@ -5,34 +5,59 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.conf import settings as django_settings
 from django.http import JsonResponse
+from apps.companies.support_utils import (
+    get_active_company,
+    is_support_mode,
+    is_effective_admin,
+    get_effective_branch,
+)
 import os
 import json
 
 from apps.companies.models import Company
 
+
 @login_required
 def settings_dashboard(request):
     """Company settings dashboard"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
     
-    # Get current settings
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
     settings_data = get_company_settings(company)
     
     context = {
         'company': company,
         'settings': settings_data,
         'is_settings': True,
+        'is_viewing_company': is_viewing_company,
     }
     return render(request, 'company/settings/dashboard.html', context)
+
 
 @login_required
 def settings_company(request):
     """Company settings - update company info and logo"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
     
     if request.method == 'POST':
         try:
-            # Update company info
             company_name = request.POST.get('company_name')
             company_email = request.POST.get('company_email')
             company_phone = request.POST.get('company_phone')
@@ -50,17 +75,13 @@ def settings_company(request):
             # Handle logo upload
             if request.FILES.get('company_logo'):
                 logo = request.FILES['company_logo']
-                # Validate file type
                 valid_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.svg']
                 ext = os.path.splitext(logo.name)[1].lower()
                 if ext in valid_extensions:
-                    # Delete old logo if exists
                     if company.logo:
                         old_logo_path = os.path.join(django_settings.MEDIA_ROOT, str(company.logo))
                         if os.path.exists(old_logo_path):
                             os.remove(old_logo_path)
-                    
-                    # Save new logo
                     company.logo = logo
                 else:
                     messages.error(request, 'Invalid file format. Please upload JPG, PNG, GIF, or SVG.')
@@ -78,8 +99,6 @@ def settings_company(request):
                     return redirect('company-settings-company')
             
             company.save()
-            
-            # Save settings to JSON
             save_company_settings(company, request.POST)
             
             messages.success(request, 'Company settings updated successfully!')
@@ -95,17 +114,27 @@ def settings_company(request):
         'settings': settings_data,
         'is_settings': True,
         'active_tab': 'company',
+        'is_viewing_company': is_viewing_company,
     }
     return render(request, 'company/settings/company.html', context)
+
 
 @login_required
 def settings_payment(request):
     """Payment settings"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
     
     if request.method == 'POST':
         try:
-            # Save payment settings
             payment_settings = {
                 'currency': request.POST.get('currency', 'KES'),
                 'currency_symbol': request.POST.get('currency_symbol', 'KSh'),
@@ -141,6 +170,7 @@ def settings_payment(request):
         'settings': settings_data,
         'is_settings': True,
         'active_tab': 'payment',
+        'is_viewing_company': is_viewing_company,
         'payment_methods_choices': [
             ('cash', 'Cash'),
             ('m-pesa', 'M-Pesa'),
@@ -151,14 +181,23 @@ def settings_payment(request):
     }
     return render(request, 'company/settings/payment.html', context)
 
+
 @login_required
 def settings_receipt(request):
     """Receipt settings"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
     
     if request.method == 'POST':
         try:
-            # Save receipt settings
             receipt_settings = {
                 'receipt_header': request.POST.get('receipt_header', ''),
                 'receipt_footer': request.POST.get('receipt_footer', ''),
@@ -194,6 +233,7 @@ def settings_receipt(request):
         'settings': settings_data,
         'is_settings': True,
         'active_tab': 'receipt',
+        'is_viewing_company': is_viewing_company,
         'receipt_formats': [
             ('standard', 'Standard'),
             ('mini', 'Mini Receipt'),
@@ -203,10 +243,21 @@ def settings_receipt(request):
     }
     return render(request, 'company/settings/receipt.html', context)
 
+
 @login_required
 def settings_preview_receipt(request):
     """Preview receipt"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
     settings_data = get_company_settings(company)
     
     # Sample receipt data
@@ -233,8 +284,10 @@ def settings_preview_receipt(request):
         'company': company,
         'settings': settings_data,
         'receipt': receipt_data,
+        'is_viewing_company': is_viewing_company,
     }
     return render(request, 'company/settings/receipt_preview.html', context)
+
 
 # ============================================
 # HELPER FUNCTIONS
@@ -291,9 +344,8 @@ def get_company_settings(company):
     }
     
     try:
-        if company.company_settings:  # Use company_settings instead of settings
+        if company.company_settings:
             saved_settings = json.loads(company.company_settings)
-            # Merge with defaults
             for section in default_settings:
                 if section in saved_settings:
                     default_settings[section].update(saved_settings[section])
@@ -302,24 +354,22 @@ def get_company_settings(company):
     
     return default_settings
 
+
 def save_company_settings(company, settings_data, section=None):
     """Save company settings to JSON"""
     try:
-        # Get existing settings
         existing = {}
-        if company.company_settings:  # Use company_settings instead of settings
+        if company.company_settings:
             existing = json.loads(company.company_settings)
         
         if section:
-            # Update specific section
             existing[section] = settings_data
         else:
-            # Update general company settings
             if 'company' not in existing:
                 existing['company'] = {}
             existing['company'].update(settings_data)
         
-        company.company_settings = json.dumps(existing)  # Use company_settings
+        company.company_settings = json.dumps(existing)
         company.save()
     except Exception as e:
         raise e

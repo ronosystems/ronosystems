@@ -8,6 +8,57 @@ from .models import Electronic, Phone, Accessory, Sale, Unit, SaleItem, Owner
 from apps.companies.models import Company
 
 
+# ============================================
+# SUPPORT MODE HELPER
+# ============================================
+
+def get_active_company(request):
+    """
+    Get the currently active company for the request.
+    
+    Priority:
+    1. Support Mode: If super admin is viewing a company, return that company
+    2. Regular: Return the user's assigned company
+    
+    Returns:
+        tuple: (company, is_support_mode)
+    """
+    user = request.user
+    
+    # Support Mode: Super admin viewing a specific company
+    if user.is_authenticated and user.role == 'super_admin':
+        viewing_company_id = request.session.get('viewing_company_id')
+        if viewing_company_id:
+            try:
+                company = Company.objects.get(id=viewing_company_id)
+                return company, True
+            except Company.DoesNotExist:
+                # Clear invalid session
+                request.session.pop('viewing_company_id', None)
+                request.session.pop('support_mode', None)
+                request.session.pop('support_started_at', None)
+    
+    # Regular mode: user's own company
+    if user.is_authenticated and user.company:
+        return user.company, False
+    
+    return None, False
+
+
+def is_support_mode(request):
+    """Check if current request is in support mode"""
+    return (
+        request.user.is_authenticated 
+        and request.user.role == 'super_admin'
+        and request.session.get('support_mode', False)
+        and request.session.get('viewing_company_id')
+    )
+
+
+# ============================================
+# EPA DASHBOARD
+# ============================================
+
 @login_required
 def epa_dashboard(request):
     """EPA Shop Web Dashboard - Shows company-specific EPA data in HTML"""
@@ -16,39 +67,27 @@ def epa_dashboard(request):
     # COMPANY SELECTION (with super admin switching)
     # ============================================
     
-    company = None
-    is_viewing_company = False
+    company, is_viewing_company = get_active_company(request)
     
-    # Check if super admin is viewing a specific company
-    if request.user.role == 'super_admin' and 'viewing_company_id' in request.session:
-        try:
-            company = Company.objects.get(id=request.session['viewing_company_id'])
-            is_viewing_company = True
-        except Company.DoesNotExist:
-            if 'viewing_company_id' in request.session:
-                del request.session['viewing_company_id']
-            messages.warning(request, 'Company not found. Returning to your dashboard.')
-            return redirect('/super-admin/dashboard/')
-    
-    # If no company found, use the user's company
+    # If no company found, handle redirects
     if not company:
-        # SUPER ADMIN: If no company is selected, redirect to company selection
+        # SUPER ADMIN: If no company is selected, redirect to support selector
         if request.user.role == 'super_admin':
             messages.info(request, 'Please select a company to view.')
-            return redirect('/companies/')
+            return redirect('/api/support/select/')
         
         # Regular user: Check if assigned to a company
         if not request.user.company:
             messages.warning(request, 'You are not assigned to any company.')
-            return redirect('/admin/')
+            return redirect('/dashboard/')
+        
         company = request.user.company
     
     # ============================================
-    # BUSINESS TYPE VALIDATION (Skip for super admin)
+    # BUSINESS TYPE VALIDATION (Skip for super admin in support mode)
     # ============================================
     
-    # Skip business type check for super admin in support mode
-    if not (request.user.role == 'super_admin' and is_viewing_company):
+    if not is_viewing_company:
         if not company.business_type or 'epa' not in company.business_type.name.lower():
             messages.warning(request, 'Your company is not an EPA Shop.')
             return redirect('/dashboard/')
@@ -81,8 +120,8 @@ def epa_dashboard(request):
     phones = Phone.objects.filter(company=company)
     accessories = Accessory.objects.filter(company=company)
     
-    # Filter by branch for non-admins
-    if not is_admin and user_branch:
+    # Filter by branch for non-admins (skip in support mode)
+    if not is_admin and user_branch and not is_viewing_company:
         electronics = electronics.filter(branch=user_branch)
         phones = phones.filter(branch=user_branch)
         accessories = accessories.filter(branch=user_branch)
@@ -104,8 +143,8 @@ def epa_dashboard(request):
         Q(phone__company=company) | Q(electronic__company=company)
     )
     
-    # Filter by branch for non-admins
-    if not is_admin and user_branch:
+    # Filter by branch for non-admins (skip in support mode)
+    if not is_admin and user_branch and not is_viewing_company:
         total_units = total_units.filter(
             Q(phone__branch=user_branch) | Q(electronic__branch=user_branch)
         )
@@ -127,17 +166,18 @@ def epa_dashboard(request):
     
     sales = Sale.objects.filter(company=company)
     
-    # Filter by role
-    if user.role == 'company_agent' and not is_viewing_company:
-        # Agents see only sales they created
-        sales = sales.filter(sold_by=user)
-    elif user.role == 'company_cashier' and not is_viewing_company:
-        # Cashiers see sales in their branch
-        if user_branch:
+    # Filter by role (skip in support mode - super admin sees all)
+    if not is_viewing_company:
+        if user.role == 'company_agent':
+            # Agents see only sales they created
+            sales = sales.filter(sold_by=user)
+        elif user.role == 'company_cashier':
+            # Cashiers see sales in their branch
+            if user_branch:
+                sales = sales.filter(branch=user_branch)
+        elif not is_admin and user_branch:
+            # Staff see sales in their branch
             sales = sales.filter(branch=user_branch)
-    elif not is_admin and user_branch and not is_viewing_company:
-        # Staff see sales in their branch
-        sales = sales.filter(branch=user_branch)
     
     total_sales = sales.count()
     total_revenue = sales.aggregate(total=Sum('net_amount'))['total'] or 0
@@ -226,11 +266,10 @@ def epa_dashboard(request):
     
     top_products = []
     try:
-        from django.db.models import Sum as SumModel
         top_items = SaleItem.objects.filter(
             sale__company=company
         ).values('item_name').annotate(
-            total_sold=SumModel('quantity')
+            total_sold=Sum('quantity')
         ).order_by('-total_sold')[:5]
         top_products = top_items
     except:
@@ -274,9 +313,6 @@ def epa_dashboard(request):
     # Context
     # ============================================
     
-    # Check if in support mode
-    is_support_mode = request.session.get('support_mode', False)
-    
     context = {
         'company': company,
         'business_type': company.business_type,
@@ -286,7 +322,7 @@ def epa_dashboard(request):
         'top_products': top_products,
         'is_admin': is_admin,
         'is_viewing_company': is_viewing_company,
-        'support_mode': is_support_mode,
+        'support_mode': is_viewing_company,
         'user_role': user.role,
         'user_branch': user_branch,
         'is_super_admin': user.role == 'super_admin',

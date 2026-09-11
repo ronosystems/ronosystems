@@ -204,6 +204,17 @@
             font-weight: 600;
         }
 
+        .sidebar-nav .nav-link .badge.bg-danger {
+            background: #dc3545 !important;
+            color: #ffffff !important;
+            animation: badgePulse 1.5s infinite;
+        }
+
+        @keyframes badgePulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
         .sidebar-nav .nav-link.text-danger {
             color: #ff6b6b !important;
         }
@@ -532,6 +543,121 @@
         }
 
         /* ============================================
+           SUPPORT MODE BANNER
+        ============================================ */
+        .support-mode-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 9999;
+            background: linear-gradient(135deg, #ff6b35 0%, #dc3545 100%);
+            color: white;
+            padding: 10px 20px;
+            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.5);
+            border-bottom: 3px solid #000000;
+            animation: supportPulse 2s infinite;
+        }
+
+        @keyframes supportPulse {
+            0%, 100% { box-shadow: 0 4px 15px rgba(220, 53, 69, 0.5); }
+            50% { box-shadow: 0 4px 25px rgba(220, 53, 69, 0.8); }
+        }
+
+        .support-mode-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .support-mode-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .support-mode-left i {
+            font-size: 1.3rem;
+            color: #ffe066;
+        }
+
+        .support-mode-title {
+            font-size: 1rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            background: rgba(0,0,0,0.2);
+            padding: 4px 12px;
+            border-radius: 4px;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .support-mode-company {
+            font-size: 0.95rem;
+            color: rgba(255,255,255,0.95);
+        }
+
+        .support-mode-company strong {
+            color: #ffe066;
+            font-weight: 700;
+        }
+
+        .support-mode-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .support-mode-timer {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(0,0,0,0.25);
+            padding: 5px 14px;
+            border-radius: 50px;
+            border: 1px solid rgba(255,255,255,0.3);
+            font-size: 0.9rem;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+
+        .support-exit-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #ffffff;
+            color: #dc3545;
+            padding: 7px 18px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 0.9rem;
+            border: 2px solid #000000;
+            transition: all 0.3s;
+        }
+
+        .support-exit-btn:hover {
+            background: #000000;
+            color: #ffffff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        /* Push content down when support banner is active */
+        body.support-mode-active .main-content {
+            padding-top: 65px;
+        }
+
+        body.support-mode-active .sidebar {
+            padding-top: 65px;
+        }
+
+        /* ============================================
            RESPONSIVE
         ============================================ */
         @media (max-width: 992px) {
@@ -603,6 +729,17 @@
                 font-size: 1.1rem;
                 margin: 0;
             }
+
+            .support-mode-content {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .support-mode-left, .support-mode-right {
+                justify-content: center;
+            }
+            .support-mode-title {
+                font-size: 0.85rem;
+            }
         }
 
         @media (max-width: 576px) {
@@ -636,7 +773,33 @@
     </style>
     {% block extra_css %}{% endblock %}
 </head>
-<body>
+<body class="{% if is_support_mode %}support-mode-active{% endif %}">
+
+<!-- ============================================ -->
+<!-- SUPPORT MODE BANNER -->
+<!-- ============================================ -->
+{% if is_support_mode and support_company %}
+<div class="support-mode-banner">
+    <div class="support-mode-content">
+        <div class="support-mode-left">
+            <i class="fas fa-headset"></i>
+            <span class="support-mode-title">SUPPORT MODE</span>
+            <span class="support-mode-company">
+                Viewing as: <strong>{{ support_company.name }}</strong>
+            </span>
+        </div>
+        <div class="support-mode-right">
+            <span class="support-mode-timer" id="supportTimer">
+                <i class="fas fa-clock"></i>
+                <span id="supportElapsed">00:00</span>
+            </span>
+            <a href="{% url 'support-exit' %}" class="support-exit-btn">
+                <i class="fas fa-sign-out-alt"></i> Exit Support Mode
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
 
     <!-- ============================================
     SIDEBAR OVERLAY (Mobile)
@@ -650,7 +813,21 @@
 
         <!-- Brand -->
         <div class="sidebar-brand">
-            {% if user.is_authenticated and user.company %}
+            {% if is_support_mode and support_company %}
+                {# Show the target company's logo in support mode #}
+                {% if support_company.logo %}
+                    <img src="{{ support_company.logo.url }}" alt="{{ support_company.name }}" class="logo-img">
+                {% elif site_logo %}
+                    <img src="{{ site_logo_url }}" alt="{{ system_name }}" class="logo-img">
+                {% else %}
+                    <div class="logo-icon">
+                        <i class="fas fa-rocket"></i>
+                    </div>
+                {% endif %}
+                <span class="company-name">
+                    <h5>{{ support_company.name }}</h5>
+                </span>
+            {% elif user.is_authenticated and user.company %}
                 {% if user.company.logo %}
                     <img src="{{ user.company.logo.url }}" alt="{{ user.company.name }}" class="logo-img">
                 {% elif site_logo %}
@@ -685,133 +862,236 @@
 
                     <!-- Dashboard -->
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/dashboard/' or request.path == '/epa_shop/dashboard/' %}active{% endif %}" href="/dashboard/">
+                        {% if is_support_mode and support_company %}
+                        <a class="nav-link {% if '/epa_shop/dashboard/' in request.path %}active{% endif %}" href="/epa_shop/dashboard/">
                             <i class="fas fa-chart-pie"></i> <span>Dashboard</span>
                         </a>
+                        {% else %}
+                        <a class="nav-link {% if request.path == '/dashboard/' or '/epa_shop/dashboard/' in request.path %}active{% endif %}" href="/dashboard/">
+                            <i class="fas fa-chart-pie"></i> <span>Dashboard</span>
+                        </a>
+                        {% endif %}
                     </li>
 
-                    <!-- ============================================
-                    EPA SHOP MENU - Check user access
-                    ============================================ -->
-                    {% if user.is_authenticated %}
-                        {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'company_cashier' or user.role == 'company_agent' or user.role == 'company_staff' or user.role == 'mpesa_agent' or user.role == 'stock_controller'%}
-                            {% if user.company and user.company.business_type %}
-                                {% if 'epa' in user.company.business_type.name.lower or 'electronics' in user.company.business_type.name.lower %}
-                                <li class="nav-label">EPA Shop</li>
-                                <!-- For Cashiers  SHOP BULK SALES  -->
-                                {% if user.role == 'company_cashier'%}
-                                <li class="nav-item">
-                                    <a class="nav-link {% if '/epa_shop/pos/' in request.path %}active{% endif %}" href="/epa_shop/pos/">
-                                        <i class="fas fa-shopping-cart"></i> <span>POS</span>
-                                    </a>
-                                </li>
-                                {% endif %}
+                    <!-- ============================================ -->
+                    <!-- SUPPORT MODE: Show target company's menu -->
+                    <!-- ============================================ -->
+                    {% if is_support_mode and support_company %}
+                        <li class="nav-label">EPA Shop</li>
 
-                                {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' or user.role == 'mpesa_agent'%}   
-                                <li class="nav-item">
-                                    <a class="nav-link {% if '/company/expenses/' in request.path %}active{% endif %}" href="{% url 'company-expenses-dashboard' %}">
-                                        <i class="fas fa-wallet"></i> <span>Expenses</span>
-                                    </a>
-                                </li>
-                                 
-                                {% if company %}
-                                <li class="nav-item">
-                                    <a class="nav-link {% if '/company/treasury/' in request.path %}active{% endif %}" href="{% url 'treasury:dashboard' company.id %}">
-                                        <i class="fas fa-money-bill"></i> <span>M-Pesa</span> 
-                                    </a>
-                                </li>
-                                {% endif %}
-                                {% endif %}
+                        <!-- POS -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/epa_shop/pos/' in request.path %}active{% endif %}" href="/epa_shop/pos/">
+                                <i class="fas fa-shopping-cart"></i> <span>POS</span>
+                            </a>
+                        </li>
 
-                                <!-- For Sales Agents  SINGLE SALES  -->
-                                {% if user.role == 'company_agent'%}
-                                <li class="nav-item">
-                                    <a class="nav-link {% if '/epa_shop/sales/single/' in request.path %}active{% endif %}" href="/epa_shop/sales/single/">
-                                        <i class="fas fa-plus"></i> New Sale
-                                    </a>
-                                </li>
-                                {% endif %}
+                        <!-- Expenses -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/company/expenses/' in request.path %}active{% endif %}" href="{% url 'company-expenses-dashboard' %}">
+                                <i class="fas fa-wallet"></i> <span>Expenses</span>
+                            </a>
+                        </li>
 
+                        <!-- M-Pesa (Treasury) -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/treasury/' in request.path %}active{% endif %}" href="{% url 'treasury:dashboard' support_company.id %}">
+                                <i class="fas fa-money-bill"></i> <span>M-Pesa</span>
+                            </a>
+                        </li>
 
-                                <!--Phone and Electronic devices -->
-                                {% if user.role == 'company_manager' or user.role == 'super_admin' or user.role == 'company_agent' or user.role == 'stock_controller'%}
-                                <li class="nav-item">
-                                    <a class="nav-link {% if '/epa_shop/units/phones/' in request.path %}active{% endif %}" href="/epa_shop/units/phones/">
-                                        <i class="fas fa-mobile-alt"></i>Mobiles
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link {% if '/epa_shop/units/electronics/' in request.path %}active{% endif %}" href="/epa_shop/units/electronics/">
-                                        <i class="fas fa-laptop"></i>Electronics
-                                    </a>
-                                </li>
-                                {% endif %}
+                        <!-- New Sale -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/epa_shop/sales/single/' in request.path %}active{% endif %}" href="/epa_shop/sales/single/">
+                                <i class="fas fa-plus"></i> <span>New Sale</span>
+                            </a>
+                        </li>
 
+                        <!-- Mobiles -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/epa_shop/units/phones/' in request.path %}active{% endif %}" href="/epa_shop/units/phones/">
+                                <i class="fas fa-mobile-alt"></i> <span>Mobiles</span>
+                            </a>
+                        </li>
 
-                                <!-- Employee management - Only for Admins and Managers -->
-                                {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'company_cashier' or user.role == 'super_admin' or user.role == 'stock_controller'%}    
+                        <!-- Electronics -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/epa_shop/units/electronics/' in request.path %}active{% endif %}" href="/epa_shop/units/electronics/">
+                                <i class="fas fa-laptop"></i> <span>Electronics</span>
+                            </a>
+                        </li>
 
-                                <li class="nav-item">
-                                    <a class="nav-link {% if '/epa_shop/sales/' in request.path %}active{% endif %}" href="/epa_shop/sales/">
-                                        <i class="fas fa-shopping-cart"></i> <span>Sales</span>
-                                    </a>
-                                </li>
+                        <!-- Sales -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/epa_shop/sales/' in request.path and '/sales/single/' not in request.path %}active{% endif %}" href="/epa_shop/sales/">
+                                <i class="fas fa-shopping-cart"></i> <span>Sales</span>
+                            </a>
+                        </li>
 
-                                <li class="nav-item">
-                                    <a class="nav-link {% if '/epa_shop/products/' in request.path %}active{% endif %}" href="/epa_shop/products/">
-                                        <i class="fas fa-box"></i> <span>Products</span>
-                                    </a>
-                                </li>
-                                {% endif %}
+                        <!-- Products -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/epa_shop/products/' in request.path %}active{% endif %}" href="/epa_shop/products/">
+                                <i class="fas fa-box"></i> <span>Products</span>
+                            </a>
+                        </li>
 
+                        <!-- Inventory -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/epa_shop/inventory/' in request.path %}active{% endif %}" href="/epa_shop/inventory/">
+                                <i class="fas fa-warehouse"></i> <span>Inventory</span>
+                            </a>
+                        </li>
 
-                                <!-- For Company admins and stock controllers -->
-                                {% if user.role == 'company_admin' or user.role == 'super_admin' or user.role == 'stock_controller'%}
-                                <li class="nav-item">
-                                    <a class="nav-link {% if '/epa_shop/inventory/' in request.path %}active{% endif %}" href="/epa_shop/inventory/">
-                                        <i class="fas fa-warehouse"></i> <span>Inventory</span>
-                                    </a>
-                                </li>
-                                {% endif %}
+                        <!-- Branches -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/company/branches/' in request.path %}active{% endif %}" href="/company/branches/">
+                                <i class="fas fa-building"></i> <span>Branches</span>
+                            </a>
+                        </li>
 
+                        <!-- Employees -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/company/employees/' in request.path %}active{% endif %}" href="/company/employees/">
+                                <i class="fas fa-users"></i> <span>Employees</span>
+                            </a>
+                        </li>
 
-                                <!-- For Company admins only  (Owners) -->
-                                {% if user.role == 'company_admin' or user.role == 'super_admin' %}
-                                <li class="nav-item">
-                                    <a class="nav-link {% if '/company/branches/' in request.path %}active{% endif %}" href="/company/branches/">
-                                        <i class="fas fa-building"></i> <span>Branches</span>
-                                    </a>
-                                </li>
-                                
-                                <li class="nav-item">
-                                    <a class="nav-link {% if '/company/employees/' in request.path %}active{% endif %}" href="/company/employees/">
-                                        <i class="fas fa-users"></i> <span>Employees</span>
-                                    </a>
-                                </li>
+                        <!-- Finance -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/epa_shop/finance/' in request.path %}active{% endif %}" href="/epa_shop/finance/">
+                                <i class="fas fa-coins"></i> <span>Finance</span>
+                            </a>
+                        </li>
 
+                        <!-- Settings -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/company/settings/' in request.path %}active{% endif %}" href="/company/settings/">
+                                <i class="fas fa-gear"></i> <span>Settings</span>
+                            </a>
+                        </li>
 
-                                <li class="nav-item">
-                                    <a class="nav-link finance-link {% if '/epa_shop/finance/'  in request.path %}active{% endif %}" href="/epa_shop/finance/">
-                                        <i class="fas fa-coins"></i> <span>Finance</span>
-                                    </a>
-                                </li>
+                    {% else %}
+                        <!-- ============================================ -->
+                        <!-- NORMAL MODE: Role-based EPA shop menu -->
+                        <!-- ============================================ -->
+                        {% if user.is_authenticated %}
+                            {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'company_cashier' or user.role == 'company_agent' or user.role == 'company_staff' or user.role == 'mpesa_agent' or user.role == 'stock_controller' %}
+                                {% if user.company and user.company.business_type %}
+                                    {% if 'epa' in user.company.business_type.name.lower or 'electronics' in user.company.business_type.name.lower %}
+                                    <li class="nav-label">EPA Shop</li>
 
-                                <li class="nav-item">
-                                    <a class="nav-link {% if '/company/settings/' in request.path %}active{% endif %}" href="/company/settings/">
-                                        <i class="fas fa-gear"></i> <span>Settings</span>
-                                    </a>
-                                </li>
-                                {% endif %}
+                                    <!-- POS (Cashiers) -->
+                                    {% if user.role == 'company_cashier' %}
+                                    <li class="nav-item">
+                                        <a class="nav-link {% if '/epa_shop/pos/' in request.path %}active{% endif %}" href="/epa_shop/pos/">
+                                            <i class="fas fa-shopping-cart"></i> <span>POS</span>
+                                        </a>
+                                    </li>
+                                    {% endif %}
+
+                                    <!-- Expenses & M-Pesa -->
+                                    {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' or user.role == 'mpesa_agent' %}
+                                    <li class="nav-item">
+                                        <a class="nav-link {% if '/company/expenses/' in request.path %}active{% endif %}" href="{% url 'company-expenses-dashboard' %}">
+                                            <i class="fas fa-wallet"></i> <span>Expenses</span>
+                                        </a>
+                                    </li>
+                                    {% if company %}
+                                    <li class="nav-item">
+                                        <a class="nav-link {% if '/treasury/' in request.path %}active{% endif %}" href="{% url 'treasury:dashboard' company.id %}">
+                                            <i class="fas fa-money-bill"></i> <span>M-Pesa</span>
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                    {% endif %}
+
+                                    <!-- New Sale (Agents) -->
+                                    {% if user.role == 'company_agent' %}
+                                    <li class="nav-item">
+                                        <a class="nav-link {% if '/epa_shop/sales/single/' in request.path %}active{% endif %}" href="/epa_shop/sales/single/">
+                                            <i class="fas fa-plus"></i> <span>New Sale</span>
+                                        </a>
+                                    </li>
+                                    {% endif %}
+
+                                    <!-- Mobiles & Electronics -->
+                                    {% if user.role == 'company_manager' or user.role == 'super_admin' or user.role == 'company_agent' or user.role == 'stock_controller' %}
+                                    <li class="nav-item">
+                                        <a class="nav-link {% if '/epa_shop/units/phones/' in request.path %}active{% endif %}" href="/epa_shop/units/phones/">
+                                            <i class="fas fa-mobile-alt"></i> <span>Mobiles</span>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link {% if '/epa_shop/units/electronics/' in request.path %}active{% endif %}" href="/epa_shop/units/electronics/">
+                                            <i class="fas fa-laptop"></i> <span>Electronics</span>
+                                        </a>
+                                    </li>
+                                    {% endif %}
+
+                                    <!-- Sales & Products -->
+                                    {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'company_cashier' or user.role == 'super_admin' or user.role == 'stock_controller' %}
+                                    <li class="nav-item">
+                                        <a class="nav-link {% if '/epa_shop/sales/' in request.path and '/sales/single/' not in request.path %}active{% endif %}" href="/epa_shop/sales/">
+                                            <i class="fas fa-shopping-cart"></i> <span>Sales</span>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link {% if '/epa_shop/products/' in request.path %}active{% endif %}" href="/epa_shop/products/">
+                                            <i class="fas fa-box"></i> <span>Products</span>
+                                        </a>
+                                    </li>
+                                    {% endif %}
+
+                                    <!-- Inventory -->
+                                    {% if user.role == 'company_admin' or user.role == 'super_admin' or user.role == 'stock_controller' %}
+                                    <li class="nav-item">
+                                        <a class="nav-link {% if '/epa_shop/inventory/' in request.path %}active{% endif %}" href="/epa_shop/inventory/">
+                                            <i class="fas fa-warehouse"></i> <span>Inventory</span>
+                                        </a>
+                                    </li>
+                                    {% endif %}
+
+                                    <!-- Branches, Employees, Finance, Settings (Admins only) -->
+                                    {% if user.role == 'company_admin' or user.role == 'super_admin' %}
+                                    <li class="nav-item">
+                                        <a class="nav-link {% if '/company/branches/' in request.path %}active{% endif %}" href="/company/branches/">
+                                            <i class="fas fa-building"></i> <span>Branches</span>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link {% if '/company/employees/' in request.path %}active{% endif %}" href="/company/employees/">
+                                            <i class="fas fa-users"></i> <span>Employees</span>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link {% if '/epa_shop/finance/' in request.path %}active{% endif %}" href="/epa_shop/finance/">
+                                            <i class="fas fa-coins"></i> <span>Finance</span>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link {% if '/company/settings/' in request.path %}active{% endif %}" href="/company/settings/">
+                                            <i class="fas fa-gear"></i> <span>Settings</span>
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                    {% endif %}
                                 {% endif %}
                             {% endif %}
                         {% endif %}
                     {% endif %}
 
-                    <!-- ============================================
-                    SUPER ADMIN LINKS
-                    ============================================ -->
-                    {% if user.is_authenticated and user.role == 'super_admin' %}
+                    <!-- ============================================ -->
+                    <!-- SUPER ADMIN LINKS - HIDDEN IN SUPPORT MODE -->
+                    <!-- ============================================ -->
+                    {% if user.is_authenticated and user.role == 'super_admin' and not is_support_mode %}
                     <li class="nav-label">Administration</li>
+
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/support/' in request.path %}active{% endif %}" href="{% url 'support-selector' %}">
+                            <i class="fas fa-headset"></i> <span>Support Mode</span>
+                        </a>
+                    </li>
+
                     <li class="nav-item">
                         <a class="nav-link" href="/admin/">
                             <i class="fas fa-tag"></i> <span>Admin Panel</span>
@@ -849,9 +1129,9 @@
                     </li>
                     {% endif %}
 
-                    <!-- ============================================
-                    ACCOUNT
-                    ============================================ -->
+                    <!-- ============================================ -->
+                    <!-- ACCOUNT -->
+                    <!-- ============================================ -->
                     <li class="nav-label">Account</li>
                     <li class="nav-item">
                         <a class="nav-link {% if '/profile/' in request.path %}active{% endif %}" href="/profile/">
@@ -1007,32 +1287,68 @@
         });
 
         // Search
-        document.getElementById('globalSearch').addEventListener('keyup', function(e) {
-            if (e.key === 'Enter') {
-                const query = this.value.trim();
-                const items = document.querySelectorAll('.card, .list-group-item, tr');
-                if (query) {
-                    let found = false;
-                    items.forEach(item => {
-                        const text = item.textContent.toLowerCase();
-                        if (text.includes(query.toLowerCase())) {
+        const globalSearch = document.getElementById('globalSearch');
+        if (globalSearch) {
+            globalSearch.addEventListener('keyup', function(e) {
+                if (e.key === 'Enter') {
+                    const query = this.value.trim();
+                    const items = document.querySelectorAll('.card, .list-group-item, tr');
+                    if (query) {
+                        let found = false;
+                        items.forEach(item => {
+                            const text = item.textContent.toLowerCase();
+                            if (text.includes(query.toLowerCase())) {
+                                item.style.display = '';
+                                item.style.border = '2px solid #87CEEB';
+                                found = true;
+                                setTimeout(() => { item.style.border = ''; }, 3000);
+                            } else {
+                                item.style.display = 'none';
+                            }
+                        });
+                        if (!found) alert('No results found for: ' + query);
+                    } else {
+                        items.forEach(item => {
                             item.style.display = '';
-                            item.style.border = '2px solid #87CEEB';
-                            found = true;
-                            setTimeout(() => { item.style.border = ''; }, 3000);
-                        } else {
-                            item.style.display = 'none';
-                        }
-                    });
-                    if (!found) alert('No results found for: ' + query);
+                            item.style.border = '';
+                        });
+                    }
+                }
+            });
+        }
+
+        {% if is_support_mode %}
+        // Live timer for support session
+        (function() {
+            const startedAtStr = "{{ request.session.support_started_at|default:'' }}";
+            const elapsedEl = document.getElementById('supportElapsed');
+            
+            if (!elapsedEl || !startedAtStr) return;
+            
+            const startedAt = new Date(startedAtStr);
+            
+            function updateTimer() {
+                const now = new Date();
+                const diff = Math.floor((now - startedAt) / 1000);
+                if (diff < 0 || isNaN(diff)) {
+                    elapsedEl.textContent = '00:00';
+                    return;
+                }
+                const hours = Math.floor(diff / 3600);
+                const mins = Math.floor((diff % 3600) / 60);
+                const secs = diff % 60;
+                
+                if (hours > 0) {
+                    elapsedEl.textContent = `${String(hours).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
                 } else {
-                    items.forEach(item => {
-                        item.style.display = '';
-                        item.style.border = '';
-                    });
+                    elapsedEl.textContent = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
                 }
             }
-        });
+            
+            updateTimer();
+            setInterval(updateTimer, 1000);
+        })();
+        {% endif %}
     </script>
     {% block extra_js %}{% endblock %}
 </body>

@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import support_views
 
 
 urlpatterns = [
@@ -15,4 +16,8 @@ urlpatterns = [
     # Super Admin Business Type Management
     path('business-types/', views.BusinessTypeListView.as_view(), name='business-type-list'),
     path('business-types/<int:pk>/', views.BusinessTypeDetailView.as_view(), name='business-type-detail'),
+
+    path('support/select/', support_views.company_selector, name='support-selector'),
+    path('support/enter/<int:company_id>/', support_views.enter_support_mode, name='support-enter'),
+    path('support/exit/', support_views.exit_support_mode, name='support-exit'),
 ]

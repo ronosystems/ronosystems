@@ -8,17 +8,55 @@ from django.db.models import Q
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from apps.epa_shop.models import Branch
+from apps.companies.support_utils import (
+    get_active_company,
+    is_support_mode,
+    is_effective_admin,
+    get_effective_branch,
+)
 
 User = get_user_model()
+
+
+# ============================================
+# HELPER FUNCTIONS
+# ============================================
+
+def get_roles():
+    """Get role choices for dropdown"""
+    return [
+        ('company_admin', 'Company Admin'),
+        ('company_manager', 'Company Manager'),
+        ('company_cashier', 'Company Cashier'),
+        ('company_agent', 'Company Agent'),
+        ('company_staff', 'Company Staff'),
+        ('stock_controller', 'Stock Controller'),
+        ('mpesa_agent', 'M-Pesa Agent'),
+    ]
+
+
+def get_branches(company):
+    """Get branches for the company"""
+    return Branch.objects.filter(company=company, is_active=True)
 
 
 @login_required
 def employee_list(request):
     """List employees for the logged-in user's company"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
     
-    # Check if user is authorized
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
+    # Check if user is authorized (support mode = always authorized)
     is_authorized = (
+        is_viewing_company or
         request.user.is_company_admin or 
         request.user.is_company_manager or 
         request.user.is_super_admin or
@@ -45,7 +83,7 @@ def employee_list(request):
             Q(last_name__icontains=search_query) |
             Q(email__icontains=search_query) |
             Q(phone__icontains=search_query) |
-            Q(staff_id__icontains=search_query)  # Changed from employee_id
+            Q(staff_id__icontains=search_query)
         )
     
     # Filter by role
@@ -72,25 +110,16 @@ def employee_list(request):
     # Get branches for filter
     branches = Branch.objects.filter(company=company, is_active=True)
     
-    # Role choices
-    roles = [
-        ('company_admin', 'Company Admin'),
-        ('company_manager', 'Company Manager'),
-        ('company_cashier', 'Company Cashier'),
-        ('company_agent', 'Company Agent'),
-        ('company_staff', 'Company Staff'),
-        ('stock_controller', 'Stock Controller'),
-        ('mpesa_agent', 'M-Pesa Agent'),
-    ]
-    
     context = {
+        'company': company,
         'employees': employees,
         'stats': stats,
         'branches': branches,
-        'roles': roles,
+        'roles': get_roles(),
         'search_query': search_query,
         'role_filter': role_filter,
         'branch_filter': branch_filter,
+        'is_viewing_company': is_viewing_company,
         'page_title': 'Employees',
         'page_subtitle': 'Manage your company employees',
     }
@@ -100,10 +129,20 @@ def employee_list(request):
 @login_required
 def employee_detail(request, pk):
     """View employee details (Company Admin/Manager)"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
     
-    # Check if user is authorized
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
+    # Check if user is authorized (support mode = always authorized)
     is_authorized = (
+        is_viewing_company or
         request.user.is_company_admin or 
         request.user.is_company_manager or 
         request.user.is_super_admin or
@@ -118,7 +157,9 @@ def employee_detail(request, pk):
     employee = get_object_or_404(User, pk=pk, company=company)
     
     context = {
+        'company': company,
         'employee': employee,
+        'is_viewing_company': is_viewing_company,
         'page_title': employee.get_full_name() or employee.username,
         'page_subtitle': 'Employee details',
     }
@@ -128,10 +169,20 @@ def employee_detail(request, pk):
 @login_required
 def employee_create(request):
     """Add a new employee to the company"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
     
-    # Check if user is authorized
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
+    # Check if user is authorized (support mode = always authorized)
     is_authorized = (
+        is_viewing_company or
         request.user.is_company_admin or 
         request.user.is_company_manager or 
         request.user.is_super_admin or
@@ -153,7 +204,7 @@ def employee_create(request):
             role = request.POST.get('role', 'company_staff')
             department = request.POST.get('department', '').strip()
             position = request.POST.get('position', '').strip()
-            staff_id = request.POST.get('staff_id', '').strip()  # Changed from employee_id
+            staff_id = request.POST.get('staff_id', '').strip()
             branch_id = request.POST.get('branch_id', '')
             password = request.POST.get('password', '')
             confirm_password = request.POST.get('confirm_password', '')
@@ -165,6 +216,7 @@ def employee_create(request):
                     'company': company,
                     'roles': get_roles(),
                     'branches': get_branches(company),
+                    'is_viewing_company': is_viewing_company,
                     'page_title': 'Add Employee',
                     'page_subtitle': 'Add a new employee to your company',
                 })
@@ -175,6 +227,7 @@ def employee_create(request):
                     'company': company,
                     'roles': get_roles(),
                     'branches': get_branches(company),
+                    'is_viewing_company': is_viewing_company,
                     'page_title': 'Add Employee',
                     'page_subtitle': 'Add a new employee to your company',
                 })
@@ -185,6 +238,7 @@ def employee_create(request):
                     'company': company,
                     'roles': get_roles(),
                     'branches': get_branches(company),
+                    'is_viewing_company': is_viewing_company,
                     'page_title': 'Add Employee',
                     'page_subtitle': 'Add a new employee to your company',
                 })
@@ -195,6 +249,7 @@ def employee_create(request):
                     'company': company,
                     'roles': get_roles(),
                     'branches': get_branches(company),
+                    'is_viewing_company': is_viewing_company,
                     'page_title': 'Add Employee',
                     'page_subtitle': 'Add a new employee to your company',
                 })
@@ -208,6 +263,7 @@ def employee_create(request):
                     'company': company,
                     'roles': get_roles(),
                     'branches': get_branches(company),
+                    'is_viewing_company': is_viewing_company,
                     'page_title': 'Add Employee',
                     'page_subtitle': 'Add a new employee to your company',
                 })
@@ -224,7 +280,7 @@ def employee_create(request):
                 company=company,
                 department=department,
                 position=position,
-                staff_id=staff_id, 
+                staff_id=staff_id,
                 branch_id=branch_id if branch_id else None,
                 is_active=True,
                 is_verified=True,
@@ -239,6 +295,7 @@ def employee_create(request):
                 'company': company,
                 'roles': get_roles(),
                 'branches': get_branches(company),
+                'is_viewing_company': is_viewing_company,
                 'page_title': 'Add Employee',
                 'page_subtitle': 'Add a new employee to your company',
             })
@@ -248,6 +305,7 @@ def employee_create(request):
         'company': company,
         'roles': get_roles(),
         'branches': get_branches(company),
+        'is_viewing_company': is_viewing_company,
         'page_title': 'Add Employee',
         'page_subtitle': 'Add a new employee to your company',
     }
@@ -257,10 +315,20 @@ def employee_create(request):
 @login_required
 def employee_edit(request, pk):
     """Edit employee details"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
     
-    # Check if user is authorized
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
+    # Check if user is authorized (support mode = always authorized)
     is_authorized = (
+        is_viewing_company or
         request.user.is_company_admin or 
         request.user.is_company_manager or 
         request.user.is_super_admin or
@@ -299,6 +367,7 @@ def employee_edit(request, pk):
         'company': company,
         'roles': get_roles(),
         'branches': get_branches(company),
+        'is_viewing_company': is_viewing_company,
         'page_title': f'Edit {employee.get_full_name()}',
         'page_subtitle': 'Edit employee details',
     }
@@ -308,10 +377,20 @@ def employee_edit(request, pk):
 @login_required
 def employee_delete(request, pk):
     """Delete employee"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
     
-    # Check if user is authorized
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
+    # Check if user is authorized (support mode = always authorized)
     is_authorized = (
+        is_viewing_company or
         request.user.is_company_admin or 
         request.user.is_company_manager or 
         request.user.is_super_admin or
@@ -325,7 +404,8 @@ def employee_delete(request, pk):
     
     employee = get_object_or_404(User, pk=pk, company=company)
     
-    if employee.id == request.user.id:
+    # Prevent self-deletion (except super admin in support mode)
+    if employee.id == request.user.id and not is_viewing_company:
         messages.error(request, 'You cannot delete your own account.')
         return redirect('employee-list')
     
@@ -339,7 +419,9 @@ def employee_delete(request, pk):
             messages.error(request, f'Error deleting employee: {str(e)}')
     
     context = {
+        'company': company,
         'employee': employee,
+        'is_viewing_company': is_viewing_company,
         'page_title': 'Delete Employee',
         'page_subtitle': f'Confirm deletion of {employee.get_full_name()}',
     }
@@ -349,10 +431,20 @@ def employee_delete(request, pk):
 @login_required
 def employee_toggle_status(request, pk):
     """Toggle employee active status"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
     
-    # Check if user is authorized
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
+    # Check if user is authorized (support mode = always authorized)
     is_authorized = (
+        is_viewing_company or
         request.user.is_company_admin or 
         request.user.is_company_manager or 
         request.user.is_super_admin or
@@ -366,7 +458,8 @@ def employee_toggle_status(request, pk):
     
     employee = get_object_or_404(User, pk=pk, company=company)
     
-    if employee.id == request.user.id:
+    # Prevent self-status change (except super admin in support mode)
+    if employee.id == request.user.id and not is_viewing_company:
         messages.error(request, 'You cannot change your own status.')
         return redirect('employee-list')
     
@@ -378,21 +471,3 @@ def employee_toggle_status(request, pk):
         return redirect('employee-list')
     
     return redirect('employee-list')
-
-
-def get_roles():
-    """Get role choices for dropdown"""
-    return [
-        ('company_admin', 'Company Admin'),
-        ('company_manager', 'Company Manager'),
-        ('company_cashier', 'Company Cashier'),
-        ('company_agent', 'Company Agent'),
-        ('company_staff', 'Company Staff'),
-        ('stock_controller', 'Stock Controller'),
-        ('mpesa_agent', 'M-Pesa Agent'),
-    ]
-
-
-def get_branches(company):
-    """Get branches for the company"""
-    return Branch.objects.filter(company=company, is_active=True)

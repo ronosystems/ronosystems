@@ -11,6 +11,12 @@ from django.db import transaction
 
 from apps.companies.models import Company
 from apps.company.models import Expense
+from apps.companies.support_utils import (
+    get_active_company,
+    is_support_mode,
+    is_effective_admin,
+    get_effective_branch,
+)
 from .models import (
     Branch, Sale, SaleItem, PurchaseOrder,
     COGSAccount, COGSTransaction, PurchaseRecord,
@@ -91,13 +97,8 @@ def get_effective_profit_balance(company, branch=None):
     total_revenue = get_total_revenue(company, branch)
     total_cogs = calculate_total_cogs_from_sales(company, branch)
     total_expenses = get_total_expenses(company, branch)
-    
-    # Gross Profit = Revenue - COGS
     gross_profit = total_revenue - total_cogs
-    
-    # Net Profit = Gross Profit - Expenses
     net_profit = gross_profit - total_expenses
-    
     return net_profit
 
 
@@ -138,7 +139,6 @@ def get_cogs_summary(company, start_date, end_date, branch=None):
         total=Sum('total_amount')
     )['total'] or Decimal('0.00')
     
-    # Opening balance
     opening_sales = Sale.objects.filter(
         company=company,
         payment_status='paid',
@@ -178,10 +178,6 @@ def get_cogs_summary(company, start_date, end_date, branch=None):
     }
 
 
-# ============================================
-# UPDATE COGS FUNCTIONS
-# ============================================
-
 def update_cogs_from_sale(sale, user=None):
     """Record COGS from sale (for future use)"""
     pass
@@ -199,7 +195,17 @@ def update_cogs_from_purchase(purchase_record, user=None):
 @login_required
 def debug_cogs_balance(request):
     """Debug view to check COGS calculation"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
     branch_id = request.GET.get('branch')
     
     sales = Sale.objects.filter(company=company, payment_status='paid')
@@ -248,19 +254,24 @@ def debug_cogs_balance(request):
 @login_required
 def finance_dashboard(request):
     """Main finance dashboard with COGS balance and Profit balance"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
     branch_id = request.GET.get('branch')
-    
     branches = Branch.objects.filter(company=company, is_active=True)
-    
-    # Today's date
     today = timezone.now().date()
     
-    # Calculate balances
     current_balance = get_effective_cogs_balance(company, branch_id)
     current_profit_balance = get_effective_profit_balance(company, branch_id)
     
-    # Get today's COGS
     today_sales = Sale.objects.filter(
         company=company,
         payment_status='paid',
@@ -273,7 +284,6 @@ def finance_dashboard(request):
     for sale in today_sales:
         today_cogs += get_cogs_from_sale(sale)
     
-    # Get today's purchases
     today_purchases = PurchaseRecord.objects.filter(
         company=company,
         status='completed',
@@ -286,7 +296,6 @@ def finance_dashboard(request):
         total=Sum('total_amount')
     )['total'] or Decimal('0.00')
     
-    # Week calculation
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
     
@@ -325,6 +334,7 @@ def finance_dashboard(request):
     last_month_cogs = get_cogs_for_period(last_month_start, last_month_end)
     
     context = {
+        'company': company,
         'branches': branches,
         'selected_branch': branch_id,
         'current_balance': current_balance,
@@ -337,6 +347,7 @@ def finance_dashboard(request):
         'last_month_cogs': last_month_cogs,
         'today_purchases': today_purchases_value,
         'is_finance': True,
+        'is_viewing_company': is_viewing_company,
     }
     return render(request, 'company/finance/dashboard.html', context)
 
@@ -348,7 +359,14 @@ def finance_dashboard(request):
 @login_required
 def api_cogs_balance(request):
     """API endpoint to get current COGS balance for the sidebar badge"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        return JsonResponse({'error': 'No company assigned'}, status=400)
+    
     branch_id = request.GET.get('branch')
     
     balance = get_effective_cogs_balance(company, branch_id)
@@ -378,7 +396,17 @@ def api_cogs_balance(request):
 @login_required
 def cogs_report(request):
     """Generate COGS report with Daily, Weekly, Monthly tables"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
     branch_id = request.GET.get('branch')
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
@@ -404,9 +432,7 @@ def cogs_report(request):
     if branch_id:
         purchases_qs = purchases_qs.filter(branch_id=branch_id)
     
-    # ============================================
-    # DAILY COGS RECORDS - Days in current week
-    # ============================================
+    # DAILY COGS RECORDS
     daily_records = []
     week_start = today - timedelta(days=today.weekday())
     current_date = week_start
@@ -445,9 +471,7 @@ def cogs_report(request):
         'closing_balance': daily_records[-1]['closing_balance'] if daily_records else Decimal('0.00'),
     }
     
-    # ============================================
-    # WEEKLY COGS RECORDS - Weeks in current month
-    # ============================================
+    # WEEKLY COGS RECORDS
     weekly_records = []
     month_start = today.replace(day=1)
     if today.month == 12:
@@ -507,9 +531,7 @@ def cogs_report(request):
         'closing_balance': weekly_records[-1]['closing_balance'] if weekly_records else Decimal('0.00'),
     }
     
-    # ============================================
-    # MONTHLY COGS RECORDS - Months in current year
-    # ============================================
+    # MONTHLY COGS RECORDS
     monthly_records = []
     current_year = today.year
     running_balance = Decimal('0.00')
@@ -563,6 +585,7 @@ def cogs_report(request):
     closing_balance = daily_totals['closing_balance']
     
     context = {
+        'company': company,
         'total_cogs_generated': total_cogs_generated,
         'total_cogs_used': total_cogs_used,
         'net_change': net_change,
@@ -581,6 +604,7 @@ def cogs_report(request):
         'current_month': today.month,
         'today': today,
         'is_finance': True,
+        'is_viewing_company': is_viewing_company,
     }
     return render(request, 'company/finance/cogs_report.html', context)
 
@@ -592,7 +616,17 @@ def cogs_report(request):
 @login_required
 def cogs_daily_detail(request, date_str):
     """View detailed daily purchases list"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
     report_date = datetime.strptime(date_str, '%Y-%m-%d').date()
     branch_id = request.GET.get('branch')
     
@@ -611,6 +645,7 @@ def cogs_daily_detail(request, date_str):
     purchases_count = purchases.count()
     
     context = {
+        'company': company,
         'report_date': report_date,
         'purchases': purchases,
         'total_purchases_value': total_purchases_value,
@@ -618,6 +653,7 @@ def cogs_daily_detail(request, date_str):
         'branches': Branch.objects.filter(company=company, is_active=True),
         'selected_branch': branch_id,
         'is_finance': True,
+        'is_viewing_company': is_viewing_company,
     }
     return render(request, 'company/finance/cogs_daily_detail.html', context)
 
@@ -629,10 +665,19 @@ def cogs_daily_detail(request, date_str):
 @login_required
 def cogs_weekly_detail(request, year, week):
     """View detailed weekly purchases list"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
     branch_id = request.GET.get('branch')
     
-    # Calculate week start using ISO week
     first_day = date(year, 1, 1)
     days_to_thursday = (3 - first_day.weekday()) % 7
     first_thursday = first_day + timedelta(days=days_to_thursday)
@@ -656,6 +701,7 @@ def cogs_weekly_detail(request, year, week):
     purchases_count = purchases.count()
     
     context = {
+        'company': company,
         'week_start': week_start,
         'week_end': week_end,
         'year': year,
@@ -666,6 +712,7 @@ def cogs_weekly_detail(request, year, week):
         'branches': Branch.objects.filter(company=company, is_active=True),
         'selected_branch': branch_id,
         'is_finance': True,
+        'is_viewing_company': is_viewing_company,
     }
     return render(request, 'company/finance/cogs_weekly_detail.html', context)
 
@@ -677,7 +724,17 @@ def cogs_weekly_detail(request, year, week):
 @login_required
 def cogs_monthly_detail(request, year, month):
     """View detailed monthly purchases list"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
     branch_id = request.GET.get('branch')
     
     month_start = date(year, month, 1)
@@ -702,6 +759,7 @@ def cogs_monthly_detail(request, year, month):
     purchases_count = purchases.count()
     
     context = {
+        'company': company,
         'month_start': month_start,
         'month_end': month_end,
         'year': year,
@@ -713,6 +771,7 @@ def cogs_monthly_detail(request, year, month):
         'branches': Branch.objects.filter(company=company, is_active=True),
         'selected_branch': branch_id,
         'is_finance': True,
+        'is_viewing_company': is_viewing_company,
     }
     return render(request, 'company/finance/cogs_monthly_detail.html', context)
 
@@ -724,7 +783,17 @@ def cogs_monthly_detail(request, year, month):
 @login_required
 def cogs_transactions(request):
     """View all COGS transactions"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
     branch_id = request.GET.get('branch')
     transaction_type = request.GET.get('transaction_type')
     date_from = request.GET.get('date_from')
@@ -762,6 +831,7 @@ def cogs_transactions(request):
     )['total'] or Decimal('0.00')
     
     context = {
+        'company': company,
         'transactions': transactions_page,
         'total_credits': total_credits,
         'total_debits': total_debits,
@@ -772,6 +842,7 @@ def cogs_transactions(request):
         'date_to': date_to,
         'search': search,
         'is_finance': True,
+        'is_viewing_company': is_viewing_company,
     }
     return render(request, 'company/finance/cogs_transactions.html', context)
 
@@ -783,7 +854,17 @@ def cogs_transactions(request):
 @login_required
 def purchase_records(request):
     """View all purchase records"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
     branch_id = request.GET.get('branch')
     purchase_type = request.GET.get('purchase_type')
     status = request.GET.get('status')
@@ -823,6 +904,7 @@ def purchase_records(request):
     current_balance = get_effective_cogs_balance(company, branch_id)
     
     context = {
+        'company': company,
         'purchases': purchases_page,
         'total_amount': total_amount,
         'current_balance': current_balance,
@@ -834,6 +916,7 @@ def purchase_records(request):
         'date_to': date_to,
         'search': search,
         'is_finance': True,
+        'is_viewing_company': is_viewing_company,
     }
     return render(request, 'company/finance/purchase_records.html', context)
 
@@ -845,7 +928,16 @@ def purchase_records(request):
 @login_required
 def purchase_create(request):
     """Create a new purchase record"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
     
     current_balance = get_effective_cogs_balance(company)
     
@@ -873,6 +965,7 @@ def purchase_create(request):
         if errors:
             messages.error(request, "\n".join(errors))
             return render(request, 'company/finance/purchase_create.html', {
+                'company': company,
                 'branches': Branch.objects.filter(company=company, is_active=True),
                 'cogs_accounts': COGSAccount.objects.filter(company=company, is_active=True),
                 'is_finance': True,
@@ -880,6 +973,7 @@ def purchase_create(request):
                 'purchase_types': PurchaseRecord.PURCHASE_TYPES,
                 'payment_methods': PurchaseRecord.PAYMENT_METHODS,
                 'today': timezone.now().date(),
+                'is_viewing_company': is_viewing_company,
             })
         
         try:
@@ -891,6 +985,7 @@ def purchase_create(request):
                     f"Insufficient COGS balance. Available: {current_balance:,.2f}, Required: {amount:,.2f}"
                 )
                 return render(request, 'company/finance/purchase_create.html', {
+                    'company': company,
                     'branches': Branch.objects.filter(company=company, is_active=True),
                     'cogs_accounts': COGSAccount.objects.filter(company=company, is_active=True),
                     'is_finance': True,
@@ -898,6 +993,7 @@ def purchase_create(request):
                     'purchase_types': PurchaseRecord.PURCHASE_TYPES,
                     'payment_methods': PurchaseRecord.PAYMENT_METHODS,
                     'today': timezone.now().date(),
+                    'is_viewing_company': is_viewing_company,
                 })
             
             with transaction.atomic():
@@ -930,6 +1026,7 @@ def purchase_create(request):
             messages.error(request, f"Error creating purchase: {str(e)}")
     
     context = {
+        'company': company,
         'branches': Branch.objects.filter(company=company, is_active=True),
         'cogs_accounts': COGSAccount.objects.filter(company=company, is_active=True),
         'is_finance': True,
@@ -937,6 +1034,7 @@ def purchase_create(request):
         'purchase_types': PurchaseRecord.PURCHASE_TYPES,
         'payment_methods': PurchaseRecord.PAYMENT_METHODS,
         'today': timezone.now().date(),
+        'is_viewing_company': is_viewing_company,
     }
     return render(request, 'company/finance/purchase_create.html', context)
 
@@ -948,12 +1046,24 @@ def purchase_create(request):
 @login_required
 def purchase_detail(request, pk):
     """View purchase record details"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
     purchase = get_object_or_404(PurchaseRecord, company=company, pk=pk)
     
     context = {
+        'company': company,
         'purchase': purchase,
         'is_finance': True,
+        'is_viewing_company': is_viewing_company,
     }
     return render(request, 'company/finance/purchase_detail.html', context)
 
@@ -965,12 +1075,24 @@ def purchase_detail(request, pk):
 @login_required
 def cogs_accounts(request):
     """Manage COGS accounts"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
     accounts = COGSAccount.objects.filter(company=company, is_active=True)
     
     context = {
+        'company': company,
         'accounts': accounts,
         'is_finance': True,
+        'is_viewing_company': is_viewing_company,
     }
     return render(request, 'company/finance/cogs_accounts.html', context)
 
@@ -978,7 +1100,16 @@ def cogs_accounts(request):
 @login_required
 def cogs_account_create(request):
     """Create a new COGS account"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
     
     if request.method == 'POST':
         branch_id = request.POST.get('branch')
@@ -996,8 +1127,10 @@ def cogs_account_create(request):
         if errors:
             messages.error(request, "\n".join(errors))
             return render(request, 'company/finance/cogs_account_create.html', {
+                'company': company,
                 'branches': Branch.objects.filter(company=company, is_active=True),
                 'is_finance': True,
+                'is_viewing_company': is_viewing_company,
             })
         
         try:
@@ -1016,9 +1149,11 @@ def cogs_account_create(request):
             messages.error(request, f"Error creating account: {str(e)}")
     
     context = {
+        'company': company,
         'branches': Branch.objects.filter(company=company, is_active=True),
         'is_finance': True,
         'account_types': COGSAccount.ACCOUNT_TYPES,
+        'is_viewing_company': is_viewing_company,
     }
     return render(request, 'company/finance/cogs_account_create.html', context)
 
@@ -1121,7 +1256,14 @@ def get_cogs_daily_trend(company, branch_id=None):
 @login_required
 def finance_api_data(request):
     """API endpoint for finance charts"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        return JsonResponse({'error': 'No company assigned'}, status=400)
+    
     period = request.GET.get('period', 'monthly')
     branch_id = request.GET.get('branch')
     
@@ -1155,7 +1297,14 @@ def export_cogs_report(request):
     import csv
     from django.http import HttpResponse
     
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        return HttpResponse('No company assigned', status=400)
+    
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
     branch_id = request.GET.get('branch')

@@ -109,6 +109,7 @@ TEMPLATES = [
                 'apps.settings.context_processors.system_settings',
                 'apps.epa_shop.context_processors.user_context',
                 'apps.company.context_processors.company_context',
+                'apps.companies.context_processors.support_mode_context',  
             ],
         },
     },

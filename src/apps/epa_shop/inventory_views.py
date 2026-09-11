@@ -7,14 +7,25 @@ from .models import (
     Electronic, Phone, Accessory, Category, 
     Sale, SaleItem, Customer, StockMovement, Supplier
 )
+from apps.companies.support_utils import (
+    get_active_company,
+    is_support_mode,
+    is_effective_admin,
+    get_effective_branch,
+)
 
 
 @login_required
 def inventory_list(request):
     """Main inventory page showing all products"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
     
     if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
     
@@ -90,13 +101,15 @@ def inventory_list(request):
     low_stock_items.sort(key=lambda x: x['quantity'])
     
     context = {
+        'company': company,
         'total_products': total_products,
         'total_stock': total_stock,
         'electronics_count': electronics_count,
         'phones_count': phones_count,
         'accessories_count': accessories_count,
         'low_stock_count': len(low_stock_items),
-        'low_stock_items': low_stock_items[:10], 
+        'low_stock_items': low_stock_items[:10],
+        'is_viewing_company': is_viewing_company,
         'page_title': 'Inventory',
         'page_subtitle': 'Manage your stock',
     }
@@ -106,9 +119,14 @@ def inventory_list(request):
 @login_required
 def low_stock(request):
     """View all low stock items with filters and pagination"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
     
     if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
     
@@ -217,12 +235,14 @@ def low_stock(request):
         page_obj = paginator.page(paginator.num_pages)
     
     context = {
+        'company': company,
         'page_obj': page_obj,
         'total_count': len(low_stock_items),
         'search_query': search_query,
         'category_filter': category_filter,
         'stock_filter': stock_filter,
         'per_page': per_page,
+        'is_viewing_company': is_viewing_company,
         'page_title': 'Low Stock Items',
         'page_subtitle': 'Items that need restocking',
     }
@@ -232,9 +252,14 @@ def low_stock(request):
 @login_required
 def stock_movement(request):
     """View stock movement history with pagination and filters"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
     
     if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
     
@@ -267,12 +292,14 @@ def stock_movement(request):
         page_obj = paginator.page(paginator.num_pages)
     
     context = {
+        'company': company,
         'page_obj': page_obj,
         'movements': page_obj.object_list,
         'total_count': movements.count(),
         'search_query': search_query,
         'movement_type': movement_type,
         'per_page': per_page,
+        'is_viewing_company': is_viewing_company,
         'page_title': 'Stock Movements',
         'page_subtitle': 'Inventory transaction history',
     }
@@ -282,16 +309,24 @@ def stock_movement(request):
 @login_required
 def customer_list(request):
     """List all customers"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
     
     if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
     
     customers = Customer.objects.filter(company=company).order_by('-created_at')[:50]
     
     context = {
+        'company': company,
         'customers': customers,
         'total_count': customers.count(),
+        'is_viewing_company': is_viewing_company,
         'page_title': 'Customers',
         'page_subtitle': 'Customer management',
     }
@@ -301,6 +336,17 @@ def customer_list(request):
 @login_required
 def customer_create(request):
     """Create a new customer"""
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
     # Placeholder
     messages.info(request, 'Customer creation coming soon.')
     return redirect('/epa/customers/')

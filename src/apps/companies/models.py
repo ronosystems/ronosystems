@@ -134,3 +134,44 @@ class Company(models.Model):
         db_table = 'rono_companies'
         ordering = ['name']
         verbose_name_plural = 'Companies'
+
+
+
+
+
+# apps/companies/models.py
+
+class SupportSession(models.Model):
+    """Track super admin support sessions for audit"""
+    super_admin = models.ForeignKey(
+        django_settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='support_sessions'
+    )
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name='support_sessions'
+    )
+    started_at = models.DateTimeField(auto_now_add=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    reason = models.TextField(blank=True, help_text="Why support was needed")
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'rono_support_sessions'
+        ordering = ['-started_at']
+        indexes = [
+            models.Index(fields=['company', '-started_at']),
+            models.Index(fields=['super_admin', '-started_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.super_admin.username} → {self.company.name} ({self.started_at})"
+
+    def end_session(self):
+        self.is_active = False
+        self.ended_at = timezone.now()
+        self.save()

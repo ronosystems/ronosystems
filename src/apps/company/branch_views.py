@@ -3,32 +3,52 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from apps.epa_shop.models import Branch
 from apps.companies.models import Company
+from apps.companies.support_utils import (
+    get_active_company,
+    is_support_mode,
+    is_effective_admin,
+    get_effective_branch,
+)
+
 
 @login_required
 def branch_list(request):
     """List all branches for the user's company"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
     
     if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
     
     branches = Branch.objects.filter(company=company).order_by('name')
     
     context = {
+        'company': company,
         'branches': branches,
         'total_count': branches.count(),
+        'is_viewing_company': is_viewing_company,
         'page_title': 'Branches',
         'page_subtitle': 'Manage your branches',
     }
     return render(request, 'company/branches/list.html', context)
 
+
 @login_required
 def branch_create(request):
     """Create a new branch"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
     
     if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
     
@@ -47,6 +67,8 @@ def branch_create(request):
             messages.error(request, 'Branch name is required.')
             return render(request, 'company/branch_form.html', {
                 'branch': None,
+                'company': company,
+                'is_viewing_company': is_viewing_company,
                 'page_title': 'Create Branch',
                 'page_subtitle': 'Add a new branch'
             })
@@ -72,15 +94,28 @@ def branch_create(request):
     
     context = {
         'branch': None,
+        'company': company,
+        'is_viewing_company': is_viewing_company,
         'page_title': 'Create Branch',
         'page_subtitle': 'Add a new branch',
     }
     return render(request, 'company/branches/form.html', context)
 
+
 @login_required
 def branch_edit(request, pk):
     """Edit a branch"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
     branch = get_object_or_404(Branch, pk=pk, company=company)
     
     if request.method == 'POST':
@@ -99,6 +134,8 @@ def branch_edit(request, pk):
             messages.error(request, 'Branch name is required.')
             return render(request, 'company/branch_form.html', {
                 'branch': branch,
+                'company': company,
+                'is_viewing_company': is_viewing_company,
                 'page_title': 'Edit Branch',
                 'page_subtitle': f'Editing {branch.name}'
             })
@@ -123,15 +160,28 @@ def branch_edit(request, pk):
     
     context = {
         'branch': branch,
+        'company': company,
+        'is_viewing_company': is_viewing_company,
         'page_title': 'Edit Branch',
         'page_subtitle': f'Editing {branch.name}',
     }
     return render(request, 'company/branches/form.html', context)
 
+
 @login_required
 def branch_delete(request, pk):
     """Delete a branch"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
     branch = get_object_or_404(Branch, pk=pk, company=company)
     
     if request.method == 'POST':
@@ -145,6 +195,8 @@ def branch_delete(request, pk):
     
     context = {
         'branch': branch,
+        'company': company,
+        'is_viewing_company': is_viewing_company,
         'page_title': 'Delete Branch',
         'page_subtitle': f'Confirm deletion of {branch.name}',
     }

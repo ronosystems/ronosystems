@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+
+{% block title %}Support Mode - Select Company{% endblock %}
+
+{% block page_title %}Support Mode{% endblock %}
+{% block page_subtitle %}Select a company to support{% endblock %}
+
+{% block extra_css %}
+<style>
+    .support-header {
+        background: linear-gradient(135deg, #ff6b35 0%, #dc3545 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 8px;
+        margin-bottom: 25px;
+        border: 3px solid #000000;
+    }
+    .support-header h2 {
+        font-weight: 800;
+        margin: 0;
+        letter-spacing: 1px;
+    }
+    .support-header p {
+        margin: 8px 0 0;
+        opacity: 0.9;
+    }
+    .company-card {
+        border: 2px solid #000000;
+        border-radius: 8px;
+        padding: 20px;
+        background: white;
+        transition: all 0.3s;
+        cursor: pointer;
+        text-decoration: none;
+        color: #000000;
+        display: block;
+        height: 100%;
+    }
+    .company-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        border-color: #dc3545;
+    }
+    .company-card .company-name {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #036a77;
+        margin-bottom: 6px;
+    }
+    .company-card .company-meta {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-bottom: 4px;
+    }
+    .company-card .company-meta i {
+        width: 18px;
+        color: #87CEEB;
+    }
+    .company-card .support-btn {
+        margin-top: 12px;
+        width: 100%;
+        background: #dc3545;
+        color: white;
+        border: 2px solid #000000;
+        padding: 8px;
+        border-radius: 4px;
+        font-weight: 700;
+        text-align: center;
+    }
+    .active-session-card {
+        background: #fff3cd;
+        border: 3px solid #ffc107;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 25px;
+    }
+    .active-session-card h5 {
+        color: #856404;
+        font-weight: 700;
+        margin-bottom: 15px;
+    }
+    .session-history {
+        background: #f8f9fa;
+        border: 2px solid #000000;
+        border-radius: 8px;
+        padding: 20px;
+    }
+    .session-item {
+        padding: 10px;
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .session-item:last-child {
+        border-bottom: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Active Session Alert -->
+    {% if active_session %}
+    <div class="active-session-card">
+        <h5><i class="fas fa-exclamation-triangle"></i> Active Support Session</h5>
+        <p style="color:#856404; margin-bottom:10px;">
+            You are currently in support mode for:
+            <strong>{{ active_session.company.name }}</strong>
+        </p>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'support-exit' %}" class="btn btn-warning">
+                <i class="fas fa-sign-out-alt"></i> Exit Support Mode
+            </a>
+            <a href="{% url 'support-enter' active_session.company.id %}" class="btn btn-danger">
+                <i class="fas fa-redo"></i> Re-enter {{ active_session.company.name }}
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Header -->
+    <div class="support-header">
+        <h2><i class="fas fa-headset"></i> Support Mode</h2>
+        <p>Select a company below to enter their interface for support. You'll see exactly what their admin sees.</p>
+    </div>
+
+    <!-- Companies Grid -->
+    <div class="row g-3 mb-4">
+        {% for company in companies %}
+        <div class="col-md-4 col-lg-3">
+            <a href="{% url 'support-enter' company.id %}" class="company-card">
+                {% if company.logo %}
+                <img src="{{ company.logo.url }}" alt="{{ company.name }}" style="max-width:60px; max-height:60px; margin-bottom:10px; border-radius:4px;">
+                {% else %}
+                <div style="width:60px; height:60px; background:#87CEEB; border-radius:4px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:1.5rem; color:#000; margin-bottom:10px;">
+                    {{ company.name|slice:":2"|upper }}
+                </div>
+                {% endif %}
+                <div class="company-name">{{ company.name }}</div>
+                <div class="company-meta">
+                    <i class="fas fa-briefcase"></i> {{ company.business_type.name|default:"N/A" }}
+                </div>
+                <div class="company-meta">
+                    <i class="fas fa-tag"></i> Plan: {{ company.plan|title }}
+                </div>
+                <div class="company-meta">
+                    <i class="fas fa-circle" style="color: {% if company.status == 'active' %}#28a745{% else %}#dc3545{% endif %}; font-size: 8px;"></i>
+                    {{ company.status|title }}
+                </div>
+                <div class="support-btn">
+                    <i class="fas fa-sign-in-alt"></i> Enter Support Mode
+                </div>
+            </a>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> No companies available.
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Recent Sessions -->
+    {% if recent_sessions %}
+    <div class="session-history">
+        <h6 class="mb-3"><i class="fas fa-history"></i> Recent Support Sessions</h6>
+        {% for session in recent_sessions %}
+        <div class="session-item">
+            <div>
+                <strong>{{ session.company.name }}</strong>
+                <br>
+                <small class="text-muted">
+                    <i class="fas fa-clock"></i> {{ session.started_at|date:"Y-m-d H:i" }}
+                    {% if session.ended_at %}
+                        | Ended: {{ session.ended_at|date:"H:i" }}
+                    {% else %}
+                        | <span class="badge bg-success">Active</span>
+                    {% endif %}
+                </small>
+            </div>
+            <a href="{% url 'support-enter' session.company.id %}" class="btn btn-sm btn-outline-primary">
+                <i class="fas fa-redo"></i> Re-enter
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

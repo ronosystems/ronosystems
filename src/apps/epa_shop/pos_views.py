@@ -4,40 +4,66 @@ from django.contrib import messages
 from .models import Phone, Electronic, Accessory, Branch, Unit
 from django.db.models import Q
 from django.http import JsonResponse
+from apps.companies.support_utils import (
+    get_active_company,
+    is_support_mode,
+    is_effective_admin,
+    get_effective_branch,
+)
 import json
 
 
 @login_required
 def pos_dashboard(request):
     """Point of Sale Dashboard"""
-    company = request.user.company
+    
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
     
     if not company:
+        if request.user.role == 'super_admin':
+            messages.info(request, 'Please select a company to view.')
+            return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
     
+    # ============================================
     # Filter branches based on user role
-    if request.user.role == 'company_cashier':
+    # ============================================
+    # In support mode, super admin sees all branches
+    # Cashiers only see their assigned branch
+    if is_viewing_company:
+        # Support mode: Show all branches of the viewed company
+        branches = Branch.objects.filter(company=company, is_active=True)
+        user_branch = None
+    elif request.user.role == 'company_cashier':
         # Cashiers only see their assigned branch
         if request.user.branch:
             branches = Branch.objects.filter(
-                company=company, 
+                company=company,
                 is_active=True,
                 id=request.user.branch.id
             )
+            user_branch = request.user.branch
         else:
             messages.warning(request, 'You are not assigned to any branch. Please contact admin.')
             return redirect('/dashboard/')
     else:
         # Admins/Managers see all branches
         branches = Branch.objects.filter(company=company, is_active=True)
+        user_branch = None
     
     context = {
+        'company': company,
         'branches': branches,
         'page_title': 'Point of Sale',
         'page_subtitle': 'Process customer sales',
         'user_role': request.user.role,
-        'user_branch': request.user.branch,
+        'user_branch': user_branch,
+        'is_viewing_company': is_viewing_company,
+        'support_mode': is_viewing_company,
     }
     return render(request, 'epa/pos.html', context)
 
@@ -46,7 +72,11 @@ def pos_dashboard(request):
 def pos_search_products(request):
     """Search products for POS - Returns all product details including specs"""
     try:
-        company = request.user.company
+        # ============================================
+        # SUPPORT MODE: Get active company
+        # ============================================
+        company, is_viewing_company = get_active_company(request)
+        
         if not company:
             return JsonResponse({'error': 'No company assigned'}, status=400)
         
@@ -54,8 +84,15 @@ def pos_search_products(request):
         category_filter = request.GET.get('category', 'all').strip()
         products = []
         
-        # Get user branch for filtering
-        user_branch = request.user.branch if request.user.role == 'company_cashier' else None
+        # ============================================
+        # Branch filter (skip in support mode & for admins)
+        # ============================================
+        if is_viewing_company:
+            user_branch = None
+        elif request.user.role == 'company_cashier':
+            user_branch = request.user.branch
+        else:
+            user_branch = None
         
         # ============================================
         # 1. SEARCH PHONES - FILTER BY BRANCH FOR CASHIERS
@@ -182,7 +219,11 @@ def pos_search_products(request):
 def pos_search_imei(request):
     """Search IMEI/Serial for POS"""
     try:
-        company = request.user.company
+        # ============================================
+        # SUPPORT MODE: Get active company
+        # ============================================
+        company, is_viewing_company = get_active_company(request)
+        
         if not company:
             return JsonResponse({'error': 'No company assigned'}, status=400)
         
@@ -193,8 +234,15 @@ def pos_search_imei(request):
         
         results = []
         
-        # Get user branch for filtering
-        user_branch = request.user.branch if request.user.role == 'company_cashier' else None
+        # ============================================
+        # Branch filter (skip in support mode & for admins)
+        # ============================================
+        if is_viewing_company:
+            user_branch = None
+        elif request.user.role == 'company_cashier':
+            user_branch = request.user.branch
+        else:
+            user_branch = None
         
         # Search phone units with branch filtering
         phone_units = Unit.objects.filter(
@@ -255,12 +303,21 @@ def pos_search_imei(request):
 def pos_get_branches(request):
     """Get branches for POS - filtered by user role"""
     try:
-        company = request.user.company
+        # ============================================
+        # SUPPORT MODE: Get active company
+        # ============================================
+        company, is_viewing_company = get_active_company(request)
+        
         if not company:
             return JsonResponse({'error': 'No company assigned'}, status=400)
         
+        # ============================================
         # Filter branches based on user role
-        if request.user.role == 'company_cashier':
+        # ============================================
+        if is_viewing_company:
+            # Support mode: Show all branches
+            branches = Branch.objects.filter(company=company, is_active=True)
+        elif request.user.role == 'company_cashier':
             # Cashiers only see their assigned branch
             if request.user.branch:
                 branches = Branch.objects.filter(

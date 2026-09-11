@@ -11,7 +11,13 @@ from django.core.paginator import Paginator
 
 from apps.epa_shop.models import Sale, SaleItem, Electronic, Phone, Accessory, Branch, StockMovement
 from apps.companies.models import Company
-from apps.company.models import Expense 
+from apps.company.models import Expense
+from apps.companies.support_utils import (
+    get_active_company,
+    is_support_mode,
+    is_effective_admin,
+    get_effective_branch,
+)
 
 
 # ============================================
@@ -29,13 +35,10 @@ def get_sale_cogs(sale):
                 if hasattr(product, 'purchase_price') and product.purchase_price:
                     total_cogs += product.purchase_price * item.quantity
                 else:
-                    # If no purchase price, estimate at 70% of selling price
                     total_cogs += item.unit_price * Decimal('0.7') * item.quantity
             except:
-                # If product not found, estimate at 70% of selling price
                 total_cogs += item.unit_price * Decimal('0.7') * item.quantity
         else:
-            # If no product reference, estimate at 70% of selling price
             total_cogs += item.unit_price * Decimal('0.7') * item.quantity
     
     return total_cogs
@@ -44,10 +47,8 @@ def get_sale_cogs(sale):
 def get_cogs_for_queryset(sales_qs):
     """Calculate total COGS for a sales queryset"""
     total_cogs = Decimal('0.00')
-    
     for sale in sales_qs:
         total_cogs += get_sale_cogs(sale)
-    
     return total_cogs
 
 
@@ -99,11 +100,7 @@ def get_sales_summary(sales_qs):
     """Calculate summary statistics for a queryset with COGS"""
     total_sales = sales_qs.count()
     total_revenue = sales_qs.aggregate(total=Sum('net_amount'))['total'] or Decimal('0.00')
-    
-    # Calculate total COGS (Cost of Goods Sold)
     total_cogs = get_cogs_for_queryset(sales_qs)
-    
-    # Gross Profit = Revenue - COGS
     gross_profit = total_revenue - total_cogs
     
     return {
@@ -111,7 +108,7 @@ def get_sales_summary(sales_qs):
         'total_revenue': total_revenue,
         'total_cogs': total_cogs,
         'gross_profit': gross_profit,
-        'total_profit': gross_profit,  # Alias for backward compatibility
+        'total_profit': gross_profit,
         'total_purchase_cost': total_cogs,
     }
 
@@ -137,7 +134,6 @@ def get_profit_breakdown(sales_qs):
                     product_type = 'accessories'
             
             if product_type in breakdown:
-                # Calculate COGS for this item
                 item_cogs = Decimal('0.00')
                 try:
                     product = item.content_type.get_object_for_this_type(id=item.object_id)
@@ -199,16 +195,10 @@ def get_sales_by_hour(sales_qs):
 
 def combine_summaries(sales_summary, expenses_summary):
     """Combine sales and expense summaries with COGS"""
-    # Gross Profit = Revenue - COGS
     gross_profit = sales_summary['total_revenue'] - sales_summary['total_cogs']
-    
-    # Net Profit = Gross Profit - Expenses
     net_profit = gross_profit - expenses_summary['total_amount']
-    
-    # Closing balance = Net Profit
     closing_balance = net_profit
     
-    # Calculate profit margin
     profit_margin = Decimal('0.00')
     if sales_summary['total_revenue'] > 0:
         profit_margin = (gross_profit / sales_summary['total_revenue']) * 100
@@ -218,7 +208,7 @@ def combine_summaries(sales_summary, expenses_summary):
         'total_revenue': sales_summary['total_revenue'],
         'total_cogs': sales_summary['total_cogs'],
         'gross_profit': gross_profit,
-        'total_profit': gross_profit,  # Keep for backward compatibility
+        'total_profit': gross_profit,
         'total_expenses': expenses_summary['total_amount'],
         'total_expense_count': expenses_summary['total_expenses'],
         'net_profit': net_profit,
@@ -247,7 +237,7 @@ def get_combined_daily_records(sales_qs, expenses_qs, start_date, end_date):
             'revenue': combined['total_revenue'],
             'cogs': combined['total_cogs'],
             'gross_profit': combined['gross_profit'],
-            'profit': combined['gross_profit'],  # Alias for backward compatibility
+            'profit': combined['gross_profit'],
             'expenses': combined['total_expenses'],
             'net_profit': combined['net_profit'],
             'closing_balance': combined['closing_balance'],
@@ -300,7 +290,7 @@ def get_combined_weekly_records(sales_qs, expenses_qs, current_date):
                 'revenue': combined['total_revenue'],
                 'cogs': combined['total_cogs'],
                 'gross_profit': combined['gross_profit'],
-                'profit': combined['gross_profit'],  # Alias for backward compatibility
+                'profit': combined['gross_profit'],
                 'expenses': combined['total_expenses'],
                 'net_profit': combined['net_profit'],
                 'closing_balance': combined['closing_balance'],
@@ -345,7 +335,7 @@ def get_combined_monthly_records(sales_qs, expenses_qs, year):
             'revenue': combined['total_revenue'],
             'cogs': combined['total_cogs'],
             'gross_profit': combined['gross_profit'],
-            'profit': combined['gross_profit'],  # Alias for backward compatibility
+            'profit': combined['gross_profit'],
             'expenses': combined['total_expenses'],
             'net_profit': combined['net_profit'],
             'closing_balance': combined['closing_balance'],
@@ -382,7 +372,7 @@ def get_combined_daily_breakdown(sales_qs, expenses_qs, start_date, end_date):
             'revenue': combined['total_revenue'],
             'cogs': combined['total_cogs'],
             'gross_profit': combined['gross_profit'],
-            'profit': combined['gross_profit'],  # Alias for backward compatibility
+            'profit': combined['gross_profit'],
             'expenses': combined['total_expenses'],
             'net_profit': combined['net_profit'],
             'closing_balance': combined['closing_balance'],
@@ -482,15 +472,22 @@ def calculate_monthly_totals(monthly_records):
 @login_required
 def reports_dashboard(request):
     """Main reports dashboard with daily, weekly, monthly views"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
     branch_id = request.GET.get('branch')
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
     
-    # Base queryset for sales
     sales_qs = Sale.objects.filter(company=company, payment_status='paid')
-    
-    # Base queryset for expenses
     expenses_qs = Expense.objects.filter(company=company)
     
     if branch_id:
@@ -504,24 +501,16 @@ def reports_dashboard(request):
         sales_qs = sales_qs.filter(sale_date__date__lte=date_to)
         expenses_qs = expenses_qs.filter(expense_date__lte=date_to)
     
-    # Get branches for filter
     branches = Branch.objects.filter(company=company, is_active=True)
     
-    # Today's summary
     today = timezone.now().date()
     
-    # Sales today
     today_sales = sales_qs.filter(sale_date__date=today)
     today_sales_summary = get_sales_summary(today_sales)
-    
-    # Expenses today
     today_expenses = expenses_qs.filter(expense_date=today)
     today_expenses_summary = get_expenses_summary(today_expenses)
-    
-    # Combined today summary
     today_summary = combine_summaries(today_sales_summary, today_expenses_summary)
     
-    # This week summary
     week_start = today - timedelta(days=today.weekday())
     week_sales = sales_qs.filter(sale_date__date__gte=week_start)
     week_sales_summary = get_sales_summary(week_sales)
@@ -529,7 +518,6 @@ def reports_dashboard(request):
     week_expenses_summary = get_expenses_summary(week_expenses)
     week_summary = combine_summaries(week_sales_summary, week_expenses_summary)
     
-    # This month summary
     month_start = today.replace(day=1)
     month_sales = sales_qs.filter(sale_date__date__gte=month_start)
     month_sales_summary = get_sales_summary(month_sales)
@@ -537,24 +525,17 @@ def reports_dashboard(request):
     month_expenses_summary = get_expenses_summary(month_expenses)
     month_summary = combine_summaries(month_sales_summary, month_expenses_summary)
     
-    # Daily records for the current month
     daily_records = get_combined_daily_records(sales_qs, expenses_qs, month_start, today)
-    
-    # Weekly records (last 12 weeks)
     weekly_records = get_combined_weekly_records(sales_qs, expenses_qs, today)
-    
-    # Monthly records for the year
     monthly_records = get_combined_monthly_records(sales_qs, expenses_qs, today.year)
-    
-    # Recent daily records (last 30 days)
     recent_days = get_combined_recent_daily_records(sales_qs, expenses_qs, 30)
     
-    # Calculate totals for each table
     daily_totals = calculate_daily_totals(daily_records)
     weekly_totals = calculate_weekly_totals(weekly_records)
     monthly_totals = calculate_monthly_totals(monthly_records)
     
     context = {
+        'company': company,
         'branches': branches,
         'today_summary': today_summary,
         'week_summary': week_summary,
@@ -573,6 +554,7 @@ def reports_dashboard(request):
         'date_from': date_from,
         'date_to': date_to,
         'is_reports': True,
+        'is_viewing_company': is_viewing_company,
     }
     return render(request, 'company/reports/dashboard.html', context)
 
@@ -584,18 +566,26 @@ def reports_dashboard(request):
 @login_required
 def reports_daily_detail(request, date_str):
     """View detailed daily report for a specific date"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
     report_date = datetime.strptime(date_str, '%Y-%m-%d').date()
     branch_id = request.GET.get('branch')
     
-    # Get EPA sales for this day
     epa_sales_qs = Sale.objects.filter(
         company=company, 
         payment_status='paid',
         sale_date__date=report_date
     )
     
-    # Get expenses for this day
     expenses_qs = Expense.objects.filter(
         company=company,
         expense_date=report_date
@@ -605,15 +595,12 @@ def reports_daily_detail(request, date_str):
         epa_sales_qs = epa_sales_qs.filter(branch_id=branch_id)
         expenses_qs = expenses_qs.filter(branch_id=branch_id)
     
-    # Get detailed sales for this day
     epa_sales = epa_sales_qs.order_by('-sale_date')
     epa_summary = get_sales_summary(epa_sales_qs)
     
-    # Get expenses for this day
     expenses = expenses_qs.order_by('-created_at')
     expenses_summary = get_expenses_summary(expenses_qs)
     
-    # Supermarket data (placeholder - add your Supermarket model here)
     supermarket_sales = []
     supermarket_summary = {
         'total_sales': 0,
@@ -624,22 +611,14 @@ def reports_daily_detail(request, date_str):
         'total_cogs': Decimal('0.00'),
     }
     
-    # Combined summary (Sales - Expenses)
     combined_summary = combine_summaries(epa_summary, expenses_summary)
-    
-    # Get profit breakdown by product type
     profit_breakdown = get_profit_breakdown(epa_sales_qs)
-    
-    # Get top selling products
     top_products = get_top_products(epa_sales_qs)
-    
-    # Get sales by hour
     sales_by_hour = get_sales_by_hour(epa_sales_qs)
-    
-    # Get expense breakdown by category
     expense_breakdown = get_expense_category_breakdown(expenses_qs)
     
     context = {
+        'company': company,
         'report_date': report_date,
         'daily_sales': epa_sales,
         'summary': epa_summary,
@@ -652,7 +631,7 @@ def reports_daily_detail(request, date_str):
         'branches': Branch.objects.filter(company=company, is_active=True),
         'selected_branch': branch_id,
         'is_reports': True,
-        # Template variables - all include COGS
+        'is_viewing_company': is_viewing_company,
         'combined_summary': combined_summary,
         'epa_sales': epa_sales,
         'epa_summary': epa_summary,
@@ -669,10 +648,19 @@ def reports_daily_detail(request, date_str):
 @login_required
 def reports_weekly_detail(request, year, week):
     """View detailed weekly report with COGS"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
     branch_id = request.GET.get('branch')
     
-    # Calculate week start and end
     week_start = datetime.strptime(f'{year}-W{week:02d}-1', '%Y-W%W-%w').date()
     week_end = week_start + timedelta(days=6)
     
@@ -693,32 +681,25 @@ def reports_weekly_detail(request, year, week):
         sales_qs = sales_qs.filter(branch_id=branch_id)
         expenses_qs = expenses_qs.filter(branch_id=branch_id)
     
-    # Get sales with COGS
     sales_summary = get_sales_summary(sales_qs)
     expenses_summary = get_expenses_summary(expenses_qs)
     combined_summary = combine_summaries(sales_summary, expenses_summary)
     
-    # Daily breakdown with COGS
     daily_breakdown = get_combined_daily_breakdown(sales_qs, expenses_qs, week_start, week_end)
-    
-    # Get top products for the week
     top_products = get_top_products(sales_qs)
-    
-    # Get expense breakdown
     expense_breakdown = get_expense_category_breakdown(expenses_qs)
-    
-    # Get profit breakdown
     profit_breakdown = get_profit_breakdown(sales_qs)
     
     today = timezone.now().date()
     
     context = {
+        'company': company,
         'week_start': week_start,
         'week_end': week_end,
         'year': year,
         'week': week,
         'summary': combined_summary,
-        'combined_summary': combined_summary,  # For template consistency
+        'combined_summary': combined_summary,
         'daily_breakdown': daily_breakdown,
         'top_products': top_products,
         'expense_breakdown': expense_breakdown,
@@ -726,6 +707,7 @@ def reports_weekly_detail(request, year, week):
         'branches': Branch.objects.filter(company=company, is_active=True),
         'selected_branch': branch_id,
         'is_reports': True,
+        'is_viewing_company': is_viewing_company,
         'today': today,
     }
     return render(request, 'company/reports/weekly_detail.html', context)
@@ -738,10 +720,19 @@ def reports_weekly_detail(request, year, week):
 @login_required
 def reports_monthly_detail(request, year, month):
     """View detailed monthly report with COGS"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
     branch_id = request.GET.get('branch')
     
-    # Calculate month range
     month_start = date(year, month, 1)
     if month == 12:
         month_end = date(year + 1, 1, 1) - timedelta(days=1)
@@ -765,36 +756,27 @@ def reports_monthly_detail(request, year, month):
         sales_qs = sales_qs.filter(branch_id=branch_id)
         expenses_qs = expenses_qs.filter(branch_id=branch_id)
     
-    # Get sales with COGS
     sales_summary = get_sales_summary(sales_qs)
     expenses_summary = get_expenses_summary(expenses_qs)
     combined_summary = combine_summaries(sales_summary, expenses_summary)
     
-    # Daily breakdown with COGS
     daily_breakdown = get_combined_daily_breakdown(sales_qs, expenses_qs, month_start, month_end)
-    
-    # Get profit breakdown by product type
     profit_breakdown = get_profit_breakdown(sales_qs)
-    
-    # Get top selling products
     top_products = get_top_products(sales_qs)
-    
-    # Get expense breakdown by category
     expense_breakdown = get_expense_category_breakdown(expenses_qs)
-    
-    # Get sales by hour (aggregated for the month)
     sales_by_hour = get_sales_by_hour(sales_qs)
     
     today = timezone.now().date()
     
     context = {
+        'company': company,
         'month_start': month_start,
         'month_end': month_end,
         'year': year,
         'month': month,
         'month_name': month_start.strftime('%B'),
         'summary': combined_summary,
-        'combined_summary': combined_summary,  # For template consistency
+        'combined_summary': combined_summary,
         'daily_breakdown': daily_breakdown,
         'profit_breakdown': profit_breakdown,
         'top_products': top_products,
@@ -803,13 +785,14 @@ def reports_monthly_detail(request, year, month):
         'branches': Branch.objects.filter(company=company, is_active=True),
         'selected_branch': branch_id,
         'is_reports': True,
+        'is_viewing_company': is_viewing_company,
         'today': today,
     }
     return render(request, 'company/reports/monthly_detail.html', context)
 
 
 # ============================================
-# EXPORT REPORTS (CSV/PDF)
+# EXPORT REPORTS (CSV)
 # ============================================
 
 @login_required
@@ -818,7 +801,14 @@ def reports_export_csv(request, report_type, date_str=None, year=None, week=None
     import csv
     from django.http import HttpResponse
     
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        return JsonResponse({'error': 'No company assigned'}, status=400)
+    
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="{report_type}_report_{timezone.now().date()}.csv"'
     
@@ -867,7 +857,6 @@ def reports_export_csv(request, report_type, date_str=None, year=None, week=None
                 expense.reference or '-'
             ])
         
-        # Summary
         writer.writerow([])
         writer.writerow(['=== SUMMARY ==='])
         sales_summary = get_sales_summary(sales)
@@ -956,7 +945,14 @@ def reports_export_csv(request, report_type, date_str=None, year=None, week=None
 @login_required
 def reports_api_data(request):
     """API endpoint for reports data (for charts) with COGS"""
-    company = request.user.company
+    # ============================================
+    # SUPPORT MODE: Get active company
+    # ============================================
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        return JsonResponse({'error': 'No company assigned'}, status=400)
+    
     period = request.GET.get('period', 'monthly')
     branch_id = request.GET.get('branch')
     
@@ -970,7 +966,6 @@ def reports_api_data(request):
     data = {}
     
     if period == 'daily':
-        # Last 30 days
         start_date = timezone.now().date() - timedelta(days=30)
         daily_data = get_combined_daily_records(sales_qs, expenses_qs, start_date, timezone.now().date())
         data = {
@@ -985,7 +980,6 @@ def reports_api_data(request):
             'margin': [float(d['profit_margin']) for d in daily_data],
         }
     elif period == 'weekly':
-        # Last 12 weeks
         weekly_data = get_combined_weekly_records(sales_qs, expenses_qs, timezone.now().date())
         data = {
             'labels': [f"Week {d['week']}" for d in weekly_data[:12]],
@@ -999,7 +993,6 @@ def reports_api_data(request):
             'margin': [float(d['profit_margin']) for d in weekly_data[:12]],
         }
     elif period == 'monthly':
-        # Current year
         monthly_data = get_combined_monthly_records(sales_qs, expenses_qs, timezone.now().year)
         data = {
             'labels': [d['month_name'] for d in monthly_data],
