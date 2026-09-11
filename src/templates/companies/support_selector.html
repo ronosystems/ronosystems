@@ -85,15 +85,46 @@
         border-radius: 8px;
         padding: 20px;
     }
+    .session-history h6 {
+        color: #036a77;
+        font-weight: 700;
+    }
     .session-item {
         padding: 10px;
         border-bottom: 1px solid #dee2e6;
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 10px;
     }
     .session-item:last-child {
         border-bottom: none;
+    }
+    .session-item button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .session-item .session-actions {
+        display: flex;
+        gap: 6px;
+        flex-shrink: 0;
+    }
+    @media (max-width: 576px) {
+        .session-item {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .session-item .session-actions {
+            width: 100%;
+            margin-top: 8px;
+        }
+        .session-item .session-actions .btn,
+        .session-item .session-actions form {
+            flex: 1;
+        }
+        .session-item .session-actions form button {
+            width: 100%;
+        }
     }
 </style>
 {% endblock %}
@@ -143,7 +174,7 @@
                     <i class="fas fa-briefcase"></i> {{ company.business_type.name|default:"N/A" }}
                 </div>
                 <div class="company-meta">
-                    <i class="fas fa-tag"></i> Plan: {{ company.plan|title }}
+                    <i class="fas fa-tag"></i> Plan: {{ company.plan|default:"Free"|title }}
                 </div>
                 <div class="company-meta">
                     <i class="fas fa-circle" style="color: {% if company.status == 'active' %}#28a745{% else %}#dc3545{% endif %}; font-size: 8px;"></i>
@@ -166,7 +197,21 @@
     <!-- Recent Sessions -->
     {% if recent_sessions %}
     <div class="session-history">
-        <h6 class="mb-3"><i class="fas fa-history"></i> Recent Support Sessions</h6>
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <h6 class="mb-0">
+                <i class="fas fa-history"></i> Recent Support Sessions
+            </h6>
+            <form method="POST" 
+                  action="{% url 'support-sessions-clear' %}" 
+                  style="display:inline;"
+                  onsubmit="return confirm('Clear ALL ended support sessions? This cannot be undone.');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-danger">
+                    <i class="fas fa-broom"></i> Clear All Ended
+                </button>
+            </form>
+        </div>
+
         {% for session in recent_sessions %}
         <div class="session-item">
             <div>
@@ -181,9 +226,34 @@
                     {% endif %}
                 </small>
             </div>
-            <a href="{% url 'support-enter' session.company.id %}" class="btn btn-sm btn-outline-primary">
-                <i class="fas fa-redo"></i> Re-enter
-            </a>
+            <div class="session-actions">
+                <a href="{% url 'support-enter' session.company.id %}" 
+                   class="btn btn-sm btn-outline-primary" 
+                   title="Re-enter support mode">
+                    <i class="fas fa-redo"></i> Re-enter
+                </a>
+
+                {% if session.is_active %}
+                    <button type="button" 
+                            class="btn btn-sm btn-outline-secondary" 
+                            disabled 
+                            title="Cannot delete an active session. Exit support mode first.">
+                        <i class="fas fa-lock"></i>
+                    </button>
+                {% else %}
+                    <form method="POST" 
+                          action="{% url 'support-session-delete' session.id %}" 
+                          style="display:inline;"
+                          onsubmit="return confirm('Delete this support session for {{ session.company.name|escapejs }}?');">
+                        {% csrf_token %}
+                        <button type="submit" 
+                                class="btn btn-sm btn-outline-danger" 
+                                title="Delete this session">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
         </div>
         {% endfor %}
     </div>

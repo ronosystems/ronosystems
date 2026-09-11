@@ -86,6 +86,28 @@ def _subscription_is_valid(sub):
     return True
 
 
+
+def _clear_support_session(request):
+    """
+    Completely clear all support-mode session data.
+    
+    Steps:
+      1. Pop each support-mode key
+      2. Save the session (persist the removal)
+      3. Rotate the session key (optional, prevents fixation)
+    """
+    # 1. Pop every key (safe if missing)
+    for key in SUPPORT_SESSION_KEYS:
+        request.session.pop(key, None)
+    
+    # 2. Persist the changes to the DB / cache
+    request.session.modified = True
+    request.session.save()
+    
+    # 3. Rotate session key — this issues a NEW session cookie
+    request.session.cycle_key()
+
+
 # ============================================
 # SUBSCRIPTION EXPIRED LANDING PAGE
 # ============================================

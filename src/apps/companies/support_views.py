@@ -22,13 +22,11 @@ def company_selector(request):
     """Company selector page for support mode"""
     companies = Company.objects.filter(is_active=True).order_by('name')
     
-    # Get active support session if any
     active_session = SupportSession.objects.filter(
         super_admin=request.user,
         is_active=True
     ).first()
     
-    # Recent support sessions (last 10)
     recent_sessions = SupportSession.objects.filter(
         super_admin=request.user
     )[:10]
@@ -41,6 +39,49 @@ def company_selector(request):
         'page_subtitle': 'View and support any company',
     }
     return render(request, 'companies/support_selector.html', context)
+
+
+@login_required
+@super_admin_required
+def delete_support_session(request, session_id):
+    """Delete a single support session (audit log entry)"""
+    if request.method != 'POST':
+        messages.error(request, 'Invalid request method.')
+        return redirect('support-selector')
+    
+    session = get_object_or_404(
+        SupportSession,
+        id=session_id,
+        super_admin=request.user  # Only own sessions
+    )
+    
+    company_name = session.company.name
+    session.delete()
+    
+    messages.success(request, f'🗑️ Support session for "{company_name}" removed.')
+    return redirect('support-selector')
+
+
+@login_required
+@super_admin_required
+def clear_all_support_sessions(request):
+    """Clear ALL ended support sessions for the current super admin"""
+    if request.method != 'POST':
+        messages.error(request, 'Invalid request method.')
+        return redirect('support-selector')
+    
+    # Only delete ENDED sessions — keep active one
+    count, _ = SupportSession.objects.filter(
+        super_admin=request.user,
+        is_active=False
+    ).delete()
+    
+    if count > 0:
+        messages.success(request, f'🗑️ Cleared {count} ended support session(s).')
+    else:
+        messages.info(request, 'No ended sessions to clear.')
+    
+    return redirect('support-selector')
 
 
 @login_required
@@ -80,7 +121,6 @@ def enter_support_mode(request, company_id):
             return redirect('/epa_shop/dashboard/')
         elif 'supermarket' in business_name:
             return redirect('/supermarket/dashboard/')
-        # Add more business types as needed
     
     return redirect('/epa_shop/dashboard/')
 
@@ -89,19 +129,16 @@ def enter_support_mode(request, company_id):
 @super_admin_required
 def exit_support_mode(request):
     """Exit support mode"""
-    # End active session
     SupportSession.objects.filter(
         super_admin=request.user,
         is_active=True
     ).update(is_active=False, ended_at=timezone.now())
     
     # Clear session flags
-    if 'viewing_company_id' in request.session:
-        del request.session['viewing_company_id']
-    if 'support_mode' in request.session:
-        del request.session['support_mode']
-    if 'support_started_at' in request.session:
-        del request.session['support_started_at']
+    for key in ['viewing_company_id', 'support_mode', 'support_started_at']:
+        request.session.pop(key, None)
+    request.session.modified = True
+    request.session.save()
     
     messages.success(request, '👋 Exited Support Mode')
     return redirect('/companies/')
