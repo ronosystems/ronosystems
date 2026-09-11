@@ -4,25 +4,130 @@
 {% block page_title %}Edit Company{% endblock %}
 {% block page_subtitle %}{{ company.name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+    .card { border: 2px solid #000000; border-radius: 4px; box-shadow: none; }
+    .card-body { color: #000000; }
+
+    .form-control, .form-select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        color: #000000;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .form-label { color: #000000; font-weight: 600; }
+    .form-label.required:after { content: " *"; color: #dc3545; font-weight: bold; }
+
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+
+    .form-section-title {
+        background: #87CEEB;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 6px 12px;
+        margin: 18px 0 12px 0;
+        font-weight: 700;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .plan-preview {
+        border: 2px dashed #000000;
+        border-radius: 4px;
+        padding: 10px 14px;
+        background: #f8f9fa;
+        font-size: 13px;
+        margin-top: 6px;
+    }
+    .plan-preview .price { font-weight: 700; font-size: 15px; }
+    .plan-preview .feat-list { list-style: none; padding-left: 0; margin: 6px 0 0 0; }
+    .plan-preview .feat-list li { padding: 1px 0; }
+    .plan-preview .feat-list li i { color: #28a745; margin-right: 6px; }
+
+    /* Current state banner */
+    .state-banner {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 8px 12px;
+        font-size: 13px;
+        margin-bottom: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .state-banner.bg-success { background: #d4edda; color: #155724; }
+    .state-banner.bg-warning { background: #fff3cd; color: #856404; }
+    .state-banner.bg-danger  { background: #f8d7da; color: #721c24; }
+    .state-banner.bg-secondary { background: #f8f9fa; color: #000000; }
+
+    @media (max-width: 768px) {
+        .card-body { padding: 15px; }
+        .form-control, .form-select { font-size: 13px; padding: 6px 10px; }
+        .form-label { font-size: 13px; }
+        .btn { font-size: 12px; padding: 6px 12px; }
+        .state-banner { font-size: 12px; }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-lg-10 mx-auto">
         <div class="card">
             <div class="card-body p-4">
-                <form method="post">
+                <form method="post" id="companyForm">
                     {% csrf_token %}
-                    
+
+                    {# ============================================ #}
+                    {# COMPANY DETAILS #}
+                    {# ============================================ #}
+                    <div class="form-section-title">
+                        <i class="fas fa-building"></i> Company Details
+                    </div>
+
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label required">Company Name</label>
-                            <input type="text" class="form-control" name="name" value="{{ company.name }}" required>
+                            <input type="text" class="form-control" name="name"
+                                   value="{{ company.name }}" required>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Business Type</label>
                             <select class="form-select" name="business_type">
                                 <option value="">Select Business Type...</option>
                                 {% for bt in business_types %}
-                                <option value="{{ bt.id }}" {% if company.business_type_id == bt.id %}selected{% endif %}>
+                                <option value="{{ bt.id }}"
+                                    {% if company.business_type_id == bt.id %}selected{% endif %}>
                                     {{ bt.name }}
                                 </option>
                                 {% endfor %}
@@ -33,76 +138,219 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Registration Number</label>
-                            <input type="text" class="form-control" name="registration_number" value="{{ company.registration_number }}">
+                            <input type="text" class="form-control" name="registration_number"
+                                   value="{{ company.registration_number|default:'' }}">
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Plan</label>
-                            <select class="form-select" name="plan">
-                                {% for plan in plans %}
-                                <option value="{{ plan.name }}" {% if company.plan == plan.name %}selected{% endif %}>
-                                    {{ plan.display_name }} - {{ plan.currency }} {{ plan.price }}/{{ plan.billing_cycle }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Email</label>
-                            <input type="email" class="form-control" name="email" value="{{ company.email }}">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Phone</label>
-                            <input type="text" class="form-control" name="phone" value="{{ company.phone }}">
+                            <input type="email" class="form-control" name="email"
+                                   value="{{ company.email|default:'' }}">
                         </div>
                     </div>
 
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Website</label>
-                            <input type="url" class="form-control" name="website" value="{{ company.website }}">
+                            <label class="form-label">Phone</label>
+                            <input type="text" class="form-control" name="phone"
+                                   value="{{ company.phone|default:'' }}">
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Postal Code</label>
-                            <input type="text" class="form-control" name="postal_code" value="{{ company.postal_code }}">
+                            <label class="form-label">Website</label>
+                            <input type="url" class="form-control" name="website"
+                                   value="{{ company.website|default:'' }}">
                         </div>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Address</label>
-                        <textarea class="form-control" name="address" rows="2">{{ company.address }}</textarea>
+                        <textarea class="form-control" name="address" rows="2">{{ company.address|default:'' }}</textarea>
                     </div>
 
                     <div class="row">
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-3 mb-3">
                             <label class="form-label">City</label>
-                            <input type="text" class="form-control" name="city" value="{{ company.city }}">
+                            <input type="text" class="form-control" name="city"
+                                   value="{{ company.city|default:'' }}">
                         </div>
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-3 mb-3">
                             <label class="form-label">State/Province</label>
-                            <input type="text" class="form-control" name="state" value="{{ company.state }}">
+                            <input type="text" class="form-control" name="state"
+                                   value="{{ company.state|default:'' }}">
                         </div>
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-3 mb-3">
                             <label class="form-label">Country</label>
-                            <input type="text" class="form-control" name="country" value="{{ company.country }}">
+                            <input type="text" class="form-control" name="country"
+                                   value="{{ company.country|default:'' }}">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Postal Code</label>
+                            <input type="text" class="form-control" name="postal_code"
+                                   value="{{ company.postal_code|default:'' }}">
                         </div>
                     </div>
 
                     <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" name="is_active" id="isActive" {% if company.is_active %}checked{% endif %}>
+                        <input type="checkbox" class="form-check-input" name="is_active" id="isActive"
+                               {% if company.is_active %}checked{% endif %}>
                         <label class="form-check-label" for="isActive">Active</label>
                     </div>
 
-                    <div class="d-flex gap-2">
+                    {# ============================================ #}
+                    {# SUBSCRIPTION & PLAN #}
+                    {# ============================================ #}
+                    <div class="form-section-title">
+                        <i class="fas fa-crown"></i> Subscription & Plan
+                    </div>
+
+                    {# ---------- Current state banner ---------- #}
+                    {% with current=company.latest_subscription %}
+                        {% if current %}
+                            {% with state=current.display_state %}
+                                <div class="state-banner
+                                    {% if state == 'lifetime' or state == 'active' %}bg-success
+                                    {% elif state == 'expiring' or state == 'pending' %}bg-warning
+                                    {% elif state == 'expired' or state == 'cancelled' %}bg-danger
+                                    {% else %}bg-secondary{% endif %}">
+                                    <div>
+                                        <strong>Current subscription:</strong>
+                                        {{ current.plan.display_name }}
+                                        · <em>{{ current.get_status_display }}</em>
+                                        {% if current.end_date %}
+                                            · Exp: {{ current.end_date|date:"Y-m-d" }}
+                                        {% else %}
+                                            · Lifetime
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        <span class="badge
+                                            {% if state == 'lifetime' or state == 'active' %}bg-success
+                                            {% elif state == 'expiring' or state == 'pending' %}bg-warning
+                                            {% elif state == 'expired' or state == 'cancelled' %}bg-danger
+                                            {% else %}bg-secondary{% endif %}">
+                                            {{ state|title }}
+                                        </span>
+                                    </div>
+                                </div>
+                            {% endwith %}
+                        {% else %}
+                            <div class="state-banner bg-secondary">
+                                <div><strong>No subscription on record.</strong></div>
+                            </div>
+                        {% endif %}
+                    {% endwith %}
+
+                    {# ---------- Subscription form ---------- #}
+                    {% with sub=company.latest_subscription %}
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">Plan</label>
+                            <select class="form-select" name="plan" id="planSelect" required>
+                                {% for plan in plans %}
+                                <option value="{{ plan.id }}"
+                                        data-price="{{ plan.price }}"
+                                        data-currency="{{ plan.currency }}"
+                                        data-cycle="{{ plan.get_billing_cycle_display }}"
+                                        data-desc="{{ plan.description }}"
+                                        data-max-emp="{{ plan.max_employees }}"
+                                        data-max-branch="{{ plan.max_branches }}"
+                                        data-storage="{{ plan.max_storage }}"
+                                        data-api="{{ plan.has_api_access|yesno:'1,0' }}"
+                                        data-reports="{{ plan.has_advanced_reports|yesno:'1,0' }}"
+                                        data-branding="{{ plan.has_custom_branding|yesno:'1,0' }}"
+                                        data-support="{{ plan.has_priority_support|yesno:'1,0' }}"
+                                        data-bulk="{{ plan.has_bulk_import|yesno:'1,0' }}"
+                                        data-domain="{{ plan.has_custom_domain|yesno:'1,0' }}"
+                                        data-mpesa="{{ plan.has_mpesa_intergration|yesno:'1,0' }}"
+                                        {% if company.plan_id == plan.id %}selected{% endif %}>
+                                    {{ plan.display_name }} — {{ plan.currency }} {{ plan.price }}/{{ plan.get_billing_cycle_display }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="plan-preview" id="planPreview"></div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">Subscription Start</label>
+                            <input type="datetime-local"
+                                   class="form-control"
+                                   name="subscription_start"
+                                   value="{% if sub %}{{ sub.start_date|date:'Y-m-d\TH:i' }}{% endif %}">
+
+                            <label class="form-label mt-3">Subscription End</label>
+                            <input type="datetime-local"
+                                   class="form-control"
+                                   name="subscription_end"
+                                   value="{% if sub and sub.end_date %}{{ sub.end_date|date:'Y-m-d\TH:i' }}{% endif %}">
+                            <small class="text-muted">Leave blank for lifetime / no expiry.</small>
+
+                            <label class="form-label mt-3">Subscription Status</label>
+                            <select class="form-select" name="subscription_status">
+                                <option value="active"    {% if sub and sub.status == 'active' %}selected{% endif %}>Active</option>
+                                <option value="pending"   {% if sub and sub.status == 'pending' %}selected{% endif %}>Pending</option>
+                                <option value="inactive"  {% if sub and sub.status == 'inactive' %}selected{% endif %}>Inactive</option>
+                                <option value="cancelled" {% if sub and sub.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                                <option value="expired"   {% if sub and sub.status == 'expired' %}selected{% endif %}>Expired</option>
+                            </select>
+                        </div>
+                    </div>
+                    {% endwith %}
+
+                    {# ---------- Actions ---------- #}
+                    <div class="d-flex gap-2 mt-3">
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-save"></i> Update Company
                         </button>
-                        <a href="/companies/" class="btn btn-secondary">Cancel</a>
+                        <a href="{% url 'companies:company-detail' company.id %}" class="btn btn-secondary">
+                            Cancel
+                        </a>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+(function () {
+    const planSelect = document.getElementById('planSelect');
+    const preview = document.getElementById('planPreview');
+
+    function renderPreview() {
+        const opt = planSelect.options[planSelect.selectedIndex];
+        if (!opt) { preview.innerHTML = ''; return; }
+
+        const price    = opt.dataset.price || '0';
+        const currency = opt.dataset.currency || '';
+        const cycle    = opt.dataset.cycle || '';
+        const desc     = opt.dataset.desc || '';
+        const maxEmp   = opt.dataset.maxEmp || '-';
+        const maxBranch= opt.dataset.maxBranch || '-';
+        const storage  = opt.dataset.storage || '-';
+
+        const feats = [];
+        if (opt.dataset.api === '1')      feats.push('API Access');
+        if (opt.dataset.reports === '1')  feats.push('Advanced Reports');
+        if (opt.dataset.branding === '1') feats.push('Custom Branding');
+        if (opt.dataset.support === '1')  feats.push('Priority Support');
+        if (opt.dataset.bulk === '1')     feats.push('Bulk Import');
+        if (opt.dataset.domain === '1')   feats.push('Custom Domain');
+        if (opt.dataset.mpesa === '1')    feats.push('M-Pesa Integration');
+
+        let html = `
+            <div class="price">${currency} ${price} <span style="font-weight:400;">/ ${cycle}</span></div>
+            ${desc ? `<div style="margin-top:4px;">${desc}</div>` : ''}
+            <div style="margin-top:6px;">
+                <strong>Limits:</strong> ${maxEmp} employees · ${maxBranch} branches · ${storage} MB storage
+            </div>
+        `;
+        if (feats.length) {
+            html += `<ul class="feat-list">${feats.map(f => `<li><i class="fas fa-check"></i>${f}</li>`).join('')}</ul>`;
+        }
+        preview.innerHTML = html;
+    }
+
+    planSelect.addEventListener('change', renderPreview);
+    renderPreview();   // ← runs on page load, so preview matches current plan
+})();
+</script>
 {% endblock %}

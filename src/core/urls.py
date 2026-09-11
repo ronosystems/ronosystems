@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from apps.companies import web_views as company_views
 from . import views
 
 admin.site.site_header = "RS ADMINISTRATION"
@@ -22,6 +23,7 @@ urlpatterns = [
     path('company/', include('apps.company.urls_web')), 
     path('epa_shop/', include('apps.epa_shop.urls_web')),
     path('business-types/', include('apps.business_types.urls')),
+    path('subscription-expired/', company_views.subscription_expired, name='subscription-expired'),
     path('companies/', include('apps.companies.web_urls')),
     path('employees/', include('apps.employees.web_urls')),
     

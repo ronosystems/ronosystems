@@ -1,210 +1,464 @@
 {% extends 'base.html' %}
 
-{% block title %}Subscription #{{ subscription.id }} - RonoSystems{% endblock %}
+{% block title %}Subscription #{{ subscription.id }}{% endblock %}
 {% block page_title %}Subscription #{{ subscription.id }}{% endblock %}
-{% block page_subtitle %}{{ subscription.company.name }} - {{ subscription.plan.display_name }}{% endblock %}
+{% block page_subtitle %}{{ subscription.company.name }} · {{ subscription.plan.display_name }}{% endblock %}
 
 {% block extra_css %}
 <style>
-    .info-card {
-        background: white;
-        border-radius: 10px;
-        padding: 20px;
-        border: 1px solid #e9ecef;
-        margin-bottom: 20px;
+    /* ============================================ */
+    /* CARDS                                         */
+    /* ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
     }
-    .info-card .info-label {
+    .card-header {
+        background: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 10px 16px;
+        color: #000000 !important;
+        border-radius: 0 !important;
+    }
+    .card-header h6 {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 700;
+        color: #000000 !important;
+    }
+    .card-body {
+        padding: 16px;
+        color: #000000;
+    }
+
+    /* ============================================ */
+    /* INFO BLOCKS                                   */
+    /* ============================================ */
+    .info-block {
+        background: #f8f9fa;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 12px 14px;
+        height: 100%;
+    }
+    .info-block .info-label {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: #000000;
+        opacity: 0.75;
+        margin-bottom: 4px;
+    }
+    .info-block .info-value {
+        font-size: 15px;
+        font-weight: 700;
+        color: #000000;
+        line-height: 1.25;
+    }
+    .info-block .info-sub {
         font-size: 12px;
-        color: #6c757d;
+        color: #333;
+        margin-top: 2px;
+    }
+
+    /* ============================================ */
+    /* STATUS PILL                                   */
+    /* ============================================ */
+    .status-pill {
+        display: inline-block;
+        padding: 4px 14px;
+        border-radius: 50px;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        border: 1px solid #000000;
+    }
+    .status-pill.active    { background: #d4edda; color: #155724; }
+    .status-pill.lifetime  { background: #d4edda; color: #155724; }
+    .status-pill.expired   { background: #f8d7da; color: #721c24; }
+    .status-pill.cancelled { background: #f8d7da; color: #721c24; }
+    .status-pill.pending   { background: #fff3cd; color: #856404; }
+    .status-pill.expiring  { background: #fff3cd; color: #856404; }
+    .status-pill.inactive  { background: #f8f9fa; color: #000000; }
+
+    /* ============================================ */
+    /* DAYS REMAINING                                */
+    /* ============================================ */
+    .remaining-block {
+        border: 2px dashed #000000;
+        border-radius: 4px;
+        padding: 10px 14px;
+        text-align: center;
+        background: #f8f9fa;
+    }
+    .remaining-block .remaining-label {
+        font-size: 10px;
+        font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        font-weight: 600;
+        color: #000000;
+        opacity: 0.75;
     }
-    .info-card .info-value {
-        font-size: 16px;
-        font-weight: 600;
-        color: #2d3436;
-        margin-top: 4px;
+    .remaining-block .remaining-value {
+        font-size: 22px;
+        font-weight: 700;
+        line-height: 1.1;
+        margin-top: 2px;
     }
-    .subscription-status-large {
-        display: inline-block;
-        padding: 6px 20px;
-        border-radius: 50px;
-        font-size: 14px;
-        font-weight: 600;
+    .remaining-block.ok      { background: #d4edda; }
+    .remaining-block.ok      .remaining-value { color: #155724; }
+    .remaining-block.warn    { background: #fff3cd; }
+    .remaining-block.warn    .remaining-value { color: #856404; }
+    .remaining-block.danger  { background: #f8d7da; }
+    .remaining-block.danger  .remaining-value { color: #721c24; }
+    .remaining-block.neutral { background: #f8f9fa; }
+    .remaining-block.neutral .remaining-value { color: #000000; }
+
+    /* ============================================ */
+    /* FEATURE LIST                                  */
+    /* ============================================ */
+    .feature-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
     }
-    .subscription-status-large.active {
-        background: #d4edda;
+    .feature-list li {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 0;
+        font-size: 13px;
+        border-bottom: 1px dashed #e0e0e0;
+    }
+    .feature-list li:last-child { border-bottom: none; }
+    .feature-list li i {
         color: #155724;
+        width: 16px;
+        text-align: center;
+        font-size: 12px;
     }
-    .subscription-status-large.expired {
-        background: #f8d7da;
-        color: #721c24;
+    .feature-list li.disabled i {
+        color: #dc3545;
     }
-    .subscription-status-large.cancelled {
-        background: #fff3cd;
-        color: #856404;
+    .feature-list li.disabled {
+        color: #999;
     }
-    .subscription-status-large.pending {
-        background: #cce5ff;
-        color: #004085;
+
+    /* ============================================ */
+    /* BUTTONS                                       */
+    /* ============================================ */
+    .btn-primary {
+        background: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
     }
-    .subscription-status-large.inactive {
-        background: #e9ecef;
-        color: #6c757d;
+    .btn-primary:hover {
+        background: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-success {
+        background: #28a745;
+        border: 2px solid #000000;
+        color: #ffffff;
+        border-radius: 4px;
+        font-weight: 700;
+    }
+    .btn-success:hover {
+        background: #218838;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    .btn-danger {
+        background: #dc3545;
+        border: 2px solid #000000;
+        color: #ffffff;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-danger:hover {
+        background: #c82333;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    .btn-secondary {
+        background: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-secondary:hover {
+        background: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-outline-info {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    .btn-outline-info:hover {
+        background: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+
+    @media (max-width: 768px) {
+        .card-body { padding: 12px; }
+        .info-block { padding: 10px; }
+        .info-block .info-value { font-size: 13px; }
+        .remaining-block .remaining-value { font-size: 18px; }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="row">
+<div class="row g-3">
+
+    {# ============================================ #}
+    {# LEFT COLUMN — details                         #}
+    {# ============================================ #}
     <div class="col-lg-8">
-        <!-- Subscription Info -->
+
         <div class="card">
             <div class="card-header">
-                <h6 class="mb-0"><i class="fas fa-info-circle"></i> Subscription Information</h6>
+                <h6><i class="fas fa-info-circle"></i> Subscription Information</h6>
             </div>
             <div class="card-body">
-                <div class="row">
+
+                {# ---------- Row 1: Company + Plan ---------- #}
+                <div class="row g-2 mb-2">
                     <div class="col-md-6">
-                        <div class="info-card">
+                        <div class="info-block">
                             <div class="info-label"><i class="fas fa-building"></i> Company</div>
                             <div class="info-value">{{ subscription.company.name }}</div>
-                            <small class="text-muted">{{ subscription.company.email }}</small>
+                            <div class="info-sub">{{ subscription.company.email|default:"—" }}</div>
                         </div>
                     </div>
                     <div class="col-md-6">
-                        <div class="info-card">
+                        <div class="info-block">
                             <div class="info-label"><i class="fas fa-crown"></i> Plan</div>
                             <div class="info-value">{{ subscription.plan.display_name }}</div>
-                            <small class="text-muted">{{ subscription.plan.currency }} {{ subscription.plan.price|floatformat:0 }} / {{ subscription.plan.billing_cycle }}</small>
+                            <div class="info-sub">
+                                {{ subscription.plan.currency }} {{ subscription.plan.price|floatformat:0 }}
+                                / {{ subscription.plan.get_billing_cycle_display }}
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="row">
+
+                {# ---------- Row 2: Status + Days Remaining ---------- #}
+                <div class="row g-2 mb-2">
                     <div class="col-md-6">
-                        <div class="info-card">
-                            <div class="info-label"><i class="fas fa-calendar-plus"></i> Start Date</div>
-                            <div class="info-value">{{ subscription.start_date|date:"Y-m-d H:i" }}</div>
+                        <div class="info-block">
+                            <div class="info-label"><i class="fas fa-tag"></i> Status</div>
+                            <div class="info-value">
+                                {% with state=subscription.display_state %}
+                                    <span class="status-pill {{ state }}">
+                                        {{ state|title }}
+                                    </span>
+                                {% endwith %}
+                            </div>
                         </div>
                     </div>
                     <div class="col-md-6">
-                        <div class="info-card">
+                        {% if not subscription.end_date %}
+                            <div class="remaining-block neutral">
+                                <div class="remaining-label">Validity</div>
+                                <div class="remaining-value">Lifetime</div>
+                            </div>
+                        {% elif subscription.is_expired_now %}
+                            <div class="remaining-block danger">
+                                <div class="remaining-label">Expired</div>
+                                <div class="remaining-value">
+                                    {{ subscription.days_since_expiry }}d ago
+                                </div>
+                            </div>
+                        {% elif subscription.days_until_expiry <= 7 %}
+                            <div class="remaining-block warn">
+                                <div class="remaining-label">Expiring soon</div>
+                                <div class="remaining-value">
+                                    {{ subscription.days_until_expiry }}d left
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="remaining-block ok">
+                                <div class="remaining-label">Days remaining</div>
+                                <div class="remaining-value">
+                                    {{ subscription.days_until_expiry }}
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {# ---------- Row 3: Start + End ---------- #}
+                <div class="row g-2 mb-2">
+                    <div class="col-md-6">
+                        <div class="info-block">
+                            <div class="info-label"><i class="fas fa-calendar-plus"></i> Start Date</div>
+                            <div class="info-value">
+                                {{ subscription.start_date|date:"Y-m-d H:i" }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-block">
                             <div class="info-label"><i class="fas fa-calendar-times"></i> End Date</div>
                             <div class="info-value">
                                 {% if subscription.end_date %}
                                     {{ subscription.end_date|date:"Y-m-d H:i" }}
                                 {% else %}
-                                    <span class="text-muted">Never</span>
+                                    <span style="opacity:0.6;">Never (Lifetime)</span>
                                 {% endif %}
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="info-card">
-                            <div class="info-label"><i class="fas fa-tag"></i> Status</div>
-                            <div class="info-value">
-                                <span class="subscription-status-large {{ subscription.status }}">
-                                    {{ subscription.status|title }}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="info-card">
+
+                {# ---------- Row 4: Payment ---------- #}
+                <div class="row g-2">
+                    <div class="col-12">
+                        <div class="info-block">
                             <div class="info-label"><i class="fas fa-credit-card"></i> Payment</div>
                             <div class="info-value">
                                 {% if subscription.payment_method %}
                                     {{ subscription.payment_method|title }}
-                                    {% if subscription.payment_reference %}
-                                        <br><small class="text-muted">Ref: {{ subscription.payment_reference }}</small>
-                                    {% endif %}
                                 {% else %}
-                                    <span class="text-muted">Not specified</span>
+                                    <span style="opacity:0.6;">Not specified</span>
                                 {% endif %}
                             </div>
+                            {% if subscription.payment_reference %}
+                                <div class="info-sub">
+                                    <strong>Ref:</strong>
+                                    <code>{{ subscription.payment_reference }}</code>
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
+
             </div>
         </div>
     </div>
 
-    <!-- Sidebar -->
+    {# ============================================ #}
+    {# RIGHT COLUMN — actions + meta                 #}
+    {# ============================================ #}
     <div class="col-lg-4">
-        <!-- Quick Actions -->
+
+        {# ---------- QUICK ACTIONS ---------- #}
         <div class="card">
             <div class="card-header">
-                <h6 class="mb-0"><i class="fas fa-cog"></i> Quick Actions</h6>
+                <h6><i class="fas fa-cog"></i> Quick Actions</h6>
             </div>
-            <div class="card-body">
-                <div class="d-grid gap-2">
-                    <a href="{% url 'plans:subscription-edit' subscription.id %}" class="btn btn-primary">
-                        <i class="fas fa-edit"></i> Edit Subscription
-                    </a>
-                    {% if subscription.status == 'active' %}
-                    <a href="{% url 'plans:subscription-cancel' subscription.id %}" class="btn btn-danger"
-                       onclick="return confirm('Are you sure you want to cancel this subscription?')">
+            <div class="card-body d-grid gap-2">
+                {# Renew — jumps to the company payments page #}
+                <a href="{% url 'companies:company-payments' subscription.company.id %}"
+                   class="btn btn-success">
+                    <i class="fas fa-credit-card"></i> Renew / Pay Now
+                </a>
+
+                <a href="{% url 'plans:subscription-edit' subscription.id %}"
+                   class="btn btn-primary">
+                    <i class="fas fa-edit"></i> Edit Subscription
+                </a>
+
+                {% if subscription.status == 'active' %}
+                    <a href="{% url 'plans:subscription-cancel' subscription.id %}"
+                       class="btn btn-danger"
+                       onclick="return confirm('Cancel this subscription for {{ subscription.company.name }}?');">
                         <i class="fas fa-times"></i> Cancel Subscription
                     </a>
-                    {% endif %}
-                    <a href="{% url 'plans:subscription-list' %}" class="btn btn-secondary">
-                        <i class="fas fa-arrow-left"></i> Back to Subscriptions
-                    </a>
-                </div>
+                {% endif %}
+
+                <a href="{% url 'plans:subscription-list' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Subscriptions
+                </a>
             </div>
         </div>
 
-        <!-- Company Info -->
+        {# ---------- COMPANY INFO ---------- #}
         <div class="card mt-3">
             <div class="card-header">
-                <h6 class="mb-0"><i class="fas fa-building"></i> Company Details</h6>
+                <h6><i class="fas fa-building"></i> Company Details</h6>
             </div>
             <div class="card-body">
-                <p><strong>Name:</strong> {{ subscription.company.name }}</p>
-                <p><strong>Email:</strong> {{ subscription.company.email }}</p>
-                <p><strong>Phone:</strong> {{ subscription.company.phone|default:"-" }}</p>
-                <p><strong>Plan:</strong> {{ subscription.company.plan|title }}</p>
-                <a href="/companies/{{ subscription.company.id }}/" class="btn btn-outline-info btn-sm w-100">
+                <p class="mb-1"><strong>Name:</strong> {{ subscription.company.name }}</p>
+                <p class="mb-1"><strong>Email:</strong> {{ subscription.company.email|default:"—" }}</p>
+                <p class="mb-1"><strong>Phone:</strong> {{ subscription.company.phone|default:"—" }}</p>
+                <p class="mb-2">
+                    <strong>Current Plan:</strong>
+                    {% if subscription.company.plan %}
+                        {{ subscription.company.plan.display_name }}
+                    {% else %}
+                        <span style="opacity:0.6;">None</span>
+                    {% endif %}
+                </p>
+                <a href="{% url 'companies:company-detail' subscription.company.id %}"
+                   class="btn btn-outline-info btn-sm w-100">
                     <i class="fas fa-eye"></i> View Company
                 </a>
             </div>
         </div>
 
-        <!-- Plan Details -->
+        {# ---------- PLAN FEATURES ---------- #}
         <div class="card mt-3">
             <div class="card-header">
-                <h6 class="mb-0"><i class="fas fa-crown"></i> Plan Features</h6>
+                <h6><i class="fas fa-crown"></i> Plan Features</h6>
             </div>
             <div class="card-body">
-                <ul class="list-unstyled mb-0">
-                    <li><i class="fas fa-user-check text-success"></i> {{ subscription.plan.max_employees }} Employees</li>
-                    <li><i class="fas fa-building text-success"></i> {{ subscription.plan.max_companies }} Company</li>
-                    <li><i class="fas fa-store text-success"></i> {{ subscription.plan.max_branches }} Branches</li>
-                    <li><i class="fas fa-database text-success"></i> {{ subscription.plan.max_storage }} MB Storage</li>
-                    {% if subscription.plan.has_api_access %}
-                    <li><i class="fas fa-code text-success"></i> API Access</li>
-                    {% endif %}
-                    {% if subscription.plan.has_advanced_reports %}
-                    <li><i class="fas fa-chart-bar text-success"></i> Advanced Reports</li>
-                    {% endif %}
+                <ul class="feature-list">
+                    <li><i class="fas fa-user-check"></i> {{ subscription.plan.max_employees }} Employees</li>
+                    <li><i class="fas fa-building"></i> {{ subscription.plan.max_companies }} Companies</li>
+                    <li><i class="fas fa-store"></i> {{ subscription.plan.max_branches }} Branches</li>
+                    <li><i class="fas fa-database"></i> {{ subscription.plan.max_storage }} MB Storage</li>
+
+                    <li class="{% if not subscription.plan.has_api_access %}disabled{% endif %}">
+                        <i class="fas {% if subscription.plan.has_api_access %}fa-check{% else %}fa-times{% endif %}"></i>
+                        API Access
+                    </li>
+                    <li class="{% if not subscription.plan.has_advanced_reports %}disabled{% endif %}">
+                        <i class="fas {% if subscription.plan.has_advanced_reports %}fa-check{% else %}fa-times{% endif %}"></i>
+                        Advanced Reports
+                    </li>
+                    <li class="{% if not subscription.plan.has_custom_branding %}disabled{% endif %}">
+                        <i class="fas {% if subscription.plan.has_custom_branding %}fa-check{% else %}fa-times{% endif %}"></i>
+                        Custom Branding
+                    </li>
+                    <li class="{% if not subscription.plan.has_priority_support %}disabled{% endif %}">
+                        <i class="fas {% if subscription.plan.has_priority_support %}fa-check{% else %}fa-times{% endif %}"></i>
+                        Priority Support
+                    </li>
+                    <li class="{% if not subscription.plan.has_mpesa_intergration %}disabled{% endif %}">
+                        <i class="fas {% if subscription.plan.has_mpesa_intergration %}fa-check{% else %}fa-times{% endif %}"></i>
+                        M-Pesa Integration
+                    </li>
                 </ul>
-                <a href="{% url 'plans:plan-detail' subscription.plan.id %}" class="btn btn-outline-info btn-sm w-100 mt-2">
-                    <i class="fas fa-eye"></i> View Plan
+
+                <a href="{% url 'plans:plan-detail' subscription.plan.id %}"
+                   class="btn btn-outline-info btn-sm w-100 mt-3">
+                    <i class="fas fa-eye"></i> View Full Plan
                 </a>
             </div>
         </div>
 
-        <!-- Timestamps -->
+        {# ---------- TIMESTAMPS ---------- #}
         <div class="card mt-3">
             <div class="card-header">
-                <h6 class="mb-0"><i class="fas fa-clock"></i> Timestamps</h6>
+                <h6><i class="fas fa-clock"></i> Timestamps</h6>
             </div>
             <div class="card-body">
-                <p><strong>Created:</strong> {{ subscription.created_at|date:"Y-m-d H:i" }}</p>
-                <p><strong>Last Updated:</strong> {{ subscription.updated_at|date:"Y-m-d H:i" }}</p>
+                <p class="mb-1"><strong>Created:</strong> {{ subscription.created_at|date:"Y-m-d H:i" }}</p>
+                <p class="mb-0"><strong>Updated:</strong> {{ subscription.updated_at|date:"Y-m-d H:i" }}</p>
             </div>
         </div>
     </div>
