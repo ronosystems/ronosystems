@@ -6,9 +6,10 @@ from apps.epa_shop.models import Branch
 
 User = get_user_model()
 
+
 class Expense(models.Model):
     """Expense tracking model for recording daily expenses"""
-    
+
     # Payment Methods
     PAYMENT_METHODS = (
         ('cash', 'Cash'),
@@ -17,7 +18,7 @@ class Expense(models.Model):
         ('card', 'Card'),
         ('other', 'Other'),
     )
-    
+
     # Expense Categories
     CATEGORY_RENT = 'rent'
     CATEGORY_SALARY = 'salary'
@@ -29,7 +30,7 @@ class Expense(models.Model):
     CATEGORY_TAX = 'tax'
     CATEGORY_INSURANCE = 'insurance'
     CATEGORY_OTHER = 'other'
-    
+
     EXPENSE_CATEGORIES = (
         (CATEGORY_RENT, 'Rent'),
         (CATEGORY_SALARY, 'Salary'),
@@ -42,66 +43,74 @@ class Expense(models.Model):
         (CATEGORY_INSURANCE, 'Insurance'),
         (CATEGORY_OTHER, 'Other'),
     )
-    
+
     # Status
     STATUS_PENDING = 'pending'
     STATUS_APPROVED = 'approved'
     STATUS_REJECTED = 'rejected'
-    
+
     EXPENSE_STATUS = (
         (STATUS_PENDING, 'Pending'),
         (STATUS_APPROVED, 'Approved'),
         (STATUS_REJECTED, 'Rejected'),
     )
-    
+
     # Basic Information
     company = models.ForeignKey(
-        Company, 
-        on_delete=models.CASCADE, 
+        Company,
+        on_delete=models.CASCADE,
         related_name='expenses'
     )
     branch = models.ForeignKey(
-        Branch, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
+        Branch,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='expenses'
     )
-    
+
     # Expense Details
     expense_date = models.DateField(default=timezone.now)
     category = models.CharField(max_length=20, choices=EXPENSE_CATEGORIES)
     description = models.CharField(max_length=200)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    
+
     # Payment Details
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS, default='cash')
     reference = models.CharField(max_length=100, blank=True, help_text="Invoice or receipt number")
-    
+
+    # Attachment (receipt / invoice image or PDF)
+    attachment = models.FileField(
+        upload_to='expense_attachments/%Y/%m/',
+        blank=True,
+        null=True,
+        help_text="Upload receipt or invoice (JPG, PNG, GIF, or PDF)"
+    )
+
     # Additional Info
     notes = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=EXPENSE_STATUS, default=STATUS_PENDING)
-    
+
     # Audit Trail
     created_by = models.ForeignKey(
-        User, 
-        on_delete=models.SET_NULL, 
-        null=True, 
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
         related_name='expenses_created'
     )
     approved_by = models.ForeignKey(
-        User, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='expenses_approved'
     )
     approved_at = models.DateTimeField(null=True, blank=True)
-    
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         db_table = 'company_expenses'
         ordering = ['-expense_date', '-created_at']
@@ -111,10 +120,10 @@ class Expense(models.Model):
             models.Index(fields=['company', 'status']),
             models.Index(fields=['expense_date']),
         ]
-    
+
     def __str__(self):
         return f"{self.category} - {self.description} (KSh {self.amount})"
-    
+
     @property
     def category_display(self):
         """Get the display name for the category"""
@@ -122,7 +131,7 @@ class Expense(models.Model):
             if key == self.category:
                 return value
         return self.category
-    
+
     @property
     def status_display(self):
         """Get the display name for the status"""
@@ -130,7 +139,7 @@ class Expense(models.Model):
             if key == self.status:
                 return value
         return self.status
-    
+
     @property
     def payment_method_display(self):
         """Get the display name for the payment method"""
@@ -138,14 +147,39 @@ class Expense(models.Model):
             if key == self.payment_method:
                 return value
         return self.payment_method
-    
+
+    @property
+    def has_attachment(self):
+        """Return True if an attachment file exists"""
+        return bool(self.attachment)
+
+    @property
+    def is_pdf(self):
+        """Return True if the attachment is a PDF"""
+        if not self.attachment:
+            return False
+        return self.attachment.name.lower().endswith('.pdf')
+
+    def save(self, *args, **kwargs):
+        """
+        Override save to delete the old attachment file when it is replaced.
+        """
+        if self.pk:
+            try:
+                old = Expense.objects.get(pk=self.pk)
+                if old.attachment and old.attachment != self.attachment:
+                    old.attachment.delete(save=False)
+            except Expense.DoesNotExist:
+                pass
+        super().save(*args, **kwargs)
+
     def approve(self, user):
         """Approve the expense"""
         self.status = self.STATUS_APPROVED
         self.approved_by = user
         self.approved_at = timezone.now()
         self.save()
-    
+
     def reject(self):
         """Reject the expense"""
         self.status = self.STATUS_REJECTED

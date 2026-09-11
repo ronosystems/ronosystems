@@ -5,7 +5,7 @@ from django.db.models import Sum, Count, Q, Value, CharField
 from django.db.models.functions import Concat
 from django.utils import timezone
 from datetime import datetime, timedelta, date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
@@ -15,12 +15,18 @@ from apps.epa_shop.models import Branch
 from .models import Expense
 
 # ============================================
+# CONSTANTS
+# ============================================
+
+# Max attachment size: 5 MB
+MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024
+ALLOWED_ATTACHMENT_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf')
+
+# ============================================
 # EXPENSE CATEGORIES (From Model)
 # ============================================
 
 EXPENSE_CATEGORIES = Expense.EXPENSE_CATEGORIES
-
-
 
 
 # ============================================
@@ -32,13 +38,13 @@ def expenses_dashboard(request):
     """Main expenses dashboard with daily, weekly, monthly views"""
     company = request.user.company
     user_branch = get_user_branch(request.user)
-    
+
     # Check if user is admin
     is_admin = request.user.role in ['super_admin', 'company_admin']
-    
+
     # Base queryset
     expenses_qs = Expense.objects.filter(company=company)
-    
+
     # Filter by branch for non-admin users
     if not is_admin:
         if user_branch:
@@ -46,52 +52,52 @@ def expenses_dashboard(request):
         else:
             messages.warning(request, 'You are not assigned to any branch.')
             expenses_qs = expenses_qs.none()
-    
+
     # Apply filters from GET parameters
     branch_id = request.GET.get('branch')
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
-    
+
     if branch_id:
         expenses_qs = expenses_qs.filter(branch_id=branch_id)
-    
+
     if date_from:
         expenses_qs = expenses_qs.filter(expense_date__gte=date_from)
     if date_to:
         expenses_qs = expenses_qs.filter(expense_date__lte=date_to)
-    
+
     # Get branches for filter (only show accessible branches)
     branches = Branch.objects.filter(company=company, is_active=True)
     if not is_admin and user_branch:
         branches = branches.filter(id=user_branch.id)
-    
+
     # Today's summary
     today = timezone.now().date()
     today_expenses = expenses_qs.filter(expense_date=today)
     today_summary = get_expenses_summary(today_expenses)
-    
+
     # This week summary
     week_start = today - timedelta(days=today.weekday())
     week_expenses = expenses_qs.filter(expense_date__gte=week_start)
     week_summary = get_expenses_summary(week_expenses)
-    
+
     # This month summary
     month_start = today.replace(day=1)
     month_expenses = expenses_qs.filter(expense_date__gte=month_start)
     month_summary = get_expenses_summary(month_expenses)
-    
+
     # Daily records for the current month with submitter information
     daily_records = get_daily_expense_records_with_submitters(expenses_qs, month_start, today)
-    
+
     # Weekly records
     weekly_records = get_weekly_expense_records(expenses_qs, today)
-    
+
     # Monthly records
     monthly_records = get_monthly_expense_records(expenses_qs, today.year)
-    
+
     # Expense categories breakdown
     category_breakdown = get_category_breakdown(expenses_qs)
-    
+
     context = {
         'branches': branches,
         'today_summary': today_summary,
@@ -125,12 +131,12 @@ def expense_create(request):
     company = request.user.company
     user_branch = get_user_branch(request.user)
     is_admin = request.user.role in ['super_admin', 'company_admin']
-    
+
     # Get branches user has access to
     branches = Branch.objects.filter(company=company, is_active=True)
     if not is_admin and user_branch:
         branches = branches.filter(id=user_branch.id)
-    
+
     if request.method == 'POST':
         try:
             # Get form data
@@ -142,24 +148,31 @@ def expense_create(request):
             payment_method = request.POST.get('payment_method', 'cash')
             reference = request.POST.get('reference', '').strip()
             notes = request.POST.get('notes', '').strip()
-            
+            attachment = request.FILES.get('attachment')
+
             # Validate
             if not expense_date:
                 messages.error(request, 'Please select a date.')
                 return redirect('company-expenses-create')
-            
+
             if not category:
                 messages.error(request, 'Please select a category.')
                 return redirect('company-expenses-create')
-            
+
             if not description:
                 messages.error(request, 'Please enter a description.')
                 return redirect('company-expenses-create')
-            
+
             if amount <= 0:
                 messages.error(request, 'Amount must be greater than 0.')
                 return redirect('company-expenses-create')
-            
+
+            # Validate attachment
+            attachment_error = validate_attachment(attachment)
+            if attachment_error:
+                messages.error(request, attachment_error)
+                return redirect('company-expenses-create')
+
             # Get branch - enforce branch access
             branch = None
             if branch_id:
@@ -172,7 +185,7 @@ def expense_create(request):
                 # If no branch selected and user is not admin, use their branch
                 if not is_admin and user_branch:
                     branch = user_branch
-            
+
             # Create expense
             expense = Expense.objects.create(
                 company=company,
@@ -184,20 +197,24 @@ def expense_create(request):
                 payment_method=payment_method,
                 reference=reference,
                 notes=notes,
+                attachment=attachment,
                 created_by=request.user,
                 status=Expense.STATUS_PENDING
             )
-            
+
             messages.success(request, f'✅ Expense "{expense.description}" recorded successfully!')
             return redirect('company-expenses-dashboard')
-            
+
         except Branch.DoesNotExist:
             messages.error(request, 'Selected branch does not exist.')
+            return redirect('company-expenses-create')
+        except (InvalidOperation, ValueError):
+            messages.error(request, 'Invalid amount entered.')
             return redirect('company-expenses-create')
         except Exception as e:
             messages.error(request, f'❌ Error saving expense: {str(e)}')
             return redirect('company-expenses-create')
-    
+
     context = {
         'branches': branches,
         'expense_categories': EXPENSE_CATEGORIES,
@@ -215,19 +232,19 @@ def expense_edit(request, pk):
     company = request.user.company
     user_branch = get_user_branch(request.user)
     is_admin = request.user.role in ['super_admin', 'company_admin']
-    
+
     expense = get_object_or_404(Expense, id=pk, company=company)
-    
+
     # Check if user has access to this expense's branch
     if not is_admin and user_branch and expense.branch and expense.branch.id != user_branch.id:
         messages.error(request, 'You do not have permission to edit this expense.')
         return redirect('company-expenses-dashboard')
-    
+
     # Get branches user has access to
     branches = Branch.objects.filter(company=company, is_active=True)
     if not is_admin and user_branch:
         branches = branches.filter(id=user_branch.id)
-    
+
     if request.method == 'POST':
         try:
             # Update expense
@@ -238,7 +255,7 @@ def expense_edit(request, pk):
             expense.payment_method = request.POST.get('payment_method', 'cash')
             expense.reference = request.POST.get('reference', '').strip()
             expense.notes = request.POST.get('notes', '').strip()
-            
+
             branch_id = request.POST.get('branch')
             if branch_id:
                 branch = Branch.objects.get(id=branch_id, company=company)
@@ -249,18 +266,36 @@ def expense_edit(request, pk):
                 expense.branch = branch
             else:
                 expense.branch = None
-            
+
+            # Handle new attachment upload (replaces old one)
+            new_attachment = request.FILES.get('attachment')
+            if new_attachment:
+                attachment_error = validate_attachment(new_attachment)
+                if attachment_error:
+                    messages.error(request, attachment_error)
+                    return redirect('company-expenses-edit', pk=pk)
+                expense.attachment = new_attachment
+
+            # Handle remove attachment flag (optional checkbox in template)
+            if request.POST.get('remove_attachment') == '1' and expense.attachment:
+                expense.attachment.delete(save=False)
+                expense.attachment = None
+
             expense.save()
-            
+
             messages.success(request, f'✅ Expense "{expense.description}" updated successfully!')
             return redirect('company-expenses-dashboard')
-            
+
         except Branch.DoesNotExist:
             messages.error(request, 'Selected branch does not exist.')
             return redirect('company-expenses-edit', pk=pk)
+        except (InvalidOperation, ValueError):
+            messages.error(request, 'Invalid amount entered.')
+            return redirect('company-expenses-edit', pk=pk)
         except Exception as e:
             messages.error(request, f'❌ Error updating expense: {str(e)}')
-    
+            return redirect('company-expenses-edit', pk=pk)
+
     context = {
         'expense': expense,
         'branches': branches,
@@ -279,23 +314,26 @@ def expense_delete(request, pk):
     company = request.user.company
     user_branch = get_user_branch(request.user)
     is_admin = request.user.role in ['super_admin', 'company_admin']
-    
+
     expense = get_object_or_404(Expense, id=pk, company=company)
-    
+
     # Check if user has access to this expense's branch
     if not is_admin and user_branch and expense.branch and expense.branch.id != user_branch.id:
         messages.error(request, 'You do not have permission to delete this expense.')
         return redirect('company-expenses-dashboard')
-    
+
     if request.method == 'POST':
         try:
             description = expense.description
+            # Delete attachment file from storage
+            if expense.attachment:
+                expense.attachment.delete(save=False)
             expense.delete()
             messages.success(request, f'✅ Expense "{description}" deleted successfully!')
         except Exception as e:
             messages.error(request, f'❌ Error deleting expense: {str(e)}')
         return redirect('company-expenses-dashboard')
-    
+
     context = {
         'expense': expense,
         'is_expenses': True,
@@ -310,14 +348,14 @@ def expense_detail(request, pk):
     company = request.user.company
     user_branch = get_user_branch(request.user)
     is_admin = request.user.role in ['super_admin', 'company_admin']
-    
+
     expense = get_object_or_404(Expense, id=pk, company=company)
-    
+
     # Check if user has access to this expense's branch
     if not is_admin and user_branch and expense.branch and expense.branch.id != user_branch.id:
         messages.error(request, 'You do not have permission to view this expense.')
         return redirect('company-expenses-dashboard')
-    
+
     context = {
         'expense': expense,
         'is_expenses': True,
@@ -336,16 +374,16 @@ def expenses_daily_detail(request, date_str):
     company = request.user.company
     report_date = datetime.strptime(date_str, '%Y-%m-%d').date()
     branch_id = request.GET.get('branch')
-    
+
     expenses_qs = Expense.objects.filter(company=company, expense_date=report_date)
-    
+
     if branch_id:
         expenses_qs = expenses_qs.filter(branch_id=branch_id)
-    
+
     expenses = expenses_qs.order_by('-created_at')
     summary = get_expenses_summary(expenses_qs)
     category_breakdown = get_category_breakdown(expenses_qs)
-    
+
     context = {
         'report_date': report_date,
         'expenses': expenses,
@@ -358,6 +396,7 @@ def expenses_daily_detail(request, date_str):
     }
     return render(request, 'company/expenses/daily_detail.html', context)
 
+
 # ============================================
 # EXPENSE APPROVAL (Optional)
 # ============================================
@@ -367,7 +406,7 @@ def expense_approve(request, pk):
     """Approve an expense (for managers/admins)"""
     company = request.user.company
     expense = get_object_or_404(Expense, id=pk, company=company)
-    
+
     if request.method == 'POST':
         try:
             expense.approve(request.user)
@@ -375,19 +414,20 @@ def expense_approve(request, pk):
         except Exception as e:
             messages.error(request, f'❌ Error approving expense: {str(e)}')
         return redirect('company-expenses-dashboard')
-    
+
     context = {
         'expense': expense,
         'is_expenses': True,
     }
     return render(request, 'company/expenses/approve.html', context)
 
+
 @login_required
 def expense_reject(request, pk):
     """Reject an expense"""
     company = request.user.company
     expense = get_object_or_404(Expense, id=pk, company=company)
-    
+
     if request.method == 'POST':
         try:
             expense.reject()
@@ -395,7 +435,7 @@ def expense_reject(request, pk):
         except Exception as e:
             messages.error(request, f'❌ Error rejecting expense: {str(e)}')
         return redirect('company-expenses-dashboard')
-    
+
     context = {
         'expense': expense,
         'is_expenses': True,
@@ -413,25 +453,48 @@ def get_user_branch(user):
         return user.branch
     return None
 
+
+def validate_attachment(file):
+    """
+    Validate an uploaded attachment file.
+    Returns an error message string if invalid, otherwise None.
+    """
+    if not file:
+        return None
+
+    # Check size
+    if file.size > MAX_ATTACHMENT_SIZE:
+        return f'Attachment is too large (max {MAX_ATTACHMENT_SIZE // (1024 * 1024)} MB).'
+
+    # Check extension
+    name = file.name.lower()
+    if not name.endswith(ALLOWED_ATTACHMENT_EXTENSIONS):
+        allowed = ', '.join(ALLOWED_ATTACHMENT_EXTENSIONS)
+        return f'Invalid file type. Allowed: {allowed}'
+
+    return None
+
+
 def get_expenses_summary(expenses_qs):
     """Calculate summary for expenses queryset"""
     total_expenses = expenses_qs.count()
     total_amount = expenses_qs.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
-    
+
     return {
         'total_expenses': total_expenses,
         'total_amount': total_amount,
     }
 
+
 def get_daily_expense_records(expenses_qs, start_date, end_date):
     """Get daily expense records (original version without submitters)"""
     records = []
     current_date = start_date
-    
+
     while current_date <= end_date:
         day_expenses = expenses_qs.filter(expense_date=current_date)
         summary = get_expenses_summary(day_expenses)
-        
+
         records.append({
             'date': current_date,
             'day_name': current_date.strftime('%A'),
@@ -440,8 +503,9 @@ def get_daily_expense_records(expenses_qs, start_date, end_date):
             'is_today': current_date == timezone.now().date(),
         })
         current_date += timedelta(days=1)
-    
+
     return records
+
 
 def get_daily_expense_records_with_submitters(expenses_qs, start_date, end_date):
     """
@@ -450,11 +514,11 @@ def get_daily_expense_records_with_submitters(expenses_qs, start_date, end_date)
     """
     records = []
     current_date = start_date
-    
+
     while current_date <= end_date:
         day_expenses = expenses_qs.filter(expense_date=current_date)
         summary = get_expenses_summary(day_expenses)
-        
+
         # Get all users who submitted expenses on this day
         submitters_qs = day_expenses.values(
             'created_by__id',
@@ -462,26 +526,26 @@ def get_daily_expense_records_with_submitters(expenses_qs, start_date, end_date)
             'created_by__first_name',
             'created_by__last_name'
         ).distinct()
-        
+
         submitter_names = []
         submitter_usernames = []
         submitter_ids = []
-        
+
         for submitter in submitters_qs:
             first_name = submitter.get('created_by__first_name', '')
             last_name = submitter.get('created_by__last_name', '')
             username = submitter.get('created_by__username', '')
             user_id = submitter.get('created_by__id')
-            
+
             if first_name or last_name:
                 full_name = f"{first_name} {last_name}".strip()
                 submitter_names.append(full_name)
             else:
                 submitter_names.append(username)
-            
+
             submitter_usernames.append(username)
             submitter_ids.append(user_id)
-        
+
         # Build display string
         if submitter_names:
             if len(submitter_names) == 1:
@@ -493,7 +557,7 @@ def get_daily_expense_records_with_submitters(expenses_qs, start_date, end_date)
         else:
             submitted_by_display = 'N/A'
             submitter_count = 0
-        
+
         records.append({
             'date': current_date,
             'day_name': current_date.strftime('%A'),
@@ -509,33 +573,34 @@ def get_daily_expense_records_with_submitters(expenses_qs, start_date, end_date)
             'submitters': submitters_qs,  # Full queryset for detailed display
         })
         current_date += timedelta(days=1)
-    
+
     return records
+
 
 def get_weekly_expense_records(expenses_qs, current_date):
     """Get weekly expense records"""
     records = []
     current_week = current_date.isocalendar()[1]
     current_year = current_date.year
-    
+
     for i in range(52):
         week_num = current_week - i
         year = current_year
-        
+
         if week_num <= 0:
             week_num += 52
             year -= 1
-        
+
         try:
             week_start = datetime.strptime(f'{year}-W{week_num:02d}-1', '%Y-W%W-%w').date()
             week_end = week_start + timedelta(days=6)
-            
+
             week_expenses = expenses_qs.filter(
                 expense_date__gte=week_start,
                 expense_date__lte=week_end
             )
             summary = get_expenses_summary(week_expenses)
-            
+
             records.append({
                 'year': year,
                 'week': week_num,
@@ -544,28 +609,29 @@ def get_weekly_expense_records(expenses_qs, current_date):
                 'expense_count': summary['total_expenses'],
                 'total_amount': summary['total_amount'],
             })
-        except:
+        except Exception:
             continue
-    
+
     return records
+
 
 def get_monthly_expense_records(expenses_qs, year):
     """Get monthly expense records"""
     records = []
-    
+
     for month in range(1, 13):
         month_start = date(year, month, 1)
         if month == 12:
             month_end = date(year + 1, 1, 1) - timedelta(days=1)
         else:
             month_end = date(year, month + 1, 1) - timedelta(days=1)
-        
+
         month_expenses = expenses_qs.filter(
             expense_date__gte=month_start,
             expense_date__lte=month_end
         )
         summary = get_expenses_summary(month_expenses)
-        
+
         records.append({
             'month': month,
             'month_name': month_start.strftime('%B'),
@@ -574,13 +640,14 @@ def get_monthly_expense_records(expenses_qs, year):
             'expense_count': summary['total_expenses'],
             'total_amount': summary['total_amount'],
         })
-    
+
     return records
+
 
 def get_category_breakdown(expenses_qs):
     """Get expense breakdown by category"""
     breakdown = {}
-    
+
     # Initialize all categories
     for category in EXPENSE_CATEGORIES:
         breakdown[category[0]] = {
@@ -588,17 +655,17 @@ def get_category_breakdown(expenses_qs):
             'count': 0,
             'amount': Decimal('0.00'),
         }
-    
+
     # Aggregate by category
     category_data = expenses_qs.values('category').annotate(
         count=Count('id'),
         total=Sum('amount')
     )
-    
+
     for data in category_data:
         category = data['category']
         if category in breakdown:
             breakdown[category]['count'] = data['count'] or 0
             breakdown[category]['amount'] = data['total'] or Decimal('0.00')
-    
+
     return breakdown

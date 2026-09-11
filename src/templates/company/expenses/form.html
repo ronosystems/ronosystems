@@ -29,6 +29,23 @@
         border-radius: 8px;
         margin-bottom: 15px;
     }
+    .current-attachment {
+        background: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 10px;
+        display: inline-block;
+        margin-top: 8px;
+    }
+    .current-attachment img {
+        max-height: 120px;
+        max-width: 100%;
+        border-radius: 6px;
+        display: block;
+    }
+    .current-attachment .file-link {
+        font-size: 13px;
+    }
 </style>
 {% endblock %}
 
@@ -38,7 +55,7 @@
         <div class="col-lg-8 mx-auto">
             <div class="card">
                 <div class="card-body p-4">
-                    <form method="post" action="{% if is_edit %}{% url 'company-expenses-edit' expense.id %}{% else %}{% url 'company-expenses-create' %}{% endif %}">
+                    <form method="post" enctype="multipart/form-data" action="{% if is_edit %}{% url 'company-expenses-edit' expense.id %}{% else %}{% url 'company-expenses-create' %}{% endif %}">
                         {% csrf_token %}
                         
                         <div class="form-section">
@@ -118,6 +135,30 @@
                                     <input type="text" class="form-control" name="reference" 
                                            value="{{ expense.reference|default:'' }}" placeholder="Invoice/Receipt number">
                                 </div>
+                            </div>
+
+                            <!-- Image / Attachment Upload -->
+                            <div class="mb-3">
+                                <label class="form-label">Attachment (Receipt / Invoice Image)</label>
+                                <input type="file" class="form-control" name="attachment" 
+                                       accept="image/*,application/pdf" 
+                                       id="attachmentInput">
+                                <small class="text-muted">Accepted formats: JPG, PNG, GIF, PDF. Max size: 5MB.</small>
+
+                                {% if is_edit and expense.attachment %}
+                                <div class="current-attachment" id="currentAttachment">
+                                    {% if expense.attachment.url|lower|slice:"-4:" == ".pdf" %}
+                                        <a href="{{ expense.attachment.url }}" target="_blank" class="file-link">
+                                            <i class="fas fa-file-pdf fa-2x text-danger"></i> View current PDF
+                                        </a>
+                                    {% else %}
+                                        <a href="{{ expense.attachment.url }}" target="_blank">
+                                            <img src="{{ expense.attachment.url }}" alt="Current attachment">
+                                        </a>
+                                        <small class="text-muted d-block mt-1">Current attachment</small>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
                             </div>
                             
                             <div class="mb-3">
