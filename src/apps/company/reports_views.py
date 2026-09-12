@@ -503,7 +503,7 @@ def reports_dashboard(request):
     
     branches = Branch.objects.filter(company=company, is_active=True)
     
-    today = timezone.now().date()
+    today = timezone.localtime(timezone.now()).date()
     
     today_sales = sales_qs.filter(sale_date__date=today)
     today_sales_summary = get_sales_summary(today_sales)
@@ -690,7 +690,7 @@ def reports_weekly_detail(request, year, week):
     expense_breakdown = get_expense_category_breakdown(expenses_qs)
     profit_breakdown = get_profit_breakdown(sales_qs)
     
-    today = timezone.now().date()
+    today = timezone.localtime(timezone.now()).date()
     
     context = {
         'company': company,
@@ -766,7 +766,7 @@ def reports_monthly_detail(request, year, month):
     expense_breakdown = get_expense_category_breakdown(expenses_qs)
     sales_by_hour = get_sales_by_hour(sales_qs)
     
-    today = timezone.now().date()
+    today = timezone.localtime(timezone.now()).date()
     
     context = {
         'company': company,
