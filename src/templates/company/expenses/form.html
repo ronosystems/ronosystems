@@ -1,183 +1,255 @@
 {% extends 'base.html' %}
-
-{% block title %}Expense Form{% endblock %}
-
-{% block extra_css %}
-<style>
-    .form-section {
-        background: #f8f9fa;
-        padding: 20px;
-        border-radius: 12px;
-        margin-bottom: 20px;
-    }
-    .form-section-title {
-        font-weight: 600;
-        margin-bottom: 15px;
-        color: #2d3436;
-        font-size: 14px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    .required:after {
-        content: " *";
-        color: #dc3545;
-        font-weight: bold;
-    }
-    .branch-info {
-        background: #e3f2fd;
-        padding: 10px 15px;
-        border-radius: 8px;
-        margin-bottom: 15px;
-    }
-    .current-attachment {
-        background: #fff;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        padding: 10px;
-        display: inline-block;
-        margin-top: 8px;
-    }
-    .current-attachment img {
-        max-height: 120px;
-        max-width: 100%;
-        border-radius: 6px;
-        display: block;
-    }
-    .current-attachment .file-link {
-        font-size: 13px;
-    }
-</style>
+{% block title %}
+  {% if expense_type == 'salary' %}Salary{% elif expense_type == 'rent' %}Rent{% elif expense_type == 'bill' %}Bill{% else %}General Expense{% endif %}
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-8 mx-auto">
-            <div class="card">
-                <div class="card-body p-4">
-                    <form method="post" enctype="multipart/form-data" action="{% if is_edit %}{% url 'company-expenses-edit' expense.id %}{% else %}{% url 'company-expenses-create' %}{% endif %}">
-                        {% csrf_token %}
-                        
-                        <div class="form-section">
-                            <h6 class="form-section-title"><i class="fas fa-info-circle"></i> Expense Details</h6>
-                            
-                            <!-- Branch Information for non-admins -->
-                            {% if not is_admin and user_branch %}
-                            <div class="branch-info">
-                                <i class="fas fa-store"></i> 
-                                <strong>Branch:</strong> {{ user_branch.name }} ({{ user_branch.code }})
-                                <br>
-                                <small class="text-muted">You are recording expenses for your assigned branch</small>
-                                <input type="hidden" name="branch" value="{{ user_branch.id }}">
-                            </div>
-                            {% endif %}
-                            
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label required">Date</label>
-                                    <input type="date" class="form-control" name="expense_date" 
-                                           value="{% if expense %}{{ expense.expense_date|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}" required>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Branch</label>
-                                    {% if is_admin %}
-                                    <select class="form-select" name="branch">
-                                        <option value="">Select Branch</option>
-                                        {% for branch in branches %}
-                                        <option value="{{ branch.id }}" {% if expense.branch_id == branch.id %}selected{% endif %}>{{ branch.name }}</option>
-                                        {% endfor %}
-                                    </select>
-                                    {% else %}
-                                    <input type="text" class="form-control" value="{{ user_branch.name }}" disabled>
-                                    <input type="hidden" name="branch" value="{{ user_branch.id }}">
-                                    <small class="text-muted">You are assigned to this branch</small>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label required">Category</label>
-                                    <select class="form-select" name="category" required>
-                                        <option value="">Select Category...</option>
-                                        {% for key, value in expense_categories %}
-                                        <option value="{{ key }}" {% if expense.category == key %}selected{% endif %}>{{ value }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label required">Amount (KSh)</label>
-                                    <input type="number" class="form-control" name="amount" 
-                                           value="{% if expense %}{{ expense.amount|floatformat:2 }}{% else %}0.00{% endif %}" 
-                                           required step="0.01" min="0.01" placeholder="0.00">
-                                </div>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label class="form-label required">Description</label>
-                                <input type="text" class="form-control" name="description" 
-                                       value="{{ expense.description|default:'' }}" required placeholder="Brief description of expense">
-                            </div>
-                            
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Payment Method</label>
-                                    <select class="form-select" name="payment_method">
-                                        <option value="cash" {% if expense.payment_method == 'cash' %}selected{% endif %}>Cash</option>
-                                        <option value="bank" {% if expense.payment_method == 'bank' %}selected{% endif %}>Bank Transfer</option>
-                                        <option value="m-pesa" {% if expense.payment_method == 'm-pesa' %}selected{% endif %}>M-Pesa</option>
-                                        <option value="card" {% if expense.payment_method == 'card' %}selected{% endif %}>Card</option>
-                                        <option value="other" {% if expense.payment_method == 'other' %}selected{% endif %}>Other</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Reference</label>
-                                    <input type="text" class="form-control" name="reference" 
-                                           value="{{ expense.reference|default:'' }}" placeholder="Invoice/Receipt number">
-                                </div>
-                            </div>
+  <div class="row">
+    <div class="col-lg-8 mx-auto">
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          <h5 class="mb-4">
+            {% if is_edit %}<i class="fas fa-edit"></i> Edit{% else %}<i class="fas fa-plus-circle"></i> Add{% endif %}
+            {% if expense_type == 'salary' %}Salary{% elif expense_type == 'rent' %}Rent{% elif expense_type == 'bill' %}Bill{% else %}General Expense{% endif %}
+          </h5>
 
-                            <!-- Image / Attachment Upload -->
-                            <div class="mb-3">
-                                <label class="form-label">Attachment (Receipt / Invoice Image)</label>
-                                <input type="file" class="form-control" name="attachment" 
-                                       accept="image/*,application/pdf" 
-                                       id="attachmentInput">
-                                <small class="text-muted">Accepted formats: JPG, PNG, GIF, PDF. Max size: 5MB.</small>
+          <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
 
-                                {% if is_edit and expense.attachment %}
-                                <div class="current-attachment" id="currentAttachment">
-                                    {% if expense.attachment.url|lower|slice:"-4:" == ".pdf" %}
-                                        <a href="{{ expense.attachment.url }}" target="_blank" class="file-link">
-                                            <i class="fas fa-file-pdf fa-2x text-danger"></i> View current PDF
-                                        </a>
-                                    {% else %}
-                                        <a href="{{ expense.attachment.url }}" target="_blank">
-                                            <img src="{{ expense.attachment.url }}" alt="Current attachment">
-                                        </a>
-                                        <small class="text-muted d-block mt-1">Current attachment</small>
-                                    {% endif %}
-                                </div>
-                                {% endif %}
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label class="form-label">Notes</label>
-                                <textarea class="form-control" name="notes" rows="2" placeholder="Additional notes...">{{ expense.notes|default:'' }}</textarea>
-                            </div>
-                        </div>
-                        
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-danger"><i class="fas fa-save"></i> {% if is_edit %}Update{% else %}Save{% endif %} Expense</button>
-                            <a href="{% url 'company-expenses-dashboard' %}" class="btn btn-secondary">Cancel</a>
-                            {% if is_edit %}
-                            <a href="{% url 'company-expenses-delete' expense.id %}" class="btn btn-outline-danger ms-auto"><i class="fas fa-trash"></i> Delete</a>
-                            {% endif %}
-                        </div>
-                    </form>
-                </div>
+            <!-- Branch info for non-admin -->
+            {% if not is_admin and user_branch %}
+              <div class="alert alert-info py-2">
+                <i class="fas fa-store"></i> <strong>Branch:</strong> {{ user_branch.name }}
+                <input type="hidden" name="branch" value="{{ user_branch.id }}">
+              </div>
+            {% endif %}
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label required">Date</label>
+                <input type="date" name="expense_date" class="form-control" required
+                       value="{% if expense %}{{ expense.expense_date|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}">
+              </div>
+
+              {% if is_admin %}
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Branch</label>
+                <select name="branch" class="form-select">
+                  <option value="">— None —</option>
+                  {% for b in branches %}
+                    <option value="{{ b.id }}" {% if expense.branch_id == b.id %}selected{% endif %}>{{ b.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              {% endif %}
             </div>
+
+            <!-- ===================== SALARY FIELDS ===================== -->
+            {% if expense_type == 'salary' %}
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label required">Employee Name</label>
+                  <input type="text" name="employee_name" class="form-control" required
+                         value="{{ expense.employee_name|default:'' }}">
+                </div>
+                <div class="col-md-3 mb-3">
+                  <label class="form-label">Employee ID</label>
+                  <input type="text" name="employee_id" class="form-control"
+                         value="{{ expense.employee_id|default:'' }}">
+                </div>
+                <div class="col-md-3 mb-3">
+                  <label class="form-label">Phone</label>
+                  <input type="text" name="employee_phone" class="form-control"
+                         value="{{ expense.employee_phone|default:'' }}">
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label required">Salary Month</label>
+                  <input type="month" name="salary_month" class="form-control" required
+                         value="{% if expense.salary_month %}{{ expense.salary_month|date:'Y-m' }}{% endif %}">
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label required">Salary Amount (KSh)</label>
+                  <input type="number" step="0.01" min="0.01" name="amount" class="form-control" required
+                         value="{{ expense.amount|default:'' }}">
+                </div>
+              </div>
+              <input type="hidden" name="description" value="Salary payment">
+
+            <!-- ===================== RENT FIELDS ===================== -->
+            {% elif expense_type == 'rent' %}
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label required">Rent Month</label>
+                  <input type="month" name="rent_month" class="form-control" required
+                         value="{% if expense.rent_month %}{{ expense.rent_month|date:'Y-m' }}{% endif %}">
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label required">Rent Amount (KSh)</label>
+                  <input type="number" step="0.01" min="0.01" name="amount" class="form-control" required
+                         value="{{ expense.amount|default:'' }}">
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Landlord Name</label>
+                  <input type="text" name="landlord_name" class="form-control"
+                         value="{{ expense.landlord_name|default:'' }}">
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Landlord Phone</label>
+                  <input type="text" name="landlord_phone" class="form-control"
+                         value="{{ expense.landlord_phone|default:'' }}">
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label required">Description</label>
+                <input type="text" name="description" class="form-control" required
+                       value="{{ expense.description|default:'' }}" placeholder="e.g. Monthly rent for main branch">
+              </div>
+
+            <!-- ===================== BILL FIELDS ===================== -->
+            {% elif expense_type == 'bill' %}
+              <div class="row">
+                <div class="col-md-4 mb-3">
+                  <label class="form-label required">Bill Type</label>
+                  <select name="bill_type" class="form-select" required>
+                    <option value="">Select…</option>
+                    {% for k,v in bill_types %}
+                      <option value="{{ k }}" {% if expense.bill_type == k %}selected{% endif %}>{{ v }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-4 mb-3">
+                  <label class="form-label required">Bill Name</label>
+                  <input type="text" name="bill_name" class="form-control" required
+                         value="{{ expense.bill_name|default:'' }}" placeholder="e.g. KPLC February">
+                </div>
+                <div class="col-md-4 mb-3">
+                  <label class="form-label">Bill Period</label>
+                  <input type="month" name="bill_period" class="form-control"
+                         value="{% if expense.bill_period %}{{ expense.bill_period|date:'Y-m' }}{% endif %}">
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label required">Bill Amount (KSh)</label>
+                  <input type="number" step="0.01" min="0.01" name="amount" class="form-control" required
+                         value="{{ expense.amount|default:'' }}">
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Receipt / Invoice Number</label>
+                  <input type="text" name="receipt_number" class="form-control"
+                         value="{{ expense.receipt_number|default:'' }}">
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label required">Description</label>
+                <input type="text" name="description" class="form-control" required
+                       value="{{ expense.description|default:'' }}" placeholder="Brief description">
+              </div>
+
+            <!-- ===================== GENERAL FIELDS ===================== -->
+            {% else %}
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label required">Category</label>
+                  <select name="category" class="form-select" required>
+                    <option value="">Select…</option>
+                    {% for k,v in general_categories %}
+                      <option value="{{ k }}" {% if expense.category == k %}selected{% endif %}>{{ v }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label required">Amount (KSh)</label>
+                  <input type="number" step="0.01" min="0.01" name="amount" class="form-control" required
+                         value="{{ expense.amount|default:'' }}">
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label required">Description</label>
+                <input type="text" name="description" class="form-control" required
+                       value="{{ expense.description|default:'' }}">
+              </div>
+            {% endif %}
+
+            <!-- Payment method + reference (all types) -->
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Payment Method</label>
+                <select name="payment_method" class="form-select">
+                  {% for k,v in payment_methods %}
+                    <option value="{{ k }}" {% if expense.payment_method == k %}selected{% endif %}>{{ v }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Reference</label>
+                <input type="text" name="reference" class="form-control"
+                       value="{{ expense.reference|default:'' }}">
+              </div>
+            </div>
+
+            <!-- Receipt upload -->
+            <div class="mb-3">
+              <label class="form-label">Receipt / Invoice Attachment</label>
+              <input type="file" name="attachment" class="form-control" accept="image/*,application/pdf">
+              <small class="text-muted">JPG, PNG, GIF, PDF · Max 5MB</small>
+
+              {% if is_edit and expense.attachment %}
+              <div class="mt-2 p-2 border rounded">
+                {% if expense.is_pdf %}
+                  <a href="{{ expense.attachment.url }}" target="_blank" class="text-danger">
+                    <i class="fas fa-file-pdf fa-2x"></i> View current PDF
+                  </a>
+                {% else %}
+                  <a href="{{ expense.attachment.url }}" target="_blank">
+                    <img src="{{ expense.attachment.url }}" alt="attachment" style="max-height:120px;border-radius:6px;">
+                  </a>
+                {% endif %}
+                <div class="form-check mt-2">
+                  <input class="form-check-input" type="checkbox" name="remove_attachment" value="1" id="rmAtt">
+                  <label class="form-check-label small text-danger" for="rmAtt">Remove current attachment</label>
+                </div>
+              </div>
+              {% endif %}
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Notes</label>
+              <textarea name="notes" class="form-control" rows="2">{{ expense.notes|default:'' }}</textarea>
+            </div>
+
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-danger">
+                <i class="fas fa-save"></i> {% if is_edit %}Update{% else %}Save{% endif %}
+              </button>
+              {% if expense_type == 'salary' %}
+                <a href="{% url 'company-salaries-list' %}" class="btn btn-secondary">Cancel</a>
+              {% elif expense_type == 'rent' %}
+                <a href="{% url 'company-rents-list' %}" class="btn btn-secondary">Cancel</a>
+              {% elif expense_type == 'bill' %}
+                <a href="{% url 'company-bills-list' %}" class="btn btn-secondary">Cancel</a>
+              {% else %}
+                <a href="{% url 'company-general-list' %}" class="btn btn-secondary">Cancel</a>
+              {% endif %}
+              {% if is_edit %}
+                <a href="{% url 'company-expenses-delete' expense.id %}" class="btn btn-outline-danger ms-auto">
+                  <i class="fas fa-trash"></i> Delete
+                </a>
+              {% endif %}
+            </div>
+          </form>
         </div>
+      </div>
     </div>
+  </div>
 </div>
+
+<style>
+.required:after { content:" *"; color:#dc3545; }
+</style>
 {% endblock %}

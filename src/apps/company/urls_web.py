@@ -41,13 +41,36 @@ urlpatterns = [
     # EXPENSES
     # ============================================
     path('expenses/', expenses_views.expenses_dashboard, name='company-expenses-dashboard'),
-    path('expenses/create/', expenses_views.expense_create, name='company-expenses-create'),
-    path('expenses/<int:pk>/', expenses_views.expense_detail, name='company-expenses-detail'),
-    path('expenses/<int:pk>/edit/', expenses_views.expense_edit, name='company-expenses-edit'),
-    path('expenses/<int:pk>/delete/', expenses_views.expense_delete, name='company-expenses-delete'),
+
+    # Daily detail (used by dashboard's "View" button)
     path('expenses/daily/<str:date_str>/', expenses_views.expenses_daily_detail, name='company-expenses-daily-detail'),
+
+    # Salaries
+    path('expenses/salaries/', expenses_views.salaries_list, name='company-salaries-list'),
+    path('expenses/salaries/create/', expenses_views.salary_create, name='company-salaries-create'),
+    path('expenses/salaries/<int:pk>/edit/', expenses_views.salary_edit, name='company-salaries-edit'),
+
+    # Rents
+    path('expenses/rents/', expenses_views.rents_list, name='company-rents-list'),
+    path('expenses/rents/create/', expenses_views.rent_create, name='company-rents-create'),
+    path('expenses/rents/<int:pk>/edit/', expenses_views.rent_edit, name='company-rents-edit'),
+
+    # Bills
+    path('expenses/bills/', expenses_views.bills_list, name='company-bills-list'),
+    path('expenses/bills/create/', expenses_views.bill_create, name='company-bills-create'),
+    path('expenses/bills/<int:pk>/edit/', expenses_views.bill_edit, name='company-bills-edit'),
+
+    # General
+    path('expenses/general/', expenses_views.general_list, name='company-general-list'),
+    path('expenses/general/create/', expenses_views.general_create, name='company-general-create'),
+    path('expenses/general/<int:pk>/edit/', expenses_views.general_edit, name='company-general-edit'),
+
+    # Shared detail / delete / status actions
+    path('expenses/<int:pk>/', expenses_views.expense_detail, name='company-expenses-detail'),
+    path('expenses/<int:pk>/delete/', expenses_views.expense_delete, name='company-expenses-delete'),
     path('expenses/<int:pk>/approve/', expenses_views.expense_approve, name='company-expenses-approve'),
     path('expenses/<int:pk>/reject/', expenses_views.expense_reject, name='company-expenses-reject'),
+    path('expenses/<int:pk>/paid/', expenses_views.expense_mark_paid, name='company-expenses-paid'),
 
     # ============================================
     # SETTINGS

@@ -782,36 +782,59 @@ def sale_history(request):
 # SALE LIST
 # ============================================
 
+from django.utils import timezone
+
 @login_required
 def sale_list(request):
     """List all sales with pagination"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
+    # Roles that can see ALL sales
+    can_view_all = (
+        is_viewing_company or
+        request.user.is_super_admin or
+        request.user.is_company_admin or
+        request.user.is_superuser or
+        request.user.is_staff
+    )
+
+    # Roles that can see all branches (but may still be date-limited)
     is_admin = (
         is_viewing_company or
-        request.user.is_company_admin or 
-        request.user.is_company_manager or 
+        request.user.is_company_admin or
+        request.user.is_company_manager or
         request.user.is_super_admin or
         request.user.is_superuser or
         request.user.is_staff
     )
-    
+
     sales_queryset = Sale.objects.filter(company=company)
-    
+
     # Filter by branch for non-admins (skip in support mode)
     if not is_admin and request.user.branch:
         sales_queryset = sales_queryset.filter(branch=request.user.branch)
-    
+
+    # ---------------------------------------------------------
+    # NEW: Non super_admin / company_admin see only TODAY's sales
+    # ---------------------------------------------------------
+    if not can_view_all:
+        today = timezone.localdate()          # uses active timezone
+        sales_queryset = sales_queryset.filter(
+            sale_date__date=today
+        )
+    # ---------------------------------------------------------
+
     sales_queryset = sales_queryset.order_by('-sale_date')
-    
+
+    # Count AFTER date filter so "Total" reflects what the user can see
     total_count = sales_queryset.count()
-    
+
     search_query = request.GET.get('search', '').strip()
     if search_query:
         sales_queryset = sales_queryset.filter(
@@ -820,7 +843,7 @@ def sale_list(request):
             models.Q(payment_method__icontains=search_query) |
             models.Q(payment_status__icontains=search_query)
         )
-    
+
     per_page = request.GET.get('per_page', '10')
     if per_page == 'all':
         per_page = total_count or 10
@@ -829,17 +852,17 @@ def sale_list(request):
             per_page = int(per_page)
         except ValueError:
             per_page = 10
-    
+
     paginator = Paginator(sales_queryset, per_page)
     page = request.GET.get('page', 1)
-    
+
     try:
         sales = paginator.page(page)
     except PageNotAnInteger:
         sales = paginator.page(1)
     except EmptyPage:
         sales = paginator.page(paginator.num_pages)
-    
+
     context = {
         'sales': sales,
         'page_obj': sales,
@@ -848,6 +871,7 @@ def sale_list(request):
         'search_query': search_query,
         'is_admin_or_manager': is_admin,
         'is_viewing_company': is_viewing_company,
+        'can_view_all_sales': can_view_all,    
         'page_title': 'Sales',
         'page_subtitle': 'Sales history',
     }
