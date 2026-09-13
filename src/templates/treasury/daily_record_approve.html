@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if action == 'approve' %}Approve{% else %}Un-approve{% endif %} Record{% endblock %}
+{% block page_title %}{% if action == 'approve' %}Approve Record{% else %}Un-approve Record{% endif %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card { border: 2px solid #000000; border-radius: 4px; }
+    .card-header {
+        background: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+        border-radius: 0 !important;
+    }
+    .card-header h5 { color: #000000; font-weight: 700; margin: 0; }
+    .info-row {
+        padding: 8px 0;
+        border-bottom: 1px solid #e9ecef;
+        font-size: 14px;
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { font-weight: 600; color: #000000; }
+    .btn-primary {
+        background: #87CEEB; border: 2px solid #000000;
+        color: #000000; font-weight: 600; border-radius: 4px;
+    }
+    .btn-secondary {
+        background: #f8f9fa; border: 2px solid #000000;
+        color: #000000; font-weight: 600; border-radius: 4px;
+    }
+    .alert-warning {
+        background: #fff3cd; border: 2px solid #000000;
+        color: #856404; padding: 12px; border-radius: 4px;
+    }
+    .alert-danger {
+        background: #f8d7da; border: 2px solid #000000;
+        color: #721c24; padding: 12px; border-radius: 4px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-3">
+    <div class="row justify-content-center">
+        <div class="col-md-7">
+            <div class="card">
+                <div class="card-header">
+                    <h5>
+                        <i class="fas fa-{% if action == 'approve' %}check-circle{% else %}undo{% endif %}"></i>
+                        {% if action == 'approve' %}Approve Record{% else %}Un-approve Record{% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if action == 'approve' %}
+                        <div class="alert-warning mb-3">
+                            <i class="fas fa-lock"></i>
+                            <strong>Approving will lock this record.</strong>
+                            No one (including admins) will be able to edit or delete it until it is un-approved.
+                        </div>
+                    {% else %}
+                        <div class="alert-danger mb-3">
+                            <i class="fas fa-unlock"></i>
+                            <strong>Un-approving will unlock this record.</strong>
+                            It will become editable again.
+                        </div>
+                    {% endif %}
+
+                    <div class="info-row">
+                        <span class="info-label">Date:</span>
+                        {{ record.date|date:"l, F j, Y" }}
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Bank Total:</span>
+                        KES {{ record.total_bank_balance|floatformat:2 }}
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">M-Pesa Total:</span>
+                        KES {{ record.total_mpesa_balance|floatformat:2 }}
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Cash:</span>
+                        KES {{ record.cash_balance|floatformat:2 }}
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Grand Total:</span>
+                        <strong>KES {{ record.grand_total|floatformat:2 }}</strong>
+                    </div>
+                    {% if record.notes %}
+                    <div class="info-row">
+                        <span class="info-label">Notes:</span>
+                        {{ record.notes }}
+                    </div>
+                    {% endif %}
+
+                    <form method="post" class="mt-4">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{% url 'treasury:daily_records_list' company.id branch.id %}"
+                               class="btn btn-secondary">
+                                Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-{% if action == 'approve' %}check{% else %}undo{% endif %}"></i>
+                                {% if action == 'approve' %}Yes, Approve{% else %}Yes, Un-approve{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

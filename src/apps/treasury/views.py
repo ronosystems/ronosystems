@@ -856,90 +856,76 @@ def daily_record_create(request, company_id=None, branch_id=None):
     company = get_user_company(request, company_id)
     if not company:
         return redirect('dashboard')
-    
-    # Get the user's branch
+
     user_branch = get_user_branch(request.user)
-    
-    # Determine which branch to use
     branch = None
-    
-    # Super admin and company admin can access any branch
+
     if request.user.role in ['super_admin', 'company_admin']:
         if branch_id:
             branch = get_object_or_404(Branch, id=branch_id, company=company)
         else:
-            # If no branch specified, use first active branch
             branch = Branch.objects.filter(company=company, is_active=True).first()
-        
+
         if not branch:
             messages.error(request, 'No branch available. Please create a branch first.')
             return redirect('treasury:dashboard', company_id=company.id)
     else:
-        # Other roles must use their own branch
         if not user_branch:
             messages.error(request, 'You are not assigned to any branch. Please contact your administrator.')
             return redirect('treasury:dashboard', company_id=company.id)
-        
-        # If branch_id in URL doesn't match user's branch, redirect to user's branch
+
         if branch_id and int(branch_id) != user_branch.id:
             messages.error(request, f'You can only record balances for your assigned branch: {user_branch.name}')
             return redirect('treasury:daily_record_create', company_id=company.id, branch_id=user_branch.id)
-        
+
         branch = user_branch
-    
+
     treasury = get_treasury(company, branch)
-    
-    # Get all active bank and M-Pesa accounts for this branch
+
     bank_accounts = BankAccount.objects.filter(
         company=company,
         branch=branch,
         is_active=True
     ).order_by('bank_type', 'account_name')
-    
+
     mpesa_accounts = MpesaAccount.objects.filter(
         company=company,
         branch=branch,
         is_active=True
     ).order_by('till_name')
-    
+
     if request.method == 'POST':
         date = request.POST.get('date', timezone.now().date())
         cash_balance = Decimal(request.POST.get('cash_balance', 0))
         credit_balance = Decimal(request.POST.get('credit_balance', 0))
         notes = request.POST.get('notes', '')
-        
-        # Check if record exists for this date
+
         existing = DailyRecord.objects.filter(
             company=company,
             branch=branch,
             date=date
         ).first()
-        
+
         if existing:
             messages.error(request, f'Record for {date} already exists. Please edit it instead.')
-            return redirect('treasury:daily_record_edit', 
-                          company_id=company.id, 
-                          branch_id=branch.id, 
+            return redirect('treasury:daily_record_edit',
+                          company_id=company.id,
+                          branch_id=branch.id,
                           record_id=existing.id)
-        
-        # Collect bank balances from form
+
         bank_balances = {}
         for bank in bank_accounts:
             balance_key = f'bank_{bank.id}'
             if balance_key in request.POST:
-                balance = Decimal(request.POST.get(balance_key, 0))
-                bank_balances[bank.id] = balance
-        
-        # Collect M-Pesa balances from form
+                bank_balances[bank.id] = Decimal(request.POST.get(balance_key, 0))
+
         mpesa_balances = {}
         for mpesa in mpesa_accounts:
             balance_key = f'mpesa_{mpesa.id}'
             if balance_key in request.POST:
-                balance = Decimal(request.POST.get(balance_key, 0))
-                mpesa_balances[mpesa.id] = balance
-        
+                mpesa_balances[mpesa.id] = Decimal(request.POST.get(balance_key, 0))
+
         with transaction.atomic():
-            # Create daily record
             daily_record = DailyRecord.objects.create(
                 company=company,
                 branch=branch,
@@ -950,8 +936,7 @@ def daily_record_create(request, company_id=None, branch_id=None):
                 notes=notes,
                 created_by=request.user
             )
-            
-            # Create daily bank balances
+
             for bank in bank_accounts:
                 balance = bank_balances.get(bank.id, 0)
                 DailyBankBalance.objects.create(
@@ -959,11 +944,9 @@ def daily_record_create(request, company_id=None, branch_id=None):
                     bank_account=bank,
                     closing_balance=balance
                 )
-                # Update account current balance
                 bank.current_balance = balance
                 bank.save()
-            
-            # Create daily M-Pesa balances
+
             for mpesa in mpesa_accounts:
                 balance = mpesa_balances.get(mpesa.id, 0)
                 DailyMpesaBalance.objects.create(
@@ -971,18 +954,15 @@ def daily_record_create(request, company_id=None, branch_id=None):
                     mpesa_account=mpesa,
                     closing_balance=balance
                 )
-                # Update account current balance
                 mpesa.current_balance = balance
                 mpesa.save()
-            
-            # Update treasury aggregated balances
+
             treasury.total_bank_balance = daily_record.total_bank_balance
             treasury.total_mpesa_balance = daily_record.total_mpesa_balance
             treasury.cash_balance = cash_balance
             treasury.credit_balance = credit_balance
             treasury.save()
-            
-            # Log transaction
+
             log_transaction(
                 treasury,
                 'daily_record',
@@ -996,19 +976,14 @@ def daily_record_create(request, company_id=None, branch_id=None):
                 f"Daily record for {date} created",
                 request.user
             )
-        
+
         messages.success(request, f'✅ Daily record for {date} created successfully!')
         return redirect('treasury:branch_treasury', company_id=company.id, branch_id=branch.id)
-    
-    # Get today's date
+
     today = timezone.now().date()
-    
-    # Get all branches for the branch selector (for admins)
     all_branches = Branch.objects.filter(company=company, is_active=True)
-    
-    # Determine if user is admin (can switch branches)
     is_admin = request.user.role in ['super_admin', 'company_admin']
-    
+
     context = {
         'company': company,
         'branch': branch,
@@ -1023,7 +998,7 @@ def daily_record_create(request, company_id=None, branch_id=None):
         'all_branches': all_branches,
     }
     return render(request, 'treasury/daily_record_form.html', context)
-    
+
 
 @login_required
 def daily_record_edit(request, company_id=None, branch_id=None, record_id=None):
@@ -1031,65 +1006,67 @@ def daily_record_edit(request, company_id=None, branch_id=None, record_id=None):
     company = get_user_company(request, company_id)
     if not company:
         return redirect('dashboard')
-    
-    # Get the user's branch
+
     user_branch = get_user_branch(request.user)
-    
-    # Determine which branch to use
     branch = None
-    
-    # Super admin and company admin can access any branch
+
     if request.user.role in ['super_admin', 'company_admin']:
         if branch_id:
             branch = get_object_or_404(Branch, id=branch_id, company=company)
         else:
             branch = user_branch or Branch.objects.filter(company=company, is_active=True).first()
     else:
-        # Other roles must use their own branch
         if not user_branch:
             messages.error(request, 'You are not assigned to any branch. Please contact your administrator.')
             return redirect('treasury:dashboard', company_id=company.id)
-        
+
         if branch_id and int(branch_id) != user_branch.id:
             messages.error(request, f'You can only edit records for your assigned branch: {user_branch.name}')
             return redirect('treasury:daily_record_edit', company_id=company.id, branch_id=user_branch.id, record_id=record_id)
-        
+
         branch = user_branch
-    
+
     if not branch:
         messages.error(request, 'No branch available.')
         return redirect('treasury:dashboard', company_id=company.id)
-    
+
     daily_record = get_object_or_404(DailyRecord, id=record_id, company=company, branch=branch)
     treasury = get_treasury(company, branch)
-    
-    # Get all active bank and M-Pesa accounts
+
+    # ============================================
+    # APPROVAL GUARD — block edits if approved
+    # ============================================
+    if daily_record.is_approved:
+        messages.error(
+            request,
+            f'Record for {daily_record.date} is approved and locked from editing. '
+            'Un-approve it first.'
+        )
+        return redirect('treasury:daily_records_list', company_id=company.id, branch_id=branch.id)
+
     bank_accounts = BankAccount.objects.filter(
         company=company,
         branch=branch,
         is_active=True
     ).order_by('bank_type', 'account_name')
-    
+
     mpesa_accounts = MpesaAccount.objects.filter(
         company=company,
         branch=branch,
         is_active=True
     ).order_by('till_name')
-    
-    # Get existing balances for this record
+
     bank_balances = DailyBankBalance.objects.filter(
         daily_record=daily_record
     ).select_related('bank_account')
-    
+
     mpesa_balances = DailyMpesaBalance.objects.filter(
         daily_record=daily_record
     ).select_related('mpesa_account')
-    
-    # Create lookup dicts
+
     bank_balance_dict = {b.bank_account_id: b.closing_balance for b in bank_balances}
     mpesa_balance_dict = {m.mpesa_account_id: m.closing_balance for m in mpesa_balances}
-    
-    # Build (account, balance) rows for the template so edit shows saved values
+
     bank_account_rows = [
         (bank, bank_balance_dict.get(bank.id, bank.current_balance))
         for bank in bank_accounts
@@ -1098,36 +1075,30 @@ def daily_record_edit(request, company_id=None, branch_id=None, record_id=None):
         (mpesa, mpesa_balance_dict.get(mpesa.id, mpesa.current_balance))
         for mpesa in mpesa_accounts
     ]
-    
+
     if request.method == 'POST':
         cash_balance = Decimal(request.POST.get('cash_balance', 0))
         credit_balance = Decimal(request.POST.get('credit_balance', 0))
         notes = request.POST.get('notes', '')
-        
-        # Collect bank balances from form
+
         bank_balance_updates = {}
         for bank in bank_accounts:
             balance_key = f'bank_{bank.id}'
             if balance_key in request.POST:
-                balance = Decimal(request.POST.get(balance_key, 0))
-                bank_balance_updates[bank.id] = balance
-        
-        # Collect M-Pesa balances from form
+                bank_balance_updates[bank.id] = Decimal(request.POST.get(balance_key, 0))
+
         mpesa_balance_updates = {}
         for mpesa in mpesa_accounts:
             balance_key = f'mpesa_{mpesa.id}'
             if balance_key in request.POST:
-                balance = Decimal(request.POST.get(balance_key, 0))
-                mpesa_balance_updates[mpesa.id] = balance
-        
+                mpesa_balance_updates[mpesa.id] = Decimal(request.POST.get(balance_key, 0))
+
         with transaction.atomic():
-            # Update daily record
             daily_record.cash_balance = cash_balance
             daily_record.credit_balance = credit_balance
             daily_record.notes = notes
             daily_record.save()
-            
-            # Update bank balances
+
             for bank in bank_accounts:
                 balance = bank_balance_updates.get(bank.id, 0)
                 DailyBankBalance.objects.update_or_create(
@@ -1135,11 +1106,9 @@ def daily_record_edit(request, company_id=None, branch_id=None, record_id=None):
                     bank_account=bank,
                     defaults={'closing_balance': balance}
                 )
-                # Update account current balance
                 bank.current_balance = balance
                 bank.save()
-            
-            # Update M-Pesa balances
+
             for mpesa in mpesa_accounts:
                 balance = mpesa_balance_updates.get(mpesa.id, 0)
                 DailyMpesaBalance.objects.update_or_create(
@@ -1147,19 +1116,16 @@ def daily_record_edit(request, company_id=None, branch_id=None, record_id=None):
                     mpesa_account=mpesa,
                     defaults={'closing_balance': balance}
                 )
-                # Update account current balance
                 mpesa.current_balance = balance
                 mpesa.save()
-            
-            # Update treasury aggregated balances
+
             treasury = daily_record.treasury
             treasury.total_bank_balance = daily_record.total_bank_balance
             treasury.total_mpesa_balance = daily_record.total_mpesa_balance
             treasury.cash_balance = cash_balance
             treasury.credit_balance = credit_balance
             treasury.save()
-            
-            # Log transaction
+
             log_transaction(
                 treasury,
                 'daily_record',
@@ -1173,16 +1139,13 @@ def daily_record_edit(request, company_id=None, branch_id=None, record_id=None):
                 f"Daily record for {daily_record.date} updated",
                 request.user
             )
-        
+
         messages.success(request, f'✅ Daily record for {daily_record.date} updated successfully!')
         return redirect('treasury:branch_treasury', company_id=company.id, branch_id=branch.id)
-    
-    # Get all branches for the branch selector (for admins)
+
     all_branches = Branch.objects.filter(company=company, is_active=True)
-    
-    # Determine if user is admin (can switch branches)
     is_admin = request.user.role in ['super_admin', 'company_admin']
-    
+
     context = {
         'company': company,
         'branch': branch,
@@ -1201,68 +1164,68 @@ def daily_record_edit(request, company_id=None, branch_id=None, record_id=None):
     }
     return render(request, 'treasury/daily_record_form.html', context)
 
+
 @login_required
 def daily_record_delete(request, company_id=None, branch_id=None, record_id=None):
     """Delete a daily record"""
     company = get_user_company(request, company_id)
     if not company:
         return redirect('dashboard')
-    
-    # Get the user's branch
+
     user_branch = get_user_branch(request.user)
-    
-    # Determine which branch to use
     branch = None
-    
-    # Super admin and company admin can access any branch
+
     if request.user.role in ['super_admin', 'company_admin']:
         if branch_id:
             branch = get_object_or_404(Branch, id=branch_id, company=company)
         else:
             branch = user_branch or Branch.objects.filter(company=company, is_active=True).first()
     else:
-        # Other roles must use their own branch
         if not user_branch:
             messages.error(request, 'You are not assigned to any branch. Please contact your administrator.')
             return redirect('treasury:dashboard', company_id=company.id)
-        
+
         if branch_id and int(branch_id) != user_branch.id:
             messages.error(request, f'You can only delete records for your assigned branch: {user_branch.name}')
             return redirect('treasury:daily_record_delete', company_id=company.id, branch_id=user_branch.id, record_id=record_id)
-        
+
         branch = user_branch
-    
+
     if not branch:
         messages.error(request, 'No branch available.')
         return redirect('treasury:dashboard', company_id=company.id)
-    
+
     record = get_object_or_404(DailyRecord, id=record_id, company=company, branch=branch)
-    
-    # Check if user has permission (admin or manager only)
+
     if not is_admin_or_manager(request.user):
         messages.error(request, 'Only admins and managers can delete daily records.')
         return redirect('treasury:branch_treasury', company_id=company.id, branch_id=branch.id)
-    
+
+    # ============================================
+    # APPROVAL GUARD — block delete if approved
+    # ============================================
+    if record.is_approved:
+        messages.error(
+            request,
+            f'Record for {record.date} is approved and locked from deletion. '
+            'Un-approve it first.'
+        )
+        return redirect('treasury:daily_records_list', company_id=company.id, branch_id=branch.id)
+
     if request.method == 'POST':
         date = record.date
-        
-        # Get treasury before deleting
         treasury = record.treasury
-        
+
         with transaction.atomic():
-            # Delete bank balances
             record.bank_balances.all().delete()
-            # Delete M-Pesa balances
             record.mpesa_balances.all().delete()
-            # Delete record
             record.delete()
-            
-            # Update treasury to use latest record or zero
+
             latest_record = DailyRecord.objects.filter(
                 company=company,
                 branch=branch
             ).first()
-            
+
             if latest_record:
                 treasury.total_bank_balance = latest_record.total_bank_balance
                 treasury.total_mpesa_balance = latest_record.total_mpesa_balance
@@ -1274,16 +1237,13 @@ def daily_record_delete(request, company_id=None, branch_id=None, record_id=None
                 treasury.cash_balance = 0
                 treasury.credit_balance = 0
             treasury.save()
-        
+
         messages.success(request, f'✅ Daily record for {date} deleted successfully!')
         return redirect('treasury:daily_records_list', company_id=company.id, branch_id=branch.id)
-    
-    # Get all branches for the branch selector (for admins)
+
     all_branches = Branch.objects.filter(company=company, is_active=True)
-    
-    # Determine if user is admin (can switch branches)
     is_admin = request.user.role in ['super_admin', 'company_admin']
-    
+
     context = {
         'company': company,
         'branch': branch,
@@ -1293,6 +1253,9 @@ def daily_record_delete(request, company_id=None, branch_id=None, record_id=None
         'user_branch': user_branch,
     }
     return render(request, 'treasury/confirm_delete.html', context)
+
+
+
 
 # ============================================
 # DAILY RECORDS LIST
@@ -1316,19 +1279,16 @@ def daily_records_list(request, company_id=None, branch_id=None):
         if branch_id:
             branch = get_object_or_404(Branch, id=branch_id, company=company)
         else:
-            # If no branch specified, use first active branch
             branch = Branch.objects.filter(company=company, is_active=True).first()
 
         if not branch:
             messages.error(request, 'No branch available. Please create a branch first.')
             return redirect('treasury:dashboard', company_id=company.id)
     else:
-        # Other roles must use their own branch
         if not user_branch:
             messages.error(request, 'You are not assigned to any branch. Please contact your administrator.')
             return redirect('treasury:dashboard', company_id=company.id)
 
-        # If branch_id in URL doesn't match user's branch, redirect to user's branch
         if branch_id and int(branch_id) != user_branch.id:
             messages.error(request, f'You can only view records for your assigned branch: {user_branch.name}')
             return redirect('treasury:daily_records_list', company_id=company.id, branch_id=user_branch.id)
@@ -1341,13 +1301,18 @@ def daily_records_list(request, company_id=None, branch_id=None):
 
     treasury = get_treasury(company, branch)
 
-    # Get date filter
+    # ============================================
+    # DATE FILTER
+    # ============================================
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
 
-    records = DailyRecord.objects.filter(
-        company=company,
-        branch=branch
+    records = (
+        DailyRecord.objects
+        .filter(company=company, branch=branch)
+        # Prefetch balances so net_balance / total_* don't fire per-row aggregates
+        .prefetch_related('bank_balances', 'mpesa_balances')
+        .select_related('created_by')
     )
 
     if date_from:
@@ -1357,40 +1322,74 @@ def daily_records_list(request, company_id=None, branch_id=None):
 
     records = records.order_by('-date')
 
+    # ============================================
+    # PAGINATION
+    # ============================================
     paginator = Paginator(records, 30)
     page = request.GET.get('page', 1)
     records_page = paginator.get_page(page)
 
-    # Calculate summary stats
+    # ============================================
+    # BULK PREFETCH PREVIOUS-DAY RECORDS
+    # Feeds `_cached_prev` on each record so the day-chain check
+    # doesn't hit the DB per row (kills 30+ extra queries).
+    # ============================================
+    page_records = list(records_page.object_list)
+
+    if page_records:
+        from datetime import timedelta
+
+        # Collect all the "previous day" dates we need
+        prev_dates = {r.date - timedelta(days=1) for r in page_records}
+
+        # Fetch them all in ONE query
+        prev_records = (
+            DailyRecord.objects
+            .filter(
+                company=company,
+                branch=branch,
+                date__in=prev_dates,
+            )
+            .prefetch_related('bank_balances', 'mpesa_balances')
+        )
+        prev_by_date = {r.date: r for r in prev_records}
+
+        # Attach the cached previous record to each row
+        for r in page_records:
+            r._cached_prev = prev_by_date.get(r.date - timedelta(days=1))
+
+        # Replace the paginated list with our enriched version
+        records_page.object_list = page_records
+
+    # ============================================
+    # SUMMARY STATS
+    # ============================================
     record_count = records.count()
 
-    # Get the most recent record (first one since ordered by -date)
+    # Latest record (first since ordered by -date)
     latest_record = records.first()
 
-    # Get the last day's closing balance (net balance of the most recent record)
     total_net = latest_record.net_balance if latest_record else 0
-
-    # Calculate total bank, mpesa, cash, credit from the latest record
     total_bank = latest_record.total_bank_balance if latest_record else 0
     total_mpesa = latest_record.total_mpesa_balance if latest_record else 0
     total_cash = latest_record.cash_balance if latest_record else 0
     total_credit = latest_record.credit_balance if latest_record else 0
 
-    # Calculate average net balance across all records
+    # ============================================
+    # AVERAGE NET BALANCE (computed from visible page)
+    # ============================================
     avg_net = 0
-    if record_count > 0:
-        total_net_sum = 0
-        for record in records:
-            total_net_sum += record.net_balance
-        avg_net = total_net_sum / record_count
+    if page_records:
+        page_total = sum(r.net_balance for r in page_records)
+        avg_net = page_total / len(page_records)
 
-    # Get the first and last record for comparison
-    first_record = records.last()  # Oldest record
+    # Oldest record for reference
+    first_record = records.last()
 
-    # Get all branches for the branch selector (for admins)
+    # ============================================
+    # BRANCH SELECTOR
+    # ============================================
     all_branches = Branch.objects.filter(company=company, is_active=True)
-
-    # Determine if user is admin (can switch branches)
     is_admin = request.user.role in ['super_admin', 'company_admin']
 
     context = {
@@ -1414,10 +1413,91 @@ def daily_records_list(request, company_id=None, branch_id=None):
         'user_branch': user_branch,
     }
     return render(request, 'treasury/daily_records_list.html', context)
-
-
-
     
+
+# ============================================
+# DAILY RECORD APPROVE / UNAPPROVE
+# ============================================
+
+@login_required
+def daily_record_approve(request, company_id=None, branch_id=None, record_id=None):
+    """Company admin approves a daily record — locks it from further edits."""
+    company = get_user_company(request, company_id)
+    if not company:
+        return redirect('dashboard')
+
+    # Only company_admin (and super_admin for support) can approve
+    if request.user.role not in ['company_admin', 'super_admin']:
+        messages.error(request, 'Only company admins can approve records.')
+        return redirect('treasury:daily_records_list', company_id=company.id, branch_id=branch_id)
+
+    branch = get_object_or_404(Branch, id=branch_id, company=company)
+    record = get_object_or_404(DailyRecord, id=record_id, company=company, branch=branch)
+
+    if request.method == 'POST':
+        if record.is_approved:
+            messages.info(request, f'Record for {record.date} is already approved.')
+        else:
+            record.is_approved = True
+            record.approved_by = request.user
+            record.approved_at = timezone.now()
+            record.save(update_fields=['is_approved', 'approved_by', 'approved_at'])
+            messages.success(
+                request,
+                f'✅ Record for {record.date} approved. It is now locked from editing.'
+            )
+        return redirect('treasury:daily_records_list', company_id=company.id, branch_id=branch.id)
+
+    # GET — show a confirmation page
+    context = {
+        'company': company,
+        'branch': branch,
+        'record': record,
+        'action': 'approve',
+    }
+    return render(request, 'treasury/daily_record_approve.html', context)
+
+
+@login_required
+def daily_record_unapprove(request, company_id=None, branch_id=None, record_id=None):
+    """Company admin un-approves a daily record — re-enables editing."""
+    company = get_user_company(request, company_id)
+    if not company:
+        return redirect('dashboard')
+
+    if request.user.role not in ['company_admin', 'super_admin']:
+        messages.error(request, 'Only company admins can un-approve records.')
+        return redirect('treasury:daily_records_list', company_id=company.id, branch_id=branch_id)
+
+    branch = get_object_or_404(Branch, id=branch_id, company=company)
+    record = get_object_or_404(DailyRecord, id=record_id, company=company, branch=branch)
+
+    if request.method == 'POST':
+        if not record.is_approved:
+            messages.info(request, f'Record for {record.date} is not approved.')
+        else:
+            record.is_approved = False
+            record.approved_by = None
+            record.approved_at = None
+            record.save(update_fields=['is_approved', 'approved_by', 'approved_at'])
+            messages.warning(
+                request,
+                f'⚠️ Approval for {record.date} removed. Record is now editable.'
+            )
+        return redirect('treasury:daily_records_list', company_id=company.id, branch_id=branch.id)
+
+    context = {
+        'company': company,
+        'branch': branch,
+        'record': record,
+        'action': 'unapprove',
+    }
+    return render(request, 'treasury/daily_record_approve.html', context)
+
+
+
+
+
 # ============================================
 # DAILY RECORD DETAIL VIEW
 # ============================================

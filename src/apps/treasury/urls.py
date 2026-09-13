@@ -89,6 +89,18 @@ urlpatterns = [
         name='daily_record_delete'
     ),
     
+    path(
+        '<int:company_id>/branch/<int:branch_id>/daily-record/<int:record_id>/approve/',
+        views.daily_record_approve,
+        name='daily_record_approve'
+    ),
+    path(
+        '<int:company_id>/branch/<int:branch_id>/daily-record/<int:record_id>/unapprove/',
+        views.daily_record_unapprove,
+        name='daily_record_unapprove'
+    ),
+
+
     # ============================================
     # MOVEMENTS (BOOST & TRANSFERS)
     # ============================================

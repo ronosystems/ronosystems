@@ -1,3 +1,5 @@
+# apps/treasury/models.py
+
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -6,6 +8,7 @@ from apps.epa_shop.models import Branch
 from apps.companies.models import Company
 
 User = get_user_model()
+
 
 # ============================================
 # TREASURY - PER COMPANY & BRANCH
@@ -16,39 +19,39 @@ class Treasury(models.Model):
     This holds the aggregate net balance but individual accounts are tracked separately
     """
     company = models.ForeignKey(
-        Company, 
-        on_delete=models.CASCADE, 
+        Company,
+        on_delete=models.CASCADE,
         related_name='treasuries'
     )
     branch = models.OneToOneField(
-        Branch, 
-        on_delete=models.CASCADE, 
+        Branch,
+        on_delete=models.CASCADE,
         related_name='treasury'
     )
-    
+
     # Aggregated balances (calculated from daily records)
     total_bank_balance = models.DecimalField(
-        max_digits=15, 
-        decimal_places=2, 
-        default=0, 
+        max_digits=15,
+        decimal_places=2,
+        default=0,
         help_text="Total of all bank accounts"
     )
     total_mpesa_balance = models.DecimalField(
-        max_digits=15, 
-        decimal_places=2, 
-        default=0, 
+        max_digits=15,
+        decimal_places=2,
+        default=0,
         help_text="Total of all M-Pesa accounts"
     )
     cash_balance = models.DecimalField(
-        max_digits=12, 
-        decimal_places=2, 
-        default=0, 
+        max_digits=12,
+        decimal_places=2,
+        default=0,
         help_text="Physical Cash in Shop"
     )
     credit_balance = models.DecimalField(
-        max_digits=12, 
-        decimal_places=2, 
-        default=0, 
+        max_digits=12,
+        decimal_places=2,
+        default=0,
         help_text="Money owed to you / Credit float"
     )
 
@@ -95,51 +98,51 @@ class BankAccount(models.Model):
         OTHER = 'OTHER', 'Other'
 
     company = models.ForeignKey(
-        Company, 
-        on_delete=models.CASCADE, 
+        Company,
+        on_delete=models.CASCADE,
         related_name='bank_accounts'
     )
     branch = models.ForeignKey(
-        Branch, 
-        on_delete=models.CASCADE, 
+        Branch,
+        on_delete=models.CASCADE,
         related_name='bank_accounts'
     )
     treasury = models.ForeignKey(
-        Treasury, 
-        on_delete=models.CASCADE, 
+        Treasury,
+        on_delete=models.CASCADE,
         related_name='bank_accounts'
     )
-    
+
     # Bank details
     bank_type = models.CharField(
-        max_length=20, 
-        choices=BankType.choices, 
+        max_length=20,
+        choices=BankType.choices,
         default=BankType.OTHER
     )
     account_name = models.CharField(
-        max_length=200, 
+        max_length=200,
         help_text="Enter bank account name (e.g., KCB A, KCB B, ABSA A)"
     )
     account_number = models.CharField(
-        max_length=50, 
+        max_length=50,
         help_text="Enter bank account number"
     )
     branch_code = models.CharField(max_length=20, blank=True)
     swift_code = models.CharField(max_length=20, blank=True)
-    
+
     # Current balance (last recorded daily balance)
     current_balance = models.DecimalField(
-        max_digits=15, 
-        decimal_places=2, 
+        max_digits=15,
+        decimal_places=2,
         default=0,
         help_text="Current/Last recorded balance for this account"
     )
-    
+
     # Status
     is_active = models.BooleanField(default=True)
     is_primary = models.BooleanField(default=False)
     notes = models.TextField(blank=True)
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -162,15 +165,15 @@ class BankAccount(models.Model):
                 branch=self.branch
             )
             self.treasury = treasury
-        
+
         # If primary, unset other primary for this branch
         if self.is_primary:
             BankAccount.objects.filter(
-                company=self.company, 
-                branch=self.branch, 
+                company=self.company,
+                branch=self.branch,
                 is_primary=True
             ).exclude(pk=self.pk).update(is_primary=False)
-        
+
         super().save(*args, **kwargs)
 
 
@@ -187,50 +190,50 @@ class MpesaAccount(models.Model):
         SEND_MONEY = 'SEND_MONEY', 'Send Money'
 
     company = models.ForeignKey(
-        Company, 
-        on_delete=models.CASCADE, 
+        Company,
+        on_delete=models.CASCADE,
         related_name='mpesa_accounts'
     )
     branch = models.ForeignKey(
-        Branch, 
-        on_delete=models.CASCADE, 
+        Branch,
+        on_delete=models.CASCADE,
         related_name='mpesa_accounts'
     )
     treasury = models.ForeignKey(
-        Treasury, 
-        on_delete=models.CASCADE, 
+        Treasury,
+        on_delete=models.CASCADE,
         related_name='mpesa_accounts'
     )
-    
+
     # M-Pesa details
     till_name = models.CharField(
-        max_length=200, 
+        max_length=200,
         help_text="Enter M-Pesa Till/Account name (e.g., MPESA A, MPESA B)"
     )
     till_number = models.CharField(
-        max_length=20, 
+        max_length=20,
         help_text="Enter M-Pesa Till number"
     )
     store_number = models.CharField(max_length=20, blank=True)
     account_type = models.CharField(
-        max_length=20, 
-        choices=MpesaType.choices, 
+        max_length=20,
+        choices=MpesaType.choices,
         default=MpesaType.TILL
     )
-    
+
     # Current balance (last recorded daily balance)
     current_balance = models.DecimalField(
-        max_digits=15, 
-        decimal_places=2, 
+        max_digits=15,
+        decimal_places=2,
         default=0,
         help_text="Current/Last recorded balance for this M-Pesa account"
     )
-    
+
     # Status
     is_active = models.BooleanField(default=True)
     is_primary = models.BooleanField(default=False)
     notes = models.TextField(blank=True)
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -253,15 +256,15 @@ class MpesaAccount(models.Model):
                 branch=self.branch
             )
             self.treasury = treasury
-        
+
         # If primary, unset other primary for this branch
         if self.is_primary:
             MpesaAccount.objects.filter(
-                company=self.company, 
-                branch=self.branch, 
+                company=self.company,
+                branch=self.branch,
                 is_primary=True
             ).exclude(pk=self.pk).update(is_primary=False)
-        
+
         super().save(*args, **kwargs)
 
 
@@ -275,38 +278,59 @@ class DailyRecord(models.Model):
     This is the main table you'll use to track daily balances
     """
     company = models.ForeignKey(
-        Company, 
-        on_delete=models.CASCADE, 
+        Company,
+        on_delete=models.CASCADE,
         related_name='daily_records'
     )
     branch = models.ForeignKey(
-        Branch, 
-        on_delete=models.CASCADE, 
+        Branch,
+        on_delete=models.CASCADE,
         related_name='daily_records'
     )
     treasury = models.ForeignKey(
-        Treasury, 
-        on_delete=models.CASCADE, 
+        Treasury,
+        on_delete=models.CASCADE,
         related_name='daily_records'
     )
     date = models.DateField(default=timezone.now)
 
     # Cash balance (physical cash in shop)
     cash_balance = models.DecimalField(
-        max_digits=15, 
-        decimal_places=2, 
+        max_digits=15,
+        decimal_places=2,
         default=0,
         help_text="Physical cash in shop"
     )
-    
+
     # Credit balance (money owed to you)
     credit_balance = models.DecimalField(
-        max_digits=15, 
-        decimal_places=2, 
+        max_digits=15,
+        decimal_places=2,
         default=0,
         help_text="Money owed to you / Credit float"
     )
-    
+
+    # ============================================
+    # APPROVAL
+    # ============================================
+    is_approved = models.BooleanField(
+        default=False,
+        help_text="Set to True by company admin to lock the record."
+    )
+    approved_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='daily_records_approved',
+        help_text="Admin who approved this record"
+    )
+    approved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the record was approved"
+    )
+
     # User tracking
     created_by = models.ForeignKey(
         User,
@@ -316,13 +340,17 @@ class DailyRecord(models.Model):
         related_name='daily_records_created',
         help_text="User who submitted this daily record"
     )
-    
+
     # Notes for this day
     notes = models.TextField(blank=True)
-    
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # ============================================
+    # BALANCE TOTALS
+    # ============================================
 
     @property
     def total_bank_balance(self):
@@ -343,6 +371,103 @@ class DailyRecord(models.Model):
         """NET BALANCE = Total Bank + Total M-Pesa + Cash + Credit"""
         return self.total_bank_balance + self.total_mpesa_balance + self.cash_balance + self.credit_balance
 
+    @property
+    def grand_total(self):
+        """
+        GRAND TOTAL = Total Bank + Total M-Pesa + Cash.
+        (Excludes Credit — this is the liquid position.)
+        Used by the day-chain check.
+        """
+        return (
+            self.total_bank_balance
+            + self.total_mpesa_balance
+            + self.cash_balance
+        )
+
+    # ============================================
+    # DAY-CHAIN CHECK — Three-state comparison
+    #
+    #   yesterday == today  →  'match'    ✅ Balanced
+    #   yesterday  > today  →  'deficit'  ❌ Money is missing
+    #   yesterday  < today  →  'surplus'  ❓ Money increased
+    #   no previous record  →  'first'    ⚫ (nothing to compare)
+    # ============================================
+
+    @property
+    def previous_day_record(self):
+        """
+        Return the DailyRecord for the calendar day before this one
+        for the SAME company + branch. Returns None if none exists.
+
+        Uses `_cached_prev` if the view pre-loaded it (bulk prefetch),
+        otherwise hits the DB.
+        """
+        # Use pre-loaded cache if available (set by the view)
+        cached = getattr(self, '_cached_prev', '__missing__')
+        if cached != '__missing__':
+            return cached
+
+        from datetime import timedelta
+        prev_date = self.date - timedelta(days=1)
+        return DailyRecord.objects.filter(
+            company=self.company,
+            branch=self.branch,
+            date=prev_date,
+        ).first()
+
+    @property
+    def day_chain_status(self):
+        """
+        Compare GRAND TOTAL (Bank + M-Pesa + Cash) with yesterday's.
+
+        Returns:
+          'first'    → no previous day record
+          'match'    → grand total matches yesterday exactly → ✅
+          'deficit'  → grand total is LOWER than yesterday   → ❌
+          'surplus'  → grand total is HIGHER than yesterday  → ❓
+        """
+        prev = self.previous_day_record
+        if not prev:
+            return 'first'
+
+        today = self.grand_total
+        yesterday = prev.grand_total
+
+        if today == yesterday:
+            return 'match'
+        elif today < yesterday:
+            return 'deficit'
+        else:  # today > yesterday
+            return 'surplus'
+
+    @property
+    def day_chain_diff(self):
+        """
+        Difference between today's grand total and yesterday's.
+        Positive = surplus (money increased).
+        Negative = deficit (money decreased).
+        Returns None if no previous day.
+        """
+        prev = self.previous_day_record
+        if not prev:
+            return None
+        return self.grand_total - prev.grand_total
+
+    @property
+    def day_chain_label(self):
+        """Human-readable label for the day-chain status."""
+        status = self.day_chain_status
+        if status == 'first':
+            return 'First record'
+        if status == 'match':
+            return 'Balanced'
+        diff = abs(self.day_chain_diff or 0)
+        if status == 'deficit':
+            return f'Deficit: KES {diff:,.2f}'
+        if status == 'surplus':
+            return f'Surplus: KES {diff:,.2f}'
+        return ''
+
     def __str__(self):
         return f"Daily Record - {self.company.name} - {self.branch.name} - {self.date} | Net: {self.net_balance}"
 
@@ -356,7 +481,6 @@ class DailyRecord(models.Model):
         ]
 
 
-
 # ============================================
 # DAILY BANK BALANCE
 # ============================================
@@ -365,24 +489,24 @@ class DailyBankBalance(models.Model):
     Daily closing balance for a specific bank account
     """
     daily_record = models.ForeignKey(
-        DailyRecord, 
-        on_delete=models.CASCADE, 
+        DailyRecord,
+        on_delete=models.CASCADE,
         related_name='bank_balances'
     )
     bank_account = models.ForeignKey(
-        BankAccount, 
-        on_delete=models.CASCADE, 
+        BankAccount,
+        on_delete=models.CASCADE,
         related_name='daily_balances'
     )
-    
+
     # The closing balance for this specific account on this day
     closing_balance = models.DecimalField(
-        max_digits=15, 
-        decimal_places=2, 
+        max_digits=15,
+        decimal_places=2,
         default=0,
         help_text="Closing balance for this bank account"
     )
-    
+
     notes = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -403,24 +527,24 @@ class DailyMpesaBalance(models.Model):
     Daily closing balance for a specific M-Pesa account
     """
     daily_record = models.ForeignKey(
-        DailyRecord, 
-        on_delete=models.CASCADE, 
+        DailyRecord,
+        on_delete=models.CASCADE,
         related_name='mpesa_balances'
     )
     mpesa_account = models.ForeignKey(
-        MpesaAccount, 
-        on_delete=models.CASCADE, 
+        MpesaAccount,
+        on_delete=models.CASCADE,
         related_name='daily_balances'
     )
-    
+
     # The closing balance for this specific M-Pesa account on this day
     closing_balance = models.DecimalField(
-        max_digits=15, 
-        decimal_places=2, 
+        max_digits=15,
+        decimal_places=2,
         default=0,
         help_text="Closing balance for this M-Pesa account"
     )
-    
+
     notes = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -462,101 +586,101 @@ class Movement(models.Model):
         OTHER = 'OTHER', 'Other'
 
     company = models.ForeignKey(
-        Company, 
-        on_delete=models.CASCADE, 
+        Company,
+        on_delete=models.CASCADE,
         related_name='treasury_movements'
     )
     branch = models.ForeignKey(
-        Branch, 
-        on_delete=models.CASCADE, 
+        Branch,
+        on_delete=models.CASCADE,
         related_name='treasury_movements'
     )
     treasury = models.ForeignKey(
-        Treasury, 
-        on_delete=models.CASCADE, 
+        Treasury,
+        on_delete=models.CASCADE,
         related_name='movements'
     )
 
     # Movement details
     movement_type = models.CharField(
-        max_length=20, 
-        choices=MovementType.choices, 
+        max_length=20,
+        choices=MovementType.choices,
         default=MovementType.TRANSFER
     )
-    
+
     from_account = models.CharField(
-        max_length=20, 
+        max_length=20,
         choices=AccountType.choices
     )
     to_account = models.CharField(
-        max_length=20, 
+        max_length=20,
         choices=AccountType.choices
     )
-    
+
     amount = models.DecimalField(max_digits=15, decimal_places=2)
     reason = models.CharField(max_length=200, blank=True)
-    
+
     # BOOST specific fields
     boost_source = models.CharField(
-        max_length=30, 
-        choices=BoostSource.choices, 
-        null=True, 
+        max_length=30,
+        choices=BoostSource.choices,
+        null=True,
         blank=True
     )
     boost_reference = models.CharField(max_length=100, blank=True)
     boost_notes = models.TextField(blank=True)
-    
+
     # Optional reference to specific accounts (for transfers between specific accounts)
     from_bank_account = models.ForeignKey(
-        BankAccount, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
+        BankAccount,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='movements_from'
     )
     to_bank_account = models.ForeignKey(
-        BankAccount, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
+        BankAccount,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='movements_to'
     )
     from_mpesa_account = models.ForeignKey(
-        MpesaAccount, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
+        MpesaAccount,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='movements_from'
     )
     to_mpesa_account = models.ForeignKey(
-        MpesaAccount, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
+        MpesaAccount,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='movements_to'
     )
-    
+
     # User tracking
     created_by = models.ForeignKey(
-        User, 
-        on_delete=models.SET_NULL, 
-        null=True, 
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
         related_name='treasury_movements'
     )
-    
+
     # Status
     class Status(models.TextChoices):
         PENDING = 'PENDING', 'Pending'
         APPROVED = 'APPROVED', 'Approved'
         COMPLETED = 'COMPLETED', 'Completed'
         CANCELLED = 'CANCELLED', 'Cancelled'
-    
+
     status = models.CharField(
-        max_length=20, 
-        choices=Status.choices, 
+        max_length=20,
+        choices=Status.choices,
         default=Status.COMPLETED
     )
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -582,33 +706,33 @@ class TreasurySummary(models.Model):
     Pre-calculated monthly summary for faster dashboard loading
     """
     company = models.ForeignKey(
-        Company, 
-        on_delete=models.CASCADE, 
+        Company,
+        on_delete=models.CASCADE,
         related_name='treasury_summaries'
     )
     treasury = models.ForeignKey(
-        Treasury, 
-        on_delete=models.CASCADE, 
+        Treasury,
+        on_delete=models.CASCADE,
         related_name='summaries'
     )
-    
+
     # Monthly summaries
     month = models.DateField()  # First day of the month
-    
+
     # Opening and closing balances for the month
     opening_net_balance = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     closing_net_balance = models.DecimalField(max_digits=15, decimal_places=2, default=0)
-    
+
     # Movement stats
     total_boost_in = models.DecimalField(max_digits=15, decimal_places=2, default=0, help_text="Total BOOST injections")
     total_movements_in = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     total_movements_out = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     net_change = models.DecimalField(max_digits=15, decimal_places=2, default=0)
-    
+
     # Counts
     boost_count = models.IntegerField(default=0)
     transfer_count = models.IntegerField(default=0)
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -637,39 +761,39 @@ class TreasuryTransactionLog(models.Model):
         ('expense', 'Expense'),
         ('purchase', 'Purchase'),
     )
-    
+
     company = models.ForeignKey(
-        Company, 
-        on_delete=models.CASCADE, 
+        Company,
+        on_delete=models.CASCADE,
         related_name='treasury_logs'
     )
     treasury = models.ForeignKey(
-        Treasury, 
-        on_delete=models.CASCADE, 
+        Treasury,
+        on_delete=models.CASCADE,
         related_name='transaction_logs'
     )
-    
+
     transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES)
-    
+
     # Balance changes
     bank_change = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     mpesa_change = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     cash_change = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     credit_change = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     net_change = models.DecimalField(max_digits=15, decimal_places=2, default=0)
-    
+
     # Reference to related objects
     content_type = models.CharField(max_length=50, blank=True)
     object_id = models.PositiveIntegerField(null=True, blank=True)
-    
+
     description = models.CharField(max_length=255)
     performed_by = models.ForeignKey(
-        User, 
-        on_delete=models.SET_NULL, 
-        null=True, 
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
         related_name='treasury_logs'
     )
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
