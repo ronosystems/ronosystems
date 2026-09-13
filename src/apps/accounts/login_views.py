@@ -69,8 +69,7 @@ def redirect_dashboard(request, user):
     company = user.company
     
     if not company:
-        messages.warning(request, 'You are not assigned to any company. Please contact your administrator.')
-        return HttpResponseRedirect('/admin/')
+        return HttpResponseRedirect('/no-access/')
     
     business_type = company.business_type
     
