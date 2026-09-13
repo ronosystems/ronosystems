@@ -3,6 +3,56 @@
 from django.shortcuts import redirect
 from django.urls import reverse, NoReverseMatch
 from django.contrib import messages
+from django.http import Http404
+
+
+class CustomDomainMiddleware:
+    """
+    Resolves Company from the request's Host header when a custom
+    domain is being used.
+
+    - Sets `request.tenant_company` to the matched Company (or None).
+    - Runs BEFORE SubscriptionExpiryMiddleware.
+    - Skips lookup for the platform's own hosts.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.platform_hosts = {
+            'ronosystems.onrender.com',
+            'localhost',
+            '127.0.0.1',
+        }
+
+    def __call__(self, request):
+        host = request.get_host().split(':')[0].lower()
+
+        # Skip lookup for platform's own hosts
+        if host in self.platform_hosts or host.endswith('.onrender.com'):
+            request.tenant_company = None
+            return self.get_response(request)
+
+        # Look up company by custom domain
+        from apps.companies.models import Company
+        try:
+            company = Company.objects.get(
+                custom_domain__iexact=host,
+                domain_verified=True,
+            )
+            request.tenant_company = company
+
+            # Trust this custom domain for CSRF on this request.
+            # Django doesn't support wildcards in CSRF_TRUSTED_ORIGINS,
+            # so we add it dynamically.
+            from django.conf import settings
+            origin = f"https://{host}"
+            if origin not in settings.CSRF_TRUSTED_ORIGINS:
+                settings.CSRF_TRUSTED_ORIGINS.append(origin)
+
+        except Company.DoesNotExist:
+            raise Http404("No company registered for this domain.")
+
+        return self.get_response(request)
 
 
 # URL names that remain accessible even when the subscription is expired
@@ -14,9 +64,9 @@ EXEMPT_URL_NAMES = {
     'reset-password',
     'subscription-expired',
     'company-payments',
-    'company-payments-initiate', 
-    'company-payments-status',    
-    'company-payments-callback',  
+    'company-payments-initiate',
+    'company-payments-status',
+    'company-payments-callback',
 }
 
 # Path prefixes that bypass the check entirely
@@ -27,9 +77,9 @@ EXEMPT_URL_PREFIXES = (
     '/auth/',
     '/api/support/',
     '/subscription-expired/',
-    '/payments/',  
-    '/plans/',     
-    '/companies/',   
+    '/payments/',
+    '/plans/',
+    '/companies/',
 )
 
 
@@ -74,7 +124,11 @@ class SubscriptionExpiryMiddleware:
             pass
 
         # ---------- Resolve current company ----------
-        company = getattr(request.user, 'company', None)
+        # Prefer the custom-domain-resolved company, fall back to user's company.
+        company = (
+            getattr(request, 'tenant_company', None)
+            or getattr(request.user, 'company', None)
+        )
         if company is None:
             return self.get_response(request)
 

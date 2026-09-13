@@ -19,4 +19,5 @@ urlpatterns = [
     path('<int:pk>/payments/initiate/', web_views.company_payments_initiate, name='company-payments-initiate'),
     path('<int:pk>/payments/status/', web_views.company_payments_status, name='company-payments-status'),
     path('<int:pk>/payments/callback/', web_views.company_payments_callback, name='company-payments-callback'),
+    path('company/<int:pk>/verify-domain/', web_views.company_verify_domain, name='company-verify-domain'),
 ]

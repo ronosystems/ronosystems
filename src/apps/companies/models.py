@@ -108,6 +108,20 @@ class Company(models.Model):
     website = models.URLField(blank=True)
     logo = models.ImageField(upload_to='company_logos/', blank=True, null=True)
 
+    # ---------- Custom Domain ----------
+    custom_domain = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        unique=True,
+        db_index=True,
+        help_text="e.g., clientcompany.co.ke (no https:// or trailing slash)"
+    )
+    domain_verified = models.BooleanField(
+        default=False,
+        help_text="Set to True after DNS is confirmed working"
+    )
+
     # ---------- Settings ----------
     company_settings = models.JSONField(
         default=dict,
@@ -403,6 +417,34 @@ class Company(models.Model):
     @property
     def business_type_app(self):
         return self.business_type.app_module if self.business_type else None
+
+    # ============================================
+    # CUSTOM DOMAIN HELPERS
+    # ============================================
+
+    def get_full_url(self, request=None):
+        """
+        Return the best URL for this company.
+        Prefers verified custom domain; falls back to platform URL.
+        """
+        if self.custom_domain and self.domain_verified:
+            return f"https://{self.custom_domain}"
+        if request:
+            return request.build_absolute_uri('/')
+        return "https://ronosystems.onrender.com"
+
+    def can_use_custom_domain(self):
+        """Check if the company's plan allows custom domains."""
+        return self.has_feature('has_custom_domain')
+
+    def clean_custom_domain(self):
+        """Normalize a custom domain string (strip protocol, slashes, lowercase)."""
+        if not self.custom_domain:
+            return None
+        d = self.custom_domain.strip().lower()
+        d = d.replace('https://', '').replace('http://', '')
+        d = d.rstrip('/')
+        return d or None
 
 
 # ============================================

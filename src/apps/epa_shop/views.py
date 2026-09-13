@@ -23,236 +23,286 @@ from .serializers import (
 )
 from apps.accounts.permissions import IsCompanyAdmin
 
+
+# ============================================
+# COMPANY MIXIN (custom-domain aware)
+# ============================================
+
+class CompanyScopedMixin:
+    """
+    Provides `get_company()` which resolves the effective company for
+    the request.
+
+    Priority:
+      1. request.tenant_company  (set by CustomDomainMiddleware)
+      2. request.user.company
+
+    Isolation: if a custom domain resolves to a company the user doesn't
+    belong to (and the user isn't a super admin), the user's own company
+    is used instead. This prevents cross-tenant access via domain spoofing.
+    """
+    def get_company(self):
+        request = self.request
+        tenant = getattr(request, 'tenant_company', None)
+
+        if tenant is not None:
+            user = request.user
+            user_company = getattr(user, 'company', None)
+            if (
+                not user.is_authenticated
+                or user.role == 'super_admin'
+                or user_company == tenant
+            ):
+                return tenant
+            # else: fall through to user's own company
+
+        return request.user.company
+
+
 # ============================================
 # BRANCH VIEWS
 # ============================================
 
-class BranchListCreateView(generics.ListCreateAPIView):
+class BranchListCreateView(CompanyScopedMixin, generics.ListCreateAPIView):
     """List and create branches"""
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
-    
+
     def get_serializer_class(self):
         if self.request.method == 'GET':
             return BranchDetailSerializer
         return BranchSerializer
-    
-    def get_queryset(self):
-        return Branch.objects.filter(company=self.request.user.company)
-    
-    def perform_create(self, serializer):
-        serializer.save(company=self.request.user.company)
 
-class BranchDetailView(generics.RetrieveUpdateDestroyAPIView):
+    def get_queryset(self):
+        return Branch.objects.filter(company=self.get_company())
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.get_company())
+
+
+class BranchDetailView(CompanyScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     """Retrieve, update, delete branch"""
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     serializer_class = BranchSerializer
-    
+
     def get_queryset(self):
-        return Branch.objects.filter(company=self.request.user.company)
+        return Branch.objects.filter(company=self.get_company())
+
 
 # ============================================
 # SUPPLIER VIEWS
 # ============================================
 
-class SupplierListCreateView(generics.ListCreateAPIView):
+class SupplierListCreateView(CompanyScopedMixin, generics.ListCreateAPIView):
     """List and create suppliers"""
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     serializer_class = SupplierSerializer
-    
-    def get_queryset(self):
-        return Supplier.objects.filter(company=self.request.user.company)
-    
-    def perform_create(self, serializer):
-        serializer.save(company=self.request.user.company)
 
-class SupplierDetailView(generics.RetrieveUpdateDestroyAPIView):
+    def get_queryset(self):
+        return Supplier.objects.filter(company=self.get_company())
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.get_company())
+
+
+class SupplierDetailView(CompanyScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     """Retrieve, update, delete supplier"""
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     serializer_class = SupplierSerializer
-    
+
     def get_queryset(self):
-        return Supplier.objects.filter(company=self.request.user.company)
+        return Supplier.objects.filter(company=self.get_company())
+
 
 # ============================================
 # CATEGORY VIEWS
 # ============================================
 
-class CategoryListCreateView(generics.ListCreateAPIView):
+class CategoryListCreateView(CompanyScopedMixin, generics.ListCreateAPIView):
     """List and create categories"""
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     serializer_class = CategorySerializer
-    
-    def get_queryset(self):
-        return Category.objects.filter(company=self.request.user.company)
-    
-    def perform_create(self, serializer):
-        serializer.save(company=self.request.user.company)
 
-class CategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
+    def get_queryset(self):
+        return Category.objects.filter(company=self.get_company())
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.get_company())
+
+
+class CategoryDetailView(CompanyScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     """Retrieve, update, delete category"""
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     serializer_class = CategorySerializer
-    
+
     def get_queryset(self):
-        return Category.objects.filter(company=self.request.user.company)
+        return Category.objects.filter(company=self.get_company())
+
 
 # ============================================
 # ELECTRONIC VIEWS
 # ============================================
 
-class ElectronicListCreateView(generics.ListCreateAPIView):
+class ElectronicListCreateView(CompanyScopedMixin, generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     serializer_class = ElectronicSerializer
-    
+
     def get_queryset(self):
-        queryset = Electronic.objects.filter(company=self.request.user.company)
+        queryset = Electronic.objects.filter(company=self.get_company())
         branch = self.request.query_params.get('branch')
         category = self.request.query_params.get('category')
         search = self.request.query_params.get('search')
-        
+
         if branch:
             queryset = queryset.filter(branch_id=branch)
         if category:
             queryset = queryset.filter(category_id=category)
         if search:
             queryset = queryset.filter(
-                Q(name__icontains=search) | 
-                Q(brand__icontains=search) | 
+                Q(name__icontains=search) |
+                Q(brand__icontains=search) |
                 Q(serial_number__icontains=search)
             )
-        
-        return queryset
-    
-    def perform_create(self, serializer):
-        serializer.save(company=self.request.user.company)
 
-class ElectronicDetailView(generics.RetrieveUpdateDestroyAPIView):
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.get_company())
+
+
+class ElectronicDetailView(CompanyScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     serializer_class = ElectronicSerializer
-    
+
     def get_queryset(self):
-        return Electronic.objects.filter(company=self.request.user.company)
+        return Electronic.objects.filter(company=self.get_company())
+
 
 # ============================================
 # PHONE VIEWS
 # ============================================
 
-class PhoneListCreateView(generics.ListCreateAPIView):
+class PhoneListCreateView(CompanyScopedMixin, generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     serializer_class = PhoneSerializer
-    
+
     def get_queryset(self):
-        queryset = Phone.objects.filter(company=self.request.user.company)
+        queryset = Phone.objects.filter(company=self.get_company())
         branch = self.request.query_params.get('branch')
         condition = self.request.query_params.get('condition')
         search = self.request.query_params.get('search')
-        
+
         if branch:
             queryset = queryset.filter(branch_id=branch)
         if condition:
             queryset = queryset.filter(condition=condition)
         if search:
             queryset = queryset.filter(
-                Q(name__icontains=search) | 
-                Q(brand__icontains=search) | 
+                Q(name__icontains=search) |
+                Q(brand__icontains=search) |
                 Q(imei__icontains=search)
             )
-        
-        return queryset
-    
-    def perform_create(self, serializer):
-        serializer.save(company=self.request.user.company)
 
-class PhoneDetailView(generics.RetrieveUpdateDestroyAPIView):
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.get_company())
+
+
+class PhoneDetailView(CompanyScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     serializer_class = PhoneSerializer
-    
+
     def get_queryset(self):
-        return Phone.objects.filter(company=self.request.user.company)
+        return Phone.objects.filter(company=self.get_company())
+
 
 # ============================================
 # ACCESSORY VIEWS
 # ============================================
 
-class AccessoryListCreateView(generics.ListCreateAPIView):
+class AccessoryListCreateView(CompanyScopedMixin, generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     serializer_class = AccessorySerializer
-    
+
     def get_queryset(self):
-        queryset = Accessory.objects.filter(company=self.request.user.company)
+        queryset = Accessory.objects.filter(company=self.get_company())
         branch = self.request.query_params.get('branch')
         accessory_type = self.request.query_params.get('accessory_type')
         search = self.request.query_params.get('search')
-        
+
         if branch:
             queryset = queryset.filter(branch_id=branch)
         if accessory_type:
             queryset = queryset.filter(accessory_type=accessory_type)
         if search:
             queryset = queryset.filter(
-                Q(name__icontains=search) | 
+                Q(name__icontains=search) |
                 Q(brand__icontains=search)
             )
-        
-        return queryset
-    
-    def perform_create(self, serializer):
-        serializer.save(company=self.request.user.company)
 
-class AccessoryDetailView(generics.RetrieveUpdateDestroyAPIView):
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.get_company())
+
+
+class AccessoryDetailView(CompanyScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     serializer_class = AccessorySerializer
-    
+
     def get_queryset(self):
-        return Accessory.objects.filter(company=self.request.user.company)
+        return Accessory.objects.filter(company=self.get_company())
+
 
 # ============================================
 # SALE VIEWS
 # ============================================
 
-class SaleListCreateView(generics.ListCreateAPIView):
+class SaleListCreateView(CompanyScopedMixin, generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
-    
+
     def get_serializer_class(self):
         if self.request.method == 'POST':
             return SaleCreateSerializer
         return SaleSerializer
-    
+
     def get_queryset(self):
-        queryset = Sale.objects.filter(company=self.request.user.company)
+        queryset = Sale.objects.filter(company=self.get_company())
         branch = self.request.query_params.get('branch')
-        status = self.request.query_params.get('status')
+        status_filter = self.request.query_params.get('status')
         date_from = self.request.query_params.get('date_from')
         date_to = self.request.query_params.get('date_to')
-        
+
         if branch:
             queryset = queryset.filter(branch_id=branch)
-        if status:
-            queryset = queryset.filter(payment_status=status)
+        if status_filter:
+            queryset = queryset.filter(payment_status=status_filter)
         if date_from:
             queryset = queryset.filter(sale_date__date__gte=date_from)
         if date_to:
             queryset = queryset.filter(sale_date__date__lte=date_to)
-        
-        return queryset
-    
-    def perform_create(self, serializer):
-        serializer.save(company=self.request.user.company, sold_by=self.request.user)
 
-class SaleDetailView(generics.RetrieveUpdateDestroyAPIView):
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.get_company(), sold_by=self.request.user)
+
+
+class SaleDetailView(CompanyScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     serializer_class = SaleSerializer
-    
-    def get_queryset(self):
-        return Sale.objects.filter(company=self.request.user.company)
 
-class SaleInvoiceView(APIView):
+    def get_queryset(self):
+        return Sale.objects.filter(company=self.get_company())
+
+
+class SaleInvoiceView(CompanyScopedMixin, APIView):
     """Get sale invoice details"""
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
-    
+
     def get(self, request, pk):
         try:
-            sale = Sale.objects.get(id=pk, company=request.user.company)
+            sale = Sale.objects.get(id=pk, company=self.get_company())
             serializer = SaleSerializer(sale)
             return Response(serializer.data)
         except Sale.DoesNotExist:
@@ -261,134 +311,142 @@ class SaleInvoiceView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+
 # ============================================
 # CUSTOMER VIEWS
 # ============================================
 
-class CustomerListCreateView(generics.ListCreateAPIView):
+class CustomerListCreateView(CompanyScopedMixin, generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     serializer_class = CustomerSerializer
-    
+
     def get_queryset(self):
-        queryset = Customer.objects.filter(company=self.request.user.company)
+        queryset = Customer.objects.filter(company=self.get_company())
         search = self.request.query_params.get('search')
         if search:
             queryset = queryset.filter(
-                Q(name__icontains=search) | 
-                Q(phone__icontains=search) | 
+                Q(name__icontains=search) |
+                Q(phone__icontains=search) |
                 Q(email__icontains=search)
             )
         return queryset
-    
-    def perform_create(self, serializer):
-        serializer.save(company=self.request.user.company)
 
-class CustomerDetailView(generics.RetrieveUpdateDestroyAPIView):
+    def perform_create(self, serializer):
+        serializer.save(company=self.get_company())
+
+
+class CustomerDetailView(CompanyScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     serializer_class = CustomerSerializer
-    
+
     def get_queryset(self):
-        return Customer.objects.filter(company=self.request.user.company)
+        return Customer.objects.filter(company=self.get_company())
+
 
 # ============================================
 # STOCK MOVEMENT VIEWS
 # ============================================
 
-class StockMovementListCreateView(generics.ListCreateAPIView):
+class StockMovementListCreateView(CompanyScopedMixin, generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
-    
+
     def get_serializer_class(self):
         if self.request.method == 'POST':
             return StockMovementCreateSerializer
         return StockMovementSerializer
-    
+
     def get_queryset(self):
-        queryset = StockMovement.objects.filter(company=self.request.user.company)
+        queryset = StockMovement.objects.filter(company=self.get_company())
         branch = self.request.query_params.get('branch')
         movement_type = self.request.query_params.get('type')
-        
+
         if branch:
             queryset = queryset.filter(branch_id=branch)
         if movement_type:
             queryset = queryset.filter(movement_type=movement_type)
-        
+
         return queryset.order_by('-created_at')
-    
+
     def perform_create(self, serializer):
         serializer.save(
-            company=self.request.user.company,
+            company=self.get_company(),
             performed_by=self.request.user
         )
 
-class StockMovementDetailView(generics.RetrieveAPIView):
+
+class StockMovementDetailView(CompanyScopedMixin, generics.RetrieveAPIView):
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     serializer_class = StockMovementSerializer
-    
+
     def get_queryset(self):
-        return StockMovement.objects.filter(company=self.request.user.company)
+        return StockMovement.objects.filter(company=self.get_company())
+
 
 # ============================================
 # PURCHASE ORDER VIEWS
 # ============================================
 
-class PurchaseOrderListCreateView(generics.ListCreateAPIView):
+class PurchaseOrderListCreateView(CompanyScopedMixin, generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     serializer_class = PurchaseOrderSerializer
-    
+
     def get_queryset(self):
-        queryset = PurchaseOrder.objects.filter(company=self.request.user.company)
+        queryset = PurchaseOrder.objects.filter(company=self.get_company())
         branch = self.request.query_params.get('branch')
-        status = self.request.query_params.get('status')
+        status_filter = self.request.query_params.get('status')
         supplier = self.request.query_params.get('supplier')
-        
+
         if branch:
             queryset = queryset.filter(branch_id=branch)
-        if status:
-            queryset = queryset.filter(status=status)
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
         if supplier:
             queryset = queryset.filter(supplier_id=supplier)
-        
+
         return queryset
-    
+
     def perform_create(self, serializer):
         serializer.save(
-            company=self.request.user.company,
+            company=self.get_company(),
             created_by=self.request.user
         )
 
-class PurchaseOrderDetailView(generics.RetrieveUpdateDestroyAPIView):
+
+class PurchaseOrderDetailView(CompanyScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     serializer_class = PurchaseOrderSerializer
-    
-    def get_queryset(self):
-        return PurchaseOrder.objects.filter(company=self.request.user.company)
 
-class PurchaseOrderReceiveView(APIView):
+    def get_queryset(self):
+        return PurchaseOrder.objects.filter(company=self.get_company())
+
+
+class PurchaseOrderReceiveView(CompanyScopedMixin, APIView):
     """Mark purchase order as received and update stock"""
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
-    
+
     def post(self, request, pk):
+        company = self.get_company()
         try:
             purchase_order = PurchaseOrder.objects.get(
-                id=pk, 
-                company=request.user.company
+                id=pk,
+                company=company
             )
-            
+
             # Update status
             purchase_order.status = 'received'
             purchase_order.received_date = timezone.now().date()
             purchase_order.save()
-            
+
             # Update stock for each item
             for item in purchase_order.items.all():
                 if item.content_type and item.object_id:
                     product = item.content_type.get_object_for_this_type(id=item.object_id)
                     product.quantity_in_stock += item.quantity_ordered
                     product.save()
-                    
+
                     # Create stock movement record
                     StockMovement.objects.create(
-                        company=request.user.company,
+                        company=company,
                         branch=purchase_order.branch,
                         content_type=item.content_type,
                         object_id=item.object_id,
@@ -401,209 +459,215 @@ class PurchaseOrderReceiveView(APIView):
                         notes=f'Received from PO #{purchase_order.order_number}',
                         performed_by=request.user
                     )
-            
+
             serializer = PurchaseOrderSerializer(purchase_order)
             return Response(serializer.data)
-            
+
         except PurchaseOrder.DoesNotExist:
             return Response(
                 {'error': 'Purchase order not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
 
+
 # ============================================
 # WARRANTY VIEWS
 # ============================================
 
-class WarrantyListCreateView(generics.ListCreateAPIView):
+class WarrantyListCreateView(CompanyScopedMixin, generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     serializer_class = WarrantySerializer
-    
+
     def get_queryset(self):
-        queryset = Warranty.objects.filter(company=self.request.user.company)
+        queryset = Warranty.objects.filter(company=self.get_company())
         branch = self.request.query_params.get('branch')
-        status = self.request.query_params.get('status')
+        status_filter = self.request.query_params.get('status')
         customer = self.request.query_params.get('customer')
-        
+
         if branch:
             queryset = queryset.filter(branch_id=branch)
-        if status:
-            queryset = queryset.filter(status=status)
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
         if customer:
             queryset = queryset.filter(customer_id=customer)
-        
+
         return queryset
-    
+
     def perform_create(self, serializer):
         # Generate warranty number
         import uuid
         warranty_number = f"WAR-{uuid.uuid4().hex[:8].upper()}"
         serializer.save(
-            company=self.request.user.company,
+            company=self.get_company(),
             warranty_number=warranty_number
         )
 
-class WarrantyDetailView(generics.RetrieveUpdateDestroyAPIView):
+
+class WarrantyDetailView(CompanyScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     serializer_class = WarrantySerializer
-    
+
     def get_queryset(self):
-        return Warranty.objects.filter(company=self.request.user.company)
+        return Warranty.objects.filter(company=self.get_company())
+
 
 # ============================================
 # REPAIR VIEWS
 # ============================================
 
-class RepairListCreateView(generics.ListCreateAPIView):
+class RepairListCreateView(CompanyScopedMixin, generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     serializer_class = RepairSerializer
-    
+
     def get_queryset(self):
-        queryset = Repair.objects.filter(company=self.request.user.company)
+        queryset = Repair.objects.filter(company=self.get_company())
         branch = self.request.query_params.get('branch')
-        status = self.request.query_params.get('status')
+        status_filter = self.request.query_params.get('status')
         priority = self.request.query_params.get('priority')
         customer = self.request.query_params.get('customer')
-        
+
         if branch:
             queryset = queryset.filter(branch_id=branch)
-        if status:
-            queryset = queryset.filter(status=status)
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
         if priority:
             queryset = queryset.filter(priority=priority)
         if customer:
             queryset = queryset.filter(customer_id=customer)
-        
+
         return queryset
-    
+
     def perform_create(self, serializer):
         # Generate repair number
         import uuid
         repair_number = f"REP-{uuid.uuid4().hex[:8].upper()}"
         serializer.save(
-            company=self.request.user.company,
+            company=self.get_company(),
             created_by=self.request.user,
             repair_number=repair_number
         )
 
-class RepairDetailView(generics.RetrieveUpdateDestroyAPIView):
+
+class RepairDetailView(CompanyScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     serializer_class = RepairSerializer
-    
-    def get_queryset(self):
-        return Repair.objects.filter(company=self.request.user.company)
 
-class RepairCompleteView(APIView):
+    def get_queryset(self):
+        return Repair.objects.filter(company=self.get_company())
+
+
+class RepairCompleteView(CompanyScopedMixin, APIView):
     """Mark repair as completed"""
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
-    
+
     def post(self, request, pk):
         try:
             repair = Repair.objects.get(
                 id=pk,
-                company=request.user.company
+                company=self.get_company()
             )
-            
+
             repair.status = 'completed'
             repair.completed_date = timezone.now()
             repair.solution = request.data.get('solution', repair.solution)
             repair.actual_cost = request.data.get('actual_cost', repair.actual_cost)
             repair.save()
-            
+
             serializer = RepairSerializer(repair)
             return Response(serializer.data)
-            
+
         except Repair.DoesNotExist:
             return Response(
                 {'error': 'Repair not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
 
+
 # ============================================
 # DASHBOARD VIEWS
 # ============================================
 
-class EPADashboardView(APIView):
+class EPADashboardView(CompanyScopedMixin, APIView):
     """EPA Shop Dashboard - Company specific"""
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
-    
+
     def get(self, request):
-        company = request.user.company
-        
+        company = self.get_company()
+
         # Sales stats
         today = timezone.now().date()
         week_ago = today - timedelta(days=7)
         month_ago = today - timedelta(days=30)
-        
+
         total_sales = Sale.objects.filter(company=company).count()
         total_revenue = Sale.objects.filter(
             company=company,
             payment_status='paid'
         ).aggregate(total=Sum('net_amount'))['total'] or 0
-        
+
         today_sales = Sale.objects.filter(
             company=company,
             sale_date__date=today
         ).count()
-        
+
         today_revenue = Sale.objects.filter(
             company=company,
             sale_date__date=today,
             payment_status='paid'
         ).aggregate(total=Sum('net_amount'))['total'] or 0
-        
+
         week_sales = Sale.objects.filter(
             company=company,
             sale_date__date__gte=week_ago
         ).count()
-        
+
         month_revenue = Sale.objects.filter(
             company=company,
             sale_date__date__gte=month_ago,
             payment_status='paid'
         ).aggregate(total=Sum('net_amount'))['total'] or 0
-        
+
         # Product counts
         electronics_count = Electronic.objects.filter(company=company, is_active=True).count()
         phones_count = Phone.objects.filter(company=company, is_active=True).count()
         accessories_count = Accessory.objects.filter(company=company, is_active=True).count()
-        
+
         # Total stock value
         electronic_value = Electronic.objects.filter(company=company).aggregate(
             total=Sum(F('quantity_in_stock') * F('purchase_price'))
         )['total'] or 0
-        
+
         phones_value = Phone.objects.filter(company=company).aggregate(
             total=Sum(F('quantity_in_stock') * F('purchase_price'))
         )['total'] or 0
-        
+
         accessories_value = Accessory.objects.filter(company=company).aggregate(
             total=Sum(F('quantity_in_stock') * F('purchase_price'))
         )['total'] or 0
-        
+
         total_stock_value = electronic_value + phones_value + accessories_value
-        
+
         # Low stock items
         low_stock_electronics = Electronic.objects.filter(
             company=company,
             quantity_in_stock__lte=F('minimum_stock_level')
         ).count()
-        
+
         low_stock_phones = Phone.objects.filter(
             company=company,
             quantity_in_stock__lte=F('minimum_stock_level')
         ).count()
-        
+
         low_stock_accessories = Accessory.objects.filter(
             company=company,
             quantity_in_stock__lte=F('minimum_stock_level')
         ).count()
-        
+
         # Recent sales
         recent_sales = Sale.objects.filter(
             company=company
         ).order_by('-sale_date')[:10]
-        
+
         # Branch statistics
         branches = Branch.objects.filter(company=company, is_active=True)
         branch_stats = []
@@ -613,7 +677,7 @@ class EPADashboardView(APIView):
                 branch=branch,
                 payment_status='paid'
             ).aggregate(total=Sum('net_amount'))['total'] or 0
-            
+
             branch_stats.append({
                 'id': branch.id,
                 'name': branch.name,
@@ -621,20 +685,20 @@ class EPADashboardView(APIView):
                 'total_sales': Sale.objects.filter(company=company, branch=branch).count(),
                 'total_revenue': branch_sales
             })
-        
+
         # Pending repairs
         pending_repairs = Repair.objects.filter(
             company=company,
             status__in=['pending', 'in_progress', 'waiting_parts']
         ).count()
-        
+
         # Active warranties expiring soon (next 30 days)
         expiring_warranties = Warranty.objects.filter(
             company=company,
             status='active',
             end_date__lte=today + timedelta(days=30)
         ).count()
-        
+
         return Response({
             'total_sales': total_sales,
             'total_revenue': total_revenue,

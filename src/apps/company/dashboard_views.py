@@ -5,6 +5,7 @@ from django.db.models import Count, Sum, Q
 from django.utils import timezone
 from django.http import JsonResponse
 from apps.companies.models import Company
+from apps.companies.utils import get_current_company
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -28,11 +29,11 @@ def company_dashboard_view(request):
         is_viewing_company = True
         
     elif request.user.role in ['company_admin', 'company_manager']:
-        # Company admin/manager - use their own company
-        if not request.user.company:
+        # Company admin/manager - resolve company (custom domain aware)
+        company = get_current_company(request)
+        if not company:
             messages.warning(request, 'You are not assigned to any company.')
             return redirect('/dashboard/')
-        company = request.user.company
         is_viewing_company = False
         
     else:
@@ -112,9 +113,9 @@ def company_dashboard_stats(request):
         company = get_object_or_404(Company, id=request.session['viewing_company_id'])
         
     elif request.user.role in ['company_admin', 'company_manager']:
-        if not request.user.company:
+        company = get_current_company(request)
+        if not company:
             return JsonResponse({'error': 'No company assigned'}, status=400)
-        company = request.user.company
     else:
         return JsonResponse({'error': 'Access denied'}, status=403)
     

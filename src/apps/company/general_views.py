@@ -1,14 +1,16 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
+from apps.companies.utils import get_current_company
 
 User = get_user_model()
 
+
 @login_required
 def general_dashboard(request):
-    company = request.user.company
-    employees = User.objects.filter(company=company) if company else []
-    
+    company = get_current_company(request)
+    employees = User.objects.filter(company=company) if company else User.objects.none()
+
     context = {
         'company': company,
         'stats': {

@@ -15,17 +15,32 @@ from apps.companies.models import Company
 def get_active_company(request):
     """
     Get the currently active company for the request.
-    
+
     Priority:
-    1. Support Mode: If super admin is viewing a company, return that company
-    2. Regular: Return the user's assigned company
-    
+    1. Custom Domain: If request came via a verified custom domain AND
+       the user belongs to that company (or is super admin), use it.
+    2. Support Mode: If super admin is viewing a company, return that company.
+    3. Regular: Return the user's assigned company.
+
     Returns:
         tuple: (company, is_support_mode)
     """
     user = request.user
-    
-    # Support Mode: Super admin viewing a specific company
+
+    # 1. Custom domain resolution (with isolation check)
+    tenant_company = getattr(request, 'tenant_company', None)
+    if tenant_company is not None:
+        user_company = getattr(user, 'company', None) if user.is_authenticated else None
+
+        if (
+            not user.is_authenticated
+            or user.role == 'super_admin'
+            or user_company == tenant_company
+        ):
+            return tenant_company, False
+        # else: domain mismatch → fall through to user's own company
+
+    # 2. Support Mode: Super admin viewing a specific company
     if user.is_authenticated and user.role == 'super_admin':
         viewing_company_id = request.session.get('viewing_company_id')
         if viewing_company_id:
@@ -33,15 +48,14 @@ def get_active_company(request):
                 company = Company.objects.get(id=viewing_company_id)
                 return company, True
             except Company.DoesNotExist:
-                # Clear invalid session
                 request.session.pop('viewing_company_id', None)
                 request.session.pop('support_mode', None)
                 request.session.pop('support_started_at', None)
-    
-    # Regular mode: user's own company
+
+    # 3. Regular mode: user's own company
     if user.is_authenticated and user.company:
         return user.company, False
-    
+
     return None, False
 
 

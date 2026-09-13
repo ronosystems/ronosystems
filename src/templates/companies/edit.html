@@ -90,6 +90,57 @@
     .state-banner.bg-danger  { background: #f8d7da; color: #721c24; }
     .state-banner.bg-secondary { background: #f8f9fa; color: #000000; }
 
+    /* Custom domain hint & verification result */
+    .domain-hint {
+        font-size: 12px;
+        color: #555;
+        margin-top: 4px;
+    }
+    .domain-hint code {
+        background: #f0f0f0;
+        padding: 1px 4px;
+        border-radius: 3px;
+        color: #000;
+    }
+    .domain-status {
+        font-size: 12px;
+        margin-top: 6px;
+        padding: 4px 8px;
+        border-radius: 3px;
+        display: none;
+    }
+    .domain-status.success {
+        display: block;
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    .domain-status.error {
+        display: block;
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    .domain-status.loading {
+        display: block;
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeeba;
+    }
+
+    /* Verified badge */
+    .verified-badge {
+        display: inline-block;
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-weight: 600;
+        margin-left: 6px;
+        vertical-align: middle;
+    }
+    .verified-badge.yes { background: #28a745; color: white; }
+    .verified-badge.no  { background: #dc3545; color: white; }
+
     @media (max-width: 768px) {
         .card-body { padding: 15px; }
         .form-control, .form-select { font-size: 13px; padding: 6px 10px; }
@@ -186,6 +237,62 @@
                             <label class="form-label">Postal Code</label>
                             <input type="text" class="form-control" name="postal_code"
                                    value="{{ company.postal_code|default:'' }}">
+                        </div>
+                    </div>
+
+                    {# ============================================ #}
+                    {# CUSTOM DOMAIN #}
+                    {# ============================================ #}
+                    <div class="form-section-title">
+                        <i class="fas fa-globe"></i> Custom Domain (Optional)
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">
+                                Custom Domain
+                                {% if company.custom_domain %}
+                                    {% if company.domain_verified %}
+                                        <span class="verified-badge yes"><i class="fas fa-check"></i> Verified</span>
+                                    {% else %}
+                                        <span class="verified-badge no"><i class="fas fa-times"></i> Not Verified</span>
+                                    {% endif %}
+                                {% endif %}
+                            </label>
+                            <input type="text"
+                                   class="form-control"
+                                   name="custom_domain"
+                                   id="customDomainInput"
+                                   value="{{ company.custom_domain|default:'' }}"
+                                   placeholder="e.g., clientcompany.co.ke">
+                            <div class="domain-hint">
+                                Enter the domain <strong>without</strong> <code>https://</code>
+                                or <code>www.</code>. Leave blank to use the platform URL.
+                                Changing this will require re-verification.
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label d-block">DNS Verification</label>
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       name="domain_verified"
+                                       id="domainVerified"
+                                       {% if company.domain_verified %}checked{% endif %}>
+                                <label class="form-check-label" for="domainVerified">
+                                    Verified (DNS is live)
+                                </label>
+                            </div>
+
+                            {% if company.custom_domain %}
+                            <button type="button"
+                                    class="btn btn-secondary btn-sm mt-2"
+                                    id="verifyDomainBtn"
+                                    data-url="{% url 'companies:company-verify-domain' company.id %}">
+                                <i class="fas fa-sync"></i> Verify DNS Now
+                            </button>
+                            <div class="domain-status" id="verifyDomainResult"></div>
+                            {% endif %}
                         </div>
                     </div>
 
@@ -312,6 +419,7 @@
 
 <script>
 (function () {
+    // ---------- Plan preview ----------
     const planSelect = document.getElementById('planSelect');
     const preview = document.getElementById('planPreview');
 
@@ -350,7 +458,48 @@
     }
 
     planSelect.addEventListener('change', renderPreview);
-    renderPreview();   // ← runs on page load, so preview matches current plan
+    renderPreview();
+})();
+
+// ---------- Verify DNS Now ----------
+(function () {
+    const btn = document.getElementById('verifyDomainBtn');
+    const result = document.getElementById('verifyDomainResult');
+    if (!btn || !result) return;
+
+    btn.addEventListener('click', function () {
+        const url = btn.dataset.url;
+
+        result.className = 'domain-status loading';
+        result.textContent = 'Checking DNS...';
+
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.verified) {
+                result.className = 'domain-status success';
+                result.textContent = data.message;
+                // Reflect the new state in the checkbox
+                const checkbox = document.getElementById('domainVerified');
+                if (checkbox) checkbox.checked = true;
+            } else {
+                result.className = 'domain-status error';
+                result.textContent = data.message || 'Verification failed.';
+                const checkbox = document.getElementById('domainVerified');
+                if (checkbox) checkbox.checked = false;
+            }
+        })
+        .catch(err => {
+            result.className = 'domain-status error';
+            result.textContent = 'Error: ' + err;
+        });
+    });
 })();
 </script>
 {% endblock %}

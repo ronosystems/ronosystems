@@ -15,7 +15,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-ronosystems-key-12345')
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-# ALLOWED_HOSTS - Fixed
+# ALLOWED_HOSTS
 ALLOWED_HOSTS = []
 allowed = os.getenv('ALLOWED_HOSTS', '')
 if allowed:
@@ -25,9 +25,13 @@ else:
 
 if 'RENDER' in os.environ:
     ALLOWED_HOSTS.append('ronosystems.onrender.com')
-    ALLOWED_HOSTS.append('*.onrender.com')
+    ALLOWED_HOSTS.append('.onrender.com')
 
-# CSRF Trusted Origins - Fixed
+# Allow all hosts because custom domains are dynamic.
+# Security is enforced by CustomDomainMiddleware (DB lookup) + Cloudflare.
+ALLOWED_HOSTS.append('*')
+
+# CSRF Trusted Origins
 CSRF_TRUSTED_ORIGINS = []
 csrf_origins = os.getenv('CSRF_TRUSTED_ORIGINS', '')
 if csrf_origins:
@@ -37,7 +41,8 @@ else:
 
 if 'RENDER' in os.environ:
     CSRF_TRUSTED_ORIGINS.append('https://ronosystems.onrender.com')
-    CSRF_TRUSTED_ORIGINS.append('https://*.onrender.com')
+    # NOTE: Django does NOT support wildcards in CSRF_TRUSTED_ORIGINS.
+    # Custom domains are added dynamically by CustomDomainMiddleware.
 
 # Filter out any origins that don't start with http:// or https://
 CSRF_TRUSTED_ORIGINS = [origin for origin in CSRF_TRUSTED_ORIGINS if origin.startswith('http')]
@@ -88,6 +93,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'apps.companies.middleware.CustomDomainMiddleware',          # ← ADD THIS
     'apps.companies.middleware.SubscriptionExpiryMiddleware',
 ]
 

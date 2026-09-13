@@ -10,10 +10,24 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST, require_GET
 from django.views.decorators.csrf import csrf_protect, csrf_exempt
 import json
+import re
+import socket
 import uuid
 
 from .models import Company, BusinessType
 from apps.plans.models import Plan, Subscription
+
+
+# ============================================
+# SUPPORT SESSION KEYS
+# ============================================
+
+SUPPORT_SESSION_KEYS = (
+    'support_mode',
+    'viewing_company_id',
+    'support_started_at',
+    'original_user_id',
+)
 
 
 # ============================================
@@ -37,6 +51,57 @@ def _resolve_plan(plan_id):
     if not plan_id:
         return None
     return Plan.objects.filter(pk=plan_id).first()
+
+
+# ============================================
+# DOMAIN HELPERS
+# ============================================
+
+DOMAIN_RE = re.compile(
+    r'^[a-z0-9]'
+    r'([a-z0-9\-]{0,61}[a-z0-9])?'
+    r'(\.[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?)+$'
+)
+
+
+def _normalize_domain(raw):
+    """
+    Clean up a user-submitted domain.
+
+    - Lowercase
+    - Strip protocol (http:// / https://)
+    - Strip trailing slashes
+    - Strip leading 'www.'
+    Returns a normalized string, or '' if input was empty.
+    """
+    if not raw:
+        return ''
+    d = raw.strip().lower()
+    d = d.replace('https://', '').replace('http://', '')
+    d = d.rstrip('/')
+    if d.startswith('www.'):
+        d = d[4:]
+    return d
+
+
+def _validate_domain(domain, exclude_company_id=None):
+    """
+    Validate a domain.
+    Returns (is_valid, error_message).
+    """
+    if not domain:
+        return True, None   # Empty is fine (no custom domain)
+
+    if not DOMAIN_RE.match(domain):
+        return False, f'Invalid domain format: "{domain}".'
+
+    qs = Company.objects.filter(custom_domain__iexact=domain)
+    if exclude_company_id:
+        qs = qs.exclude(pk=exclude_company_id)
+    if qs.exists():
+        return False, f'Domain "{domain}" is already used by another company.'
+
+    return True, None
 
 
 def _sync_company_from_subscription(company, plan, start_dt, end_dt, status):
@@ -86,25 +151,15 @@ def _subscription_is_valid(sub):
     return True
 
 
-
 def _clear_support_session(request):
     """
     Completely clear all support-mode session data.
-    
-    Steps:
-      1. Pop each support-mode key
-      2. Save the session (persist the removal)
-      3. Rotate the session key (optional, prevents fixation)
     """
-    # 1. Pop every key (safe if missing)
     for key in SUPPORT_SESSION_KEYS:
         request.session.pop(key, None)
-    
-    # 2. Persist the changes to the DB / cache
+
     request.session.modified = True
     request.session.save()
-    
-    # 3. Rotate session key — this issues a NEW session cookie
     request.session.cycle_key()
 
 
@@ -185,8 +240,23 @@ def company_create(request):
         end_raw = request.POST.get('subscription_end')
         sub_status = request.POST.get('subscription_status', 'active')
 
+        # ---------- Custom domain ----------
+        raw_domain = request.POST.get('custom_domain', '')
+        custom_domain = _normalize_domain(raw_domain)
+        domain_verified = request.POST.get('domain_verified') == 'on'
+
+        # ---------- Validate ----------
         if not name:
             messages.error(request, 'Company name is required.')
+            return render(request, 'companies/create.html', {
+                'business_types': business_types,
+                'plans': plans,
+                'form_data': request.POST,
+            })
+
+        domain_ok, domain_err = _validate_domain(custom_domain)
+        if not domain_ok:
+            messages.error(request, domain_err)
             return render(request, 'companies/create.html', {
                 'business_types': business_types,
                 'plans': plans,
@@ -210,6 +280,8 @@ def company_create(request):
                 email=request.POST.get('email', ''),
                 phone=request.POST.get('phone', ''),
                 website=request.POST.get('website', ''),
+                custom_domain=custom_domain or None,
+                domain_verified=domain_verified,
                 plan=plan,
                 subscription_start=start_dt,
                 subscription_end=end_dt,
@@ -303,9 +375,24 @@ def company_edit(request, pk):
         end_raw = request.POST.get('subscription_end')
         sub_status = request.POST.get('subscription_status', 'active')
 
+        # ---------- Custom domain ----------
+        raw_domain = request.POST.get('custom_domain', '')
+        custom_domain = _normalize_domain(raw_domain)
+        domain_verified = request.POST.get('domain_verified') == 'on'
+
         # ---------- Validate ----------
         if not name:
             messages.error(request, 'Company name is required.')
+            return render(request, 'companies/edit.html', {
+                'company': company,
+                'business_types': business_types,
+                'plans': plans,
+                'form_data': request.POST,
+            })
+
+        domain_ok, domain_err = _validate_domain(custom_domain, exclude_company_id=company.pk)
+        if not domain_ok:
+            messages.error(request, domain_err)
             return render(request, 'companies/edit.html', {
                 'company': company,
                 'business_types': business_types,
@@ -326,6 +413,15 @@ def company_edit(request, pk):
             company.email = request.POST.get('email', '')
             company.phone = request.POST.get('phone', '')
             company.website = request.POST.get('website', '')
+
+            # ---------- Custom domain ----------
+            # If the domain changed, force re-verification.
+            if custom_domain != (company.custom_domain or ''):
+                company.custom_domain = custom_domain or None
+                company.domain_verified = False   # require re-verify
+            else:
+                # Domain unchanged — allow toggling the verified flag
+                company.domain_verified = domain_verified
 
             # ---------- Sync is_active ↔ status ----------
             if is_active:
@@ -376,6 +472,54 @@ def company_edit(request, pk):
         'page_subtitle': f'Editing {company.name}',
     }
     return render(request, 'companies/edit.html', context)
+
+
+# ============================================
+# VERIFY CUSTOM DOMAIN (DNS CHECK)
+# ============================================
+
+@login_required
+@staff_member_required
+@require_POST
+def company_verify_domain(request, pk):
+    """
+    Quick DNS check: does the company's custom_domain resolve to an IP?
+
+    Returns JSON: { success, message, verified, resolved_ip? }
+
+    Note: this is a basic "does it resolve at all" check. It does NOT
+    confirm the domain points at YOUR server. For full verification,
+    you'd compare the resolved IP against your platform's IPs.
+    """
+    company = get_object_or_404(Company, pk=pk)
+
+    if not company.custom_domain:
+        return JsonResponse({
+            'success': False,
+            'verified': False,
+            'message': 'No custom domain set for this company.',
+        }, status=400)
+
+    try:
+        resolved_ip = socket.gethostbyname(company.custom_domain)
+    except socket.gaierror:
+        company.domain_verified = False
+        company.save(update_fields=['domain_verified'])
+        return JsonResponse({
+            'success': False,
+            'verified': False,
+            'message': f'{company.custom_domain} does not resolve. Check the DNS records.',
+        })
+
+    company.domain_verified = True
+    company.save(update_fields=['domain_verified'])
+
+    return JsonResponse({
+        'success': True,
+        'verified': True,
+        'resolved_ip': resolved_ip,
+        'message': f'{company.custom_domain} resolves to {resolved_ip}. Marked as verified.',
+    })
 
 
 # ============================================
@@ -503,7 +647,6 @@ def company_payments_initiate(request, pk):
 def company_payments_status(request, pk):
     """
     Poll payment status. Frontend hits this every 3s.
-    Returns JSON: { status: 'pending'|'success'|'failed'|'cancelled', message, reference }
     """
     company = get_object_or_404(Company, pk=pk)
     reference = request.GET.get('ref', '').strip()
