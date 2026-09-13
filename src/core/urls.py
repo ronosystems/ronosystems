@@ -5,7 +5,7 @@ from django.conf.urls.static import static
 from apps.companies import web_views as company_views
 from . import views
 
-admin.site.site_header = "RS ADMINISTRATION"
+admin.site.site_header = "RONOSYSTEMS ADMINISTRATION"
 admin.site.site_title = "Administration Portal"
 admin.site.index_title = "Welcome to RonoSystems Administration"
 
