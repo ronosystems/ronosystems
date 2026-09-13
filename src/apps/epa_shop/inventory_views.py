@@ -15,6 +15,8 @@ from apps.companies.support_utils import (
 )
 
 
+
+
 @login_required
 def inventory_list(request):
     """Main inventory page showing all products"""
@@ -45,6 +47,89 @@ def inventory_list(request):
     
     total_products = electronics_count + phones_count + accessories_count
     total_stock = electronics_stock + phones_stock + accessories_stock
+    
+    # ============================================
+    # FINANCIAL STATISTICS
+    # ============================================
+    
+    # Calculate Purchase Value (Total cost of all inventory in stock)
+    electronics_purchase = electronics.aggregate(
+        total=Sum('purchase_price', default=0)
+    )['total'] or 0
+    phones_purchase = phones.aggregate(
+        total=Sum('purchase_price', default=0)
+    )['total'] or 0
+    accessories_purchase = accessories.aggregate(
+        total=Sum('purchase_price', default=0)
+    )['total'] or 0
+    
+    # Better: Calculate purchase value * quantity for each item
+    electronics_purchase_value = sum(
+        item.purchase_price * item.quantity_in_stock 
+        for item in electronics
+    )
+    phones_purchase_value = sum(
+        item.purchase_price * item.quantity_in_stock 
+        for item in phones
+    )
+    accessories_purchase_value = sum(
+        item.purchase_price * item.quantity_in_stock 
+        for item in accessories
+    )
+    total_purchase_value = (
+        electronics_purchase_value + 
+        phones_purchase_value + 
+        accessories_purchase_value
+    )
+    
+    # Calculate Expected Selling Value (Total potential revenue at selling price)
+    electronics_selling_value = sum(
+        item.selling_price * item.quantity_in_stock 
+        for item in electronics
+    )
+    phones_selling_value = sum(
+        item.selling_price * item.quantity_in_stock 
+        for item in phones
+    )
+    accessories_selling_value = sum(
+        item.selling_price * item.quantity_in_stock 
+        for item in accessories
+    )
+    total_selling_value = (
+        electronics_selling_value + 
+        phones_selling_value + 
+        accessories_selling_value
+    )
+    
+    # Calculate Expected Profit (Selling Value - Purchase Value)
+    expected_profit = total_selling_value - total_purchase_value
+    expected_profit_margin = (
+        (expected_profit / total_purchase_value * 100) 
+        if total_purchase_value > 0 else 0
+    )
+    
+    # Calculate Best Price Value (Total potential revenue at best price)
+    # Best price is the minimum acceptable price - use selling_price if best_price is null
+    electronics_best_value = sum(
+        (item.best_price if item.best_price else item.selling_price) * item.quantity_in_stock 
+        for item in electronics
+    )
+    phones_best_value = sum(
+        (item.best_price if item.best_price else item.selling_price) * item.quantity_in_stock 
+        for item in phones
+    )
+    accessories_best_value = sum(
+        (item.best_price if item.best_price else item.selling_price) * item.quantity_in_stock 
+        for item in accessories
+    )
+    total_best_value = (
+        electronics_best_value + 
+        phones_best_value + 
+        accessories_best_value
+    )
+    
+    # Best price profit
+    best_price_profit = total_best_value - total_purchase_value
     
     # Low stock items
     low_stock_items = []
@@ -110,10 +195,21 @@ def inventory_list(request):
         'low_stock_count': len(low_stock_items),
         'low_stock_items': low_stock_items[:10],
         'is_viewing_company': is_viewing_company,
+        
+        # Financial stats
+        'total_purchase_value': total_purchase_value,
+        'total_selling_value': total_selling_value,
+        'total_best_value': total_best_value,
+        'expected_profit': expected_profit,
+        'expected_profit_margin': expected_profit_margin,
+        'best_price_profit': best_price_profit,
+        
         'page_title': 'Inventory',
         'page_subtitle': 'Manage your stock',
     }
     return render(request, 'epa/inventory.html', context)
+
+
 
 
 @login_required
