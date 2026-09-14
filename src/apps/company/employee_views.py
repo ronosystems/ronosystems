@@ -128,34 +128,45 @@ def employee_list(request):
 
 @login_required
 def employee_detail(request, pk):
-    """View employee details (Company Admin/Manager)"""
+    """
+    View employee details for the active company.
+
+    - Company admin/manager: sees employees of their own company.
+    - Super admin in support mode: sees employees of the active company.
+    - Unauthorized roles: redirected back to the list.
+    """
     # ============================================
     # SUPPORT MODE: Get active company
     # ============================================
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
-    # Check if user is authorized (support mode = always authorized)
+
+    # ---- Authorization ----
     is_authorized = (
         is_viewing_company or
-        request.user.is_company_admin or 
-        request.user.is_company_manager or 
+        request.user.is_company_admin or
+        request.user.is_company_manager or
         request.user.is_super_admin or
         request.user.is_superuser or
         request.user.is_staff
     )
-    
+
     if not is_authorized:
         messages.error(request, 'You do not have permission to view employee details.')
         return redirect('employee-list')
-    
-    employee = get_object_or_404(User, pk=pk, company=company)
-    
+
+    # ---- Fetch employee scoped to the active company ----
+    employee = get_object_or_404(
+        User.objects.select_related('company', 'branch'),
+        pk=pk,
+        company=company,
+    )
+
     context = {
         'company': company,
         'employee': employee,

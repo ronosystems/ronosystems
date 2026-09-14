@@ -195,4 +195,4 @@ def super_admin_dashboard(request):
         'business_type_breakdown': business_type_breakdown,
         'health': health,
     }
-    return render(request, 'admin/super_dashboard.html', context)
+    return render(request, 'superadmin/super_dashboard.html', context)

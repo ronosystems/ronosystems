@@ -13,7 +13,6 @@ class RestrictedAdminSite(AdminSite):
     def login(self, request, extra_context=None):
         # Logged in but not super_admin → send to no-access
         if request.user.is_authenticated and request.user.role != 'super_admin':
-            messages.error(request, 'You do not have permission to access the admin panel.')
             return redirect('/no-access/')   # ✅ FIXED
         return super().login(request, extra_context)
 

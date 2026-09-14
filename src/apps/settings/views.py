@@ -64,7 +64,7 @@ def settings_dashboard(request):
         'page_subtitle': 'Configure your system preferences',
         'active_tab': 'settings',
     }
-    return render(request, 'admin/settings_dashboard.html', context)
+    return render(request, 'superadmin/settings_dashboard.html', context)
 
 
 @login_required

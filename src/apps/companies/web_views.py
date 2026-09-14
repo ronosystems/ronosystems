@@ -16,6 +16,13 @@ import uuid
 
 from .models import Company, BusinessType
 from apps.plans.models import Plan, Subscription
+from django.contrib.auth import get_user_model
+
+
+
+
+User = get_user_model()
+
 
 
 # ============================================
@@ -733,3 +740,32 @@ def company_payments_callback(request, pk):
         sub.save(update_fields=['status'])
 
     return JsonResponse({'ResultCode': 0, 'ResultDesc': 'Received'})
+
+
+
+@login_required
+@staff_member_required
+def company_employee_list(request, company_id):
+    """Super admin view: list employees for a specific company."""
+    company = get_object_or_404(Company, pk=company_id)
+
+    employees = User.objects.filter(company=company).exclude(role='super_admin')
+
+    # search
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        employees = employees.filter(
+            Q(first_name__icontains=search_query) |
+            Q(last_name__icontains=search_query) |
+            Q(email__icontains=search_query) |
+            Q(phone__icontains=search_query) |
+            Q(staff_id__icontains=search_query)
+        )
+
+    context = {
+        'company': company,
+        'employees': employees,
+        'page_title': f'{company.name} · Employees',
+        'page_subtitle': 'Company employees',
+    }
+    return render(request, 'companies/employees.html', context)

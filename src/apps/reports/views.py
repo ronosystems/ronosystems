@@ -210,4 +210,4 @@ def reports_dashboard(request):
         'page_subtitle': 'Company & Analytics Reports',
     }
     
-    return render(request, 'admin/reports_dashboard.html', context)
+    return render(request, 'superadmin/reports_dashboard.html', context)

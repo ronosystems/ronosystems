@@ -1,0 +1,332 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ company.name }} · Employees - RonoSystems{% endblock %}
+{% block page_title %}{{ company.name }} — Employees{% endblock %}
+{% block page_subtitle %}All employees in this company{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE STYLING (matches your other pages)
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    .card-body { color: #000000; }
+    .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+        color: #000000 !important;
+        border-radius: 0 !important;
+    }
+    .card-header h6 {
+        color: #000000 !important;
+        font-weight: 700;
+        margin: 0;
+    }
+
+    /* Table */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .table-excel th,
+    .table-excel td {
+        border: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    .table-excel thead th {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+    }
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    .table-excel tbody tr:hover td { background-color: #f5f5f5; }
+    .table-excel tbody tr:nth-child(even) td { background-color: #f9f9f9; }
+
+    /* Badges */
+    .badge {
+        padding: 4px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    .badge.bg-success { background: #d4edda !important; color: #155724 !important; }
+    .badge.bg-danger  { background: #f8d7da !important; color: #721c24 !important; }
+    .badge.bg-warning { background: #fff3cd !important; color: #856404 !important; }
+    .badge.bg-info    { background: #d1ecf1 !important; color: #0c5460 !important; }
+
+    .badge-role {
+        padding: 5px 12px;
+        border-radius: 50px;
+        font-size: 12px;
+        border: 1px solid #000000;
+        font-weight: 600;
+    }
+    .badge-company_admin    { background: #2ed573; color: #fff; }
+    .badge-company_manager  { background: #1e90ff; color: #fff; }
+    .badge-company_staff    { background: #0228ff; color: #fff; }
+    .badge-company_agent    { background: #ffa502; color: #fff; }
+    .badge-company_cashier  { background: #7a5cff; color: #fff; }
+    .badge-stock_controller { background: #ff02b3; color: #fff; }
+    .badge-mpesa_agent      { background: #a29bfe; color: #fff; }
+    .badge-super_admin      { background: #ff4757; color: #fff; }
+
+    /* Buttons */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(135,206,235,0.3);
+    }
+    .btn-outline-primary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    .btn-outline-primary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-outline-secondary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    .btn-outline-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-sm { padding: 4px 12px; font-size: 12px; }
+
+    /* Header row with search */
+    .products-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    .products-header h3 { color: #000000; font-weight: 700; margin: 0; }
+    .products-header p { color: #000000; margin: 0; }
+
+    .search-input {
+        padding: 8px 12px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        min-width: 250px;
+        background: #ffffff;
+    }
+    .search-input:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+
+    .avatar-sm {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #87CEEB, #7bb8d8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #000000;
+        font-weight: 700;
+        flex-shrink: 0;
+        border: 2px solid #000000;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+    }
+    .empty-icon {
+        font-size: 48px;
+        display: block;
+        margin-bottom: 16px;
+    }
+
+    @media (max-width: 768px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 12px;
+        }
+        .avatar-sm { width: 30px; height: 30px; font-size: 12px; }
+        .search-input { min-width: 150px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+
+        {# ---------- HEADER ---------- #}
+        <div class="products-header">
+            <div>
+                <h3>
+                    <i class="fas fa-users"></i> {{ company.name }} — Employees
+                </h3>
+                <p class="text-muted">Total: {{ employees|length }} employee{{ employees|length|pluralize }}</p>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="{% url 'companies:company-detail' company.id %}"
+                   class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-arrow-left"></i> Back to Company
+                </a>
+            </div>
+        </div>
+
+        {# ---------- SEARCH ---------- #}
+        <div class="mb-3">
+            <form method="get" class="d-flex gap-2 flex-wrap">
+                <input type="text"
+                       name="search"
+                       class="search-input"
+                       placeholder="Search by name, email, phone, staff ID…"
+                       value="{{ search_query|default:'' }}">
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="fas fa-search"></i> Search
+                </button>
+                {% if search_query %}
+                <a href="{% url 'companies:company-employees' company.id %}"
+                   class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-times"></i> Clear
+                </a>
+                {% endif %}
+            </form>
+        </div>
+
+        {# ---------- TABLE ---------- #}
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-list"></i> Employee List</h6>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table-excel mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width:5%;">#</th>
+                                <th style="width:22%;">Employee</th>
+                                <th style="width:18%;">Email</th>
+                                <th style="width:12%;">Phone</th>
+                                <th style="width:12%;">Role</th>
+                                <th style="width:12%;">Branch</th>
+                                <th style="width:9%;">Status</th>
+                                <th style="width:10%;" class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for employee in employees %}
+                            <tr>
+                                <td><strong>#{{ forloop.counter }}</strong></td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar-sm me-2">
+                                            {{ employee.first_name|default:employee.username|make_list|first|upper }}
+                                        </div>
+                                        <div>
+                                            <strong>{{ employee.get_full_name|default:employee.username }}</strong>
+                                            {% if employee.staff_id %}
+                                            <br><small class="text-muted">ID: {{ employee.staff_id }}</small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <i class="fas fa-envelope" style="color:#000;"></i>
+                                    {{ employee.email|default:"—" }}
+                                </td>
+                                <td>
+                                    {% if employee.phone %}
+                                        <i class="fas fa-phone" style="color:#000;"></i> {{ employee.phone }}
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge-role badge-{{ employee.role }}">
+                                        {{ employee.get_role_display|default:employee.role|title }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if employee.branch %}
+                                        <i class="fas fa-building" style="color:#000;"></i> {{ employee.branch.name }}
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if employee.is_active %}
+                                        <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'employees:superadmin-employee-detail' employee.id %}"
+                                           class="btn btn-outline-primary"
+                                           title="View employee details">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8">
+                                    <div class="empty-state">
+                                        <span class="empty-icon">👥</span>
+                                        <h3>No Employees Found</h3>
+                                        <p class="text-muted">
+                                            {% if search_query %}
+                                                No employees match "{{ search_query }}".
+                                            {% else %}
+                                                This company has no employees yet.
+                                            {% endif %}
+                                        </p>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer text-muted" style="border-top: 2px solid #000000; background: #f8f9fa;">
+                Showing {{ employees|length }} employee{{ employees|length|pluralize }}
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

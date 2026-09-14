@@ -13,7 +13,7 @@ urlpatterns = [
     path('<int:pk>/', web_views.company_detail, name='company-detail'),
     path('<int:pk>/edit/', web_views.company_edit, name='company-edit'),
     path('<int:pk>/delete/', web_views.company_delete, name='company-delete'),
-
+    path('<int:company_id>/employees/', web_views.company_employee_list, name='company-employees'),
     path('<int:pk>/payments/', web_views.company_payments, name='company-payments'),
     path('<int:pk>/payments/', web_views.company_payments, name='company-payments'),
     path('<int:pk>/payments/initiate/', web_views.company_payments_initiate, name='company-payments-initiate'),

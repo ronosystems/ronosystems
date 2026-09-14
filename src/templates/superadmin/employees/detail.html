@@ -1,0 +1,592 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ employee.get_full_name|default:employee.username }} · Employee{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE DETAIL CARDS
+    ============================================ */
+    .detail-card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: #ffffff;
+        box-shadow: none;
+    }
+    .detail-card .card-header {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        font-weight: 700;
+        border-bottom: 2px solid #000000;
+        padding: 12px 18px;
+        font-size: 15px;
+    }
+    .detail-card .card-body {
+        padding: 0;
+    }
+
+    /* ============================================
+       PROFILE HEADER
+    ============================================ */
+    .profile-header {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        padding: 20px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: #ffffff;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    .avatar-lg {
+        width: 90px;
+        height: 90px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #87CEEB, #7bb8d8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 34px;
+        color: #000000;
+        border: 2px solid #000000;
+        flex-shrink: 0;
+    }
+    .profile-header h2 {
+        margin: 0 0 6px 0;
+        font-weight: 700;
+        color: #000000;
+        font-size: 1.5rem;
+    }
+    .profile-header .meta {
+        color: #333;
+        font-size: 14px;
+        margin: 3px 0;
+    }
+    .profile-header .meta i {
+        color: #000000;
+        width: 18px;
+    }
+
+    /* ============================================
+       INFO GRID (2-COLUMN EXCEL-LIKE)
+    ============================================ */
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 0;
+        background: #ffffff;
+    }
+    .info-row {
+        display: flex;
+        border-bottom: 1px solid #000000;
+        border-right: 1px solid #000000;
+        padding: 12px 16px;
+        align-items: center;
+        min-height: 54px;
+    }
+    .info-row:nth-child(even) {
+        background: #f9f9f9;
+    }
+    .info-row .label {
+        font-weight: 700;
+        color: #000000;
+        width: 160px;
+        flex-shrink: 0;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+    }
+    .info-row .value {
+        color: #000000;
+        font-size: 14px;
+        word-break: break-word;
+    }
+    .info-row .value.empty {
+        color: #888;
+        font-style: italic;
+    }
+
+    /* ============================================
+       ROLE BADGES
+    ============================================ */
+    .badge-role {
+        padding: 5px 12px;
+        border-radius: 50px;
+        font-size: 12px;
+        border: 1px solid #000000;
+        font-weight: 600;
+        display: inline-block;
+    }
+    .badge-company_admin    { background: #2ed573; color: #fff; }
+    .badge-company_manager  { background: #1e90ff; color: #fff; }
+    .badge-company_staff    { background: #0228ff; color: #fff; }
+    .badge-company_agent    { background: #ffa502; color: #fff; }
+    .badge-company_cashier  { background: #7a5cff; color: #fff; }
+    .badge-stock_controller { background: #ff02b3; color: #fff; }
+    .badge-mpesa_agent      { background: #a29bfe; color: #fff; }
+    .badge-super_admin      { background: #ff4757; color: #fff; }
+
+    .badge.bg-success {
+        background-color: #d4edda !important;
+        color: #155724;
+        border: 1px solid #000000;
+        padding: 4px 10px;
+        font-weight: 600;
+    }
+    .badge.bg-danger {
+        background-color: #f8d7da !important;
+        color: #721c24;
+        border: 1px solid #000000;
+        padding: 4px 10px;
+        font-weight: 600;
+    }
+
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-outline-primary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    .btn-outline-primary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-outline-danger {
+        border: 2px solid #000000;
+        color: #dc3545;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    .btn-outline-danger:hover {
+        background-color: #dc3545;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    .btn-outline-secondary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    .btn-outline-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-outline-warning {
+        border: 2px solid #000000;
+        color: #b8860b;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    .btn-outline-warning:hover {
+        background-color: #ffc107;
+        border-color: #000000;
+        color: #000000;
+    }
+
+    /* ============================================
+       TIMELINE CHIPS
+    ============================================ */
+    .date-strip {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        padding: 16px;
+    }
+    .date-chip {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 10px 16px;
+        background: #ffffff;
+        font-size: 13px;
+        min-width: 180px;
+    }
+    .date-chip .label {
+        font-weight: 700;
+        display: block;
+        font-size: 11px;
+        text-transform: uppercase;
+        color: #555;
+        letter-spacing: 0.4px;
+        margin-bottom: 3px;
+    }
+    .date-chip .value {
+        color: #000000;
+        font-weight: 600;
+    }
+
+    /* ============================================
+       ACTION BAR
+    ============================================ */
+    .action-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    .action-bar .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .info-row .label { width: 120px; font-size: 11px; }
+        .info-row .value { font-size: 13px; }
+        .profile-header { flex-direction: column; text-align: center; }
+        .avatar-lg { width: 70px; height: 70px; font-size: 26px; }
+        .profile-header h2 { font-size: 1.2rem; }
+        .date-chip { min-width: 100%; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+
+        {# ============================================ #}
+        {# ACTION BAR                                    #}
+        {# ============================================ #}
+        <div class="action-bar">
+            <a href="{% url 'employees:superadmin-employee-list' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Employees
+            </a>
+            <div class="actions">
+                <a href="{% url 'employees:superadmin-employee-edit' employee.id %}" class="btn btn-primary">
+                    <i class="fas fa-edit"></i> Edit
+                </a>
+
+                {# ---- TOGGLE STATUS (POST) ---- #}
+                <form method="post"
+                      action="{% url 'employees:superadmin-employee-toggle-status' employee.id %}"
+                      style="display:inline;"
+                      onsubmit="return confirm('Toggle status for {{ employee.get_full_name|default:employee.username|escapejs }}?');">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="btn btn-outline-warning"
+                            title="{% if employee.is_active %}Deactivate{% else %}Activate{% endif %}">
+                        <i class="fas {% if employee.is_active %}fa-user-slash{% else %}fa-user-check{% endif %}"></i>
+                        {% if employee.is_active %}Deactivate{% else %}Activate{% endif %}
+                    </button>
+                </form>
+
+                {# ---- DELETE (POST) ---- #}
+                <form method="post"
+                      action="{% url 'employees:superadmin-employee-delete' employee.id %}"
+                      style="display:inline;"
+                      onsubmit="return confirm('Delete {{ employee.get_full_name|default:employee.username|escapejs }}? This cannot be undone.');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger" title="Delete">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        {# ============================================ #}
+        {# PROFILE HEADER                                #}
+        {# ============================================ #}
+        <div class="profile-header">
+            <div class="avatar-lg">
+                {{ employee.first_name|default:employee.username|make_list|first|upper }}
+            </div>
+            <div class="flex-grow-1">
+                <h2>{{ employee.get_full_name|default:employee.username }}</h2>
+                <p class="meta">
+                    <i class="fas fa-user-tag"></i>
+                    <span class="badge-role badge-{{ employee.role }}">
+                        {{ employee.get_role_display|default:employee.role|title }}
+                    </span>
+                    &nbsp;
+                    {% if employee.is_active %}
+                        <span class="badge bg-success">Active</span>
+                    {% else %}
+                        <span class="badge bg-danger">Inactive</span>
+                    {% endif %}
+                    &nbsp;
+                    {% if employee.is_verified %}
+                        <span class="badge bg-success">Verified</span>
+                    {% else %}
+                        <span class="badge bg-danger">Unverified</span>
+                    {% endif %}
+                    &nbsp;
+                    {% if employee.is_staff %}
+                        <span class="badge bg-success">Staff Access</span>
+                    {% endif %}
+                    {% if employee.is_superuser %}
+                        <span class="badge bg-danger">Superuser</span>
+                    {% endif %}
+                </p>
+                <p class="meta"><i class="fas fa-envelope"></i> {{ employee.email|default:"—" }}</p>
+                <p class="meta"><i class="fas fa-phone"></i> {{ employee.phone|default:"—" }}</p>
+                <p class="meta">
+                    <i class="fas fa-building"></i>
+                    {{ employee.company.name|default:"No company assigned" }}
+                    {% if employee.branch %}
+                        &nbsp;·&nbsp;
+                        <i class="fas fa-code-branch"></i> {{ employee.branch.name }}
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+
+        {# ============================================ #}
+        {# PERSONAL & ACCOUNT INFORMATION                #}
+        {# ============================================ #}
+        <div class="detail-card mb-4">
+            <div class="card-header">
+                <i class="fas fa-id-card"></i> Personal & Account Information
+            </div>
+            <div class="info-grid">
+
+                <div class="info-row">
+                    <div class="label">Username</div>
+                    <div class="value">{{ employee.username|default:"—" }}</div>
+                </div>
+
+                <div class="info-row">
+                    <div class="label">Staff ID</div>
+                    <div class="value">
+                        {% if employee.staff_id %}{{ employee.staff_id }}{% else %}<span class="empty">Not assigned</span>{% endif %}
+                    </div>
+                </div>
+
+                <div class="info-row">
+                    <div class="label">First Name</div>
+                    <div class="value">{{ employee.first_name|default:"—" }}</div>
+                </div>
+
+                <div class="info-row">
+                    <div class="label">Last Name</div>
+                    <div class="value">{{ employee.last_name|default:"—" }}</div>
+                </div>
+
+                <div class="info-row">
+                    <div class="label">Email</div>
+                    <div class="value">{{ employee.email|default:"—" }}</div>
+                </div>
+
+                <div class="info-row">
+                    <div class="label">Phone</div>
+                    <div class="value">
+                        {% if employee.phone %}{{ employee.phone }}{% else %}<span class="empty">Not provided</span>{% endif %}
+                    </div>
+                </div>
+
+                <div class="info-row">
+                    <div class="label">Role</div>
+                    <div class="value">
+                        <span class="badge-role badge-{{ employee.role }}">
+                            {{ employee.get_role_display|default:employee.role|title }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="info-row">
+                    <div class="label">Department</div>
+                    <div class="value">
+                        {% if employee.department %}{{ employee.department }}{% else %}<span class="empty">Not set</span>{% endif %}
+                    </div>
+                </div>
+
+                <div class="info-row">
+                    <div class="label">Position</div>
+                    <div class="value">
+                        {% if employee.position %}{{ employee.position }}{% else %}<span class="empty">Not set</span>{% endif %}
+                    </div>
+                </div>
+
+                <div class="info-row">
+                    <div class="label">Hire Date</div>
+                    <div class="value">
+                        {% if employee.hire_date %}
+                            {{ employee.hire_date|date:"M d, Y" }}
+                        {% else %}
+                            <span class="empty">Not set</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="info-row">
+                    <div class="label">Active</div>
+                    <div class="value">
+                        {% if employee.is_active %}
+                            <span class="badge bg-success">Yes</span>
+                        {% else %}
+                            <span class="badge bg-danger">No</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="info-row">
+                    <div class="label">Verified</div>
+                    <div class="value">
+                        {% if employee.is_verified %}
+                            <span class="badge bg-success">Yes</span>
+                        {% else %}
+                            <span class="badge bg-danger">No</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="info-row">
+                    <div class="label">2FA</div>
+                    <div class="value">
+                        {% if employee.two_factor_enabled %}
+                            <span class="badge bg-success">Enabled</span>
+                        {% else %}
+                            <span class="badge bg-danger">Disabled</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="info-row">
+                    <div class="label">Staff Access</div>
+                    <div class="value">
+                        {% if employee.is_staff %}
+                            <span class="badge bg-success">Yes</span>
+                        {% else %}
+                            <span class="badge bg-danger">No</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="info-row">
+                    <div class="label">Superuser</div>
+                    <div class="value">
+                        {% if employee.is_superuser %}
+                            <span class="badge bg-success">Yes</span>
+                        {% else %}
+                            <span class="badge bg-danger">No</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        {# ============================================ #}
+        {# COMPANY & BRANCH                              #}
+        {# ============================================ #}
+        <div class="detail-card mb-4">
+            <div class="card-header">
+                <i class="fas fa-building"></i> Company & Branch
+            </div>
+            <div class="info-grid">
+
+                <div class="info-row">
+                    <div class="label">Company</div>
+                    <div class="value">
+                        {% if employee.company %}
+                            {{ employee.company.name }}
+                        {% else %}
+                            <span class="empty">No company assigned</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="info-row">
+                    <div class="label">Branch</div>
+                    <div class="value">
+                        {% if employee.branch %}
+                            {{ employee.branch.name }}
+                        {% else %}
+                            <span class="empty">No branch assigned</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if employee.company %}
+                <div class="info-row">
+                    <div class="label">Business Type</div>
+                    <div class="value">
+                        {{ employee.company.business_type.name|default:"—" }}
+                    </div>
+                </div>
+
+                <div class="info-row">
+                    <div class="label">Company Active</div>
+                    <div class="value">
+                        {% if employee.company.is_active %}
+                            <span class="badge bg-success">Yes</span>
+                        {% else %}
+                            <span class="badge bg-danger">No</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+
+        {# ============================================ #}
+        {# ACCOUNT TIMELINE                              #}
+        {# ============================================ #}
+        <div class="detail-card mb-4">
+            <div class="card-header">
+                <i class="fas fa-clock"></i> Account Timeline
+            </div>
+            <div class="date-strip">
+                <div class="date-chip">
+                    <span class="label">Date Joined</span>
+                    <span class="value">
+                        {{ employee.date_joined|date:"M d, Y · H:i"|default:"—" }}
+                    </span>
+                </div>
+                <div class="date-chip">
+                    <span class="label">Last Login</span>
+                    <span class="value">
+                        {% if employee.last_login %}
+                            {{ employee.last_login|date:"M d, Y · H:i" }}
+                        {% else %}
+                            Never
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="date-chip">
+                    <span class="label">Created</span>
+                    <span class="value">
+                        {{ employee.created_at|date:"M d, Y · H:i"|default:"—" }}
+                    </span>
+                </div>
+                <div class="date-chip">
+                    <span class="label">Updated</span>
+                    <span class="value">
+                        {{ employee.updated_at|date:"M d, Y · H:i"|default:"—" }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
