@@ -134,6 +134,60 @@
     @keyframes spin {
         to { transform: rotate(360deg); }
     }
+
+    /* ============================================ */
+    /* DEV-ONLY BUTTON                               */
+    /* ============================================ */
+    .dev-confirm-wrap {
+        margin-top: 16px;
+        padding-top: 12px;
+        border-top: 1px dashed #adb5bd;
+        text-align: center;
+    }
+    .dev-confirm-btn {
+        background: #fff3cd;
+        border: 2px dashed #856404;
+        color: #856404;
+        font-weight: 700;
+        font-size: 12px;
+        padding: 6px 14px;
+        border-radius: 4px;
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .dev-confirm-btn:hover {
+        background: #ffe9a3;
+    }
+    .dev-confirm-btn:disabled {
+        background: #e9ecef;
+        border-color: #adb5bd;
+        color: #6c757d;
+        cursor: not-allowed;
+    }
+    .dev-confirm-note {
+        font-size: 10px;
+        color: #856404;
+        margin-top: 6px;
+        font-style: italic;
+    }
+
+    /* Raw error detail box */
+    .pay-error-detail {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 8px 10px;
+        margin-top: 10px;
+        font-family: monospace;
+        font-size: 11px;
+        color: #333;
+        text-align: left;
+        max-height: 120px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-all;
+    }
 </style>
 {% endblock %}
 
@@ -141,7 +195,7 @@
 <div class="row">
     <div class="col-lg-10 mx-auto">
 
-        {# Current state banner #}
+        {# ---------- Current state banner ---------- #}
         {% with sub=current_subscription %}
         {% if sub %}
             <div class="alert alert-warning">
@@ -258,6 +312,21 @@
                     </p>
                     <p style="font-size:12px;color:#666;margin-top:8px;"
                        id="pollingStatus"></p>
+
+                    {# ---------- DEV-ONLY: mark as paid ---------- #}
+                    {% if debug %}
+                    <div class="dev-confirm-wrap">
+                        <button type="button"
+                                class="dev-confirm-btn"
+                                id="devConfirmBtn">
+                            <i class="fas fa-flask"></i>
+                            Dev: Mark as Paid
+                        </button>
+                        <div class="dev-confirm-note">
+                            Debug mode only — simulates a successful M-Pesa callback.
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -283,6 +352,17 @@
 <script>
 (function () {
     // ============================================
+    // CSRF helper — read from cookie (reliable)
+    // ============================================
+    function getCookie(name) {
+        const match = document.cookie.match(
+            '(^|;)\\s*' + name.replace(/([.*+?^${}()|[\]\\])/g, '\\$1') + '\\s*=\\s*([^;]+)'
+        );
+        return match ? decodeURIComponent(match.pop()) : '';
+    }
+    const CSRF = getCookie('csrftoken');
+
+    // ============================================
     // Elements
     // ============================================
     const modalEl     = document.getElementById('payModal');
@@ -303,7 +383,7 @@
     const modalPlanPrice = document.getElementById('modalPlanPrice');
     const submitPayBtn   = document.getElementById('submitPayBtn');
 
-    const CSRF = '{{ csrf_token }}';
+    const devConfirmBtn  = document.getElementById('devConfirmBtn'); // may be null
 
     let current = {
         companyId: null,
@@ -362,6 +442,11 @@
             phoneInput.value = '';
             pollingStatus.textContent = '';
 
+            if (devConfirmBtn) {
+                devConfirmBtn.disabled = false;
+                devConfirmBtn.innerHTML = '<i class="fas fa-flask"></i> Dev: Mark as Paid';
+            }
+
             openModal();
             setTimeout(() => phoneInput.focus(), 200);
         });
@@ -389,6 +474,36 @@
     });
 
     // ============================================
+    // Safe JSON fetch
+    // ============================================
+    async function fetchJSON(url, options) {
+        const resp = await fetch(url, options);
+        const raw  = await resp.text();
+
+        let data = null;
+        let parseError = null;
+        try {
+            data = raw ? JSON.parse(raw) : null;
+        } catch (e) {
+            parseError = e;
+        }
+
+        if (parseError) {
+            console.error('Non-JSON response from', url,
+                          '\nStatus:', resp.status,
+                          '\nBody (first 500 chars):', raw.slice(0, 500));
+            const err = new Error(
+                `Server returned HTTP ${resp.status} (not JSON).`
+            );
+            err.httpStatus = resp.status;
+            err.rawBody    = raw;
+            throw err;
+        }
+
+        return { resp, data };
+    }
+
+    // ============================================
     // Submit → STK Push
     // ============================================
     submitPayBtn.addEventListener('click', async () => {
@@ -405,13 +520,15 @@
         submitPayBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
 
         try {
-            const resp = await fetch(
+            const { resp, data } = await fetchJSON(
                 `/companies/${current.companyId}/payments/initiate/`,
                 {
                     method: 'POST',
+                    credentials: 'same-origin',
                     headers: {
                         'X-CSRFToken': CSRF,
                         'Content-Type': 'application/json',
+                        'Accept': 'application/json',
                     },
                     body: JSON.stringify({
                         plan_id: current.planId,
@@ -419,10 +536,12 @@
                     }),
                 }
             );
-            const data = await resp.json();
 
-            if (!resp.ok || !data.success) {
-                showError(data.error || 'Failed to send STK Push.');
+            if (!resp.ok || !data || !data.success) {
+                const msg = (data && data.error)
+                    ? data.error
+                    : `Failed to send STK Push (HTTP ${resp.status}).`;
+                showError(msg);
                 return;
             }
 
@@ -435,7 +554,23 @@
 
             startPolling();
         } catch (err) {
-            showError('Network error: ' + err.message);
+            let msg = err.message || 'Unknown error.';
+            let detail = '';
+
+            if (err.rawBody) {
+                const bodyLower = err.rawBody.toLowerCase();
+                if (bodyLower.includes('csrf')) {
+                    msg = 'Security check failed (CSRF). Please refresh the page and try again.';
+                } else if (bodyLower.includes('<!doctype html') && bodyLower.includes('login')) {
+                    msg = 'Your session expired. Please log in again.';
+                } else if (err.httpStatus === 404) {
+                    msg = 'Payment endpoint not found (404). Contact support.';
+                } else if (err.httpStatus === 500) {
+                    msg = 'Server error (500). Check the Django console for details.';
+                }
+                detail = err.rawBody.slice(0, 300);
+            }
+            showError(msg, detail);
         }
     });
 
@@ -450,10 +585,16 @@
         current.pollTimer = setInterval(async () => {
             attempts++;
             try {
-                const r = await fetch(
-                    `/companies/${current.companyId}/payments/status/?ref=${encodeURIComponent(current.reference)}`
+                const { data } = await fetchJSON(
+                    `/companies/${current.companyId}/payments/status/?ref=${encodeURIComponent(current.reference)}`,
+                    {
+                        method: 'GET',
+                        credentials: 'same-origin',
+                        headers: { 'Accept': 'application/json' },
+                    }
                 );
-                const data = await r.json();
+
+                if (!data) return;
 
                 if (data.status === 'success') {
                     clearInterval(current.pollTimer);
@@ -470,9 +611,55 @@
                     showError('Timed out waiting for payment confirmation.');
                 }
             } catch (err) {
-                // ignore transient errors
+                console.warn('Polling error:', err.message);
             }
         }, 3000);
+    }
+
+    // ============================================
+    // DEV-ONLY: mark latest pending as paid
+    // ============================================
+    if (devConfirmBtn) {
+        devConfirmBtn.addEventListener('click', async () => {
+            if (!current.companyId || !current.reference) {
+                alert('No pending payment to confirm.');
+                return;
+            }
+
+            devConfirmBtn.disabled = true;
+            devConfirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Confirming...';
+
+            try {
+                const { resp, data } = await fetchJSON(
+                    `/companies/${current.companyId}/payments/dev-confirm/?ref=${encodeURIComponent(current.reference)}`,
+                    {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'X-CSRFToken': CSRF,
+                            'Accept': 'application/json',
+                        },
+                    }
+                );
+
+                if (!resp.ok || !data || !data.success) {
+                    const msg = (data && data.error) ? data.error : 'Dev confirm failed.';
+                    alert(msg);
+                    devConfirmBtn.disabled = false;
+                    devConfirmBtn.innerHTML = '<i class="fas fa-flask"></i> Dev: Mark as Paid';
+                    return;
+                }
+
+                // Success — the next poll will pick it up. But let's
+                // also trigger one immediately for a snappier UX.
+                pollingStatus.textContent = 'Marked as paid — confirming…';
+                // The next 3s tick will flip the modal to success.
+            } catch (err) {
+                alert('Dev confirm error: ' + err.message);
+                devConfirmBtn.disabled = false;
+                devConfirmBtn.innerHTML = '<i class="fas fa-flask"></i> Dev: Mark as Paid';
+            }
+        });
     }
 
     // ============================================
@@ -488,7 +675,7 @@
                 <i class="fas fa-check-circle" style="font-size:3rem;color:#28a745;"></i>
                 <h4 style="margin-top:12px;">Payment Successful</h4>
                 <p>Your subscription has been renewed.</p>
-                <p style="font-size:12px;color:#666;">Ref: ${data.reference || ''}</p>
+                <p style="font-size:12px;color:#666;">Ref: ${escapeHtml(data.reference || '')}</p>
                 <a href="/epa_shop/dashboard/" class="btn btn-primary" style="margin-top:8px;">
                     Continue to Dashboard
                 </a>
@@ -496,20 +683,34 @@
         `;
     }
 
-    function showError(message) {
+    function showError(message, detail) {
         stepWaiting.style.display = 'none';
         stepResult.style.display  = 'block';
         submitPayBtn.style.display = 'inline-block';
         submitPayBtn.disabled = false;
         submitPayBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Retry';
 
+        const detailHtml = detail
+            ? `<div class="pay-error-detail">${escapeHtml(detail)}</div>`
+            : '';
+
         resultBox.innerHTML = `
             <div style="text-align:center;">
                 <i class="fas fa-times-circle" style="font-size:3rem;color:#dc3545;"></i>
                 <h5 style="margin-top:12px;">Payment Failed</h5>
-                <p style="color:#666;">${message}</p>
+                <p style="color:#666;">${escapeHtml(message)}</p>
+                ${detailHtml}
             </div>
         `;
+    }
+
+    function escapeHtml(s) {
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 })();
 </script>

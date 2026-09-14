@@ -13,10 +13,11 @@ import json
 import re
 import socket
 import uuid
-
+from django.conf import settings
 from .models import Company, BusinessType
 from apps.plans.models import Plan, Subscription
 from django.contrib.auth import get_user_model
+from datetime import timedelta
 
 
 
@@ -60,6 +61,22 @@ def _resolve_plan(plan_id):
     return Plan.objects.filter(pk=plan_id).first()
 
 
+def _compute_end_date(plan, start_dt=None):
+    """
+    Return the end_date for a plan based on its billing_cycle.
+    - monthly → start + 30 days
+    - yearly  → start + 365 days
+    - lifetime → None
+    """
+    if not plan:
+        return None
+    start_dt = start_dt or timezone.now()
+    if plan.billing_cycle == 'monthly':
+        return start_dt + timedelta(days=30)
+    if plan.billing_cycle == 'yearly':
+        return start_dt + timedelta(days=365)
+    return None  # lifetime
+
 # ============================================
 # DOMAIN HELPERS
 # ============================================
@@ -69,7 +86,6 @@ DOMAIN_RE = re.compile(
     r'([a-z0-9\-]{0,61}[a-z0-9])?'
     r'(\.[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?)+$'
 )
-
 
 def _normalize_domain(raw):
     """
@@ -111,10 +127,13 @@ def _validate_domain(domain, exclude_company_id=None):
     return True, None
 
 
-def _sync_company_from_subscription(company, plan, start_dt, end_dt, status):
+def _sync_company_from_subscription(company, plan, start_dt, end_dt, status,
+                                     renew=False, payment_method='', payment_reference=''):
     """
-    Update Company.plan + subscription dates and keep the Subscription row in sync.
-    Prefers the existing active row, else the latest row, else creates a new one.
+    Sync Company.plan + dates with a Subscription row.
+
+    renew=False  → edit the current row in place (fixing mistakes)
+    renew=True   → expire the current row and create a NEW row (real renewal)
     """
     company.plan = plan
     company.subscription_start = start_dt
@@ -124,6 +143,22 @@ def _sync_company_from_subscription(company, plan, start_dt, end_dt, status):
     if not plan:
         return None
 
+    # ---------- RENEWAL: always create a new row ----------
+    if renew:
+        # Expire whatever was active before
+        company.subscriptions.filter(status='active').update(status='expired')
+
+        return Subscription.objects.create(
+            company=company,
+            plan=plan,
+            start_date=start_dt or timezone.now(),
+            end_date=end_dt,
+            status=status or 'active',
+            payment_method=payment_method,
+            payment_reference=payment_reference,
+        )
+
+    # ---------- CORRECTION: edit the existing row ----------
     target = (
         company.subscriptions.filter(status='active').order_by('-created_at').first()
         or company.subscriptions.order_by('-created_at').first()
@@ -596,54 +631,66 @@ def company_payments_initiate(request, pk):
     Receives plan_id + phone, sends an M-Pesa STK Push.
     Returns JSON: { success, reference, message }.
     """
-    company = get_object_or_404(Company, pk=pk)
-
-    if not request.user.is_superuser:
-        if getattr(request.user, 'company_id', None) != company.id:
-            return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
-
     try:
-        payload = json.loads(request.body.decode() or '{}')
-    except json.JSONDecodeError:
-        return JsonResponse({'success': False, 'error': 'Invalid JSON.'}, status=400)
+        company = get_object_or_404(Company, pk=pk)
 
-    plan_id = payload.get('plan_id')
-    phone = (payload.get('phone') or '').strip()
+        if not request.user.is_superuser:
+            if getattr(request.user, 'company_id', None) != company.id:
+                return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
 
-    if not plan_id or not phone:
-        return JsonResponse(
-            {'success': False, 'error': 'Plan and phone are required.'},
-            status=400,
+        try:
+            payload = json.loads(request.body.decode() or '{}')
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'error': 'Invalid JSON.'}, status=400)
+
+        plan_id = payload.get('plan_id')
+        phone = (payload.get('phone') or '').strip()
+
+        if not plan_id or not phone:
+            return JsonResponse(
+                {'success': False, 'error': 'Plan and phone are required.'},
+                status=400,
+            )
+
+        plan = get_object_or_404(Plan, pk=plan_id)
+
+        # ---------- Stub reference (replace with real Daraja call) ----------
+        reference = f"STUB-{uuid.uuid4().hex[:12].upper()}"
+
+        # ---------- Compute subscription window ----------
+        start_dt = timezone.now()
+        end_dt = _compute_end_date(plan, start_dt)
+
+        Subscription.objects.create(
+            company=company,
+            plan=plan,
+            start_date=start_dt,
+            end_date=end_dt,
+            status='pending',
+            payment_method='mpesa',
+            payment_reference=reference,
         )
 
-    plan = get_object_or_404(Plan, pk=plan_id)
+        request.session[f'mpesa_ref_{reference}'] = {
+            'checkout_request_id': reference,
+            'company_id': company.id,
+            'plan_id': plan.id,
+            'created_at': timezone.now().isoformat(),
+        }
 
-    # ---------- TODO: Replace stub with real Daraja call ----------
-    reference = f"STUB-{uuid.uuid4().hex[:12].upper()}"
+        return JsonResponse({
+            'success': True,
+            'reference': reference,
+            'message': f'STK Push sent to {phone}. Enter your PIN.',
+        })
 
-    Subscription.objects.create(
-        company=company,
-        plan=plan,
-        start_date=timezone.now(),
-        end_date=None,
-        status='pending',
-        payment_method='mpesa',
-        payment_reference=reference,
-    )
-
-    request.session[f'mpesa_ref_{reference}'] = {
-        'checkout_request_id': reference,
-        'company_id': company.id,
-        'plan_id': plan.id,
-        'created_at': timezone.now().isoformat(),
-    }
-
-    return JsonResponse({
-        'success': True,
-        'reference': reference,
-        'message': f'STK Push sent to {phone}. Enter your PIN.',
-    })
-
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception("Payment initiate failed")
+        return JsonResponse(
+            {'success': False, 'error': f'Server error: {e}'},
+            status=500,
+        )
 
 # ============================================
 # M-PESA STK PUSH — STATUS POLL
@@ -700,6 +747,12 @@ def company_payments_callback(request, pk):
     M-Pesa callback endpoint. Safaricom POSTs here after the STK push
     is completed (success or failure). CSRF-exempt because Safaricom
     won't send a token — validate source IP in production.
+
+    On SUCCESS:
+      1. Expire any OTHER active subscriptions for this company
+      2. Activate the pending subscription this payment was for
+      3. Ensure the activated row has a real end_date (derived from plan)
+      4. Update the Company cache (plan + dates + status flags)
     """
     company = get_object_or_404(Company, pk=pk)
 
@@ -721,10 +774,26 @@ def company_payments_callback(request, pk):
         return JsonResponse({'ResultCode': 1, 'ResultDesc': 'Unknown reference'})
 
     if str(result_code) == '0':
-        # SUCCESS
-        sub.status = 'active'
-        sub.save(update_fields=['status'])
+        # ---------- SUCCESS ----------
 
+        # 1. Expire any OTHER currently-active subscriptions
+        (company.subscriptions
+            .filter(status='active')
+            .exclude(pk=sub.pk)
+            .update(status='expired'))
+
+        # 2. Make sure this row has a proper window
+        now = timezone.now()
+        if not sub.start_date:
+            sub.start_date = now
+        if not sub.end_date:
+            sub.end_date = _compute_end_date(sub.plan, sub.start_date)
+
+        # 3. Activate it
+        sub.status = 'active'
+        sub.save(update_fields=['status', 'start_date', 'end_date'])
+
+        # 4. Update the Company cache
         company.plan = sub.plan
         company.subscription_start = sub.start_date
         company.subscription_end = sub.end_date
@@ -734,13 +803,52 @@ def company_payments_callback(request, pk):
             'plan', 'subscription_start', 'subscription_end',
             'status', 'is_active',
         ])
+
     else:
-        # FAILED / CANCELLED
+        # ---------- FAILED / CANCELLED ----------
         sub.status = 'cancelled'
         sub.save(update_fields=['status'])
 
     return JsonResponse({'ResultCode': 0, 'ResultDesc': 'Received'})
 
+
+@login_required
+@require_POST
+def company_payments_dev_confirm(request, pk):
+    """
+    DEV ONLY — flips the latest pending subscription to active.
+    Never enable this in production.
+    """
+    if not settings.DEBUG:
+        return JsonResponse({'success': False, 'error': 'Not allowed.'}, status=403)
+
+    company = get_object_or_404(Company, pk=pk)
+    reference = request.POST.get('ref') or request.GET.get('ref', '').strip()
+
+    sub = Subscription.objects.filter(
+        company=company,
+        payment_reference=reference,
+        status='pending',
+    ).first()
+
+    if not sub:
+        return JsonResponse({'success': False, 'error': 'No pending subscription found.'}, status=404)
+
+    # Same logic as the real callback
+    company.subscriptions.filter(status='active').exclude(pk=sub.pk).update(status='expired')
+    sub.status = 'active'
+    sub.save(update_fields=['status'])
+
+    company.plan = sub.plan
+    company.subscription_start = sub.start_date
+    company.subscription_end = sub.end_date
+    company.status = 'active'
+    company.is_active = True
+    company.save(update_fields=[
+        'plan', 'subscription_start', 'subscription_end', 'status', 'is_active'
+    ])
+
+    return JsonResponse({'success': True, 'message': 'Marked as paid.'})
 
 
 @login_required
