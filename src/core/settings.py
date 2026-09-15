@@ -4,10 +4,11 @@ from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
-
+# Define BASE_DIR FIRST so we know where .env lives
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Explicitly load .env from BASE_DIR  →  /home/rs/ronosystems/src/.env
+load_dotenv(BASE_DIR / '.env')
 
 # ============================================
 # SECURITY - Production Ready
@@ -117,6 +118,7 @@ TEMPLATES = [
                 'apps.epa_shop.context_processors.user_context',
                 'apps.company.context_processors.company_context',
                 'apps.companies.context_processors.support_mode_context',  
+                'apps.companies.context_processors.pending_join_requests',
             ],
         },
     },
@@ -297,6 +299,29 @@ if not DEBUG and ON_RENDER:
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+
+
+# ============================================
+# EMAIL CONFIGURATION
+# ============================================
+ON_RENDER = 'RENDER' in os.environ
+
+if ON_RENDER:
+    # Production (Render) — use SMTP
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+    EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+    EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
+    EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+    EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+    DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'noreply@ronosystems.com')
+else:
+    # Local development — print emails to console
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    DEFAULT_FROM_EMAIL = 'noreply@ronosystems.com'
+
+SYSTEM_NAME = os.getenv('SYSTEM_NAME', 'RonoSystems')
+
 
 # ============================================
 # LOGGING

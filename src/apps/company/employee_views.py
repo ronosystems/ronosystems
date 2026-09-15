@@ -174,7 +174,7 @@ def employee_detail(request, pk):
         'page_title': employee.get_full_name() or employee.username,
         'page_subtitle': 'Employee details',
     }
-    return render(request, 'company/employee_detail.html', context)
+    return render(request, 'company/employees/detail.html', context)
 
 
 @login_required

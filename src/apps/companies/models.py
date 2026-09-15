@@ -1,13 +1,64 @@
 # apps/companies/models.py
 
+import re
+
 from django.db import models
 from django.conf import settings as django_settings
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+
 from apps.business_types.business_type_registry import (
     BusinessTypeEnum,
     BUSINESS_TYPE_CHOICES,
 )
+
+
+# ============================================
+# COMPANY ID GENERATOR
+# ============================================
+
+def generate_company_id(name, exclude_pk=None):
+    """
+    Generate a company ID in the format:  {LETTER}@RS{NNN}
+
+    Examples:
+        "Fieldmax Company"  →  F@RS001
+        "Kalyet Company"    →  K@RS002
+
+    Rules:
+        - First letter is uppercased.
+        - If the name starts with a non-letter, fall back to 'X'.
+        - The sequential number is global (not per-letter), zero-padded to 3 digits.
+        - If the number exceeds 999, it grows naturally (e.g. F@RS1000).
+
+    The number is derived by finding the highest existing trailing number
+    across ALL company_ids, then adding 1.
+    """
+    # --- First letter ---
+    first_char = (name or '').strip()[:1].upper()
+    if not first_char.isalpha():
+        first_char = 'X'
+
+    # --- Find the highest existing sequence number ---
+    pattern = re.compile(r'^[A-Z]@RS(\d+)$')
+    highest = 0
+
+    qs = Company.objects.all()
+    if exclude_pk:
+        qs = qs.exclude(pk=exclude_pk)
+
+    for cid in qs.values_list('company_id', flat=True):
+        if not cid:
+            continue
+        m = pattern.match(cid)
+        if m:
+            try:
+                highest = max(highest, int(m.group(1)))
+            except ValueError:
+                continue
+
+    next_number = highest + 1
+    return f"{first_char}@RS{next_number:03d}"
 
 
 # ============================================
@@ -86,6 +137,15 @@ class Company(models.Model):
     )
 
     # ---------- Identity ----------
+    company_id = models.CharField(
+        max_length=20,
+        unique=True,
+        db_index=True,
+        editable=False,
+        blank=True,
+        help_text="Auto-generated unique company ID (e.g. F@RS001). "
+                  "Employees use this to register into the company.",
+    )
     name = models.CharField(max_length=200)
     business_type = models.ForeignKey(
         BusinessType,
@@ -115,11 +175,11 @@ class Company(models.Model):
         null=True,
         unique=True,
         db_index=True,
-        help_text="e.g., clientcompany.co.ke (no https:// or trailing slash)"
+        help_text="e.g., clientcompany.co.ke (no https:// or trailing slash)",
     )
     domain_verified = models.BooleanField(
         default=False,
-        help_text="Set to True after DNS is confirmed working"
+        help_text="Set to True after DNS is confirmed working",
     )
 
     # ---------- Settings ----------
@@ -156,12 +216,30 @@ class Company(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     # ============================================
+    # SAVE — AUTO-GENERATE company_id
+    # ============================================
+
+    def save(self, *args, **kwargs):
+        if not self.company_id:
+            # Retry a few times in case of a race-condition collision
+            for _ in range(10):
+                candidate = generate_company_id(self.name, exclude_pk=self.pk)
+                if not Company.objects.filter(company_id=candidate).exists():
+                    self.company_id = candidate
+                    break
+            else:
+                raise RuntimeError(
+                    "Could not generate a unique company_id after 10 attempts."
+                )
+        super().save(*args, **kwargs)
+
+    # ============================================
     # STRING / META
     # ============================================
 
     def __str__(self):
         plan_name = self.plan.display_name if self.plan else 'No Plan'
-        return f"{self.name} ({plan_name})"
+        return f"{self.name} [{self.company_id}] ({plan_name})"
 
     class Meta:
         db_table = 'rono_companies'
@@ -279,14 +357,6 @@ class Company(models.Model):
         """
         Master gate. Returns (allowed: bool, reason: str).
         Used by SubscriptionExpiryMiddleware on every request.
-
-        Order (most specific reason first):
-          1. Suspended
-          2. Subscription expired (via latest_subscription)
-          3. Manually deactivated
-          4. No active subscription
-          5. Active subscription is not 'active'
-          6. OK
         """
         # 1. Suspended
         if self.status == 'suspended':
@@ -448,6 +518,207 @@ class Company(models.Model):
 
 
 # ============================================
+# COMPANY JOIN REQUEST
+# ============================================
+
+class CompanyJoinRequest(models.Model):
+    """
+    Pending registration request for a specific company.
+
+    Created when a user submits the register form WITH a valid Company ID.
+    The applicant does NOT get a User account until a company admin approves
+    the request. The password is stored pre-hashed so we can build the User
+    account in a single step on approval.
+
+    Approval can assign a role and branch different from the applicant's
+    original request — these are stored in `assigned_role`, `assigned_branch`,
+    and `assigned_user` so the admin UI can show what was *actually* given.
+    """
+
+    STATUS_CHOICES = (
+        ('pending',  'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    )
+
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name='join_requests',
+    )
+
+    # ---------- Applicant data ----------
+    first_name = models.CharField(max_length=150)
+    last_name = models.CharField(max_length=150, blank=True)
+    username = models.CharField(max_length=150)
+    email = models.EmailField()
+    phone = models.CharField(max_length=20, blank=True)
+
+    # Django password hash (ready to assign to User.password on approval)
+    password_hash = models.CharField(max_length=255)
+
+    # What role the applicant asked for at signup time
+    requested_role = models.CharField(max_length=20, default='company_staff')
+
+    # ---------- Assignment (filled in on approval) ----------
+    assigned_role = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        help_text="Role that was actually assigned when this request was approved.",
+    )
+    assigned_user = models.ForeignKey(
+        django_settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='join_request_assigned',
+        help_text="The User account created when this request was approved.",
+    )
+    assigned_branch = models.ForeignKey(
+        'epa_shop.Branch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='join_request_assigned',
+        help_text="Branch chosen at approval time (if any).",
+    )
+
+    # ---------- Review state ----------
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+
+    reviewed_by = models.ForeignKey(
+        django_settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_join_requests',
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True)
+
+    # ---------- Metadata ----------
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'rono_company_join_requests'
+        ordering = ['-created_at']
+        unique_together = [('company', 'email')]
+        indexes = [
+            models.Index(fields=['company', 'status']),
+            models.Index(fields=['status', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.email} → {self.company.name} [{self.status}]"
+
+    # ============================================
+    # PROPERTIES
+    # ============================================
+
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}".strip() or self.username
+
+    @property
+    def is_pending(self):
+        return self.status == 'pending'
+
+    @property
+    def is_approved(self):
+        return self.status == 'approved'
+
+    @property
+    def is_rejected(self):
+        return self.status == 'rejected'
+
+    @property
+    def effective_role(self):
+        """Role to display: assigned role if approved, else requested."""
+        return self.assigned_role or self.requested_role
+
+    # ============================================
+    # STATE TRANSITIONS
+    # ============================================
+
+    def mark_approved(self, reviewed_by, assigned_user=None,
+                      assigned_role=None, assigned_branch=None):
+        """
+        Flip to approved, stamp the reviewer, and record what was assigned.
+
+        `assigned_role` falls back to `requested_role` when not provided.
+        `updated_at` is set explicitly because save(update_fields=[...])
+        skips auto_now fields.
+        """
+        now = timezone.now()
+        self.status = 'approved'
+        self.reviewed_by = reviewed_by
+        self.reviewed_at = now
+
+        self.assigned_role = assigned_role or self.requested_role or 'company_staff'
+        self.assigned_user = assigned_user
+        self.assigned_branch = assigned_branch
+
+        self.updated_at = now
+        self.save(update_fields=[
+            'status', 'reviewed_by', 'reviewed_at',
+            'assigned_role', 'assigned_user', 'assigned_branch',
+            'updated_at',
+        ])
+
+    def mark_rejected(self, reviewed_by, reason=''):
+        """
+        Flip to rejected and record the reviewer + reason.
+
+        Clears any assignment so a later reset starts clean.
+        NOTE: `updated_at` is set explicitly (see `mark_approved`).
+        """
+        now = timezone.now()
+        self.status = 'rejected'
+        self.reviewed_by = reviewed_by
+        self.reviewed_at = now
+        self.rejection_reason = reason or ''
+
+        self.assigned_role = ''
+        self.assigned_user = None
+        self.assigned_branch = None
+
+        self.updated_at = now
+        self.save(update_fields=[
+            'status', 'reviewed_by', 'reviewed_at',
+            'rejection_reason',
+            'assigned_role', 'assigned_user', 'assigned_branch',
+            'updated_at',
+        ])
+
+    def mark_pending(self):
+        """
+        Reset a reviewed request back to 'pending'.
+
+        Clears the review stamp and any assignment so the request
+        re-enters the pending queue with a clean slate.
+        """
+        now = timezone.now()
+        self.status = 'pending'
+        self.reviewed_by = None
+        self.reviewed_at = None
+        self.rejection_reason = ''
+
+        self.assigned_role = ''
+        self.assigned_user = None
+        self.assigned_branch = None
+
+        self.updated_at = now
+        self.save(update_fields=[
+            'status', 'reviewed_by', 'reviewed_at',
+            'rejection_reason',
+            'assigned_role', 'assigned_user', 'assigned_branch',
+            'updated_at',
+        ])
+
+
+# ============================================
 # SUPPORT SESSION
 # ============================================
 
@@ -484,4 +755,4 @@ class SupportSession(models.Model):
     def end_session(self):
         self.is_active = False
         self.ended_at = timezone.now()
-        self.save()
+        self.save(update_fields=['is_active', 'ended_at'])

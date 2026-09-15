@@ -1,0 +1,1267 @@
+{% extends 'base.html' %}
+
+{% block title %}Join Requests - {{ company.name }}{% endblock %}
+
+{% block page_title %}{{ company.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       PAGE HEADER STRIP
+    ============================================ */
+    .page-header-strip {
+        background: linear-gradient(135deg, #036a77 0%, #02515b 100%);
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 20px 25px;
+        color: #ffffff;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+    .page-header-strip .header-left {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+    .page-header-strip .header-icon {
+        font-size: 2.2rem;
+        color: #87CEEB;
+    }
+    .page-header-strip h3 {
+        margin: 0;
+        font-weight: 700;
+        font-size: 1.3rem;
+        color: #ffffff;
+    }
+    .page-header-strip p {
+        margin: 3px 0 0;
+        font-size: 0.9rem;
+        color: rgba(255, 255, 255, 0.85);
+    }
+    .page-header-strip .header-stats {
+        display: flex;
+        gap: 25px;
+        flex-wrap: wrap;
+    }
+    .page-header-strip .h-stat { text-align: center; }
+    .page-header-strip .h-stat .num {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: #ffe066;
+        line-height: 1.1;
+    }
+    .page-header-strip .h-stat .lbl {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: rgba(255, 255, 255, 0.75);
+        font-weight: 600;
+    }
+
+    /* ============================================
+       TABS
+    ============================================ */
+    .jr-tabs.nav-tabs {
+        display: flex;
+        gap: 0;
+        border-bottom: 2px solid #000000;
+        margin-bottom: 0;
+        flex-wrap: wrap;
+    }
+    .jr-tabs .nav-item { margin-bottom: 0; }
+    .jr-tabs .nav-link.jr-tab {
+        border-radius: 0;
+        border: 2px solid #000000;
+        border-bottom: none;
+        border-right: none;
+        background: #f8f9fa;
+        color: #000000;
+        font-weight: 600;
+        font-size: 0.9rem;
+        padding: 12px 24px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+        cursor: pointer;
+        text-decoration: none;
+    }
+    .jr-tabs .nav-item:last-child .nav-link.jr-tab {
+        border-right: 2px solid #000000;
+    }
+    .jr-tabs .nav-link.jr-tab:hover {
+        background: #e9ecef;
+        color: #000000;
+        border-color: #000000;
+    }
+    .jr-tabs .nav-link.jr-tab.active {
+        background: #87CEEB;
+        color: #000000;
+        border-color: #000000;
+        border-bottom-color: #87CEEB;
+        margin-bottom: -2px;
+    }
+    .jr-tab .tab-count {
+        background: #000000;
+        color: #ffffff;
+        font-size: 0.7rem;
+        padding: 1px 8px;
+        border-radius: 50px;
+        font-weight: 700;
+        margin-left: 4px;
+    }
+    .jr-tab.active .tab-count {
+        background: #000000;
+        color: #87CEEB;
+    }
+
+    /* ============================================
+       PANEL
+    ============================================ */
+    .jr-panel {
+        background: #ffffff;
+        border: 2px solid #000000;
+        border-top: none;
+        padding: 0;
+    }
+    .jr-panel-inner { padding: 20px; }
+    .jr-panel .tab-content > .tab-pane { display: none; }
+    .jr-panel .tab-content > .tab-pane.active { display: block; }
+
+    /* ============================================
+       FILTER BAR
+    ============================================ */
+    .filter-bar {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+        padding: 12px 15px;
+        background: #f8f9fa;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        margin-bottom: 15px;
+    }
+    .filter-bar .search-wrap {
+        position: relative;
+        flex: 1;
+        min-width: 220px;
+    }
+    .filter-bar .search-wrap i {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+        font-size: 0.85rem;
+        pointer-events: none;
+    }
+    .filter-bar .search-input {
+        width: 100%;
+        padding: 7px 12px 7px 34px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        background: #ffffff;
+        color: #000000;
+    }
+    .filter-bar .search-input:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135, 206, 235, 0.3);
+    }
+    .filter-bar .filter-select {
+        padding: 7px 12px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        background: #ffffff;
+        color: #000000;
+        min-width: 150px;
+    }
+    .filter-bar .filter-select:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135, 206, 235, 0.3);
+    }
+    .filter-bar .btn-clear {
+        padding: 7px 14px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: #ffffff;
+        color: #000000;
+        font-weight: 600;
+        font-size: 0.85rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .filter-bar .btn-clear:hover {
+        background: #000000;
+        color: #ffffff;
+    }
+    .filter-bar .row-count {
+        font-size: 0.8rem;
+        color: #6c757d;
+        font-weight: 600;
+        margin-left: auto;
+        white-space: nowrap;
+    }
+
+    /* ============================================
+       TABLE (EXCEL STYLE, matches your other pages)
+    ============================================ */
+    .table-responsive.jr-table-wrap {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        overflow-x: auto;
+    }
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 0;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .table-excel th,
+    .table-excel td {
+        border: 1px solid #000000 !important;
+        padding: 8px 10px;
+        vertical-align: middle;
+    }
+    .table-excel thead th {
+        background: #87CEEB !important;
+        color: #000000 !important;
+        font-weight: 700;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        white-space: nowrap;
+    }
+    .table-excel tbody td {
+        background: #ffffff;
+        color: #000000;
+        font-size: 13px;
+    }
+    .table-excel tbody tr:hover td { background: #f5f5f5; }
+    .table-excel tbody tr:nth-child(even) td { background: #f9f9f9; }
+    .table-excel tbody tr:nth-child(even):hover td { background: #f0f0f0; }
+
+    /* Left accent on rows by state */
+    .table-excel tbody tr.row-pending td:first-child  { border-left: 5px solid #ffc107 !important; }
+    .table-excel tbody tr.row-approved td:first-child { border-left: 5px solid #28a745 !important; }
+    .table-excel tbody tr.row-rejected td:first-child { border-left: 5px solid #dc3545 !important; }
+
+    /* User cell */
+    .user-cell {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 180px;
+    }
+    .user-cell .uc-name {
+        font-weight: 700;
+        color: #000000;
+        font-size: 13px;
+    }
+    .user-cell .uc-email {
+        font-size: 11px;
+        color: #6c757d;
+    }
+
+    /* Status pill */
+    .req-status {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 3px 10px;
+        border-radius: 50px;
+        border: 1px solid #000000;
+        white-space: nowrap;
+    }
+    .req-status.pending  { background: #fff3cd; color: #856404; }
+    .req-status.approved { background: #d4edda; color: #155724; }
+    .req-status.rejected { background: #f8d7da; color: #721c24; }
+
+    /* Role chip */
+    .role-chip {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 4px;
+        background: #e9ecef;
+        color: #000000;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #000000;
+        white-space: nowrap;
+    }
+
+    /* Muted/empty text */
+    .empty-cell {
+        color: #adb5bd;
+        font-style: italic;
+        font-size: 12px;
+    }
+
+    /* ============================================
+       ACTION BUTTONS (small)
+    ============================================ */
+    .btn-approve,
+    .btn-reject,
+    .btn-reset,
+    .btn-outline-dark {
+        padding: 5px 12px;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 0.78rem;
+        cursor: pointer;
+        transition: all 0.15s;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        border: 2px solid #000000;
+        white-space: nowrap;
+    }
+    .btn-approve { background: #28a745; color: #ffffff; }
+    .btn-approve:hover {
+        background: #218838; color: #ffffff;
+        transform: translateY(-1px);
+        box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+    }
+    .btn-reject { background: #dc3545; color: #ffffff; }
+    .btn-reject:hover {
+        background: #c82333; color: #ffffff;
+        transform: translateY(-1px);
+        box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+    }
+    .btn-reset { background: #ffc107; color: #000000; }
+    .btn-reset:hover {
+        background: #e0a800; color: #000000;
+        transform: translateY(-1px);
+        box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+    }
+    .btn-outline-dark {
+        background: #ffffff; color: #000000;
+        text-decoration: none;
+        padding: 6px 14px;
+    }
+    .btn-outline-dark:hover {
+        background: #000000; color: #ffffff;
+        text-decoration: none;
+    }
+
+    /* ============================================
+       EMPTY STATE
+    ============================================ */
+    .empty-state {
+        text-align: center;
+        padding: 50px 20px;
+        color: #6c757d;
+    }
+    .empty-state i {
+        font-size: 3rem;
+        color: #adb5bd;
+        margin-bottom: 15px;
+    }
+    .empty-state h5 {
+        color: #000000;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+    .empty-state p { margin: 0; font-size: 0.9rem; }
+
+    /* ============================================
+       MODALS (unchanged)
+    ============================================ */
+    .modal-content {
+        border: 2px solid #000000;
+        border-radius: 4px;
+    }
+    .modal-header {
+        background: #87CEEB;
+        border-bottom: 2px solid #000000;
+        color: #000000;
+    }
+    .modal-header .modal-title { font-weight: 700; color: #000000; }
+    .modal-footer { border-top: 2px solid #000000; }
+    .modal-body .form-label { font-size: 0.8rem; color: #000000; }
+    .modal-body .form-control,
+    .modal-body .form-select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 0.9rem;
+    }
+    .modal-body .form-control:focus,
+    .modal-body .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .approve-summary {
+        background: #f8f9fa;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 10px 15px;
+        font-size: 0.85rem;
+        color: #000000;
+    }
+    .approve-summary strong { color: #0227fd; }
+
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .page-header-strip { padding: 15px; }
+        .page-header-strip h3 { font-size: 1.1rem; }
+        .page-header-strip .h-stat .num { font-size: 1.3rem; }
+        .jr-tabs .nav-link.jr-tab { padding: 10px 14px; font-size: 0.8rem; }
+        .filter-bar { flex-direction: column; align-items: stretch; }
+        .filter-bar .row-count { margin-left: 0; text-align: right; }
+        .table-excel th, .table-excel td { padding: 6px 8px; font-size: 11px; }
+        .table-excel thead th { font-size: 10px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ============================================ #}
+{# PAGE HEADER #}
+{# ============================================ #}
+<div class="page-header-strip">
+    <div class="header-left">
+        <i class="fas fa-user-plus header-icon"></i>
+        <div>
+            <h3>Join Requests</h3>
+            <p>
+                <i class="fas fa-building"></i>
+                {{ company.name }}
+                {% if company.company_id %}
+                    <span style="opacity: 0.7; margin-left: 8px;">[{{ company.company_id }}]</span>
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <div class="header-stats">
+        <div class="h-stat">
+            <div class="num">{{ pending_count }}</div>
+            <div class="lbl">Pending</div>
+        </div>
+        <div class="h-stat">
+            <div class="num">{{ approved_count }}</div>
+            <div class="lbl">Approved</div>
+        </div>
+        <div class="h-stat">
+            <div class="num">{{ rejected_count }}</div>
+            <div class="lbl">Rejected</div>
+        </div>
+    </div>
+</div>
+
+{# ============================================ #}
+{# TABS #}
+{# ============================================ #}
+<ul class="nav nav-tabs jr-tabs" id="jrTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link jr-tab active"
+                id="pending-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#tab-pending"
+                type="button"
+                role="tab"
+                aria-controls="tab-pending"
+                aria-selected="true">
+            <i class="fas fa-hourglass-half"></i>
+            Pending
+            {% if pending_count %}<span class="tab-count">{{ pending_count }}</span>{% endif %}
+        </button>
+    </li>
+
+    <li class="nav-item" role="presentation">
+        <button class="nav-link jr-tab"
+                id="approved-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#tab-approved"
+                type="button"
+                role="tab"
+                aria-controls="tab-approved"
+                aria-selected="false">
+            <i class="fas fa-check-circle"></i>
+            Approved
+            {% if approved_count %}<span class="tab-count">{{ approved_count }}</span>{% endif %}
+        </button>
+    </li>
+
+    <li class="nav-item" role="presentation">
+        <button class="nav-link jr-tab"
+                id="rejected-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#tab-rejected"
+                type="button"
+                role="tab"
+                aria-controls="tab-rejected"
+                aria-selected="false">
+            <i class="fas fa-times-circle"></i>
+            Rejected
+            {% if rejected_count %}<span class="tab-count">{{ rejected_count }}</span>{% endif %}
+        </button>
+    </li>
+</ul>
+
+<div class="jr-panel">
+    <div class="tab-content" id="jrTabContent">
+
+        {# ============================================ #}
+        {# TAB: PENDING #}
+        {# ============================================ #}
+        <div class="tab-pane fade show active" id="tab-pending" role="tabpanel" aria-labelledby="pending-tab">
+            <div class="jr-panel-inner">
+
+                {% if pending %}
+                {# Filter bar #}
+                <div class="filter-bar" data-filter-for="pending">
+                    <div class="search-wrap">
+                        <i class="fas fa-search"></i>
+                        <input type="text"
+                               class="search-input"
+                               placeholder="Search name, email, username, phone…"
+                               data-search="pending">
+                    </div>
+                    <select class="filter-select" data-role="pending">
+                        <option value="">All Roles</option>
+                        {% for value, label in roles %}
+                            <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" class="btn-clear" data-clear="pending">
+                        <i class="fas fa-times"></i> Clear
+                    </button>
+                    <span class="row-count" data-count="pending">
+                        {{ pending|length }} request{{ pending|length|pluralize }}
+                    </span>
+                </div>
+
+                <div class="table-responsive jr-table-wrap">
+                    <table class="table-excel" data-table="pending">
+                        <thead>
+                            <tr>
+                                <th style="width:14%;">Applicant</th>
+                                <th style="width:10%;">Username</th>
+                                <th style="width:14%;">Email</th>
+                                <th style="width:10%;">Phone</th>
+                                <th style="width:10%;">Requested Role</th>
+                                <th style="width:12%;">Submitted</th>
+                                <th style="width:10%;">Status</th>
+                                <th style="width:20%;" class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in pending %}
+                            <tr class="row-pending"
+                                data-name="{{ req.full_name|lower }}"
+                                data-email="{{ req.email|lower }}"
+                                data-username="{{ req.username|lower }}"
+                                data-phone="{{ req.phone|default:''|lower }}"
+                                data-role="{{ req.requested_role }}">
+                                <td>
+                                    <div class="user-cell">
+                                        <span class="uc-name">
+                                            <i class="fas fa-user-circle text-warning"></i>
+                                            {{ req.full_name }}
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>{{ req.username }}</td>
+                                <td style="font-size:12px;">{{ req.email }}</td>
+                                <td>
+                                    {% if req.phone %}{{ req.phone }}
+                                    {% else %}<span class="empty-cell">—</span>{% endif %}
+                                </td>
+                                <td>
+                                    <span class="role-chip">{{ req.requested_role|title }}</span>
+                                </td>
+                                <td style="font-size:12px;color:#6c757d;">
+                                    {{ req.created_at|date:"M d, Y H:i" }}
+                                </td>
+                                <td>
+                                    <span class="req-status pending">
+                                        <i class="fas fa-clock"></i> Pending
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    <div class="d-inline-flex gap-1">
+                                        <button type="button"
+                                                class="btn-approve"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#approveModal"
+                                                data-approve-url="{% url 'companies:company-join-request-approve' company.id req.id %}"
+                                                data-request-name="{{ req.full_name }}"
+                                                data-request-role="{{ req.requested_role }}">
+                                            <i class="fas fa-check"></i> Approve
+                                        </button>
+                                        <button type="button"
+                                                class="btn-reject"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#rejectModal"
+                                                data-reject-url="{% url 'companies:company-join-request-reject' company.id req.id %}"
+                                                data-request-name="{{ req.full_name }}">
+                                            <i class="fas fa-times"></i> Reject
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                {# Empty-state shown when filters hide everything #}
+                <div class="empty-state d-none" data-no-results="pending">
+                    <i class="fas fa-search"></i>
+                    <h5>No matches</h5>
+                    <p>No pending requests match your filters.</p>
+                </div>
+
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <h5>No pending requests</h5>
+                        <p>When someone registers with your Company ID, their request will appear here.</p>
+                    </div>
+                {% endif %}
+
+            </div>
+        </div>
+
+        {# ============================================ #}
+        {# TAB: APPROVED #}
+        {# ============================================ #}
+        <div class="tab-pane fade" id="tab-approved" role="tabpanel" aria-labelledby="approved-tab">
+            <div class="jr-panel-inner">
+
+                {% if approved %}
+                <div class="filter-bar" data-filter-for="approved">
+                    <div class="search-wrap">
+                        <i class="fas fa-search"></i>
+                        <input type="text"
+                               class="search-input"
+                               placeholder="Search name, email, username, phone…"
+                               data-search="approved">
+                    </div>
+                    <select class="filter-select" data-role="approved">
+                        <option value="">All Roles</option>
+                        {% for value, label in roles %}
+                            <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" class="btn-clear" data-clear="approved">
+                        <i class="fas fa-times"></i> Clear
+                    </button>
+                    <span class="row-count" data-count="approved">
+                        {{ approved|length }} request{{ approved|length|pluralize }}
+                    </span>
+                </div>
+
+                <div class="table-responsive jr-table-wrap">
+                    <table class="table-excel" data-table="approved">
+                        <thead>
+                            <tr>
+                                <th style="width:16%;">Applicant</th>
+                                <th style="width:10%;">Username</th>
+                                <th style="width:16%;">Email</th>
+                                <th style="width:10%;">Phone</th>
+                                <th style="width:10%;">Role Asigned</th>
+                                <th style="width:12%;">Reviewed</th>
+                                <th style="width:10%;">Status</th>
+                                <th style="width:16%;" class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in approved %}
+                            <tr class="row-approved"
+                                data-name="{{ req.full_name|lower }}"
+                                data-email="{{ req.email|lower }}"
+                                data-username="{{ req.username|lower }}"
+                                data-phone="{{ req.phone|default:''|lower }}"
+                                data-role="{{ req.requested_role }}">
+                                <td>
+                                    <div class="user-cell">
+                                        <span class="uc-name">
+                                            <i class="fas fa-user-check text-success"></i>
+                                            {{ req.full_name }}
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>{{ req.username }}</td>
+                                <td style="font-size:12px;">{{ req.email }}</td>
+                                <td>
+                                    {% if req.phone %}{{ req.phone }}
+                                    {% else %}<span class="empty-cell">—</span>{% endif %}
+                                </td>
+                                <td>
+                                    <span class="role-chip">{{ req.assigned_role|default:req.requested_role|title }}</span>
+                                </td>
+                                <td style="font-size:12px;color:#6c757d;">
+                                    {{ req.reviewed_at|date:"M d, Y H:i"|default:"—" }}
+                                </td>
+                                <td>
+                                    <span class="req-status approved">
+                                        <i class="fas fa-check"></i> Approved
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    <button type="button"
+                                            class="btn-reset"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#resetModal"
+                                            data-reset-url="{% url 'companies:company-join-request-reset' company.id req.id %}"
+                                            data-request-name="{{ req.full_name }}"
+                                            data-request-status="approved">
+                                        <i class="fas fa-undo"></i> Move to Pending
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="empty-state d-none" data-no-results="approved">
+                    <i class="fas fa-search"></i>
+                    <h5>No matches</h5>
+                    <p>No approved requests match your filters.</p>
+                </div>
+
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-check-circle"></i>
+                        <h5>No approved requests yet</h5>
+                        <p>Approved requests will show up here as a record.</p>
+                    </div>
+                {% endif %}
+
+            </div>
+        </div>
+
+        {# ============================================ #}
+        {# TAB: REJECTED #}
+        {# ============================================ #}
+        <div class="tab-pane fade" id="tab-rejected" role="tabpanel" aria-labelledby="rejected-tab">
+            <div class="jr-panel-inner">
+
+                {% if rejected %}
+                <div class="filter-bar" data-filter-for="rejected">
+                    <div class="search-wrap">
+                        <i class="fas fa-search"></i>
+                        <input type="text"
+                               class="search-input"
+                               placeholder="Search name, email, username, phone…"
+                               data-search="rejected">
+                    </div>
+                    <select class="filter-select" data-role="rejected">
+                        <option value="">All Roles</option>
+                        {% for value, label in roles %}
+                            <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" class="btn-clear" data-clear="rejected">
+                        <i class="fas fa-times"></i> Clear
+                    </button>
+                    <span class="row-count" data-count="rejected">
+                        {{ rejected|length }} request{{ rejected|length|pluralize }}
+                    </span>
+                </div>
+
+                <div class="table-responsive jr-table-wrap">
+                    <table class="table-excel" data-table="rejected">
+                        <thead>
+                            <tr>
+                                <th style="width:16%;">Applicant</th>
+                                <th style="width:10%;">Username</th>
+                                <th style="width:16%;">Email</th>
+                                <th style="width:10%;">Phone</th>
+                                <th style="width:10%;">Role</th>
+                                <th style="width:12%;">Reviewed</th>
+                                <th style="width:14%;">Reason</th>
+                                <th style="width:12%;" class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in rejected %}
+                            <tr class="row-rejected"
+                                data-name="{{ req.full_name|lower }}"
+                                data-email="{{ req.email|lower }}"
+                                data-username="{{ req.username|lower }}"
+                                data-phone="{{ req.phone|default:''|lower }}"
+                                data-role="{{ req.requested_role }}">
+                                <td>
+                                    <div class="user-cell">
+                                        <span class="uc-name">
+                                            <i class="fas fa-user-times text-danger"></i>
+                                            {{ req.full_name }}
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>{{ req.username }}</td>
+                                <td style="font-size:12px;">{{ req.email }}</td>
+                                <td>
+                                    {% if req.phone %}{{ req.phone }}
+                                    {% else %}<span class="empty-cell">—</span>{% endif %}
+                                </td>
+                                <td>
+                                    <span class="role-chip">{{ req.requested_role|title }}</span>
+                                </td>
+                                <td style="font-size:12px;color:#6c757d;">
+                                    {{ req.reviewed_at|date:"M d, Y H:i"|default:"—" }}
+                                </td>
+                                <td style="font-size:12px;">
+                                    {% if req.rejection_reason %}
+                                        {{ req.rejection_reason|truncatechars:60 }}
+                                    {% else %}
+                                        <span class="empty-cell">No reason given</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <button type="button"
+                                            class="btn-reset"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#resetModal"
+                                            data-reset-url="{% url 'companies:company-join-request-reset' company.id req.id %}"
+                                            data-request-name="{{ req.full_name }}"
+                                            data-request-status="rejected">
+                                        <i class="fas fa-undo"></i> Move to Pending
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="empty-state d-none" data-no-results="rejected">
+                    <i class="fas fa-search"></i>
+                    <h5>No matches</h5>
+                    <p>No rejected requests match your filters.</p>
+                </div>
+
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-ban"></i>
+                        <h5>No rejected requests</h5>
+                        <p>Rejected requests will show up here.</p>
+                    </div>
+                {% endif %}
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{# ============================================ #}
+{# APPROVE MODAL #}
+{# ============================================ #}
+<div class="modal fade" id="approveModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" id="approveForm" action="">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-user-check"></i> Approve Join Request
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-3">
+                        Approving <strong id="approveName">this applicant</strong>
+                        will create their account for <strong>{{ company.name }}</strong>.
+                        You can assign a role and branch now — or leave them blank and edit later.
+                    </p>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-user-tag"></i> Role
+                            </label>
+                            <select name="role" class="form-select" id="approveRole">
+                                {% for value, label in roles %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-store"></i> Branch
+                                <span class="text-muted fw-normal">(optional)</span>
+                            </label>
+                            <select name="branch_id" class="form-select" id="approveBranch">
+                                <option value="">— No branch —</option>
+                                {% for b in branches %}
+                                    <option value="{{ b.id }}">{{ b.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-id-badge"></i> Staff ID
+                                <span class="text-muted fw-normal">(optional)</span>
+                            </label>
+                            <input type="text"
+                                   name="staff_id"
+                                   class="form-control"
+                                   placeholder="e.g. EMP-001"
+                                   maxlength="50">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-sitemap"></i> Department
+                                <span class="text-muted fw-normal">(optional)</span>
+                            </label>
+                            <input type="text"
+                                   name="department"
+                                   class="form-control"
+                                   placeholder="e.g. Sales"
+                                   maxlength="100">
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-briefcase"></i> Position
+                                <span class="text-muted fw-normal">(optional)</span>
+                            </label>
+                            <input type="text"
+                                   name="position"
+                                   class="form-control"
+                                   placeholder="e.g. Sales Associate"
+                                   maxlength="100">
+                        </div>
+                    </div>
+
+                    <div class="approve-summary mt-3">
+                        <i class="fas fa-info-circle text-primary"></i>
+                        Approving as <strong id="approveSummaryRole">Company Staff</strong><span id="approveSummaryBranch"></span>.
+                        Their account will be marked active and verified.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-outline-dark" data-bs-dismiss="modal">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn-approve">
+                        <i class="fas fa-check"></i> Confirm Approve
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# ============================================ #}
+{# REJECT MODAL #}
+{# ============================================ #}
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" id="rejectForm" action="">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-user-times"></i> Reject Join Request
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        Rejecting <strong id="rejectName">this applicant</strong> will prevent
+                        them from joining {{ company.name }}.
+                    </p>
+
+                    <label class="form-label fw-bold">Reason (optional)</label>
+                    <textarea name="reason"
+                              class="form-control"
+                              rows="3"
+                              maxlength="500"
+                              placeholder="e.g., Employee record not found, please contact HR."></textarea>
+                    <small class="text-muted">
+                        Visible to the company admin only. Not shown to the applicant.
+                    </small>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-outline-dark" data-bs-dismiss="modal">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn-reject">
+                        <i class="fas fa-times"></i> Confirm Reject
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# ============================================ #}
+{# RESET MODAL (Move back to Pending) #}
+{# ============================================ #}
+<div class="modal fade" id="resetModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" id="resetForm" action="">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-undo"></i> Move Request Back to Pending
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        Move <strong id="resetName">this applicant</strong>
+                        back to the <strong>Pending</strong> list?
+                    </p>
+
+                    <div id="resetWarning" class="alert alert-warning mb-0"
+                         style="border: 2px solid #000; border-radius: 4px; display: none;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Heads up:</strong> if this request was already approved and a
+                        User account was created, that account is <strong>not</strong> deleted —
+                        only the request goes back to Pending. Manage the user separately
+                        in the Employees list.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-outline-dark" data-bs-dismiss="modal">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn-reset">
+                        <i class="fas fa-undo"></i> Yes, Move to Pending
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    // ============================================
+    // TABS — manual fallback
+    // ============================================
+    const tabs  = document.querySelectorAll('.jr-tab');
+    const panes = document.querySelectorAll('#jrTabContent > .tab-pane');
+
+    tabs.forEach(function (tab) {
+        tab.addEventListener('click', function (e) {
+            e.preventDefault();
+
+            tabs.forEach(t => {
+                t.classList.remove('active');
+                t.setAttribute('aria-selected', 'false');
+            });
+            panes.forEach(p => {
+                p.classList.remove('show', 'active');
+            });
+
+            this.classList.add('active');
+            this.setAttribute('aria-selected', 'true');
+
+            const targetId = this.getAttribute('data-bs-target')
+                          || this.getAttribute('href');
+            if (targetId && targetId.startsWith('#')) {
+                const pane = document.querySelector(targetId);
+                if (pane) pane.classList.add('show', 'active');
+            }
+        });
+    });
+
+    // ============================================
+    // TABLE FILTERS — per tab, client-side
+    // ============================================
+    function applyFilter(tabKey) {
+        const table      = document.querySelector(`table[data-table="${tabKey}"]`);
+        const searchEl   = document.querySelector(`input[data-search="${tabKey}"]`);
+        const roleEl     = document.querySelector(`select[data-role="${tabKey}"]`);
+        const countEl    = document.querySelector(`[data-count="${tabKey}"]`);
+        const noResults  = document.querySelector(`[data-no-results="${tabKey}"]`);
+
+        if (!table) return;
+
+        const q    = (searchEl?.value || '').trim().toLowerCase();
+        const role = (roleEl?.value || '').trim();
+
+        let visible = 0;
+        const rows = table.querySelectorAll('tbody tr');
+
+        rows.forEach(row => {
+            const haystack = [
+                row.dataset.name     || '',
+                row.dataset.email    || '',
+                row.dataset.username || '',
+                row.dataset.phone    || '',
+            ].join(' ');
+
+            const matchSearch = !q || haystack.includes(q);
+            const matchRole   = !role || row.dataset.role === role;
+
+            if (matchSearch && matchRole) {
+                row.style.display = '';
+                visible++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        if (countEl) {
+            countEl.textContent =
+                `${visible} request${visible === 1 ? '' : 's'}`;
+        }
+
+        if (noResults) {
+            noResults.classList.toggle('d-none', visible > 0);
+        }
+    }
+
+    // Wire up search + role filters for all three tabs
+    ['pending', 'approved', 'rejected'].forEach(tabKey => {
+        const searchEl = document.querySelector(`input[data-search="${tabKey}"]`);
+        const roleEl   = document.querySelector(`select[data-role="${tabKey}"]`);
+        const clearBtn = document.querySelector(`[data-clear="${tabKey}"]`);
+
+        if (searchEl) {
+            searchEl.addEventListener('input', () => applyFilter(tabKey));
+        }
+        if (roleEl) {
+            roleEl.addEventListener('change', () => applyFilter(tabKey));
+        }
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                if (searchEl) searchEl.value = '';
+                if (roleEl)   roleEl.value   = '';
+                applyFilter(tabKey);
+            });
+        }
+    });
+
+    // ============================================
+    // APPROVE MODAL
+    // ============================================
+    const approveModal  = document.getElementById('approveModal');
+    const approveForm   = document.getElementById('approveForm');
+    const approveRole   = document.getElementById('approveRole');
+    const approveBranch = document.getElementById('approveBranch');
+    const summaryRole   = document.getElementById('approveSummaryRole');
+    const summaryBranch = document.getElementById('approveSummaryBranch');
+
+    function updateApproveSummary() {
+        if (summaryRole && approveRole) {
+            summaryRole.textContent =
+                approveRole.options[approveRole.selectedIndex]?.text || '—';
+        }
+        if (summaryBranch && approveBranch) {
+            const bText = approveBranch.options[approveBranch.selectedIndex]?.text;
+            summaryBranch.textContent =
+                (bText && bText !== '— No branch —') ? ` · ${bText}` : '';
+        }
+    }
+
+    if (approveRole)   approveRole.addEventListener('change', updateApproveSummary);
+    if (approveBranch) approveBranch.addEventListener('change', updateApproveSummary);
+
+    if (approveModal) {
+        approveModal.addEventListener('show.bs.modal', function (event) {
+            if (approveForm) approveForm.reset();
+
+            const button = event.relatedTarget;
+            if (!button) return;
+
+            const reqName    = button.getAttribute('data-request-name');
+            const reqRole    = button.getAttribute('data-request-role');
+            const approveUrl = button.getAttribute('data-approve-url');
+
+            const nameEl = document.getElementById('approveName');
+            if (nameEl) nameEl.textContent = reqName;
+
+            if (approveForm) approveForm.action = approveUrl;
+
+            if (approveRole && reqRole) {
+                const match = Array.from(approveRole.options)
+                    .find(o => o.value === reqRole);
+                if (match) approveRole.value = reqRole;
+            }
+
+            updateApproveSummary();
+        });
+    }
+
+    // ============================================
+    // REJECT MODAL
+    // ============================================
+    const rejectModal = document.getElementById('rejectModal');
+    const rejectForm  = document.getElementById('rejectForm');
+
+    if (rejectModal) {
+        rejectModal.addEventListener('show.bs.modal', function (event) {
+            if (rejectForm) rejectForm.reset();
+
+            const button = event.relatedTarget;
+            if (!button) return;
+
+            const nameEl = document.getElementById('rejectName');
+            if (nameEl) {
+                nameEl.textContent = button.getAttribute('data-request-name');
+            }
+            if (rejectForm) {
+                rejectForm.action = button.getAttribute('data-reject-url');
+            }
+        });
+    }
+
+    // ============================================
+    // RESET MODAL
+    // ============================================
+    const resetModal = document.getElementById('resetModal');
+    const resetForm  = document.getElementById('resetForm');
+
+    if (resetModal) {
+        resetModal.addEventListener('show.bs.modal', function (event) {
+            if (resetForm) resetForm.reset();
+
+            const button = event.relatedTarget;
+            if (!button) return;
+
+            const reqName   = button.getAttribute('data-request-name');
+            const reqStatus = button.getAttribute('data-request-status');
+            const resetUrl  = button.getAttribute('data-reset-url');
+
+            const nameEl = document.getElementById('resetName');
+            if (nameEl) nameEl.textContent = reqName;
+
+            if (resetForm) resetForm.action = resetUrl;
+
+            const warning = document.getElementById('resetWarning');
+            if (warning) {
+                warning.style.display =
+                    (reqStatus === 'approved') ? 'block' : 'none';
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

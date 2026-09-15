@@ -3,6 +3,23 @@ Context processors - Make support mode company available in every template.
 """
 
 from apps.companies.models import Company
+from apps.companies.models import CompanyJoinRequest
+
+
+def pending_join_requests(request):
+    """Inject pending_join_requests_count into every template context."""
+    count = 0
+    try:
+        user = request.user
+        if user.is_authenticated and getattr(user, 'role', None) in ('company_admin', 'super_admin'):
+            company = getattr(user, 'company', None)
+            if company:
+                count = CompanyJoinRequest.objects.filter(
+                    company=company, status='pending'
+                ).count()
+    except Exception:
+        count = 0
+    return {'pending_join_requests_count': count}
 
 
 def support_mode_context(request):
