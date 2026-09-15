@@ -857,6 +857,16 @@
                             </a>
                         </li>
 
+                        {# --- Support Mode: Subscription (moved here) --- #}
+                        {% if support_company %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/payments/' in request.path %}active{% endif %}"
+                                href="{% url 'companies:company-payments' support_company.id %}">
+                                <i class="fas fa-credit-card"></i> <span>Subscription</span>
+                            </a>
+                        </li>
+                        {% endif %}
+
                     {% else %}
                         {# ============================================ #}
                         {# NORMAL MODE — Role-based EPA shop menu      #}
@@ -943,6 +953,20 @@
                                             <i class="fas fa-users"></i> <span>Employees</span>
                                         </a>
                                     </li>
+
+                                    {# --- Join Requests (moved next to Employees) --- #}
+                                    {% if company %}
+                                    <li class="nav-item">
+                                        <a class="nav-link {% if '/company/join-requests/' in request.path %}active{% endif %}"
+                                           href="{% url 'companies:company-join-requests' company.id %}">
+                                            <i class="fas fa-user-plus"></i> <span>Join Requests</span>
+                                            {% if pending_join_requests_count and pending_join_requests_count > 0 %}
+                                                <span class="badge bg-danger">{{ pending_join_requests_count }}</span>
+                                            {% endif %}
+                                        </a>
+                                    </li>
+                                    {% endif %}
+
                                     <li class="nav-item">
                                         <a class="nav-link {% if '/epa_shop/finance/' in request.path %}active{% endif %}" href="/epa_shop/finance/">
                                             <i class="fas fa-coins"></i> <span>Finance</span>
@@ -1009,50 +1033,15 @@
                     </li>
                     {% endif %}
 
-                    {# ============================================ #}
-                    {# ACCOUNT                                     #}
-                    {# ============================================ #}
-                    {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'company_cashier' or user.role == 'company_agent' or user.role == 'mpesa_agent' or user.role == 'stock_controller' %}
-                    <li class="nav-label">Account</li>
-
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/profile/' in request.path %}active{% endif %}" href="/profile/">
-                            <i class="fas fa-user-alt"></i> <span>Profile</span>
-                        </a>
-                    </li>
-                    {% endif %}
-
-                    {# ---------- Subscription ---------- #}
-                    {% if support_company %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/payments/' in request.path %}active{% endif %}"
-                            href="{% url 'companies:company-payments' support_company.id %}">
-                            <i class="fas fa-credit-card"></i> <span>Subscription</span>
-                        </a>
-                    </li>
-                    {% elif company and user.role == 'super_admin' or user.role == 'company_admin' %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/payments/' in request.path %}active{% endif %}"
-                            href="{% url 'companies:company-payments' company.id %}">
-                            <i class="fas fa-credit-card"></i> <span>Subscription</span>
-                        </a>
-                    </li>
-                    {% endif %}
-
-                    {# ---------- Join Requests (Company Admin / Super Admin) ---------- #}
-                    {% if user.is_authenticated and not is_support_mode %}
-                        {% if user.role == 'company_admin' or user.role == 'super_admin' %}
-                            {% if company %}
-                            <li class="nav-item">
-                                <a class="nav-link {% if '/company/join-requests/' in request.path %}active{% endif %}"
-                                   href="{% url 'companies:company-join-requests' company.id %}">
-                                    <i class="fas fa-user-plus"></i> <span>Join Requests</span>
-                                    {% if pending_join_requests_count and pending_join_requests_count > 0 %}
-                                        <span class="badge bg-danger">{{ pending_join_requests_count }}</span>
-                                    {% endif %}
-                                </a>
-                            </li>
-                            {% endif %}
+                    {# ---------- Subscription for super admin / company admin (non-support mode) ---------- #}
+                    {% if not is_support_mode %}
+                        {% if company and user.role == 'super_admin' or user.role == 'company_admin' %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/payments/' in request.path %}active{% endif %}"
+                                href="{% url 'companies:company-payments' company.id %}">
+                                <i class="fas fa-credit-card"></i> <span>Subscription</span>
+                            </a>
+                        </li>
                         {% endif %}
                     {% endif %}
 
