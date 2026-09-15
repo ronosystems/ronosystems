@@ -5,6 +5,75 @@
 {% block extra_css %}
 <style>
     /* ============================================ */
+    /* CURRENT SUBSCRIPTION BANNER                   */
+    /* ============================================ */
+    .current-sub-banner {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 16px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        margin-bottom: 18px;
+        font-size: 14px;
+    }
+    .current-sub-banner .csb-left {
+        font-size: 24px;
+        line-height: 1;
+        flex-shrink: 0;
+    }
+    .current-sub-banner .csb-body {
+        flex: 1;
+        min-width: 0;
+    }
+    .current-sub-banner .csb-title {
+        font-weight: 600;
+        font-size: 14px;
+        margin-bottom: 2px;
+    }
+    .current-sub-banner .csb-detail {
+        font-size: 13px;
+        color: #333;
+    }
+    .current-sub-banner .csb-action {
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+        padding: 4px 10px;
+        border: 2px solid currentColor;
+        border-radius: 4px;
+        color: inherit;
+        text-decoration: none;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .current-sub-banner .csb-action:hover {
+        background: rgba(0, 0, 0, 0.06);
+    }
+
+    /* State colors */
+    .current-sub-banner.state-active    { background: #d4edda; border-color: #155724; color: #155724; }
+    .current-sub-banner.state-lifetime  { background: #d4edda; border-color: #155724; color: #155724; }
+    .current-sub-banner.state-expiring  { background: #fff3cd; border-color: #856404; color: #856404; }
+    .current-sub-banner.state-expired   { background: #f8d7da; border-color: #721c24; color: #721c24; }
+    .current-sub-banner.state-cancelled { background: #f8d7da; border-color: #721c24; color: #721c24; }
+    .current-sub-banner.state-pending   { background: #fff3cd; border-color: #856404; color: #856404; }
+    .current-sub-banner.state-inactive  { background: #f8f9fa; border-color: #000000; color: #000000; }
+
+    @media (max-width: 576px) {
+        .current-sub-banner {
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .current-sub-banner .csb-action {
+            width: 100%;
+            text-align: center;
+        }
+    }
+
+    /* ============================================ */
     /* PLAN CARDS                                    */
     /* ============================================ */
     .plan-card {
@@ -198,20 +267,61 @@
         {# ---------- Current state banner ---------- #}
         {% with sub=current_subscription %}
         {% if sub %}
-            <div class="alert alert-warning">
-                <strong>Current:</strong> {{ sub.plan.display_name }}
-                · {{ sub.get_status_display }}
-                {% if sub.end_date %}· Expired: {{ sub.end_date|date:"Y-m-d" }}{% endif %}
+            {% with state=sub.display_state %}
+            <div class="current-sub-banner state-{{ state }}">
+                <div class="csb-left">
+                    <i class="fas
+                        {% if state == 'active' %}fa-check-circle
+                        {% elif state == 'lifetime' %}fa-infinity
+                        {% elif state == 'expiring' %}fa-hourglass-half
+                        {% elif state == 'expired' %}fa-times-circle
+                        {% elif state == 'pending' %}fa-clock
+                        {% elif state == 'cancelled' %}fa-ban
+                        {% else %}fa-info-circle{% endif %}"></i>
+                </div>
+                <div class="csb-body">
+                    <div class="csb-title">
+                        Current plan: <strong>{{ sub.plan.display_name }}</strong>
+                    </div>
+                    <div class="csb-detail">
+                        {% if state == 'lifetime' %}
+                            Lifetime access — never expires
+                        {% elif state == 'expired' %}
+                            Expired on {{ sub.end_date|date:"M j, Y" }}
+                            {% if sub.days_since_expiry %}
+                                ({{ sub.days_since_expiry }} day{{ sub.days_since_expiry|pluralize }} ago)
+                            {% endif %}
+                        {% elif state == 'expiring' %}
+                            Expires in {{ sub.days_until_expiry }} day{{ sub.days_until_expiry|pluralize }}
+                            — on {{ sub.end_date|date:"M j, Y" }}
+                        {% elif state == 'active' %}
+                            Active until {{ sub.end_date|date:"M j, Y" }}
+                            ({{ sub.days_until_expiry }} day{{ sub.days_until_expiry|pluralize }} left)
+                        {% elif state == 'pending' %}
+                            Payment pending — activate by completing M-Pesa
+                        {% elif state == 'cancelled' %}
+                            Cancelled — renew to restore access
+                        {% else %}
+                            {{ sub.get_status_display }}
+                        {% endif %}
+                    </div>
+                </div>
+                {% if state == 'expired' or state == 'expiring' or state == 'cancelled' %}
+                <a href="#plansSection" class="csb-action">
+                    <i class="fas fa-arrow-down"></i> Renew below
+                </a>
+                {% endif %}
             </div>
+            {% endwith %}
         {% endif %}
         {% endwith %}
 
         <h4>Choose a Plan</h4>
         <p class="text-muted">Select a plan to renew your subscription. You'll pay via M-Pesa.</p>
 
-        <div class="row mt-4">
+        <div class="row mt-4" id="plansSection">
             {% for plan in plans %}
-            <div class="col-md-4 mb-3">
+            <div class="col-md-3 mb-3">
                 <div class="card plan-card h-100 {% if plan.is_featured %}featured{% endif %}">
                     <div class="card-body d-flex flex-column">
                         <h5>{{ plan.display_name }}</h5>
@@ -650,10 +760,8 @@
                     return;
                 }
 
-                // Success — the next poll will pick it up. But let's
-                // also trigger one immediately for a snappier UX.
+                // Success — the next poll will pick it up.
                 pollingStatus.textContent = 'Marked as paid — confirming…';
-                // The next 3s tick will flip the modal to success.
             } catch (err) {
                 alert('Dev confirm error: ' + err.message);
                 devConfirmBtn.disabled = false;
