@@ -67,6 +67,9 @@ EXEMPT_URL_NAMES = {
     'company-payments-initiate',
     'company-payments-status',
     'company-payments-callback',
+    'company-payments-dev-confirm',   # ✅ added
+    'kcb-callback',                    # ✅ added
+    'mpesa-callback',                  # ✅ added
 }
 
 # Path prefixes that bypass the check entirely
@@ -77,7 +80,7 @@ EXEMPT_URL_PREFIXES = (
     '/auth/',
     '/api/support/',
     '/subscription-expired/',
-    '/payments/',
+    '/payments/',                      # covers /payments/kcb/callback/
     '/plans/',
     '/companies/',
 )
@@ -92,8 +95,8 @@ class SubscriptionExpiryMiddleware:
       - Superusers
       - Support-mode sessions (super admin impersonating a company)
       - Users with no company attached
-      - Exempt URL prefixes (admin, static, media, auth, support API)
-      - Exempt URL names (login, logout, expired page, etc.)
+      - Exempt URL prefixes (admin, static, media, auth, support API, payments)
+      - Exempt URL names (login, logout, expired page, payment endpoints, callbacks)
     """
 
     def __init__(self, get_response):
@@ -112,7 +115,9 @@ class SubscriptionExpiryMiddleware:
         if request.user.is_superuser:
             return self.get_response(request)
 
-        if request.session.get('support_company_id'):
+        # ---------- Support-mode exemptions ----------
+        # FIXED: use the actual keys set by support_views.py
+        if request.session.get('support_mode') or request.session.get('viewing_company_id'):
             return self.get_response(request)
 
         # ---------- Name-based exemptions ----------

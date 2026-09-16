@@ -64,8 +64,13 @@ class User(AbstractUser):
             2. Super admin assigns them to a company via Django admin
             3. Their role silently upgrades to 'company_staff'
         """
+        # Superuser always gets the super_admin role
+        if self.is_superuser and self.role != 'super_admin':
+            self.role = 'super_admin'
+
         if self.company_id and self.role == 'guest':
             self.role = 'company_staff'
+            
         super().save(*args, **kwargs)
 
     # ============================================================

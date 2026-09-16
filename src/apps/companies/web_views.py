@@ -25,6 +25,7 @@ from apps.epa_shop.models import Branch
 from apps.plans.models import Plan, Subscription
 
 from .models import Company, BusinessType, CompanyJoinRequest
+from .kcb_client import KCBClient
 
 
 logger = logging.getLogger(__name__)
@@ -419,7 +420,6 @@ def company_join_request_reject(request, company_id, request_id):
     reason = (request.POST.get('reason') or '').strip()
 
     # ---------- Clean up an auto-created User, if any ----------
-    # Match by email + company only (role can differ from requested_role).
     stale_qs = User.objects.filter(
         email__iexact=req.email,
         company=company,
@@ -912,15 +912,15 @@ def company_payments(request, pk):
 
 
 # ============================================
-# M-PESA STK PUSH — INITIATE
+# M-PESA STK PUSH — INITIATE (KCB BUNI)
 # ============================================
 
 @login_required
 @require_POST
 def company_payments_initiate(request, pk):
     """
-    Receives plan_id + phone, sends an M-Pesa STK Push.
-    Returns JSON: { success, reference, message }.
+    Initiate an M-Pesa STK Push via KCB Buni.
+    Creates a pending Subscription row, then calls the KCB API.
     """
     try:
         company = get_object_or_404(Company, pk=pk)
@@ -929,6 +929,7 @@ def company_payments_initiate(request, pk):
             if getattr(request.user, 'company_id', None) != company.id:
                 return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
 
+        # ---------- Parse payload ----------
         try:
             payload = json.loads(request.body.decode() or '{}')
         except json.JSONDecodeError:
@@ -936,6 +937,8 @@ def company_payments_initiate(request, pk):
 
         plan_id = payload.get('plan_id')
         phone = (payload.get('phone') or '').strip()
+        first_name = (payload.get('first_name') or request.user.first_name or 'Customer').strip()
+        last_name = (payload.get('last_name') or request.user.last_name or '').strip()
 
         if not plan_id or not phone:
             return JsonResponse(
@@ -945,33 +948,70 @@ def company_payments_initiate(request, pk):
 
         plan = get_object_or_404(Plan, pk=plan_id)
 
-        # ---------- Stub reference (replace with real Daraja call) ----------
-        reference = f"STUB-{uuid.uuid4().hex[:12].upper()}"
-
-        # ---------- Compute subscription window ----------
         start_dt = timezone.now()
         end_dt = _compute_end_date(plan, start_dt)
 
-        Subscription.objects.create(
+        # ---------- Create pending Subscription FIRST ----------
+        sub = Subscription.objects.create(
             company=company,
             plan=plan,
             start_date=start_dt,
             end_date=end_dt,
             status='pending',
             payment_method='mpesa',
-            payment_reference=reference,
+            payment_reference='',  # filled after KCB returns the checkout ID
         )
 
-        request.session[f'mpesa_ref_{reference}'] = {
-            'checkout_request_id': reference,
-            'company_id': company.id,
-            'plan_id': plan.id,
-            'created_at': timezone.now().isoformat(),
-        }
+        # Unique invoice reference KCB will echo back in the callback
+        invoice_number = f"CO{company.id}-SUB{sub.id}-{uuid.uuid4().hex[:6].upper()}"
+
+        # ---------- Call KCB Buni ----------
+        try:
+            client = KCBClient()
+            result = client.stk_push(
+                phone_number=phone,
+                amount=int(plan.price),
+                invoice_number=invoice_number,
+                description=f"{company.name} subscription",
+            )
+        except Exception as e:
+            sub.status = 'cancelled'
+            sub.save(update_fields=['status'])
+            logger.error("KCB STK push failed for sub %s: %s", sub.id, e)
+            return JsonResponse(
+                {'success': False, 'error': str(e)},
+                status=502,
+            )
+
+        # KCB returns:
+        # {
+        #   'header': {'statusCode': '0', 'statusDescription': '...'},
+        #   'response': {
+        #       'MerchantRequestID': '...',
+        #       'CheckoutRequestID': 'ws_CO_...',
+        #       'ResponseCode': '0',
+        #       'CustomerMessage': '...',
+        #   }
+        # }
+        body = result.get('response', result)
+        checkout_id = body.get('CheckoutRequestID') or body.get('MerchantRequestID') or ''
+
+        # Store BOTH the invoice_number and checkout_id so the callback can match either
+        sub.payment_reference = checkout_id or invoice_number
+        sub.save(update_fields=['payment_reference'])
+
+        # Store invoice_number in a safe place for the callback lookup
+        # (we stash it on the Subscription row via payment_reference fallback)
+        logger.info(
+            "KCB STK push sent: sub=%s invoice=%s checkout=%s",
+            sub.id, invoice_number, checkout_id,
+        )
 
         return JsonResponse({
             'success': True,
-            'reference': reference,
+            'reference': sub.payment_reference,
+            'invoice_number': invoice_number,
+            'checkout_request_id': checkout_id,
             'message': f'STK Push sent to {phone}. Enter your PIN.',
         })
 
@@ -990,7 +1030,11 @@ def company_payments_initiate(request, pk):
 @login_required
 @require_GET
 def company_payments_status(request, pk):
-    """Poll payment status. Frontend hits this every 3s."""
+    """
+    Poll payment status.
+    For KCB, we don't have a direct status API in this integration — we rely
+    on the callback. So this endpoint just reports what the DB says.
+    """
     company = get_object_or_404(Company, pk=pk)
     reference = request.GET.get('ref', '').strip()
 
@@ -1019,6 +1063,7 @@ def company_payments_status(request, pk):
             'message': 'Payment was cancelled or failed.',
         })
 
+    # Still pending — wait for KCB callback
     return JsonResponse({
         'status': 'pending',
         'reference': reference,
@@ -1026,47 +1071,86 @@ def company_payments_status(request, pk):
 
 
 # ============================================
-# M-PESA STK PUSH — CALLBACK
+# M-PESA STK PUSH — CALLBACK (KCB BUNI)
 # ============================================
 
 @csrf_exempt
 @require_POST
-def company_payments_callback(request, pk):
+def company_payments_callback(request):
     """
-    M-Pesa callback endpoint. Safaricom POSTs here after the STK push
-    is completed (success or failure).
+    Global KCB Buni callback. KCB sends one callback URL for all payments.
 
-    On SUCCESS:
-      1. Expire any OTHER active subscriptions for this company
-      2. Activate the pending subscription this payment was for
-      3. Ensure the activated row has a real end_date
-      4. Update the Company cache
+    Matches the Subscription by:
+      - CheckoutRequestID (stored on sub.payment_reference)
+      - OR invoiceNumber (fallback)
     """
-    company = get_object_or_404(Company, pk=pk)
-
     try:
         payload = json.loads(request.body.decode() or '{}')
     except json.JSONDecodeError:
-        return JsonResponse({'ResultCode': 1, 'ResultDesc': 'Invalid JSON'})
+        logger.warning("KCB callback: invalid JSON: %s", request.body[:500])
+        return JsonResponse({'status': 'error', 'message': 'Invalid JSON'})
 
-    stk = payload.get('Body', {}).get('stkCallback', {})
-    checkout_id = stk.get('CheckoutRequestID')
-    result_code = stk.get('ResultCode')
+    logger.info("KCB CALLBACK RECEIVED: %s", json.dumps(payload, indent=2))
 
-    sub = Subscription.objects.filter(
-        payment_reference=checkout_id,
-        company=company,
-    ).first()
+    # KCB payload structure (typical):
+    # {
+    #   "MerchantRequestID": "...",
+    #   "CheckoutRequestID": "ws_CO_...",
+    #   "ResultCode": "0",
+    #   "ResultDesc": "The service request is processed successfully.",
+    #   "Amount": 10.0,
+    #   "MpesaReceiptNumber": "...",
+    #   "TransactionDate": "20260916143015",
+    #   "PhoneNumber": "254722527955"
+    # }
+    # It may also be wrapped: { "response": {...} } or { "data": {...} }
+
+    body = payload.get('response') or payload.get('data') or payload
+
+    checkout_id = (
+        body.get('CheckoutRequestID')
+        or body.get('checkoutRequestID')
+        or body.get('MerchantRequestID')
+        or body.get('merchantRequestID')
+        or ''
+    )
+    invoice_number = (
+        body.get('InvoiceNumber')
+        or body.get('invoiceNumber')
+        or body.get('AccountReference')
+        or body.get('accountReference')
+        or ''
+    )
+    result_code = str(
+        body.get('ResultCode')
+        or body.get('ResponseCode')
+        or body.get('resultCode')
+        or ''
+    )
+    result_desc = body.get('ResultDesc') or body.get('ResponseDescription') or ''
+    receipt = body.get('MpesaReceiptNumber') or body.get('mpesaReceiptNumber') or ''
+
+    # ---------- Locate the Subscription ----------
+    sub = None
+    if checkout_id:
+        sub = Subscription.objects.filter(
+            payment_reference=checkout_id
+        ).select_related('company', 'plan').first()
+    if not sub and invoice_number:
+        sub = Subscription.objects.filter(
+            payment_reference__icontains=invoice_number
+        ).select_related('company', 'plan').first()
 
     if not sub:
-        return JsonResponse({'ResultCode': 1, 'ResultDesc': 'Unknown reference'})
+        logger.warning("KCB callback: no matching subscription. payload=%s", payload)
+        return JsonResponse({'status': 'error', 'message': 'Unknown reference'})
 
-    if str(result_code) == '0':
-        # ---------- SUCCESS ----------
-        (company.subscriptions
-            .filter(status='active')
-            .exclude(pk=sub.pk)
-            .update(status='expired'))
+    company = sub.company
+
+    # ---------- Activate or cancel ----------
+    if result_code == '0':
+        # SUCCESS
+        company.subscriptions.filter(status='active').exclude(pk=sub.pk).update(status='expired')
 
         now = timezone.now()
         if not sub.start_date:
@@ -1075,7 +1159,9 @@ def company_payments_callback(request, pk):
             sub.end_date = _compute_end_date(sub.plan, sub.start_date)
 
         sub.status = 'active'
-        sub.save(update_fields=['status', 'start_date', 'end_date'])
+        if receipt:
+            sub.payment_reference = f"{sub.payment_reference}|{receipt}"
+        sub.save(update_fields=['status', 'start_date', 'end_date', 'payment_reference'])
 
         company.plan = sub.plan
         company.subscription_start = sub.start_date
@@ -1086,12 +1172,24 @@ def company_payments_callback(request, pk):
             'plan', 'subscription_start', 'subscription_end',
             'status', 'is_active',
         ])
+        logger.info(
+            "KCB payment SUCCESS for company=%s sub=%s receipt=%s",
+            company.id, sub.id, receipt,
+        )
     else:
-        # ---------- FAILED / CANCELLED ----------
+        # FAILED / CANCELLED
         sub.status = 'cancelled'
         sub.save(update_fields=['status'])
+        logger.info(
+            "KCB payment FAILED for company=%s sub=%s ResultCode=%s ResultDesc=%s",
+            company.id, sub.id, result_code, result_desc,
+        )
 
-    return JsonResponse({'ResultCode': 0, 'ResultDesc': 'Received'})
+    # KCB expects an ACK with ResultCode/ResultDesc
+    return JsonResponse({
+        'ResultCode': 0,
+        'ResultDesc': 'Accepted',
+    })
 
 
 # ============================================
@@ -1137,6 +1235,7 @@ def company_payments_dev_confirm(request, pk):
     ])
 
     return JsonResponse({'success': True, 'message': 'Marked as paid.'})
+
 
 
 # ============================================

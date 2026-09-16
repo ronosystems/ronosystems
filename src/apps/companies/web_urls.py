@@ -3,12 +3,21 @@
 from django.urls import path
 
 from . import web_views
-from . import views  # noqa: F401  (kept for existing imports elsewhere)
+from . import views  # noqa: F401
 
 app_name = 'companies'
 
 
 urlpatterns = [
+    # ============================================
+    # M-PESA GLOBAL CALLBACK (KCB Buni webhook)
+    # ============================================
+    path(
+        'mpesa/callback/',
+        web_views.company_payments_callback,
+        name='mpesa-callback',
+    ),
+
     # ============================================
     # COMPANY MANAGEMENT (Super Admin)
     # ============================================
@@ -32,7 +41,7 @@ urlpatterns = [
     ),
 
     # ============================================
-    # JOIN REQUESTS (Company Admin / Super Admin)
+    # JOIN REQUESTS
     # ============================================
     path(
         '<int:company_id>/join-requests/',
@@ -56,7 +65,8 @@ urlpatterns = [
     ),
 
     # ============================================
-    # PAYMENTS — specific routes FIRST
+    # PAYMENTS — per-company endpoints (initiate, status, dev-confirm)
+    # KCB Buni sends ALL payment results to the global callback above.
     # ============================================
     path(
         '<int:pk>/payments/initiate/',
@@ -67,11 +77,6 @@ urlpatterns = [
         '<int:pk>/payments/status/',
         web_views.company_payments_status,
         name='company-payments-status',
-    ),
-    path(
-        '<int:pk>/payments/callback/',
-        web_views.company_payments_callback,
-        name='company-payments-callback',
     ),
     path(
         '<int:pk>/payments/dev-confirm/',

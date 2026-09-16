@@ -323,6 +323,68 @@ else:
 SYSTEM_NAME = os.getenv('SYSTEM_NAME', 'RonoSystems')
 
 
+
+# ============================================
+# KOPOKOPO PAYMENT GATEWAY
+# ============================================
+
+# API credentials — set these in Render Dashboard → Environment
+KOPOKOPO_CLIENT_ID = os.getenv('KOPOKOPO_CLIENT_ID', '')
+KOPOKOPO_CLIENT_SECRET = os.getenv('KOPOKOPO_CLIENT_SECRET', '')
+KOPOKOPO_API_KEY = os.getenv('KOPOKOPO_API_KEY', '')
+
+# Environment — 'sandbox' or 'production'
+KOPOKOPO_ENVIRONMENT = os.getenv('KOPOKOPO_ENVIRONMENT', 'sandbox')
+
+# Base URL for Kopokopo API (auto-selects based on environment)
+if KOPOKOPO_ENVIRONMENT == 'production':
+    KOPOKOPO_BASE_URL = 'https://api.kopokopo.com'
+else:
+    KOPOKOPO_BASE_URL = 'https://sandbox.kopokopo.com'
+
+# Callback URL — where Kopokopo sends payment result
+# Must be publicly accessible over HTTPS
+if ON_RENDER:
+    KOPOKOPO_CALLBACK_URL = os.getenv(
+        'KOPOKOPO_CALLBACK_URL',
+        'https://ronosystems.onrender.com/payments/kopokopo/callback/'
+    )
+else:
+    # Local — use your ngrok URL or the Render URL for testing
+    KOPOKOPO_CALLBACK_URL = os.getenv(
+        'KOPOKOPO_CALLBACK_URL',
+        'https://ronosystems.onrender.com/payments/kopokopo/callback/'
+    )
+
+# Optional: where to redirect the user after payment completes
+KOPOKOPO_REDIRECT_URL = os.getenv(
+    'KOPOKOPO_REDIRECT_URL',
+    'https://ronosystems.onrender.com/'
+)
+
+
+
+# ============================================
+# KCB BUNI PAYMENT GATEWAY
+# ============================================
+
+KCB_CONSUMER_KEY = os.getenv('KCB_CONSUMER_KEY', '')
+KCB_CONSUMER_SECRET = os.getenv('KCB_CONSUMER_SECRET', '')
+KCB_ENVIRONMENT = os.getenv('KCB_ENVIRONMENT', 'sandbox')
+
+if KCB_ENVIRONMENT == 'production':
+    KCB_BASE_URL = 'https://api.buni.kcbgroup.com'
+else:
+    KCB_BASE_URL = 'https://uat.buni.kcbgroup.com'
+
+KCB_TOKEN_URL = f'{KCB_BASE_URL}/token?grant_type=client_credentials'
+KCB_STK_ENDPOINT = '/mm/api/request/1.0.0/stkpush'
+KCB_CALLBACK_URL = os.getenv(
+    'KCB_CALLBACK_URL',
+    'https://ronosystems.onrender.com/payments/kcb/callback/'
+)
+
+
 # ============================================
 # LOGGING
 # ============================================
