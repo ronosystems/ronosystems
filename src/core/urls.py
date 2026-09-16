@@ -49,6 +49,7 @@ urlpatterns = [
     path('reports/', include('apps.reports.urls')),
     path('settings/', include('apps.settings.urls')),
     path('profile/', include('apps.accounts.profile_urls')),
+    path('accounts/', include('allauth.urls')),
 
     # ============================================
     # API ENDPOINTS

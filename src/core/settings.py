@@ -58,28 +58,43 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    # Sites framework (required by django-allauth)
+    'django.contrib.sites',
+
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
     'whitenoise.runserver_nostatic',
     'cloudinary_storage',
     'cloudinary',
-    
+
+    # ===== django-allauth =====
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
+    'allauth.socialaccount.providers.apple',
+    'allauth.socialaccount.providers.facebook',
+
     # Custom Apps
     'apps.accounts',
     'apps.employees',
     'apps.business_types',
     'apps.companies',
-    'apps.company', 
+    'apps.company',
     'apps.treasury',
     'apps.plans',
     'apps.reports',
-    'apps.settings', 
-    
+    'apps.settings',
+
     # Business Type Apps
     'apps.epa_shop',
     'apps.supermarket',
 ]
+
+# Required by django.contrib.sites / allauth
+SITE_ID = 1
 
 # ============================================
 # MIDDLEWARE
@@ -94,7 +109,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'apps.companies.middleware.CustomDomainMiddleware',          # ← ADD THIS
+    # allauth middleware (must come after AuthenticationMiddleware)
+    'allauth.account.middleware.AccountMiddleware',
+    'apps.companies.middleware.CustomDomainMiddleware',
     'apps.companies.middleware.SubscriptionExpiryMiddleware',
 ]
 
@@ -117,7 +134,7 @@ TEMPLATES = [
                 'apps.settings.context_processors.system_settings',
                 'apps.epa_shop.context_processors.user_context',
                 'apps.company.context_processors.company_context',
-                'apps.companies.context_processors.support_mode_context',  
+                'apps.companies.context_processors.support_mode_context',
                 'apps.companies.context_processors.pending_join_requests',
             ],
         },
@@ -160,7 +177,7 @@ if ON_RENDER:
                 'PORT': os.getenv('DATABASE_PORT', '5432'),
             }
         }
-        
+
 elif USE_SQLITE:
     # Local development with SQLite
     DATABASES = {
@@ -170,7 +187,7 @@ elif USE_SQLITE:
         }
     }
     print("✅ Using SQLite database for local development")
-    
+
 else:
     # Local development with PostgreSQL (default)
     DATABASE_URL = os.getenv('DATABASE_URL')
@@ -204,6 +221,98 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
+# ===== allauth authentication backends =====
+AUTHENTICATION_BACKENDS = [
+    # Default ModelBackend — keeps email/password login working
+    'django.contrib.auth.backends.ModelBackend',
+    # allauth-specific backend — handles social + email login
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
+
+# ============================================
+# DJANGO-ALLAUTH CONFIGURATION
+# ============================================
+
+# Use email as the primary identifier (matches your existing login by email)
+ACCOUNT_LOGIN_METHODS = {'email'}
+ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+ACCOUNT_EMAIL_VERIFICATION = 'optional'
+
+
+# Login/logout behavior
+ACCOUNT_LOGOUT_ON_GET = True
+ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
+ACCOUNT_SESSION_REMEMBER = True  # "Remember me" checkbox behaviour
+
+# Signup behaviour — don't auto-redirect to allauth's signup flow,
+# we have our own register page at /auth/register/
+ACCOUNT_SIGNUP_REDIRECT_URL = '/dashboard/'
+LOGIN_REDIRECT_URL = '/dashboard/'
+ACCOUNT_LOGOUT_REDIRECT_URL = '/auth/login/'
+
+# Adapter — see signals/adapters note below
+SOCIALACCOUNT_ADAPTER = 'apps.accounts.adapters.RonoSocialAccountAdapter'
+ACCOUNT_ADAPTER = 'apps.accounts.adapters.RonoAccountAdapter'
+
+# Auto-connect social accounts to existing users with the same email
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
+SOCIALACCOUNT_AUTO_SIGNUP = True
+SOCIALACCOUNT_QUERY_EMAIL = True
+
+# Which fields to pull from social providers
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'SCOPE': ['profile', 'email'],
+        'AUTH_PARAMS': {'access_type': 'online'},
+        'APP': {
+            'client_id': os.getenv('GOOGLE_CLIENT_ID', ''),
+            'secret': os.getenv('GOOGLE_CLIENT_SECRET', ''),
+            'key': '',
+        },
+    },
+    'facebook': {
+        'METHOD': 'oauth2',
+        'SDK_URL': '//connect.facebook.net/{locale}/sdk.js',
+        'SCOPE': ['email', 'public_profile'],
+        'AUTH_PARAMS': {'auth_type': 'reauthenticate'},
+        'INIT_PARAMS': {'cookie': True},
+        'FIELDS': [
+            'id',
+            'first_name',
+            'last_name',
+            'middle_name',
+            'name',
+            'name_format',
+            'picture',
+            'short_name',
+            'email',
+        ],
+        'EXCHANGE_TOKEN': True,
+        'VERIFIED_EMAIL': False,
+        'VERSION': 'v18.0',
+        'APP': {
+            'client_id': os.getenv('FACEBOOK_CLIENT_ID', ''),
+            'secret': os.getenv('FACEBOOK_CLIENT_SECRET', ''),
+            'key': '',
+        },
+    },
+    'apple': {
+        'APP': {
+            'client_id': os.getenv('APPLE_CLIENT_ID', ''),
+            'secret': os.getenv('APPLE_CLIENT_SECRET', ''),
+            'key': os.getenv('APPLE_KEY_ID', ''),
+            'certificate_key': os.getenv('APPLE_PRIVATE_KEY', ''),
+        },
+        'SCOPE': ['name', 'email'],
+    },
+}
+
+# Where social signups land after account creation
+SOCIALACCOUNT_LOGIN_ON_GET = True  # lets social buttons work as simple links
+SOCIALACCOUNT_STORE_TOKENS = False
+
 # ============================================
 # INTERNATIONALIZATION
 # ============================================
@@ -230,20 +339,16 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Use Cloudinary for media files in production
 if ON_RENDER:
-    # Use Cloudinary for media storage
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
     print("✅ Using Cloudinary for media files on Render")
 else:
-    # Local development - use local media
     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
     MEDIA_ROOT = BASE_DIR / 'media'
     MEDIA_URL = '/media/'
     print("✅ Using local media storage")
 
-# Ensure static directory exists
 os.makedirs(STATIC_ROOT, exist_ok=True)
 
-# Use WhiteNoise for static files in production
 if ON_RENDER:
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
@@ -300,7 +405,6 @@ if not DEBUG and ON_RENDER:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
-
 # ============================================
 # EMAIL CONFIGURATION
 # ============================================
@@ -322,47 +426,36 @@ else:
 
 SYSTEM_NAME = os.getenv('SYSTEM_NAME', 'RonoSystems')
 
-
-
 # ============================================
 # KOPOKOPO PAYMENT GATEWAY
 # ============================================
 
-# API credentials — set these in Render Dashboard → Environment
 KOPOKOPO_CLIENT_ID = os.getenv('KOPOKOPO_CLIENT_ID', '')
 KOPOKOPO_CLIENT_SECRET = os.getenv('KOPOKOPO_CLIENT_SECRET', '')
 KOPOKOPO_API_KEY = os.getenv('KOPOKOPO_API_KEY', '')
 
-# Environment — 'sandbox' or 'production'
 KOPOKOPO_ENVIRONMENT = os.getenv('KOPOKOPO_ENVIRONMENT', 'sandbox')
 
-# Base URL for Kopokopo API (auto-selects based on environment)
 if KOPOKOPO_ENVIRONMENT == 'production':
     KOPOKOPO_BASE_URL = 'https://api.kopokopo.com'
 else:
     KOPOKOPO_BASE_URL = 'https://sandbox.kopokopo.com'
 
-# Callback URL — where Kopokopo sends payment result
-# Must be publicly accessible over HTTPS
 if ON_RENDER:
     KOPOKOPO_CALLBACK_URL = os.getenv(
         'KOPOKOPO_CALLBACK_URL',
         'https://ronosystems.onrender.com/payments/kopokopo/callback/'
     )
 else:
-    # Local — use your ngrok URL or the Render URL for testing
     KOPOKOPO_CALLBACK_URL = os.getenv(
         'KOPOKOPO_CALLBACK_URL',
         'https://ronosystems.onrender.com/payments/kopokopo/callback/'
     )
 
-# Optional: where to redirect the user after payment completes
 KOPOKOPO_REDIRECT_URL = os.getenv(
     'KOPOKOPO_REDIRECT_URL',
     'https://ronosystems.onrender.com/'
 )
-
-
 
 # ============================================
 # KCB BUNI PAYMENT GATEWAY
@@ -383,7 +476,6 @@ KCB_CALLBACK_URL = os.getenv(
     'KCB_CALLBACK_URL',
     'https://ronosystems.onrender.com/payments/kcb/callback/'
 )
-
 
 # ============================================
 # LOGGING
