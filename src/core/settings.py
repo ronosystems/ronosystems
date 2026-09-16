@@ -16,7 +16,14 @@ load_dotenv(BASE_DIR / '.env')
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-ronosystems-key-12345')
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-# ALLOWED_HOSTS
+# ============================================
+# ENVIRONMENT FLAGS (used everywhere below)
+# ============================================
+ON_RENDER = 'RENDER' in os.environ
+
+# ============================================
+# ALLOWED HOSTS
+# ============================================
 ALLOWED_HOSTS = []
 allowed = os.getenv('ALLOWED_HOSTS', '')
 if allowed:
@@ -24,7 +31,7 @@ if allowed:
 else:
     ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
-if 'RENDER' in os.environ:
+if ON_RENDER:
     ALLOWED_HOSTS.append('ronosystems.onrender.com')
     ALLOWED_HOSTS.append('.onrender.com')
 
@@ -32,7 +39,9 @@ if 'RENDER' in os.environ:
 # Security is enforced by CustomDomainMiddleware (DB lookup) + Cloudflare.
 ALLOWED_HOSTS.append('*')
 
-# CSRF Trusted Origins
+# ============================================
+# CSRF TRUSTED ORIGINS
+# ============================================
 CSRF_TRUSTED_ORIGINS = []
 csrf_origins = os.getenv('CSRF_TRUSTED_ORIGINS', '')
 if csrf_origins:
@@ -40,10 +49,8 @@ if csrf_origins:
 else:
     CSRF_TRUSTED_ORIGINS = ['http://localhost:8000', 'http://127.0.0.1:8000']
 
-if 'RENDER' in os.environ:
+if ON_RENDER:
     CSRF_TRUSTED_ORIGINS.append('https://ronosystems.onrender.com')
-    # NOTE: Django does NOT support wildcards in CSRF_TRUSTED_ORIGINS.
-    # Custom domains are added dynamically by CustomDomainMiddleware.
 
 # Filter out any origins that don't start with http:// or https://
 CSRF_TRUSTED_ORIGINS = [origin for origin in CSRF_TRUSTED_ORIGINS if origin.startswith('http')]
@@ -109,7 +116,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    # allauth middleware (must come after AuthenticationMiddleware)
     'allauth.account.middleware.AccountMiddleware',
     'apps.companies.middleware.CustomDomainMiddleware',
     'apps.companies.middleware.SubscriptionExpiryMiddleware',
@@ -144,17 +150,11 @@ TEMPLATES = [
 WSGI_APPLICATION = 'core.wsgi.application'
 
 # ============================================
-# DATABASE - SQLite for Local, PostgreSQL for Production
+# DATABASE
 # ============================================
-
-# Check if we should use SQLite (local development)
 USE_SQLITE = os.getenv('USE_SQLITE', 'False') == 'True'
 
-# Check if we're on Render (production)
-ON_RENDER = 'RENDER' in os.environ
-
 if ON_RENDER:
-    # Production on Render - Use PostgreSQL
     DATABASE_URL = os.getenv('DATABASE_URL')
     if DATABASE_URL:
         DATABASES = {
@@ -166,7 +166,6 @@ if ON_RENDER:
             )
         }
     else:
-        # Fallback if DATABASE_URL not set
         DATABASES = {
             'default': {
                 'ENGINE': 'django.db.backends.postgresql',
@@ -179,7 +178,6 @@ if ON_RENDER:
         }
 
 elif USE_SQLITE:
-    # Local development with SQLite
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -189,7 +187,6 @@ elif USE_SQLITE:
     print("✅ Using SQLite database for local development")
 
 else:
-    # Local development with PostgreSQL (default)
     DATABASE_URL = os.getenv('DATABASE_URL')
     if DATABASE_URL:
         DATABASES = {
@@ -221,47 +218,35 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# ===== allauth authentication backends =====
 AUTHENTICATION_BACKENDS = [
-    # Default ModelBackend — keeps email/password login working
     'django.contrib.auth.backends.ModelBackend',
-    # allauth-specific backend — handles social + email login
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
 # ============================================
 # DJANGO-ALLAUTH CONFIGURATION
 # ============================================
-
-# Use email as the primary identifier (matches your existing login by email)
 ACCOUNT_LOGIN_METHODS = {'email'}
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 ACCOUNT_EMAIL_VERIFICATION = 'optional'
 
-
-# Login/logout behavior
 ACCOUNT_LOGOUT_ON_GET = True
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
-ACCOUNT_SESSION_REMEMBER = True  # "Remember me" checkbox behaviour
+ACCOUNT_SESSION_REMEMBER = True
 
-# Signup behaviour — don't auto-redirect to allauth's signup flow,
-# we have our own register page at /auth/register/
 ACCOUNT_SIGNUP_REDIRECT_URL = '/dashboard/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 ACCOUNT_LOGOUT_REDIRECT_URL = '/auth/login/'
 
-# Adapter — see signals/adapters note below
 SOCIALACCOUNT_ADAPTER = 'apps.accounts.adapters.RonoSocialAccountAdapter'
 ACCOUNT_ADAPTER = 'apps.accounts.adapters.RonoAccountAdapter'
 
-# Auto-connect social accounts to existing users with the same email
 SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
 SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
 SOCIALACCOUNT_AUTO_SIGNUP = True
 SOCIALACCOUNT_QUERY_EMAIL = True
 
-# Which fields to pull from social providers
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
         'SCOPE': ['profile', 'email'],
@@ -279,15 +264,8 @@ SOCIALACCOUNT_PROVIDERS = {
         'AUTH_PARAMS': {'auth_type': 'reauthenticate'},
         'INIT_PARAMS': {'cookie': True},
         'FIELDS': [
-            'id',
-            'first_name',
-            'last_name',
-            'middle_name',
-            'name',
-            'name_format',
-            'picture',
-            'short_name',
-            'email',
+            'id', 'first_name', 'last_name', 'middle_name',
+            'name', 'name_format', 'picture', 'short_name', 'email',
         ],
         'EXCHANGE_TOKEN': True,
         'VERIFIED_EMAIL': False,
@@ -309,8 +287,7 @@ SOCIALACCOUNT_PROVIDERS = {
     },
 }
 
-# Where social signups land after account creation
-SOCIALACCOUNT_LOGIN_ON_GET = True  # lets social buttons work as simple links
+SOCIALACCOUNT_LOGIN_ON_GET = True
 SOCIALACCOUNT_STORE_TOKENS = False
 
 # ============================================
@@ -322,7 +299,7 @@ USE_I18N = True
 USE_TZ = True
 
 # ============================================
-# CLOUDINARY STORAGE CONFIGURATION
+# CLOUDINARY
 # ============================================
 CLOUDINARY_STORAGE = {
     'CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME', 'dg9it0ut8'),
@@ -331,26 +308,50 @@ CLOUDINARY_STORAGE = {
 }
 
 # ============================================
-# STATIC & MEDIA FILES - CLOUDINARY
+# STATIC & MEDIA
 # ============================================
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Use Cloudinary for media files in production
-if ON_RENDER:
-    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-    print("✅ Using Cloudinary for media files on Render")
+# Whether to store media on Cloudinary. Default: True in production, False in dev.
+# Set `USE_CLOUDINARY_MEDIA=True` in your .env to test Cloudinary in dev too.
+USE_CLOUDINARY_MEDIA = os.getenv(
+    'USE_CLOUDINARY_MEDIA',
+    'True' if ON_RENDER else 'False'
+) == 'True'
+
+if USE_CLOUDINARY_MEDIA:
+    # ---------- Media on Cloudinary (persistent across deploys) ----------
+    STORAGES = {
+        "default": {
+            "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
+        },
+        "staticfiles": {
+            "BACKEND": (
+                "whitenoise.storage.CompressedManifestStaticFilesStorage"
+                if ON_RENDER
+                else "django.contrib.staticfiles.storage.StaticFilesStorage"
+            ),
+        },
+    }
+    MEDIA_URL = f"https://res.cloudinary.com/{CLOUDINARY_STORAGE['CLOUD_NAME']}/"
+    print("✅ Using Cloudinary for media files")
 else:
-    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+    # ---------- Media on local filesystem (dev only) ----------
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
     MEDIA_ROOT = BASE_DIR / 'media'
     MEDIA_URL = '/media/'
     print("✅ Using local media storage")
 
 os.makedirs(STATIC_ROOT, exist_ok=True)
-
-if ON_RENDER:
-    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # ============================================
 # DEFAULT SETTINGS
@@ -367,7 +368,7 @@ if not DEBUG:
     CORS_ALLOW_CREDENTIALS = True
 
 # ============================================
-# JWT Settings
+# JWT
 # ============================================
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -387,14 +388,14 @@ SIMPLE_JWT = {
 }
 
 # ============================================
-# LOGIN/LOGOUT URLs
+# LOGIN / LOGOUT URLs
 # ============================================
 LOGIN_URL = '/auth/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/auth/login/'
 
 # ============================================
-# SECURITY SETTINGS (Production)
+# SECURITY (Production)
 # ============================================
 if not DEBUG and ON_RENDER:
     SECURE_SSL_REDIRECT = True
@@ -406,12 +407,9 @@ if not DEBUG and ON_RENDER:
     SECURE_HSTS_PRELOAD = True
 
 # ============================================
-# EMAIL CONFIGURATION
+# EMAIL
 # ============================================
-ON_RENDER = 'RENDER' in os.environ
-
 if ON_RENDER:
-    # Production (Render) — use SMTP
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
     EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
@@ -420,7 +418,6 @@ if ON_RENDER:
     EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
     DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'noreply@ronosystems.com')
 else:
-    # Local development — print emails to console
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
     DEFAULT_FROM_EMAIL = 'noreply@ronosystems.com'
 
@@ -429,7 +426,6 @@ SYSTEM_NAME = os.getenv('SYSTEM_NAME', 'RonoSystems')
 # ============================================
 # KOPOKOPO PAYMENT GATEWAY
 # ============================================
-
 KOPOKOPO_CLIENT_ID = os.getenv('KOPOKOPO_CLIENT_ID', '')
 KOPOKOPO_CLIENT_SECRET = os.getenv('KOPOKOPO_CLIENT_SECRET', '')
 KOPOKOPO_API_KEY = os.getenv('KOPOKOPO_API_KEY', '')
@@ -441,16 +437,10 @@ if KOPOKOPO_ENVIRONMENT == 'production':
 else:
     KOPOKOPO_BASE_URL = 'https://sandbox.kopokopo.com'
 
-if ON_RENDER:
-    KOPOKOPO_CALLBACK_URL = os.getenv(
-        'KOPOKOPO_CALLBACK_URL',
-        'https://ronosystems.onrender.com/payments/kopokopo/callback/'
-    )
-else:
-    KOPOKOPO_CALLBACK_URL = os.getenv(
-        'KOPOKOPO_CALLBACK_URL',
-        'https://ronosystems.onrender.com/payments/kopokopo/callback/'
-    )
+KOPOKOPO_CALLBACK_URL = os.getenv(
+    'KOPOKOPO_CALLBACK_URL',
+    'https://ronosystems.onrender.com/payments/kopokopo/callback/'
+)
 
 KOPOKOPO_REDIRECT_URL = os.getenv(
     'KOPOKOPO_REDIRECT_URL',
@@ -460,7 +450,6 @@ KOPOKOPO_REDIRECT_URL = os.getenv(
 # ============================================
 # KCB BUNI PAYMENT GATEWAY
 # ============================================
-
 KCB_CONSUMER_KEY = os.getenv('KCB_CONSUMER_KEY', '')
 KCB_CONSUMER_SECRET = os.getenv('KCB_CONSUMER_SECRET', '')
 KCB_ENVIRONMENT = os.getenv('KCB_ENVIRONMENT', 'sandbox')
