@@ -1032,8 +1032,16 @@ def company_payments_initiate(request, pk):
 def company_payments_status(request, pk):
     """
     Poll payment status.
-    For KCB, we don't have a direct status API in this integration — we rely
-    on the callback. So this endpoint just reports what the DB says.
+
+    For KCB, we don't have a direct status API in this integration — we
+    rely on the callback to flip the Subscription row to 'active' or
+    'cancelled'. This endpoint just reports what the DB says.
+
+    Lookup strategy:
+      1. Exact match on CheckoutRequestID (fresh pending row)
+      2. Prefix match on CheckoutRequestID (after the callback appended
+         the M-Pesa receipt to payment_reference)
+      3. Fallback: invoice_number contained in payment_reference
     """
     company = get_object_or_404(Company, pk=pk)
     reference = request.GET.get('ref', '').strip()
@@ -1041,10 +1049,30 @@ def company_payments_status(request, pk):
     if not reference:
         return JsonResponse({'status': 'failed', 'message': 'Missing reference.'})
 
+    # ---------- (1) Exact match ----------
     sub = Subscription.objects.filter(
         company=company,
         payment_reference=reference,
     ).order_by('-created_at').first()
+
+    # ---------- (2) Prefix match ----------
+    # After a successful callback, payment_reference becomes
+    # "ws_CO_...|UIG6170F6F", so an exact match on the raw checkout id
+    # no longer finds the row. Prefix-match handles that.
+    if not sub:
+        sub = Subscription.objects.filter(
+            company=company,
+            payment_reference__startswith=f"{reference}|",
+        ).order_by('-created_at').first()
+
+    # ---------- (3) Invoice-number fallback ----------
+    # The initiate view stores the checkout ID, but if anything ever
+    # writes the invoice number instead, this catches it.
+    if not sub:
+        sub = Subscription.objects.filter(
+            company=company,
+            payment_reference__icontains=reference,
+        ).order_by('-created_at').first()
 
     if not sub:
         return JsonResponse({'status': 'failed', 'message': 'Unknown reference.'})
@@ -1069,6 +1097,7 @@ def company_payments_status(request, pk):
         'reference': reference,
     })
 
+    
 
 # ============================================
 # M-PESA STK PUSH — CALLBACK (KCB BUNI)
@@ -1078,12 +1107,32 @@ def company_payments_status(request, pk):
 @require_POST
 def company_payments_callback(request):
     """
-    Global KCB Buni callback. KCB sends one callback URL for all payments.
+    Global KCB Buni callback. Handles BOTH payload shapes:
 
-    Matches the Subscription by:
-      - CheckoutRequestID (stored on sub.payment_reference)
-      - OR invoiceNumber (fallback)
+    A) Flat / wrapped (KCB → your app directly):
+       { "CheckoutRequestID": "ws_CO_...", "ResultCode": "0", ... }
+
+    B) Safaricom Daraja nested (KCB relays from M-Pesa):
+       {
+         "Body": {
+           "stkCallback": {
+             "MerchantRequestID": "...",
+             "CheckoutRequestID": "ws_CO_...",
+             "ResultCode": 0,
+             "ResultDesc": "...",
+             "CallbackMetadata": {
+               "Item": [
+                 {"Name": "Amount", "Value": 10.0},
+                 {"Name": "MpesaReceiptNumber", "Value": "UIG6170AQ4"},
+                 {"Name": "PhoneNumber", "Value": 254722527955},
+                 ...
+               ]
+             }
+           }
+         }
+       }
     """
+    # ---------- Parse body ----------
     try:
         payload = json.loads(request.body.decode() or '{}')
     except json.JSONDecodeError:
@@ -1092,21 +1141,37 @@ def company_payments_callback(request):
 
     logger.info("KCB CALLBACK RECEIVED: %s", json.dumps(payload, indent=2))
 
-    # KCB payload structure (typical):
-    # {
-    #   "MerchantRequestID": "...",
-    #   "CheckoutRequestID": "ws_CO_...",
-    #   "ResultCode": "0",
-    #   "ResultDesc": "The service request is processed successfully.",
-    #   "Amount": 10.0,
-    #   "MpesaReceiptNumber": "...",
-    #   "TransactionDate": "20260916143015",
-    #   "PhoneNumber": "254722527955"
-    # }
-    # It may also be wrapped: { "response": {...} } or { "data": {...} }
+    # ---------- Normalize payload across shapes ----------
+    # Shape A: KCB flat / {"response": {...}} / {"data": {...}}
+    # Shape B: Safaricom Daraja {"Body": {"stkCallback": {...}}}
+    body = payload
 
-    body = payload.get('response') or payload.get('data') or payload
+    # Unwrap Safaricom's outer "Body"
+    if isinstance(body.get('Body'), dict):
+        body = body['Body']
 
+    # Unwrap Safaricom's "stkCallback"
+    if isinstance(body.get('stkCallback'), dict):
+        body = body['stkCallback']
+
+    # Unwrap KCB's "response" / "data"
+    if isinstance(body.get('response'), dict):
+        body = body['response']
+    elif isinstance(body.get('data'), dict):
+        body = body['data']
+
+    # ---------- Extract metadata (Safaricom style) ----------
+    # Safaricom puts Amount / MpesaReceiptNumber / PhoneNumber under
+    # CallbackMetadata.Item as a list of {"Name": ..., "Value": ...}
+    metadata = {}
+    cb_meta = body.get('CallbackMetadata') or {}
+    items = cb_meta.get('Item') if isinstance(cb_meta, dict) else None
+    if isinstance(items, list):
+        for it in items:
+            if isinstance(it, dict) and 'Name' in it:
+                metadata[it['Name']] = it.get('Value')
+
+    # ---------- Extract fields (fall back to metadata) ----------
     checkout_id = (
         body.get('CheckoutRequestID')
         or body.get('checkoutRequestID')
@@ -1123,23 +1188,55 @@ def company_payments_callback(request):
     )
     result_code = str(
         body.get('ResultCode')
-        or body.get('ResponseCode')
-        or body.get('resultCode')
+        if body.get('ResultCode') is not None
+        else body.get('ResponseCode')
+        if body.get('ResponseCode') is not None
+        else body.get('resultCode')
+        if body.get('resultCode') is not None
+        else ''
+    )
+    result_desc = (
+        body.get('ResultDesc')
+        or body.get('ResponseDescription')
+        or body.get('resultDesc')
         or ''
     )
-    result_desc = body.get('ResultDesc') or body.get('ResponseDescription') or ''
-    receipt = body.get('MpesaReceiptNumber') or body.get('mpesaReceiptNumber') or ''
+    receipt = (
+        body.get('MpesaReceiptNumber')
+        or body.get('mpesaReceiptNumber')
+        or metadata.get('MpesaReceiptNumber')
+        or ''
+    )
 
     # ---------- Locate the Subscription ----------
     sub = None
+
     if checkout_id:
-        sub = Subscription.objects.filter(
-            payment_reference=checkout_id
-        ).select_related('company', 'plan').first()
+        # (1) Exact match — fresh callback for a pending row
+        sub = (
+            Subscription.objects
+            .filter(payment_reference=checkout_id)
+            .select_related('company', 'plan')
+            .first()
+        )
+
+        # (2) Prefix match — retry after receipt was appended
+        if not sub:
+            sub = (
+                Subscription.objects
+                .filter(payment_reference__startswith=f"{checkout_id}|")
+                .select_related('company', 'plan')
+                .first()
+            )
+
+    # (3) Fallback — invoice_number embedded in payment_reference
     if not sub and invoice_number:
-        sub = Subscription.objects.filter(
-            payment_reference__icontains=invoice_number
-        ).select_related('company', 'plan').first()
+        sub = (
+            Subscription.objects
+            .filter(payment_reference__icontains=invoice_number)
+            .select_related('company', 'plan')
+            .first()
+        )
 
     if not sub:
         logger.warning("KCB callback: no matching subscription. payload=%s", payload)
@@ -1150,7 +1247,14 @@ def company_payments_callback(request):
     # ---------- Activate or cancel ----------
     if result_code == '0':
         # SUCCESS
-        company.subscriptions.filter(status='active').exclude(pk=sub.pk).update(status='expired')
+
+        # Expire other active subscriptions for this company
+        (
+            company.subscriptions
+            .filter(status='active')
+            .exclude(pk=sub.pk)
+            .update(status='expired')
+        )
 
         now = timezone.now()
         if not sub.start_date:
@@ -1159,10 +1263,17 @@ def company_payments_callback(request):
             sub.end_date = _compute_end_date(sub.plan, sub.start_date)
 
         sub.status = 'active'
-        if receipt:
-            sub.payment_reference = f"{sub.payment_reference}|{receipt}"
-        sub.save(update_fields=['status', 'start_date', 'end_date', 'payment_reference'])
 
+        # Idempotent receipt append
+        current_ref = sub.payment_reference or ''
+        if receipt and f"|{receipt}" not in current_ref:
+            sub.payment_reference = f"{current_ref}|{receipt}"
+
+        sub.save(update_fields=[
+            'status', 'start_date', 'end_date', 'payment_reference',
+        ])
+
+        # Sync Company row
         company.plan = sub.plan
         company.subscription_start = sub.start_date
         company.subscription_end = sub.end_date
@@ -1172,25 +1283,28 @@ def company_payments_callback(request):
             'plan', 'subscription_start', 'subscription_end',
             'status', 'is_active',
         ])
+
         logger.info(
             "KCB payment SUCCESS for company=%s sub=%s receipt=%s",
             company.id, sub.id, receipt,
         )
     else:
-        # FAILED / CANCELLED
-        sub.status = 'cancelled'
-        sub.save(update_fields=['status'])
+        # FAILED / CANCELLED — only cancel rows still pending
+        if sub.status == 'pending':
+            sub.status = 'cancelled'
+            sub.save(update_fields=['status'])
+
         logger.info(
             "KCB payment FAILED for company=%s sub=%s ResultCode=%s ResultDesc=%s",
             company.id, sub.id, result_code, result_desc,
         )
 
-    # KCB expects an ACK with ResultCode/ResultDesc
     return JsonResponse({
         'ResultCode': 0,
         'ResultDesc': 'Accepted',
     })
 
+    
 
 # ============================================
 # M-PESA STK PUSH — DEV CONFIRM

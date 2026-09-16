@@ -6,6 +6,27 @@ from django.contrib import messages
 from django.http import Http404
 
 
+# ============================================
+# PATHS THAT BYPASS CUSTOM-DOMAIN RESOLUTION
+# ============================================
+# Requests to these paths never need a tenant company resolved from
+# the Host header. This keeps webhooks (KCB, M-Pesa), admin, static
+# files, auth flows, and the payments UI reachable from any host —
+# including ngrok tunnels, Render preview URLs, and platform domains.
+#
+# IMPORTANT: keep this in sync with EXEMPT_URL_PREFIXES below.
+BYPASS_DOMAIN_PREFIXES = (
+    '/payments/',        # KCB / M-Pesa callbacks + payment UI
+    '/admin/',           # Django admin
+    '/static/',          # static assets
+    '/media/',           # user-uploaded media
+    '/auth/',            # login / logout / register / password reset
+    '/api/support/',     # support-mode API
+    '/subscription-expired/',
+    '/plans/',           # plans list (super admin)
+)
+
+
 class CustomDomainMiddleware:
     """
     Resolves Company from the request's Host header when a custom
@@ -13,7 +34,9 @@ class CustomDomainMiddleware:
 
     - Sets `request.tenant_company` to the matched Company (or None).
     - Runs BEFORE SubscriptionExpiryMiddleware.
-    - Skips lookup for the platform's own hosts.
+    - Skips lookup for:
+        * platform hosts (localhost, 127.0.0.1, *.onrender.com)
+        * explicitly bypassed paths (webhooks, admin, static, auth, ...)
     """
 
     def __init__(self, get_response):
@@ -27,12 +50,26 @@ class CustomDomainMiddleware:
     def __call__(self, request):
         host = request.get_host().split(':')[0].lower()
 
-        # Skip lookup for platform's own hosts
+        # ------------------------------------------------------------
+        # BYPASS 1: Explicit paths that never resolve a tenant company
+        # ------------------------------------------------------------
+        # This is critical for webhooks (KCB / M-Pesa callbacks) which
+        # arrive at arbitrary hosts (ngrok, Render) that may not be
+        # registered as a custom_domain on any Company.
+        if any(request.path_info.startswith(p) for p in BYPASS_DOMAIN_PREFIXES):
+            request.tenant_company = None
+            return self.get_response(request)
+
+        # ------------------------------------------------------------
+        # BYPASS 2: Platform's own hosts
+        # ------------------------------------------------------------
         if host in self.platform_hosts or host.endswith('.onrender.com'):
             request.tenant_company = None
             return self.get_response(request)
 
-        # Look up company by custom domain
+        # ------------------------------------------------------------
+        # Resolve company by custom domain
+        # ------------------------------------------------------------
         from apps.companies.models import Company
         try:
             company = Company.objects.get(
@@ -55,7 +92,9 @@ class CustomDomainMiddleware:
         return self.get_response(request)
 
 
+# ============================================
 # URL names that remain accessible even when the subscription is expired
+# ============================================
 EXEMPT_URL_NAMES = {
     'login',
     'logout',
@@ -67,12 +106,15 @@ EXEMPT_URL_NAMES = {
     'company-payments-initiate',
     'company-payments-status',
     'company-payments-callback',
-    'company-payments-dev-confirm',   # ✅ added
-    'kcb-callback',                    # ✅ added
-    'mpesa-callback',                  # ✅ added
+    'company-payments-dev-confirm',
+    'kcb-callback',
+    'mpesa-callback',
 }
 
-# Path prefixes that bypass the check entirely
+
+# ============================================
+# Path prefixes that bypass the subscription-expiry check entirely
+# ============================================
 EXEMPT_URL_PREFIXES = (
     '/admin/',
     '/static/',
@@ -80,7 +122,7 @@ EXEMPT_URL_PREFIXES = (
     '/auth/',
     '/api/support/',
     '/subscription-expired/',
-    '/payments/',                      # covers /payments/kcb/callback/
+    '/payments/',        # covers /payments/kcb/callback/
     '/plans/',
     '/companies/',
 )
@@ -116,7 +158,6 @@ class SubscriptionExpiryMiddleware:
             return self.get_response(request)
 
         # ---------- Support-mode exemptions ----------
-        # FIXED: use the actual keys set by support_views.py
         if request.session.get('support_mode') or request.session.get('viewing_company_id'):
             return self.get_response(request)
 
@@ -151,7 +192,6 @@ class SubscriptionExpiryMiddleware:
             try:
                 return redirect('subscription-expired')
             except NoReverseMatch:
-                # Fallback: plain URL if name isn't registered
                 return redirect('/subscription-expired/')
 
         return self.get_response(request)
