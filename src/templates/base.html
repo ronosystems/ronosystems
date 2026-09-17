@@ -479,20 +479,16 @@
         .alert-info    { background: #cce5ff; color: #004085; border-color: #000000; }
 
         /* ============================================
-           SUPPORT MODE BANNER
+           SUPPORT MODE BANNER — now INSIDE main-content
         ============================================ */
         .support-mode-banner {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 9999;
             background: linear-gradient(135deg, #ff6b35 0%, #dc3545 100%);
             color: white;
             padding: 10px 20px;
             box-shadow: 0 4px 15px rgba(220, 53, 69, 0.5);
             border-bottom: 3px solid #000000;
             animation: supportPulse 2s infinite;
+            flex-shrink: 0;
         }
 
         @keyframes supportPulse {
@@ -584,9 +580,6 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
 
-        body.support-mode-active .main-content { padding-top: 65px; }
-        body.support-mode-active .sidebar { padding-top: 65px; }
-
         /* ============================================
            RESPONSIVE
         ============================================ */
@@ -670,33 +663,7 @@
     </style>
     {% block extra_css %}{% endblock %}
 </head>
-<body class="{% if is_support_mode %}support-mode-active{% endif %}">
-
-<!-- ============================================ -->
-<!-- SUPPORT MODE BANNER -->
-<!-- ============================================ -->
-{% if is_support_mode and support_company %}
-<div class="support-mode-banner">
-    <div class="support-mode-content">
-        <div class="support-mode-left">
-            <i class="fas fa-headset"></i>
-            <span class="support-mode-title">SUPPORT MODE</span>
-            <span class="support-mode-company">
-                Viewing as: <strong>{{ support_company.name }}</strong>
-            </span>
-        </div>
-        <div class="support-mode-right">
-            <span class="support-mode-timer" id="supportTimer">
-                <i class="fas fa-clock"></i>
-                <span id="supportElapsed">00:00</span>
-            </span>
-            <a href="{% url 'support-exit' %}" class="support-exit-btn">
-                <i class="fas fa-sign-out-alt"></i> Exit Support Mode
-            </a>
-        </div>
-    </div>
-</div>
-{% endif %}
+<body>
 
     <!-- ============================================
     SIDEBAR OVERLAY (Mobile)
@@ -858,7 +825,6 @@
                             </a>
                         </li>
 
-                        {# --- Support Mode: Subscription (moved here) --- #}
                         {% if support_company %}
                         <li class="nav-item">
                             <a class="nav-link {% if '/payments/' in request.path %}active{% endif %}"
@@ -869,9 +835,6 @@
                         {% endif %}
 
                     {% else %}
-                        {# ============================================ #}
-                        {# NORMAL MODE — Role-based EPA shop menu      #}
-                        {# ============================================ #}
                         {% if user.is_authenticated %}
                             {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'company_cashier' or user.role == 'company_agent' or user.role == 'mpesa_agent' or user.role == 'stock_controller' %}
                                 {% if user.company and user.company.business_type %}
@@ -955,7 +918,6 @@
                                         </a>
                                     </li>
 
-                                    {# --- Join Requests (moved next to Employees) --- #}
                                     {% if company %}
                                     <li class="nav-item">
                                         <a class="nav-link {% if '/company/join-requests/' in request.path %}active{% endif %}"
@@ -1034,7 +996,6 @@
                     </li>
                     {% endif %}
 
-                    {# ---------- Subscription for super admin / company admin (non-support mode) ---------- #}
                     {% if not is_support_mode %}
                         {% if company and user.role == 'super_admin' or user.role == 'company_admin' %}
                         <li class="nav-item">
@@ -1046,7 +1007,6 @@
                         {% endif %}
                     {% endif %}
 
-                    {# ---------- Guest fallback ---------- #}
                     {% if user.role == 'guest' %}
                     <li class="nav-label">Home</li>
                     <li class="nav-item">
@@ -1073,6 +1033,32 @@
     MAIN CONTENT
     ============================================ -->
     <div class="main-content" id="mainContent">
+
+        <!-- ============================================ -->
+        <!-- SUPPORT MODE BANNER — now at top of main content -->
+        <!-- ============================================ -->
+        {% if is_support_mode and support_company %}
+        <div class="support-mode-banner">
+            <div class="support-mode-content">
+                <div class="support-mode-left">
+                    <i class="fas fa-headset"></i>
+                    <span class="support-mode-title">SUPPORT MODE</span>
+                    <span class="support-mode-company">
+                        Viewing as: <strong>{{ support_company.name }}</strong>
+                    </span>
+                </div>
+                <div class="support-mode-right">
+                    <span class="support-mode-timer" id="supportTimer">
+                        <i class="fas fa-clock"></i>
+                        <span id="supportElapsed">00:00</span>
+                    </span>
+                    <a href="{% url 'support-exit' %}" class="support-exit-btn">
+                        <i class="fas fa-sign-out-alt"></i> Exit Support Mode
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Top Navbar -->
         <nav class="top-navbar">

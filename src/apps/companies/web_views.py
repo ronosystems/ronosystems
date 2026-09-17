@@ -1300,6 +1300,9 @@ def company_payments_callback(request):
         )
 
     return JsonResponse({
+        'transactionID': receipt or checkout_id or 'N/A',
+        'statusCode': '0',
+        'statusMessage': 'Notification received',
         'ResultCode': 0,
         'ResultDesc': 'Accepted',
     })

@@ -1,392 +1,353 @@
+import os
+import re
+import cloudinary
+import cloudinary.uploader
 from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required
-from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.conf import settings as django_settings
-from django.http import JsonResponse
-import json
-import os
+from django.utils.text import slugify
+from django.views.decorators.http import require_http_methods
 
-from .settings_data import get_settings, save_settings, DEFAULT_SETTINGS, CATEGORIES, SETTINGS_META
+from .models import SystemSetting
 
-# Define SETTINGS_FILE for use in this module
-SETTINGS_FILE = os.path.join(os.path.dirname(__file__), 'settings.json')
+
+# ----------------------------------------------------------------------
+# Schema — which settings exist, their type, category, and defaults.
+# ----------------------------------------------------------------------
+SETTINGS_SCHEMA = [
+    # --- General ---
+    {'key': 'SITE_NAME', 'type': 'text', 'category': 'general', 'label': 'Site Name',
+     'default': 'RonoSystems', 'required': True, 'order': 1},
+    {'key': 'SITE_TAGLINE', 'type': 'text', 'category': 'general', 'label': 'Tagline',
+     'default': 'Enterprise Management Platform', 'order': 2},
+    {'key': 'TIMEZONE', 'type': 'select', 'category': 'general', 'label': 'Timezone',
+     'default': 'Africa/Nairobi', 'order': 3,
+     'options': [
+         {'value': 'UTC', 'label': 'UTC'},
+         {'value': 'Africa/Nairobi', 'label': 'Africa/Nairobi'},
+         {'value': 'America/New_York', 'label': 'America/New_York'},
+         {'value': 'Europe/London', 'label': 'Europe/London'},
+         {'value': 'Asia/Dubai', 'label': 'Asia/Dubai'},
+     ]},
+    {'key': 'DATE_FORMAT', 'type': 'select', 'category': 'general', 'label': 'Date Format',
+     'default': 'Y-m-d', 'order': 4,
+     'options': [
+         {'value': 'Y-m-d', 'label': 'YYYY-MM-DD'},
+         {'value': 'd/m/Y', 'label': 'DD/MM/YYYY'},
+         {'value': 'm/d/Y', 'label': 'MM/DD/YYYY'},
+         {'value': 'd M Y', 'label': 'DD Mon YYYY'},
+     ]},
+    {'key': 'ITEMS_PER_PAGE', 'type': 'select', 'category': 'general', 'label': 'Items Per Page',
+     'default': '25', 'order': 5,
+     'options': [
+         {'value': '10', 'label': '10'},
+         {'value': '25', 'label': '25'},
+         {'value': '50', 'label': '50'},
+         {'value': '100', 'label': '100'},
+     ]},
+
+    # --- Branding ---
+    {'key': 'PRIMARY_COLOR', 'type': 'color', 'category': 'branding', 'label': 'Primary Color',
+     'default': '#036a77', 'order': 1},
+    {'key': 'SECONDARY_COLOR', 'type': 'color', 'category': 'branding', 'label': 'Secondary Color',
+     'default': '#00b4d8', 'order': 2},
+    {'key': 'SITE_LOGO', 'type': 'image', 'category': 'branding', 'label': 'Site Logo',
+     'default': '', 'order': 3,
+     'help_text': 'Recommended 200×60px. PNG or JPG.'},
+    {'key': 'SITE_FAVICON', 'type': 'image', 'category': 'branding', 'label': 'Favicon',
+     'default': '', 'order': 4,
+     'help_text': 'Recommended 32×32px. PNG.'},
+    {'key': 'LOGIN_BACKGROUND', 'type': 'image', 'category': 'branding', 'label': 'Login Background',
+     'default': '', 'order': 5,
+     'help_text': 'Recommended 1920×1080px. JPG or AVIF.'},
+
+    # --- Email ---
+    {'key': 'EMAIL_HOST', 'type': 'text', 'category': 'email', 'label': 'SMTP Host',
+     'default': 'smtp.gmail.com', 'order': 1},
+    {'key': 'EMAIL_PORT', 'type': 'integer', 'category': 'email', 'label': 'SMTP Port',
+     'default': '587', 'order': 2},
+    {'key': 'EMAIL_USERNAME', 'type': 'text', 'category': 'email', 'label': 'SMTP Username',
+     'default': '', 'order': 3},
+    {'key': 'EMAIL_PASSWORD', 'type': 'password', 'category': 'email', 'label': 'SMTP Password',
+     'default': '', 'order': 4},
+    {'key': 'EMAIL_FROM', 'type': 'email', 'category': 'email', 'label': 'From Email',
+     'default': 'noreply@example.com', 'order': 5},
+    {'key': 'EMAIL_TLS', 'type': 'boolean', 'category': 'email', 'label': 'Enable TLS',
+     'default': True, 'order': 6},
+
+    # --- Payment ---
+    {'key': 'CURRENCY', 'type': 'select', 'category': 'payment', 'label': 'Default Currency',
+     'default': 'KES', 'order': 1,
+     'options': [
+         {'value': 'KES', 'label': 'Kenyan Shilling (KES)'},
+         {'value': 'USD', 'label': 'US Dollar (USD)'},
+         {'value': 'EUR', 'label': 'Euro (EUR)'},
+         {'value': 'GBP', 'label': 'British Pound (GBP)'},
+     ]},
+    {'key': 'CURRENCY_SYMBOL', 'type': 'text', 'category': 'payment', 'label': 'Currency Symbol',
+     'default': 'KSh', 'order': 2},
+    {'key': 'TAX_RATE', 'type': 'float', 'category': 'payment', 'label': 'Tax Rate (%)',
+     'default': '0', 'order': 3},
+    {'key': 'ENABLE_DISCOUNT', 'type': 'boolean', 'category': 'payment', 'label': 'Enable Discounts',
+     'default': True, 'order': 4},
+    {'key': 'ENABLE_TAX', 'type': 'boolean', 'category': 'payment', 'label': 'Enable Tax',
+     'default': False, 'order': 5},
+
+    # --- Preferences ---
+    {'key': 'NOTIFICATIONS', 'type': 'boolean', 'category': 'preferences', 'label': 'Notifications',
+     'default': True, 'order': 1},
+    {'key': 'EMAIL_NOTIFICATIONS', 'type': 'boolean', 'category': 'preferences', 'label': 'Email Notifications',
+     'default': True, 'order': 2},
+    {'key': 'PUSH_NOTIFICATIONS', 'type': 'boolean', 'category': 'preferences', 'label': 'Push Notifications',
+     'default': False, 'order': 3},
+]
+
+
+def _ensure_schema_rows():
+    """Create any missing SystemSetting rows for keys in SETTINGS_SCHEMA."""
+    for spec in SETTINGS_SCHEMA:
+        defaults = {
+            'value': _stringify(spec['default'], spec['type']),
+            'setting_type': spec['type'],
+            'category': spec['category'],
+            'label': spec.get('label', spec['key']),
+            'description': spec.get('description', ''),
+            'help_text': spec.get('help_text', ''),
+            'order': spec.get('order', 0),
+            'is_required': spec.get('required', False),
+            'options': spec.get('options', []),
+        }
+        SystemSetting.objects.get_or_create(key=spec['key'], defaults=defaults)
+
+
+def _stringify(value, setting_type):
+    if setting_type == 'boolean':
+        return 'true' if value else 'false'
+    if value is None:
+        return ''
+    return str(value)
+
+
+def _is_admin(user):
+    return user.is_authenticated and (user.is_staff or user.is_superuser)
+
+
+def _sanitize_filename(raw_name, fallback='upload'):
+    """
+    Turn an arbitrary filename into a safe basename.
+    Handles pathological cases where the browser sends a full path or URL.
+    """
+    if not raw_name:
+        return fallback
+    base = os.path.basename(str(raw_name).replace('\\', '/'))
+    base = re.sub(r'[:*?"<>|]+', '_', base)
+    stem, ext = os.path.splitext(base)
+    stem = slugify(stem) or 'file'
+    ext = ext.lower()
+    return f'{stem}{ext}'
+
+
+def _cloudinary_config():
+    """Return the Cloudinary config dict from Django settings."""
+    return getattr(django_settings, 'CLOUDINARY_STORAGE', {})
+
+
+def _upload_to_cloudinary(file_obj, key):
+    """
+    Upload a file to Cloudinary under 'settings/<setting-key>'.
+
+    Returns the storage key (e.g. 'settings/site-logo') on success,
+    or raises on failure.
+
+    We bypass django-cloudinary-storage entirely because its save() and url()
+    methods produce inconsistent keys and incomplete URLs.
+    """
+    cfg = _cloudinary_config()
+
+    cloudinary.config(
+        cloud_name=cfg.get('CLOUD_NAME', ''),
+        api_key=cfg.get('API_KEY', ''),
+        api_secret=cfg.get('API_SECRET', ''),
+        secure=True,
+    )
+
+    # Use the setting key as the public ID — deterministic and stable.
+    # e.g. SITE_LOGO → "settings/site-logo"
+    prefix = key.lower().replace('_', '-')
+    public_id = f'settings/{prefix}'
+
+    result = cloudinary.uploader.upload(
+        file_obj,
+        public_id=public_id,
+        overwrite=True,
+        resource_type='image',
+        invalidate=True,
+    )
+
+    returned_id = result.get('public_id', public_id)
+    return returned_id
 
 
 @login_required
-@staff_member_required
+@user_passes_test(_is_admin)
 def settings_dashboard(request):
-    """System settings dashboard"""
-    
-    # Get current settings
-    current_settings = get_settings()
-    
-    # Prepare categories with their settings
-    categories_data = {}
-    for cat_key, cat_data in CATEGORIES.items():
-        categories_data[cat_key] = {
-            'label': cat_data['label'],
-            'icon': cat_data['icon'],
-            'color': cat_data['color'],
-            'settings': []
-        }
-        
-        for setting_key in cat_data['settings']:
-            meta = SETTINGS_META.get(setting_key, {})
-            value = current_settings.get(setting_key, '')
-            
-            # Convert boolean for display
-            if meta.get('type') == 'boolean':
-                value = 'true' if value else 'false'
-            
-            # For images, store just the relative path (without /media/)
-            if meta.get('type') == 'image' and value:
-                # Remove any /media/ prefix if present
-                value = value.replace('/media/', '').replace('media/', '')
-            
-            categories_data[cat_key]['settings'].append({
-                'key': setting_key,
-                'value': value,
-                'label': meta.get('label', setting_key.replace('_', ' ').title()),
-                'type': meta.get('type', 'text'),
-                'description': meta.get('description', ''),
-                'help_text': meta.get('help_text', ''),
-                'required': meta.get('required', False),
-                'options': meta.get('options', []),
-            })
-    
+    """GET: render the settings form."""
+    _ensure_schema_rows()
+
+    categories = {}
+    for spec in SETTINGS_SCHEMA:
+        cat = spec['category']
+        categories.setdefault(cat, [])
+        try:
+            setting = SystemSetting.objects.get(key=spec['key'])
+        except SystemSetting.DoesNotExist:
+            continue
+
+        categories[cat].append({
+            'key': setting.key,
+            'label': setting.label or spec['key'],
+            'type': setting.setting_type,
+            'value': setting.value,
+            'url': setting.get_url(),
+            'help_text': setting.help_text,
+            'required': setting.is_required,
+            'options': setting.options or [],
+        })
+
+    category_labels = dict(SystemSetting.CATEGORIES)
+
     context = {
-        'categories': categories_data,
-        'settings': current_settings,
+        'categories': categories,
+        'category_labels': category_labels,
         'page_title': 'System Settings',
         'page_subtitle': 'Configure your system preferences',
-        'active_tab': 'settings',
     }
-    return render(request, 'superadmin/settings_dashboard.html', context)
+    return render(request, 'superadmin/settings.html', context)
 
 
 @login_required
-@staff_member_required
+@user_passes_test(_is_admin)
+@require_http_methods(['POST'])
 def settings_update(request):
-    """Update system settings with Cloudinary support"""
-    
-    print("=" * 50)
-    print("SETTINGS UPDATE REQUEST")
-    print("Method:", request.method)
-    print("POST Keys:", list(request.POST.keys()))
-    print("FILES Keys:", list(request.FILES.keys()))
-    print("=" * 50)
-    
-    if request.method != 'POST':
-        return redirect('/settings/')
-    
-    current_settings = get_settings()
-    updated_count = 0
-    
-    # Process form fields
-    for key, value in request.POST.items():
+    """POST: apply changes from the form."""
+    _ensure_schema_rows()
+
+    updated = 0
+    upload_errors = []
+
+    # ---- 1) Handle uploaded files (direct Cloudinary upload) ----
+    for key, file_obj in request.FILES.items():
+        try:
+            setting = SystemSetting.objects.get(key=key)
+        except SystemSetting.DoesNotExist:
+            continue
+
+        if setting.setting_type not in ('image', 'file'):
+            continue
+
+        try:
+            storage_key = _upload_to_cloudinary(file_obj, key)
+        except Exception as e:
+            upload_errors.append(f'{key}: {e}')
+            continue
+
+        setting.value = storage_key
+        setting.save()
+        updated += 1
+
+    # ---- 2) Handle removals (only when the user actually clicked Remove) ----
+    for key in list(request.POST.keys()):
+        if not key.startswith('remove_'):
+            continue
+        real_key = key[len('remove_'):]
+
+        # The hidden field only has a value when the Remove button was clicked.
+        # Empty value = the user did NOT ask to remove this image.
+        if not request.POST.get(key):
+            continue
+
+        try:
+            setting = SystemSetting.objects.get(key=real_key)
+        except SystemSetting.DoesNotExist:
+            continue
+
+        if setting.setting_type in ('image', 'file'):
+            setting.delete_file()
+            setting.value = ''
+            setting.save()
+            updated += 1
+
+    # ---- 3) Handle plain values (only count actual changes) ----
+    for key, raw in request.POST.items():
         if key == 'csrfmiddlewaretoken' or key.startswith('remove_'):
             continue
-        
-        # Check if this is a setting key
-        if key in current_settings:
-            # Get the setting type
-            meta = SETTINGS_META.get(key, {})
-            setting_type = meta.get('type', 'text')
-            
-            # Handle different types
-            if setting_type == 'boolean':
-                current_settings[key] = value == 'on'
-            elif setting_type == 'integer':
-                try:
-                    current_settings[key] = int(value) if value else 0
-                except:
-                    current_settings[key] = 0
-            elif setting_type == 'float':
-                try:
-                    current_settings[key] = float(value) if value else 0.0
-                except:
-                    current_settings[key] = 0.0
-            else:
-                current_settings[key] = value.strip() if value else ''
-            
-            updated_count += 1
-            print(f"Updated {key} = {current_settings[key]}")
-    
-    # Handle file uploads - with Cloudinary support
-    for key, file_obj in request.FILES.items():
-        if key in current_settings:
-            # Delete old file if exists
-            old_value = current_settings.get(key, '')
-            if old_value:
-                # Remove any /media/ prefix for storage path
-                old_path = old_value.replace('/media/', '').replace('media/', '')
-                try:
-                    if default_storage.exists(old_path):
-                        default_storage.delete(old_path)
-                        print(f"Deleted old file: {old_path}")
-                except Exception as e:
-                    print(f"Error deleting old file: {e}")
-            
-            # Save file - store path WITHOUT /media/ prefix
-            # Cloudinary will handle the storage
-            file_name = file_obj.name.replace(' ', '_')
-            file_path = default_storage.save(f'settings/{file_name}', ContentFile(file_obj.read()))
-            
-            # Store just the relative path (without /media/)
-            # Cloudinary storage will return the full URL when accessed
-            current_settings[key] = file_path
-            updated_count += 1
-            label = SETTINGS_META.get(key, {}).get('label', key)
-            messages.success(request, f'✅ {label} uploaded successfully!')
-            print(f"Uploaded {key} = {file_path}")
-    
-    # Handle image removals
-    for key, value in request.POST.items():
-        if key.startswith('remove_'):
-            setting_key = key.replace('remove_', '')
-            if setting_key in current_settings:
-                # Delete old file
-                old_value = current_settings.get(setting_key, '')
-                if old_value:
-                    old_path = old_value.replace('/media/', '').replace('media/', '')
-                    try:
-                        if default_storage.exists(old_path):
-                            default_storage.delete(old_path)
-                            print(f"Deleted removed file: {old_path}")
-                    except Exception as e:
-                        print(f"Error deleting file: {e}")
-                
-                current_settings[setting_key] = ''
-                updated_count += 1
-                label = SETTINGS_META.get(setting_key, {}).get('label', setting_key)
-                messages.success(request, f'✅ {label} removed successfully')
-    
-    # Save settings
-    if updated_count > 0:
-        save_settings(current_settings)
-        messages.success(request, f'✅ {updated_count} settings updated successfully!')
-    else:
-        messages.info(request, 'No changes were made')
-    
-    return redirect('/settings/?saved=1')
+        try:
+            setting = SystemSetting.objects.get(key=key)
+        except SystemSetting.DoesNotExist:
+            continue
+        if setting.setting_type in ('image', 'file'):
+            continue
 
+        value = raw.strip() if isinstance(raw, str) else raw
 
-@login_required
-@staff_member_required
-def settings_reset(request):
-    """Reset a setting to default"""
-    
-    if request.method == 'POST':
-        setting_key = request.POST.get('key')
-        current_settings = get_settings()
-        
-        if setting_key in DEFAULT_SETTINGS:
-            # If it's an image, delete the file
-            meta = SETTINGS_META.get(setting_key, {})
-            if meta.get('type') == 'image' and current_settings.get(setting_key):
-                old_value = current_settings.get(setting_key, '')
-                if old_value:
-                    old_path = old_value.replace('/media/', '').replace('media/', '')
-                    try:
-                        if default_storage.exists(old_path):
-                            default_storage.delete(old_path)
-                    except Exception as e:
-                        print(f"Error deleting file on reset: {e}")
-            
-            current_settings[setting_key] = DEFAULT_SETTINGS[setting_key]
-            save_settings(current_settings)
-            label = SETTINGS_META.get(setting_key, {}).get('label', setting_key)
-            messages.success(request, f'✅ "{label}" has been reset to default.')
+        if setting.setting_type == 'boolean':
+            new_value = 'true' if raw == 'on' else 'false'
+        elif setting.setting_type == 'integer':
+            try:
+                new_value = str(int(value or 0))
+            except ValueError:
+                new_value = '0'
+        elif setting.setting_type == 'float':
+            try:
+                new_value = str(float(value or 0))
+            except ValueError:
+                new_value = '0'
         else:
-            messages.error(request, f'❌ Setting "{setting_key}" not found.')
-    
-    return redirect('/settings/')
+            new_value = value
+
+        if setting.value != new_value:
+            setting.value = new_value
+            setting.save()
+            updated += 1
+
+    if upload_errors:
+        for err in upload_errors:
+            messages.error(request, f'Upload failed — {err}')
+
+    if updated:
+        messages.success(request, f'Settings saved ({updated} changed).')
+    elif not upload_errors:
+        messages.info(request, 'No changes were made.')
+
+    return redirect('settings:dashboard')
 
 
 @login_required
-@staff_member_required
-def settings_export(request):
-    """Export settings as JSON"""
-    current_settings = get_settings()
-    return JsonResponse(current_settings, safe=False)
+@user_passes_test(_is_admin)
+@require_http_methods(['POST'])
+def settings_reset_category(request):
+    """POST: reset every setting in a category to its default."""
+    category = request.POST.get('category')
+    if not category:
+        messages.error(request, 'No category specified.')
+        return redirect('settings:dashboard')
 
-
-@login_required
-@staff_member_required
-def settings_import(request):
-    """Import settings from JSON"""
-    if request.method == 'POST' and request.FILES.get('settings_file'):
+    count = 0
+    for spec in SETTINGS_SCHEMA:
+        if spec['category'] != category:
+            continue
         try:
-            file = request.FILES['settings_file']
-            data = json.loads(file.read().decode('utf-8'))
-            
-            current_settings = get_settings()
-            imported_count = 0
-            
-            for key, value in data.items():
-                if key in current_settings:
-                    current_settings[key] = value
-                    imported_count += 1
-            
-            save_settings(current_settings)
-            messages.success(request, f'✅ Successfully imported {imported_count} settings')
-        except Exception as e:
-            messages.error(request, f'❌ Error importing settings: {str(e)}')
-    
-    return redirect('/settings/')
+            setting = SystemSetting.objects.get(key=spec['key'])
+        except SystemSetting.DoesNotExist:
+            continue
+        if setting.setting_type in ('image', 'file'):
+            setting.delete_file()
+        setting.value = _stringify(spec['default'], spec['type'])
+        setting.save()
+        count += 1
 
-
-@login_required
-@staff_member_required
-def settings_test_email(request):
-    """Test email configuration"""
-    if request.method == 'POST':
-        try:
-            from django.core.mail import send_mail
-            from django.conf import settings as django_settings
-            
-            test_email = request.POST.get('test_email')
-            if not test_email:
-                messages.error(request, 'Please provide a test email address')
-                return redirect('/settings/')
-            
-            current_settings = get_settings()
-            
-            # Configure email
-            django_settings.EMAIL_HOST = current_settings.get('EMAIL_HOST', 'smtp.gmail.com')
-            django_settings.EMAIL_PORT = int(current_settings.get('EMAIL_PORT', 587))
-            django_settings.EMAIL_HOST_USER = current_settings.get('EMAIL_USERNAME', '')
-            django_settings.EMAIL_HOST_PASSWORD = current_settings.get('EMAIL_PASSWORD', '')
-            django_settings.EMAIL_USE_TLS = current_settings.get('EMAIL_TLS', True)
-            django_settings.DEFAULT_FROM_EMAIL = current_settings.get('EMAIL_FROM', 'noreply@example.com')
-            
-            # Send test email
-            send_mail(
-                'Test Email from RonoSystems',
-                'This is a test email to verify your email configuration.\n\nIf you received this, your email settings are working correctly!\n\nBest regards,\nRonoSystems Team',
-                django_settings.DEFAULT_FROM_EMAIL,
-                [test_email],
-                fail_silently=False,
-            )
-            
-            messages.success(request, f'✅ Test email sent successfully to {test_email}')
-        except Exception as e:
-            messages.error(request, f'❌ Failed to send test email: {str(e)}')
-    
-    return redirect('/settings/')
-
-
-@login_required
-@staff_member_required
-def settings_debug(request):
-    """Debug view to check settings"""
-    current_settings = get_settings()
-    
-    # Check if images exist
-    image_status = {}
-    for key, value in current_settings.items():
-        meta = SETTINGS_META.get(key, {})
-        if meta.get('type') == 'image' and value:
-            file_path = value.replace('/media/', '').replace('media/', '')
-            image_status[key] = {
-                'path': file_path,
-                'exists': default_storage.exists(file_path) if file_path else False,
-                'url': default_storage.url(file_path) if file_path else None,
-            }
-    
-    return JsonResponse({
-        'settings': current_settings,
-        'file_exists': os.path.exists(SETTINGS_FILE),
-        'file_path': SETTINGS_FILE,
-        'settings_keys': list(current_settings.keys()),
-        'image_status': image_status,
-        'storage_type': str(type(default_storage)),
-    })
-
-
-def create_default_settings():
-    """Create default system settings if they don't exist"""
-    import os
-    import json
-    from .settings_data import DEFAULT_SETTINGS, SETTINGS_FILE
-    
-    try:
-        if not os.path.exists(SETTINGS_FILE):
-            with open(SETTINGS_FILE, 'w') as f:
-                json.dump(DEFAULT_SETTINGS, f, indent=2)
-            print("✅ Created default settings file!")
-        return True
-    except Exception as e:
-        print(f"❌ Error creating default settings: {e}")
-        return False
-
-
-# ============================================
-# CLOUDINARY HELPER FUNCTIONS
-# ============================================
-
-def get_cloudinary_url(file_path):
-    """
-    Get the full Cloudinary URL for a file path
-    Works with both Cloudinary and local storage
-    """
-    if not file_path:
-        return None
-    
-    # If it's already a full URL
-    if file_path.startswith('http://') or file_path.startswith('https://'):
-        return file_path
-    
-    # Clean the path
-    clean_path = file_path.replace('/media/', '').replace('media/', '')
-    
-    try:
-        # Try to get URL from storage
-        return default_storage.url(clean_path)
-    except Exception:
-        # Fallback: construct URL manually
-        media_url = django_settings.MEDIA_URL
-        if media_url:
-            if media_url.endswith('/') and clean_path.startswith('/'):
-                return f"{media_url}{clean_path[1:]}"
-            elif media_url.endswith('/') or clean_path.startswith('/'):
-                return f"{media_url}{clean_path}"
-            else:
-                return f"{media_url}/{clean_path}"
-        return file_path
-
-
-def delete_setting_file(setting_key, settings_dict):
-    """Delete the file associated with a setting"""
-    if setting_key not in settings_dict:
-        return False
-    
-    file_path = settings_dict.get(setting_key, '')
-    if not file_path:
-        return False
-    
-    clean_path = file_path.replace('/media/', '').replace('media/', '')
-    
-    try:
-        if default_storage.exists(clean_path):
-            default_storage.delete(clean_path)
-            return True
-    except Exception as e:
-        print(f"Error deleting file for {setting_key}: {e}")
-    
-    return False
-
-
-def get_setting_display_value(setting_key, settings_dict):
-    """Get the display value for a setting, handling images properly"""
-    value = settings_dict.get(setting_key, '')
-    meta = SETTINGS_META.get(setting_key, {})
-    setting_type = meta.get('type', 'text')
-    
-    if setting_type == 'image' and value:
-        return get_cloudinary_url(value)
-    
-    return value
+    messages.success(request, f'Reset {count} setting(s) in "{category}".')
+    return redirect('settings:dashboard')
