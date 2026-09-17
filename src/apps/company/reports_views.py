@@ -21,6 +21,37 @@ from apps.companies.support_utils import (
 
 
 # ============================================
+# TIME HELPERS (local timezone, Mon-Sun weeks)
+# ============================================
+
+def local_today():
+    """Return today's date in the local timezone (not UTC)."""
+    return timezone.localtime(timezone.now()).date()
+
+
+def monday_of_week(d):
+    """Return the Monday of the week containing date d."""
+    return d - timedelta(days=d.weekday())
+
+
+def week_bounds(d):
+    """Return (monday, sunday) for the week containing d."""
+    monday = monday_of_week(d)
+    sunday = monday + timedelta(days=6)
+    return monday, sunday
+
+
+def month_bounds(d):
+    """Return (first_day, last_day) for the month containing d."""
+    first = d.replace(day=1)
+    if d.month == 12:
+        last = date(d.year + 1, 1, 1) - timedelta(days=1)
+    else:
+        last = date(d.year, d.month + 1, 1) - timedelta(days=1)
+    return first, last
+
+
+# ============================================
 # COST OF GOODS SOLD (COGS) HELPER FUNCTIONS
 # ============================================
 
@@ -80,7 +111,6 @@ def get_expense_category_breakdown(expenses_qs):
     """
     breakdown = {}
 
-    # Pre-initialize every expense type so templates always render a row
     for type_key, type_label in Expense.EXPENSE_TYPES:
         breakdown[type_key] = {
             'label': type_label,
@@ -89,7 +119,6 @@ def get_expense_category_breakdown(expenses_qs):
             'subcategories': {},
         }
 
-    # Single aggregated query for everything we need
     category_data = expenses_qs.values(
         'expense_type', 'category', 'bill_type'
     ).annotate(
@@ -97,24 +126,20 @@ def get_expense_category_breakdown(expenses_qs):
         total=Sum('amount'),
     )
 
-    # Build lookup dicts once
     general_labels = dict(Expense.GENERAL_CATEGORIES)
     bill_labels = dict(Expense.BILL_TYPES)
 
     for data in category_data:
         exp_type = data['expense_type']
         if exp_type not in breakdown:
-            # Unknown / unexpected type — skip safely
             continue
 
         count = data['count'] or 0
         amount = data['total'] or Decimal('0.00')
 
-        # Top-level totals per expense type
         breakdown[exp_type]['count'] += count
         breakdown[exp_type]['amount'] += amount
 
-        # Decide the sub-category key + label
         if exp_type == Expense.TYPE_GENERAL:
             sub_key = data['category'] or 'uncategorized'
             sub_label = general_labels.get(sub_key, 'Uncategorized')
@@ -122,7 +147,6 @@ def get_expense_category_breakdown(expenses_qs):
             sub_key = data['bill_type'] or 'uncategorized'
             sub_label = bill_labels.get(sub_key, 'Uncategorized')
         else:
-            # Salary / Rent — no meaningful sub-category
             sub_key = exp_type
             sub_label = breakdown[exp_type]['label']
 
@@ -268,6 +292,7 @@ def get_combined_daily_records(sales_qs, expenses_qs, start_date, end_date):
     """Get combined daily records (sales + expenses) with COGS"""
     records = []
     current_date = start_date
+    today = local_today()
 
     while current_date <= end_date:
         day_sales = sales_qs.filter(sale_date__date=current_date)
@@ -289,7 +314,7 @@ def get_combined_daily_records(sales_qs, expenses_qs, start_date, end_date):
             'net_profit': combined['net_profit'],
             'closing_balance': combined['closing_balance'],
             'profit_margin': combined['profit_margin'],
-            'is_today': current_date == timezone.now().date(),
+            'is_today': current_date == today,
             'has_sales': combined['total_sales'] > 0,
         })
         current_date += timedelta(days=1)
@@ -298,53 +323,55 @@ def get_combined_daily_records(sales_qs, expenses_qs, start_date, end_date):
 
 
 def get_combined_weekly_records(sales_qs, expenses_qs, current_date):
-    """Get combined weekly records with COGS"""
+    """
+    Get combined weekly records with COGS.
+    Weeks are Monday-Sunday. Returns the last 52 weeks ending with the
+    current (partial) week, newest first.
+    """
     records = []
-    current_week = current_date.isocalendar()[1]
-    current_year = current_date.year
+    today = local_today()
+
+    # Monday of the current week
+    current_monday = monday_of_week(current_date)
 
     for i in range(52):
-        week_num = current_week - i
-        year = current_year
+        week_start = current_monday - timedelta(weeks=i)
+        week_end = week_start + timedelta(days=6)
 
-        if week_num <= 0:
-            week_num += 52
-            year -= 1
+        # Cap at today so we don't scan future days
+        query_end = min(week_end, today)
 
-        try:
-            week_start = datetime.strptime(f'{year}-W{week_num:02d}-1', '%Y-W%W-%w').date()
-            week_end = week_start + timedelta(days=6)
+        week_sales = sales_qs.filter(
+            sale_date__date__gte=week_start,
+            sale_date__date__lte=query_end,
+        )
+        week_expenses = expenses_qs.filter(
+            expense_date__gte=week_start,
+            expense_date__lte=query_end,
+        )
 
-            week_sales = sales_qs.filter(
-                sale_date__date__gte=week_start,
-                sale_date__date__lte=week_end
-            )
-            week_expenses = expenses_qs.filter(
-                expense_date__gte=week_start,
-                expense_date__lte=week_end
-            )
+        sales_summary = get_sales_summary(week_sales)
+        expenses_summary = get_expenses_summary(week_expenses)
+        combined = combine_summaries(sales_summary, expenses_summary)
 
-            sales_summary = get_sales_summary(week_sales)
-            expenses_summary = get_expenses_summary(week_expenses)
-            combined = combine_summaries(sales_summary, expenses_summary)
+        iso_year, iso_week, _ = week_start.isocalendar()
 
-            records.append({
-                'year': year,
-                'week': week_num,
-                'week_start': week_start,
-                'week_end': week_end,
-                'sales_count': combined['total_sales'],
-                'revenue': combined['total_revenue'],
-                'cogs': combined['total_cogs'],
-                'gross_profit': combined['gross_profit'],
-                'profit': combined['gross_profit'],
-                'expenses': combined['total_expenses'],
-                'net_profit': combined['net_profit'],
-                'closing_balance': combined['closing_balance'],
-                'profit_margin': combined['profit_margin'],
-            })
-        except Exception:
-            continue
+        records.append({
+            'year': iso_year,
+            'week': iso_week,
+            'week_start': week_start,
+            'week_end': week_end,
+            'is_current_week': week_start == current_monday,
+            'sales_count': combined['total_sales'],
+            'revenue': combined['total_revenue'],
+            'cogs': combined['total_cogs'],
+            'gross_profit': combined['gross_profit'],
+            'profit': combined['gross_profit'],
+            'expenses': combined['total_expenses'],
+            'net_profit': combined['net_profit'],
+            'closing_balance': combined['closing_balance'],
+            'profit_margin': combined['profit_margin'],
+        })
 
     return records
 
@@ -352,6 +379,7 @@ def get_combined_weekly_records(sales_qs, expenses_qs, current_date):
 def get_combined_monthly_records(sales_qs, expenses_qs, year):
     """Get combined monthly records with COGS"""
     records = []
+    today = local_today()
 
     for month in range(1, 13):
         month_start = date(year, month, 1)
@@ -360,13 +388,16 @@ def get_combined_monthly_records(sales_qs, expenses_qs, year):
         else:
             month_end = date(year, month + 1, 1) - timedelta(days=1)
 
+        # Cap at today (only matters for the current month)
+        query_end = min(month_end, today)
+
         month_sales = sales_qs.filter(
             sale_date__date__gte=month_start,
-            sale_date__date__lte=month_end
+            sale_date__date__lte=query_end,
         )
         month_expenses = expenses_qs.filter(
             expense_date__gte=month_start,
-            expense_date__lte=month_end
+            expense_date__lte=query_end,
         )
 
         sales_summary = get_sales_summary(month_sales)
@@ -394,7 +425,7 @@ def get_combined_monthly_records(sales_qs, expenses_qs, year):
 
 def get_combined_recent_daily_records(sales_qs, expenses_qs, days):
     """Get recent combined daily records with COGS"""
-    today = timezone.now().date()
+    today = local_today()
     start_date = today - timedelta(days=days)
     return get_combined_daily_records(sales_qs, expenses_qs, start_date, today)
 
@@ -547,28 +578,48 @@ def reports_dashboard(request):
 
     branches = Branch.objects.filter(company=company, is_active=True)
 
-    today = timezone.localtime(timezone.now()).date()
+    today = local_today()
 
+    # --- TODAY ---
     today_sales = sales_qs.filter(sale_date__date=today)
     today_sales_summary = get_sales_summary(today_sales)
     today_expenses = expenses_qs.filter(expense_date=today)
     today_expenses_summary = get_expenses_summary(today_expenses)
     today_summary = combine_summaries(today_sales_summary, today_expenses_summary)
 
-    week_start = today - timedelta(days=today.weekday())
-    week_sales = sales_qs.filter(sale_date__date__gte=week_start)
+    # --- THIS WEEK (Monday -> Sunday, capped at today) ---
+    week_start, week_end = week_bounds(today)
+    query_end = min(week_end, today)
+
+    week_sales = sales_qs.filter(
+        sale_date__date__gte=week_start,
+        sale_date__date__lte=query_end,
+    )
     week_sales_summary = get_sales_summary(week_sales)
-    week_expenses = expenses_qs.filter(expense_date__gte=week_start)
+    week_expenses = expenses_qs.filter(
+        expense_date__gte=week_start,
+        expense_date__lte=query_end,
+    )
     week_expenses_summary = get_expenses_summary(week_expenses)
     week_summary = combine_summaries(week_sales_summary, week_expenses_summary)
 
-    month_start = today.replace(day=1)
-    month_sales = sales_qs.filter(sale_date__date__gte=month_start)
+    # --- THIS MONTH (1st -> last, capped at today) ---
+    month_start, month_end = month_bounds(today)
+    month_query_end = min(month_end, today)
+
+    month_sales = sales_qs.filter(
+        sale_date__date__gte=month_start,
+        sale_date__date__lte=month_query_end,
+    )
     month_sales_summary = get_sales_summary(month_sales)
-    month_expenses = expenses_qs.filter(expense_date__gte=month_start)
+    month_expenses = expenses_qs.filter(
+        expense_date__gte=month_start,
+        expense_date__lte=month_query_end,
+    )
     month_expenses_summary = get_expenses_summary(month_expenses)
     month_summary = combine_summaries(month_sales_summary, month_expenses_summary)
 
+    # --- RECORDS ---
     daily_records = get_combined_daily_records(sales_qs, expenses_qs, month_start, today)
     weekly_records = get_combined_weekly_records(sales_qs, expenses_qs, today)
     monthly_records = get_combined_monthly_records(sales_qs, expenses_qs, today.year)
@@ -593,7 +644,10 @@ def reports_dashboard(request):
         'monthly_totals': monthly_totals,
         'current_date': today,
         'today': today,
+        'week_start': week_start,
+        'week_end': week_end,
         'month_start': month_start,
+        'month_end': month_end,
         'selected_branch': branch_id,
         'date_from': date_from,
         'date_to': date_to,
@@ -688,7 +742,10 @@ def reports_daily_detail(request, date_str):
 
 @login_required
 def reports_weekly_detail(request, year, week):
-    """View detailed weekly report with COGS"""
+    """
+    View detailed weekly report with COGS.
+    Weeks are Monday-Sunday (ISO 8601).
+    """
     company, is_viewing_company = get_active_company(request)
 
     if not company:
@@ -699,8 +756,10 @@ def reports_weekly_detail(request, year, week):
 
     branch_id = request.GET.get('branch')
 
-    week_start = datetime.strptime(f'{year}-W{week:02d}-1', '%Y-W%W-%w').date()
-    week_end = week_start + timedelta(days=6)
+    # ISO week: week 1 of a year is the week containing the first Thursday.
+    # Monday of week W in year Y:
+    week_start = date.fromisocalendar(int(year), int(week), 1)  # Monday
+    week_end = week_start + timedelta(days=6)                    # Sunday
 
     sales_qs = Sale.objects.filter(
         company=company,
@@ -728,7 +787,7 @@ def reports_weekly_detail(request, year, week):
     expense_breakdown = get_expense_category_breakdown(expenses_qs)
     profit_breakdown = get_profit_breakdown(sales_qs)
 
-    today = timezone.localtime(timezone.now()).date()
+    today = local_today()
 
     context = {
         'company': company,
@@ -801,7 +860,7 @@ def reports_monthly_detail(request, year, month):
     expense_breakdown = get_expense_category_breakdown(expenses_qs)
     sales_by_hour = get_sales_by_hour(sales_qs)
 
-    today = timezone.localtime(timezone.now()).date()
+    today = local_today()
 
     context = {
         'company': company,
@@ -842,7 +901,7 @@ def reports_export_csv(request, report_type, date_str=None, year=None, week=None
         return JsonResponse({'error': 'No company assigned'}, status=400)
 
     response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="{report_type}_report_{timezone.now().date()}.csv"'
+    response['Content-Disposition'] = f'attachment; filename="{report_type}_report_{local_today()}.csv"'
 
     writer = csv.writer(response)
 
@@ -880,7 +939,6 @@ def reports_export_csv(request, report_type, date_str=None, year=None, week=None
         writer.writerow(['=== EXPENSES ==='])
         writer.writerow(['ID', 'Type', 'Category / Detail', 'Description', 'Amount', 'Payment Method', 'Reference'])
         for expense in expenses:
-            # Determine a meaningful "category" label depending on the type
             if expense.expense_type == Expense.TYPE_GENERAL:
                 detail = expense.category_display
             elif expense.expense_type == Expense.TYPE_BILL:
@@ -916,8 +974,9 @@ def reports_export_csv(request, report_type, date_str=None, year=None, week=None
         writer.writerow(['Profit Margin %', float(combined['profit_margin'])])
 
     elif report_type == 'weekly':
-        week_start = datetime.strptime(f'{year}-W{week:02d}-1', '%Y-W%W-%w').date()
-        week_end = week_start + timedelta(days=6)
+        week_start = date.fromisocalendar(int(year), int(week), 1)   # Monday
+        week_end = week_start + timedelta(days=6)                    # Sunday
+
         sales = Sale.objects.filter(
             company=company,
             payment_status='paid',
@@ -1005,11 +1064,12 @@ def reports_api_data(request):
         sales_qs = sales_qs.filter(branch_id=branch_id)
         expenses_qs = expenses_qs.filter(branch_id=branch_id)
 
+    today = local_today()
     data = {}
 
     if period == 'daily':
-        start_date = timezone.now().date() - timedelta(days=30)
-        daily_data = get_combined_daily_records(sales_qs, expenses_qs, start_date, timezone.now().date())
+        start_date = today - timedelta(days=30)
+        daily_data = get_combined_daily_records(sales_qs, expenses_qs, start_date, today)
         data = {
             'labels': [d['date'].strftime('%b %d') for d in daily_data],
             'revenue': [float(d['revenue']) for d in daily_data],
@@ -1022,20 +1082,22 @@ def reports_api_data(request):
             'margin': [float(d['profit_margin']) for d in daily_data],
         }
     elif period == 'weekly':
-        weekly_data = get_combined_weekly_records(sales_qs, expenses_qs, timezone.now().date())
+        weekly_data = get_combined_weekly_records(sales_qs, expenses_qs, today)
+        # Newest first → reverse for chronological charts
+        weekly_chrono = list(reversed(weekly_data[:12]))
         data = {
-            'labels': [f"Week {d['week']}" for d in weekly_data[:12]],
-            'revenue': [float(d['revenue']) for d in weekly_data[:12]],
-            'cogs': [float(d['cogs']) for d in weekly_data[:12]],
-            'gross_profit': [float(d['gross_profit']) for d in weekly_data[:12]],
-            'profit': [float(d['profit']) for d in weekly_data[:12]],
-            'expenses': [float(d['expenses']) for d in weekly_data[:12]],
-            'net_profit': [float(d['net_profit']) for d in weekly_data[:12]],
-            'sales': [d['sales_count'] for d in weekly_data[:12]],
-            'margin': [float(d['profit_margin']) for d in weekly_data[:12]],
+            'labels': [f"{d['week_start'].strftime('%b %d')} - {d['week_end'].strftime('%b %d')}" for d in weekly_chrono],
+            'revenue': [float(d['revenue']) for d in weekly_chrono],
+            'cogs': [float(d['cogs']) for d in weekly_chrono],
+            'gross_profit': [float(d['gross_profit']) for d in weekly_chrono],
+            'profit': [float(d['profit']) for d in weekly_chrono],
+            'expenses': [float(d['expenses']) for d in weekly_chrono],
+            'net_profit': [float(d['net_profit']) for d in weekly_chrono],
+            'sales': [d['sales_count'] for d in weekly_chrono],
+            'margin': [float(d['profit_margin']) for d in weekly_chrono],
         }
     elif period == 'monthly':
-        monthly_data = get_combined_monthly_records(sales_qs, expenses_qs, timezone.now().year)
+        monthly_data = get_combined_monthly_records(sales_qs, expenses_qs, today.year)
         data = {
             'labels': [d['month_name'] for d in monthly_data],
             'revenue': [float(d['revenue']) for d in monthly_data],
