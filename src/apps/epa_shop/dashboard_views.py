@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Sum, Count, F, Q
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, date
 from .models import Electronic, Phone, Accessory, Sale, Unit, SaleItem, Owner
 from apps.companies.models import Company
 
@@ -62,7 +62,7 @@ def get_active_company(request):
 def is_support_mode(request):
     """Check if current request is in support mode"""
     return (
-        request.user.is_authenticated 
+        request.user.is_authenticated
         and request.user.role == 'super_admin'
         and request.session.get('support_mode', False)
         and request.session.get('viewing_company_id')
@@ -76,95 +76,95 @@ def is_support_mode(request):
 @login_required
 def epa_dashboard(request):
     """EPA Shop Web Dashboard - Shows company-specific EPA data in HTML"""
-    
+
     # ============================================
     # COMPANY SELECTION (with super admin switching)
     # ============================================
-    
+
     company, is_viewing_company = get_active_company(request)
-    
+
     # If no company found, handle redirects
     if not company:
         # SUPER ADMIN: If no company is selected, redirect to support selector
         if request.user.role == 'super_admin':
             messages.info(request, 'Please select a company to view.')
             return redirect('/api/support/select/')
-        
+
         # Regular user: Check if assigned to a company
         if not request.user.company:
             messages.warning(request, 'You are not assigned to any company.')
             return redirect('/dashboard/')
-        
+
         company = request.user.company
-    
+
     # ============================================
     # BUSINESS TYPE VALIDATION (Skip for super admin in support mode)
     # ============================================
-    
+
     if not is_viewing_company:
         if not company.business_type or 'epa' not in company.business_type.name.lower():
             messages.warning(request, 'Your company is not an EPA Shop.')
             return redirect('/dashboard/')
-    
+
     # ============================================
     # Role-based data filtering
     # ============================================
-    
+
     user = request.user
-    
+
     # For super admin viewing a company, treat as admin
     if is_viewing_company and user.role == 'super_admin':
         is_admin = True
         user_branch = None
     else:
         is_admin = (
-            user.is_company_admin or 
-            user.is_company_manager or 
+            user.is_company_admin or
+            user.is_company_manager or
             user.is_super_admin or
             user.is_superuser or
             user.is_staff
         )
         user_branch = user.branch if not is_admin else None
-    
+
     # ============================================
     # Product counts (filtered by branch for non-admins)
     # ============================================
-    
+
     electronics = Electronic.objects.filter(company=company)
     phones = Phone.objects.filter(company=company)
     accessories = Accessory.objects.filter(company=company)
-    
+
     # Filter by branch for non-admins (skip in support mode)
     if not is_admin and user_branch and not is_viewing_company:
         electronics = electronics.filter(branch=user_branch)
         phones = phones.filter(branch=user_branch)
         accessories = accessories.filter(branch=user_branch)
-    
+
     # Product counts
     electronics_count = electronics.count()
     phones_count = phones.count()
     accessories_count = accessories.count()
-    
+
     # Total PRODUCTS (all product types - 1 product = 1 count)
     total_products = electronics_count + phones_count + accessories_count
-    
+
     # ============================================
     # TOTAL UNITS (from Phone and Electronic only)
     # ============================================
-    
+
     # Get total units across all products
     total_units = Unit.objects.filter(
         Q(phone__company=company) | Q(electronic__company=company)
     )
-    
+
     # Filter by branch for non-admins (skip in support mode)
     if not is_admin and user_branch and not is_viewing_company:
         total_units = total_units.filter(
             Q(phone__branch=user_branch) | Q(electronic__branch=user_branch)
         )
-    
+
     total_unit_items = total_units.count()
-    
+
     # ============================================
     # TOTAL STOCK (Products + Accessories quantity)
     # ============================================
@@ -173,13 +173,13 @@ def epa_dashboard(request):
     total_electronic_stock = electronics.aggregate(total=Sum('quantity_in_stock'))['total'] or 0
     total_accessory_stock = accessories.aggregate(total=Sum('quantity_in_stock'))['total'] or 0
     total_stock_items = total_phone_stock + total_electronic_stock + total_accessory_stock
-    
+
     # ============================================
     # Sales data (filtered by branch/agent)
     # ============================================
-    
+
     sales = Sale.objects.filter(company=company)
-    
+
     # Filter by role (skip in support mode - super admin sees all)
     if not is_viewing_company:
         if user.role == 'company_agent':
@@ -192,38 +192,71 @@ def epa_dashboard(request):
         elif not is_admin and user_branch:
             # Staff see sales in their branch
             sales = sales.filter(branch=user_branch)
-    
+
     total_sales = sales.count()
     total_revenue = sales.aggregate(total=Sum('net_amount'))['total'] or 0
-    
-    # Today's sales
-    today = timezone.now().date()
+
+    # ============================================
+    # TODAY (local timezone)
+    # ============================================
+    today = timezone.localtime(timezone.now()).date()
+
     today_sales = sales.filter(sale_date__date=today)
     today_count = today_sales.count()
     today_revenue = today_sales.aggregate(total=Sum('net_amount'))['total'] or 0
-    
-    # Week sales
-    week_ago = today - timedelta(days=7)
-    week_sales = sales.filter(sale_date__date__gte=week_ago)
+
+    # ============================================
+    # THIS WEEK (Monday → Sunday, capped at today)
+    # ============================================
+    # weekday(): Monday=0 ... Sunday=6
+    week_start = today - timedelta(days=today.weekday())   # Monday of this week
+    week_end = week_start + timedelta(days=6)              # Sunday of this week
+
+    week_sales = sales.filter(
+        sale_date__date__gte=week_start,
+        sale_date__date__lte=min(week_end, today),         # don't include future days
+    )
     week_count = week_sales.count()
     week_revenue = week_sales.aggregate(total=Sum('net_amount'))['total'] or 0
-    
-    # Month sales
-    month_ago = today - timedelta(days=30)
-    month_sales = sales.filter(sale_date__date__gte=month_ago)
+
+    # ============================================
+    # LAST WEEK (Monday → Sunday, fully completed)
+    # ============================================
+    last_week_start = week_start - timedelta(days=7)
+    last_week_end = week_start - timedelta(days=1)
+    last_week_sales = sales.filter(
+        sale_date__date__gte=last_week_start,
+        sale_date__date__lte=last_week_end,
+    )
+    last_week_count = last_week_sales.count()
+    last_week_revenue = last_week_sales.aggregate(total=Sum('net_amount'))['total'] or 0
+
+    # ============================================
+    # THIS MONTH (1st → end of month, capped at today)
+    # ============================================
+    month_start = today.replace(day=1)
+    if today.month == 12:
+        month_end = date(today.year + 1, 1, 1) - timedelta(days=1)
+    else:
+        month_end = date(today.year, today.month + 1, 1) - timedelta(days=1)
+
+    month_sales = sales.filter(
+        sale_date__date__gte=month_start,
+        sale_date__date__lte=min(month_end, today),
+    )
     month_count = month_sales.count()
     month_revenue = month_sales.aggregate(total=Sum('net_amount'))['total'] or 0
-    
+
     # ============================================
     # Low stock items (filtered by branch)
     # ============================================
-    
+
     low_stock_products = []
-    
+
     electronics_low = electronics.filter(quantity_in_stock__lte=F('minimum_stock_level'))
     phones_low = phones.filter(quantity_in_stock__lte=F('minimum_stock_level'))
     accessories_low = accessories.filter(quantity_in_stock__lte=F('minimum_stock_level'))
-    
+
     for item in electronics_low[:5]:
         low_stock_products.append({
             'name': f"{item.brand} {item.name}",
@@ -231,7 +264,7 @@ def epa_dashboard(request):
             'type': 'Electronic',
             'branch': item.branch.name if item.branch else 'N/A'
         })
-    
+
     for item in phones_low[:5]:
         low_stock_products.append({
             'name': f"{item.brand} {item.model}",
@@ -239,7 +272,7 @@ def epa_dashboard(request):
             'type': 'Phone',
             'branch': item.branch.name if item.branch else 'N/A'
         })
-    
+
     for item in accessories_low[:5]:
         low_stock_products.append({
             'name': f"{item.brand} {item.name}",
@@ -247,17 +280,17 @@ def epa_dashboard(request):
             'type': 'Accessory',
             'branch': item.branch.name if item.branch else 'N/A'
         })
-    
+
     # ============================================
     # Recent sales (filtered)
     # ============================================
-    
+
     recent_sales = sales.select_related('branch', 'sold_by').order_by('-sale_date')[:10]
-    
+
     # ============================================
     # Agent-specific stats (units owned by agent)
     # ============================================
-    
+
     if user.role == 'company_agent' and not is_viewing_company:
         owner = Owner.objects.filter(company=company, phone=user.phone).first()
         if owner:
@@ -273,11 +306,11 @@ def epa_dashboard(request):
         agent_units_count = 0
         agent_available_units = 0
         agent_sold_units = 0
-    
+
     # ============================================
     # Top selling products
     # ============================================
-    
+
     top_products = []
     try:
         top_items = SaleItem.objects.filter(
@@ -286,26 +319,26 @@ def epa_dashboard(request):
             total_sold=Sum('quantity')
         ).order_by('-total_sold')[:5]
         top_products = top_items
-    except:
+    except Exception:
         pass
-    
+
     # ============================================
     # Stats for template
     # ============================================
-    
+
     stats = {
         # Product counts
         'total_products': total_products,
         'electronics': electronics_count,
         'phones': phones_count,
         'accessories': accessories_count,
-        
+
         # Unit counts (individual IMEI/Serial numbers)
         'total_unit_items': total_unit_items,
-        
+
         # Total stock (including accessory quantities)
         'total_stock_items': total_stock_items,
-        
+
         # Sales stats
         'total_sales': total_sales,
         'total_revenue': total_revenue,
@@ -316,17 +349,21 @@ def epa_dashboard(request):
         'month_sales': month_count,
         'month_revenue': month_revenue,
         'low_stock': len(low_stock_products),
-        
+
+        # Last week (for comparison)
+        'last_week_sales': last_week_count,
+        'last_week_revenue': last_week_revenue,
+
         # Agent-specific stats
         'agent_units': agent_units_count,
         'agent_available': agent_available_units,
         'agent_sold': agent_sold_units,
     }
-    
+
     # ============================================
     # Context
     # ============================================
-    
+
     context = {
         'company': company,
         'business_type': company.business_type,
@@ -341,8 +378,12 @@ def epa_dashboard(request):
         'user_branch': user_branch,
         'is_super_admin': user.role == 'super_admin',
         'today': today,
+        'week_start': week_start,
+        'week_end': week_end,
+        'month_start': month_start,
+        'month_end': month_end,
         'page_title': f'EPA Dashboard - {company.name}' if is_viewing_company else 'EPA Dashboard',
         'page_subtitle': f'Welcome back, {user.get_full_name() or user.username}!',
     }
-    
+
     return render(request, 'epa/dashboard.html', context)
