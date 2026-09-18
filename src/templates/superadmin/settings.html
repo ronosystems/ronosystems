@@ -182,12 +182,21 @@
         justify-content: center;
         border: 2px solid #000000;
         margin-bottom: 8px;
+        position: relative;
     }
     .upload-item .preview img {
         max-width: 100%;
         max-height: 100%;
         object-fit: contain;
         padding: 4px;
+    }
+    /* Video preview (NEW) */
+    .upload-item .preview video {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        background: #000;
+        display: block;
     }
     .upload-item .preview .placeholder {
         color: #000000;
@@ -569,7 +578,7 @@
                             </div>
                             <div class="card-body">
 
-                                {# --- Special layout for branding: colors on top, uploads in grid --- #}
+                                {# --- Special layout for branding: colors on top, media in grid --- #}
                                 {% if cat_key == 'branding' %}
                                     {# Colors #}
                                     <div class="form-row mb-3">
@@ -589,37 +598,41 @@
                                         {% endfor %}
                                     </div>
 
-                                    {# Uploads #}
+                                    {# Uploads — images AND videos #}
                                     <div class="upload-grid">
                                         {% for field in items %}
-                                            {% if field.type == 'image' %}
-                                            <div class="upload-item">
+                                            {% if field.type == 'image' or field.type == 'video' %}
+                                            <div class="upload-item" data-field-key="{{ field.key }}" data-field-type="{{ field.type }}">
                                                 <span class="label-text">
-                                                    <i class="fas fa-{% if field.key == 'SITE_FAVICON' %}star{% else %}image{% endif %}"></i>
+                                                    <i class="fas fa-{% if field.key == 'SITE_FAVICON' %}star{% elif field.type == 'video' %}video{% else %}image{% endif %}"></i>
                                                     {{ field.label }}
                                                 </span>
                                                 <div class="preview">
-                                                    {% if field.url %}
-                                                        <img src="{{ field.url }}" alt="{{ field.label }}" id="{{ field.key }}-preview">
+                                                    {% if field.type == 'video' and field.url %}
+                                                        <video src="{{ field.url }}"
+                                                               id="{{ field.key }}-preview"
+                                                               muted
+                                                               preload="metadata"
+                                                               playsinline></video>
+                                                    {% elif field.url %}
+                                                        <img src="{{ field.url }}"
+                                                             alt="{{ field.label }}"
+                                                             id="{{ field.key }}-preview">
                                                     {% else %}
                                                         <div class="placeholder">
-                                                            <i class="fas fa-image"></i>
+                                                            <i class="fas fa-{% if field.type == 'video' %}video{% else %}image{% endif %}"></i>
                                                             No {{ field.label|lower }}
                                                         </div>
                                                     {% endif %}
                                                 </div>
                                                 <div class="file-input">
-                                                    <input type="file" class="form-control form-control-sm"
-                                                           name="{{ field.key }}" accept="image/*"
+                                                    <input type="file"
+                                                           class="form-control form-control-sm"
+                                                           name="{{ field.key }}"
+                                                           accept="{% if field.type == 'video' %}video/*{% else %}image/*{% endif %}"
                                                            id="{{ field.key }}-input">
                                                 </div>
                                                 {% if field.url %}
-                                                    {% comment %}
-                                                       Remove is a BUTTON that submits its own
-                                                       mini-form by ID (form="..."). The mini-form
-                                                       lives OUTSIDE the main settings form so the
-                                                       two can never interfere.
-                                                    {% endcomment %}
                                                     <button type="submit"
                                                             form="removeForm_{{ field.key }}"
                                                             class="btn btn-danger btn-sm btn-remove">
@@ -732,7 +745,6 @@
         </div>
     </form>
 
-
      {% comment %}
        ============================================================
        Remove mini-forms — live OUTSIDE the main settings form.
@@ -740,19 +752,20 @@
        HTML5 `form="..."` attribute. No nesting = no interference.
        ============================================================
     {% endcomment %}
-
-
+    
     {% for cat_key, items in categories.items %}
         {% for field in items %}
-            {% if field.type == 'image' and field.url %}
-                <form id="removeForm_{{ field.key }}"
-                      method="post"
-                      action="{% url 'settings:update' %}"
-                      style="display:none;"
-                      onsubmit="return confirm('Remove {{ field.label|escapejs }}?');">
-                    {% csrf_token %}
-                    <input type="hidden" name="remove_{{ field.key }}" value="{{ field.key }}">
-                </form>
+            {% if field.url %}
+                {% if field.type == 'image' or field.type == 'video' %}
+                    <form id="removeForm_{{ field.key }}"
+                          method="post"
+                          action="{% url 'settings:update' %}"
+                          style="display:none;"
+                          onsubmit="return confirm('Remove {{ field.label|escapejs }}?');">
+                        {% csrf_token %}
+                        <input type="hidden" name="remove_{{ field.key }}" value="{{ field.key }}">
+                    </form>
+                {% endif %}
             {% endif %}
         {% endfor %}
     {% endfor %}
@@ -799,9 +812,9 @@ function showToast(type, message) {
     bsToast.show();
 }
 
-// Color sync + live image preview
+// Color sync + live preview (works for both images and videos)
 document.addEventListener('DOMContentLoaded', function () {
-    // Clear any stale file selections from the browser's back/forward cache
+    // Clear stale file selections from the browser's back/forward cache
     document.querySelectorAll('input[type="file"]').forEach(function (el) {
         el.value = '';
     });
@@ -814,31 +827,39 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Live image preview when a file is selected
-    ['SITE_LOGO', 'SITE_FAVICON', 'LOGIN_BACKGROUND'].forEach(function (key) {
+    // Live preview for every media input on the page
+    document.querySelectorAll('.upload-item').forEach(function (item) {
+        const key = item.dataset.fieldKey;
+        const type = item.dataset.fieldType;
         const input = document.getElementById(key + '-input');
         if (!input) return;
+
         input.addEventListener('change', function () {
             const file = this.files[0];
             if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                const preview = document.getElementById(key + '-preview');
-                const container = input.closest('.upload-item');
-                const previewDiv = container.querySelector('.preview');
-                if (preview) {
-                    preview.src = e.target.result;
-                } else {
-                    const placeholder = previewDiv.querySelector('.placeholder');
-                    if (placeholder) placeholder.remove();
-                    const img = document.createElement('img');
-                    img.id = key + '-preview';
-                    img.src = e.target.result;
-                    img.alt = key;
-                    previewDiv.appendChild(img);
-                }
-            };
-            reader.readAsDataURL(file);
+            const url = URL.createObjectURL(file);
+            const previewDiv = item.querySelector('.preview');
+            const oldEl = document.getElementById(key + '-preview');
+            if (oldEl) oldEl.remove();
+
+            const placeholder = previewDiv.querySelector('.placeholder');
+            if (placeholder) placeholder.remove();
+
+            if (type === 'video') {
+                const video = document.createElement('video');
+                video.id = key + '-preview';
+                video.src = url;
+                video.muted = true;
+                video.playsInline = true;
+                video.preload = 'metadata';
+                previewDiv.appendChild(video);
+            } else {
+                const img = document.createElement('img');
+                img.id = key + '-preview';
+                img.src = url;
+                img.alt = key;
+                previewDiv.appendChild(img);
+            }
         });
     });
 });

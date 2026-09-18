@@ -364,6 +364,12 @@ else:
 
 os.makedirs(STATIC_ROOT, exist_ok=True)
 
+
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024   # 100 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024   # 100 MB
+
+
 # ============================================
 # DEFAULT SETTINGS
 # ============================================

@@ -6,12 +6,12 @@ class SystemSetting(models.Model):
     """
     One key/value row per setting.
 
-    Storage contract for image/file types:
-      - `value` holds the storage key (e.g. "settings/site_logo.png")
+    Storage contract for image/file/video types:
+      - `value` holds the storage key (e.g. "settings/site_logo")
       - `get_url()` returns a fully-formed Cloudinary URL with a cache-buster
 
-    The value for images is written by the view via `cloudinary.uploader.upload`
-    using a stable public_id derived from the setting key (e.g. "settings/site_logo.png").
+    The value for media is written by the view via `cloudinary.uploader.upload`
+    using a stable public_id derived from the setting key (e.g. "settings/site_logo").
     The view is the only writer. This model never rewrites the stored value.
     """
 
@@ -25,6 +25,7 @@ class SystemSetting(models.Model):
         ('url', 'URL'),
         ('image', 'Image'),
         ('file', 'File'),
+        ('video', 'Video'),           # ← NEW
         ('color', 'Color'),
         ('password', 'Password'),
         ('select', 'Select'),
@@ -87,18 +88,22 @@ class SystemSetting(models.Model):
                 return 0.0
 
         # text / textarea / email / url / color / password / select /
-        # image / file  → return raw string
+        # image / file / video  → return raw string
         return self.value or ''
 
     def get_url(self):
         """
-        For image/file settings: return a fully-formed Cloudinary URL with
-        a cache-buster (based on updated_at), so browsers/CDN always fetch
-        the newest version after an update.
+        Return a fully-formed Cloudinary URL for image/file/video settings,
+        with a cache-buster (based on updated_at) so browsers/CDN always
+        fetch the newest version after an update.
+
+        - Images / files → /image/upload/  (Cloudinary serves both from
+          the 'image' pipeline for our purposes)
+        - Videos         → /video/upload/
 
         Returns None if no value is stored.
         """
-        if self.setting_type not in ('image', 'file'):
+        if self.setting_type not in ('image', 'file', 'video'):
             return None
 
         key = (self.value or '').strip().lstrip('/')
@@ -109,7 +114,13 @@ class SystemSetting(models.Model):
         cloud_name = cfg.get('CLOUD_NAME', '')
 
         if cloud_name:
-            url = f"https://res.cloudinary.com/{cloud_name}/image/upload/{key}"
+            # Pick the correct Cloudinary delivery path
+            if self.setting_type == 'video':
+                resource = 'video'
+            else:
+                resource = 'image'
+
+            url = f"https://res.cloudinary.com/{cloud_name}/{resource}/upload/{key}"
             if self.updated_at:
                 url += f"?v={int(self.updated_at.timestamp())}"
             return url
@@ -135,9 +146,25 @@ class SystemSetting(models.Model):
 
     @classmethod
     def get_image_url(cls, key):
-        """Return the Cloudinary URL for an image setting, or None."""
+        """Return the Cloudinary URL for any media setting (image/file/video)."""
         try:
             return cls.objects.get(key=key).get_url()
+        except cls.DoesNotExist:
+            return None
+        except Exception:
+            return None
+
+    @classmethod
+    def get_video_url(cls, key):
+        """
+        Explicit helper for video settings — same as get_image_url() but
+        named for clarity when the caller knows they want a video.
+        """
+        try:
+            obj = cls.objects.get(key=key)
+            if obj.setting_type != 'video':
+                return None
+            return obj.get_url()
         except cls.DoesNotExist:
             return None
         except Exception:
@@ -158,6 +185,5 @@ class SystemSetting(models.Model):
     # ------------------------------------------------------------------
     def save(self, *args, **kwargs):
         # NOTE: we do NOT touch `value` here. The view is responsible for
-        # writing correctly-formatted storage keys for image/file settings.
-        # Adding normalization here caused cross-setting bugs in the past.
+        # writing correctly-formatted storage keys for image/file/video settings.
         super().save(*args, **kwargs)

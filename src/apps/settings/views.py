@@ -61,6 +61,14 @@ SETTINGS_SCHEMA = [
      'label': 'Login Background', 'default': '', 'order': 5,
      'help_text': 'Recommended 1920×1080px. JPG.'},
 
+    # --- Branding → Landing Video (NEW) ---
+    {'key': 'LANDING_VIDEO', 'type': 'video', 'category': 'branding',
+     'label': 'Landing Video', 'default': '', 'order': 6,
+     'help_text': 'MP4 or WebM, up to 50MB. Plays inline on the landing page.'},
+    {'key': 'LANDING_VIDEO_POSTER', 'type': 'image', 'category': 'branding',
+     'label': 'Video Thumbnail', 'default': '', 'order': 7,
+     'help_text': 'Optional. Shown before the video plays. 1280×720px.'},
+
     # --- Email ---
     {'key': 'EMAIL_HOST', 'type': 'text', 'category': 'email',
      'label': 'SMTP Host', 'default': 'smtp.gmail.com', 'order': 1},
@@ -145,15 +153,19 @@ def _cloudinary():
     )
 
 
-def _upload_image(file_obj, setting_key):
+def _upload_media(file_obj, setting_key, resource_type='image'):
     """
     Upload to Cloudinary at settings/<key> — NO extension in the public_id.
 
-    Cloudinary assigns and manages the format (jpg/png/webp/avif) itself.
-    Passing an extension in public_id causes Cloudinary to append its own
-    format suffix, producing ugly URLs like 'site_logo.jpeg.jpg' that 404.
+    Cloudinary assigns and manages the format itself. Passing an extension
+    in public_id causes Cloudinary to append its own format suffix,
+    producing ugly URLs like 'site_logo.jpeg.jpg' that 404.
 
-    Returns the public_id Cloudinary used (e.g. 'settings/site_logo').
+    resource_type:
+        'image'  → for logos, favicons, backgrounds, video posters
+        'video'  → for landing videos
+
+    Returns the public_id Cloudinary used (e.g. 'settings/landing_video').
     """
     _cloudinary()
     key_lower = setting_key.lower()
@@ -163,19 +175,19 @@ def _upload_image(file_obj, setting_key):
         file_obj,
         public_id=public_id,
         overwrite=True,
-        resource_type='image',
+        resource_type=resource_type,
     )
     # Cloudinary returns the public_id WITHOUT extension
     return result.get('public_id') or public_id
 
 
-def _delete_image(public_id):
+def _delete_media(public_id, resource_type='image'):
     """Delete a Cloudinary asset by its exact public_id. Silent on failure."""
     if not public_id:
         return
     try:
         _cloudinary()
-        cloudinary.uploader.destroy(public_id)
+        cloudinary.uploader.destroy(public_id, resource_type=resource_type)
     except Exception:
         pass
 
@@ -229,11 +241,14 @@ def settings_update(request):
             obj = SystemSetting.objects.get(key=key)
         except SystemSetting.DoesNotExist:
             continue
-        if obj.setting_type != 'image':
+        if obj.setting_type not in ('image', 'video'):
             continue
 
+        # Pick resource type based on setting type
+        resource_type = 'video' if obj.setting_type == 'video' else 'image'
+
         try:
-            new_value = _upload_image(file_obj, key)
+            new_value = _upload_media(file_obj, key, resource_type=resource_type)
         except Exception as e:
             errors.append(f'{key}: {e}')
             continue
@@ -246,7 +261,7 @@ def settings_update(request):
 
         # Delete the previous asset if it was a different one
         if old_value and old_value != new_value:
-            _delete_image(old_value)
+            _delete_media(old_value, resource_type=resource_type)
 
     # ---------- 2) Removals: only for keys with no upload in this request ----------
     for post_key in list(request.POST.keys()):
@@ -262,14 +277,15 @@ def settings_update(request):
             obj = SystemSetting.objects.get(key=real_key)
         except SystemSetting.DoesNotExist:
             continue
-        if obj.setting_type != 'image':
+        if obj.setting_type not in ('image', 'video'):
             continue
 
+        resource_type = 'video' if obj.setting_type == 'video' else 'image'
         old = obj.value
         obj.value = ''
         obj.save()
         if old:
-            _delete_image(old)
+            _delete_media(old, resource_type=resource_type)
         updated += 1
 
     # ---------- 3) Plain values ----------
@@ -280,7 +296,7 @@ def settings_update(request):
             obj = SystemSetting.objects.get(key=key)
         except SystemSetting.DoesNotExist:
             continue
-        if obj.setting_type == 'image':
+        if obj.setting_type in ('image', 'video'):
             continue
 
         val = raw.strip() if isinstance(raw, str) else raw
@@ -333,8 +349,11 @@ def settings_reset_category(request):
             obj = SystemSetting.objects.get(key=spec['key'])
         except SystemSetting.DoesNotExist:
             continue
-        if obj.setting_type == 'image' and obj.value:
-            _delete_image(obj.value)
+
+        if obj.setting_type in ('image', 'video') and obj.value:
+            resource_type = 'video' if obj.setting_type == 'video' else 'image'
+            _delete_media(obj.value, resource_type=resource_type)
+
         obj.value = _stringify(spec['default'], spec['type'])
         obj.save()
         count += 1
