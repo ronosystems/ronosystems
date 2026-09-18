@@ -614,11 +614,17 @@
                                                            id="{{ field.key }}-input">
                                                 </div>
                                                 {% if field.url %}
-                                                    <button type="button" class="btn btn-danger btn-sm btn-remove"
-                                                            onclick="removeImage('{{ field.key }}')">
+                                                    {#
+                                                       Remove is a BUTTON that submits its own
+                                                       mini-form by ID (form="..."). The mini-form
+                                                       lives OUTSIDE the main settings form so the
+                                                       two can never interfere.
+                                                    #}
+                                                    <button type="submit"
+                                                            form="removeForm_{{ field.key }}"
+                                                            class="btn btn-danger btn-sm btn-remove">
                                                         <i class="fas fa-trash"></i> Remove
                                                     </button>
-                                                    {# No static hidden field — the JS adds it on click #}
                                                 {% endif %}
                                             </div>
                                             {% endif %}
@@ -725,6 +731,32 @@
             </div>
         </div>
     </form>
+
+
+     {% comment %}
+       ============================================================
+       Remove mini-forms — live OUTSIDE the main settings form.
+       The "Remove" buttons above reference these by id using the
+       HTML5 `form="..."` attribute. No nesting = no interference.
+       ============================================================
+    {% endcomment %}
+
+
+    {% for cat_key, items in categories.items %}
+        {% for field in items %}
+            {% if field.type == 'image' and field.url %}
+                <form id="removeForm_{{ field.key }}"
+                      method="post"
+                      action="{% url 'settings:update' %}"
+                      style="display:none;"
+                      onsubmit="return confirm('Remove {{ field.label|escapejs }}?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="remove_{{ field.key }}" value="{{ field.key }}">
+                </form>
+            {% endif %}
+        {% endfor %}
+    {% endfor %}
+
 </div>
 
 <!-- Toast Container -->
@@ -742,28 +774,6 @@ function togglePassword(id) {
         input.type = 'password';
         icon.className = 'fas fa-eye';
     }
-}
-
-// Remove image — dynamically add a removal marker, then submit.
-// The hidden field is only created when the user actually confirms,
-// so untouched images are never deleted on save.
-function removeImage(key) {
-    if (!confirm('Are you sure you want to remove this image?')) return;
-
-    const form = document.getElementById('settingsForm');
-
-    // Remove any previous removal marker for this key (in case of double clicks)
-    const existing = form.querySelector(`input[name="remove_${key}"]`);
-    if (existing) existing.remove();
-
-    // Add the removal marker
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'remove_' + key;
-    input.value = key;
-    form.appendChild(input);
-
-    form.submit();
 }
 
 // Show toast
@@ -789,25 +799,30 @@ function showToast(type, message) {
     bsToast.show();
 }
 
-// Color sync + image preview
-document.addEventListener('DOMContentLoaded', function() {
+// Color sync + live image preview
+document.addEventListener('DOMContentLoaded', function () {
+    // Clear any stale file selections from the browser's back/forward cache
+    document.querySelectorAll('input[type="file"]').forEach(function (el) {
+        el.value = '';
+    });
+
     // Sync color pickers with their text counterparts
-    document.querySelectorAll('input[type="color"]').forEach(function(el) {
-        el.addEventListener('input', function() {
+    document.querySelectorAll('input[type="color"]').forEach(function (el) {
+        el.addEventListener('input', function () {
             const textInput = document.getElementById(this.id + '_text');
             if (textInput) textInput.value = this.value;
         });
     });
 
     // Live image preview when a file is selected
-    ['SITE_LOGO', 'SITE_FAVICON', 'LOGIN_BACKGROUND'].forEach(function(key) {
+    ['SITE_LOGO', 'SITE_FAVICON', 'LOGIN_BACKGROUND'].forEach(function (key) {
         const input = document.getElementById(key + '-input');
         if (!input) return;
-        input.addEventListener('change', function() {
+        input.addEventListener('change', function () {
             const file = this.files[0];
             if (!file) return;
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = function (e) {
                 const preview = document.getElementById(key + '-preview');
                 const container = input.closest('.upload-item');
                 const previewDiv = container.querySelector('.preview');

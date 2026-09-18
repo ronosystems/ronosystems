@@ -28,7 +28,7 @@
             position: fixed;
             inset: 0;
             background: url('{{ login_background_url }}') center center / cover no-repeat;
-            opacity: 4;
+            opacity: 1;
             z-index: 0;
         }
         body::after {
@@ -36,7 +36,8 @@
             position: fixed;
             inset: 0;
             background: linear-gradient(135deg, rgba(238, 242, 247, 0.55) 0%, rgba(238, 242, 247, 0.75) 100%);
-            z-index: 0;
+            z-index: 1;
+            pointer-events: none;
         }
         {% endif %}
 
@@ -45,7 +46,7 @@
             width: 100%;
             max-width: 380px;
             position: relative;
-            z-index: 1;
+            z-index: 2;
         }
         .login-card {
             padding: 40px 30px;
@@ -443,18 +444,19 @@
         <div class="login-card">
             <div class="login-header">
                 <div class="logo">
-                    {% if user.company.logo %}
-                        <img src="{{ user.company.logo.url }}" alt="{{ system_name|default:'RonoSystems' }}">
-                    {% elif site_logo_url %}
+                    {# Site Logo takes priority (it's the one uploaded in Settings → Branding) #}
+                    {% if site_logo_url %}
                         <img src="{{ site_logo_url }}" alt="{{ system_name|default:'RonoSystems' }}">
+                    {% elif user.company.logo %}
+                        <img src="{{ user.company.logo.url }}" alt="{{ system_name|default:'RonoSystems' }}">
                     {% else %}
                         <div class="logo-icon">
                             <i class="fas fa-rocket"></i>
                         </div>
                     {% endif %}
                 </div>
-                <h3>WELCOME</h3>
-                <p>Sign In To Access Your Account</p>
+                <h3>{{ system_name|default:"RonoSystems" }}</h3>
+                <p>{{ site_tagline|default:"Sign In To Access Your Account" }}</p>
             </div>
 
             {% if messages %}

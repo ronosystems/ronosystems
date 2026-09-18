@@ -1,82 +1,18 @@
 from django.db import models
-from django.core.files.storage import default_storage
 from django.conf import settings as django_settings
-from urllib.parse import urlparse
-
-
-# ----------------------------------------------------------------------
-# URL / key normalization helper
-# ----------------------------------------------------------------------
-def _clean_storage_key(raw):
-    """
-    Given an arbitrary string that might be:
-      - a full Cloudinary URL       (https://res.cloudinary.com/<cloud>/image/upload/v123/settings/rs_logo.png)
-      - a /media/ prefixed path     (/media/settings/rs_logo.png)
-      - a raw storage key           (settings/rs_logo.png)
-      - a malformed URL             (https:/res.cloudinary.com/<cloud>/settings/rs_logo.png)
-      - a cloud-name-prefixed key   (dg9it0ut8/settings/rs_logo.png)
-
-    Return just the storage key (e.g. 'settings/rs_logo.png').
-
-    This is the single point that guarantees `SystemSetting.value` for
-    image/file types is always a clean key — never a URL, never a
-    /media/ prefix, never prefixed with the Cloudinary cloud name.
-    """
-    if not raw:
-        return ''
-
-    v = str(raw).strip()
-
-    # ---- Repair malformed URLs (single slash after scheme) ----
-    if v.startswith('https:/') and not v.startswith('https://'):
-        v = 'https://' + v[len('https:/'):]
-    elif v.startswith('http:/') and not v.startswith('http://'):
-        v = 'http://' + v[len('http:/'):]
-    elif v.startswith('//'):
-        v = 'https:' + v
-
-    # ---- Full URL: extract the storage key from the path ----
-    if v.startswith(('http://', 'https://')):
-        marker = '/image/upload/'
-        if marker in v:
-            tail = v.split(marker, 1)[1]
-            # Drop a version segment like "v1234567890/"
-            parts = tail.split('/', 1)
-            if len(parts) == 2 and parts[0].startswith('v') and parts[0][1:].isdigit():
-                return parts[1]
-            return tail
-
-        # Generic URL — take everything after the domain
-        path = urlparse(v).path.lstrip('/')
-        return path
-
-    # ---- Strip /media/ or media/ prefix ----
-    if v.startswith('/media/'):
-        v = v[len('/media/'):]
-    elif v.startswith('media/'):
-        v = v[len('media/'):]
-
-    # ---- Strip Cloudinary cloud name if the storage backend prefixed it ----
-    cloud_name = getattr(django_settings, 'CLOUDINARY_STORAGE', {}).get('CLOUD_NAME', '')
-    if cloud_name and v.startswith(f'{cloud_name}/'):
-        v = v[len(cloud_name) + 1:]
-
-    return v.lstrip('/')
 
 
 class SystemSetting(models.Model):
     """
-    A single key/value pair.
+    One key/value row per setting.
 
-    Storage contract:
-      - `value` always holds the RAW stored value.
-      - For image/file types: `value` is the storage KEY (e.g. "settings/rs_logo")
-        — never a full URL, never a /media/ prefix, never cloud-name-prefixed.
-      - Use `.get_value()` to read it back as a Python value.
-      - Use `.get_url()` to get a browser-ready Cloudinary URL for image/file types.
+    Storage contract for image/file types:
+      - `value` holds the storage key (e.g. "settings/site_logo.png")
+      - `get_url()` returns a fully-formed Cloudinary URL with a cache-buster
 
-    The contract is enforced by `_clean_storage_key()` in `save()`, so even
-    if a caller assigns a URL, the value is normalized before it hits the DB.
+    The value for images is written by the view via `cloudinary.uploader.upload`
+    using a stable public_id derived from the setting key (e.g. "settings/site_logo.png").
+    The view is the only writer. This model never rewrites the stored value.
     """
 
     SETTING_TYPES = (
@@ -131,79 +67,65 @@ class SystemSetting(models.Model):
     # ------------------------------------------------------------------
     # Reads
     # ------------------------------------------------------------------
-
     def get_value(self):
         """Return the value as the correct Python type."""
-        if self.setting_type == 'boolean':
+        t = self.setting_type
+
+        if t == 'boolean':
             return str(self.value).lower() in ('true', '1', 'yes', 'on')
 
-        if self.setting_type == 'integer':
+        if t == 'integer':
             try:
                 return int(self.value or 0)
             except (TypeError, ValueError):
                 return 0
 
-        if self.setting_type == 'float':
+        if t == 'float':
             try:
                 return float(self.value or 0)
             except (TypeError, ValueError):
                 return 0.0
 
-        # text / textarea / email / url / color / password / select
-        # image / file return the raw storage key
+        # text / textarea / email / url / color / password / select /
+        # image / file  → return raw string
         return self.value or ''
 
     def get_url(self):
         """
-        For image/file settings: return a browser-ready Cloudinary URL, or None.
+        For image/file settings: return a fully-formed Cloudinary URL with
+        a cache-buster (based on updated_at), so browsers/CDN always fetch
+        the newest version after an update.
 
-        We build the Cloudinary delivery URL directly instead of calling
-        default_storage.url() — because django-cloudinary-storage 0.3.0
-        returns an incomplete URL (missing the /image/upload/ segment),
-        which Cloudinary rejects with 404.
+        Returns None if no value is stored.
         """
         if self.setting_type not in ('image', 'file'):
             return None
 
-        key = _clean_storage_key(self.value)
+        key = (self.value or '').strip().lstrip('/')
         if not key:
             return None
 
-        # ---- Direct Cloudinary URL ----
-        cloud_name = getattr(django_settings, 'CLOUDINARY_STORAGE', {}).get('CLOUD_NAME', '')
+        cfg = getattr(django_settings, 'CLOUDINARY_STORAGE', {})
+        cloud_name = cfg.get('CLOUD_NAME', '')
+
         if cloud_name:
-            return f"https://res.cloudinary.com/{cloud_name}/image/upload/{key}"
+            url = f"https://res.cloudinary.com/{cloud_name}/image/upload/{key}"
+            if self.updated_at:
+                url += f"?v={int(self.updated_at.timestamp())}"
+            return url
 
-        # ---- Fallback: local filesystem or other storage backend ----
-        try:
-            return default_storage.url(key)
-        except Exception:
-            media_url = getattr(django_settings, 'MEDIA_URL', '/media/')
-            if not media_url.endswith('/'):
-                media_url += '/'
-            return f"{media_url}{key}"
-
-    def delete_file(self):
-        """Delete the stored file for image/file types (best-effort)."""
-        if self.setting_type not in ('image', 'file'):
-            return
-
-        key = _clean_storage_key(self.value)
-        if not key:
-            return
-
-        try:
-            if default_storage.exists(key):
-                default_storage.delete(key)
-        except Exception:
-            pass
+        # Local filesystem fallback (dev with USE_CLOUDINARY_MEDIA=False)
+        media_url = getattr(django_settings, 'MEDIA_URL', '/media/')
+        if not media_url.endswith('/'):
+            media_url += '/'
+        return f"{media_url}{key}"
 
     # ------------------------------------------------------------------
-    # Class helpers
+    # Class helpers (used by views, templates, context processors)
     # ------------------------------------------------------------------
-
     @classmethod
     def get_setting(cls, key, default=None):
+        """Return the typed value for `key`, or `default` if not set."""
         try:
             return cls.objects.get(key=key).get_value()
         except cls.DoesNotExist:
@@ -213,6 +135,7 @@ class SystemSetting(models.Model):
 
     @classmethod
     def get_image_url(cls, key):
+        """Return the Cloudinary URL for an image setting, or None."""
         try:
             return cls.objects.get(key=key).get_url()
         except cls.DoesNotExist:
@@ -222,17 +145,19 @@ class SystemSetting(models.Model):
 
     @classmethod
     def as_dict(cls):
-        """Return all settings as a flat dict of key → typed value."""
+        """
+        Return all settings as a flat dict of {key: typed_value}.
+
+        Used by apps.settings.context_processors.system_settings to inject
+        SITE_NAME, PRIMARY_COLOR, etc. into every template.
+        """
         return {s.key: s.get_value() for s in cls.objects.all()}
 
     # ------------------------------------------------------------------
     # Write
     # ------------------------------------------------------------------
-
     def save(self, *args, **kwargs):
-        # Normalize image/file values to a clean storage key before saving.
-        # This is the last line of defense against URLs, /media/ prefixes,
-        # or cloud-name-prefixed keys ever reaching the database.
-        if self.setting_type in ('image', 'file') and self.value:
-            self.value = _clean_storage_key(self.value)
+        # NOTE: we do NOT touch `value` here. The view is responsible for
+        # writing correctly-formatted storage keys for image/file settings.
+        # Adding normalization here caused cross-setting bugs in the past.
         super().save(*args, **kwargs)

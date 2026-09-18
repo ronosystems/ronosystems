@@ -322,10 +322,14 @@ USE_CLOUDINARY_MEDIA = os.getenv(
 ) == 'True'
 
 if USE_CLOUDINARY_MEDIA:
-    # ---------- Media on Cloudinary (persistent across deploys) ----------
+    # ---------- Media on Cloudinary ----------
+    # We upload to Cloudinary MANUALLY via cloudinary.uploader.upload().
+    # We do NOT want django-cloudinary-storage to intercept those uploads
+    # (its 0.3.0 release mangles public_ids and generates broken URLs).
+    # So the default storage stays on the local filesystem, unused.
     STORAGES = {
         "default": {
-            "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
         },
         "staticfiles": {
             "BACKEND": (
@@ -335,8 +339,15 @@ if USE_CLOUDINARY_MEDIA:
             ),
         },
     }
-    MEDIA_URL = f"https://res.cloudinary.com/{CLOUDINARY_STORAGE['CLOUD_NAME']}/"
-    print("✅ Using Cloudinary for media files")
+    # Point MEDIA_URL at the correct Cloudinary delivery prefix.
+    # The /image/upload/ segment is REQUIRED — without it, Cloudinary 404s.
+    MEDIA_URL = (
+        f"https://res.cloudinary.com/"
+        f"{CLOUDINARY_STORAGE['CLOUD_NAME']}/image/upload/"
+    )
+    print("✅ Using Cloudinary for media files (direct SDK uploads)")
+
+    
 else:
     # ---------- Media on local filesystem (dev only) ----------
     STORAGES = {
