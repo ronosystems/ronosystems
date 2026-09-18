@@ -1,12 +1,13 @@
-# apps/users/models.py
+# apps/accounts/models.py
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.conf import settings as django_settings
 
 
 class User(AbstractUser):
     ROLE_CHOICES = (
-        ('guest', 'Guest'),                          # ← pending approval, no company
+        ('guest', 'Guest'),
         ('super_admin', 'Super Admin'),
         ('company_admin', 'Company Admin'),
         ('company_manager', 'Company Manager'),
@@ -17,24 +18,14 @@ class User(AbstractUser):
         ('company_staff', 'Company Staff'),
     )
 
-    role = models.CharField(
-        max_length=20,
-        choices=ROLE_CHOICES,
-        default='company_staff',
-    )
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='company_staff')
     company = models.ForeignKey(
-        'companies.Company',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='users',
+        'companies.Company', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='users',
     )
     branch = models.ForeignKey(
-        'epa_shop.Branch',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='staff',
+        'epa_shop.Branch', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='staff',
     )
     phone = models.CharField(max_length=20, blank=True)
     is_verified = models.BooleanField(default=False)
@@ -57,25 +48,12 @@ class User(AbstractUser):
     # SAVE OVERRIDE
     # ============================================================
     def save(self, *args, **kwargs):
-        """
-        Auto-promote a 'guest' to 'company_staff' when a company is assigned.
-        This handles the common admin flow:
-            1. Guest registers without a company ID (is_active=False, role='guest')
-            2. Super admin assigns them to a company via Django admin
-            3. Their role silently upgrades to 'company_staff'
-        """
-        # Superuser always gets the super_admin role
         if self.is_superuser and self.role != 'super_admin':
             self.role = 'super_admin'
-
         if self.company_id and self.role == 'guest':
             self.role = 'company_staff'
-            
         super().save(*args, **kwargs)
 
-    # ============================================================
-    # STRING
-    # ============================================================
     def __str__(self):
         return f"{self.email} ({self.role})"
 
@@ -132,6 +110,45 @@ class User(AbstractUser):
     @property
     def branch_name(self):
         return self.branch.name if self.branch else 'Not Assigned'
+
+    # ============================================================
+    # PROFILE PICTURE URL
+    # ============================================================
+    @property
+    def profile_picture_url(self):
+        """
+        Fully-formed Cloudinary URL for the profile picture.
+
+        The view uploads to Cloudinary via cloudinary.uploader.upload() with
+        a UNIQUE public_id per upload (profiles/user_<id>_<timestamp>). This
+        guarantees the URL changes every time, so the browser and Cloudinary's
+        CDN always serve the freshest image — no stale cache.
+
+        Returns None if no picture is set.
+        """
+        if not self.profile_picture:
+            return None
+
+        key = getattr(self.profile_picture, 'name', None) or str(self.profile_picture)
+        key = key.strip().lstrip('/')
+
+        if not key:
+            return None
+
+        # Strip any legacy /media/ prefix
+        if key.startswith('media/'):
+            key = key[len('media/'):]
+
+        cfg = getattr(django_settings, 'CLOUDINARY_STORAGE', {})
+        cloud_name = cfg.get('CLOUD_NAME', '')
+
+        if cloud_name:
+            return f"https://res.cloudinary.com/{cloud_name}/image/upload/{key}"
+
+        media_url = getattr(django_settings, 'MEDIA_URL', '/media/')
+        if not media_url.endswith('/'):
+            media_url += '/'
+        return f"{media_url}{key}"
 
     class Meta:
         db_table = 'rono_users'
