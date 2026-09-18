@@ -7,12 +7,12 @@ class SystemSetting(models.Model):
     One key/value row per setting.
 
     Storage contract for image/file/video types:
-      - `value` holds the storage key (e.g. "settings/site_logo")
-      - `get_url()` returns a fully-formed Cloudinary URL with a cache-buster
+      - `value` holds the storage key (e.g. "settings/site_logo_1789754321")
+      - `get_url()` returns a fully-formed Cloudinary URL
 
-    The value for media is written by the view via `cloudinary.uploader.upload`
-    using a stable public_id derived from the setting key (e.g. "settings/site_logo").
-    The view is the only writer. This model never rewrites the stored value.
+    Every upload uses a UNIQUE public_id (`settings/<key>_<timestamp>`),
+    so the URL itself changes each time. This defeats Cloudinary's CDN
+    cache — no stale content, ever.
     """
 
     SETTING_TYPES = (
@@ -25,7 +25,7 @@ class SystemSetting(models.Model):
         ('url', 'URL'),
         ('image', 'Image'),
         ('file', 'File'),
-        ('video', 'Video'),           # ← NEW
+        ('video', 'Video'),
         ('color', 'Color'),
         ('password', 'Password'),
         ('select', 'Select'),
@@ -93,13 +93,13 @@ class SystemSetting(models.Model):
 
     def get_url(self):
         """
-        Return a fully-formed Cloudinary URL for image/file/video settings,
-        with a cache-buster (based on updated_at) so browsers/CDN always
-        fetch the newest version after an update.
+        Return a fully-formed Cloudinary URL for image/file/video settings.
 
-        - Images / files → /image/upload/  (Cloudinary serves both from
-          the 'image' pipeline for our purposes)
-        - Videos         → /video/upload/
+        - Images / files → /image/upload/...
+        - Videos         → /video/upload/...
+
+        No cache-buster needed: each upload uses a unique public_id, so the
+        URL changes every time. Cloudinary's CDN never serves stale content.
 
         Returns None if no value is stored.
         """
@@ -114,25 +114,17 @@ class SystemSetting(models.Model):
         cloud_name = cfg.get('CLOUD_NAME', '')
 
         if cloud_name:
-            # Pick the correct Cloudinary delivery path
-            if self.setting_type == 'video':
-                resource = 'video'
-            else:
-                resource = 'image'
+            resource = 'video' if self.setting_type == 'video' else 'image'
+            return f"https://res.cloudinary.com/{cloud_name}/{resource}/upload/{key}"
 
-            url = f"https://res.cloudinary.com/{cloud_name}/{resource}/upload/{key}"
-            if self.updated_at:
-                url += f"?v={int(self.updated_at.timestamp())}"
-            return url
-
-        # Local filesystem fallback (dev with USE_CLOUDINARY_MEDIA=False)
+        # Local filesystem fallback (dev)
         media_url = getattr(django_settings, 'MEDIA_URL', '/media/')
         if not media_url.endswith('/'):
             media_url += '/'
         return f"{media_url}{key}"
 
     # ------------------------------------------------------------------
-    # Class helpers (used by views, templates, context processors)
+    # Class helpers
     # ------------------------------------------------------------------
     @classmethod
     def get_setting(cls, key, default=None):
@@ -156,10 +148,7 @@ class SystemSetting(models.Model):
 
     @classmethod
     def get_video_url(cls, key):
-        """
-        Explicit helper for video settings — same as get_image_url() but
-        named for clarity when the caller knows they want a video.
-        """
+        """Explicit helper for video settings."""
         try:
             obj = cls.objects.get(key=key)
             if obj.setting_type != 'video':
@@ -172,18 +161,12 @@ class SystemSetting(models.Model):
 
     @classmethod
     def as_dict(cls):
-        """
-        Return all settings as a flat dict of {key: typed_value}.
-
-        Used by apps.settings.context_processors.system_settings to inject
-        SITE_NAME, PRIMARY_COLOR, etc. into every template.
-        """
+        """Return all settings as a flat dict of {key: typed_value}."""
         return {s.key: s.get_value() for s in cls.objects.all()}
 
     # ------------------------------------------------------------------
     # Write
     # ------------------------------------------------------------------
     def save(self, *args, **kwargs):
-        # NOTE: we do NOT touch `value` here. The view is responsible for
-        # writing correctly-formatted storage keys for image/file/video settings.
+        # We do NOT touch `value` here — the view writes the storage key.
         super().save(*args, **kwargs)

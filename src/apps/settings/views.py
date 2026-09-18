@@ -1,5 +1,4 @@
-import os
-import re
+import time
 import cloudinary
 import cloudinary.uploader
 from django.shortcuts import render, redirect
@@ -60,8 +59,6 @@ SETTINGS_SCHEMA = [
     {'key': 'LOGIN_BACKGROUND', 'type': 'image', 'category': 'branding',
      'label': 'Login Background', 'default': '', 'order': 5,
      'help_text': 'Recommended 1920×1080px. JPG.'},
-
-    # --- Branding → Landing Video (NEW) ---
     {'key': 'LANDING_VIDEO', 'type': 'video', 'category': 'branding',
      'label': 'Landing Video', 'default': '', 'order': 6,
      'help_text': 'MP4 or WebM, up to 50MB. Plays inline on the landing page.'},
@@ -155,29 +152,27 @@ def _cloudinary():
 
 def _upload_media(file_obj, setting_key, resource_type='image'):
     """
-    Upload to Cloudinary at settings/<key> — NO extension in the public_id.
+    Upload to Cloudinary with a UNIQUE public_id per upload:
+        settings/<key>_<timestamp>
 
-    Cloudinary assigns and manages the format itself. Passing an extension
-    in public_id causes Cloudinary to append its own format suffix,
-    producing ugly URLs like 'site_logo.jpeg.jpg' that 404.
+    Why unique: Cloudinary's CDN caches by public_id. With a fixed
+    public_id + overwrite=True, replacing an image/video serves the
+    OLD cached version even though the new file is uploaded. A unique
+    public_id makes every upload a brand-new asset → CDN never serves
+    stale content.
 
-    resource_type:
-        'image'  → for logos, favicons, backgrounds, video posters
-        'video'  → for landing videos
-
-    Returns the public_id Cloudinary used (e.g. 'settings/landing_video').
+    Returns the public_id Cloudinary used (e.g. 'settings/site_logo_1789754321').
     """
     _cloudinary()
     key_lower = setting_key.lower()
-    public_id = f"settings/{key_lower}"          # ← NO extension
+    public_id = f"settings/{key_lower}_{int(time.time())}"
 
     result = cloudinary.uploader.upload(
         file_obj,
         public_id=public_id,
-        overwrite=True,
+        overwrite=False,
         resource_type=resource_type,
     )
-    # Cloudinary returns the public_id WITHOUT extension
     return result.get('public_id') or public_id
 
 
@@ -244,7 +239,6 @@ def settings_update(request):
         if obj.setting_type not in ('image', 'video'):
             continue
 
-        # Pick resource type based on setting type
         resource_type = 'video' if obj.setting_type == 'video' else 'image'
 
         try:
@@ -255,7 +249,7 @@ def settings_update(request):
 
         old_value = obj.value
         obj.value = new_value
-        obj.save()                       # bumps updated_at → cache-buster changes
+        obj.save()
         uploaded_keys.add(key)
         updated += 1
 
