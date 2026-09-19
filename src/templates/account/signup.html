@@ -1,0 +1,615 @@
+{% load static %}
+{% load socialaccount %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - {{ system_name|default:"RonoSystems" }}</title>
+
+    {# Favicon from Settings #}
+    {% if site_favicon_url %}
+        <link rel="icon" type="image/png" href="{{ site_favicon_url }}">
+        <link rel="shortcut icon" href="{{ site_favicon_url }}">
+    {% endif %}
+
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #cfe8ee;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* ============================================
+           LOGIN BACKGROUND (from Settings → Branding)
+           Same background image is used for both the
+           Login and Register pages.
+        ============================================ */
+        {% if login_background_url %}
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: url('{{ login_background_url }}') center center / cover no-repeat;
+            z-index: -2;
+        }
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(
+                135deg,
+                rgba(207, 232, 238, 0.35) 0%,
+                rgba(207, 232, 238, 0.55) 100%
+            );
+            z-index: -1;
+            pointer-events: none;
+        }
+        {% endif %}
+
+        /* ============================================
+           SPLIT CARD (mirrored: form left, panel right)
+        ============================================ */
+        .auth-card {
+            width: 100%;
+            max-width: 900px;
+            min-height: 620px;
+            background: #ffffff;
+            border-radius: 28px;
+            box-shadow:
+                0 20px 50px rgba(0, 0, 0, 0.25),
+                0 5px 15px rgba(0, 0, 0, 0.12);
+            overflow: hidden;
+            display: flex;
+            position: relative;
+            animation: fadeIn 0.5s ease;
+            z-index: 1;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ============================================
+           LEFT PANEL — form
+        ============================================ */
+        .panel-left {
+            flex: 1;
+            padding: 40px 45px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            background: #ffffff;
+            overflow-y: auto;
+        }
+
+        .panel-left .form-title {
+            font-size: 1.9rem;
+            font-weight: 700;
+            color: #1f2937;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        /* ============================================
+           INPUT FIELDS
+        ============================================ */
+        .field {
+            display: flex;
+            align-items: center;
+            background: #f3f4f6;
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-bottom: 14px;
+            transition: box-shadow 0.2s ease;
+            border: 1px solid transparent;
+        }
+
+        .field:focus-within {
+            background: #f9fafb;
+            border-color: #29c5e0;
+            box-shadow: 0 0 0 3px rgba(41, 197, 224, 0.15);
+        }
+
+        .field input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.92rem;
+            color: #1f2937;
+            outline: none;
+            min-width: 0;
+        }
+
+        .field input::placeholder {
+            color: #9ca3af;
+            font-weight: 400;
+        }
+
+        .field .field-icon {
+            color: #4b5563;
+            font-size: 1rem;
+            margin-left: 12px;
+            flex-shrink: 0;
+        }
+
+        .field .password-toggle {
+            background: transparent;
+            border: none;
+            color: #4b5563;
+            cursor: pointer;
+            padding: 0;
+            margin-left: 10px;
+            font-size: 1rem;
+        }
+
+        .field .password-toggle:hover { color: #1f2937; }
+
+        /* Company ID field — uppercase monospace styling */
+        .field.company-id-group input {
+            font-weight: 600;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+        }
+
+        .helper-text {
+            display: block;
+            font-size: 0.72rem;
+            color: #6b7280;
+            margin: -8px 4px 14px;
+        }
+
+        .password-feedback {
+            display: none;
+            font-size: 0.72rem;
+            margin: -8px 4px 14px;
+            font-weight: 500;
+        }
+        .password-feedback.show { display: block; }
+        .password-feedback.match   { color: #059669; }
+        .password-feedback.mismatch { color: #dc2626; }
+
+        /* ============================================
+           MAIN BUTTON — gradient pill
+        ============================================ */
+        .btn-primary-gradient {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 50px;
+            background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
+            color: #ffffff;
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 6px;
+        }
+
+        .btn-primary-gradient:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 24px rgba(31, 180, 210, 0.35);
+        }
+
+        .btn-primary-gradient:active { transform: translateY(0); }
+
+        .btn-primary-gradient:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* ============================================
+           DIVIDER
+        ============================================ */
+        .divider-text {
+            text-align: center;
+            color: #6b7280;
+            font-size: 0.82rem;
+            margin: 22px 0 16px;
+        }
+
+        /* ============================================
+           SOCIAL ICONS — bordered squares
+        ============================================ */
+        .socials {
+            display: flex;
+            justify-content: center;
+            gap: 14px;
+        }
+
+        .social-btn {
+            width: 46px;
+            height: 46px;
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+            color: #1f2937;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        .social-btn:hover {
+            border-color: #29c5e0;
+            background: #f0fbfd;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(41, 197, 224, 0.15);
+        }
+
+        .social-btn img {
+            width: 22px;
+            height: 22px;
+            object-fit: contain;
+        }
+
+        /* ============================================
+           ALERTS
+        ============================================ */
+        .alert {
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 0.82rem;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+        .alert.success { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
+        .alert.info    { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
+
+        .alert .btn-close {
+            margin-left: auto;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            color: inherit;
+            font-size: 1rem;
+            opacity: 0.6;
+        }
+        .alert .btn-close:hover { opacity: 1; }
+
+        /* ============================================
+           RIGHT PANEL — dark teal welcome
+        ============================================ */
+        .panel-right {
+            flex: 1;
+            background: linear-gradient(160deg, #0b3b4a 0%, #14566a 100%);
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px 30px;
+            text-align: center;
+            border-top-left-radius: 60% 100%;
+            border-bottom-left-radius: 60% 100%;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Logo wrap (shown above "Welcome Back!") */
+        .panel-right .logo-wrap {
+            width: 90px;
+            height: 90px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 18px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            padding: 8px;
+            backdrop-filter: blur(4px);
+        }
+
+        .panel-right .logo-wrap img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .panel-right .logo-wrap i {
+            font-size: 2.2rem;
+            color: #ffffff;
+        }
+
+        .panel-right .welcome-title {
+            font-size: 2.1rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .panel-right .welcome-sub {
+            font-size: 0.95rem;
+            font-weight: 400;
+            opacity: 0.9;
+            margin-bottom: 28px;
+        }
+
+        .panel-right .btn-outline-light {
+            display: inline-block;
+            padding: 12px 48px;
+            border: 2px solid #ffffff;
+            border-radius: 50px;
+            color: #ffffff;
+            font-weight: 600;
+            font-size: 0.95rem;
+            text-decoration: none;
+            background: transparent;
+            transition: all 0.25s ease;
+        }
+
+        .panel-right .btn-outline-light:hover {
+            background: #ffffff;
+            color: #0b3b4a;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        /* ============================================
+           RESPONSIVE
+        ============================================ */
+        @media (max-width: 768px) {
+            .auth-card {
+                flex-direction: column-reverse;
+                max-width: 440px;
+                min-height: auto;
+            }
+
+            .panel-right {
+                border-top-left-radius: 0;
+                border-bottom-left-radius: 0;
+                border-bottom-left-radius: 40px;
+                border-bottom-right-radius: 40px;
+                padding: 30px 24px;
+                min-height: 220px;
+            }
+
+            .panel-right .logo-wrap {
+                width: 70px;
+                height: 70px;
+                margin-bottom: 12px;
+            }
+
+            .panel-right .welcome-title { font-size: 1.6rem; }
+            .panel-right .welcome-sub { margin-bottom: 18px; font-size: 0.85rem; }
+            .panel-right .btn-outline-light { padding: 10px 34px; font-size: 0.85rem; }
+
+            .panel-left { padding: 34px 24px; }
+            .panel-left .form-title { font-size: 1.6rem; margin-bottom: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="auth-card">
+
+        <!-- ==========================================
+             LEFT PANEL (Registration form)
+        =========================================== -->
+        <div class="panel-left">
+            <h2 class="form-title">Registration</h2>
+
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert {% if message.tags == 'success' %}success{% elif message.tags == 'info' %}info{% endif %}">
+                        <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-circle{% else %}info-circle{% endif %}"></i>
+                        <span>{{ message }}</span>
+                        <button type="button" class="btn-close" onclick="this.parentElement.remove()">×</button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <form method="post" action="/auth/register/" id="registerForm">
+                {% csrf_token %}
+
+                <!-- Username -->
+                <div class="field">
+                    <input type="text" name="username" placeholder="Username" required
+                           value="{{ request.POST.username|default:'' }}" autofocus autocomplete="username">
+                    <i class="fas fa-user field-icon"></i>
+                </div>
+
+                <!-- Email -->
+                <div class="field">
+                    <input type="email" name="email" placeholder="Email" required
+                           value="{{ request.POST.email|default:'' }}" autocomplete="email">
+                    <i class="fas fa-envelope field-icon"></i>
+                </div>
+
+                <!-- Password -->
+                <div class="field">
+                    <input type="password" name="password1" id="password" placeholder="Password" required
+                           minlength="8" autocomplete="new-password">
+                    <button class="password-toggle" type="button" id="togglePassword" tabindex="-1">
+                        <i class="fas fa-lock"></i>
+                    </button>
+                </div>
+                <small class="password-feedback" id="strengthFeedback"></small>
+
+                <!-- Confirm Password -->
+                <div class="field">
+                    <input type="password" name="password2" id="confirmPassword" placeholder="Confirm Password" required
+                           autocomplete="new-password">
+                    <button class="password-toggle" type="button" id="toggleConfirmPassword" tabindex="-1">
+                        <i class="fas fa-lock"></i>
+                    </button>
+                </div>
+                <small class="password-feedback" id="matchFeedback"></small>
+
+                <!-- Company ID (optional) -->
+                <div class="field company-id-group">
+                    <input type="text" name="company_id" id="companyId" placeholder="Company ID (optional)"
+                           maxlength="20" autocomplete="off"
+                           value="{{ request.POST.company_id|default:'' }}">
+                    <i class="fas fa-hashtag field-icon"></i>
+                </div>
+
+                <!-- Register Button -->
+                <button type="submit" class="btn-primary-gradient" id="registerBtn">
+                    Register
+                </button>
+
+                <!-- Divider -->
+                <div class="divider-text">or register with social platforms</div>
+
+                <!-- Social Buttons -->
+                <div class="socials">
+                    <a href="{% provider_login_url 'google' %}" class="social-btn" title="Register with Google">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google">
+                    </a>
+                    <a href="#" class="social-btn" title="Facebook (not configured)">
+                        <i class="fab fa-facebook-f"></i>
+                    </a>
+                    <a href="#" class="social-btn" title="GitHub (not configured)">
+                        <i class="fab fa-github"></i>
+                    </a>
+                    <a href="#" class="social-btn" title="LinkedIn (not configured)">
+                        <i class="fab fa-linkedin-in"></i>
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <!-- ==========================================
+             RIGHT PANEL (Welcome Back + Login)
+        =========================================== -->
+        <div class="panel-right">
+            <div class="logo-wrap">
+                {% if site_logo_url %}
+                    <img src="{{ site_logo_url }}" alt="{{ system_name|default:'RonoSystems' }}">
+                {% else %}
+                    <i class="fas fa-rocket"></i>
+                {% endif %}
+            </div>
+            <h1 class="welcome-title">Welcome Back!</h1>
+            <p class="welcome-sub">Already have an Account</p>
+            <a href="/auth/login/" class="btn-outline-light">Login</a>
+        </div>
+
+    </div>
+
+    <script>
+        // ---- Password visibility toggles ----
+        function setupToggle(toggleId, inputId) {
+            const toggle = document.getElementById(toggleId);
+            const input = document.getElementById(inputId);
+            if (!toggle || !input) return;
+
+            toggle.addEventListener('click', function() {
+                const icon = this.querySelector('i');
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    icon.classList.remove('fa-lock');
+                    icon.classList.add('fa-eye');
+                } else {
+                    input.type = 'password';
+                    icon.classList.remove('fa-eye');
+                    icon.classList.add('fa-lock');
+                }
+            });
+        }
+        setupToggle('togglePassword', 'password');
+        setupToggle('toggleConfirmPassword', 'confirmPassword');
+
+        // ---- Auto-uppercase + trim company ID ----
+        const companyIdEl = document.getElementById('companyId');
+        if (companyIdEl) {
+            companyIdEl.addEventListener('input', function() {
+                const start = this.selectionStart;
+                const end = this.selectionEnd;
+                this.value = this.value.toUpperCase();
+                this.setSelectionRange(start, end);
+            });
+            companyIdEl.addEventListener('blur', function() {
+                this.value = this.value.trim();
+            });
+        }
+
+        // ---- Password strength ----
+        const pwInput = document.getElementById('password');
+        const cpwInput = document.getElementById('confirmPassword');
+        const strengthEl = document.getElementById('strengthFeedback');
+        const matchEl = document.getElementById('matchFeedback');
+        const registerBtn = document.getElementById('registerBtn');
+
+        function checkStrength(val) {
+            if (!strengthEl) return;
+            if (!val) {
+                strengthEl.className = 'password-feedback';
+                strengthEl.textContent = '';
+                return;
+            }
+            let score = 0;
+            if (val.length >= 8) score++;
+            if (/[A-Z]/.test(val)) score++;
+            if (/[a-z]/.test(val)) score++;
+            if (/[0-9]/.test(val)) score++;
+            if (/[^A-Za-z0-9]/.test(val)) score++;
+
+            strengthEl.classList.add('show');
+            if (score <= 2) {
+                strengthEl.textContent = 'Weak password';
+                strengthEl.className = 'password-feedback show mismatch';
+            } else if (score <= 3) {
+                strengthEl.textContent = 'Medium password';
+                strengthEl.className = 'password-feedback show';
+                strengthEl.style.color = '#d97706';
+            } else {
+                strengthEl.textContent = 'Strong password';
+                strengthEl.className = 'password-feedback show match';
+                strengthEl.style.color = '';
+            }
+        }
+
+        function checkMatch() {
+            if (!pwInput || !cpwInput || !matchEl) return;
+            if (!cpwInput.value) {
+                matchEl.classList.remove('show');
+                if (registerBtn) registerBtn.disabled = false;
+                return;
+            }
+            matchEl.classList.add('show');
+            if (pwInput.value === cpwInput.value) {
+                matchEl.textContent = '✓ Passwords match';
+                matchEl.className = 'password-feedback show match';
+                if (registerBtn) registerBtn.disabled = false;
+            } else {
+                matchEl.textContent = '✗ Passwords do not match';
+                matchEl.className = 'password-feedback show mismatch';
+                if (registerBtn) registerBtn.disabled = true;
+            }
+        }
+
+        if (pwInput) pwInput.addEventListener('input', function() {
+            checkStrength(this.value);
+            checkMatch();
+        });
+        if (cpwInput) cpwInput.addEventListener('input', checkMatch);
+    </script>
+</body>
+</html>
