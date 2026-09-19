@@ -247,6 +247,51 @@ class Company(models.Model):
         verbose_name_plural = 'Companies'
 
     # ============================================
+    # LOGO URL (Cloudinary)
+    # ============================================
+
+    @property
+    def logo_url(self):
+        """
+        Fully-formed Cloudinary URL for the company logo, or None.
+
+        The view (apps/companies/views.py::settings_company) uploads the
+        file to Cloudinary via cloudinary.uploader.upload() with a unique
+        public_id like 'companies/<id>_<timestamp>' and stores that key in
+        `self.logo`. This property builds the delivery URL for templates:
+
+            {% if company.logo_url %}
+                <img src="{{ company.logo_url }}" alt="{{ company.name }}">
+            {% endif %}
+
+        Because each upload uses a unique public_id, the URL changes on every
+        replacement — Cloudinary's CDN never serves stale content.
+        """
+        if not self.logo:
+            return None
+
+        key = getattr(self.logo, 'name', None) or str(self.logo)
+        key = key.strip().lstrip('/')
+        if not key:
+            return None
+
+        # Strip legacy /media/ prefix if present
+        if key.startswith('media/'):
+            key = key[len('media/'):]
+
+        cfg = getattr(django_settings, 'CLOUDINARY_STORAGE', {})
+        cloud_name = cfg.get('CLOUD_NAME', '')
+
+        if cloud_name:
+            return f"https://res.cloudinary.com/{cloud_name}/image/upload/{key}"
+
+        # Local filesystem fallback (dev with USE_CLOUDINARY_MEDIA=False)
+        media_url = getattr(django_settings, 'MEDIA_URL', '/media/')
+        if not media_url.endswith('/'):
+            media_url += '/'
+        return f"{media_url}{key}"
+
+    # ============================================
     # SUBSCRIPTION ACCESSORS
     # ============================================
 

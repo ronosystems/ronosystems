@@ -1,3 +1,9 @@
+import os
+import time
+import json
+import cloudinary
+import cloudinary.uploader
+
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -5,34 +11,75 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.conf import settings as django_settings
 from django.http import JsonResponse
+
 from apps.companies.support_utils import (
     get_active_company,
     is_support_mode,
     is_effective_admin,
     get_effective_branch,
 )
-import os
-import json
-
 from apps.companies.models import Company
 
 
+# ============================================
+# CLOUDINARY HELPERS
+# ============================================
+def _cloudinary_configure():
+    cfg = getattr(django_settings, 'CLOUDINARY_STORAGE', {})
+    cloudinary.config(
+        cloud_name=cfg.get('CLOUD_NAME', ''),
+        api_key=cfg.get('API_KEY', ''),
+        api_secret=cfg.get('API_SECRET', ''),
+        secure=True,
+    )
+
+
+def _upload_company_logo(file_obj, company_id):
+    """
+    Upload company logo to Cloudinary at a UNIQUE public_id:
+        companies/<company_id>_<timestamp>
+
+    Unique ID → new asset every upload → CDN never serves stale content.
+    Returns the public_id Cloudinary used.
+    """
+    _cloudinary_configure()
+    public_id = f"companies/{company_id}_{int(time.time())}"
+    result = cloudinary.uploader.upload(
+        file_obj,
+        public_id=public_id,
+        overwrite=False,
+        resource_type='image',
+    )
+    return result.get('public_id') or public_id
+
+
+def _delete_company_logo(public_id):
+    """Delete a Cloudinary asset by its exact public_id. Silent on failure."""
+    if not public_id:
+        return
+    try:
+        _cloudinary_configure()
+        cloudinary.uploader.destroy(public_id, resource_type='image')
+    except Exception:
+        pass
+
+
+# ============================================
+# DASHBOARD
+# ============================================
 @login_required
 def settings_dashboard(request):
     """Company settings dashboard"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     settings_data = get_company_settings(company)
-    
+
     context = {
         'company': company,
         'settings': settings_data,
@@ -42,27 +89,28 @@ def settings_dashboard(request):
     return render(request, 'company/settings/dashboard.html', context)
 
 
+# ============================================
+# COMPANY SETTINGS (with Cloudinary logo upload)
+# ============================================
 @login_required
 def settings_company(request):
-    """Company settings - update company info and logo"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
+    """Company settings — update company info and logo"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     if request.method == 'POST':
         try:
+            # ---------- Text fields ----------
             company_name = request.POST.get('company_name')
             company_email = request.POST.get('company_email')
             company_phone = request.POST.get('company_phone')
             company_address = request.POST.get('company_address')
-            
+
             if company_name:
                 company.name = company_name
             if company_email:
@@ -71,44 +119,68 @@ def settings_company(request):
                 company.phone = company_phone
             if company_address:
                 company.address = company_address
-            
-            # Handle logo upload
-            if request.FILES.get('company_logo'):
-                logo = request.FILES['company_logo']
-                valid_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.svg']
-                ext = os.path.splitext(logo.name)[1].lower()
-                if ext in valid_extensions:
-                    if company.logo:
-                        old_logo_path = os.path.join(django_settings.MEDIA_ROOT, str(company.logo))
-                        if os.path.exists(old_logo_path):
-                            os.remove(old_logo_path)
-                    company.logo = logo
-                else:
-                    messages.error(request, 'Invalid file format. Please upload JPG, PNG, GIF, or SVG.')
-                    return redirect('company-settings-company')
-            
-            # Handle logo removal
+
+            # ---------- Logo removal (checked first) ----------
             if request.POST.get('remove_logo') == 'true':
                 if company.logo:
-                    old_logo_path = os.path.join(django_settings.MEDIA_ROOT, str(company.logo))
-                    if os.path.exists(old_logo_path):
-                        os.remove(old_logo_path)
+                    old_key = getattr(company.logo, 'name', '') or str(company.logo)
+                    old_key = old_key.strip().lstrip('/')
+                    _delete_company_logo(old_key)
                     company.logo = None
                     company.save()
-                    messages.success(request, 'Company logo removed successfully!')
+                messages.success(request, 'Company logo removed successfully!')
+                return redirect('company-settings-company')
+
+            # ---------- Logo upload (Cloudinary, unique public_id) ----------
+            if request.FILES.get('company_logo'):
+                logo = request.FILES['company_logo']
+                valid_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp']
+                ext = os.path.splitext(logo.name)[1].lower()
+
+                if ext not in valid_extensions:
+                    messages.error(
+                        request,
+                        'Invalid file format. Please upload JPG, PNG, GIF, SVG, or WEBP.'
+                    )
                     return redirect('company-settings-company')
-            
+
+                # Remember the current key so we can delete the old asset after
+                old_key = ''
+                if company.logo:
+                    old_key = getattr(company.logo, 'name', '') or str(company.logo)
+                    old_key = old_key.strip().lstrip('/')
+
+                try:
+                    new_key = _upload_company_logo(logo, company.id or company.pk)
+                except Exception as e:
+                    messages.error(request, f'Logo upload failed: {e}')
+                    return redirect('company-settings-company')
+
+                company.logo = new_key
+                company.save()
+
+                # Delete the previous asset (best-effort)
+                if old_key and old_key != new_key:
+                    _delete_company_logo(old_key)
+
+                # Also persist any other fields submitted with the same form
+                save_company_settings(company, request.POST)
+
+                messages.success(request, 'Company settings updated successfully!')
+                return redirect('company-settings-company')
+
+            # ---------- Save text-only changes ----------
             company.save()
             save_company_settings(company, request.POST)
-            
+
             messages.success(request, 'Company settings updated successfully!')
             return redirect('company-settings-company')
-            
+
         except Exception as e:
             messages.error(request, f'Error updating settings: {str(e)}')
-    
+
     settings_data = get_company_settings(company)
-    
+
     context = {
         'company': company,
         'settings': settings_data,
@@ -119,20 +191,20 @@ def settings_company(request):
     return render(request, 'company/settings/company.html', context)
 
 
+# ============================================
+# PAYMENT SETTINGS
+# ============================================
 @login_required
 def settings_payment(request):
     """Payment settings"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     if request.method == 'POST':
         try:
             payment_settings = {
@@ -155,16 +227,16 @@ def settings_payment(request):
                 'bank_account': request.POST.get('bank_account', ''),
                 'bank_branch': request.POST.get('bank_branch', ''),
             }
-            
+
             save_company_settings(company, payment_settings, 'payment')
             messages.success(request, 'Payment settings updated successfully!')
             return redirect('company-settings-payment')
-            
+
         except Exception as e:
             messages.error(request, f'Error updating payment settings: {str(e)}')
-    
+
     settings_data = get_company_settings(company)
-    
+
     context = {
         'company': company,
         'settings': settings_data,
@@ -182,20 +254,20 @@ def settings_payment(request):
     return render(request, 'company/settings/payment.html', context)
 
 
+# ============================================
+# RECEIPT SETTINGS
+# ============================================
 @login_required
 def settings_receipt(request):
     """Receipt settings"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     if request.method == 'POST':
         try:
             receipt_settings = {
@@ -218,16 +290,16 @@ def settings_receipt(request):
                 'receipt_width': request.POST.get('receipt_width', '80'),
                 'custom_css': request.POST.get('custom_css', ''),
             }
-            
+
             save_company_settings(company, receipt_settings, 'receipt')
             messages.success(request, 'Receipt settings updated successfully!')
             return redirect('company-settings-receipt')
-            
+
         except Exception as e:
             messages.error(request, f'Error updating receipt settings: {str(e)}')
-    
+
     settings_data = get_company_settings(company)
-    
+
     context = {
         'company': company,
         'settings': settings_data,
@@ -244,23 +316,22 @@ def settings_receipt(request):
     return render(request, 'company/settings/receipt.html', context)
 
 
+# ============================================
+# RECEIPT PREVIEW
+# ============================================
 @login_required
 def settings_preview_receipt(request):
     """Preview receipt"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     settings_data = get_company_settings(company)
-    
-    # Sample receipt data
+
     receipt_data = {
         'receipt_number': 'RCP-2026-0001',
         'date': '2026-08-27 14:30',
@@ -279,7 +350,7 @@ def settings_preview_receipt(request):
         'payment_status': 'Paid',
         'cashier': 'Admin',
     }
-    
+
     context = {
         'company': company,
         'settings': settings_data,
@@ -342,16 +413,16 @@ def get_company_settings(company):
             'custom_css': '',
         }
     }
-    
+
     try:
         if company.company_settings:
             saved_settings = json.loads(company.company_settings)
             for section in default_settings:
                 if section in saved_settings:
                     default_settings[section].update(saved_settings[section])
-    except:
+    except Exception:
         pass
-    
+
     return default_settings
 
 
@@ -361,14 +432,14 @@ def save_company_settings(company, settings_data, section=None):
         existing = {}
         if company.company_settings:
             existing = json.loads(company.company_settings)
-        
+
         if section:
             existing[section] = settings_data
         else:
             if 'company' not in existing:
                 existing['company'] = {}
             existing['company'].update(settings_data)
-        
+
         company.company_settings = json.dumps(existing)
         company.save()
     except Exception as e:
