@@ -98,6 +98,7 @@ INSTALLED_APPS = [
     # Business Type Apps
     'apps.epa_shop',
     'apps.supermarket',
+    'apps.kuku_biz',
 ]
 
 # Required by django.contrib.sites / allauth
