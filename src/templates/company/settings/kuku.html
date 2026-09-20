@@ -1,0 +1,193 @@
+{% extends base_template|default:"base.html" %}
+{% load static %}
+
+{% block title %}Kuku Biz Settings{% endblock %}
+
+{% block extra_css %}
+<style>
+    .settings-page {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 30px 36px;
+        max-width: 780px;
+    }
+    .settings-page .page-title {
+        font-size: 1.3rem;
+        font-weight: 700;
+        margin-bottom: 6px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid #000;
+    }
+    .settings-page .page-sub {
+        color: #6b7280;
+        font-size: 0.85rem;
+        margin-bottom: 24px;
+    }
+    .section-divider {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #6b7280;
+        margin: 24px 0 12px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        font-size: 0.85rem;
+        margin-bottom: 6px;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 10px 14px;
+        border: 2px solid #000;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 0.9rem;
+        background: #fff;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: #1fb4d2;
+        box-shadow: 0 0 0 3px rgba(31,180,210,0.2);
+    }
+    .form-group .help-text {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-top: 4px;
+    }
+    .form-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 28px;
+        padding-top: 20px;
+        border-top: 2px solid #000;
+    }
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 24px;
+        border-radius: 50px;
+        border: 2px solid #000;
+        background: #fff;
+        color: #000;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.2s;
+    }
+    .btn-primary {
+        background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
+        color: #fff;
+    }
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 18px rgba(31,180,210,0.35);
+        color: #fff;
+    }
+    .btn-secondary:hover {
+        background: #f0fbfd;
+        border-color: #1fb4d2;
+        color: #1fb4d2;
+    }
+    @media (max-width: 768px) {
+        .settings-page { padding: 24px 20px; }
+        .form-row { grid-template-columns: 1fr; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="settings-page">
+        <div class="page-title">
+            <i class="fas fa-drumstick-bite"></i> Kuku Biz Settings
+        </div>
+        <div class="page-sub">
+            Configure defaults for your poultry operations. These apply to all Kuku Biz pages.
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+
+            <div class="section-divider">Egg Packaging</div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="default_tray_size">Eggs Per Tray</label>
+                    <input type="number" id="default_tray_size" name="default_tray_size"
+                           value="{{ settings.default_tray_size }}" min="1">
+                    <div class="help-text">Usually 30 eggs per tray</div>
+                </div>
+                <div class="form-group">
+                    <label for="default_crate_size">Eggs Per Crate</label>
+                    <input type="number" id="default_crate_size" name="default_crate_size"
+                           value="{{ settings.default_crate_size }}" min="1">
+                    <div class="help-text">Usually 360 eggs per crate (12 trays)</div>
+                </div>
+            </div>
+
+            <div class="section-divider">Pricing</div>
+
+            <div class="form-group">
+                <label for="default_tray_price">Default Tray Price (KES)</label>
+                <input type="number" id="default_tray_price" name="default_tray_price"
+                       value="{{ settings.default_tray_price }}" min="0" step="0.01">
+                <div class="help-text">Pre-fills the sale form with this price</div>
+            </div>
+
+            <div class="section-divider">Alerts</div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="auto_alert_breach_days">Low Lay-Rate Alert (days)</label>
+                    <input type="number" id="auto_alert_breach_days" name="auto_alert_breach_days"
+                           value="{{ settings.auto_alert_breach_days }}" min="1">
+                    <div class="help-text">Warn if a flock stays below 60% for this many days</div>
+                </div>
+                <div class="form-group">
+                    <label for="notify_email">Alert Email (optional)</label>
+                    <input type="email" id="notify_email" name="notify_email"
+                           value="{{ settings.notify_email }}" placeholder="manager@example.com">
+                    <div class="help-text">Where to send Kuku Biz alerts</div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Save Settings
+                </button>
+                <a href="{% url 'company-settings-dashboard' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
