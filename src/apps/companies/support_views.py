@@ -87,15 +87,15 @@ def clear_all_support_sessions(request):
 @login_required
 @super_admin_required
 def enter_support_mode(request, company_id):
-    """Enter support mode for a specific company"""
+    """Enter support mode for a specific company."""
     company = get_object_or_404(Company, id=company_id)
-    
+
     # End any existing active session
     SupportSession.objects.filter(
         super_admin=request.user,
         is_active=True
     ).update(is_active=False, ended_at=timezone.now())
-    
+
     # Create new support session
     SupportSession.objects.create(
         super_admin=request.user,
@@ -105,24 +105,61 @@ def enter_support_mode(request, company_id):
         reason=request.GET.get('reason', ''),
         is_active=True
     )
-    
+
     # Set session flags
     request.session['viewing_company_id'] = company.id
     request.session['support_mode'] = True
     request.session['support_started_at'] = timezone.now().isoformat()
-    
+
     messages.success(request, f'✅ Support Mode active: Viewing {company.name}')
-    
-    # Redirect to the company's dashboard
-    business_type = company.business_type
-    if business_type:
-        business_name = business_type.name.lower()
-        if 'epa' in business_name or 'electronics' in business_name:
-            return redirect('/epa_shop/dashboard/')
-        elif 'supermarket' in business_name:
-            return redirect('/supermarket/dashboard/')
-    
-    return redirect('/epa_shop/dashboard/')
+
+    # ------------------------------------------------------------
+    # Route to the correct dashboard by business type
+    # ------------------------------------------------------------
+    target_url = _dashboard_url_for_company(company)
+
+    return redirect(target_url)
+
+
+# ============================================================
+# BUSINESS TYPE → DASHBOARD MAPPER
+# ============================================================
+
+# Keyword in business_type.name → dashboard URL
+BUSINESS_TYPE_DASHBOARDS = [
+    ('kuku',        '/kuku_biz/dashboard/'),
+    ('poultry',     '/kuku_biz/dashboard/'),
+    ('supermarket', '/supermarket/dashboard/'),
+    ('grocery',     '/supermarket/dashboard/'),
+    ('healthcare',  '/healthcare/dashboard/'),
+    ('medical',     '/healthcare/dashboard/'),
+    ('education',   '/education/dashboard/'),
+    ('school',      '/education/dashboard/'),
+    ('restaurant',  '/restaurant/dashboard/'),
+    ('food',        '/restaurant/dashboard/'),
+    ('retail',      '/retail/dashboard/'),
+    ('epa',         '/epa_shop/dashboard/'),
+    ('electronic',  '/epa_shop/dashboard/'),
+]
+
+DEFAULT_DASHBOARD = '/dashboard/'
+
+
+def _dashboard_url_for_company(company):
+    """
+    Return the correct dashboard URL for a company based on its business type.
+
+    Falls back to '/dashboard/' if the business type is unknown or missing.
+    """
+    if not company or not company.business_type:
+        return DEFAULT_DASHBOARD
+
+    name = (company.business_type.name or '').lower()
+    for keyword, url in BUSINESS_TYPE_DASHBOARDS:
+        if keyword in name:
+            return url
+
+    return DEFAULT_DASHBOARD
 
 
 @login_required
