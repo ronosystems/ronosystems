@@ -71,6 +71,7 @@ def login_page(request):
 # ============================================================
 # DASHBOARD ROUTING
 # ============================================================
+
 def redirect_dashboard(request, user):
     """Redirect user to the appropriate dashboard based on role, company, and business type."""
 
@@ -94,6 +95,8 @@ def redirect_dashboard(request, user):
             return HttpResponseRedirect('/epa_shop/dashboard/')
         if 'supermarket' in business_name or 'grocery' in business_name:
             return HttpResponseRedirect('/supermarket/dashboard/')
+        if 'kuku' in business_name or 'poultry' in business_name:
+            return HttpResponseRedirect('/kuku_biz/dashboard/')
         if 'healthcare' in business_name or 'medical' in business_name:
             return HttpResponseRedirect('/healthcare/dashboard/')
         if 'education' in business_name or 'school' in business_name:
@@ -103,9 +106,33 @@ def redirect_dashboard(request, user):
         if 'retail' in business_name:
             return HttpResponseRedirect('/retail/dashboard/')
 
-    # Fallback
-    return HttpResponseRedirect('/dashboard/general/')
+        # ─────────────────────────────────────────────
+        # FALLBACK 1 — business_type exists but no match
+        # ─────────────────────────────────────────────
+        logger.warning(
+            "No dashboard mapped for company '%s' (business_type='%s')",
+            company.name, business_name
+        )
+        messages.warning(
+            request,
+            f'No dashboard is configured for "{business_type.name}". '
+            'Please contact support.'
+        )
+        return HttpResponseRedirect('/no-access/')
 
+    # ─────────────────────────────────────────────
+    # FALLBACK 2 — company has no business_type set
+    # ─────────────────────────────────────────────
+    logger.warning(
+        "Company '%s' has no business_type assigned", company.name
+    )
+    messages.warning(
+        request,
+        'Your company has no business type configured. Please contact support.'
+    )
+    return HttpResponseRedirect('/no-access/')
+
+    
 
 # ============================================================
 # LOGOUT

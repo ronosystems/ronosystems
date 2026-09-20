@@ -5,6 +5,7 @@ from . import branch_views
 from . import reports_views
 from . import expenses_views
 from . import settings_views
+from apps.kuku_biz import settings_views as kuku_settings_views
 
 urlpatterns = [
     # ============================================
@@ -82,5 +83,6 @@ urlpatterns = [
     path('settings/payment/', settings_views.settings_payment, name='company-settings-payment'),
     path('settings/receipt/', settings_views.settings_receipt, name='company-settings-receipt'),
     path('settings/preview-receipt/', settings_views.settings_preview_receipt, name='company-settings-preview-receipt'),
+    path('settings/kuku/', kuku_settings_views.settings_kuku, name='company-settings-kuku'),
     
 ]

@@ -95,21 +95,50 @@ class BusinessTypeEnum(Enum):
         'integration': {
             'module': 'supermarket',
             'models': [
-                'Category',           # Product categories (Dairy, Meat, Produce, etc.)
-                'Product',            # Individual products with barcodes
-                'Inventory',          # Stock management
-                'Supplier',           # Product suppliers
-                'PurchaseOrder',      # Orders from suppliers
-                'PurchaseOrderItem',  # Items in purchase orders
-                'Sale',               # Customer sales
-                'SaleItem',           # Items in sales
-                'Customer',           # Customer profiles
-                'PriceHistory',       # Price change tracking
-                'Discount',           # Promotions and discounts
-                'ShelfLocation'       # Store shelf/aisle locations
+                'Category',
+                'Product',
+                'Inventory',
+                'Supplier',
+                'PurchaseOrder',
+                'PurchaseOrderItem',
+                'Sale',
+                'SaleItem',
+                'Customer',
+                'PriceHistory',
+                'Discount',
+                'ShelfLocation'
             ],
             'dashboard': 'SupermarketDashboardView'
         }
+    }
+
+    KUKU_BIZ = {
+        'id': 7,
+        'name': 'Kuku Biz',
+        'slug': 'kuku-biz',
+        'description': 'Poultry Farming - Layer Hens and Egg Production',
+        'icon': 'fa-drumstick-bite',
+        'app': 'apps.kuku_biz',
+        'is_active': True,
+        'integration': {
+            'module': 'kuku_biz',
+            'models': [
+                'Flock',                # Batches of hens (age, breed, count)
+                'Hen',                  # Individual hen records (optional)
+                'EggProduction',        # Daily egg counts per flock
+                'EggSale',              # Egg sales to customers
+                'EggSaleItem',          # Line items in an egg sale
+                'Customer',             # Egg buyers (retail, wholesale)
+                'FeedRecord',           # Feed consumed / purchased
+                'FeedType',             # Brands or formulas of feed
+                'HealthRecord',         # Vaccinations, treatments, vet visits
+                'Mortality',            # Deaths / culling
+                'Expense',              # Farm expenses (labour, utilities, etc.)
+                'Inventory',            # Egg crates, feed stock, supplies
+                'PriceHistory',         # Egg price changes over time
+            ],
+            'dashboard': 'KukuBizDashboardView',
+        },
     }
     
     @classmethod

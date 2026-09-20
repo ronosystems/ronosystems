@@ -37,6 +37,7 @@ urlpatterns = [
     path('dashboard/', include('apps.company.dashboard_urls')),
     path('company/', include('apps.company.urls_web')),
     path('epa_shop/', include('apps.epa_shop.urls_web')),
+    path('kuku_biz/', include('apps.kuku_biz.urls')),
     path('business-types/', include('apps.business_types.urls')),
     path('subscription-expired/', company_views.subscription_expired, name='subscription-expired'),
     path('payments/kcb/callback/', company_views.company_payments_callback, name='kcb-callback'),
