@@ -1,0 +1,234 @@
+{% extends 'kuku_base.html' %}
+{% load static %}
+
+{% block title %}Egg Prices — Kuku Biz{% endblock %}
+{% block page_title %}Egg Prices{% endblock %}
+{% block page_subtitle %}<small>Set and track egg prices per unit</small>{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
+    }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .card {
+        background: #fff; border: 2px solid #000; border-radius: 8px; overflow: hidden;
+    }
+    .card-header {
+        padding: 12px 18px; background: #f0fbfd; border-bottom: 2px solid #000;
+        font-weight: 700; font-size: 0.85rem; text-transform: uppercase;
+        letter-spacing: 1px; color: #0a2f45; display: flex; align-items: center; gap: 10px;
+    }
+    .card-header i { color: #1fb4d2; }
+    .card-body { padding: 18px; }
+
+    .price-item {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 12px 0; border-bottom: 1px solid #e5e7eb;
+    }
+    .price-item:last-child { border-bottom: none; }
+    .price-label { font-weight: 600; color: #374151; display: flex; align-items: center; gap: 10px; }
+    .price-label i { color: #1fb4d2; width: 18px; text-align: center; }
+    .price-amt {
+        font-family: 'Courier New', monospace; font-weight: 700; font-size: 1.05rem; color: #0a2f45;
+    }
+    .price-amt.none { color: #9ca3af; font-style: italic; font-size: 0.85rem; font-weight: 400; }
+    .price-since { font-size: 0.7rem; color: #9ca3af; display: block; }
+
+    .form-row { margin-bottom: 14px; }
+    .form-row label {
+        display: block; font-size: 0.75rem; font-weight: 700; color: #374151;
+        text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;
+    }
+    .form-row input,
+    .form-row select,
+    .form-row textarea {
+        width: 100%; padding: 10px 14px; border: 2px solid #000; border-radius: 4px;
+        font-family: inherit; font-size: 0.9rem; background: #fff;
+    }
+    .form-row input:focus,
+    .form-row select:focus,
+    .form-row textarea:focus {
+        outline: none; border-color: #1fb4d2; box-shadow: 0 0 0 3px rgba(31,180,210,0.2);
+    }
+
+    .btn {
+        display: inline-flex; align-items: center; gap: 8px; padding: 11px 22px;
+        border-radius: 50px; border: 2px solid #000; background: #fff; color: #000;
+        text-decoration: none; font-weight: 600; font-size: 0.85rem;
+        cursor: pointer; font-family: inherit; transition: all 0.2s;
+    }
+    .btn-primary {
+        background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%); color: #fff;
+    }
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 18px rgba(31,180,210,0.35); color: #fff;
+    }
+    .btn-sm { padding: 6px 12px; font-size: 0.75rem; }
+    .btn-danger { background: #fee2e2; color: #991b1b; }
+    .btn-danger:hover { background: #991b1b; color: #fff; }
+
+    .data-table {
+        width: 100%; background: #fff; border: 2px solid #000; border-radius: 8px;
+        border-collapse: separate; border-spacing: 0; overflow: hidden;
+    }
+    .data-table th {
+        text-align: left; padding: 12px 16px; font-size: 0.75rem;
+        text-transform: uppercase; letter-spacing: 1px; font-weight: 700;
+        color: #374151; background: #f0fbfd; border-bottom: 2px solid #000;
+    }
+    .data-table td {
+        padding: 12px 16px; border-bottom: 1px solid #e5e7eb; font-size: 0.88rem;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover { background: #f9fafb; }
+    .cell-num {
+        font-family: 'Courier New', monospace; font-weight: 700; text-align: right;
+    }
+    .readonly-banner {
+        display: flex; align-items: center; gap: 10px; padding: 12px 18px;
+        background: #fef3c7; border: 2px solid #000; border-radius: 8px;
+        font-size: 0.85rem; font-weight: 600; color: #92400e; margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h2 style="margin:0;font-size:1.1rem;font-weight:700;">Egg Price Management</h2>
+</div>
+
+{% if not can_edit %}
+<div class="readonly-banner">
+    <i class="fas fa-lock"></i>
+    You can view prices but only company admins and stock controllers can modify them.
+</div>
+{% endif %}
+
+<div class="grid-2">
+
+    <!-- ============ Current Prices + Add Form ============ -->
+    <div class="card">
+        <div class="card-header">
+            <i class="fas fa-tag"></i> Current Prices
+        </div>
+        <div class="card-body">
+
+            <!-- Current price snapshot -->
+            {% for code, info in latest_prices.items %}
+            <div class="price-item">
+                <span class="price-label">
+                    <i class="fas fa-{% if code == 'egg' %}egg{% elif code == 'tray' %}box{% else %}boxes{% endif %}"></i>
+                    {{ info.label }}
+                </span>
+                {% if info.price %}
+                    <span class="price-amt">
+                        KES {{ info.price|floatformat:2 }}
+                        <span class="price-since">since {{ info.effective_date|date:"d M Y" }}</span>
+                    </span>
+                {% else %}
+                    <span class="price-amt none">Not set</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            <!-- Add new price -->
+            {% if can_edit %}
+            <hr style="border-top: 2px solid #000; margin: 20px 0 16px;">
+            <h4 style="margin:0 0 14px;font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#0a2f45;">
+                <i class="fas fa-plus-circle" style="color:#1fb4d2;"></i> Set New Price
+            </h4>
+            <form method="post">
+                {% csrf_token %}
+
+                <div class="form-row">
+                    <label>Unit</label>
+                    <select name="unit" required>
+                        {% for code, label in unit_choices %}
+                            <option value="{{ code }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <label>Price (KES)</label>
+                    <input type="number" name="price" step="0.01" min="0.01" required
+                           placeholder="e.g. 450.00">
+                </div>
+
+                <div class="form-row">
+                    <label>Effective Date</label>
+                    <input type="date" name="effective_date" value="{{ today|date:'Y-m-d' }}">
+                </div>
+
+                <div class="form-row">
+                    <label>Notes (optional)</label>
+                    <input type="text" name="notes" maxlength="200"
+                           placeholder="e.g. Wholesale price increase">
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">
+                    <i class="fas fa-save"></i> Save Price
+                </button>
+            </form>
+            {% endif %}
+
+        </div>
+    </div>
+
+    <!-- ============ History ============ -->
+    <div class="card">
+        <div class="card-header">
+            <i class="fas fa-history"></i> Price History
+        </div>
+        <div class="card-body" style="padding: 0;">
+            {% if history %}
+            <table class="data-table" style="border:none;border-radius:0;">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Unit</th>
+                        <th style="text-align:right;">Price (KES)</th>
+                        {% if can_edit %}<th style="text-align:right;">&nbsp;</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in history %}
+                    <tr>
+                        <td>{{ entry.effective_date|date:"d M Y" }}</td>
+                        <td>{{ entry.get_unit_display }}</td>
+                        <td class="cell-num">{{ entry.price|floatformat:2 }}</td>
+                        {% if can_edit %}
+                        <td style="text-align:right;">
+                            <form method="post"
+                                  action="{% url 'kuku_biz:price_delete' entry.pk %}"
+                                  style="display:inline;"
+                                  onsubmit="return confirm('Delete this price entry?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-danger" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div style="padding: 40px; text-align: center; color: #9ca3af;">
+                <i class="fas fa-tags" style="font-size: 2.5rem; margin-bottom: 12px; display: block;"></i>
+                No price history yet.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

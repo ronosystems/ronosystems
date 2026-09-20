@@ -1,0 +1,205 @@
+{% extends 'kuku_base.html' %}
+{% load static %}
+
+{% block page_title %}Inventory{% endblock %}
+{% block page_subtitle %}{{ company.name }}{% endblock %}
+
+{% block content %}
+
+<!-- ============================================================ -->
+<!-- KPI Cards -->
+<!-- ============================================================ -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card border-dark" style="border: 2px solid #000 !important;">
+            <div class="card-body">
+                <div class="text-muted small">Total Items</div>
+                <div class="fs-3 fw-bold">{{ items|length }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-dark" style="border: 2px solid #000 !important;">
+            <div class="card-body">
+                <div class="text-muted small">Low Stock Alerts</div>
+                <div class="fs-3 fw-bold text-danger">{{ low_stock|length }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 text-end">
+        <a href="{% url 'kuku_biz:inventory_create' %}"
+           class="btn btn-primary fw-bold"
+           style="border: 2px solid #000;">
+            <i class="fas fa-plus"></i> Add Stock
+        </a>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Branch Filter -->
+<!-- ============================================================ -->
+<div class="card mb-3" style="border: 2px solid #000;">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small fw-bold">Filter by Branch</label>
+                <select name="branch" class="form-select" style="border: 2px solid #000;">
+                    <option value="">All Branches</option>
+                    {% for b in branches %}
+                        <option value="{{ b.id }}" {% if branch_filter == b.id|stringformat:"s" %}selected{% endif %}>
+                            {{ b.name }}
+                        </option>
+                    {% endfor %}
+                    <option value="unassigned" {% if branch_filter == 'unassigned' %}selected{% endif %}>
+                        — Unassigned —
+                    </option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-dark w-100" style="border: 2px solid #000;">
+                    <i class="fas fa-filter"></i> Apply
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Inventory Table -->
+<!-- ============================================================ -->
+<div class="card" style="border: 2px solid #000;">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead style="background: #f0f2f5;">
+                    <tr>
+                        <th style="border-bottom: 2px solid #000;">Item</th>
+                        <th style="border-bottom: 2px solid #000;">Branch</th>
+                        <th style="border-bottom: 2px solid #000;">Type</th>
+                        <th style="border-bottom: 2px solid #000;" class="text-end">Qty</th>
+                        <th style="border-bottom: 2px solid #000;" class="text-end">Reorder</th>
+                        <th style="border-bottom: 2px solid #000;" class="text-end">Cost/Unit</th>
+                        <th style="border-bottom: 2px solid #000;" class="text-end">Total Value</th>
+                        <th style="border-bottom: 2px solid #000;" class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td class="fw-bold">
+                            {{ item.name }}
+                            {% if item.needs_reorder %}
+                                <span class="badge bg-danger ms-1">Low</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.branch %}
+                                <span class="badge bg-info text-dark">{{ item.branch.name }}</span>
+                            {% else %}
+                                <span class="text-muted small">— Unassigned —</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ item.get_item_type_display }}</td>
+                        <td class="text-end fw-bold">
+                            {{ item.quantity }} <span class="text-muted small">{{ item.unit }}</span>
+                        </td>
+                        <td class="text-end text-muted">{{ item.reorder_level }}</td>
+                        <td class="text-end">KES {{ item.cost_per_unit|floatformat:2 }}</td>
+                        <td class="text-end fw-bold">
+                            KES {{ item.quantity|floatformat:2 }}
+                            <!-- optional: multiply in a property -->
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'kuku_biz:inventory_edit' item.pk %}"
+                                   class="btn btn-outline-dark" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button type="button"
+                                        class="btn btn-outline-success"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#adjustModal{{ item.pk }}"
+                                        title="Adjust Stock">
+                                    <i class="fas fa-plus-minus"></i>
+                                </button>
+                                <form method="post"
+                                      action="{% url 'kuku_biz:inventory_delete' item.pk %}"
+                                      class="d-inline"
+                                      onsubmit="return confirm('Delete {{ item.name|escapejs }}?');">
+                                    {% csrf_token %}
+                                    <button class="btn btn-outline-danger" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+
+                            <!-- Adjust Stock Modal -->
+                            <div class="modal fade" id="adjustModal{{ item.pk }}" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <form method="post"
+                                          action="{% url 'kuku_biz:inventory_adjust' item.pk %}">
+                                        {% csrf_token %}
+                                        <div class="modal-content" style="border: 2px solid #000;">
+                                            <div class="modal-header" style="background: #036a77; color: #fff;">
+                                                <h5 class="modal-title">
+                                                    Adjust Stock — {{ item.name }}
+                                                    {% if item.branch %}@ {{ item.branch.name }}{% endif %}
+                                                </h5>
+                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p class="mb-2">
+                                                    Current stock:
+                                                    <strong>{{ item.quantity }} {{ item.unit }}</strong>
+                                                </p>
+                                                <div class="mb-3">
+                                                    <label class="form-label fw-bold">Action</label>
+                                                    <select name="action" class="form-select" style="border: 2px solid #000;">
+                                                        <option value="add">Add stock (received)</option>
+                                                        <option value="subtract">Remove stock (used/sold)</option>
+                                                    </select>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label fw-bold">Quantity</label>
+                                                    <input type="number"
+                                                           name="delta"
+                                                           step="0.01"
+                                                           min="0.01"
+                                                           class="form-control"
+                                                           style="border: 2px solid #000;"
+                                                           placeholder="e.g. 100"
+                                                           required>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                <button type="submit" class="btn btn-primary fw-bold" style="border: 2px solid #000;">
+                                                    Apply
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center py-5 text-muted">
+                            <i class="fas fa-warehouse fa-2x mb-3 d-block"></i>
+                            No inventory items yet.
+                            <div class="mt-3">
+                                <a href="{% url 'kuku_biz:inventory_create' %}" class="btn btn-primary" style="border: 2px solid #000;">
+                                    <i class="fas fa-plus"></i> Add First Item
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

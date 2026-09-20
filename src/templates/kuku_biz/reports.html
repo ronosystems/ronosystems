@@ -1,0 +1,360 @@
+{% extends 'kuku_base.html' %}
+
+{% block title %}Reports — Kuku Biz{% endblock %}
+{% block page_title %}Reports{% endblock %}
+{% block page_subtitle %}<small>{{ period_label }}</small>{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Period selector */
+    .period-bar {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+    }
+    .period-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 18px;
+        border-radius: 50px;
+        border: 2px solid #000;
+        background: #fff;
+        color: #000;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.82rem;
+        transition: all 0.2s;
+    }
+    .period-btn:hover {
+        background: #f0fbfd;
+        border-color: #1fb4d2;
+    }
+    .period-btn.active {
+        background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
+        color: #fff;
+    }
+
+    /* Section */
+    .section {
+        margin-bottom: 32px;
+    }
+    .section-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 14px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #000;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    /* KPI grid */
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 14px;
+    }
+    .kpi-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 18px 20px;
+        position: relative;
+    }
+    .kpi-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #6b7280;
+    }
+    .kpi-value {
+        font-size: 1.6rem;
+        font-weight: 800;
+        color: #1f2937;
+        margin-top: 6px;
+    }
+    .kpi-sub {
+        font-size: 0.75rem;
+        color: #9ca3af;
+        margin-top: 4px;
+    }
+    .kpi-value.good { color: #059669; }
+    .kpi-value.bad  { color: #dc2626; }
+    .kpi-value.warn { color: #d97706; }
+
+    /* Data table */
+    .data-table {
+        width: 100%;
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        overflow: hidden;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    .data-table thead { background: #f0fbfd; }
+    .data-table th {
+        text-align: left;
+        padding: 12px 16px;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #374151;
+        border-bottom: 2px solid #000;
+    }
+    .data-table td {
+        padding: 12px 16px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.85rem;
+        color: #1f2937;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover { background: #f9fafb; }
+    .cell-num {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        text-align: right;
+    }
+
+    .empty-block {
+        text-align: center;
+        padding: 40px 20px;
+        background: #fff;
+        border: 2px dashed #d1d5db;
+        border-radius: 8px;
+        color: #9ca3af;
+        font-size: 0.85rem;
+    }
+
+    .summary-banner {
+        background: linear-gradient(135deg, #f0fbfd 0%, #e0f4fa 100%);
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 20px 24px;
+        margin-bottom: 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+    .summary-banner .label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #4b5563;
+        font-weight: 700;
+    }
+    .summary-banner .big {
+        font-size: 2rem;
+        font-weight: 800;
+        color: #0a2f45;
+    }
+    .summary-banner .big.good { color: #059669; }
+    .summary-banner .big.bad  { color: #dc2626; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Period selector -->
+<div class="period-bar">
+    <a href="?period=7"
+       class="period-btn {% if period_days == 7 %}active{% endif %}">
+        <i class="fas fa-calendar-day"></i> Last 7 days
+    </a>
+    <a href="?period=30"
+       class="period-btn {% if period_days == 30 %}active{% endif %}">
+        <i class="fas fa-calendar-week"></i> Last 30 days
+    </a>
+    <a href="?period=90"
+       class="period-btn {% if period_days == 90 %}active{% endif %}">
+        <i class="fas fa-calendar-alt"></i> Last 90 days
+    </a>
+    <a href="?period=365"
+       class="period-btn {% if period_days == 365 %}active{% endif %}">
+        <i class="fas fa-calendar"></i> Last 12 months
+    </a>
+</div>
+
+<!-- Headline summary -->
+<div class="summary-banner">
+    <div>
+        <div class="label">Profit ({{ period_label }})</div>
+        <div class="big {% if profit >= 0 %}good{% else %}bad{% endif %}">
+            KES {{ profit|floatformat:0 }}
+        </div>
+    </div>
+    <div>
+        <div class="label">Revenue</div>
+        <div class="big">KES {{ total_sales|floatformat:0 }}</div>
+    </div>
+    <div>
+        <div class="label">Costs</div>
+        <div class="big">KES {{ total_cost|floatformat:0 }}</div>
+    </div>
+    <div>
+        <div class="label">Period</div>
+        <div style="font-size:1rem;font-weight:600;color:#4b5563;margin-top:6px;">
+            {{ start_date|date:"d M" }} → {{ today|date:"d M Y" }}
+        </div>
+    </div>
+</div>
+
+<!-- Egg Production -->
+<div class="section">
+    <div class="section-title">
+        <i class="fas fa-egg"></i> Egg Production
+    </div>
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">Total Collected</div>
+            <div class="kpi-value">{{ eggs_collected|floatformat:0 }}</div>
+            <div class="kpi-sub">eggs</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Sellable (Good)</div>
+            <div class="kpi-value good">{{ eggs_good|floatformat:0 }}</div>
+            <div class="kpi-sub">collected − cracked − broken</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Damaged</div>
+            <div class="kpi-value bad">{{ eggs_cracked|add:eggs_broken|floatformat:0 }}</div>
+            <div class="kpi-sub">{{ eggs_cracked }} cracked, {{ eggs_broken }} broken</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Sold</div>
+            <div class="kpi-value">{{ eggs_sold|floatformat:0 }}</div>
+            <div class="kpi-sub">across all sale items</div>
+        </div>
+    </div>
+</div>
+
+<!-- Sales -->
+<div class="section">
+    <div class="section-title">
+        <i class="fas fa-shopping-cart"></i> Sales
+    </div>
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">Total Invoiced</div>
+            <div class="kpi-value">KES {{ total_sales|floatformat:0 }}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Collected</div>
+            <div class="kpi-value good">KES {{ total_collected|floatformat:0 }}</div>
+            <div class="kpi-sub">cash received</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Outstanding</div>
+            <div class="kpi-value {% if total_outstanding > 0 %}bad{% endif %}">
+                KES {{ total_outstanding|floatformat:0 }}
+            </div>
+            <div class="kpi-sub">owed by customers</div>
+        </div>
+    </div>
+</div>
+
+<!-- Costs -->
+<div class="section">
+    <div class="section-title">
+        <i class="fas fa-wallet"></i> Costs
+    </div>
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">Feed</div>
+            <div class="kpi-value bad">KES {{ feed_cost|floatformat:0 }}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Health</div>
+            <div class="kpi-value bad">KES {{ health_cost|floatformat:0 }}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Other Expenses</div>
+            <div class="kpi-value bad">KES {{ other_cost|floatformat:0 }}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Total Cost</div>
+            <div class="kpi-value bad">KES {{ total_cost|floatformat:0 }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Top Customers -->
+<div class="section">
+    <div class="section-title">
+        <i class="fas fa-trophy"></i> Top Customers
+    </div>
+    {% if top_customers %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Customer</th>
+                    <th style="text-align:right;">Sales</th>
+                    <th style="text-align:right;">Total (KES)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in top_customers %}
+                <tr>
+                    <td><strong>{{ c.customer__name }}</strong></td>
+                    <td class="cell-num">{{ c.count }}</td>
+                    <td class="cell-num">{{ c.total|floatformat:0 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="empty-block">
+            No customer sales in this period.
+        </div>
+    {% endif %}
+</div>
+
+<!-- Per-Flock Summary -->
+<div class="section">
+    <div class="section-title">
+        <i class="fas fa-kiwi-bird"></i> Flock Performance
+    </div>
+    {% if flock_summary %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Flock</th>
+                    <th>Type</th>
+                    <th>Age</th>
+                    <th style="text-align:right;">Current Birds</th>
+                    <th style="text-align:right;">Eggs</th>
+                    <th style="text-align:right;">Deaths</th>
+                    <th style="text-align:right;">Feed (kg)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in flock_summary %}
+                <tr>
+                    <td><strong>{{ row.flock.name }}</strong></td>
+                    <td>{{ row.flock.get_flock_type_display }}</td>
+                    <td>{{ row.flock.age_in_weeks }}w</td>
+                    <td class="cell-num">{{ row.flock.current_count }}</td>
+                    <td class="cell-num">{{ row.eggs }}</td>
+                    <td class="cell-num">{{ row.deaths }}</td>
+                    <td class="cell-num">{{ row.feed_kg|floatformat:0 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="empty-block">
+            No flocks recorded yet.
+        </div>
+    {% endif %}
+</div>
+
+{% endblock %}

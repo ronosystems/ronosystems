@@ -1,0 +1,318 @@
+{% extends 'kuku_base.html' %}
+
+{% block title %}Customers — Kuku Biz{% endblock %}
+{% block page_title %}Customers{% endblock %}
+{% block page_subtitle %}<small>{{ customers.count }} total</small>{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 22px;
+        border-radius: 50px;
+        border: 2px solid #000;
+        background: #fff;
+        color: #000;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.85rem;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.2s;
+    }
+    .btn-primary {
+        background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
+        color: #fff;
+    }
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 18px rgba(31,180,210,0.35);
+        color: #fff;
+    }
+    .btn-sm {
+        padding: 6px 14px;
+        font-size: 0.75rem;
+    }
+
+    .data-table {
+        width: 100%;
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        overflow: hidden;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    .data-table thead { background: #f0fbfd; }
+    .data-table th {
+        text-align: left;
+        padding: 14px 18px;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #374151;
+        border-bottom: 2px solid #000;
+    }
+    .data-table td {
+        padding: 14px 18px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.88rem;
+        color: #1f2937;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover { background: #f9fafb; }
+
+    .badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 50px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        border: 1px solid #000;
+    }
+    .badge-individual   { background: #dbeafe; color: #1e40af; }
+    .badge-retail       { background: #fef3c7; color: #92400e; }
+    .badge-hotel        { background: #d1fae5; color: #065f46; }
+    .badge-wholesale    { background: #e0e7ff; color: #3730a3; }
+    .badge-institution  { background: #fce7f3; color: #9f1239; }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 30px;
+        background: #fff;
+        border: 2px dashed #9ca3af;
+        border-radius: 8px;
+    }
+    .empty-state i { font-size: 3rem; color: #87CEEB; margin-bottom: 16px; }
+    .empty-state h3 { margin: 0 0 8px; color: #1f2937; }
+    .empty-state p { color: #6b7280; margin-bottom: 20px; }
+
+    /* Modal */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 2000;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 28px 32px;
+        max-width: 560px;
+        width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    .modal-box h3 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #000;
+    }
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        margin-bottom: 14px;
+    }
+    .form-group { margin-bottom: 14px; }
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        font-size: 0.82rem;
+        margin-bottom: 5px;
+    }
+    .form-group label .required { color: #dc2626; }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 9px 12px;
+        border: 2px solid #000;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 0.88rem;
+        background: #fff;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: #1fb4d2;
+        box-shadow: 0 0 0 3px rgba(31,180,210,0.2);
+    }
+    .modal-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 2px solid #000;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h2 style="margin:0;font-size:1.1rem;font-weight:700;">All Customers</h2>
+    <button type="button" class="btn btn-primary" onclick="openModal()">
+        <i class="fas fa-plus"></i> New Customer
+    </button>
+</div>
+
+{% if customers %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Phone</th>
+                <th>Location</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in customers %}
+            <tr>
+                <td><strong>{{ c.name }}</strong></td>
+                <td>
+                    <span class="badge badge-{{ c.customer_type }}">
+                        {{ c.get_customer_type_display }}
+                    </span>
+                </td>
+                <td>{{ c.phone|default:"—" }}</td>
+                <td>{{ c.location|default:"—" }}</td>
+                <td>
+                    {% if c.is_active %}
+                        <span class="badge badge-hotel">Active</span>
+                    {% else %}
+                        <span class="badge badge-retail">Inactive</span>
+                    {% endif %}
+                </td>
+                <td style="text-align:right;">
+                    <a href="/admin/kuku_biz/customer/{{ c.id }}/change/"
+                       class="btn btn-sm"
+                       target="_blank"
+                       title="Edit in admin">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div class="empty-state">
+        <i class="fas fa-users"></i>
+        <h3>No customers yet</h3>
+        <p>Add your first customer to start recording sales to them.</p>
+        <button type="button" class="btn btn-primary" onclick="openModal()">
+            <i class="fas fa-plus"></i> Add First Customer
+        </button>
+    </div>
+{% endif %}
+
+<!-- Add Customer Modal -->
+<div class="modal-overlay" id="customerModal">
+    <div class="modal-box">
+        <h3><i class="fas fa-user-plus"></i> New Customer</h3>
+
+        <form method="post" action="{% url 'kuku_biz:customer_create' %}">
+            {% csrf_token %}
+
+            <div class="form-group">
+                <label for="name">Name <span class="required">*</span></label>
+                <input type="text" id="name" name="name" required autofocus
+                       placeholder="e.g. Mama Njeri Shop">
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="customer_type">Type <span class="required">*</span></label>
+                    <select id="customer_type" name="customer_type" required>
+                        <option value="individual">Individual</option>
+                        <option value="retail">Retail Shop</option>
+                        <option value="hotel">Hotel / Restaurant</option>
+                        <option value="wholesale">Wholesaler</option>
+                        <option value="institution">Institution</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="phone">Phone</label>
+                    <input type="tel" id="phone" name="phone"
+                           placeholder="e.g. 0722 123 456">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email"
+                           placeholder="optional">
+                </div>
+
+                <div class="form-group">
+                    <label for="location">Location</label>
+                    <input type="text" id="location" name="location"
+                           placeholder="e.g. Nakuru Town">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="notes">Notes</label>
+                <textarea id="notes" name="notes" rows="2"
+                          placeholder="Any notes about this customer"></textarea>
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-check"></i> Save Customer
+                </button>
+                <button type="button" class="btn" onclick="closeModal()">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openModal() {
+        document.getElementById('customerModal').classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeModal() {
+        document.getElementById('customerModal').classList.remove('active');
+        document.body.style.overflow = '';
+    }
+    // Close on overlay click
+    document.getElementById('customerModal').addEventListener('click', function(e) {
+        if (e.target === this) closeModal();
+    });
+    // Close on Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeModal();
+    });
+</script>
+
+{% endblock %}

@@ -1,0 +1,181 @@
+{% extends 'kuku_base.html' %}
+
+{% block title %}Flocks — Kuku Biz{% endblock %}
+{% block page_title %}Flocks{% endblock %}
+{% block page_subtitle %}<small>{{ flocks.count }} total</small>{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 22px;
+        border-radius: 50px;
+        border: 2px solid #000;
+        background: #fff;
+        color: #000;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.85rem;
+        transition: all 0.2s;
+    }
+    .btn-primary {
+        background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
+        color: #fff;
+    }
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 18px rgba(31,180,210,0.35);
+        color: #fff;
+    }
+
+    .flocks-table {
+        width: 100%;
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        overflow: hidden;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    .flocks-table thead {
+        background: #f0fbfd;
+    }
+    .flocks-table th {
+        text-align: left;
+        padding: 14px 18px;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #374151;
+        border-bottom: 2px solid #000;
+    }
+    .flocks-table td {
+        padding: 14px 18px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.88rem;
+        color: #1f2937;
+    }
+    .flocks-table tr:last-child td {
+        border-bottom: none;
+    }
+    .flocks-table tr:hover {
+        background: #f9fafb;
+    }
+    .flock-name {
+        font-weight: 700;
+        color: #1f2937;
+        text-decoration: none;
+    }
+    .flock-name:hover {
+        color: #1fb4d2;
+    }
+    .badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 50px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        border: 1px solid #000;
+    }
+    .badge-layer   { background: #d1fae5; color: #065f46; }
+    .badge-broiler { background: #fef3c7; color: #92400e; }
+    .badge-mixed   { background: #dbeafe; color: #1e40af; }
+    .badge-active  { background: #d1fae5; color: #065f46; }
+    .badge-retired { background: #e5e7eb; color: #4b5563; }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 30px;
+        background: #fff;
+        border: 2px dashed #9ca3af;
+        border-radius: 8px;
+    }
+    .empty-state i {
+        font-size: 3rem;
+        color: #87CEEB;
+        margin-bottom: 16px;
+    }
+    .empty-state h3 {
+        margin: 0 0 8px;
+        color: #1f2937;
+    }
+    .empty-state p {
+        color: #6b7280;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h2 style="margin:0;font-size:1.1rem;font-weight:700;">All Flocks</h2>
+    <a href="{% url 'kuku_biz:flock_create' %}" class="btn btn-primary">
+        <i class="fas fa-plus"></i> New Flock
+    </a>
+</div>
+
+{% if flocks %}
+    <table class="flocks-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Breed</th>
+                <th>Date Acquired</th>
+                <th>Age</th>
+                <th>Initial</th>
+                <th>Current</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for flock in flocks %}
+            <tr>
+                <td>
+                    <a href="{% url 'kuku_biz:flock_detail' flock.pk %}" class="flock-name">
+                        {{ flock.name }}
+                    </a>
+                </td>
+                <td>
+                    <span class="badge badge-{{ flock.flock_type }}">
+                        {{ flock.get_flock_type_display }}
+                    </span>
+                </td>
+                <td>{{ flock.breed|default:"—" }}</td>
+                <td>{{ flock.date_acquired|date:"d M Y" }}</td>
+                <td>{{ flock.age_in_weeks }} weeks</td>
+                <td>{{ flock.initial_count }}</td>
+                <td>{{ flock.current_count }}</td>
+                <td>
+                    <span class="badge badge-{{ flock.status }}">
+                        {{ flock.get_status_display }}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div class="empty-state">
+        <i class="fas fa-kiwi-bird"></i>
+        <h3>No flocks yet</h3>
+        <p>Register your first batch of birds to get started.</p>
+        <a href="{% url 'kuku_biz:flock_create' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Create First Flock
+        </a>
+    </div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,535 @@
+{% extends 'kuku_base.html' %}
+{% load static %}
+
+{% block title %}Sales — Kuku Biz{% endblock %}
+{% block page_title %}Egg Sales{% endblock %}
+{% block page_subtitle %}<small>Recent sales log</small>{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 22px;
+        border-radius: 50px;
+        border: 2px solid #000;
+        background: #fff;
+        color: #000;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.85rem;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.2s;
+    }
+    .btn-primary {
+        background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
+        color: #fff;
+    }
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 18px rgba(31,180,210,0.35);
+        color: #fff;
+    }
+    .btn-sm {
+        padding: 6px 14px;
+        font-size: 0.75rem;
+        gap: 5px;
+    }
+    .btn-paid {
+        background: #d1fae5;
+        color: #065f46;
+        border-color: #000;
+    }
+    .btn-paid:hover {
+        background: #065f46;
+        color: #fff;
+    }
+    .btn-icon {
+        padding: 6px 11px;
+        font-size: 0.75rem;
+    }
+
+    /* ============================================================ */
+    /* PRICE + STOCK CARDS                                          */
+    /* ============================================================ */
+    .info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 24px;
+    }
+    @media (max-width: 900px) {
+        .info-grid { grid-template-columns: 1fr; }
+    }
+
+    .info-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .info-card-header {
+        padding: 12px 18px;
+        background: #f0fbfd;
+        border-bottom: 2px solid #000;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #0a2f45;
+    }
+    .info-card-header i {
+        color: #1fb4d2;
+        font-size: 1rem;
+    }
+    .info-card-body {
+        padding: 6px 0;
+    }
+
+    /* Price rows */
+    .price-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 18px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.88rem;
+    }
+    .price-row:last-child { border-bottom: none; }
+    .price-label {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #374151;
+        font-weight: 600;
+    }
+    .price-label i {
+        color: #1fb4d2;
+        width: 18px;
+        text-align: center;
+    }
+    .price-value {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        font-size: 1rem;
+        color: #0a2f45;
+    }
+    .price-value.no-price {
+        color: #9ca3af;
+        font-style: italic;
+        font-weight: 400;
+        font-size: 0.8rem;
+    }
+    .price-meta {
+        font-size: 0.7rem;
+        color: #9ca3af;
+        display: block;
+        font-weight: 400;
+    }
+
+    /* Stock rows */
+    .stock-branch-group {
+        padding: 0;
+    }
+    .stock-branch-name {
+        padding: 8px 18px;
+        background: #f9fafb;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #374151;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .stock-branch-name i { color: #1fb4d2; }
+    .stock-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 18px;
+        border-bottom: 1px solid #f3f4f6;
+        font-size: 0.85rem;
+    }
+    .stock-row:last-child { border-bottom: none; }
+    .stock-qty {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        color: #059669;
+    }
+    .stock-qty.low { color: #dc2626; }
+    .stock-empty {
+        padding: 30px 18px;
+        text-align: center;
+        color: #9ca3af;
+        font-size: 0.85rem;
+    }
+
+    /* Filter bar */
+    .filter-bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 18px;
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    .filter-bar label {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #374151;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .filter-bar select {
+        padding: 8px 14px;
+        border: 2px solid #000;
+        border-radius: 4px;
+        font-family: inherit;
+        font-size: 0.85rem;
+        background: #fff;
+        min-width: 200px;
+    }
+    .filter-bar .locked-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        background: #fef3c7;
+        border: 2px solid #000;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #92400e;
+    }
+
+    /* KPI bar */
+    .kpi-bar {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    @media (max-width: 700px) {
+        .kpi-bar { grid-template-columns: 1fr; }
+    }
+    .kpi-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 16px 20px;
+    }
+    .kpi-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #6b7280;
+        font-weight: 700;
+        margin-bottom: 6px;
+    }
+    .kpi-value {
+        font-family: 'Courier New', monospace;
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #0a2f45;
+    }
+    .kpi-value.owed { color: #dc2626; }
+    .kpi-value.paid { color: #059669; }
+
+    /* Sales table */
+    .data-table {
+        width: 100%;
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        overflow: hidden;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    .data-table thead { background: #f0fbfd; }
+    .data-table th {
+        text-align: left;
+        padding: 14px 18px;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #374151;
+        border-bottom: 2px solid #000;
+    }
+    .data-table td {
+        padding: 14px 18px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.88rem;
+        color: #1f2937;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover { background: #f9fafb; }
+    .cell-num {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        text-align: right;
+    }
+    .cell-balance-owed { color: #dc2626; }
+    .cell-balance-clear { color: #059669; }
+    .cell-actions {
+        text-align: right;
+        white-space: nowrap;
+    }
+    .badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 50px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        border: 1px solid #000;
+    }
+    .badge-paid     { background: #d1fae5; color: #065f46; }
+    .badge-pending  { background: #fef3c7; color: #92400e; }
+    .badge-partial  { background: #dbeafe; color: #1e40af; }
+    .badge-credit   { background: #fee2e2; color: #991b1b; }
+    .badge-cancelled{ background: #e5e7eb; color: #4b5563; }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 30px;
+        background: #fff;
+        border: 2px dashed #9ca3af;
+        border-radius: 8px;
+    }
+    .empty-state i { font-size: 3rem; color: #87CEEB; margin-bottom: 16px; }
+    .empty-state h3 { margin: 0 0 8px; color: #1f2937; }
+    .empty-state p { color: #6b7280; margin-bottom: 20px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ============================================================ -->
+<!-- Page header                                                   -->
+<!-- ============================================================ -->
+<div class="page-header">
+    <h2 style="margin:0;font-size:1.1rem;font-weight:700;">Recent Sales</h2>
+    <a href="{% url 'kuku_biz:sale_create' %}" class="btn btn-primary">
+        <i class="fas fa-plus"></i> New Sale
+    </a>
+</div>
+
+<!-- ============================================================ -->
+<!-- Branch filter                                                 -->
+<!-- ============================================================ -->
+<div class="filter-bar">
+    {% if can_see_all_branches %}
+        <label for="branchFilter"><i class="fas fa-building"></i> Branch:</label>
+        <form method="get" id="branchFilterForm" style="display:contents;">
+            <select name="branch" id="branchFilter" onchange="this.form.submit()">
+                <option value="">All Branches</option>
+                {% for b in branches %}
+                    <option value="{{ b.id }}"
+                        {% if selected_branch_id == b.id|stringformat:"s" %}selected{% endif %}>
+                        {{ b.name }}
+                    </option>
+                {% endfor %}
+            </select>
+            <noscript>
+                <button type="submit" class="btn btn-sm">Apply</button>
+            </noscript>
+        </form>
+    {% elif user_branch %}
+        <span class="locked-badge">
+            <i class="fas fa-lock"></i>
+            Showing: {{ user_branch.name }}
+        </span>
+    {% endif %}
+</div>
+
+<!-- ============================================================ -->
+<!-- Price list + Stock availability                               -->
+<!-- ============================================================ -->
+<div class="info-grid">
+
+    <!-- ---------- Egg Prices ---------- -->
+    <div class="info-card">
+        <div class="info-card-header">
+            <i class="fas fa-tag"></i> Egg Prices
+        </div>
+        <div class="info-card-body">
+            {% for unit_code, info in price_map.items %}
+            <div class="price-row">
+                <span class="price-label">
+                    <i class="fas fa-{% if unit_code == 'egg' %}egg{% elif unit_code == 'tray' %}box{% else %}boxes{% endif %}"></i>
+                    {{ info.label }}
+                </span>
+                {% if info.price %}
+                    <span class="price-value">
+                        KES {{ info.price|floatformat:2 }}
+                        <span class="price-meta">since {{ info.effective_date|date:"d M Y" }}</span>
+                    </span>
+                {% else %}
+                    <span class="price-value no-price">
+                        Not set —
+                        <a href="{% url 'kuku_biz:price_list' %}" style="color:#1fb4d2;font-weight:600;">
+                            <i class="fas fa-plus"></i> Set price
+                        </a>
+                    </span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- ---------- Stock Availability ---------- -->
+    <div class="info-card">
+        <div class="info-card-header">
+            <i class="fas fa-warehouse"></i> Egg Stock Availability
+        </div>
+        <div class="info-card-body">
+            {% if stock_by_branch %}
+                {% for branch_name, items in stock_by_branch.items %}
+                <div class="stock-branch-group">
+                    <div class="stock-branch-name">
+                        <i class="fas fa-building"></i> {{ branch_name }}
+                    </div>
+                    {% for item in items %}
+                    <div class="stock-row">
+                        <span>
+                            {{ item.name }}
+                            <span style="color:#9ca3af;font-size:0.75rem;">
+                                ({{ item.unit|default:"pcs" }})
+                            </span>
+                        </span>
+                        <span class="stock-qty {% if item.quantity <= item.reorder_level %}low{% endif %}">
+                            {{ item.quantity|floatformat:0 }}
+                            {% if item.quantity <= item.reorder_level %}
+                                <i class="fas fa-exclamation-triangle" title="Low stock"></i>
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="stock-empty">
+                    <i class="fas fa-box-open" style="font-size:2rem;display:block;margin-bottom:10px;color:#d1d5db;"></i>
+                    No egg inventory recorded yet.
+                    <br>
+                    <a href="{% url 'kuku_biz:inventory_create' %}" style="color:#1fb4d2;font-weight:600;">
+                        <i class="fas fa-plus"></i> Add stock
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<!-- ============================================================ -->
+<!-- Sales KPIs                                                    -->
+<!-- ============================================================ -->
+<div class="kpi-bar">
+    <div class="kpi-card">
+        <div class="kpi-label">Total Sales</div>
+        <div class="kpi-value">KES {{ total_sales|floatformat:0 }}</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Collected</div>
+        <div class="kpi-value paid">KES {{ total_paid|floatformat:0 }}</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Outstanding</div>
+        <div class="kpi-value owed">KES {{ total_balance|floatformat:0 }}</div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Sales table                                                   -->
+<!-- ============================================================ -->
+{% if sales %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Invoice</th>
+                <th>Customer</th>
+                <th style="text-align:right;">Total</th>
+                <th style="text-align:right;">Paid</th>
+                <th style="text-align:right;">Balance</th>
+                <th>Status</th>
+                <th style="text-align:right;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sale in sales %}
+            <tr>
+                <td>{{ sale.sale_date|date:"d M Y" }}</td>
+                <td>{{ sale.invoice_number|default:"—" }}</td>
+                <td>
+                    {% if sale.customer %}
+                        {{ sale.customer.name }}
+                    {% else %}
+                        <em style="color:#9ca3af;">Walk-in</em>
+                    {% endif %}
+                </td>
+                <td class="cell-num">{{ sale.total_amount|floatformat:0 }}</td>
+                <td class="cell-num">{{ sale.amount_paid|floatformat:0 }}</td>
+                <td class="cell-num {% if sale.balance > 0 %}cell-balance-owed{% else %}cell-balance-clear{% endif %}">
+                    {{ sale.balance|floatformat:0 }}
+                </td>
+                <td>
+                    <span class="badge badge-{{ sale.status }}">
+                        {{ sale.get_status_display }}
+                    </span>
+                </td>
+                <td class="cell-actions">
+                    {% if sale.status != 'paid' and sale.status != 'cancelled' %}
+                        <form method="post"
+                              action="{% url 'kuku_biz:sale_mark_paid' sale.pk %}"
+                              style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit"
+                                    class="btn btn-sm btn-paid"
+                                    onclick="return confirm('Mark sale #{{ sale.pk }} as fully paid (KES {{ sale.total_amount|floatformat:0 }})?')">
+                                <i class="fas fa-check"></i> Mark Paid
+                            </button>
+                        </form>
+                    {% endif %}
+                    <a href="{% url 'kuku_biz:sale_edit' sale.pk %}"
+                       class="btn btn-sm btn-icon"
+                       title="Edit sale">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div class="empty-state">
+        <i class="fas fa-shopping-cart"></i>
+        <h3>No sales yet</h3>
+        <p>Record your first egg sale to start tracking revenue.</p>
+        <a href="{% url 'kuku_biz:sale_create' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Record First Sale
+        </a>
+    </div>
+{% endif %}
+
+{% endblock %}

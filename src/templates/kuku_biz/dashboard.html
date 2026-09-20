@@ -1,0 +1,682 @@
+{% extends 'kuku_base.html' %}
+{% load static %}
+
+{% block title %}Dashboard — Kuku Biz{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}<small>{{ page_subtitle }}</small>{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================================ */
+    /* BRANCH FILTER                                                 */
+    /* ============================================================ */
+    .filter-bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 18px;
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    .filter-bar label {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #374151;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .filter-bar select {
+        padding: 8px 14px;
+        border: 2px solid #000;
+        border-radius: 4px;
+        font-family: inherit;
+        font-size: 0.85rem;
+        background: #fff;
+        min-width: 220px;
+    }
+    .locked-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        background: #fef3c7;
+        border: 2px solid #000;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #92400e;
+    }
+
+    /* ============================================================ */
+    /* QUICK ACTIONS                                                 */
+    /* ============================================================ */
+    .quick-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 24px;
+    }
+    .qa-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 18px;
+        border-radius: 50px;
+        border: 2px solid #000;
+        background: #fff;
+        color: #000;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.85rem;
+        transition: all 0.2s;
+    }
+    .qa-btn:hover {
+        background: #87CEEB;
+        color: #000;
+        transform: translateY(-2px);
+    }
+    .qa-btn.primary {
+        background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
+        color: #fff;
+        border-color: #000;
+    }
+    .qa-btn.primary:hover {
+        box-shadow: 0 6px 16px rgba(31,180,210,0.35);
+        color: #fff;
+    }
+
+    /* ============================================================ */
+    /* KPI GRIDS                                                     */
+    /* ============================================================ */
+    .section-title {
+        font-size: 1rem;
+        font-weight: 700;
+        margin: 24px 0 12px;
+        padding-bottom: 6px;
+        border-bottom: 2px solid #000;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .section-title .section-link {
+        font-size: 0.78rem;
+        color: #1fb4d2;
+        text-decoration: none;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .section-title .section-link:hover { text-decoration: underline; }
+
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    .kpi-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 18px 20px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-height: 110px;
+    }
+    .kpi-label {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #6b7280;
+    }
+    .kpi-value {
+        font-size: 1.8rem;
+        font-weight: 800;
+        color: #1f2937;
+        margin-top: 6px;
+        font-family: 'Courier New', monospace;
+    }
+    .kpi-sub {
+        font-size: 0.75rem;
+        color: #9ca3af;
+        margin-top: 4px;
+    }
+    .kpi-icon {
+        float: right;
+        font-size: 1.4rem;
+        color: #87CEEB;
+    }
+    .kpi-value.positive { color: #059669; }
+    .kpi-value.negative { color: #dc2626; }
+    .kpi-value.owed     { color: #dc2626; }
+
+    /* ============================================================ */
+    /* WIDGETS (top flocks, recent sales, recent eggs)               */
+    /* ============================================================ */
+    .widgets-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 20px;
+        margin-bottom: 24px;
+    }
+    .widget {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .widget-header {
+        padding: 12px 18px;
+        background: #f0fbfd;
+        border-bottom: 2px solid #000;
+        font-weight: 700;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #0a2f45;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .widget-header i { color: #1fb4d2; }
+    .widget-body { padding: 6px 0; }
+    .widget-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 18px;
+        border-bottom: 1px solid #f3f4f6;
+        font-size: 0.85rem;
+        gap: 10px;
+    }
+    .widget-row:last-child { border-bottom: none; }
+    .widget-row .wr-main { flex: 1; color: #1f2937; }
+    .widget-row .wr-meta {
+        font-size: 0.72rem;
+        color: #9ca3af;
+        display: block;
+        margin-top: 2px;
+    }
+    .widget-row .wr-value {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        color: #0a2f45;
+        white-space: nowrap;
+    }
+    .widget-empty {
+        padding: 30px 18px;
+        text-align: center;
+        color: #9ca3af;
+        font-size: 0.85rem;
+    }
+
+    /* ============================================================ */
+    /* BRANCH BREAKDOWN TABLE                                        */
+    /* ============================================================ */
+    .branch-table {
+        width: 100%;
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        border-collapse: separate;
+        border-spacing: 0;
+        overflow: hidden;
+        margin-bottom: 24px;
+    }
+    .branch-table th {
+        text-align: left;
+        padding: 12px 16px;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #374151;
+        background: #f0fbfd;
+        border-bottom: 2px solid #000;
+    }
+    .branch-table td {
+        padding: 12px 16px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.88rem;
+    }
+    .branch-table tr:last-child td { border-bottom: none; }
+    .branch-table tr:hover { background: #f9fafb; }
+    .branch-table .num {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        text-align: right;
+    }
+    .branch-table .branch-name {
+        font-weight: 700;
+        color: #0a2f45;
+    }
+    .branch-table .branch-name i { color: #1fb4d2; margin-right: 6px; }
+    .branch-table .low-badge {
+        display: inline-block;
+        background: #fee2e2;
+        color: #991b1b;
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 50px;
+        border: 1px solid #000;
+    }
+    .branch-table .ok-badge {
+        color: #059669;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    /* ============================================================ */
+    /* LOW STOCK ALERT                                               */
+    /* ============================================================ */
+    .low-stock-alert {
+        background: #fef3c7;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 16px 20px;
+        margin-bottom: 24px;
+    }
+    .low-stock-alert .title {
+        font-weight: 700;
+        color: #92400e;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .low-stock-alert .title i { color: #dc2626; }
+    .low-stock-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .low-stock-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        background: #fff;
+        border: 1px solid #000;
+        border-radius: 50px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #1f2937;
+    }
+    .low-stock-pill .branch {
+        color: #6b7280;
+        font-weight: 400;
+        font-size: 0.7rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ============================================================ -->
+<!-- Branch filter                                                 -->
+<!-- ============================================================ -->
+<div class="filter-bar">
+    {% if can_see_all_branches %}
+        <label for="branchFilter"><i class="fas fa-building"></i> View:</label>
+        <form method="get" id="branchFilterForm" style="display:contents;">
+            <select name="branch" id="branchFilter" onchange="this.form.submit()">
+                <option value="">All Branches (Company-wide)</option>
+                {% for b in branches %}
+                    <option value="{{ b.id }}"
+                        {% if selected_branch_id == b.id|stringformat:"s" %}selected{% endif %}>
+                        {{ b.name }}
+                    </option>
+                {% endfor %}
+            </select>
+            <noscript>
+                <button type="submit" style="padding:8px 14px;border:2px solid #000;border-radius:4px;background:#fff;font-weight:600;cursor:pointer;">Apply</button>
+            </noscript>
+        </form>
+    {% elif user_branch %}
+        <span class="locked-badge">
+            <i class="fas fa-lock"></i>
+            Viewing: {{ user_branch.name }}
+        </span>
+    {% endif %}
+</div>
+
+<!-- ============================================================ -->
+<!-- Quick actions                                                 -->
+<!-- ============================================================ -->
+<div class="quick-actions">
+    <a href="{% url 'kuku_biz:egg_create' %}" class="qa-btn primary">
+        <i class="fas fa-egg"></i> Record Eggs Today
+    </a>
+    <a href="{% url 'kuku_biz:sale_create' %}" class="qa-btn primary">
+        <i class="fas fa-shopping-cart"></i> New Sale
+    </a>
+    <a href="{% url 'kuku_biz:flock_create' %}" class="qa-btn">
+        <i class="fas fa-plus"></i> Add Flock
+    </a>
+    <a href="{% url 'kuku_biz:inventory_create' %}" class="qa-btn">
+        <i class="fas fa-warehouse"></i> Add Stock
+    </a>
+</div>
+
+<!-- ============================================================ -->
+<!-- Farm Overview                                                 -->
+<!-- ============================================================ -->
+<div class="section-title">
+    <span>Farm Overview</span>
+    <a href="{% url 'kuku_biz:flock_list' %}" class="section-link">View Flocks →</a>
+</div>
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div>
+            <i class="fas fa-kiwi-bird kpi-icon"></i>
+            <div class="kpi-label">Active Flocks</div>
+            <div class="kpi-value">{{ total_flocks }}</div>
+        </div>
+        <div class="kpi-sub">
+            {{ layer_flocks_count }} layer · {{ broiler_flocks_count }} broiler
+        </div>
+    </div>
+    <div class="kpi-card">
+        <div>
+            <i class="fas fa-hashtag kpi-icon"></i>
+            <div class="kpi-label">Total Birds</div>
+            <div class="kpi-value">{{ total_birds }}</div>
+        </div>
+        <div class="kpi-sub">Across all active flocks</div>
+    </div>
+    <div class="kpi-card">
+        <div>
+            <i class="fas fa-chart-line kpi-icon"></i>
+            <div class="kpi-label">Lay Rate Today</div>
+            <div class="kpi-value">{{ lay_rate }}%</div>
+        </div>
+        <div class="kpi-sub">{{ eggs_today }} eggs from layers</div>
+    </div>
+    <div class="kpi-card">
+        <div>
+            <i class="fas fa-triangle-exclamation kpi-icon"></i>
+            <div class="kpi-label">Mortality (30d)</div>
+            <div class="kpi-value">{{ mortality_month }}</div>
+        </div>
+        <div class="kpi-sub">Birds lost this month</div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Branch breakdown (only when viewing all)                       -->
+<!-- ============================================================ -->
+{% if branch_breakdown %}
+<div class="section-title">
+    <span>Branch Breakdown</span>
+</div>
+<table class="branch-table">
+    <thead>
+        <tr>
+            <th>Branch</th>
+            <th style="text-align:right;">Flocks</th>
+            <th style="text-align:right;">Birds</th>
+            <th style="text-align:right;">Eggs Today</th>
+            <th style="text-align:right;">Sales (30d)</th>
+            <th style="text-align:right;">Low Stock</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in branch_breakdown %}
+        <tr>
+            <td class="branch-name">
+                <i class="fas fa-building"></i>{{ row.branch.name }}
+            </td>
+            <td class="num">{{ row.flocks }}</td>
+            <td class="num">{{ row.birds }}</td>
+            <td class="num">{{ row.eggs_today }}</td>
+            <td class="num">KES {{ row.sales_month|floatformat:0 }}</td>
+            <td class="num">
+                {% if row.low_stock > 0 %}
+                    <span class="low-badge">{{ row.low_stock }} low</span>
+                {% else %}
+                    <span class="ok-badge">OK</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+<!-- ============================================================ -->
+<!-- Egg Production                                                -->
+<!-- ============================================================ -->
+<div class="section-title">
+    <span>Egg Production</span>
+    <a href="{% url 'kuku_biz:egg_list' %}" class="section-link">View All →</a>
+</div>
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div>
+            <i class="fas fa-egg kpi-icon"></i>
+            <div class="kpi-label">Today</div>
+            <div class="kpi-value">{{ eggs_today }}</div>
+        </div>
+        <div class="kpi-sub">eggs collected</div>
+    </div>
+    <div class="kpi-card">
+        <div>
+            <i class="fas fa-calendar-week kpi-icon"></i>
+            <div class="kpi-label">This Week</div>
+            <div class="kpi-value">{{ eggs_this_week }}</div>
+        </div>
+        <div class="kpi-sub">eggs collected</div>
+    </div>
+    <div class="kpi-card">
+        <div>
+            <i class="fas fa-calendar-alt kpi-icon"></i>
+            <div class="kpi-label">This Month</div>
+            <div class="kpi-value">{{ eggs_this_month }}</div>
+        </div>
+        <div class="kpi-sub">eggs collected</div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Finance                                                       -->
+<!-- ============================================================ -->
+<div class="section-title">
+    <span>Finance (Last 30 Days)</span>
+    <a href="{% url 'kuku_biz:reports' %}" class="section-link">Full Reports →</a>
+</div>
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div>
+            <i class="fas fa-coins kpi-icon"></i>
+            <div class="kpi-label">Sales</div>
+            <div class="kpi-value">KES {{ sales_this_month|floatformat:0 }}</div>
+        </div>
+        <div class="kpi-sub">{{ sales_month_count }} sale{{ sales_month_count|pluralize }}</div>
+    </div>
+    <div class="kpi-card">
+        <div>
+            <i class="fas fa-wallet kpi-icon"></i>
+            <div class="kpi-label">Expenses</div>
+            <div class="kpi-value">KES {{ total_expenses_month|floatformat:0 }}</div>
+        </div>
+        <div class="kpi-sub">Feed + Health + Other</div>
+    </div>
+    <div class="kpi-card">
+        <div>
+            <i class="fas fa-chart-pie kpi-icon"></i>
+            <div class="kpi-label">Profit</div>
+            <div class="kpi-value {% if profit_month >= 0 %}positive{% else %}negative{% endif %}">
+                KES {{ profit_month|floatformat:0 }}
+            </div>
+        </div>
+        <div class="kpi-sub">Revenue − Expenses</div>
+    </div>
+    <div class="kpi-card">
+        <div>
+            <i class="fas fa-hand-holding-usd kpi-icon"></i>
+            <div class="kpi-label">Outstanding</div>
+            <div class="kpi-value {% if sales_outstanding_month > 0 %}owed{% endif %}">
+                KES {{ sales_outstanding_month|floatformat:0 }}
+            </div>
+        </div>
+        <div class="kpi-sub">Credit + partial sales</div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Operations (Feed / Health / Inventory)                        -->
+<!-- ============================================================ -->
+<div class="section-title">
+    <span>Operations (Last 30 Days)</span>
+</div>
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div>
+            <i class="fas fa-wheat-awn kpi-icon"></i>
+            <div class="kpi-label">Feed Used</div>
+            <div class="kpi-value">{{ feed_kg_month|floatformat:0 }}</div>
+        </div>
+        <div class="kpi-sub">kg · KES {{ feed_cost_month|floatformat:0 }}</div>
+    </div>
+    <div class="kpi-card">
+        <div>
+            <i class="fas fa-briefcase-medical kpi-icon"></i>
+            <div class="kpi-label">Health Records</div>
+            <div class="kpi-value">{{ health_records_month }}</div>
+        </div>
+        <div class="kpi-sub">KES {{ health_cost_month|floatformat:0 }} spent</div>
+    </div>
+    <div class="kpi-card">
+        <div>
+            <i class="fas fa-warehouse kpi-icon"></i>
+            <div class="kpi-label">Inventory Items</div>
+            <div class="kpi-value">{{ inventory_count }}</div>
+        </div>
+        <div class="kpi-sub">
+            KES {{ inventory_value|floatformat:0 }} value
+        </div>
+    </div>
+    <div class="kpi-card">
+        <div>
+            <i class="fas fa-exclamation-triangle kpi-icon"></i>
+            <div class="kpi-label">Low Stock</div>
+            <div class="kpi-value {% if low_stock_count > 0 %}negative{% endif %}">
+                {{ low_stock_count }}
+            </div>
+        </div>
+        <div class="kpi-sub">
+            {% if low_stock_count > 0 %}Need restocking{% else %}All stocked{% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Low stock alert                                               -->
+<!-- ============================================================ -->
+{% if low_stock %}
+<div class="low-stock-alert">
+    <div class="title">
+        <i class="fas fa-exclamation-triangle"></i>
+        {{ low_stock_count }} item{{ low_stock_count|pluralize }} low on stock
+    </div>
+    <div class="low-stock-list">
+        {% for item in low_stock|slice:":15" %}
+        <span class="low-stock-pill">
+            <strong>{{ item.name }}</strong>
+            ({{ item.quantity|floatformat:1 }} {{ item.unit|default:"pcs" }})
+            {% if item.branch %}
+                <span class="branch">· {{ item.branch.name }}</span>
+            {% endif %}
+        </span>
+        {% endfor %}
+        {% if low_stock_count > 15 %}
+        <span class="low-stock-pill">+{{ low_stock_count|add:"-15" }} more</span>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- ============================================================ -->
+<!-- Widgets: Top flocks · Recent sales · Recent eggs              -->
+<!-- ============================================================ -->
+<div class="widgets-grid">
+
+    <!-- Top Flocks -->
+    <div class="widget">
+        <div class="widget-header">
+            <i class="fas fa-kiwi-bird"></i> Top Flocks
+        </div>
+        <div class="widget-body">
+            {% for flock in top_flocks %}
+            <div class="widget-row">
+                <div class="wr-main">
+                    <strong>{{ flock.name }}</strong>
+                    <span class="wr-meta">
+                        {{ flock.get_flock_type_display }}
+                        {% if flock.branch %} · {{ flock.branch.name }}{% endif %}
+                    </span>
+                </div>
+                <div class="wr-value">{{ flock.current_count }} birds</div>
+            </div>
+            {% empty %}
+            <div class="widget-empty">No active flocks yet</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Recent Sales -->
+    <div class="widget">
+        <div class="widget-header">
+            <i class="fas fa-shopping-cart"></i> Recent Sales
+        </div>
+        <div class="widget-body">
+            {% for sale in recent_sales %}
+            <div class="widget-row">
+                <div class="wr-main">
+                    <strong>{{ sale.customer.name|default:"Walk-in" }}</strong>
+                    <span class="wr-meta">
+                        {{ sale.sale_date|date:"d M" }}
+                        {% if sale.branch %} · {{ sale.branch.name }}{% endif %}
+                        · {{ sale.get_status_display }}
+                    </span>
+                </div>
+                <div class="wr-value">KES {{ sale.total_amount|floatformat:0 }}</div>
+            </div>
+            {% empty %}
+            <div class="widget-empty">No sales recorded yet</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Recent Egg Production -->
+    <div class="widget">
+        <div class="widget-header">
+            <i class="fas fa-egg"></i> Recent Egg Records
+        </div>
+        <div class="widget-body">
+            {% for rec in recent_eggs %}
+            <div class="widget-row">
+                <div class="wr-main">
+                    <strong>{{ rec.flock.name }}</strong>
+                    <span class="wr-meta">
+                        {{ rec.date|date:"d M Y" }}
+                        {% if rec.branch %} · {{ rec.branch.name }}{% endif %}
+                    </span>
+                </div>
+                <div class="wr-value">{{ rec.eggs_collected }} eggs</div>
+            </div>
+            {% empty %}
+            <div class="widget-empty">No egg records yet</div>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

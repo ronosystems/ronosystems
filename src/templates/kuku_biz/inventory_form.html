@@ -1,0 +1,146 @@
+{% extends 'kuku_base.html' %}
+
+{% block page_title %}
+    {% if item %}Edit {{ item.name }}{% else %}Add Inventory Stock{% endif %}
+{% endblock %}
+{% block page_subtitle %}{{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card" style="border: 2px solid #000;">
+            <div class="card-header" style="background: #036a77; color: #fff; border-bottom: 2px solid #000;">
+                <h5 class="mb-0">
+                    <i class="fas fa-warehouse"></i>
+                    {% if item %}Edit Inventory Item{% else %}New Inventory Item{% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+
+                    <!-- Branch -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            Branch / Depot <span class="text-danger">*</span>
+                        </label>
+                        <select name="branch" class="form-select" style="border: 2px solid #000;" required>
+                            <option value="">— Select a branch —</option>
+                            {% for b in branches %}
+                                <option value="{{ b.id }}"
+                                    {% if item and item.branch_id == b.id %}selected{% endif %}>
+                                    {{ b.name }}{% if b.code %} ({{ b.code }}){% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">
+                            Pick the depot/store where this stock lives (e.g. Nairobi Depot).
+                        </small>
+                    </div>
+
+                    <!-- Name -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            Item Name <span class="text-danger">*</span>
+                        </label>
+                        <input type="text"
+                               name="name"
+                               class="form-control"
+                               style="border: 2px solid #000;"
+                               value="{{ item.name|default:'' }}"
+                               placeholder="e.g. Egg Trays, Layers Mash"
+                               required>
+                    </div>
+
+                    <!-- Type + Unit -->
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Item Type</label>
+                            <select name="item_type" class="form-select" style="border: 2px solid #000;">
+                                {% for value, label in item_types %}
+                                    <option value="{{ value }}"
+                                        {% if item and item.item_type == value %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Unit</label>
+                            <input type="text"
+                                   name="unit"
+                                   class="form-control"
+                                   style="border: 2px solid #000;"
+                                   value="{{ item.unit|default:'' }}"
+                                   placeholder="pcs, trays, bags, kg">
+                        </div>
+                    </div>
+
+                    <!-- Quantity + Reorder + Cost -->
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold">
+                                Quantity <span class="text-danger">*</span>
+                            </label>
+                            <input type="number"
+                                   step="0.01"
+                                   min="0"
+                                   name="quantity"
+                                   class="form-control"
+                                   style="border: 2px solid #000;"
+                                   value="{{ item.quantity|default:'' }}"
+                                   placeholder="e.g. 100"
+                                   required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold">Reorder Level</label>
+                            <input type="number"
+                                   step="0.01"
+                                   min="0"
+                                   name="reorder_level"
+                                   class="form-control"
+                                   style="border: 2px solid #000;"
+                                   value="{{ item.reorder_level|default:'' }}"
+                                   placeholder="e.g. 20">
+                            <small class="text-muted">Alert when stock falls to this level</small>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold">Cost per Unit (KES)</label>
+                            <input type="number"
+                                   step="0.01"
+                                   min="0"
+                                   name="cost_per_unit"
+                                   class="form-control"
+                                   style="border: 2px solid #000;"
+                                   value="{{ item.cost_per_unit|default:'' }}"
+                                   placeholder="e.g. 25.00">
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Notes</label>
+                        <textarea name="notes"
+                                  class="form-control"
+                                  style="border: 2px solid #000;"
+                                  rows="3"
+                                  placeholder="Optional notes...">{{ item.notes|default:'' }}</textarea>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'kuku_biz:inventory_list' %}"
+                           class="btn btn-secondary" style="border: 2px solid #000;">
+                            <i class="fas fa-arrow-left"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary fw-bold" style="border: 2px solid #000;">
+                            <i class="fas fa-save"></i>
+                            {% if item %}Update{% else %}Save Item{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

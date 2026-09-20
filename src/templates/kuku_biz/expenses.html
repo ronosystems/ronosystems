@@ -1,0 +1,184 @@
+{% extends 'kuku_base.html' %}
+{% block title %}Expenses — Kuku Biz{% endblock %}
+{% block page_title %}Expenses{% endblock %}
+{% block page_subtitle %}<small>Farm operating costs</small>{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px; }
+    .btn { display:inline-flex; align-items:center; gap:8px; padding:11px 22px; border-radius:50px; border:2px solid #000; background:#fff; color:#000; text-decoration:none; font-weight:600; font-size:0.85rem; cursor:pointer; font-family:inherit; transition:all 0.2s; }
+    .btn-primary { background:linear-gradient(90deg,#0a2f45 0%,#1fb4d2 100%); color:#fff; }
+    .btn-primary:hover { transform:translateY(-1px); box-shadow:0 8px 18px rgba(31,180,210,0.35); color:#fff; }
+    .kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:20px; }
+    .kpi-card { background:#fff; border:2px solid #000; border-radius:8px; padding:16px 18px; }
+    .kpi-label { font-size:0.7rem; text-transform:uppercase; letter-spacing:1px; font-weight:700; color:#6b7280; }
+    .kpi-value { font-size:1.5rem; font-weight:800; color:#1f2937; margin-top:4px; }
+    .kpi-sub { font-size:0.72rem; color:#9ca3af; margin-top:3px; }
+    .data-table { width:100%; background:#fff; border:2px solid #000; border-radius:8px; overflow:hidden; border-collapse:separate; border-spacing:0; }
+    .data-table thead { background:#f0fbfd; }
+    .data-table th { text-align:left; padding:14px 18px; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; font-weight:700; color:#374151; border-bottom:2px solid #000; }
+    .data-table td { padding:14px 18px; border-bottom:1px solid #e5e7eb; font-size:0.88rem; color:#1f2937; }
+    .data-table tr:last-child td { border-bottom:none; }
+    .data-table tr:hover { background:#f9fafb; }
+    .cell-num { font-family:'Courier New',monospace; font-weight:700; text-align:right; color:#dc2626; }
+    .badge { display:inline-block; padding:3px 10px; border-radius:50px; font-size:0.7rem; font-weight:600; border:1px solid #000; }
+    .badge-feed       { background:#fef3c7; color:#92400e; }
+    .badge-labour     { background:#dbeafe; color:#1e40af; }
+    .badge-utilities  { background:#e0e7ff; color:#3730a3; }
+    .badge-equipment  { background:#fce7f3; color:#9f1239; }
+    .badge-transport  { background:#d1fae5; color:#065f46; }
+    .badge-veterinary { background:#fee2e2; color:#991b1b; }
+    .badge-chicks     { background:#ffedd5; color:#9a3412; }
+    .badge-other      { background:#e5e7eb; color:#4b5563; }
+    .empty-state { text-align:center; padding:60px 30px; background:#fff; border:2px dashed #9ca3af; border-radius:8px; }
+    .empty-state i { font-size:3rem; color:#87CEEB; margin-bottom:16px; }
+    .empty-state h3 { margin:0 0 8px; color:#1f2937; }
+    .empty-state p { color:#6b7280; margin-bottom:20px; }
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; justify-content:center; align-items:center; padding:20px; }
+    .modal-overlay.active { display:flex; }
+    .modal-box { background:#fff; border:2px solid #000; border-radius:8px; padding:28px 32px; max-width:600px; width:100%; max-height:90vh; overflow-y:auto; }
+    .modal-box h3 { font-size:1.1rem; font-weight:700; margin-bottom:20px; padding-bottom:10px; border-bottom:2px solid #000; }
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+    .form-group { margin-bottom:14px; }
+    .form-group label { display:block; font-weight:600; font-size:0.82rem; margin-bottom:5px; }
+    .form-group label .required { color:#dc2626; }
+    .form-group input, .form-group select, .form-group textarea { width:100%; padding:9px 12px; border:2px solid #000; border-radius:6px; font-family:inherit; font-size:0.88rem; background:#fff; }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline:none; border-color:#1fb4d2; box-shadow:0 0 0 3px rgba(31,180,210,0.2); }
+    .modal-actions { display:flex; gap:10px; margin-top:20px; padding-top:16px; border-top:2px solid #000; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h2 style="margin:0;font-size:1.1rem;font-weight:700;">Expense Log</h2>
+    <button type="button" class="btn btn-primary" onclick="openModal()">
+        <i class="fas fa-plus"></i> Record Expense
+    </button>
+</div>
+
+<div class="kpi-row">
+    <div class="kpi-card">
+        <div class="kpi-label">Total (Last 30 Days)</div>
+        <div class="kpi-value">KES {{ month_total|floatformat:0 }}</div>
+        <div class="kpi-sub">All categories</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Total Records</div>
+        <div class="kpi-value">{{ expenses|length }}</div>
+        <div class="kpi-sub">Showing latest 100</div>
+    </div>
+</div>
+
+{% if expenses %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th>Paid To</th>
+                <th>Flock</th>
+                <th style="text-align:right;">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in expenses %}
+            <tr>
+                <td>{{ e.date|date:"d M Y" }}</td>
+                <td><span class="badge badge-{{ e.category }}">{{ e.get_category_display }}</span></td>
+                <td>{{ e.description|default:"—"|truncatechars:50 }}</td>
+                <td>{{ e.paid_to|default:"—" }}</td>
+                <td>{% if e.flock %}{{ e.flock.name }}{% else %}<em style="color:#9ca3af;">General</em>{% endif %}</td>
+                <td class="cell-num">{{ e.amount|floatformat:0 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div class="empty-state">
+        <i class="fas fa-wallet"></i>
+        <h3>No expenses yet</h3>
+        <p>Track labour, utilities, equipment and other farm costs.</p>
+        <button type="button" class="btn btn-primary" onclick="openModal()">
+            <i class="fas fa-plus"></i> Record First Expense
+        </button>
+    </div>
+{% endif %}
+
+<!-- Modal -->
+<div class="modal-overlay" id="expenseModal">
+    <div class="modal-box">
+        <h3><i class="fas fa-wallet"></i> Record Expense</h3>
+        <form method="post" action="{% url 'kuku_biz:expense_create' %}">
+            {% csrf_token %}
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="date">Date <span class="required">*</span></label>
+                    <input type="date" id="date" name="date" value="{{ today|date:'Y-m-d' }}" required>
+                </div>
+                <div class="form-group">
+                    <label for="category">Category <span class="required">*</span></label>
+                    <select id="category" name="category" required>
+                        <option value="feed">Feed</option>
+                        <option value="labour">Labour</option>
+                        <option value="utilities">Utilities</option>
+                        <option value="equipment">Equipment</option>
+                        <option value="transport">Transport</option>
+                        <option value="veterinary">Veterinary</option>
+                        <option value="chicks">Chick Purchase</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="amount">Amount (KES) <span class="required">*</span></label>
+                    <input type="number" id="amount" name="amount" min="0" step="0.01" required placeholder="e.g. 1500">
+                </div>
+                <div class="form-group">
+                    <label for="flock">Flock (optional)</label>
+                    <select id="flock" name="flock">
+                        <option value="">— General —</option>
+                        {% for f in flocks %}<option value="{{ f.id }}">{{ f.name }}</option>{% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="description">Description</label>
+                <input type="text" id="description" name="description" placeholder="e.g. Water bill for September">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="paid_to">Paid To</label>
+                    <input type="text" id="paid_to" name="paid_to" placeholder="e.g. KPLC">
+                </div>
+                <div class="form-group">
+                    <label for="payment_method">Payment Method</label>
+                    <select id="payment_method" name="payment_method">
+                        <option value="">— Select —</option>
+                        <option value="cash">Cash</option>
+                        <option value="mpesa">M-Pesa</option>
+                        <option value="bank">Bank</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="notes">Notes</label>
+                <textarea id="notes" name="notes" rows="2"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Save</button>
+                <button type="button" class="btn" onclick="closeModal()"><i class="fas fa-times"></i> Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openModal(){document.getElementById('expenseModal').classList.add('active');document.body.style.overflow='hidden';}
+function closeModal(){document.getElementById('expenseModal').classList.remove('active');document.body.style.overflow='';}
+document.getElementById('expenseModal').addEventListener('click',function(e){if(e.target===this)closeModal();});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();});
+</script>
+{% endblock %}

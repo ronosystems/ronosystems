@@ -1,0 +1,317 @@
+{% extends 'kuku_base.html' %}
+
+{% block title %}New Sale — Kuku Biz{% endblock %}
+{% block page_title %}New Egg Sale{% endblock %}
+{% block page_subtitle %}<small>Record a sale to a customer</small>{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 26px 30px;
+        max-width: 760px;
+    }
+    .form-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #000;
+    }
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        font-size: 0.85rem;
+        margin-bottom: 6px;
+    }
+    .form-group label .required {
+        color: #dc2626;
+        margin-left: 3px;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 10px 14px;
+        border: 2px solid #000;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 0.9rem;
+        background: #fff;
+        transition: all 0.2s;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: #1fb4d2;
+        box-shadow: 0 0 0 3px rgba(31,180,210,0.2);
+    }
+    .form-group .help-text {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-top: 4px;
+    }
+    .section-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #6b7280;
+        margin: 22px 0 10px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .form-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 24px;
+        padding-top: 20px;
+        border-top: 2px solid #000;
+    }
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 24px;
+        border-radius: 50px;
+        border: 2px solid #000;
+        background: #fff;
+        color: #000;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.2s;
+    }
+    .btn-primary {
+        background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
+        color: #fff;
+    }
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 18px rgba(31,180,210,0.35);
+        color: #fff;
+    }
+    .btn-secondary:hover {
+        background: #f0fbfd;
+        border-color: #1fb4d2;
+        color: #1fb4d2;
+    }
+    .quick-fill {
+        display: flex;
+        gap: 8px;
+        margin-top: 6px;
+        flex-wrap: wrap;
+    }
+    .quick-fill button {
+        padding: 6px 14px;
+        border: 1px solid #d1d5db;
+        border-radius: 50px;
+        background: #f9fafb;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+    .quick-fill button:hover {
+        background: #1fb4d2;
+        color: #fff;
+        border-color: #1fb4d2;
+    }
+    .amount-preview {
+        background: #f0fbfd;
+        border: 1px dashed #1fb4d2;
+        border-radius: 8px;
+        padding: 14px 18px;
+        margin-top: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .amount-preview .label {
+        font-size: 0.8rem;
+        color: #4b5563;
+        font-weight: 600;
+    }
+    .amount-preview .value {
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: #0a2f45;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="form-card">
+    <div class="form-title">
+        <i class="fas fa-shopping-cart"></i> Record Egg Sale
+    </div>
+
+    <form method="post" id="saleForm">
+        {% csrf_token %}
+
+        <div class="section-label">Customer & Date</div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="customer">Customer</label>
+                <select id="customer" name="customer">
+                    <option value="">— Walk-in / Cash —</option>
+                    {% for c in customers %}
+                        <option value="{{ c.id }}">{{ c.name }} ({{ c.get_customer_type_display }})</option>
+                    {% endfor %}
+                </select>
+                <div class="help-text">Leave blank for a walk-in customer</div>
+            </div>
+
+            <div class="form-group">
+                <label for="sale_date">Date <span class="required">*</span></label>
+                <input type="date"
+                       id="sale_date"
+                       name="sale_date"
+                       value="{{ today|date:'Y-m-d' }}"
+                       required>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="invoice_number">Invoice / Ref #</label>
+                <input type="text"
+                       id="invoice_number"
+                       name="invoice_number"
+                       placeholder="e.g. INV-001"
+                       maxlength="50">
+            </div>
+
+            <div class="form-group">
+                <label for="payment_method">Payment Method</label>
+                <select id="payment_method" name="payment_method">
+                    <option value="">— Select —</option>
+                    <option value="cash">Cash</option>
+                    <option value="mpesa">M-Pesa</option>
+                    <option value="bank">Bank Transfer</option>
+                    <option value="credit">Credit (Pay Later)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="section-label">Sale Details</div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="unit">Unit <span class="required">*</span></label>
+                <select id="unit" name="unit" required>
+                    <option value="tray">Tray (30 eggs)</option>
+                    <option value="egg">Individual Egg</option>
+                    <option value="crate">Crate (360 eggs)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="quantity">Quantity <span class="required">*</span></label>
+                <input type="number"
+                       id="quantity"
+                       name="quantity"
+                       min="1"
+                       placeholder="e.g. 5"
+                       required>
+                <div class="quick-fill">
+                    <button type="button" onclick="setQty(1)">1</button>
+                    <button type="button" onclick="setQty(5)">5</button>
+                    <button type="button" onclick="setQty(10)">10</button>
+                    <button type="button" onclick="setQty(30)">30</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="unit_price">Unit Price (KES) <span class="required">*</span></label>
+                <input type="number"
+                       id="unit_price"
+                       name="unit_price"
+                       min="0"
+                       step="0.01"
+                       placeholder="e.g. 360"
+                       required>
+                <div class="quick-fill">
+                    <button type="button" onclick="setPrice(360)">360</button>
+                    <button type="button" onclick="setPrice(380)">380</button>
+                    <button type="button" onclick="setPrice(400)">400</button>
+                    <button type="button" onclick="setPrice(15)">15</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="amount_paid">Amount Paid (KES)</label>
+                <input type="number"
+                       id="amount_paid"
+                       name="amount_paid"
+                       min="0"
+                       step="0.01"
+                       value="0">
+                <div class="help-text">Leave 0 for unpaid / on credit</div>
+            </div>
+        </div>
+
+        <!-- Live total preview -->
+        <div class="amount-preview">
+            <span class="label">Sale Total</span>
+            <span class="value" id="totalPreview">KES 0</span>
+        </div>
+
+        <div class="form-group" style="margin-top:16px;">
+            <label for="notes">Notes</label>
+            <textarea id="notes"
+                      name="notes"
+                      rows="2"
+                      placeholder="Any notes about this sale"></textarea>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-check"></i> Save Sale
+            </button>
+            <a href="{% url 'kuku_biz:sale_list' %}" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancel
+            </a>
+        </div>
+    </form>
+</div>
+
+<script>
+    function setQty(n) {
+        document.getElementById('quantity').value = n;
+        updateTotal();
+    }
+    function setPrice(p) {
+        document.getElementById('unit_price').value = p;
+        updateTotal();
+    }
+    function updateTotal() {
+        const qty = parseFloat(document.getElementById('quantity').value) || 0;
+        const price = parseFloat(document.getElementById('unit_price').value) || 0;
+        const total = qty * price;
+        document.getElementById('totalPreview').textContent = 'KES ' + total.toLocaleString('en-KE', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2,
+        });
+    }
+    document.getElementById('quantity').addEventListener('input', updateTotal);
+    document.getElementById('unit_price').addEventListener('input', updateTotal);
+</script>
+
+{% endblock %}

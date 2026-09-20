@@ -1,0 +1,253 @@
+{% extends 'kuku_base.html' %}
+
+{% block title %}Record Eggs — Kuku Biz{% endblock %}
+{% block page_title %}Record Egg Production{% endblock %}
+{% block page_subtitle %}<small>Log today's collection</small>{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 26px 30px;
+        max-width: 720px;
+    }
+    .form-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #000;
+    }
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        font-size: 0.85rem;
+        margin-bottom: 6px;
+    }
+    .form-group label .required {
+        color: #dc2626;
+        margin-left: 3px;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 10px 14px;
+        border: 2px solid #000;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 0.9rem;
+        background: #fff;
+        transition: all 0.2s;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: #1fb4d2;
+        box-shadow: 0 0 0 3px rgba(31,180,210,0.2);
+    }
+    .form-group .help-text {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-top: 4px;
+    }
+    .form-group .flock-info {
+        font-size: 0.75rem;
+        color: #1fb4d2;
+        margin-top: 4px;
+        font-weight: 500;
+    }
+    .form-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 24px;
+        padding-top: 20px;
+        border-top: 2px solid #000;
+    }
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 24px;
+        border-radius: 50px;
+        border: 2px solid #000;
+        background: #fff;
+        color: #000;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.2s;
+    }
+    .btn-primary {
+        background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
+        color: #fff;
+    }
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 18px rgba(31,180,210,0.35);
+        color: #fff;
+    }
+    .btn-secondary:hover {
+        background: #f0fbfd;
+        border-color: #1fb4d2;
+        color: #1fb4d2;
+    }
+    .section-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #6b7280;
+        margin: 20px 0 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="form-card">
+    <div class="form-title">
+        <i class="fas fa-egg"></i> Record Egg Collection
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="flock">Flock <span class="required">*</span></label>
+                <select id="flock" name="flock" required>
+                    <option value="">— Select flock —</option>
+                    {% for flock in flocks %}
+                        <option value="{{ flock.id }}"
+                                data-count="{{ flock.current_count }}"
+                                data-type="{{ flock.flock_type }}">
+                            {{ flock.name }} ({{ flock.get_flock_type_display }} · {{ flock.current_count }} birds)
+                        </option>
+                    {% endfor %}
+                </select>
+                <div class="help-text" id="flockInfo"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="date">Date <span class="required">*</span></label>
+                <input type="date"
+                       id="date"
+                       name="date"
+                       value="{{ today|date:'Y-m-d' }}"
+                       required>
+            </div>
+        </div>
+
+        <div class="section-label">Collection</div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="eggs_collected">Eggs Collected <span class="required">*</span></label>
+                <input type="number"
+                       id="eggs_collected"
+                       name="eggs_collected"
+                       min="0"
+                       placeholder="e.g. 85"
+                       required
+                       autofocus>
+                <div class="help-text">Total eggs collected today</div>
+            </div>
+
+            <div class="form-group">
+                <label for="eggs_cracked">Cracked</label>
+                <input type="number"
+                       id="eggs_cracked"
+                       name="eggs_cracked"
+                       min="0"
+                       value="0">
+                <div class="help-text">Cracked during collection</div>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="eggs_broken">Broken</label>
+                <input type="number"
+                       id="eggs_broken"
+                       name="eggs_broken"
+                       min="0"
+                       value="0">
+            </div>
+
+            <div class="form-group">
+                <label for="eggs_discarded">Discarded</label>
+                <input type="number"
+                       id="eggs_discarded"
+                       name="eggs_discarded"
+                       min="0"
+                       value="0">
+                <div class="help-text">Unfit for sale</div>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="eggs_consumed">Consumed (Farm)</label>
+                <input type="number"
+                       id="eggs_consumed"
+                       name="eggs_consumed"
+                       min="0"
+                       value="0">
+                <div class="help-text">Kept for home/farm use</div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="notes">Notes</label>
+            <textarea id="notes"
+                      name="notes"
+                      rows="2"
+                      placeholder="Any observations (e.g. feed change, weather, health issues)"></textarea>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-check"></i> Save Record
+            </button>
+            <a href="{% url 'kuku_biz:egg_list' %}" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancel
+            </a>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Show helpful info when a flock is selected
+    document.getElementById('flock').addEventListener('change', function() {
+        const opt = this.options[this.selectedIndex];
+        const count = opt.dataset.count;
+        const type = opt.dataset.type;
+        const info = document.getElementById('flockInfo');
+
+        if (!count) {
+            info.textContent = '';
+            return;
+        }
+
+        if (type === 'broiler') {
+            info.innerHTML = '<i class="fas fa-info-circle"></i> This is a broiler flock — egg tracking is optional';
+        } else {
+            info.innerHTML = `<i class="fas fa-info-circle"></i> ${count} birds — expect up to ${count} eggs/day at peak lay`;
+        }
+    });
+</script>
+
+{% endblock %}
