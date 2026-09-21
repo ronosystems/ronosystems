@@ -1,8 +1,14 @@
 {% extends 'kuku_base.html' %}
 
-{% block title %}New Flock — Kuku Biz{% endblock %}
-{% block page_title %}New Flock{% endblock %}
-{% block page_subtitle %}<small>Register a new batch of birds</small>{% endblock %}
+{% block title %}
+    {% if is_edit %}Edit {{ flock.name }} — Kuku Biz{% else %}New Flock — Kuku Biz{% endif %}
+{% endblock %}
+{% block page_title %}
+    {% if is_edit %}Edit {{ flock.name }}{% else %}New Flock{% endif %}
+{% endblock %}
+{% block page_subtitle %}
+    <small>{% if is_edit %}Update flock details{% else %}Register a new batch of birds{% endif %}</small>
+{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -11,7 +17,7 @@
         border: 2px solid #000;
         border-radius: 8px;
         padding: 26px 30px;
-        max-width: 720px;
+        max-width: 760px;
     }
     .form-title {
         font-size: 1.15rem;
@@ -19,12 +25,31 @@
         margin-bottom: 20px;
         padding-bottom: 10px;
         border-bottom: 2px solid #000;
+        display: flex;
+        align-items: center;
+        gap: 10px;
     }
+    .form-title i { color: #1fb4d2; }
+
+    .section-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #6b7280;
+        margin: 22px 0 10px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
     .form-row {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 16px;
         margin-bottom: 16px;
+    }
+    @media (max-width: 640px) {
+        .form-row { grid-template-columns: 1fr; }
     }
     .form-group { margin-bottom: 16px; }
     .form-group label {
@@ -58,6 +83,10 @@
         border-color: #1fb4d2;
         box-shadow: 0 0 0 3px rgba(31,180,210,0.2);
     }
+    .form-group input[readonly] {
+        background: #f3f4f6;
+        cursor: not-allowed;
+    }
     .form-group textarea {
         resize: vertical;
         min-height: 80px;
@@ -67,6 +96,94 @@
         color: #6b7280;
         margin-top: 4px;
     }
+
+    .quick-fill {
+        display: flex;
+        gap: 8px;
+        margin-top: 6px;
+        flex-wrap: wrap;
+    }
+    .quick-fill button {
+        padding: 6px 14px;
+        border: 1px solid #d1d5db;
+        border-radius: 50px;
+        background: #f9fafb;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s;
+        font-family: inherit;
+    }
+    .quick-fill button:hover {
+        background: #1fb4d2;
+        color: #fff;
+        border-color: #1fb4d2;
+    }
+
+    .amount-preview {
+        background: #f0fbfd;
+        border: 1px dashed #1fb4d2;
+        border-radius: 8px;
+        padding: 14px 18px;
+        margin-top: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .amount-preview .label {
+        font-size: 0.8rem;
+        color: #4b5563;
+        font-weight: 600;
+    }
+    .amount-preview .value {
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: #0a2f45;
+        font-family: 'Courier New', monospace;
+    }
+    .amount-preview .calc {
+        font-size: 0.75rem;
+        color: #6b7280;
+        display: block;
+        font-weight: 400;
+        margin-top: 4px;
+    }
+
+    .cost-summary {
+        background: #fef3c7;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 14px 18px;
+        margin-bottom: 20px;
+        font-size: 0.85rem;
+        color: #78350f;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    .cost-summary i {
+        color: #92400e;
+        font-size: 1.1rem;
+        margin-top: 2px;
+    }
+    .cost-summary strong { color: #78350f; }
+
+    .status-hint {
+        background: #e0f4fa;
+        border: 1px dashed #1fb4d2;
+        border-radius: 6px;
+        padding: 10px 14px;
+        margin-top: 6px;
+        font-size: 0.78rem;
+        color: #036a77;
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    .status-hint i { color: #1fb4d2; margin-top: 2px; }
+
     .form-actions {
         display: flex;
         gap: 12px;
@@ -111,11 +228,27 @@
 
 <div class="form-card">
     <div class="form-title">
-        <i class="fas fa-kiwi-bird"></i> Register New Flock
+        <i class="fas fa-kiwi-bird"></i>
+        {% if is_edit %}Edit Flock — {{ flock.name }}{% else %}Register New Flock{% endif %}
     </div>
 
-    <form method="post">
+    {% if not is_edit %}
+    <div class="cost-summary">
+        <i class="fas fa-info-circle"></i>
+        <div>
+            <strong>Purchase cost</strong> and <strong>supplier</strong> are recorded as part of this flock.
+            The cost is also logged as a <strong>"Chick Purchase"</strong> expense so it flows into your financial reports.
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="post" id="flockForm">
         {% csrf_token %}
+
+        <!-- ============================================================ -->
+        <!-- FLOCK IDENTITY                                                -->
+        <!-- ============================================================ -->
+        <div class="section-label">Flock Identity</div>
 
         <div class="form-group">
             <label for="name">Flock Name <span class="required">*</span></label>
@@ -123,8 +256,9 @@
                    id="name"
                    name="name"
                    placeholder="e.g. Batch A - Layers 2026"
+                   value="{{ flock.name|default:'' }}"
                    required
-                   autofocus>
+                   {% if not is_edit %}autofocus{% endif %}>
             <div class="help-text">A name you'll recognize (e.g. Batch A, March 2026, Kuroiler Group 1)</div>
         </div>
 
@@ -132,9 +266,9 @@
             <div class="form-group">
                 <label for="flock_type">Type <span class="required">*</span></label>
                 <select id="flock_type" name="flock_type" required>
-                    <option value="layer">Layers (Egg Production)</option>
-                    <option value="broiler">Broilers (Meat Production)</option>
-                    <option value="mixed">Mixed</option>
+                    <option value="layer"   {% if flock and flock.flock_type == 'layer' %}selected{% endif %}>Layers (Egg Production)</option>
+                    <option value="broiler" {% if flock and flock.flock_type == 'broiler' %}selected{% endif %}>Broilers (Meat Production)</option>
+                    <option value="mixed"   {% if flock and flock.flock_type == 'mixed' %}selected{% endif %}>Mixed</option>
                 </select>
             </div>
 
@@ -143,48 +277,278 @@
                 <input type="text"
                        id="breed"
                        name="breed"
+                       value="{{ flock.breed|default:'' }}"
                        placeholder="e.g. Isa Brown, Kuroiler, Kenbro">
             </div>
         </div>
 
+        <!-- ============================================================ -->
+        <!-- LOCATION & TIMELINE                                            -->
+        <!-- ============================================================ -->
+        <div class="section-label">Location &amp; Timeline</div>
+
         <div class="form-row">
+            <div class="form-group">
+                <label for="branch">Branch / Farm</label>
+                <select id="branch" name="branch">
+                    <option value="">— Unassigned —</option>
+                    {% for b in branches %}
+                        <option value="{{ b.id }}"
+                            {% if flock and flock.branch_id == b.id %}selected
+                            {% elif not flock and user_branch and user_branch.id == b.id %}selected{% endif %}>
+                            {{ b.name }}{% if b.code %} ({{ b.code }}){% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+                <div class="help-text">Where this flock lives (defaults to your branch)</div>
+            </div>
+
             <div class="form-group">
                 <label for="date_acquired">Date Acquired <span class="required">*</span></label>
                 <input type="date"
                        id="date_acquired"
                        name="date_acquired"
-                       value="{{ today|date:'Y-m-d' }}"
+                       value="{% if flock %}{{ flock.date_acquired|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}"
                        required>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="age_at_acquisition">Age at Acquisition (days)</label>
+                <input type="number"
+                       id="age_at_acquisition"
+                       name="age_at_acquisition"
+                       min="0"
+                       max="365"
+                       value="{{ flock.age_at_acquisition_days|default:0 }}"
+                       placeholder="e.g. 7, 30, 90">
+                <div class="quick-fill">
+                    <button type="button" onclick="setAge(7)">7</button>
+                    <button type="button" onclick="setAge(14)">14</button>
+                    <button type="button" onclick="setAge(30)">30</button>
+                    <button type="button" onclick="setAge(60)">60</button>
+                    <button type="button" onclick="setAge(90)">90</button>
+                </div>
+                <div class="help-text">How old were the birds when you bought them?</div>
             </div>
 
             <div class="form-group">
-                <label for="initial_count">Initial Count <span class="required">*</span></label>
+                <label for="initial_count">
+                    Initial Count <span class="required">*</span>
+                    {% if is_edit %}<span style="color:#9ca3af;font-weight:400;font-size:0.75rem;">(locked)</span>{% endif %}
+                </label>
                 <input type="number"
                        id="initial_count"
                        name="initial_count"
                        placeholder="e.g. 500"
                        min="1"
-                       required>
-                <div class="help-text">How many birds in this flock</div>
+                       value="{{ flock.initial_count|default:'' }}"
+                       {% if is_edit %}readonly{% else %}required{% endif %}>
+                <div class="help-text">
+                    {% if is_edit %}
+                        Initial count cannot be changed after creation — it's the baseline for mortality calculations.
+                    {% else %}
+                        How many birds in this flock
+                    {% endif %}
+                </div>
             </div>
         </div>
+
+        <!-- ============================================================ -->
+        <!-- PURCHASE DETAILS                                              -->
+        <!-- ============================================================ -->
+        <div class="section-label">Purchase Details</div>
+
+        <div class="form-group">
+            <label for="supplier">Supplier / Hatchery</label>
+            <input type="text"
+                   id="supplier"
+                   name="supplier"
+                   maxlength="150"
+                   value="{{ flock.supplier|default:'' }}"
+                   placeholder="e.g. Kilimo Hatchery, Kenchic, Local Farmer">
+            <div class="help-text">Who sold you these birds</div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="purchase_price">Price per Bird (KES)</label>
+                <input type="number"
+                       id="purchase_price"
+                       name="purchase_price"
+                       min="0"
+                       step="0.01"
+                       value="{{ flock.purchase_price_per_bird|default:'' }}"
+                       placeholder="e.g. 150"
+                       oninput="updateTotalPurchase()">
+                <div class="quick-fill">
+                    <button type="button" onclick="setPrice(100)">100</button>
+                    <button type="button" onclick="setPrice(150)">150</button>
+                    <button type="button" onclick="setPrice(200)">200</button>
+                    <button type="button" onclick="setPrice(300)">300</button>
+                    <button type="button" onclick="setPrice(400)">400</button>
+                </div>
+                <div class="help-text">Cost per bird at acquisition</div>
+            </div>
+
+            <div class="form-group">
+                <label for="total_purchase">Total Purchase Cost (KES)</label>
+                <input type="number"
+                       id="total_purchase"
+                       name="total_purchase"
+                       min="0"
+                       step="0.01"
+                       value="{{ flock.total_purchase_cost|default:'' }}"
+                       placeholder="Auto-calculated">
+                <div class="help-text">Auto-fills from birds × price (you can override)</div>
+            </div>
+        </div>
+
+        <div class="amount-preview">
+            <span class="label">
+                Total Purchase Cost
+                <span class="calc" id="calcDetail">Enter bird count and price</span>
+            </span>
+            <span class="value" id="purchasePreview">KES 0</span>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- STATUS (only when editing)                                    -->
+        <!-- ============================================================ -->
+        {% if is_edit %}
+        <div class="section-label">Status</div>
+
+        <div class="form-group">
+            <label for="status">Flock Status</label>
+            <select id="status" name="status">
+                <option value="active"   {% if flock.status == 'active' %}selected{% endif %}>Active — currently producing / being kept</option>
+                <option value="retired"  {% if flock.status == 'retired' %}selected{% endif %}>Retired — stopped producing, still on site</option>
+                <option value="sold"     {% if flock.status == 'sold' %}selected{% endif %}>Sold — entire flock sold off</option>
+                <option value="depleted" {% if flock.status == 'depleted' %}selected{% endif %}>Depleted — all birds gone</option>
+            </select>
+            <div class="status-hint">
+                <i class="fas fa-info-circle"></i>
+                <div>
+                    Retired / sold / depleted flocks disappear from dashboards and active metrics,
+                    but their historical records stay intact for reporting.
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- ============================================================ -->
+        <!-- NOTES                                                         -->
+        <!-- ============================================================ -->
+        <div class="section-label">Additional Notes</div>
 
         <div class="form-group">
             <label for="notes">Notes</label>
             <textarea id="notes"
                       name="notes"
-                      placeholder="Any additional notes about this flock (e.g. supplier, vaccine history, housing)"></textarea>
+                      rows="3"
+                      placeholder="e.g. Supplier contact, vaccine history on arrival, housing notes">{{ flock.notes|default:'' }}</textarea>
         </div>
 
+        <!-- ============================================================ -->
+        <!-- ACTIONS                                                       -->
+        <!-- ============================================================ -->
         <div class="form-actions">
             <button type="submit" class="btn btn-primary">
-                <i class="fas fa-check"></i> Create Flock
+                <i class="fas fa-check"></i>
+                {% if is_edit %}Save Changes{% else %}Create Flock{% endif %}
             </button>
-            <a href="{% url 'kuku_biz:flock_list' %}" class="btn btn-secondary">
+            <a href="{% if is_edit %}{% url 'kuku_biz:flock_detail' flock.pk %}{% else %}{% url 'kuku_biz:flock_list' %}{% endif %}"
+               class="btn btn-secondary">
                 <i class="fas fa-times"></i> Cancel
             </a>
         </div>
     </form>
 </div>
+
+<script>
+    // ============================================================
+    // Age quick-fill
+    // ============================================================
+    function setAge(n) {
+        document.getElementById('age_at_acquisition').value = n;
+    }
+
+    // ============================================================
+    // Price quick-fill
+    // ============================================================
+    function setPrice(p) {
+        document.getElementById('purchase_price').value = p;
+        updateTotalPurchase(true);
+    }
+
+    // ============================================================
+    // Live total purchase cost
+    // ============================================================
+    const birdsInput  = document.getElementById('initial_count');
+    const priceInput  = document.getElementById('purchase_price');
+    const totalInput  = document.getElementById('total_purchase');
+    const preview     = document.getElementById('purchasePreview');
+    const calcDetail  = document.getElementById('calcDetail');
+
+    let totalManuallyEdited = false;
+
+    // If we're editing and there's an existing total, treat it as user-set
+    {% if is_edit and flock.total_purchase_cost %}
+    totalManuallyEdited = true;
+    {% endif %}
+
+    totalInput.addEventListener('input', function () {
+        totalManuallyEdited = true;
+        updatePurchasePreview();
+    });
+
+    function formatNumber(n) {
+        return n.toLocaleString('en-KE', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2,
+        });
+    }
+
+    function updateTotalPurchase(force = false) {
+        const birds = parseInt(birdsInput.value, 10) || 0;
+        const price = parseFloat(priceInput.value) || 0;
+        const total = birds * price;
+
+        if (force || !totalManuallyEdited) {
+            totalInput.value = total > 0 ? total : '';
+        }
+        updatePurchasePreview();
+    }
+
+    function updatePurchasePreview() {
+        const birds = parseInt(birdsInput.value, 10) || 0;
+        const price = parseFloat(priceInput.value) || 0;
+        const manualTotal = parseFloat(totalInput.value) || 0;
+
+        let shownTotal;
+        let detail;
+
+        if (totalManuallyEdited && manualTotal > 0) {
+            shownTotal = manualTotal;
+            detail = 'Manual override';
+        } else {
+            shownTotal = birds * price;
+            if (birds > 0 && price > 0) {
+                detail = birds + ' birds × KES ' + formatNumber(price);
+            } else {
+                detail = 'Enter bird count and price';
+            }
+        }
+
+        preview.textContent = 'KES ' + formatNumber(shownTotal);
+        calcDetail.textContent = detail;
+    }
+
+    birdsInput.addEventListener('input', function () { updateTotalPurchase(); });
+    priceInput.addEventListener('input', function () { updateTotalPurchase(); });
+
+    updatePurchasePreview();
+</script>
 
 {% endblock %}

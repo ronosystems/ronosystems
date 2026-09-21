@@ -26,7 +26,17 @@
             </div>
         </div>
     </div>
-    <div class="col-md-6 text-end">
+    <div class="col-md-3">
+        <div class="card border-dark" style="border: 2px solid #000 !important;">
+            <div class="card-body">
+                <div class="text-muted small">Eggs in Stock</div>
+                <div class="fs-3 fw-bold" style="color: #0a2f45;">
+                    {{ total_eggs|floatformat:0 }}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 text-end d-flex align-items-center justify-content-end">
         <a href="{% url 'kuku_biz:inventory_create' %}"
            class="btn btn-primary fw-bold"
            style="border: 2px solid #000;">
@@ -73,10 +83,13 @@
             <table class="table table-hover mb-0 align-middle">
                 <thead style="background: #f0f2f5;">
                     <tr>
+                        <th style="border-bottom: 2px solid #000; width: 60px;">Photo</th>
                         <th style="border-bottom: 2px solid #000;">Item</th>
                         <th style="border-bottom: 2px solid #000;">Branch</th>
                         <th style="border-bottom: 2px solid #000;">Type</th>
+                        <th style="border-bottom: 2px solid #000;" class="text-end">Tray Size</th>
                         <th style="border-bottom: 2px solid #000;" class="text-end">Qty</th>
+                        <th style="border-bottom: 2px solid #000;" class="text-end">Eggs</th>
                         <th style="border-bottom: 2px solid #000;" class="text-end">Reorder</th>
                         <th style="border-bottom: 2px solid #000;" class="text-end">Cost/Unit</th>
                         <th style="border-bottom: 2px solid #000;" class="text-end">Total Value</th>
@@ -86,12 +99,34 @@
                 <tbody>
                     {% for item in items %}
                     <tr>
+                        <!-- Image thumbnail -->
+                        <td>
+                            {% if item.image_url %}
+                                <a href="{{ item.image_url }}" target="_blank" rel="noopener">
+                                    <img src="{{ item.image_url }}"
+                                         alt="{{ item.name }}"
+                                         style="width: 44px; height: 44px; object-fit: cover;
+                                                border: 2px solid #000; border-radius: 4px;
+                                                cursor: pointer; display: block;">
+                                </a>
+                            {% else %}
+                                <div style="width: 44px; height: 44px; border: 2px dashed #cbd5e1;
+                                            border-radius: 4px; display: flex; align-items: center;
+                                            justify-content: center; color: #cbd5e1;">
+                                    <i class="fas fa-image"></i>
+                                </div>
+                            {% endif %}
+                        </td>
+
+                        <!-- Item name -->
                         <td class="fw-bold">
                             {{ item.name }}
                             {% if item.needs_reorder %}
                                 <span class="badge bg-danger ms-1">Low</span>
                             {% endif %}
                         </td>
+
+                        <!-- Branch -->
                         <td>
                             {% if item.branch %}
                                 <span class="badge bg-info text-dark">{{ item.branch.name }}</span>
@@ -99,16 +134,55 @@
                                 <span class="text-muted small">— Unassigned —</span>
                             {% endif %}
                         </td>
+
+                        <!-- Type -->
                         <td>{{ item.get_item_type_display }}</td>
-                        <td class="text-end fw-bold">
-                            {{ item.quantity }} <span class="text-muted small">{{ item.unit }}</span>
+
+                        <!-- Tray Size (only for egg containers) -->
+                        <td class="text-end">
+                            {% if item.eggs_per_unit %}
+                                <span style="display:inline-block;padding:3px 10px;
+                                             background:#f0fbfd;border:1px solid #1fb4d2;
+                                             border-radius:50px;font-size:0.72rem;
+                                             font-weight:700;color:#0a2f45;
+                                             font-family:'Courier New',monospace;">
+                                    {{ item.eggs_per_unit }}-egg
+                                </span>
+                            {% else %}
+                                <span class="text-muted small">—</span>
+                            {% endif %}
                         </td>
-                        <td class="text-end text-muted">{{ item.reorder_level }}</td>
+
+                        <!-- Qty -->
+                        <td class="text-end fw-bold">
+                            {{ item.quantity|floatformat:"-2" }}
+                            <span class="text-muted small">{{ item.unit }}</span>
+                        </td>
+
+                        <!-- Eggs (only meaningful for egg containers) -->
+                        <td class="text-end fw-bold">
+                            {% if item.eggs_per_unit %}
+                                <span style="font-family:'Courier New',monospace;color:#0a2f45;">
+                                    {{ item.total_eggs|floatformat:0 }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted small">—</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Reorder -->
+                        <td class="text-end text-muted">{{ item.reorder_level|floatformat:"-2" }}</td>
+
+                        <!-- Cost/unit -->
                         <td class="text-end">KES {{ item.cost_per_unit|floatformat:2 }}</td>
+
+                        <!-- Total value (qty × cost) -->
                         <td class="text-end fw-bold">
-                            KES {{ item.quantity|floatformat:2 }}
-                            <!-- optional: multiply in a property -->
+                            KES {{ item.quantity|floatformat:0 }}
+                            <!-- optional: replace with a real qty × cost property -->
                         </td>
+
+                        <!-- Actions -->
                         <td class="text-end">
                             <div class="btn-group btn-group-sm">
                                 <a href="{% url 'kuku_biz:inventory_edit' item.pk %}"
@@ -148,19 +222,43 @@
                                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                                             </div>
                                             <div class="modal-body">
+
+                                                {% if item.image_url %}
+                                                <div style="text-align: center; margin-bottom: 14px;">
+                                                    <img src="{{ item.image_url }}"
+                                                         alt="{{ item.name }}"
+                                                         style="max-width: 120px; max-height: 120px;
+                                                                border: 2px solid #000; border-radius: 4px;
+                                                                object-fit: cover;">
+                                                </div>
+                                                {% endif %}
+
                                                 <p class="mb-2">
                                                     Current stock:
-                                                    <strong>{{ item.quantity }} {{ item.unit }}</strong>
+                                                    <strong>{{ item.quantity|floatformat:"-2" }} {{ item.unit }}</strong>
+                                                    {% if item.eggs_per_unit %}
+                                                        <span style="color:#6b7280;font-size:0.85rem;">
+                                                            ({{ item.total_eggs|floatformat:0 }} eggs)
+                                                        </span>
+                                                    {% endif %}
                                                 </p>
+
                                                 <div class="mb-3">
                                                     <label class="form-label fw-bold">Action</label>
                                                     <select name="action" class="form-select" style="border: 2px solid #000;">
                                                         <option value="add">Add stock (received)</option>
-                                                        <option value="subtract">Remove stock (used/sold)</option>
+                                                        <option value="subtract">Remove stock (broken)</option>
                                                     </select>
                                                 </div>
                                                 <div class="mb-3">
-                                                    <label class="form-label fw-bold">Quantity</label>
+                                                    <label class="form-label fw-bold">
+                                                        Quantity
+                                                        {% if item.eggs_per_unit %}
+                                                            <span style="color:#6b7280;font-weight:400;">
+                                                                ({{ item.eggs_per_unit }} eggs per {{ item.unit|default:"unit" }})
+                                                            </span>
+                                                        {% endif %}
+                                                    </label>
                                                     <input type="number"
                                                            name="delta"
                                                            step="0.01"
@@ -185,7 +283,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="text-center py-5 text-muted">
+                        <td colspan="11" class="text-center py-5 text-muted">
                             <i class="fas fa-warehouse fa-2x mb-3 d-block"></i>
                             No inventory items yet.
                             <div class="mt-3">

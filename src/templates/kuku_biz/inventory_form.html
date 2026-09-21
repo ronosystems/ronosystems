@@ -16,7 +16,7 @@
                 </h5>
             </div>
             <div class="card-body">
-                <form method="post">
+                <form method="post" enctype="multipart/form-data">
                     {% csrf_token %}
 
                     <!-- Branch -->
@@ -45,6 +45,7 @@
                         </label>
                         <input type="text"
                                name="name"
+                               id="item-name"
                                class="form-control"
                                style="border: 2px solid #000;"
                                value="{{ item.name|default:'' }}"
@@ -52,11 +53,14 @@
                                required>
                     </div>
 
-                    <!-- Type + Unit -->
+                    <!-- Type + Tray Size -->
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">Item Type</label>
-                            <select name="item_type" class="form-select" style="border: 2px solid #000;">
+                            <select name="item_type"
+                                    id="item-type"
+                                    class="form-select"
+                                    style="border: 2px solid #000;">
                                 {% for value, label in item_types %}
                                     <option value="{{ value }}"
                                         {% if item and item.item_type == value %}selected{% endif %}>
@@ -65,15 +69,39 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Unit</label>
-                            <input type="text"
-                                   name="unit"
-                                   class="form-control"
-                                   style="border: 2px solid #000;"
-                                   value="{{ item.unit|default:'' }}"
-                                   placeholder="pcs, trays, bags, kg">
+
+                        <!-- Tray size (only relevant for egg containers) -->
+                        <div class="col-md-6 mb-3" id="tray-size-wrapper">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-egg"></i> Eggs per Unit (tray size)
+                            </label>
+                            <select name="tray_size"
+                                    id="tray-size"
+                                    class="form-select"
+                                    style="border: 2px solid #000;">
+                                <option value="0"   {% if item and item.tray_size == 0   %}selected{% endif %}>— Not an egg container —</option>
+                                <option value="1"   {% if item and item.tray_size == 1   %}selected{% endif %}>1-Egg (Individual)</option>
+                                <option value="6"   {% if item and item.tray_size == 6   %}selected{% endif %}>6-Egg Tray</option>
+                                <option value="12"  {% if item and item.tray_size == 12  %}selected{% endif %}>12-Egg Tray</option>
+                                <option value="30"  {% if item and item.tray_size == 30  %}selected{% endif %}>30-Egg Tray</option>
+                                <option value="45"  {% if item and item.tray_size == 45  %}selected{% endif %}>45-Egg Tray</option>
+                                <option value="360" {% if item and item.tray_size == 360 %}selected{% endif %}>360-Egg Crate</option>
+                            </select>
+                            <small class="text-muted">
+                                How many eggs does one unit hold? Used to auto-deduct stock on sale.
+                            </small>
                         </div>
+                    </div>
+
+                    <!-- Unit -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Unit</label>
+                        <input type="text"
+                               name="unit"
+                               class="form-control"
+                               style="border: 2px solid #000;"
+                               value="{{ item.unit|default:'' }}"
+                               placeholder="pcs, trays, bags, kg">
                     </div>
 
                     <!-- Quantity + Reorder + Cost -->
@@ -86,6 +114,7 @@
                                    step="0.01"
                                    min="0"
                                    name="quantity"
+                                   id="quantity"
                                    class="form-control"
                                    style="border: 2px solid #000;"
                                    value="{{ item.quantity|default:'' }}"
@@ -117,6 +146,64 @@
                         </div>
                     </div>
 
+                    <!-- Live egg-total preview (only when tray size > 0) -->
+                    <div class="mb-3" id="egg-total-box" style="display:none;">
+                        <div style="background: #f0fbfd; border: 2px dashed #1fb4d2; border-radius: 8px;
+                                    padding: 14px 18px; display: flex; justify-content: space-between;
+                                    align-items: center;">
+                            <span style="font-size: 0.8rem; color: #4b5563; font-weight: 600;">
+                                Total Eggs Available
+                            </span>
+                            <span style="font-family: 'Courier New', monospace; font-size: 1.5rem;
+                                         font-weight: 800; color: #0a2f45;"
+                                  id="egg-total-value">
+                                0 eggs
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Image Upload -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-image"></i> Item Photo (optional)
+                        </label>
+
+                        {% if item and item.image_url %}
+                            <div style="margin-bottom: 12px;">
+                                <img src="{{ item.image_url }}"
+                                     alt="{{ item.name }}"
+                                     id="image-preview"
+                                     style="max-width: 200px; max-height: 200px; border: 2px solid #000; border-radius: 4px; display: block; object-fit: cover;">
+                                <label style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:0.85rem;font-weight:500;cursor:pointer;">
+                                    <input type="checkbox" name="remove_image">
+                                    <span style="color: #991b1b;">
+                                        <i class="fas fa-trash"></i> Remove current image
+                                    </span>
+                                </label>
+                            </div>
+                        {% else %}
+                            <div id="image-preview-wrap" style="display:none;margin-bottom: 12px;">
+                                <img src=""
+                                     alt="Preview"
+                                     id="image-preview"
+                                     style="max-width: 200px; max-height: 200px; border: 2px solid #000; border-radius: 4px; display: block; object-fit: cover;">
+                            </div>
+                        {% endif %}
+
+                        <input type="file"
+                               name="image"
+                               id="image-input"
+                               accept="image/*"
+                               class="form-control"
+                               style="border: 2px solid #000;">
+                        <small class="text-muted">
+                            JPG, PNG, or WEBP. Max ~5MB.
+                            {% if item and item.image_url %}
+                                Leave blank to keep the current image.
+                            {% endif %}
+                        </small>
+                    </div>
+
                     <!-- Notes -->
                     <div class="mb-3">
                         <label class="form-label fw-bold">Notes</label>
@@ -143,4 +230,117 @@
         </div>
     </div>
 </div>
+
+<script>
+    // ============================================================
+    // Image preview
+    // ============================================================
+    (function () {
+        const input = document.getElementById('image-input');
+        const preview = document.getElementById('image-preview');
+        const wrap = document.getElementById('image-preview-wrap');
+
+        if (!input) return;
+
+        input.addEventListener('change', function (e) {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (ev) {
+                preview.src = ev.target.result;
+                if (wrap) wrap.style.display = 'block';
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        });
+    })();
+
+    // ============================================================
+    // Tray-size-aware egg-total preview
+    // ============================================================
+    (function () {
+        const traySelect   = document.getElementById('tray-size');
+        const qtyInput     = document.getElementById('quantity');
+        const typeSelect   = document.getElementById('item-type');
+        const nameInput    = document.getElementById('item-name');
+        const totalBox     = document.getElementById('egg-total-box');
+        const totalValue   = document.getElementById('egg-total-value');
+
+        if (!traySelect || !qtyInput || !totalBox) return;
+
+        // Auto-fill helpers based on item type
+        function autoTraySize() {
+            const t = typeSelect ? typeSelect.value : '';
+            if (t === 'egg_crate') {
+                traySelect.value = '360';
+            } else if (t === 'egg_tray') {
+                // Leave user-selected value alone if already > 0
+                if (traySelect.value === '0') traySelect.value = '30';
+            } else {
+                traySelect.value = '0';
+            }
+        }
+
+        function formatNumber(n) {
+            return n.toLocaleString('en-KE', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2,
+            });
+        }
+
+        function updateEggTotal() {
+            const traySize = parseInt(traySelect.value, 10) || 0;
+            const qty = parseFloat(qtyInput.value) || 0;
+
+            if (traySize > 0 && qty > 0) {
+                const total = traySize * qty;
+                totalValue.textContent = formatNumber(total) + ' eggs';
+                totalBox.style.display = 'block';
+            } else {
+                totalBox.style.display = 'none';
+            }
+        }
+
+        // Auto-suggest item name based on tray size
+        function autoName() {
+            const traySize = parseInt(traySelect.value, 10) || 0;
+            const t = typeSelect ? typeSelect.value : '';
+            if (!nameInput) return;
+
+            // Only auto-fill when the name is empty or was auto-filled before
+            const isAutoNamed = (
+                !nameInput.value ||
+                /^\d+-Egg (Tray|Crate)$/.test(nameInput.value) ||
+                nameInput.value === 'Egg Crate' ||
+                nameInput.value === 'Egg Tray'
+            );
+
+            if (!isAutoNamed) return;
+
+            if (t === 'egg_crate') {
+                nameInput.value = 'Egg Crate (360)';
+            } else if (t === 'egg_tray' && traySize > 0) {
+                nameInput.value = traySize + '-Egg Tray';
+            }
+        }
+
+        traySelect.addEventListener('change', function () {
+            autoName();
+            updateEggTotal();
+        });
+        qtyInput.addEventListener('input', updateEggTotal);
+        if (typeSelect) {
+            typeSelect.addEventListener('change', function () {
+                autoTraySize();
+                autoName();
+                updateEggTotal();
+            });
+        }
+
+        // Run once on load
+        autoTraySize();
+        updateEggTotal();
+    })();
+</script>
 {% endblock %}

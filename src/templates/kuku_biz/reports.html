@@ -78,6 +78,7 @@
         font-weight: 800;
         color: #1f2937;
         margin-top: 6px;
+        font-family: 'Courier New', monospace;
     }
     .kpi-sub {
         font-size: 0.75rem;
@@ -156,6 +157,7 @@
         font-size: 2rem;
         font-weight: 800;
         color: #0a2f45;
+        font-family: 'Courier New', monospace;
     }
     .summary-banner .big.good { color: #059669; }
     .summary-banner .big.bad  { color: #dc2626; }
@@ -193,7 +195,7 @@
         </div>
     </div>
     <div>
-        <div class="label">Revenue</div>
+        <div class="label">Total Revenue</div>
         <div class="big">KES {{ total_sales|floatformat:0 }}</div>
     </div>
     <div>
@@ -208,7 +210,9 @@
     </div>
 </div>
 
-<!-- Egg Production -->
+<!-- ============================================================ -->
+<!-- EGG PRODUCTION                                                -->
+<!-- ============================================================ -->
 <div class="section">
     <div class="section-title">
         <i class="fas fa-egg"></i> Egg Production
@@ -237,21 +241,45 @@
     </div>
 </div>
 
-<!-- Sales -->
+<!-- ============================================================ -->
+<!-- REVENUE — EGG SALES + BIRD SALES                             -->
+<!-- ============================================================ -->
 <div class="section">
     <div class="section-title">
-        <i class="fas fa-shopping-cart"></i> Sales
+        <i class="fas fa-coins"></i> Revenue Breakdown
     </div>
     <div class="kpi-grid">
+        <!-- Egg Sales -->
         <div class="kpi-card">
-            <div class="kpi-label">Total Invoiced</div>
-            <div class="kpi-value">KES {{ total_sales|floatformat:0 }}</div>
+            <div class="kpi-label">
+                <i class="fas fa-egg" style="color:#1fb4d2;margin-right:4px;"></i>
+                Egg Sales
+            </div>
+            <div class="kpi-value">KES {{ egg_sales_total|floatformat:0 }}</div>
+            <div class="kpi-sub">{{ eggs_sold }} eggs sold</div>
         </div>
+
+        <!-- Bird Sales -->
         <div class="kpi-card">
-            <div class="kpi-label">Collected</div>
+            <div class="kpi-label">
+                <i class="fas fa-drumstick-bite" style="color:#1fb4d2;margin-right:4px;"></i>
+                Bird Sales
+            </div>
+            <div class="kpi-value">KES {{ bird_sales_total|floatformat:0 }}</div>
+            <div class="kpi-sub">
+                {{ birds_sold_count }} birds
+                {% if bird_sales_count %} · {{ bird_sales_count }} sale{{ bird_sales_count|pluralize }}{% endif %}
+            </div>
+        </div>
+
+        <!-- Collected -->
+        <div class="kpi-card">
+            <div class="kpi-label">Total Collected</div>
             <div class="kpi-value good">KES {{ total_collected|floatformat:0 }}</div>
             <div class="kpi-sub">cash received</div>
         </div>
+
+        <!-- Outstanding -->
         <div class="kpi-card">
             <div class="kpi-label">Outstanding</div>
             <div class="kpi-value {% if total_outstanding > 0 %}bad{% endif %}">
@@ -262,7 +290,9 @@
     </div>
 </div>
 
-<!-- Costs -->
+<!-- ============================================================ -->
+<!-- COSTS                                                         -->
+<!-- ============================================================ -->
 <div class="section">
     <div class="section-title">
         <i class="fas fa-wallet"></i> Costs
@@ -287,7 +317,9 @@
     </div>
 </div>
 
-<!-- Top Customers -->
+<!-- ============================================================ -->
+<!-- TOP CUSTOMERS                                                 -->
+<!-- ============================================================ -->
 <div class="section">
     <div class="section-title">
         <i class="fas fa-trophy"></i> Top Customers
@@ -318,7 +350,9 @@
     {% endif %}
 </div>
 
-<!-- Per-Flock Summary -->
+<!-- ============================================================ -->
+<!-- FLOCK PERFORMANCE                                             -->
+<!-- ============================================================ -->
 <div class="section">
     <div class="section-title">
         <i class="fas fa-kiwi-bird"></i> Flock Performance
@@ -334,6 +368,8 @@
                     <th style="text-align:right;">Eggs</th>
                     <th style="text-align:right;">Deaths</th>
                     <th style="text-align:right;">Feed (kg)</th>
+                    <th style="text-align:right;">Birds Sold</th>
+                    <th style="text-align:right;">Bird Revenue</th>
                 </tr>
             </thead>
             <tbody>
@@ -346,6 +382,20 @@
                     <td class="cell-num">{{ row.eggs }}</td>
                     <td class="cell-num">{{ row.deaths }}</td>
                     <td class="cell-num">{{ row.feed_kg|floatformat:0 }}</td>
+                    <td class="cell-num">
+                        {% if row.birds_sold %}
+                            <strong>{{ row.birds_sold }}</strong>
+                        {% else %}
+                            <span style="color:#d1d5db;">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="cell-num">
+                        {% if row.bird_revenue %}
+                            KES {{ row.bird_revenue|floatformat:0 }}
+                        {% else %}
+                            <span style="color:#d1d5db;">—</span>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

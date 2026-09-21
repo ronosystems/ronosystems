@@ -1,8 +1,10 @@
 {% extends 'kuku_base.html' %}
 
-{% block title %}Record Eggs — Kuku Biz{% endblock %}
-{% block page_title %}Record Egg Production{% endblock %}
-{% block page_subtitle %}<small>Log today's collection</small>{% endblock %}
+{% block title %}{% if record %}Edit Egg Record{% else %}Record Eggs{% endif %} — Kuku Biz{% endblock %}
+{% block page_title %}{% if record %}Edit Egg Record{% else %}Record Egg Production{% endif %}{% endblock %}
+{% block page_subtitle %}
+    <small>{% if record %}{{ record.flock.name }} · {{ record.date|date:"d M Y" }}{% else %}Log today's collection{% endif %}</small>
+{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -11,7 +13,7 @@
         border: 2px solid #000;
         border-radius: 8px;
         padding: 26px 30px;
-        max-width: 720px;
+        max-width: 760px;
     }
     .form-title {
         font-size: 1.15rem;
@@ -19,12 +21,50 @@
         margin-bottom: 20px;
         padding-bottom: 10px;
         border-bottom: 2px solid #000;
+        display: flex;
+        align-items: center;
+        gap: 10px;
     }
+    .form-title i { color: #d97706; }
+
+    /* Edit banner */
+    .edit-banner {
+        background: #f0fbfd;
+        border: 1px dashed #1fb4d2;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 20px;
+        font-size: 0.85rem;
+        color: #0a2f45;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .edit-banner i {
+        color: #1fb4d2;
+        font-size: 1.1rem;
+        margin-top: 2px;
+    }
+
+    .section-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #6b7280;
+        margin: 22px 0 10px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
     .form-row {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 16px;
         margin-bottom: 16px;
+    }
+    @media (max-width: 640px) {
+        .form-row { grid-template-columns: 1fr; }
     }
     .form-group { margin-bottom: 16px; }
     .form-group label {
@@ -61,12 +101,56 @@
         color: #6b7280;
         margin-top: 4px;
     }
-    .form-group .flock-info {
-        font-size: 0.75rem;
-        color: #1fb4d2;
-        margin-top: 4px;
-        font-weight: 500;
+
+    /* Flock info box */
+    .flock-info-box {
+        margin-top: 8px;
+        padding: 12px 16px;
+        background: #fef3c7;
+        border: 1px solid #d97706;
+        border-radius: 6px;
+        font-size: 0.82rem;
+        color: #78350f;
+        display: none;
     }
+    .flock-info-box.visible { display: block; }
+    .flock-info-box strong { color: #78350f; }
+    .flock-info-box .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 3px 0;
+    }
+    .flock-info-box .row .label { color: #92400e; }
+    .flock-info-box .row .value {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        color: #78350f;
+    }
+
+    /* Live good eggs preview */
+    .amount-preview {
+        background: #f0fbfd;
+        border: 1px dashed #1fb4d2;
+        border-radius: 8px;
+        padding: 14px 18px;
+        margin-top: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .amount-preview .label {
+        font-size: 0.8rem;
+        color: #4b5563;
+        font-weight: 600;
+    }
+    .amount-preview .value {
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: #0a2f45;
+        font-family: 'Courier New', monospace;
+    }
+
     .form-actions {
         display: flex;
         gap: 12px;
@@ -104,14 +188,6 @@
         border-color: #1fb4d2;
         color: #1fb4d2;
     }
-    .section-label {
-        font-size: 0.72rem;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        font-weight: 700;
-        color: #6b7280;
-        margin: 20px 0 10px;
-    }
 </style>
 {% endblock %}
 
@@ -119,26 +195,63 @@
 
 <div class="form-card">
     <div class="form-title">
-        <i class="fas fa-egg"></i> Record Egg Collection
+        <i class="fas fa-egg"></i>
+        {% if record %}Edit Egg Record{% else %}Record Egg Collection{% endif %}
     </div>
+
+    {% if record %}
+    <div class="edit-banner">
+        <i class="fas fa-info-circle"></i>
+        <div>
+            <strong>Editing record from {{ record.date|date:"d M Y" }}.</strong>
+            Changes will update production totals and per-flock history.
+        </div>
+    </div>
+    {% endif %}
 
     <form method="post">
         {% csrf_token %}
 
+        <!-- ============================================================ -->
+        <!-- FLOCK & LOCATION                                              -->
+        <!-- ============================================================ -->
+        <div class="section-label">Flock &amp; Location</div>
+
+        <div class="form-group">
+            <label for="flock">Flock <span class="required">*</span></label>
+            <select id="flock" name="flock" required>
+                <option value="">— Select flock —</option>
+                {% for flock in flocks %}
+                    <option value="{{ flock.id }}"
+                            data-count="{{ flock.current_count }}"
+                            data-type="{{ flock.flock_type }}"
+                            data-branch="{{ flock.branch.name|default:'' }}"
+                            data-branch-id="{{ flock.branch_id|default:'' }}"
+                            {% if record and record.flock_id == flock.id %}selected{% endif %}>
+                        {{ flock.name }}
+                        ({{ flock.get_flock_type_display }} · {{ flock.current_count }} birds{% if flock.branch %} · {{ flock.branch.name }}{% endif %})
+                    </option>
+                {% endfor %}
+            </select>
+            <div class="flock-info-box" id="flockInfoBox"></div>
+        </div>
+
         <div class="form-row">
             <div class="form-group">
-                <label for="flock">Flock <span class="required">*</span></label>
-                <select id="flock" name="flock" required>
-                    <option value="">— Select flock —</option>
-                    {% for flock in flocks %}
-                        <option value="{{ flock.id }}"
-                                data-count="{{ flock.current_count }}"
-                                data-type="{{ flock.flock_type }}">
-                            {{ flock.name }} ({{ flock.get_flock_type_display }} · {{ flock.current_count }} birds)
+                <label for="branch">Branch</label>
+                <select id="branch" name="branch">
+                    <option value="">— Auto (from flock) —</option>
+                    {% for b in branches %}
+                        <option value="{{ b.id }}"
+                            {% if record and record.branch_id == b.id %}selected
+                            {% elif not record and user_branch and user_branch.id == b.id %}selected{% endif %}>
+                            {{ b.name }}
                         </option>
                     {% endfor %}
                 </select>
-                <div class="help-text" id="flockInfo"></div>
+                <div class="help-text">
+                    Leave as auto to use the flock's branch, or override.
+                </div>
             </div>
 
             <div class="form-group">
@@ -146,23 +259,29 @@
                 <input type="date"
                        id="date"
                        name="date"
-                       value="{{ today|date:'Y-m-d' }}"
+                       value="{% if record %}{{ record.date|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}"
                        required>
             </div>
         </div>
 
-        <div class="section-label">Collection</div>
+        <!-- ============================================================ -->
+        <!-- COLLECTION NUMBERS                                            -->
+        <!-- ============================================================ -->
+        <div class="section-label">Collection Numbers</div>
 
         <div class="form-row">
             <div class="form-group">
-                <label for="eggs_collected">Eggs Collected <span class="required">*</span></label>
+                <label for="eggs_collected">
+                    Eggs Collected <span class="required">*</span>
+                </label>
                 <input type="number"
                        id="eggs_collected"
                        name="eggs_collected"
                        min="0"
+                       value="{% if record %}{{ record.eggs_collected }}{% endif %}"
                        placeholder="e.g. 85"
                        required
-                       autofocus>
+                       {% if not record %}autofocus{% endif %}>
                 <div class="help-text">Total eggs collected today</div>
             </div>
 
@@ -172,7 +291,7 @@
                        id="eggs_cracked"
                        name="eggs_cracked"
                        min="0"
-                       value="0">
+                       value="{% if record %}{{ record.eggs_cracked }}{% else %}0{% endif %}">
                 <div class="help-text">Cracked during collection</div>
             </div>
         </div>
@@ -184,7 +303,7 @@
                        id="eggs_broken"
                        name="eggs_broken"
                        min="0"
-                       value="0">
+                       value="{% if record %}{{ record.eggs_broken }}{% else %}0{% endif %}">
             </div>
 
             <div class="form-group">
@@ -193,7 +312,7 @@
                        id="eggs_discarded"
                        name="eggs_discarded"
                        min="0"
-                       value="0">
+                       value="{% if record %}{{ record.eggs_discarded }}{% else %}0{% endif %}">
                 <div class="help-text">Unfit for sale</div>
             </div>
         </div>
@@ -205,22 +324,37 @@
                        id="eggs_consumed"
                        name="eggs_consumed"
                        min="0"
-                       value="0">
+                       value="{% if record %}{{ record.eggs_consumed }}{% else %}0{% endif %}">
                 <div class="help-text">Kept for home/farm use</div>
             </div>
         </div>
 
-        <div class="form-group">
+        <!-- Live good eggs preview -->
+        <div class="amount-preview">
+            <span class="label">
+                Good Eggs (Sellable)
+            </span>
+            <span class="value" id="goodEggsPreview">0</span>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- NOTES                                                         -->
+        <!-- ============================================================ -->
+        <div class="form-group" style="margin-top:16px;">
             <label for="notes">Notes</label>
             <textarea id="notes"
                       name="notes"
                       rows="2"
-                      placeholder="Any observations (e.g. feed change, weather, health issues)"></textarea>
+                      placeholder="Any observations (e.g. feed change, weather, health issues)">{% if record %}{{ record.notes }}{% endif %}</textarea>
         </div>
 
+        <!-- ============================================================ -->
+        <!-- ACTIONS                                                       -->
+        <!-- ============================================================ -->
         <div class="form-actions">
             <button type="submit" class="btn btn-primary">
-                <i class="fas fa-check"></i> Save Record
+                <i class="fas fa-check"></i>
+                {% if record %}Save Changes{% else %}Save Record{% endif %}
             </button>
             <a href="{% url 'kuku_biz:egg_list' %}" class="btn btn-secondary">
                 <i class="fas fa-times"></i> Cancel
@@ -230,24 +364,99 @@
 </div>
 
 <script>
-    // Show helpful info when a flock is selected
-    document.getElementById('flock').addEventListener('change', function() {
-        const opt = this.options[this.selectedIndex];
-        const count = opt.dataset.count;
-        const type = opt.dataset.type;
-        const info = document.getElementById('flockInfo');
+(function () {
+    const flockSelect    = document.getElementById('flock');
+    const branchSelect   = document.getElementById('branch');
+    const flockInfoBox   = document.getElementById('flockInfoBox');
+    const collectedInput = document.getElementById('eggs_collected');
+    const crackedInput   = document.getElementById('eggs_cracked');
+    const brokenInput    = document.getElementById('eggs_broken');
+    const consumedInput  = document.getElementById('eggs_consumed');
+    const discardedInput = document.getElementById('eggs_discarded');
+    const goodPreview    = document.getElementById('goodEggsPreview');
 
-        if (!count) {
-            info.textContent = '';
+    // Whether we're editing — don't auto-override the branch if the user
+    // already picked one on the original record.
+    const isEdit = {% if record %}true{% else %}false{% endif %};
+    let branchTouched = isEdit;  // treat edit as "user has already chosen"
+
+    // Track manual branch changes
+    branchSelect.addEventListener('change', function () {
+        branchTouched = true;
+    });
+
+    // Auto-fill branch from flock (unless user already picked one)
+    function syncBranchFromFlock() {
+        if (branchTouched) return;
+        const opt = flockSelect.options[flockSelect.selectedIndex];
+        if (!opt || !flockSelect.value) return;
+        const branchId = opt.dataset.branchId;
+        if (branchId) {
+            branchSelect.value = branchId;
+        }
+    }
+
+    // Show flock info when a flock is selected
+    function updateFlockInfo() {
+        const opt = flockSelect.options[flockSelect.selectedIndex];
+        if (!flockSelect.value || !opt) {
+            flockInfoBox.classList.remove('visible');
+            flockInfoBox.innerHTML = '';
             return;
         }
+        const count  = parseInt(opt.dataset.count, 10) || 0;
+        const type   = opt.dataset.type || '';
+        const branch = opt.dataset.branch || 'Unassigned';
 
+        const typeLabel = type === 'layer' ? 'Layers (Egg Production)'
+                        : type === 'broiler' ? 'Broilers (Meat Production)'
+                        : 'Mixed';
+
+        let note = '';
         if (type === 'broiler') {
-            info.innerHTML = '<i class="fas fa-info-circle"></i> This is a broiler flock — egg tracking is optional';
-        } else {
-            info.innerHTML = `<i class="fas fa-info-circle"></i> ${count} birds — expect up to ${count} eggs/day at peak lay`;
+            note = '<div style="margin-top:6px;padding-top:6px;border-top:1px dashed #d97706;color:#92400e;">'
+                 + '<i class="fas fa-info-circle"></i> This is a broiler flock — egg tracking is unusual. '
+                 + 'Confirm you meant to record eggs.'
+                 + '</div>';
         }
+
+        flockInfoBox.innerHTML =
+            '<div class="row"><span class="label">Bird count</span><span class="value">' + count + '</span></div>' +
+            '<div class="row"><span class="label">Flock type</span><span class="value">' + typeLabel + '</span></div>' +
+            '<div class="row"><span class="label">Branch</span><span class="value">' + branch + '</span></div>' +
+            (type === 'layer' && count > 0
+                ? '<div class="row"><span class="label">Expected max/day</span><span class="value">' + count + '</span></div>'
+                : '') +
+            note;
+
+        flockInfoBox.classList.add('visible');
+    }
+
+    // Live "good eggs" preview
+    function updateGoodEggs() {
+        const collected = parseInt(collectedInput.value, 10) || 0;
+        const cracked   = parseInt(crackedInput.value, 10) || 0;
+        const broken    = parseInt(brokenInput.value, 10) || 0;
+
+        // Good = collected − cracked − broken (matches the model's good_eggs property)
+        const good = Math.max(collected - cracked - broken, 0);
+        goodPreview.textContent = good.toLocaleString('en-KE');
+    }
+
+    // Event wiring
+    flockSelect.addEventListener('change', function () {
+        syncBranchFromFlock();
+        updateFlockInfo();
     });
+
+    [collectedInput, crackedInput, brokenInput, consumedInput, discardedInput].forEach(function (el) {
+        el.addEventListener('input', updateGoodEggs);
+    });
+
+    // Initial state
+    updateFlockInfo();
+    updateGoodEggs();
+})();
 </script>
 
 {% endblock %}

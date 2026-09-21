@@ -118,11 +118,11 @@
 
         .sidebar-nav .nav-label {
             padding: 8px 20px;
-            font-size: 0.6rem;
+            font-size: 0.8rem;
             text-transform: uppercase;
-            color: rgba(255,255,255,0.5);
+            color: rgb(1, 8, 77);
             letter-spacing: 1px;
-            font-weight: 700;
+            font-weight: 800;
             transition: opacity 0.2s;
         }
 
@@ -573,7 +573,7 @@
                     {# ============================================ #}
                     {# KUKU BIZ OPERATIONS                          #}
                     {# ============================================ #}
-                    <li class="nav-label">Kuku Biz</li>
+                    <li class="nav-label">KUKU MANAGEMENT</li>
 
                     {# Dashboard — everyone #}
                     <li class="nav-item">
@@ -583,24 +583,20 @@
                         </a>
                     </li>
 
-                    {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'stock_controller'  %}
-                    {# Flocks — everyone can view #}
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/kuku_biz/flocks/' in request.path %}active{% endif %}"
-                           href="/kuku_biz/flocks/">
-                            <i class="fas fa-kiwi-bird"></i> <span>Flocks</span>
-                        </a>
-                    </li>
+                    
 
-                    {# Egg Production — everyone can view #}
+                    {% if company and user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager'  or user.role == 'mpesa_agent' %}
+                    <li class="nav-label">MPESA SHOP</li>
                     <li class="nav-item">
-                        <a class="nav-link {% if '/kuku_biz/eggs/' in request.path %}active{% endif %}"
-                           href="/kuku_biz/eggs/">
-                            <i class="fas fa-egg"></i> <span>Egg Production</span>
+                        <a class="nav-link {% if '/treasury/' in request.path %}active{% endif %}"
+                           href="{% url 'treasury:dashboard' company.id %}">
+                            <i class="fas fa-money-bill"></i> <span>M-Pesa</span>
                         </a>
                     </li>
                     {% endif %}
 
+
+                    <li class="nav-label">KUKU SALES SHOP</li>
                     {# Sales — everyone except guest & mpesa_agent #}
                     {% if user.role != 'guest' and user.role != 'mpesa_agent' %}
                     <li class="nav-item">
@@ -624,6 +620,32 @@
                         <a class="nav-link {% if '/kuku_biz/customers/' in request.path %}active{% endif %}"
                            href="/kuku_biz/customers/">
                             <i class="fas fa-users"></i> <span>Customers</span>
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'stock_controller'  %}
+                    {# Flocks — everyone can view #}
+                    <li class="nav-label">KUKU MANAGEMENT</li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/kuku_biz/flocks/' in request.path %}active{% endif %}"
+                           href="/kuku_biz/flocks/">
+                            <i class="fas fa-kiwi-bird"></i> <span>Flocks</span>
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/kuku_biz/bird-sales/' in request.path %}active{% endif %}"
+                           href="/kuku_biz/bird-sales/">
+                            <i class="fas fa-drumstick-bite"></i> <span>Bird Sales</span>
+                        </a>
+                    </li>
+
+                    {# Egg Production — everyone can view #}
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/kuku_biz/eggs/' in request.path %}active{% endif %}"
+                           href="/kuku_biz/eggs/">
+                            <i class="fas fa-egg"></i> <span>Production</span>
                         </a>
                     </li>
                     {% endif %}
@@ -665,36 +687,13 @@
                             <i class="fas fa-warehouse"></i> <span>Inventory</span>
                         </a>
                     </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/kuku_biz/reports/' in request.path %}active{% endif %}"
-                           href="/kuku_biz/reports/">
-                            <i class="fas fa-file-alt"></i> <span>Reports</span>
-                        </a>
-                    </li>
-                    {% endif %}
-
-                    {% if company and user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager'  or user.role == 'mpesa_agent' %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/treasury/' in request.path %}active{% endif %}"
-                           href="{% url 'treasury:dashboard' company.id %}">
-                            <i class="fas fa-money-bill"></i> <span>M-Pesa</span>
-                        </a>
-                    </li>
                     {% endif %}
 
                     {# ============================================ #}
                     {# COMPANY — super admin, admin, manager only    #}
                     {# ============================================ #}
                     {% if company and user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' %}
-                    <li class="nav-label">Company</li>
-
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/company/branches/' in request.path %}active{% endif %}"
-                           href="/company/branches/">
-                            <i class="fas fa-building"></i> <span>Branches</span>
-                        </a>
-                    </li>
+                    <li class="nav-label">EMPLOYEES SETTINGS</li>
 
                     <li class="nav-item">
                         <a class="nav-link {% if '/company/employees/' in request.path %}active{% endif %}"
@@ -718,20 +717,34 @@
                     {# ACCOUNT — everyone with a company            #}
                     {# ============================================ #}
                     {% if company and user.role != 'guest' and user.role != 'mpesa_agent' %}
-                    {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' %}
-                    <li class="nav-label">Account</li>
+                    {% if user.role == 'super_admin' or user.role == 'company_admin' %}
+                    <li class="nav-label">COMPANY SETTINGS </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/company/branches/' in request.path %}active{% endif %}"
+                           href="/company/branches/">
+                            <i class="fas fa-building"></i> <span>Company Branches</span>
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/kuku_biz/reports/' in request.path %}active{% endif %}"
+                           href="/kuku_biz/reports/">
+                            <i class="fas fa-file-alt"></i> <span>Company Reports</span>
+                        </a>
+                    </li>
 
                     <li class="nav-item">
                         <a class="nav-link {% if '/company/settings/' in request.path %}active{% endif %}"
                            href="/company/settings/">
-                            <i class="fas fa-gear"></i> <span>Settings</span>
+                            <i class="fas fa-gear"></i> <span>Company Settings</span>
                         </a>
                     </li>
 
                     <li class="nav-item">
                         <a class="nav-link {% if '/payments/' in request.path %}active{% endif %}"
                            href="{% url 'companies:company-payments' company.id %}">
-                            <i class="fas fa-credit-card"></i> <span>Subscription</span>
+                            <i class="fas fa-credit-card"></i> <span>Plan Subscriptions</span>
                         </a>
                     </li>
                     {% endif %}

@@ -27,16 +27,32 @@
 
     .price-item {
         display: flex; justify-content: space-between; align-items: center;
-        padding: 12px 0; border-bottom: 1px solid #e5e7eb;
+        padding: 12px 0; border-bottom: 1px solid #e5e7eb; gap: 12px;
     }
     .price-item:last-child { border-bottom: none; }
-    .price-label { font-weight: 600; color: #374151; display: flex; align-items: center; gap: 10px; }
+    .price-label { font-weight: 600; color: #374151; display: flex; align-items: center; gap: 10px; flex: 1; }
     .price-label i { color: #1fb4d2; width: 18px; text-align: center; }
+
+    /* Thumbnail preview beside the price */
+    .price-thumb {
+        width: 44px; height: 44px; object-fit: cover;
+        border: 2px solid #000; border-radius: 4px;
+        display: inline-block; background: #f3f4f6;
+        flex-shrink: 0;
+    }
+    .price-thumb-placeholder {
+        width: 44px; height: 44px;
+        border: 2px dashed #cbd5e1; border-radius: 4px;
+        display: inline-flex; align-items: center; justify-content: center;
+        color: #cbd5e1; flex-shrink: 0;
+    }
+
     .price-amt {
-        font-family: 'Courier New', monospace; font-weight: 700; font-size: 1.05rem; color: #0a2f45;
+        font-family: 'Courier New', monospace; font-weight: 700; font-size: 1.05rem;
+        color: #0a2f45; text-align: right;
     }
     .price-amt.none { color: #9ca3af; font-style: italic; font-size: 0.85rem; font-weight: 400; }
-    .price-since { font-size: 0.7rem; color: #9ca3af; display: block; }
+    .price-since { font-size: 0.7rem; color: #9ca3af; display: block; font-weight: 400; }
 
     .form-row { margin-bottom: 14px; }
     .form-row label {
@@ -83,6 +99,7 @@
     }
     .data-table td {
         padding: 12px 16px; border-bottom: 1px solid #e5e7eb; font-size: 0.88rem;
+        vertical-align: middle;
     }
     .data-table tr:last-child td { border-bottom: none; }
     .data-table tr:hover { background: #f9fafb; }
@@ -93,6 +110,16 @@
         display: flex; align-items: center; gap: 10px; padding: 12px 18px;
         background: #fef3c7; border: 2px solid #000; border-radius: 8px;
         font-size: 0.85rem; font-weight: 600; color: #92400e; margin-bottom: 20px;
+    }
+
+    /* Live preview box for the form */
+    .image-preview-wrap {
+        display: none; margin-top: 8px;
+    }
+    .image-preview-wrap.visible { display: block; }
+    .image-preview {
+        max-width: 180px; max-height: 180px; object-fit: cover;
+        border: 2px solid #000; border-radius: 4px; display: block;
     }
 </style>
 {% endblock %}
@@ -106,7 +133,7 @@
 {% if not can_edit %}
 <div class="readonly-banner">
     <i class="fas fa-lock"></i>
-    You can view prices but only company admins and stock controllers can modify them.
+    You can view prices bellow.
 </div>
 {% endif %}
 
@@ -126,6 +153,20 @@
                     <i class="fas fa-{% if code == 'egg' %}egg{% elif code == 'tray' %}box{% else %}boxes{% endif %}"></i>
                     {{ info.label }}
                 </span>
+
+                <!-- Image preview (from the latest PriceHistory entry for this unit) -->
+                {% if info.image_url %}
+                    <a href="{{ info.image_url }}" target="_blank" rel="noopener">
+                        <img src="{{ info.image_url }}"
+                             alt="{{ info.label }}"
+                             class="price-thumb">
+                    </a>
+                {% else %}
+                    <div class="price-thumb-placeholder" title="No image">
+                        <i class="fas fa-image"></i>
+                    </div>
+                {% endif %}
+
                 {% if info.price %}
                     <span class="price-amt">
                         KES {{ info.price|floatformat:2 }}
@@ -143,7 +184,7 @@
             <h4 style="margin:0 0 14px;font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#0a2f45;">
                 <i class="fas fa-plus-circle" style="color:#1fb4d2;"></i> Set New Price
             </h4>
-            <form method="post">
+            <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
 
                 <div class="form-row">
@@ -164,6 +205,23 @@
                 <div class="form-row">
                     <label>Effective Date</label>
                     <input type="date" name="effective_date" value="{{ today|date:'Y-m-d' }}">
+                </div>
+
+                <div class="form-row">
+                    <label>Reference Image (optional)</label>
+                    <input type="file"
+                           name="image"
+                           id="price-image-input"
+                           accept="image/*">
+                    <div class="image-preview-wrap" id="image-preview-wrap">
+                        <img src=""
+                             alt="Preview"
+                             id="image-preview"
+                             class="image-preview">
+                    </div>
+                    <small style="color:#9ca3af;font-size:0.75rem;display:block;margin-top:6px;">
+                        JPG, PNG, or WEBP. Max ~5MB.
+                    </small>
                 </div>
 
                 <div class="form-row">
@@ -191,6 +249,7 @@
             <table class="data-table" style="border:none;border-radius:0;">
                 <thead>
                     <tr>
+                        <th style="width: 60px;">Photo</th>
                         <th>Date</th>
                         <th>Unit</th>
                         <th style="text-align:right;">Price (KES)</th>
@@ -200,6 +259,19 @@
                 <tbody>
                     {% for entry in history %}
                     <tr>
+                        <td>
+                            {% if entry.image_url %}
+                                <a href="{{ entry.image_url }}" target="_blank" rel="noopener">
+                                    <img src="{{ entry.image_url }}"
+                                         alt="{{ entry.get_unit_display }}"
+                                         class="price-thumb">
+                                </a>
+                            {% else %}
+                                <div class="price-thumb-placeholder" title="No image">
+                                    <i class="fas fa-image"></i>
+                                </div>
+                            {% endif %}
+                        </td>
                         <td>{{ entry.effective_date|date:"d M Y" }}</td>
                         <td>{{ entry.get_unit_display }}</td>
                         <td class="cell-num">{{ entry.price|floatformat:2 }}</td>
@@ -230,5 +302,39 @@
     </div>
 
 </div>
+
+<script>
+    // Live preview when the user picks an image
+    (function () {
+        const input = document.getElementById('price-image-input');
+        const wrap = document.getElementById('image-preview-wrap');
+        const preview = document.getElementById('image-preview');
+
+        if (!input || !wrap || !preview) return;
+
+        input.addEventListener('change', function (e) {
+            const file = e.target.files && e.target.files[0];
+            if (!file) {
+                wrap.classList.remove('visible');
+                return;
+            }
+
+            // Client-side size check
+            if (file.size > 5 * 1024 * 1024) {
+                alert('File too large. Max 5MB.');
+                input.value = '';
+                wrap.classList.remove('visible');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function (ev) {
+                preview.src = ev.target.result;
+                wrap.classList.add('visible');
+            };
+            reader.readAsDataURL(file);
+        });
+    })();
+</script>
 
 {% endblock %}
