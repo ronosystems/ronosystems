@@ -11,16 +11,29 @@ urlpatterns = [
     path('flocks/', views.flock_list, name='flock_list'),
     path('flocks/new/', views.flock_create, name='flock_create'),
     path('flocks/<int:pk>/', views.flock_detail, name='flock_detail'),
+    path('flocks/<int:pk>/edit/', views.flock_edit, name='flock_edit'),
+    path('flocks/<int:pk>/delete/', views.flock_delete, name='flock_delete'),
+   
+    # Bird sales
+    path('bird-sales/', views.bird_sale_list, name='bird_sale_list'),
+    path('bird-sales/create/', views.bird_sale_create, name='bird_sale_create'),
+    path('bird-sales/<int:pk>/edit/', views.bird_sale_edit, name='bird_sale_edit'),
+    path('bird-sales/<int:pk>/delete/', views.bird_sale_delete, name='bird_sale_delete'),
+    path('bird-sales/<int:pk>/receipt/', views.bird_sale_receipt, name='bird_sale_receipt'),
+    path('bird-sales/<int:pk>/mark-paid/', views.bird_sale_mark_paid, name='bird_sale_mark_paid'),
 
-    # Egg Production
+    # Egg production
     path('eggs/', views.egg_list, name='egg_list'),
-    path('eggs/new/', views.egg_create, name='egg_create'),
+    path('eggs/create/', views.egg_create, name='egg_create'),
+    path('eggs/<int:pk>/edit/', views.egg_edit, name='egg_edit'),
+    path('eggs/<int:pk>/delete/', views.egg_delete, name='egg_delete'),
 
     # Sales
     path('sales/', views.sale_list, name='sale_list'),
     path('sales/new/', views.sale_create, name='sale_create'),
     path('sales/<int:pk>/mark-paid/', views.sale_mark_paid, name='sale_mark_paid'),
     path('sales/<int:pk>/edit/', views.sale_edit, name='sale_edit'),
+    path('sales/<int:pk>/receipt/', views.sale_receipt, name='sale_receipt'),
     path('prices/', views.price_list, name='price_list'),
     path('prices/<int:pk>/delete/', views.price_delete, name='price_delete'),
 
