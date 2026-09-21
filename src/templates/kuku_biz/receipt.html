@@ -1,0 +1,478 @@
+{% extends 'kuku_base.html' %}
+{% load static %}
+
+{% block title %}Receipt {{ sale.receipt_number }} — Kuku Biz{% endblock %}
+{% block page_title %}Receipt{% endblock %}
+{% block page_subtitle %}<small>{{ sale.receipt_number }}</small>{% endblock %}
+
+{% block extra_css %}
+<style>
+    .receipt-wrap {
+        max-width: 780px;
+        margin: 0 auto;
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 32px 40px;
+    }
+
+    .receipt-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 20px;
+        padding-bottom: 20px;
+        border-bottom: 3px solid #000;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+    }
+    .receipt-brand h1 {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #0a2f45;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .receipt-brand h1 i { color: #1fb4d2; }
+    .receipt-brand .meta {
+        font-size: 0.85rem;
+        color: #6b7280;
+        margin-top: 6px;
+        line-height: 1.5;
+    }
+    .receipt-brand .meta strong { color: #374151; }
+
+    .receipt-stamp {
+        text-align: right;
+    }
+    .receipt-stamp .label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #6b7280;
+        font-weight: 700;
+    }
+    .receipt-stamp .value {
+        font-family: 'Courier New', monospace;
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #0a2f45;
+    }
+    .receipt-stamp .status {
+        display: inline-block;
+        margin-top: 8px;
+        padding: 4px 14px;
+        border-radius: 50px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border: 2px solid #000;
+    }
+    .status-paid     { background: #d1fae5; color: #065f46; }
+    .status-pending  { background: #fef3c7; color: #92400e; }
+    .status-partial  { background: #dbeafe; color: #1e40af; }
+    .status-credit   { background: #fee2e2; color: #991b1b; }
+    .status-cancelled{ background: #e5e7eb; color: #4b5563; }
+
+    .receipt-parties {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        margin-bottom: 24px;
+    }
+    @media (max-width: 600px) {
+        .receipt-parties { grid-template-columns: 1fr; }
+    }
+    .receipt-party .label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #6b7280;
+        font-weight: 700;
+        margin-bottom: 6px;
+    }
+    .receipt-party .name {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #1f2937;
+    }
+    .receipt-party .detail {
+        font-size: 0.85rem;
+        color: #6b7280;
+        margin-top: 4px;
+        line-height: 1.5;
+    }
+
+    .receipt-items {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        border: 2px solid #000;
+        border-radius: 6px;
+        overflow: hidden;
+        margin-bottom: 24px;
+    }
+    .receipt-items th {
+        background: #f0fbfd;
+        padding: 12px 16px;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #374151;
+        border-bottom: 2px solid #000;
+        text-align: left;
+    }
+    .receipt-items td {
+        padding: 12px 16px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.9rem;
+        color: #1f2937;
+    }
+    .receipt-items tr:last-child td { border-bottom: none; }
+    .receipt-items .num {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        text-align: right;
+    }
+    .receipt-items .desc {
+        font-weight: 600;
+    }
+    .receipt-items .sub {
+        font-size: 0.75rem;
+        color: #9ca3af;
+        font-weight: 400;
+        margin-top: 2px;
+    }
+
+    .receipt-totals {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 24px;
+    }
+    .receipt-totals-box {
+        min-width: 320px;
+    }
+    .receipt-totals-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        font-size: 0.95rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .receipt-totals-row .label { color: #6b7280; }
+    .receipt-totals-row .value {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        color: #1f2937;
+    }
+    .receipt-totals-row.grand {
+        border-bottom: none;
+        border-top: 3px double #000;
+        margin-top: 6px;
+        padding-top: 12px;
+        font-size: 1.1rem;
+    }
+    .receipt-totals-row.grand .label { font-weight: 800; color: #0a2f45; }
+    .receipt-totals-row.grand .value {
+        font-size: 1.25rem;
+        color: #0a2f45;
+    }
+    .receipt-totals-row.owed .value { color: #dc2626; }
+    .receipt-totals-row.clear .value { color: #059669; }
+
+    .receipt-notes {
+        padding: 14px 18px;
+        background: #f9fafb;
+        border: 2px dashed #9ca3af;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        color: #374151;
+        margin-bottom: 24px;
+    }
+    .receipt-notes .label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #6b7280;
+        font-weight: 700;
+        margin-bottom: 6px;
+    }
+
+    .receipt-footer {
+        padding-top: 20px;
+        border-top: 2px solid #000;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+    .receipt-footer .thanks {
+        font-size: 0.95rem;
+        color: #0a2f45;
+        font-weight: 700;
+    }
+    .receipt-footer .thanks small {
+        display: block;
+        font-weight: 400;
+        color: #6b7280;
+        font-size: 0.75rem;
+        margin-top: 4px;
+    }
+    .receipt-footer .signature {
+        text-align: right;
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+    .receipt-footer .signature .line {
+        width: 180px;
+        border-bottom: 1px solid #000;
+        margin-bottom: 6px;
+    }
+
+    .receipt-actions {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        margin: 20px 0;
+        flex-wrap: wrap;
+    }
+    .rbtn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 22px;
+        border-radius: 50px;
+        border: 2px solid #000;
+        background: #fff;
+        color: #000;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.85rem;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.2s;
+    }
+    .rbtn-primary {
+        background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
+        color: #fff;
+    }
+    .rbtn-primary:hover { transform: translateY(-1px); color: #fff; }
+    .rbtn:hover { transform: translateY(-1px); }
+
+    /* ============================================================ */
+    /* PRINT STYLES — hide everything except the receipt             */
+    /* ============================================================ */
+    @media print {
+        body { background: #fff !important; }
+        .sidebar,
+        .top-navbar,
+        .footer,
+        .support-mode-banner,
+        .receipt-actions,
+        .sidebar-overlay { display: none !important; }
+        .main-content { margin: 0 !important; }
+        .content-area { padding: 0 !important; }
+        .receipt-wrap {
+            border: none !important;
+            border-radius: 0 !important;
+            max-width: 100% !important;
+            padding: 20px !important;
+            box-shadow: none !important;
+        }
+        .receipt-items,
+        .receipt-items th,
+        .receipt-totals-row.grand { border-color: #000 !important; }
+        .receipt-wrap * { color: #000 !important; }
+        @page { margin: 15mm; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ============================================================ -->
+<!-- Action buttons (hidden when printing)                         -->
+<!-- ============================================================ -->
+<div class="receipt-actions">
+    <button type="button" class="rbtn rbtn-primary" onclick="window.print();">
+        <i class="fas fa-print"></i> Print Receipt
+    </button>
+    <a href="{% url 'kuku_biz:sale_edit' sale.pk %}" class="rbtn">
+        <i class="fas fa-edit"></i> Edit Sale
+    </a>
+    <a href="{% url 'kuku_biz:sale_list' %}" class="rbtn">
+        <i class="fas fa-arrow-left"></i> Back to Sales
+    </a>
+</div>
+
+<!-- ============================================================ -->
+<!-- The receipt                                                   -->
+<!-- ============================================================ -->
+<div class="receipt-wrap" id="receipt">
+
+    <!-- Header -->
+    <div class="receipt-header">
+        <div class="receipt-brand">
+            <h1><i class="fas fa-drumstick-bite"></i> {{ company.name }}</h1>
+            <div class="meta">
+                {% if sale.branch %}
+                    <strong>Branch:</strong> {{ sale.branch.name }}<br>
+                {% endif %}
+                {% if company.phone %}
+                    <strong>Tel:</strong> {{ company.phone }}<br>
+                {% endif %}
+                {% if company.email %}
+                    <strong>Email:</strong> {{ company.email }}<br>
+                {% endif %}
+                {% if company.address %}
+                    {{ company.address }}
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="receipt-stamp">
+            <div class="label">Receipt No.</div>
+            <div class="value">{{ sale.receipt_number }}</div>
+            <div class="meta" style="text-align:right;font-size:0.85rem;color:#6b7280;margin-top:6px;">
+                Date: <strong>{{ sale.sale_date|date:"d M Y" }}</strong>
+            </div>
+            <span class="status status-{{ sale.status }}">
+                {{ sale.get_status_display }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Parties -->
+    <div class="receipt-parties">
+        <div class="receipt-party">
+            <div class="label">Billed To</div>
+            {% if sale.customer %}
+                <div class="name">{{ sale.customer.name }}</div>
+                <div class="detail">
+                    {% if sale.customer.phone %}{{ sale.customer.phone }}<br>{% endif %}
+                    {% if sale.customer.email %}{{ sale.customer.email }}<br>{% endif %}
+                    {% if sale.customer.location %}{{ sale.customer.location }}{% endif %}
+                </div>
+            {% else %}
+                <div class="name">Walk-in Customer</div>
+                <div class="detail">No customer details recorded.</div>
+            {% endif %}
+        </div>
+
+        <div class="receipt-party" style="text-align:right;">
+            <div class="label">Served By</div>
+            <div class="name">
+                {% if sale.recorded_by %}
+                    {{ sale.recorded_by.get_full_name|default:sale.recorded_by.username }}
+                {% else %}
+                    —
+                {% endif %}
+            </div>
+            <div class="detail">
+                {% if sale.payment_method %}
+                    Payment: <strong>{{ sale.payment_method|title }}</strong>
+                {% else %}
+                    Payment: <em>Not specified</em>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Line items -->
+    <table class="receipt-items">
+        <thead>
+            <tr>
+                <th style="width: 60%;">Item</th>
+                <th style="text-align:center;">Qty</th>
+                <th style="text-align:right;">Unit Price</th>
+                <th style="text-align:right;">Subtotal</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td class="desc">
+                    {{ item.get_unit_display }}
+                    <div class="sub">
+                        {% if item.unit == 'tray' %}
+                            {{ item.eggs_count }} eggs
+                        {% elif item.unit == 'crate' %}
+                            {{ item.eggs_count }} eggs
+                        {% else %}
+                            Individual
+                        {% endif %}
+                    </div>
+                </td>
+                <td class="num" style="text-align:center;">{{ item.quantity }}</td>
+                <td class="num">{{ item.unit_price|floatformat:2 }}</td>
+                <td class="num">{{ item.subtotal|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4" style="text-align:center;color:#9ca3af;padding:24px;">
+                    No items recorded on this sale.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Totals -->
+    <div class="receipt-totals">
+        <div class="receipt-totals-box">
+            <div class="receipt-totals-row">
+                <span class="label">Total</span>
+                <span class="value">KES {{ sale.total_amount|floatformat:2 }}</span>
+            </div>
+            <div class="receipt-totals-row">
+                <span class="label">Amount Paid</span>
+                <span class="value">KES {{ sale.amount_paid|floatformat:2 }}</span>
+            </div>
+            <div class="receipt-totals-row grand {% if sale.balance > 0 %}owed{% else %}clear{% endif %}">
+                <span class="label">
+                    {% if sale.balance > 0 %}Balance Due{% else %}Balance{% endif %}
+                </span>
+                <span class="value">KES {{ sale.balance|floatformat:2 }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notes -->
+    {% if sale.notes %}
+    <div class="receipt-notes">
+        <div class="label">Notes</div>
+        {{ sale.notes|linebreaksbr }}
+    </div>
+    {% endif %}
+
+    <!-- Footer -->
+    <div class="receipt-footer">
+        <div class="thanks">
+            Thank you for your business!
+            <small>This receipt was generated on {{ "now"|date:"d M Y, H:i" }}.</small>
+        </div>
+        <div class="signature">
+            <div class="line"></div>
+            Authorised Signature
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Auto-print if ?print=1 is in the URL (optional)
+    {% if auto_print %}
+    window.addEventListener('load', function () {
+        setTimeout(function () { window.print(); }, 300);
+    });
+    {% endif %}
+</script>
+{% endblock %}

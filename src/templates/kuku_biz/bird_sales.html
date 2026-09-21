@@ -1,0 +1,427 @@
+{% extends 'kuku_base.html' %}
+{% load static %}
+
+{% block title %}Bird Sales — Kuku Biz{% endblock %}
+{% block page_title %}Bird Sales{% endblock %}
+{% block page_subtitle %}<small>Live bird sales log</small>{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 22px;
+        border-radius: 50px;
+        border: 2px solid #000;
+        background: #fff;
+        color: #000;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.85rem;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.2s;
+    }
+    .btn-primary {
+        background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
+        color: #fff;
+    }
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 18px rgba(31,180,210,0.35);
+        color: #fff;
+    }
+    .btn-sm {
+        padding: 6px 14px;
+        font-size: 0.75rem;
+        gap: 5px;
+    }
+    .btn-icon {
+        padding: 6px 11px;
+        font-size: 0.75rem;
+    }
+    .btn-paid {
+        background: #d1fae5;
+        color: #065f46;
+        border-color: #000;
+    }
+    .btn-paid:hover {
+        background: #065f46;
+        color: #fff;
+    }
+    .btn-receipt {
+        background: #f0fbfd;
+        color: #0a2f45;
+        border-color: #000;
+    }
+    .btn-receipt:hover {
+        background: #0a2f45;
+        color: #fff;
+    }
+    .btn-edit {
+        background: #f0fbfd;
+        color: #0a2f45;
+        border-color: #000;
+    }
+    .btn-edit:hover {
+        background: #0a2f45;
+        color: #fff;
+    }
+    .btn-delete {
+        background: #fee2e2;
+        color: #991b1b;
+        border-color: #000;
+    }
+    .btn-delete:hover {
+        background: #991b1b;
+        color: #fff;
+    }
+
+    /* Filter bar */
+    .filter-bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 18px;
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    .filter-bar label {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #374151;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .filter-bar select {
+        padding: 8px 14px;
+        border: 2px solid #000;
+        border-radius: 4px;
+        font-family: inherit;
+        font-size: 0.85rem;
+        background: #fff;
+        min-width: 220px;
+    }
+    .locked-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        background: #fef3c7;
+        border: 2px solid #000;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #92400e;
+    }
+
+    /* KPI bar */
+    .kpi-bar {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    @media (max-width: 900px) {
+        .kpi-bar { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 500px) {
+        .kpi-bar { grid-template-columns: 1fr; }
+    }
+    .kpi-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 16px 20px;
+    }
+    .kpi-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #6b7280;
+        font-weight: 700;
+        margin-bottom: 6px;
+    }
+    .kpi-value {
+        font-family: 'Courier New', monospace;
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #0a2f45;
+    }
+    .kpi-value.birds { color: #92400e; }
+    .kpi-value.paid  { color: #059669; }
+    .kpi-value.owed  { color: #dc2626; }
+
+    /* Data table */
+    .data-table {
+        width: 100%;
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        overflow: hidden;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    .data-table thead { background: #f0fbfd; }
+    .data-table th {
+        text-align: left;
+        padding: 14px 18px;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #374151;
+        border-bottom: 2px solid #000;
+    }
+    .data-table td {
+        padding: 14px 18px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.88rem;
+        color: #1f2937;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover { background: #f9fafb; }
+    .cell-num {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        text-align: right;
+    }
+    .cell-birds {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        text-align: right;
+        color: #92400e;
+    }
+    .cell-balance-owed { color: #dc2626; }
+    .cell-balance-clear { color: #059669; }
+    .cell-actions {
+        text-align: right;
+        white-space: nowrap;
+    }
+    .cell-actions .btn { margin-left: 3px; }
+    .cell-actions form { display: inline; }
+
+    .flock-chip {
+        display: inline-block;
+        padding: 3px 10px;
+        background: #f0fbfd;
+        border: 1px solid #1fb4d2;
+        border-radius: 50px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #0a2f45;
+    }
+    .branch-chip {
+        display: inline-block;
+        padding: 2px 8px;
+        background: #e0f4fa;
+        border-radius: 50px;
+        font-size: 0.7rem;
+        color: #036a77;
+        margin-left: 4px;
+    }
+    .badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 50px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        border: 1px solid #000;
+    }
+    .badge-paid     { background: #d1fae5; color: #065f46; }
+    .badge-partial  { background: #dbeafe; color: #1e40af; }
+    .badge-credit   { background: #fee2e2; color: #991b1b; }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 30px;
+        background: #fff;
+        border: 2px dashed #9ca3af;
+        border-radius: 8px;
+    }
+    .empty-state i { font-size: 3rem; color: #87CEEB; margin-bottom: 16px; }
+    .empty-state h3 { margin: 0 0 8px; color: #1f2937; }
+    .empty-state p { color: #6b7280; margin-bottom: 20px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ============================================================ -->
+<!-- Page header                                                   -->
+<!-- ============================================================ -->
+<div class="page-header">
+    <h2 style="margin:0;font-size:1.1rem;font-weight:700;">
+        <i class="fas fa-drumstick-bite" style="color:#92400e;"></i> Recent Bird Sales
+    </h2>
+    <a href="{% url 'kuku_biz:bird_sale_create' %}" class="btn btn-primary">
+        <i class="fas fa-plus"></i> New Bird Sale
+    </a>
+</div>
+
+<!-- ============================================================ -->
+<!-- Branch filter                                                 -->
+<!-- ============================================================ -->
+<div class="filter-bar">
+    {% if can_see_all_branches %}
+        <label for="branchFilter"><i class="fas fa-building"></i> Branch:</label>
+        <form method="get" style="display:contents;">
+            <select name="branch" id="branchFilter" onchange="this.form.submit()">
+                <option value="">All Branches</option>
+                {% for b in branches %}
+                    <option value="{{ b.id }}"
+                        {% if selected_branch_id == b.id|stringformat:"s" %}selected{% endif %}>
+                        {{ b.name }}
+                    </option>
+                {% endfor %}
+            </select>
+            <noscript>
+                <button type="submit" class="btn btn-sm">Apply</button>
+            </noscript>
+        </form>
+    {% elif user_branch %}
+        <span class="locked-badge">
+            <i class="fas fa-lock"></i>
+            Showing: {{ user_branch.name }}
+        </span>
+    {% endif %}
+</div>
+
+<!-- ============================================================ -->
+<!-- KPIs                                                          -->
+<!-- ============================================================ -->
+<div class="kpi-bar">
+    <div class="kpi-card">
+        <div class="kpi-label">Birds Sold</div>
+        <div class="kpi-value birds">{{ total_birds }}</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Total Revenue</div>
+        <div class="kpi-value">KES {{ total_revenue|floatformat:0 }}</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Collected</div>
+        <div class="kpi-value paid">KES {{ total_paid|floatformat:0 }}</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Outstanding</div>
+        <div class="kpi-value {% if total_balance > 0 %}owed{% endif %}">
+            KES {{ total_balance|floatformat:0 }}
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Sales table                                                   -->
+<!-- ============================================================ -->
+{% if sales %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Flock</th>
+                <th>Buyer</th>
+                <th style="text-align:right;">Birds</th>
+                <th style="text-align:right;">Unit Price</th>
+                <th style="text-align:right;">Total</th>
+                <th style="text-align:right;">Paid</th>
+                <th style="text-align:right;">Balance</th>
+                <th style="text-align:right;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sale in sales %}
+            <tr>
+                <td>{{ sale.date|date:"d M Y" }}</td>
+                <td>
+                    <span class="flock-chip">
+                        <i class="fas fa-kiwi-bird"></i> {{ sale.flock.name }}
+                    </span>
+                    {% if sale.branch %}
+                        <span class="branch-chip">{{ sale.branch.name }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {{ sale.buyer_display }}
+                    {% if not sale.customer and not sale.buyer_name %}
+                        <em style="color:#9ca3af;font-size:0.8rem;">(unrecorded)</em>
+                    {% endif %}
+                </td>
+                <td class="cell-birds">{{ sale.birds_sold }}</td>
+                <td class="cell-num">KES {{ sale.unit_price|floatformat:0 }}</td>
+                <td class="cell-num">{{ sale.total_amount|floatformat:0 }}</td>
+                <td class="cell-num">{{ sale.amount_paid|floatformat:0 }}</td>
+                <td class="cell-num {% if sale.balance > 0 %}cell-balance-owed{% else %}cell-balance-clear{% endif %}">
+                    {{ sale.balance|floatformat:0 }}
+                </td>
+                <td class="cell-actions">
+
+                    <!-- Receipt -->
+                    <a href="{% url 'kuku_biz:bird_sale_receipt' sale.pk %}"
+                       class="btn btn-sm btn-icon btn-receipt"
+                       title="View receipt">
+                        <i class="fas fa-receipt"></i>
+                    </a>
+
+                    <!-- Edit -->
+                    <a href="{% url 'kuku_biz:bird_sale_edit' sale.pk %}"
+                       class="btn btn-sm btn-icon btn-edit"
+                       title="Edit sale">
+                        <i class="fas fa-edit"></i>
+                    </a>
+
+                    <!-- Mark Paid (only when balance > 0) -->
+                    {% if sale.balance > 0 %}
+                        <form method="post"
+                              action="{% url 'kuku_biz:bird_sale_mark_paid' sale.pk %}">
+                            {% csrf_token %}
+                            <button type="submit"
+                                    class="btn btn-sm btn-icon btn-paid"
+                                    title="Mark as fully paid"
+                                    onclick="return confirm('Mark sale #{{ sale.pk }} as fully paid (KES {{ sale.total_amount|floatformat:0 }})?')">
+                                <i class="fas fa-check"></i>
+                            </button>
+                        </form>
+                    {% endif %}
+
+                    <!-- Delete -->
+                    <form method="post"
+                          action="{% url 'kuku_biz:bird_sale_delete' sale.pk %}"
+                          onsubmit="return confirm('Delete this bird sale?\n\n{{ sale.birds_sold }} bird(s) will be returned to {{ sale.flock.name|escapejs }}.');">
+                        {% csrf_token %}
+                        <button type="submit"
+                                class="btn btn-sm btn-icon btn-delete"
+                                title="Delete sale">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </form>
+
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div class="empty-state">
+        <i class="fas fa-drumstick-bite"></i>
+        <h3>No bird sales yet</h3>
+        <p>Record a sale of broilers, spent hens, or surplus males to start tracking revenue.</p>
+        <a href="{% url 'kuku_biz:bird_sale_create' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Record First Bird Sale
+        </a>
+    </div>
+{% endif %}
+
+{% endblock %}

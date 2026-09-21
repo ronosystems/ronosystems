@@ -1,0 +1,1174 @@
+{% extends 'kuku_base.html' %}
+
+{% block title %}{% if sale %}Edit Bird Sale #{{ sale.pk }}{% else %}New Bird Sale{% endif %} — Kuku Biz{% endblock %}
+{% block page_title %}{% if sale %}Edit Bird Sale #{{ sale.pk }}{% else %}New Bird Sale{% endif %}{% endblock %}
+{% block page_subtitle %}<small>{% if sale %}Update sale details{% else %}Record sale of live birds{% endif %}</small>{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 26px 30px;
+        max-width: 760px;
+    }
+    .form-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #000;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .form-title i { color: #92400e; }
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+    @media (max-width: 640px) {
+        .form-row { grid-template-columns: 1fr; }
+    }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        font-size: 0.85rem;
+        margin-bottom: 6px;
+    }
+    .form-group label .required {
+        color: #dc2626;
+        margin-left: 3px;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 10px 14px;
+        border: 2px solid #000;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 0.9rem;
+        background: #fff;
+        transition: all 0.2s;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: #1fb4d2;
+        box-shadow: 0 0 0 3px rgba(31,180,210,0.2);
+    }
+    .form-group .help-text {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-top: 4px;
+    }
+    .section-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #6b7280;
+        margin: 22px 0 10px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .form-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 24px;
+        padding-top: 20px;
+        border-top: 2px solid #000;
+    }
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 24px;
+        border-radius: 50px;
+        border: 2px solid #000;
+        background: #fff;
+        color: #000;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.2s;
+    }
+    .btn-primary {
+        background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
+        color: #fff;
+    }
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 18px rgba(31,180,210,0.35);
+        color: #fff;
+    }
+    .btn-secondary:hover {
+        background: #f0fbfd;
+        border-color: #1fb4d2;
+        color: #1fb4d2;
+    }
+    .btn-sm {
+        padding: 8px 16px;
+        font-size: 0.8rem;
+    }
+    .quick-fill {
+        display: flex;
+        gap: 8px;
+        margin-top: 6px;
+        flex-wrap: wrap;
+    }
+    .quick-fill button {
+        padding: 6px 14px;
+        border: 1px solid #d1d5db;
+        border-radius: 50px;
+        background: #f9fafb;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+    .quick-fill button:hover {
+        background: #1fb4d2;
+        color: #fff;
+        border-color: #1fb4d2;
+    }
+
+    /* Sale total preview */
+    .amount-preview {
+        background: #fef3c7;
+        border: 1px dashed #92400e;
+        border-radius: 8px;
+        padding: 14px 18px;
+        margin-top: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .amount-preview .label {
+        font-size: 0.8rem;
+        color: #78350f;
+        font-weight: 600;
+    }
+    .amount-preview .value {
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: #78350f;
+        font-family: 'Courier New', monospace;
+    }
+
+    /* Flock info box */
+    .flock-info {
+        margin-top: 8px;
+        padding: 10px 14px;
+        background: #f0fbfd;
+        border: 1px solid #1fb4d2;
+        border-radius: 6px;
+        font-size: 0.82rem;
+        color: #0a2f45;
+        display: none;
+    }
+    .flock-info.visible { display: block; }
+    .flock-info strong { color: #036a77; }
+    .flock-info .edit-note {
+        display: block;
+        margin-top: 6px;
+        padding-top: 6px;
+        border-top: 1px dashed #1fb4d2;
+        font-size: 0.75rem;
+        color: #036a77;
+    }
+
+    /* ============================================================ */
+    /* CUSTOMER PICKER — same pattern as sale_form                  */
+    /* ============================================================ */
+    .customer-picker {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .customer-display {
+        flex: 1;
+        padding: 10px 14px;
+        border: 2px solid #000;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        background: #f9fafb;
+        color: #374151;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 42px;
+    }
+    .customer-display.empty {
+        color: #9ca3af;
+        font-style: italic;
+    }
+    .customer-display .name {
+        font-weight: 700;
+        color: #0a2f45;
+    }
+    .customer-display .phone {
+        font-size: 0.78rem;
+        color: #6b7280;
+    }
+    .customer-display .clear-btn {
+        margin-left: auto;
+        background: transparent;
+        border: none;
+        color: #9ca3af;
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.85rem;
+    }
+    .customer-display .clear-btn:hover {
+        color: #dc2626;
+        background: #fee2e2;
+    }
+    .customer-picker .btn-pick {
+        flex-shrink: 0;
+        padding: 10px 18px;
+        border: 2px solid #000;
+        border-radius: 6px;
+        background: #fff;
+        font-weight: 700;
+        font-size: 0.85rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+    }
+    .customer-picker .btn-pick:hover {
+        background: #1fb4d2;
+        color: #fff;
+        border-color: #000;
+    }
+
+    /* ============================================================ */
+    /* MODAL                                                         */
+    /* ============================================================ */
+    .modal-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        z-index: 2000;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-card {
+        background: #fff;
+        border: 3px solid #000;
+        border-radius: 10px;
+        width: 100%;
+        max-width: 520px;
+        max-height: 90vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    }
+    .modal-header {
+        padding: 16px 22px;
+        background: #0a2f45;
+        color: #fff;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 3px solid #000;
+    }
+    .modal-header h3 {
+        margin: 0;
+        font-size: 1.05rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .modal-header h3 i { color: #1fb4d2; }
+    .modal-close {
+        background: transparent;
+        border: none;
+        color: #fff;
+        font-size: 1.4rem;
+        cursor: pointer;
+        line-height: 1;
+        padding: 0 6px;
+    }
+    .modal-close:hover { color: #ff6b6b; }
+    .modal-body {
+        padding: 20px 22px;
+        overflow-y: auto;
+        flex: 1;
+    }
+    .modal-footer {
+        padding: 14px 22px;
+        border-top: 2px solid #e5e7eb;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .search-input-wrap {
+        position: relative;
+        margin-bottom: 14px;
+    }
+    .search-input-wrap i {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #9ca3af;
+        font-size: 0.9rem;
+    }
+    .search-input-wrap input {
+        width: 100%;
+        padding: 11px 14px 11px 40px;
+        border: 2px solid #000;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-family: inherit;
+    }
+    .search-input-wrap input:focus {
+        outline: none;
+        border-color: #1fb4d2;
+        box-shadow: 0 0 0 3px rgba(31,180,210,0.2);
+    }
+
+    .search-hint {
+        font-size: 0.78rem;
+        color: #9ca3af;
+        padding: 8px 4px;
+        text-align: center;
+    }
+
+    .customer-list {
+        max-height: 320px;
+        overflow-y: auto;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        margin-bottom: 12px;
+    }
+    .customer-item {
+        padding: 12px 14px;
+        border-bottom: 1px solid #f3f4f6;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        transition: background 0.15s;
+    }
+    .customer-item:last-child { border-bottom: none; }
+    .customer-item:hover { background: #f0fbfd; }
+    .customer-item .info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    .customer-item .info .name {
+        font-weight: 700;
+        color: #0a2f45;
+        font-size: 0.92rem;
+    }
+    .customer-item .info .meta {
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+    .customer-item .pick-icon {
+        color: #1fb4d2;
+        font-size: 0.85rem;
+    }
+
+    .modal-empty {
+        padding: 30px 20px;
+        text-align: center;
+        color: #6b7280;
+        font-size: 0.85rem;
+        border: 1px dashed #cbd5e1;
+        border-radius: 8px;
+        background: #fafbfc;
+    }
+    .modal-empty i {
+        display: block;
+        font-size: 2rem;
+        color: #cbd5e1;
+        margin-bottom: 12px;
+    }
+    .modal-empty .create-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 12px;
+        padding: 8px 18px;
+        background: #1fb4d2;
+        color: #fff;
+        border: 2px solid #000;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.82rem;
+        cursor: pointer;
+    }
+    .modal-empty .create-btn:hover { background: #0a2f45; }
+
+    .new-customer-form { display: none; }
+    .new-customer-form.active { display: block; }
+
+    .form-row-modal {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+    @media (max-width: 520px) {
+        .form-row-modal { grid-template-columns: 1fr; }
+    }
+    .form-row-modal .form-group { margin-bottom: 0; }
+
+    .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid #cbd5e1;
+        border-top-color: #1fb4d2;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="form-card">
+    <div class="form-title">
+        <i class="fas fa-drumstick-bite"></i>
+        {% if sale %}Edit Bird Sale #{{ sale.pk }}{% else %}Record Bird Sale{% endif %}
+    </div>
+
+    {% if sale %}
+    <div style="background:#f0fbfd;border:1px dashed #1fb4d2;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:0.85rem;color:#0a2f45;display:flex;align-items:flex-start;gap:10px;">
+        <i class="fas fa-info-circle" style="color:#1fb4d2;margin-top:2px;"></i>
+        <div>
+            <strong>Editing an existing sale.</strong>
+            Changing the flock or bird count will automatically adjust the flock counts
+            (birds returned to the original flock, deducted from the new one).
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="post" id="birdSaleForm">
+        {% csrf_token %}
+
+        <!-- Hidden input that carries the customer_id on submit -->
+        <input type="hidden" name="customer" id="customerIdInput"
+               value="{% if sale and sale.customer_id %}{{ sale.customer_id }}{% endif %}">
+
+        <div class="section-label">Customer &amp; Date</div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Buyer</label>
+
+                <div class="customer-picker">
+                    <div class="customer-display {% if not sale.customer %}empty{% endif %}" id="customerDisplay">
+                        <i class="fas fa-user"></i>
+                        <span id="customerDisplayText">
+                            {% if sale.customer %}
+                                {{ sale.customer.name }}
+                            {% else %}
+                                Walk-in / Cash
+                            {% endif %}
+                        </span>
+                        <button type="button"
+                                class="clear-btn"
+                                id="customerClearBtn"
+                                style="{% if not sale.customer %}display:none;{% endif %}"
+                                title="Clear buyer">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    <button type="button"
+                            class="btn-pick"
+                            id="customerPickBtn">
+                        <i class="fas fa-search"></i> Pick
+                    </button>
+                </div>
+
+                <div class="help-text">
+                    Leave as Walk-in, or pick an existing customer / create new.
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="date">Date <span class="required">*</span></label>
+                <input type="date"
+                       id="date"
+                       name="date"
+                       value="{% if sale %}{{ sale.date|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}"
+                       required>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="buyer_name">Buyer Name (if no customer selected)</label>
+            <input type="text"
+                   id="buyer_name"
+                   name="buyer_name"
+                   value="{{ sale.buyer_name|default:'' }}"
+                   placeholder="e.g. Local market trader"
+                   maxlength="150">
+            <div class="help-text">Optional — used when no customer record is linked</div>
+        </div>
+
+        <div class="section-label">Flock &amp; Sale Details</div>
+
+        <div class="form-group">
+            <label for="flock">Flock <span class="required">*</span></label>
+            <select id="flock" name="flock" required>
+                <option value="">— Select a flock —</option>
+                {% for f in flocks %}
+                    <option value="{{ f.id }}"
+                            data-count="{{ f.current_count }}"
+                            data-type="{{ f.get_flock_type_display }}"
+                            data-branch="{{ f.branch.name|default:'' }}"
+                            {% if sale and sale.flock_id == f.id %}selected
+                            {% elif not sale and preselected_flock_id == f.id|stringformat:"s" %}selected{% endif %}>
+                        {{ f.name }}
+                        ({{ f.get_flock_type_display }} · {{ f.current_count }} birds)
+                    </option>
+                {% endfor %}
+            </select>
+            <div class="flock-info" id="flockInfo"></div>
+            <div class="help-text">
+                Only active flocks are listed. Birds will be deducted from this flock on save.
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="birds_sold">
+                    Number of Birds <span class="required">*</span>
+                </label>
+                <input type="number"
+                       id="birds_sold"
+                       name="birds_sold"
+                       min="1"
+                       step="1"
+                       value="{% if sale %}{{ sale.birds_sold }}{% endif %}"
+                       placeholder="e.g. 20"
+                       required>
+                <div class="quick-fill">
+                    <button type="button" onclick="setBirds(5)">5</button>
+                    <button type="button" onclick="setBirds(10)">10</button>
+                    <button type="button" onclick="setBirds(20)">20</button>
+                    <button type="button" onclick="setBirds(50)">50</button>
+                </div>
+                <div class="help-text" id="birdsAvailableHint">
+                    Select a flock to see available birds.
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="unit_price">
+                    Price per Bird (KES) <span class="required">*</span>
+                </label>
+                <input type="number"
+                       id="unit_price"
+                       name="unit_price"
+                       min="0"
+                       step="0.01"
+                       value="{% if sale %}{{ sale.unit_price }}{% endif %}"
+                       placeholder="e.g. 400"
+                       required>
+                <div class="quick-fill">
+                    <button type="button" onclick="setPrice(300)">300</button>
+                    <button type="button" onclick="setPrice(350)">350</button>
+                    <button type="button" onclick="setPrice(400)">400</button>
+                    <button type="button" onclick="setPrice(500)">500</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live total preview -->
+        <div class="amount-preview">
+            <span class="label">Sale Total</span>
+            <span class="value" id="totalPreview">KES 0</span>
+        </div>
+
+        <div class="section-label">Payment</div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="amount_paid">Amount Paid (KES)</label>
+                <input type="number"
+                       id="amount_paid"
+                       name="amount_paid"
+                       min="0"
+                       step="0.01"
+                       value="{% if sale %}{{ sale.amount_paid|floatformat:2 }}{% else %}0{% endif %}">
+                <div class="help-text">Leave 0 for unpaid / on credit</div>
+            </div>
+
+            <div class="form-group">
+                <label for="payment_method">Payment Method</label>
+                <select id="payment_method" name="payment_method">
+                    <option value="">— Select —</option>
+                    <option value="cash"   {% if sale and sale.payment_method == 'cash' %}selected{% endif %}>Cash</option>
+                    <option value="mpesa"  {% if sale and sale.payment_method == 'mpesa' %}selected{% endif %}>M-Pesa</option>
+                    <option value="bank"   {% if sale and sale.payment_method == 'bank' %}selected{% endif %}>Bank Transfer</option>
+                    <option value="credit" {% if sale and sale.payment_method == 'credit' %}selected{% endif %}>Credit (Pay Later)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="notes">Notes</label>
+            <textarea id="notes"
+                      name="notes"
+                      rows="2"
+                      placeholder="Any notes about this sale">{{ sale.notes|default:'' }}</textarea>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-check"></i>
+                {% if sale %}Save Changes{% else %}Save Bird Sale{% endif %}
+            </button>
+            <a href="{% url 'kuku_biz:bird_sale_list' %}" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancel
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- ============================================================ -->
+<!-- CUSTOMER MODAL                                                -->
+<!-- ============================================================ -->
+<div class="modal-backdrop" id="customerModal">
+    <div class="modal-card">
+
+        <div class="modal-header">
+            <h3><i class="fas fa-users"></i> <span id="modalTitle">Pick Buyer</span></h3>
+            <button type="button" class="modal-close" id="modalCloseBtn">&times;</button>
+        </div>
+
+        <div class="modal-body">
+
+            <!-- ================= SEARCH MODE ================= -->
+            <div id="searchMode">
+                <div class="search-input-wrap">
+                    <i class="fas fa-search"></i>
+                    <input type="text"
+                           id="customerSearch"
+                           placeholder="Search by name or phone..."
+                           autocomplete="off">
+                </div>
+
+                <div id="searchResults">
+                    <div class="search-hint">
+                        Type at least 2 characters to search.
+                    </div>
+                </div>
+
+                <div class="modal-empty" id="emptyState" style="display:none;">
+                    <i class="fas fa-user-plus"></i>
+                    No customer found for "<span id="emptyQuery"></span>".
+                    <br>
+                    <button type="button"
+                            class="create-btn"
+                            id="createFromEmptyBtn">
+                        <i class="fas fa-plus"></i> Create New Customer
+                    </button>
+                </div>
+            </div>
+
+            <!-- ================= CREATE MODE ================= -->
+            <div id="createMode" class="new-customer-form">
+                <div class="form-row-modal">
+                    <div class="form-group">
+                        <label for="newCustomerName">
+                            Customer Name <span class="required">*</span>
+                        </label>
+                        <input type="text"
+                               id="newCustomerName"
+                               placeholder="e.g. Acme Hotel"
+                               maxlength="150">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="newCustomerPhone">Phone Number</label>
+                        <input type="tel"
+                               id="newCustomerPhone"
+                               placeholder="e.g. 0712345678"
+                               maxlength="20">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="newCustomerType">Customer Type</label>
+                    <select id="newCustomerType">
+                        <option value="individual">Individual</option>
+                        <option value="retail">Retail Shop</option>
+                        <option value="hotel">Hotel / Restaurant</option>
+                        <option value="wholesale">Wholesaler</option>
+                        <option value="institution">Institution</option>
+                    </select>
+                </div>
+
+                <div id="createError"
+                     style="display:none;padding:8px 12px;background:#fee2e2;border:1px solid #dc2626;border-radius:6px;color:#991b1b;font-size:0.82rem;margin-top:8px;">
+                </div>
+            </div>
+
+        </div>
+
+        <div class="modal-footer">
+            <!-- Search mode footer -->
+            <div id="footerSearch" style="display:flex;justify-content:space-between;width:100%;gap:10px;flex-wrap:wrap;">
+                <button type="button"
+                        class="btn btn-sm"
+                        id="showCreateBtn">
+                    <i class="fas fa-user-plus"></i> New Customer
+                </button>
+                <button type="button"
+                        class="btn btn-sm"
+                        id="useWalkinBtn">
+                    <i class="fas fa-user"></i> Use Walk-in
+                </button>
+            </div>
+
+            <!-- Create mode footer -->
+            <div id="footerCreate" style="display:none;justify-content:space-between;width:100%;gap:10px;flex-wrap:wrap;">
+                <button type="button"
+                        class="btn btn-sm"
+                        id="backToSearchBtn">
+                    <i class="fas fa-arrow-left"></i> Back
+                </button>
+                <button type="button"
+                        class="btn btn-sm btn-primary"
+                        id="saveCustomerBtn">
+                    <i class="fas fa-check"></i> Save &amp; Select
+                </button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Customer data injected from server for client-side search -->
+<script id="customerData" type="application/json">
+[
+    {% for c in customers %}
+        {
+            "id": {{ c.id }},
+            "name": "{{ c.name|escapejs }}",
+            "phone": "{{ c.phone|default:''|escapejs }}",
+            "type": "{{ c.get_customer_type_display|escapejs }}"
+        }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+]
+</script>
+
+<!-- Current sale context (edit mode only) -->
+<script id="saleContext" type="application/json">
+{
+    "isEdit": {% if sale %}true{% else %}false{% endif %},
+    "saleId": {% if sale %}{{ sale.pk }}{% else %}null{% endif %},
+    "originalFlockId": {% if sale %}{{ sale.flock_id }}{% else %}null{% endif %},
+    "originalBirdsSold": {% if sale %}{{ sale.birds_sold }}{% else %}0{% endif %}
+}
+</script>
+
+<script>
+// ============================================================
+// Bird / price helpers + live total preview
+// ============================================================
+function setBirds(n) {
+    document.getElementById('birds_sold').value = n;
+    updateTotal();
+}
+function setPrice(p) {
+    document.getElementById('unit_price').value = p;
+    updateTotal();
+}
+function updateTotal() {
+    const birds = parseInt(document.getElementById('birds_sold').value, 10) || 0;
+    const price = parseFloat(document.getElementById('unit_price').value) || 0;
+    const total = birds * price;
+    document.getElementById('totalPreview').textContent = 'KES ' + total.toLocaleString('en-KE', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+    });
+}
+document.getElementById('birds_sold').addEventListener('input', updateTotal);
+document.getElementById('unit_price').addEventListener('input', updateTotal);
+
+// ============================================================
+// Flock info + max birds validation (edit-aware)
+// ============================================================
+(function () {
+    const saleCtx       = JSON.parse(document.getElementById('saleContext').textContent);
+    const flockSelect   = document.getElementById('flock');
+    const birdsInput    = document.getElementById('birds_sold');
+    const flockInfo     = document.getElementById('flockInfo');
+    const birdsHint     = document.getElementById('birdsAvailableHint');
+
+    function updateFlockInfo() {
+        const opt = flockSelect.options[flockSelect.selectedIndex];
+        if (!flockSelect.value || !opt) {
+            flockInfo.classList.remove('visible');
+            flockInfo.innerHTML = '';
+            birdsInput.removeAttribute('max');
+            birdsHint.textContent = 'Select a flock to see available birds.';
+            return;
+        }
+
+        const baseCount = parseInt(opt.dataset.count, 10) || 0;
+        const type = opt.dataset.type || '';
+        const branch = opt.dataset.branch || '';
+        const selectedFlockId = parseInt(flockSelect.value, 10) || 0;
+
+        // When editing: if the user is still on the ORIGINAL flock,
+        // the available pool already excludes the original sale's birds.
+        // Add them back to show the "true available" count.
+        let available = baseCount;
+        let editNote = '';
+        if (saleCtx.isEdit && selectedFlockId === saleCtx.originalFlockId) {
+            available = baseCount + saleCtx.originalBirdsSold;
+            editNote = '<span class="edit-note">'
+                     + '<i class="fas fa-info-circle"></i> Includes the '
+                     + saleCtx.originalBirdsSold
+                     + ' bird(s) currently on this sale.</span>';
+        }
+
+        flockInfo.classList.add('visible');
+        flockInfo.innerHTML =
+            '<strong>Available birds:</strong> ' + available +
+            (type ? ' &middot; <strong>Type:</strong> ' + type : '') +
+            (branch ? ' &middot; <strong>Branch:</strong> ' + branch : '') +
+            editNote;
+
+        birdsInput.max = available;
+        birdsHint.textContent = 'Available in selected flock: ' + available + ' birds.';
+    }
+
+    flockSelect.addEventListener('change', updateFlockInfo);
+    updateFlockInfo();
+})();
+
+
+// ============================================================
+// Customer picker + modal
+// ============================================================
+(function () {
+    const customers = JSON.parse(document.getElementById('customerData').textContent);
+
+    const modal          = document.getElementById('customerModal');
+    const modalCloseBtn  = document.getElementById('modalCloseBtn');
+    const modalTitle     = document.getElementById('modalTitle');
+
+    const searchMode     = document.getElementById('searchMode');
+    const createMode     = document.getElementById('createMode');
+
+    const searchInput    = document.getElementById('customerSearch');
+    const searchResults  = document.getElementById('searchResults');
+    const emptyState     = document.getElementById('emptyState');
+    const emptyQuery     = document.getElementById('emptyQuery');
+
+    const footerSearch   = document.getElementById('footerSearch');
+    const footerCreate   = document.getElementById('footerCreate');
+
+    const showCreateBtn  = document.getElementById('showCreateBtn');
+    const useWalkinBtn   = document.getElementById('useWalkinBtn');
+    const backToSearchBtn= document.getElementById('backToSearchBtn');
+    const saveCustomerBtn= document.getElementById('saveCustomerBtn');
+    const createFromEmptyBtn = document.getElementById('createFromEmptyBtn');
+
+    const newName        = document.getElementById('newCustomerName');
+    const newPhone       = document.getElementById('newCustomerPhone');
+    const newType        = document.getElementById('newCustomerType');
+    const createError    = document.getElementById('createError');
+
+    const hiddenIdInput  = document.getElementById('customerIdInput');
+    const displayBox     = document.getElementById('customerDisplay');
+    const displayText    = document.getElementById('customerDisplayText');
+    const clearBtn       = document.getElementById('customerClearBtn');
+    const pickBtn        = document.getElementById('customerPickBtn');
+
+    function openModal() {
+        modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        switchToSearch();
+        searchInput.value = '';
+        renderResults([]);
+        setTimeout(function () { searchInput.focus(); }, 50);
+    }
+
+    function closeModal() {
+        modal.classList.remove('open');
+        document.body.style.overflow = '';
+    }
+
+    function switchToSearch() {
+        searchMode.style.display = 'block';
+        createMode.classList.remove('active');
+        footerSearch.style.display = 'flex';
+        footerCreate.style.display = 'none';
+        modalTitle.textContent = 'Pick Buyer';
+        createError.style.display = 'none';
+    }
+
+    function switchToCreate(prefillName) {
+        searchMode.style.display = 'none';
+        createMode.classList.add('active');
+        footerSearch.style.display = 'none';
+        footerCreate.style.display = 'flex';
+        modalTitle.textContent = 'New Customer';
+        newName.value = prefillName || '';
+        newPhone.value = '';
+        newType.value = 'individual';
+        createError.style.display = 'none';
+        setTimeout(function () { newName.focus(); }, 50);
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
+    function renderResults(list) {
+        if (!list.length) {
+            searchResults.innerHTML = '';
+            return;
+        }
+        const html = list.map(function (c) {
+            return ''
+                + '<div class="customer-item" data-id="' + c.id + '"'
+                +    ' data-name="' + escapeHtml(c.name) + '"'
+                +    ' data-phone="' + escapeHtml(c.phone) + '">'
+                + '<div class="info">'
+                +   '<div class="name">' + escapeHtml(c.name) + '</div>'
+                +   '<div class="meta">'
+                +     (c.phone ? '<i class="fas fa-phone"></i> ' + escapeHtml(c.phone) + ' · ' : '')
+                +     escapeHtml(c.type)
+                +   '</div>'
+                + '</div>'
+                + '<i class="fas fa-arrow-right pick-icon"></i>'
+                + '</div>';
+        }).join('');
+        searchResults.innerHTML = '<div class="customer-list">' + html + '</div>';
+
+        searchResults.querySelectorAll('.customer-item').forEach(function (el) {
+            el.addEventListener('click', function () {
+                selectCustomer(el.dataset.id, el.dataset.name, el.dataset.phone);
+            });
+        });
+    }
+
+    function doSearch() {
+        const q = searchInput.value.trim().toLowerCase();
+        emptyState.style.display = 'none';
+
+        if (q.length < 2) {
+            renderResults([]);
+            searchResults.innerHTML = '<div class="search-hint">Type at least 2 characters to search.</div>';
+            return;
+        }
+
+        const matches = customers.filter(function (c) {
+            return c.name.toLowerCase().indexOf(q) !== -1
+                || (c.phone && c.phone.toLowerCase().indexOf(q) !== -1);
+        });
+
+        if (matches.length === 0) {
+            renderResults([]);
+            searchResults.innerHTML = '';
+            emptyQuery.textContent = searchInput.value.trim();
+            emptyState.style.display = 'block';
+            return;
+        }
+
+        renderResults(matches.slice(0, 20));
+    }
+
+    function selectCustomer(id, name, phone) {
+        hiddenIdInput.value = id;
+        displayBox.classList.remove('empty');
+        displayText.innerHTML = '<span class="name">' + escapeHtml(name) + '</span>'
+            + (phone ? ' <span class="phone"><i class="fas fa-phone"></i> ' + escapeHtml(phone) + '</span>' : '');
+        clearBtn.style.display = 'inline-block';
+
+        // Auto-fill buyer_name as a fallback
+        const buyerNameInput = document.getElementById('buyer_name');
+        if (buyerNameInput && !buyerNameInput.value) {
+            buyerNameInput.value = name;
+        }
+
+        closeModal();
+    }
+
+    function clearCustomer() {
+        hiddenIdInput.value = '';
+        displayBox.classList.add('empty');
+        displayText.textContent = 'Walk-in / Cash';
+        clearBtn.style.display = 'none';
+
+        const buyerNameInput = document.getElementById('buyer_name');
+        if (buyerNameInput) buyerNameInput.value = '';
+    }
+
+    function saveNewCustomer() {
+        const name = newName.value.trim();
+        const phone = newPhone.value.trim();
+        const type = newType.value;
+
+        createError.style.display = 'none';
+
+        if (!name) {
+            createError.textContent = 'Customer name is required.';
+            createError.style.display = 'block';
+            return;
+        }
+
+        const dupe = customers.find(function (c) {
+            return c.name.toLowerCase() === name.toLowerCase()
+                && (c.phone || '') === phone;
+        });
+        if (dupe) {
+            createError.textContent = 'A customer with this name and phone already exists. '
+                + 'Select them from the search instead.';
+            createError.style.display = 'block';
+            return;
+        }
+
+        saveCustomerBtn.disabled = true;
+        saveCustomerBtn.innerHTML = '<span class="spinner"></span> Saving...';
+
+        const csrf = document.querySelector('#birdSaleForm [name=csrfmiddlewaretoken]').value;
+
+        fetch('{% url "kuku_biz:customer_create" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrf,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                name: name,
+                phone: phone,
+                customer_type: type,
+                _modal: '1',
+            }).toString(),
+        })
+        .then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        })
+        .then(function (data) {
+            if (!data.success) {
+                throw new Error(data.error || 'Save failed.');
+            }
+            customers.push({
+                id: data.id,
+                name: data.name,
+                phone: data.phone,
+                type: data.type,
+            });
+            selectCustomer(String(data.id), data.name, data.phone);
+        })
+        .catch(function (err) {
+            createError.textContent = 'Could not save customer: ' + err.message;
+            createError.style.display = 'block';
+        })
+        .finally(function () {
+            saveCustomerBtn.disabled = false;
+            saveCustomerBtn.innerHTML = '<i class="fas fa-check"></i> Save &amp; Select';
+        });
+    }
+
+    // Event wiring
+    pickBtn.addEventListener('click', openModal);
+    modalCloseBtn.addEventListener('click', closeModal);
+
+    modal.addEventListener('click', function (e) {
+        if (e.target === modal) closeModal();
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && modal.classList.contains('open')) {
+            closeModal();
+        }
+    });
+
+    searchInput.addEventListener('input', doSearch);
+
+    showCreateBtn.addEventListener('click', function () {
+        switchToCreate(searchInput.value.trim());
+    });
+
+    createFromEmptyBtn.addEventListener('click', function () {
+        switchToCreate(searchInput.value.trim());
+    });
+
+    backToSearchBtn.addEventListener('click', switchToSearch);
+    saveCustomerBtn.addEventListener('click', saveNewCustomer);
+
+    useWalkinBtn.addEventListener('click', function () {
+        clearCustomer();
+        closeModal();
+    });
+
+    clearBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        clearCustomer();
+    });
+
+    searchInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && emptyState.style.display === 'block') {
+            e.preventDefault();
+            switchToCreate(searchInput.value.trim());
+        }
+    });
+
+    newName.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            newPhone.focus();
+        }
+    });
+
+    newPhone.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveNewCustomer();
+        }
+    });
+
+    // Only clear on fresh-create; keep existing customer on edit
+    {% if not sale %}
+    clearCustomer();
+    {% else %}
+    updateTotal();
+    {% endif %}
+})();
+</script>
+
+{% endblock %}

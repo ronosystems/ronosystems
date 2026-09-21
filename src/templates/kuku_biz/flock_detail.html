@@ -1,0 +1,661 @@
+{% extends 'kuku_base.html' %}
+{% load static %}
+
+{% block title %}{{ flock.name }} — Kuku Biz{% endblock %}
+{% block page_title %}{{ flock.name }}{% endblock %}
+{% block page_subtitle %}<small>{{ flock.get_flock_type_display }} · {{ flock.age_display }} old</small>{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================================ */
+    /* HEADER CARD                                                   */
+    /* ============================================================ */
+    .flock-header {
+        background: linear-gradient(135deg, #0a2f45 0%, #1fb4d2 100%);
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 24px 28px;
+        color: #fff;
+        margin-bottom: 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 20px;
+    }
+    .flock-header-left { flex: 1; min-width: 260px; }
+    .flock-header h2 {
+        margin: 0 0 6px;
+        font-size: 1.6rem;
+        font-weight: 800;
+    }
+    .flock-header .meta {
+        font-size: 0.85rem;
+        opacity: 0.9;
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+    }
+    .flock-header .meta-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .flock-header .meta-item i { color: #87CEEB; }
+
+    .flock-header-badges {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+    }
+    .flock-badge {
+        padding: 4px 12px;
+        border-radius: 50px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        background: rgba(0, 0, 0, 0.25);
+    }
+    .flock-badge.active   { background: #d1fae5; color: #065f46; border-color: #000; }
+    .flock-badge.retired  { background: #e5e7eb; color: #4b5563; border-color: #000; }
+    .flock-badge.sold     { background: #e0e7ff; color: #3730a3; border-color: #000; }
+    .flock-badge.depleted { background: #fee2e2; color: #991b1b; border-color: #000; }
+
+    .flock-header-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+    .hbtn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 18px;
+        border-radius: 50px;
+        border: 2px solid #fff;
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 0.82rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .hbtn:hover {
+        background: #fff;
+        color: #0a2f45;
+    }
+    .hbtn.primary {
+        background: #fff;
+        color: #0a2f45;
+        border-color: #fff;
+    }
+    .hbtn.primary:hover {
+        background: #87CEEB;
+        color: #0a2f45;
+    }
+    .hbtn.warn {
+        border-color: #fbbf24;
+        background: rgba(251, 191, 36, 0.2);
+        color: #fbbf24;
+    }
+    .hbtn.warn:hover {
+        background: #fbbf24;
+        color: #000;
+    }
+
+    /* ============================================================ */
+    /* KPI GRID                                                      */
+    /* ============================================================ */
+    .section-title {
+        font-size: 1rem;
+        font-weight: 700;
+        margin: 24px 0 12px;
+        padding-bottom: 6px;
+        border-bottom: 2px solid #000;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .section-title .section-link {
+        font-size: 0.78rem;
+        color: #1fb4d2;
+        text-decoration: none;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .section-title .section-link:hover { text-decoration: underline; }
+
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    .kpi-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 18px 20px;
+        min-height: 108px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .kpi-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #6b7280;
+    }
+    .kpi-value {
+        font-family: 'Courier New', monospace;
+        font-size: 1.6rem;
+        font-weight: 800;
+        color: #0a2f45;
+        margin-top: 6px;
+    }
+    .kpi-sub {
+        font-size: 0.72rem;
+        color: #9ca3af;
+        margin-top: 4px;
+    }
+    .kpi-icon {
+        float: right;
+        font-size: 1.4rem;
+        color: #87CEEB;
+    }
+    .kpi-value.good { color: #059669; }
+    .kpi-value.bad  { color: #dc2626; }
+    .kpi-value.warn { color: #d97706; }
+
+    /* ============================================================ */
+    /* INFO CARDS                                                    */
+    /* ============================================================ */
+    .info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 24px;
+    }
+    @media (max-width: 900px) {
+        .info-grid { grid-template-columns: 1fr; }
+    }
+    .info-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .info-card-header {
+        padding: 12px 18px;
+        background: #f0fbfd;
+        border-bottom: 2px solid #000;
+        font-weight: 700;
+        font-size: 0.82rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #0a2f45;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .info-card-header i { color: #1fb4d2; }
+    .info-card-body { padding: 0; }
+
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 11px 18px;
+        border-bottom: 1px solid #f3f4f6;
+        font-size: 0.85rem;
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-row .label {
+        color: #6b7280;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .info-row .label i {
+        color: #1fb4d2;
+        width: 16px;
+        text-align: center;
+    }
+    .info-row .value {
+        font-weight: 700;
+        color: #1f2937;
+        text-align: right;
+    }
+    .info-row .value.muted {
+        color: #9ca3af;
+        font-style: italic;
+        font-weight: 400;
+    }
+
+    /* Progress bar for birds */
+    .progress-wrap {
+        padding: 14px 18px;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    .progress-wrap:last-child { border-bottom: none; }
+    .progress-label {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.78rem;
+        color: #374151;
+        font-weight: 600;
+        margin-bottom: 6px;
+    }
+    .progress-bar {
+        height: 10px;
+        background: #e5e7eb;
+        border-radius: 50px;
+        overflow: hidden;
+    }
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #1fb4d2 0%, #0a2f45 100%);
+        border-radius: 50px;
+        transition: width 0.3s;
+    }
+
+    /* ============================================================ */
+    /* DATA TABLE                                                    */
+    /* ============================================================ */
+    .data-table {
+        width: 100%;
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        overflow: hidden;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    .data-table thead { background: #f0fbfd; }
+    .data-table th {
+        text-align: left;
+        padding: 12px 16px;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #374151;
+        border-bottom: 2px solid #000;
+    }
+    .data-table td {
+        padding: 12px 16px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.85rem;
+        color: #1f2937;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover { background: #f9fafb; }
+    .cell-num {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        text-align: right;
+    }
+    .cell-price {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        text-align: right;
+        color: #0a2f45;
+    }
+
+    .empty-block {
+        text-align: center;
+        padding: 40px 20px;
+        background: #fff;
+        border: 2px dashed #d1d5db;
+        border-radius: 8px;
+        color: #9ca3af;
+        font-size: 0.85rem;
+    }
+
+    /* ============================================================ */
+    /* RESPONSIVE                                                    */
+    /* ============================================================ */
+    @media (max-width: 640px) {
+        .flock-header { padding: 18px 20px; }
+        .flock-header h2 { font-size: 1.25rem; }
+        .hbtn { padding: 8px 14px; font-size: 0.75rem; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ============================================================ -->
+<!-- FLOCK HEADER                                                  -->
+<!-- ============================================================ -->
+<div class="flock-header">
+
+    <div class="flock-header-left">
+        <h2>
+            <i class="fas fa-kiwi-bird" style="color:#87CEEB;"></i>
+            {{ flock.name }}
+        </h2>
+
+        <div class="meta">
+            {% if flock.breed %}
+            <span class="meta-item">
+                <i class="fas fa-dna"></i> {{ flock.breed }}
+            </span>
+            {% endif %}
+            <span class="meta-item">
+                <i class="fas fa-calendar-day"></i>
+                Acquired {{ flock.date_acquired|date:"d M Y" }}
+            </span>
+            <span class="meta-item">
+                <i class="fas fa-clock"></i>
+                {{ flock.age_display }} old
+            </span>
+            {% if flock.branch %}
+            <span class="meta-item">
+                <i class="fas fa-store"></i> {{ flock.branch.name }}
+            </span>
+            {% endif %}
+        </div>
+
+        <div class="flock-header-badges">
+            <span class="flock-badge active" style="background:#87CEEB;color:#0a2f45;border-color:#000;">
+                {{ flock.get_flock_type_display }}
+            </span>
+            <span class="flock-badge {{ flock.status }}">
+                {{ flock.get_status_display }}
+            </span>
+        </div>
+    </div>
+
+    <div class="flock-header-actions">
+        {% if flock.status == 'active' and flock.current_count > 0 %}
+        <a href="{% url 'kuku_biz:bird_sale_create' %}?flock={{ flock.pk }}"
+           class="hbtn warn">
+            <i class="fas fa-drumstick-bite"></i> Sell Birds
+        </a>
+        {% endif %}
+
+        {% if flock.status == 'active' %}
+        <a href="{% url 'kuku_biz:egg_create' %}?flock={{ flock.pk }}"
+           class="hbtn primary">
+            <i class="fas fa-egg"></i> Record Eggs
+        </a>
+        <a href="{% url 'kuku_biz:feed_create' %}?flock={{ flock.pk }}"
+           class="hbtn">
+            <i class="fas fa-wheat-awn"></i> Add Feed
+        </a>
+        <a href="{% url 'kuku_biz:health_create' %}?flock={{ flock.pk }}"
+           class="hbtn">
+            <i class="fas fa-briefcase-medical"></i> Add Health
+        </a>
+        {% endif %}
+
+        <a href="{% url 'kuku_biz:flock_list' %}" class="hbtn">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+    </div>
+
+</div>
+
+<!-- ============================================================ -->
+<!-- KPI GRID                                                      -->
+<!-- ============================================================ -->
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div>
+            <i class="fas fa-kiwi-bird kpi-icon"></i>
+            <div class="kpi-label">Current Birds</div>
+            <div class="kpi-value">{{ flock.current_count }}</div>
+        </div>
+        <div class="kpi-sub">
+            started at {{ flock.initial_count }}
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div>
+            <i class="fas fa-chart-line kpi-icon"></i>
+            <div class="kpi-label">Mortality Rate</div>
+            <div class="kpi-value {% if flock.mortality_rate > 10 %}bad{% elif flock.mortality_rate > 5 %}warn{% else %}good{% endif %}">
+                {{ flock.mortality_rate }}%
+            </div>
+        </div>
+        <div class="kpi-sub">{{ flock.mortality_count }} bird{{ flock.mortality_count|pluralize }} lost</div>
+    </div>
+
+    <div class="kpi-card">
+        <div>
+            <i class="fas fa-egg kpi-icon"></i>
+            <div class="kpi-label">Eggs Collected (30d)</div>
+            <div class="kpi-value">{{ eggs_last_30 }}</div>
+        </div>
+        <div class="kpi-sub">last 30 days</div>
+    </div>
+
+    <div class="kpi-card">
+        <div>
+            <i class="fas fa-clock kpi-icon"></i>
+            <div class="kpi-label">Age</div>
+            <div class="kpi-value">{{ flock.age_display }}</div>
+        </div>
+        <div class="kpi-sub">
+            {{ flock.age_in_days }} days · {{ flock.age_in_weeks }} weeks
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- PURCHASE + COST INFO                                          -->
+<!-- ============================================================ -->
+<div class="info-grid">
+
+    <!-- Purchase details -->
+    <div class="info-card">
+        <div class="info-card-header">
+            <i class="fas fa-shopping-bag"></i> Purchase Details
+        </div>
+        <div class="info-card-body">
+            <div class="info-row">
+                <span class="label"><i class="fas fa-truck"></i> Supplier</span>
+                <span class="value {% if not flock.supplier %}muted{% endif %}">
+                    {{ flock.supplier|default:"Not recorded" }}
+                </span>
+            </div>
+            <div class="info-row">
+                <span class="label"><i class="fas fa-tag"></i> Price per Bird</span>
+                <span class="value">
+                    {% if flock.purchase_price_per_bird %}
+                        KES {{ flock.purchase_price_per_bird|floatformat:2 }}
+                    {% else %}
+                        <span class="muted">—</span>
+                    {% endif %}
+                </span>
+            </div>
+            <div class="info-row">
+                <span class="label"><i class="fas fa-coins"></i> Total Purchase</span>
+                <span class="value">
+                    {% if flock.total_purchase_cost %}
+                        KES {{ flock.total_purchase_cost|floatformat:0 }}
+                    {% else %}
+                        <span class="muted">—</span>
+                    {% endif %}
+                </span>
+            </div>
+            <div class="info-row">
+                <span class="label"><i class="fas fa-baby"></i> Age at Acquisition</span>
+                <span class="value">
+                    {% if flock.age_at_acquisition_days %}
+                        {{ flock.age_at_acquisition_days }} day{{ flock.age_at_acquisition_days|pluralize }}
+                    {% else %}
+                        <span class="muted">Day-old</span>
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Flock composition / health -->
+    <div class="info-card">
+        <div class="info-card-header">
+            <i class="fas fa-chart-pie"></i> Flock Composition
+        </div>
+        <div class="info-card-body">
+
+            <!-- Progress bar: survival -->
+            <div class="progress-wrap">
+                <div class="progress-label">
+                    <span>Survival Rate</span>
+                    <span>{{ flock.initial_count|add:"-1"|default:0 }}
+                        {% widthratio flock.current_count flock.initial_count 100 %}%
+                    </span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill"
+                         style="width: {% widthratio flock.current_count flock.initial_count 100 %}%;"></div>
+                </div>
+            </div>
+
+            <div class="info-row">
+                <span class="label"><i class="fas fa-hashtag"></i> Initial Count</span>
+                <span class="value">{{ flock.initial_count }} birds</span>
+            </div>
+            <div class="info-row">
+                <span class="label"><i class="fas fa-heart"></i> Current Count</span>
+                <span class="value">{{ flock.current_count }} birds</span>
+            </div>
+            <div class="info-row">
+                <span class="label"><i class="fas fa-skull"></i> Total Losses</span>
+                <span class="value">{{ flock.mortality_count }} birds</span>
+            </div>
+            <div class="info-row">
+                <span class="label"><i class="fas fa-user-tie"></i> Created By</span>
+                <span class="value">
+                    {% if flock.created_by %}
+                        {{ flock.created_by.get_full_name|default:flock.created_by.username }}
+                    {% else %}
+                        <span class="muted">—</span>
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ============================================================ -->
+<!-- EGG PRODUCTION — LAST 30 DAYS                                 -->
+<!-- ============================================================ -->
+<div class="section-title">
+    <span>Egg Production (Last 30 Days)</span>
+    <a href="{% url 'kuku_biz:egg_list' %}" class="section-link">View All →</a>
+</div>
+
+{% if egg_history %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th style="text-align:right;">Collected</th>
+                <th style="text-align:right;">Cracked</th>
+                <th style="text-align:right;">Broken</th>
+                <th style="text-align:right;">Good</th>
+                <th style="text-align:right;">Lay Rate</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rec in egg_history %}
+            <tr>
+                <td>{{ rec.date|date:"d M Y" }}</td>
+                <td class="cell-num">{{ rec.eggs_collected }}</td>
+                <td class="cell-num">{{ rec.eggs_cracked }}</td>
+                <td class="cell-num">{{ rec.eggs_broken }}</td>
+                <td class="cell-num">{{ rec.good_eggs }}</td>
+                <td class="cell-num">{{ rec.lay_rate }}%</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div class="empty-block">
+        <i class="fas fa-egg fa-2x" style="display:block;margin-bottom:10px;color:#cbd5e1;"></i>
+        No egg production recorded in the last 30 days.
+    </div>
+{% endif %}
+
+<!-- ============================================================ -->
+<!-- BIRD SALES                                                    -->
+<!-- ============================================================ -->
+{% if bird_sales %}
+<div class="section-title" style="margin-top: 32px;">
+    <span>Bird Sales from this Flock</span>
+    <a href="{% url 'kuku_biz:bird_sale_list' %}" class="section-link">View All →</a>
+</div>
+
+<div class="kpi-grid" style="margin-bottom: 16px;">
+    <div class="kpi-card">
+        <div>
+            <i class="fas fa-drumstick-bite kpi-icon"></i>
+            <div class="kpi-label">Total Birds Sold</div>
+            <div class="kpi-value">{{ total_birds_sold }}</div>
+        </div>
+        <div class="kpi-sub">from this flock</div>
+    </div>
+    <div class="kpi-card">
+        <div>
+            <i class="fas fa-coins kpi-icon"></i>
+            <div class="kpi-label">Total Revenue</div>
+            <div class="kpi-value good">KES {{ total_bird_revenue|floatformat:0 }}</div>
+        </div>
+        <div class="kpi-sub">from bird sales</div>
+    </div>
+</div>
+
+<table class="data-table" style="margin-bottom: 24px;">
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>Buyer</th>
+            <th style="text-align:right;">Birds</th>
+            <th style="text-align:right;">Unit Price</th>
+            <th style="text-align:right;">Total</th>
+            <th style="text-align:right;">Paid</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for s in bird_sales %}
+        <tr>
+            <td>{{ s.date|date:"d M Y" }}</td>
+            <td>{{ s.buyer_display }}</td>
+            <td class="cell-num">{{ s.birds_sold }}</td>
+            <td class="cell-price">KES {{ s.unit_price|floatformat:0 }}</td>
+            <td class="cell-price">KES {{ s.total_amount|floatformat:0 }}</td>
+            <td class="cell-price">KES {{ s.amount_paid|floatformat:0 }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+<!-- ============================================================ -->
+<!-- NOTES                                                         -->
+<!-- ============================================================ -->
+{% if flock.notes %}
+<div class="section-title" style="margin-top: 32px;">
+    <span>Notes</span>
+</div>
+<div style="background:#f9fafb;border:2px dashed #9ca3af;border-radius:8px;padding:16px 20px;font-size:0.88rem;color:#374151;line-height:1.6;">
+    {{ flock.notes|linebreaksbr }}
+</div>
+{% endif %}
+
+{% endblock %}
