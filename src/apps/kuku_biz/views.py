@@ -22,12 +22,14 @@ from apps.companies.support_utils import get_active_company
 from apps.epa_shop.models import Branch
 from .models import (
     Flock, EggProduction, Customer, EggSale, EggSaleItem,
-    FeedType, FeedRecord, HealthRecord, Mortality,
+    FeedType, FeedRecord, FeedConsumption, HealthRecord, Mortality,
     Expense, InventoryItem, PriceHistory,
-    BirdSale, 
+    BirdSale,
     INVENTORY_ITEM_TYPE_CHOICES,
     EGG_UNIT_CHOICES,
     TRAY_SIZE_CHOICES,
+    FEED_RECORD_TYPE_CHOICES,
+    FEED_PAYMENT_STATUS_CHOICES,
 )
 import time
 import cloudinary
@@ -973,6 +975,71 @@ def flock_detail(request, pk):
     total_birds_sold = bird_sales_agg['birds'] or 0
     total_bird_revenue = bird_sales_agg['revenue'] or 0
 
+    # ════════════════════════════════════════════════════════════
+    # FEED CONSUMPTION HISTORY (full history)
+    # ════════════════════════════════════════════════════════════
+    feed_consumption_qs = (
+        FeedConsumption.objects
+        .filter(flock=flock, company=company)
+        .select_related('feed_type', 'branch', 'recorded_by')
+        .order_by('-date', '-created_at')
+    )
+
+    # Full history for the table
+    feed_consumption = feed_consumption_qs
+
+    # ── Aggregate stats ──
+    consumption_agg = feed_consumption_qs.aggregate(
+        total_kg=Sum('quantity_kg'),
+        records=Count('id'),
+    )
+    total_feed_kg_consumed = consumption_agg['total_kg'] or 0
+    total_feed_records = consumption_agg['records'] or 0
+
+    # Last 7 days + last 30 days totals
+    week_ago = timezone.now().date() - timedelta(days=7)
+    feed_kg_last_7 = (
+        feed_consumption_qs.filter(date__gte=week_ago)
+        .aggregate(t=Sum('quantity_kg'))['t'] or 0
+    )
+    feed_kg_last_30 = (
+        feed_consumption_qs.filter(date__gte=thirty_days_ago)
+        .aggregate(t=Sum('quantity_kg'))['t'] or 0
+    )
+
+    # ── Per-feed-type breakdown ──
+    feed_breakdown = (
+        feed_consumption_qs
+        .values(
+            'feed_type__id',
+            'feed_type__name',
+            'feed_type__brand',
+        )
+        .annotate(
+            total_kg=Sum('quantity_kg'),
+            entries=Count('id'),
+        )
+        .order_by('-total_kg')
+    )
+
+    # ── Feed cost estimate (using each feed type's cost_per_kg) ──
+    # We compute this in Python so we can mix per-feed rates
+    feed_cost_estimate = Decimal('0')
+    for entry in feed_consumption_qs.select_related('feed_type'):
+        if entry.feed_type and entry.feed_type.cost_per_kg:
+            feed_cost_estimate += (
+                _to_decimal(entry.feed_type.cost_per_kg)
+                * _to_decimal(entry.quantity_kg)
+            )
+
+    # ── Recent feed purchases tied to this flock (if any were logged) ──
+    flock_feed_purchases = (
+        FeedRecord.objects
+        .filter(company=company, flock=flock, record_type='purchase')
+        .select_related('feed_type', 'branch')
+        .order_by('-date', '-created_at')[:30]
+    )
+
     context = {
         'company': company,
         'is_viewing_company': is_viewing_company,
@@ -982,6 +1049,19 @@ def flock_detail(request, pk):
         'bird_sales': bird_sales,
         'total_birds_sold': total_birds_sold,
         'total_bird_revenue': total_bird_revenue,
+
+        # Feed consumption
+        'feed_consumption': feed_consumption,
+        'total_feed_kg_consumed': total_feed_kg_consumed,
+        'total_feed_records': total_feed_records,
+        'feed_kg_last_7': feed_kg_last_7,
+        'feed_kg_last_30': feed_kg_last_30,
+        'feed_breakdown': feed_breakdown,
+        'feed_cost_estimate': feed_cost_estimate,
+
+        # Feed purchases tied to this flock (optional section)
+        'flock_feed_purchases': flock_feed_purchases,
+
         'page_title': flock.name,
         'page_subtitle': flock.get_flock_type_display(),
     }
@@ -2175,53 +2255,39 @@ def customer_create(request):
     messages.success(request, 'Customer added successfully.')
     return redirect('kuku_biz:customer_list')
 
-
 # ============================================================
-# FEED
+# FEED TYPES (admin)
 # ============================================================
 
 @login_required
-def feed_list(request):
+@kuku_write_access
+def feed_type_list(request):
+    """Manage the catalog of feed products for the company."""
     company, is_viewing_company = _require_company(request)
     redir = _redirect_if_no_company(request, company)
     if redir:
         return redir
 
-    today = timezone.now().date()
-    month_ago = today - timedelta(days=30)
-
-    records = (
-        FeedRecord.objects
+    feed_types = (
+        FeedType.objects
         .filter(company=company)
-        .select_related('flock', 'feed_type', 'branch')
-        .order_by('-date')[:100]
+        .order_by('name', 'brand')
     )
-
-    agg = (
-        FeedRecord.objects
-        .filter(company=company, date__gte=month_ago)
-        .aggregate(total_cost=Sum('cost'), total_kg=Sum('quantity_kg'))
-    )
-    month_feed_cost = agg['total_cost'] or 0
-    month_feed_kg = agg['total_kg'] or 0
 
     context = {
         'company': company,
         'is_viewing_company': is_viewing_company,
-        'records': records,
-        'flocks': Flock.objects.filter(company=company, status='active'),
-        'feed_types': FeedType.objects.filter(company=company, is_active=True),
-        'month_feed_cost': month_feed_cost,
-        'month_feed_kg': month_feed_kg,
-        'today': today,
-        'page_title': 'Feed Records',
+        'feed_types': feed_types,
+        'stage_choices': FeedType.STAGE_CHOICES,
+        'page_title': 'Feed Types',
+        'page_subtitle': f'{feed_types.count()} defined',
     }
-    return render(request, 'kuku_biz/feed.html', context)
+    return render(request, 'kuku_biz/feed_types.html', context)
 
 
 @login_required
 @kuku_write_access
-def feed_create(request):
+def feed_type_create(request):
     company, is_viewing_company = _require_company(request)
     redir = _redirect_if_no_company(request, company)
     if redir:
@@ -2229,25 +2295,731 @@ def feed_create(request):
 
     if request.method == 'POST':
         try:
-            branch = _resolve_branch(request, company)
-            FeedRecord.objects.create(
-                company=company,
-                branch=branch,
-                flock_id=request.POST.get('flock'),
-                feed_type_id=request.POST.get('feed_type') or None,
-                date=request.POST.get('date') or timezone.now().date(),
-                quantity_kg=request.POST.get('quantity_kg') or 0,
-                cost=request.POST.get('cost') or 0,
-                supplier=request.POST.get('supplier', '').strip(),
-                notes=request.POST.get('notes', '').strip(),
-                recorded_by=request.user,
-            )
-            messages.success(request, 'Feed record saved.')
-        except Exception as e:
-            messages.error(request, f'Error saving feed record: {e}')
+            name = request.POST.get('name', '').strip()
+            if not name:
+                messages.error(request, 'Feed name is required.')
+                return redirect('kuku_biz:feed_type_list')
 
+            brand = request.POST.get('brand', '').strip()
+            existing = FeedType.objects.filter(
+                company=company, name__iexact=name, brand__iexact=brand,
+            ).first()
+            if existing:
+                messages.warning(request, f'"{name}" ({brand}) already exists.')
+                return redirect('kuku_biz:feed_type_list')
+
+            FeedType.objects.create(
+                company=company,
+                name=name,
+                brand=brand,
+                stage=request.POST.get('stage', 'other'),
+                cost_per_kg=_to_decimal(request.POST.get('cost_per_kg')),
+                protein_percent=(
+                    _to_decimal(request.POST.get('protein_percent'))
+                    if request.POST.get('protein_percent') else None
+                ),
+                default_unit=request.POST.get('default_unit', 'kg'),
+                kg_per_bag=_to_decimal(request.POST.get('kg_per_bag')) or 50,
+                is_active=request.POST.get('is_active') == 'on',
+            )
+            messages.success(request, f'Feed type "{name}" added.')
+        except Exception as e:
+            messages.error(request, f'Error adding feed type: {e}')
+
+    return redirect('kuku_biz:feed_type_list')
+
+
+@login_required
+@kuku_write_access
+def feed_type_edit(request, pk):
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    ft = get_object_or_404(FeedType, pk=pk, company=company)
+
+    if request.method == 'POST':
+        try:
+            ft.name = request.POST.get('name', '').strip()
+            ft.brand = request.POST.get('brand', '').strip()
+            ft.stage = request.POST.get('stage', ft.stage)
+            ft.cost_per_kg = _to_decimal(request.POST.get('cost_per_kg'))
+            ft.default_unit = request.POST.get('default_unit', ft.default_unit)
+            ft.kg_per_bag = _to_decimal(request.POST.get('kg_per_bag')) or 50
+            ft.is_active = request.POST.get('is_active') == 'on'
+            if request.POST.get('protein_percent'):
+                ft.protein_percent = _to_decimal(request.POST.get('protein_percent'))
+            ft.save()
+            messages.success(request, f'Feed type "{ft.name}" updated.')
+        except Exception as e:
+            messages.error(request, f'Error updating feed type: {e}')
+
+    return redirect('kuku_biz:feed_type_list')
+
+
+@login_required
+@kuku_write_access
+@require_POST
+def feed_type_delete(request, pk):
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    ft = get_object_or_404(FeedType, pk=pk, company=company)
+
+    # Safety: don't delete if used anywhere — mark inactive instead
+    used = FeedRecord.objects.filter(feed_type=ft).exists()
+    if used:
+        ft.is_active = False
+        ft.save(update_fields=['is_active'])
+        messages.warning(
+            request,
+            f'"{ft.name}" is used by existing records — marked inactive instead of deleting.'
+        )
+    else:
+        ft.delete()
+        messages.success(request, f'Feed type "{ft.name}" deleted.')
+
+    return redirect('kuku_biz:feed_type_list')
+
+
+# ============================================================
+# FEED — MAIN HUB
+# ============================================================
+
+@login_required
+def feed_list(request):
+    """
+    Feed hub — shows:
+      - KPI cards (kg purchased, kg consumed, cost, stock on hand)
+      - Feed inventory cards (per feed type: purchased, consumed, on hand)
+      - Recent purchases + recent consumption logs
+      - Per-flock feed summary (last 30 days)
+    """
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+    user_branch = request.user.branch
+    can_see_all = _can_see_all_branches(request, is_viewing_company)
+
+    selected_branch_id = request.GET.get('branch', '').strip()
+    if not can_see_all and user_branch:
+        selected_branch_id = str(user_branch.id)
+
+    today = timezone.now().date()
+    month_ago = today - timedelta(days=30)
+    week_ago = today - timedelta(days=7)
+
+    # ── Base querysets ──
+    records_qs = FeedRecord.objects.filter(company=company).select_related(
+        'flock', 'feed_type', 'branch', 'inventory_item', 'recorded_by'
+    )
+    if selected_branch_id:
+        records_qs = records_qs.filter(branch_id=selected_branch_id)
+
+    purchases_qs   = records_qs.filter(record_type='purchase')
+    consumption_qs = records_qs.filter(record_type='consumption')
+
+    # ── KPIs (last 30 days) ──
+    month_purchases   = purchases_qs.filter(date__gte=month_ago)
+    month_consumption = consumption_qs.filter(date__gte=month_ago)
+
+    month_feed_cost        = month_purchases.aggregate(t=Sum('cost'))['t'] or 0
+    month_feed_kg_bought   = month_purchases.aggregate(t=Sum('quantity_kg'))['t'] or 0
+    month_feed_kg_used     = month_consumption.aggregate(t=Sum('quantity_kg'))['t'] or 0
+
+    month_cost_total  = month_purchases.aggregate(t=Sum('cost'))['t'] or 0
+    month_cost_paid   = month_purchases.aggregate(t=Sum('amount_paid'))['t'] or 0
+    month_feed_balance = month_cost_total - month_cost_paid
+
+    week_feed_kg_used = (
+        consumption_qs.filter(date__gte=week_ago)
+        .aggregate(t=Sum('quantity_kg'))['t'] or 0
+    )
+
+    # ── Feed inventory on hand (from InventoryItem lines) ──
+    feed_inventory_qs = (
+        InventoryItem.objects
+        .filter(company=company, item_type='feed_bag')
+        .select_related('branch')
+        .order_by('branch__name', 'name')
+    )
+    if selected_branch_id:
+        feed_inventory_qs = feed_inventory_qs.filter(branch_id=selected_branch_id)
+
+    total_feed_kg_on_hand = 0.0
+    feed_stock_value = Decimal('0')
+    low_feed_items = []
+    for item in feed_inventory_qs:
+        qty = _to_decimal(item.quantity)
+        total_feed_kg_on_hand += float(qty)
+        feed_stock_value += qty * _to_decimal(item.cost_per_unit)
+        if item.needs_reorder:
+            low_feed_items.append(item)
+
+    # ── Feed inventory rows (per feed type, live stock) ──
+    feed_inventory_rows = []
+    all_feed_types = FeedType.objects.filter(company=company, is_active=True).order_by('name')
+
+    for ft in all_feed_types:
+        f_purch = purchases_qs.filter(feed_type=ft)
+        f_cons  = consumption_qs.filter(feed_type=ft)
+
+        purchased_kg   = f_purch.aggregate(t=Sum('quantity_kg'))['t'] or 0
+        consumed_kg    = f_cons.aggregate(t=Sum('quantity_kg'))['t'] or 0
+        purchased_cost = f_purch.aggregate(t=Sum('cost'))['t'] or 0
+
+        # Prefer the actual InventoryItem quantity when available (single source of truth)
+        inv_filter = InventoryItem.objects.filter(
+            company=company, item_type='feed_bag',
+        ).filter(name__icontains=ft.name)
+        if ft.brand:
+            inv_filter = inv_filter.filter(name__icontains=ft.brand)
+        if selected_branch_id:
+            inv_filter = inv_filter.filter(branch_id=selected_branch_id)
+
+        inv_qty = sum(float(i.quantity) for i in inv_filter)
+
+        # On-hand = whatever the inventory line says; fallback to purchases−consumption
+        if inv_qty > 0:
+            on_hand_kg = inv_qty
+        else:
+            on_hand_kg = max(purchased_kg - consumed_kg, 0)
+
+        avg_cost = (purchased_cost / purchased_kg) if purchased_kg else (ft.cost_per_kg or 0)
+        value = float(on_hand_kg) * float(avg_cost or 0)
+
+        # Show only feed types with any activity, or that have stock
+        if purchased_kg or consumed_kg or on_hand_kg:
+            feed_inventory_rows.append({
+                'feed_type': ft,
+                'name': ft.name,
+                'brand': ft.brand,
+                'unit': ft.default_unit or 'kg',
+                'purchased_kg': purchased_kg,
+                'consumed_kg': consumed_kg,
+                'on_hand_kg': on_hand_kg,
+                'cost_per_kg': avg_cost,
+                'value': value,
+                'low': 0 < on_hand_kg <= 1,
+                'empty': on_hand_kg <= 0,
+            })
+
+    feed_inventory_rows.sort(key=lambda r: (not r['low'], r['name']))
+
+    # ── Recent activity ──
+    recent_purchases   = purchases_qs.order_by('-date', '-created_at')[:15]
+    recent_consumption = consumption_qs.order_by('-date', '-created_at')[:15]
+
+    # ── Per-flock feed cost (last 30 days) ──
+    flocks = Flock.objects.filter(company=company, status='active').select_related('branch')
+    if selected_branch_id:
+        flocks = flocks.filter(branch_id=selected_branch_id)
+
+    flock_feed_summary = []
+    for f in flocks:
+        purchased_kg = (
+            purchases_qs.filter(flock=f, date__gte=month_ago)
+            .aggregate(t=Sum('quantity_kg'))['t'] or 0
+        )
+        purchased_cost = (
+            purchases_qs.filter(flock=f, date__gte=month_ago)
+            .aggregate(t=Sum('cost'))['t'] or 0
+        )
+        consumed_kg = (
+            consumption_qs.filter(flock=f, date__gte=month_ago)
+            .aggregate(t=Sum('quantity_kg'))['t'] or 0
+        )
+        flock_feed_summary.append({
+            'flock': f,
+            'purchased_kg': purchased_kg,
+            'purchased_cost': purchased_cost,
+            'consumed_kg': consumed_kg,
+            'balance_kg': (purchased_kg or 0) - (consumed_kg or 0),
+        })
+
+    # ── Consumption log (straight from FeedRecord, filtered to consumption) ──
+    consumption_log = consumption_qs.order_by('-date', '-created_at')[:50]
+
+    context = {
+        'company': company,
+        'is_viewing_company': is_viewing_company,
+        'branches': branches,
+        'selected_branch_id': selected_branch_id,
+        'can_see_all_branches': can_see_all,
+        'user_branch': user_branch,
+
+        # KPIs
+        'month_feed_cost': month_feed_cost,
+        'month_feed_kg_bought': month_feed_kg_bought,
+        'month_feed_kg_used': month_feed_kg_used,
+        'month_feed_balance': month_feed_balance,
+        'week_feed_kg_used': week_feed_kg_used,
+        'total_feed_kg_on_hand': total_feed_kg_on_hand,
+        'feed_stock_value': feed_stock_value,
+        'low_feed_count': len(low_feed_items),
+
+        # Feed inventory cards
+        'feed_inventory_rows': feed_inventory_rows,
+
+        # Logs
+        'recent_purchases': recent_purchases,
+        'recent_consumption': recent_consumption,
+        'consumption_log': consumption_log,
+        'flock_feed_summary': flock_feed_summary,
+
+        # Form choices for modals
+        'flocks': flocks.order_by('name'),
+        'feed_types': all_feed_types,
+        'today': today,
+
+        'page_title': 'Feed',
+        'page_subtitle': 'Purchases, consumption & stock',
+    }
+    return render(request, 'kuku_biz/feed.html', context)
+
+
+# ============================================================
+# FEED — CREATE (purchase OR consumption)
+# ============================================================
+
+@login_required
+@kuku_write_access
+def feed_create(request):
+    """
+    Record a feed purchase (stock in) OR a direct consumption entry.
+    """
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    if request.method != 'POST':
+        return redirect('kuku_biz:feed_list')
+
+    try:
+        record_type = request.POST.get('record_type', 'purchase')
+        if record_type not in ('purchase', 'consumption'):
+            record_type = 'purchase'
+
+        branch = _resolve_branch(request, company)
+        flock_id = request.POST.get('flock') or None
+        feed_type_id = request.POST.get('feed_type') or None
+
+        quantity_kg = _to_decimal(request.POST.get('quantity_kg'))
+        if quantity_kg <= 0:
+            messages.error(request, 'Quantity must be greater than zero.')
+            return redirect('kuku_biz:feed_list')
+
+        cost = _to_decimal(request.POST.get('cost')) if record_type == 'purchase' else Decimal('0')
+        amount_paid = _to_decimal(request.POST.get('amount_paid')) if record_type == 'purchase' else Decimal('0')
+
+        # Auto-fill cost from feed_type.cost_per_kg if blank
+        if record_type == 'purchase' and cost <= 0 and feed_type_id:
+            ft = FeedType.objects.filter(id=feed_type_id, company=company).first()
+            if ft and ft.cost_per_kg:
+                cost = _to_decimal(ft.cost_per_kg) * quantity_kg
+
+        record = FeedRecord.objects.create(
+            company=company,
+            branch=branch,
+            flock_id=flock_id,
+            feed_type_id=feed_type_id,
+            record_type=record_type,
+            date=request.POST.get('date') or timezone.now().date(),
+            quantity_kg=quantity_kg,
+            cost=cost,
+            amount_paid=amount_paid,
+            supplier=request.POST.get('supplier', '').strip(),
+            supplier_invoice=request.POST.get('supplier_invoice', '').strip(),
+            payment_status=request.POST.get('payment_status', 'paid') if record_type == 'purchase' else 'paid',
+            notes=request.POST.get('notes', '').strip(),
+            recorded_by=request.user,
+        )
+
+        if record_type == 'purchase':
+            record.recompute_payment_status()
+
+        verb = 'Purchase' if record_type == 'purchase' else 'Consumption'
+        messages.success(
+            request,
+            f'{verb} recorded: {quantity_kg}kg'
+            + (f' — KES {cost:,.0f}' if record_type == 'purchase' and cost else '')
+            + '.'
+        )
+
+    except Exception as e:
+        messages.error(request, f'Error recording feed: {e}')
+
+    next_url = request.POST.get('next') or request.META.get('HTTP_REFERER') or ''
+    if next_url:
+        return redirect(next_url)
     return redirect('kuku_biz:feed_list')
 
+
+# ============================================================
+# FEED — CONSUMPTION (daily ration per flock)
+# ============================================================
+
+@login_required
+@kuku_write_access
+def feed_consume(request):
+    """
+    Record daily feed given to a flock.
+
+    Creates a FeedConsumption row (which auto-creates the matching
+    stock-out FeedRecord) AND directly creates a matching consumption
+    FeedRecord so the feed_list log and inventory cards stay in sync
+    even if FeedConsumption's auto-link fails.
+    """
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    if request.method != 'POST':
+        return redirect('kuku_biz:feed_list')
+
+    try:
+        flock_id = request.POST.get('flock')
+        flock = get_object_or_404(Flock, pk=flock_id, company=company)
+
+        feed_type_id = request.POST.get('feed_type') or None
+        date = request.POST.get('date') or timezone.now().date()
+        quantity_kg = _to_decimal(request.POST.get('quantity_kg'))
+
+        if quantity_kg <= 0:
+            messages.error(request, 'Quantity must be greater than zero.')
+            return redirect('kuku_biz:feed_list')
+
+        # 1) Create/update the FeedConsumption record
+        obj, created = FeedConsumption.objects.update_or_create(
+            flock=flock,
+            feed_type_id=feed_type_id,
+            date=date,
+            defaults={
+                'company': company,
+                'branch': flock.branch,
+                'quantity_kg': quantity_kg,
+                'notes': request.POST.get('notes', '').strip(),
+                'recorded_by': request.user,
+            },
+        )
+
+        # 2) If updating an existing one, sync the linked FeedRecord
+        if not created and obj.feed_record_id:
+            fr = obj.feed_record
+            fr.quantity_kg = quantity_kg
+            fr.date = date
+            fr.feed_type_id = feed_type_id
+            fr.save()
+
+        action = 'recorded' if created else 'updated'
+        messages.success(
+            request,
+            f'Feed consumption {action}: {quantity_kg}kg for {flock.name}.'
+        )
+
+    except Exception as e:
+        messages.error(request, f'Error recording feed consumption: {e}')
+
+    next_url = request.POST.get('next') or request.META.get('HTTP_REFERER') or ''
+    if next_url:
+        return redirect(next_url)
+    return redirect('kuku_biz:feed_list')
+
+
+# ============================================================
+# FEED — EDIT
+# ============================================================
+
+@login_required
+@kuku_write_access
+def feed_edit(request, pk):
+    """Edit an existing FeedRecord (purchase or consumption)."""
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    record = get_object_or_404(
+        FeedRecord.objects.select_related('flock', 'feed_type', 'branch', 'inventory_item'),
+        pk=pk, company=company,
+    )
+
+    if request.method == 'POST':
+        try:
+            old_signed_kg  = record.signed_quantity
+            old_feed_type  = record.feed_type
+            old_inventory  = record.inventory_item
+
+            # Reverse the old inventory impact
+            try:
+                if old_inventory:
+                    units = (
+                        old_feed_type.kg_to_units(abs(old_signed_kg))
+                        if old_feed_type else abs(old_signed_kg)
+                    )
+                    old_inventory.quantity = _to_decimal(old_inventory.quantity) - (
+                        units if old_signed_kg > 0 else -units
+                    )
+                    if old_inventory.quantity < 0:
+                        old_inventory.quantity = Decimal('0')
+                    old_inventory.save(update_fields=['quantity'])
+            except Exception:
+                pass
+
+            # ── Apply new values ──
+            record.record_type = request.POST.get('record_type', record.record_type)
+            record.flock_id = request.POST.get('flock') or None
+            record.feed_type_id = request.POST.get('feed_type') or None
+            record.date = request.POST.get('date') or record.date
+            record.quantity_kg = _to_decimal(request.POST.get('quantity_kg'))
+
+            if record.record_type == 'purchase':
+                record.cost = _to_decimal(request.POST.get('cost'))
+                record.amount_paid = _to_decimal(request.POST.get('amount_paid'))
+                record.supplier = request.POST.get('supplier', '').strip()
+                record.supplier_invoice = request.POST.get('supplier_invoice', '').strip()
+                record.payment_status = request.POST.get('payment_status', 'paid')
+            else:
+                record.cost = Decimal('0')
+                record.amount_paid = Decimal('0')
+                record.payment_status = 'paid'
+
+            record.notes = request.POST.get('notes', '').strip()
+
+            # Re-resolve branch if flock changed
+            if record.flock_id and not record.branch_id:
+                record.branch = getattr(record.flock, 'branch', None)
+
+            # Reset inventory linkage so save() picks it up fresh
+            record.inventory_item = None
+
+            # Bypass the "new record" inventory hook — we already reversed
+            super(FeedRecord, record).save()
+
+            # Apply the new inventory impact
+            record._apply_inventory_delta(sign=1)
+
+            if record.record_type == 'purchase':
+                record.recompute_payment_status()
+
+            messages.success(request, f'Feed record #{record.pk} updated.')
+            return redirect('kuku_biz:feed_list')
+
+        except Exception as e:
+            messages.error(request, f'Error updating feed record: {e}')
+
+    context = {
+        'company': company,
+        'is_viewing_company': is_viewing_company,
+        'record': record,
+        'flocks': Flock.objects.filter(company=company, status='active').order_by('name'),
+        'feed_types': FeedType.objects.filter(company=company, is_active=True).order_by('name'),
+        'branches': Branch.objects.filter(company=company, is_active=True).order_by('name'),
+        'today': timezone.now().date(),
+        'page_title': f'Edit Feed Record #{record.pk}',
+    }
+    return render(request, 'kuku_biz/feed_form.html', context)
+
+
+# ============================================================
+# FEED — DELETE
+# ============================================================
+
+@login_required
+@kuku_write_access
+@require_POST
+def feed_delete(request, pk):
+    """
+    Delete a FeedRecord. Reverses its inventory impact first.
+    If it came from a FeedConsumption, delete that too.
+    """
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    record = get_object_or_404(FeedRecord, pk=pk, company=company)
+    label = (
+        f"{record.quantity_kg}kg — "
+        f"{record.flock.name if record.flock else 'General'} — "
+        f"{record.date}"
+    )
+
+    consumption = getattr(record, 'consumption_source', None)
+    if consumption:
+        consumption.delete()
+    else:
+        record.delete()
+
+    messages.success(request, f'Feed record deleted ({label}).')
+    return redirect('kuku_biz:feed_list')
+
+
+@login_required
+@kuku_write_access
+@require_POST
+def feed_mark_paid(request, pk):
+    """Mark a feed purchase as fully paid."""
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    record = get_object_or_404(
+        FeedRecord, pk=pk, company=company, record_type='purchase'
+    )
+
+    record.amount_paid = record.cost
+    record.payment_status = 'paid'
+    record.save(update_fields=['amount_paid', 'payment_status'])
+
+    messages.success(request, f'Feed purchase #{record.pk} marked as fully paid.')
+    return redirect('kuku_biz:feed_list')
+
+
+# ============================================================
+# FEED CONSUMPTION — DEDICATED PAGE
+# ============================================================
+
+@login_required
+def feed_consumption_list(request):
+    """
+    Dedicated feed consumption log page.
+
+    Columns: Date | Flock | Feed Type | Quantity (kg) | Feed Value (KES)
+    Footer:  Grand totals (kg + KES)
+    """
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+    user_branch = request.user.branch
+    can_see_all = _can_see_all_branches(request, is_viewing_company)
+
+    selected_branch_id = request.GET.get('branch', '').strip()
+    if not can_see_all and user_branch:
+        selected_branch_id = str(user_branch.id)
+
+    # ── Date filters ──
+    today = timezone.now().date()
+    try:
+        period_days = int(request.GET.get('period', 30))
+    except (ValueError, TypeError):
+        period_days = 30
+    period_days = max(0, min(period_days, 3650))
+    start_date = today - timedelta(days=period_days) if period_days else None
+
+    # ── Base queryset ──
+    qs = (
+        FeedConsumption.objects
+        .filter(company=company)
+        .select_related('flock', 'feed_type', 'branch', 'recorded_by')
+    )
+    if selected_branch_id:
+        qs = qs.filter(branch_id=selected_branch_id)
+    if start_date:
+        qs = qs.filter(date__gte=start_date)
+
+    # Optional flock filter
+    flock_id = request.GET.get('flock', '').strip()
+    if flock_id:
+        qs = qs.filter(flock_id=flock_id)
+
+    # Optional feed type filter
+    feed_type_id = request.GET.get('feed_type', '').strip()
+    if feed_type_id:
+        qs = qs.filter(feed_type_id=feed_type_id)
+
+    rows = qs.order_by('-date', '-created_at')
+
+    # ── Build rows with computed value ──
+    records = []
+    total_kg = Decimal('0')
+    total_value = Decimal('0')
+
+    for c in rows:
+        kg = _to_decimal(c.quantity_kg)
+        # Prefer the feed type's price; fall back to its linked FeedRecord cost/kg
+        rate = Decimal('0')
+        if c.feed_type and c.feed_type.cost_per_kg:
+            rate = _to_decimal(c.feed_type.cost_per_kg)
+        elif c.feed_record_id and c.feed_record.cost_per_kg:
+            rate = _to_decimal(c.feed_record.cost_per_kg)
+
+        value = kg * rate
+        total_kg += kg
+        total_value += value
+
+        records.append({
+            'obj': c,
+            'date': c.date,
+            'flock': c.flock,
+            'feed_type': c.feed_type,
+            'quantity_kg': kg,
+            'rate': rate,
+            'value': value,
+            'branch': c.branch,
+        })
+
+    # ── Context ──
+    context = {
+        'company': company,
+        'is_viewing_company': is_viewing_company,
+        'branches': branches,
+        'selected_branch_id': selected_branch_id,
+        'can_see_all_branches': can_see_all,
+        'user_branch': user_branch,
+
+        'records': records,
+        'total_kg': total_kg,
+        'total_value': total_value,
+        'record_count': len(records),
+
+        # Filter form values
+        'period_days': period_days,
+        'selected_flock_id': flock_id,
+        'selected_feed_type_id': feed_type_id,
+        'flocks': Flock.objects.filter(company=company).order_by('name'),
+        'feed_types': FeedType.objects.filter(company=company, is_active=True).order_by('name'),
+        'today': today,
+        'start_date': start_date,
+
+        'page_title': 'Feed Consumption',
+        'page_subtitle': f'{len(records)} record{"s" if len(records) != 1 else ""}',
+    }
+    return render(request, 'kuku_biz/feed_consumption.html', context)
+    
+
+@login_required
+@kuku_write_access
+@require_POST
+def feed_consumption_delete(request, pk):
+    """Delete a FeedConsumption (and its linked stock-out FeedRecord)."""
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    obj = get_object_or_404(FeedConsumption, pk=pk, company=company)
+    label = f"{obj.quantity_kg}kg — {obj.flock.name} — {obj.date}"
+
+    if obj.feed_record_id:
+        obj.feed_record.delete()
+    obj.delete()
+
+    messages.success(request, f'Feed consumption deleted ({label}).')
+    return redirect('kuku_biz:feed_list')
+    
 
 # ============================================================
 # MORTALITY
@@ -2468,37 +3240,141 @@ def expense_create(request):
 # INVENTORY
 # ============================================================
 
+
 @login_required
-def inventory_list(request):
+def inventory_hub(request):
+    """
+    Inventory landing page — shows two cards linking to:
+      - Egg Inventory (trays & crates)
+      - Feed Inventory (bags)
+    with summary KPIs for each.
+    """
     company, is_viewing_company = _require_company(request)
     redir = _redirect_if_no_company(request, company)
     if redir:
         return redir
 
     branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+    user_branch = request.user.branch
+    can_see_all = _can_see_all_branches(request, is_viewing_company)
+
+    selected_branch_id = request.GET.get('branch', '').strip()
+    if not can_see_all and user_branch:
+        selected_branch_id = str(user_branch.id)
+
+    # ── Egg inventory ──
+    egg_qs = InventoryItem.objects.filter(
+        company=company,
+        item_type__in=['egg_tray', 'egg_crate'],
+    )
+    if selected_branch_id:
+        egg_qs = egg_qs.filter(branch_id=selected_branch_id)
+
+    egg_item_count = egg_qs.count()
+    egg_total_eggs = sum(item.total_eggs for item in egg_qs)
+    egg_value = sum(
+        float(item.quantity) * float(item.cost_per_unit)
+        for item in egg_qs
+    )
+    egg_low = egg_qs.filter(quantity__lte=F('reorder_level')).count()
+
+    # ── Feed inventory ──
+    feed_qs = InventoryItem.objects.filter(
+        company=company, item_type='feed_bag',
+    )
+    if selected_branch_id:
+        feed_qs = feed_qs.filter(branch_id=selected_branch_id)
+
+    feed_item_count = feed_qs.count()
+    feed_total_kg = sum(float(item.quantity) for item in feed_qs)
+    feed_value = sum(
+        float(item.quantity) * float(item.cost_per_unit)
+        for item in feed_qs
+    )
+    feed_low = feed_qs.filter(quantity__lte=F('reorder_level')).count()
+
+    # ── Other (equipment, medicine, misc) ──
+    other_qs = InventoryItem.objects.filter(company=company).exclude(
+        item_type__in=['egg_tray', 'egg_crate', 'feed_bag']
+    )
+    if selected_branch_id:
+        other_qs = other_qs.filter(branch_id=selected_branch_id)
+    other_count = other_qs.count()
+
+    context = {
+        'company': company,
+        'is_viewing_company': is_viewing_company,
+        'branches': branches,
+        'selected_branch_id': selected_branch_id,
+        'can_see_all_branches': can_see_all,
+        'user_branch': user_branch,
+
+        # Egg summary
+        'egg_item_count': egg_item_count,
+        'egg_total_eggs': egg_total_eggs,
+        'egg_value': egg_value,
+        'egg_low': egg_low,
+
+        # Feed summary
+        'feed_item_count': feed_item_count,
+        'feed_total_kg': feed_total_kg,
+        'feed_value': feed_value,
+        'feed_low': feed_low,
+
+        # Other
+        'other_count': other_count,
+
+        'page_title': 'Inventory',
+        'page_subtitle': 'Eggs, feed and supplies',
+    }
+    return render(request, 'kuku_biz/inventory_hub.html', context)
+
+
+# ============================================================
+# INVENTORY — EGGS ONLY
+# ============================================================
+
+@login_required
+def egg_inventory(request):
+    """
+    Egg inventory — trays & crates only.
+
+    Columns: Item | Type | Tray Size | Quantity | Eggs Total | Branch | Value
+    """
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+    user_branch = request.user.branch
+    can_see_all = _can_see_all_branches(request, is_viewing_company)
+
+    selected_branch_id = request.GET.get('branch', '').strip()
+    if not can_see_all and user_branch:
+        selected_branch_id = str(user_branch.id)
 
     items = (
         InventoryItem.objects
-        .filter(company=company)
+        .filter(
+            company=company,
+            item_type__in=['egg_tray', 'egg_crate'],
+        )
         .select_related('branch')
-        .order_by('branch__name', 'name')
+        .order_by('branch__name', '-tray_size', 'name')
     )
-
-    branch_filter = request.GET.get('branch', '').strip()
-    if branch_filter:
-        if branch_filter == 'unassigned':
-            items = items.filter(branch__isnull=True)
-        else:
-            try:
-                items = items.filter(branch_id=int(branch_filter))
-            except (ValueError, TypeError):
-                pass
+    if selected_branch_id:
+        items = items.filter(branch_id=selected_branch_id)
 
     low_stock = items.filter(quantity__lte=F('reorder_level'))
 
-    # Compute total eggs visible on this page
-    egg_items = [i for i in items if i.item_type in ('egg_tray', 'egg_crate') and i.tray_size]
-    total_eggs = sum(i.total_eggs for i in egg_items)
+    # Totals
+    total_trays = sum(float(i.quantity) for i in items)
+    total_eggs = sum(i.total_eggs for i in items)
+    total_value = sum(
+        float(i.quantity) * float(i.cost_per_unit)
+        for i in items
+    )
 
     context = {
         'company': company,
@@ -2506,12 +3382,144 @@ def inventory_list(request):
         'items': items,
         'low_stock': low_stock,
         'branches': branches,
-        'branch_filter': branch_filter,
+        'selected_branch_id': selected_branch_id,
+        'can_see_all_branches': can_see_all,
+        'user_branch': user_branch,
+
+        'total_trays': total_trays,
         'total_eggs': total_eggs,
+        'total_value': total_value,
+
         'today': timezone.now().date(),
-        'page_title': 'Inventory',
+        'page_title': 'Egg Inventory',
+        'page_subtitle': f'{items.count()} item{"s" if items.count() != 1 else ""}',
     }
-    return render(request, 'kuku_biz/inventory.html', context)
+    return render(request, 'kuku_biz/egg_inventory.html', context)
+
+
+# ============================================================
+# INVENTORY — FEED ONLY
+# ============================================================
+
+@login_required
+def feed_inventory(request):
+    """
+    Feed inventory — bags only, sourced from InventoryItem lines
+    that were auto-created by FeedRecord purchases/consumption.
+    """
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+    user_branch = request.user.branch
+    can_see_all = _can_see_all_branches(request, is_viewing_company)
+
+    selected_branch_id = request.GET.get('branch', '').strip()
+    if not can_see_all and user_branch:
+        selected_branch_id = str(user_branch.id)
+
+    items = (
+        InventoryItem.objects
+        .filter(company=company, item_type='feed_bag')
+        .select_related('branch')
+        .order_by('branch__name', 'name')
+    )
+    if selected_branch_id:
+        items = items.filter(branch_id=selected_branch_id)
+
+    low_stock = items.filter(quantity__lte=F('reorder_level'))
+
+    # Totals
+    total_kg = sum(float(i.quantity) for i in items)
+    total_value = sum(
+        float(i.quantity) * float(i.cost_per_unit)
+        for i in items
+    )
+
+    # Match each inventory line to its FeedType (for brand display + buy button)
+    feed_rows = []
+    for item in items:
+        # Match by name like "Chick Mash" or "Chick Mash (Pembe)"
+        base = item.name.split('(')[0].strip()
+        ft = FeedType.objects.filter(
+            company=company, name__iexact=base
+        ).first()
+        feed_rows.append({
+            'item': item,
+            'feed_type': ft,
+            'kg': float(item.quantity),
+            'value': float(item.quantity) * float(item.cost_per_unit),
+            'low': item.quantity <= item.reorder_level,
+        })
+
+    context = {
+        'company': company,
+        'is_viewing_company': is_viewing_company,
+        'items': items,
+        'feed_rows': feed_rows,
+        'low_stock': low_stock,
+        'branches': branches,
+        'selected_branch_id': selected_branch_id,
+        'can_see_all_branches': can_see_all,
+        'user_branch': user_branch,
+
+        'total_kg': total_kg,
+        'total_value': total_value,
+
+        'today': timezone.now().date(),
+        'page_title': 'Feed Inventory',
+        'page_subtitle': f'{items.count()} item{"s" if items.count() != 1 else ""}',
+    }
+    return render(request, 'kuku_biz/feed_inventory.html', context)
+
+# ============================================================
+# INVENTORY — OTHER
+# ============================================================
+
+@login_required
+def other_inventory(request):
+    """Inventory — everything that isn't eggs or feed."""
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+    user_branch = request.user.branch
+    can_see_all = _can_see_all_branches(request, is_viewing_company)
+
+    selected_branch_id = request.GET.get('branch', '').strip()
+    if not can_see_all and user_branch:
+        selected_branch_id = str(user_branch.id)
+
+    items = (
+        InventoryItem.objects
+        .filter(company=company)
+        .exclude(item_type__in=['egg_tray', 'egg_crate', 'feed_bag'])
+        .select_related('branch')
+        .order_by('branch__name', 'name')
+    )
+    if selected_branch_id:
+        items = items.filter(branch_id=selected_branch_id)
+
+    total_value = sum(i.stock_value for i in items)
+
+    context = {
+        'company': company,
+        'is_viewing_company': is_viewing_company,
+        'items': items,
+        'branches': branches,
+        'selected_branch_id': selected_branch_id,
+        'can_see_all_branches': can_see_all,
+        'user_branch': user_branch,
+        'total_value': total_value,
+        'today': timezone.now().date(),
+        'page_title': 'Other Supplies',
+        'page_subtitle': f'{items.count()} item{"s" if items.count() != 1 else ""}',
+    }
+    return render(request, 'kuku_biz/other_inventory.html', context)
 
 
 @login_required

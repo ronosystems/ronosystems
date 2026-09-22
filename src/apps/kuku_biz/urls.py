@@ -42,8 +42,18 @@ urlpatterns = [
     path('customers/new/', views.customer_create, name='customer_create'),  
 
     # Feed
+    path('feed-types/', views.feed_type_list, name='feed_type_list'),
+    path('feed-types/new/', views.feed_type_create, name='feed_type_create'),
+    path('feed-types/<int:pk>/edit/', views.feed_type_edit, name='feed_type_edit'),
+    path('feed-types/<int:pk>/delete/', views.feed_type_delete, name='feed_type_delete'),
     path('feed/', views.feed_list, name='feed_list'),
-    path('feed/new/', views.feed_create, name='feed_create'), 
+    path('feed/new/', views.feed_create, name='feed_create'),
+    path('feed/consume/', views.feed_consume, name='feed_consume'),
+    path('feed/<int:pk>/edit/', views.feed_edit, name='feed_edit'),
+    path('feed/<int:pk>/delete/', views.feed_delete, name='feed_delete'),
+    path('feed/<int:pk>/mark-paid/', views.feed_mark_paid, name='feed_mark_paid'),
+    path('feed/consumption/', views.feed_consumption_list, name='feed_consumption_list'),
+    path('feed/consumption/<int:pk>/delete/', views.feed_consumption_delete, name='feed_consumption_delete'),
 
     # Mortality
     path('mortality/', views.mortality_list, name='mortality_list'),
@@ -57,8 +67,13 @@ urlpatterns = [
     path('expenses/', views.expense_list, name='expense_list'),
     path('expenses/new/', views.expense_create, name='expense_create'),
 
-    # Inventory
-    path('inventory/', views.inventory_list, name='inventory_list'),
+    # Inventory — separated by category
+    path('inventory/', views.inventory_hub, name='inventory_hub'),
+    path('inventory/eggs/', views.egg_inventory, name='egg_inventory'),
+    path('inventory/feed/', views.feed_inventory, name='feed_inventory'),
+    path('inventory/other/', views.other_inventory, name='other_inventory'),
+
+    # Shared create/edit/delete (unchanged)
     path('inventory/create/', views.inventory_create, name='inventory_create'),
     path('inventory/<int:pk>/edit/', views.inventory_edit, name='inventory_edit'),
     path('inventory/<int:pk>/delete/', views.inventory_delete, name='inventory_delete'),
