@@ -84,6 +84,35 @@ HEALTH_TYPE_CHOICES = [
     ('other', 'Other'),
 ]
 
+HEALTH_RECORD_TYPE_CHOICES = [
+    ('purchase',       'Purchase (stock in)'),
+    ('administration', 'Administration (given to birds)'),
+]
+
+HEALTH_ITEM_KIND_CHOICES = [
+    ('vaccine',   'Vaccine'),
+    ('drug',      'Drug / Antibiotic'),
+    ('dewormer',  'Dewormer'),
+    ('vitamin',   'Vitamin / Supplement'),
+    ('disinfectant', 'Disinfectant'),
+    ('other',     'Other'),
+]
+
+HEALTH_ADMIN_METHOD_CHOICES = [
+    ('drinking_water', 'Drinking water'),
+    ('injection',      'Injection'),
+    ('eye_drop',       'Eye drop'),
+    ('spray',          'Spray'),
+    ('oral',           'Oral'),
+    ('other',          'Other'),
+]
+
+HEALTH_PAYMENT_STATUS_CHOICES = [
+    ('paid',    'Paid'),
+    ('partial', 'Partially Paid'),
+    ('credit',  'On Credit'),
+]
+
 MORTALITY_CAUSE_CHOICES = [
     ('disease', 'Disease'),
     ('predator', 'Predator'),
@@ -92,15 +121,56 @@ MORTALITY_CAUSE_CHOICES = [
     ('unknown', 'Unknown'),
 ]
 
+MORTALITY_DISPOSAL_CHOICES = [
+    ('buried',     'Buried'),
+    ('burned',     'Burned / Incinerated'),
+    ('compost',    'Composted'),
+    ('vet_necropsy', 'Sent to Vet (Necropsy)'),
+    ('sold',       'Sold (culled to market)'),
+    ('consumed',   'Consumed'),
+    ('none',       'Not recorded'),
+]
+
+MORTALITY_AGE_GROUP_CHOICES = [
+    ('chick',    'Chick (0–8 weeks)'),
+    ('grower',   'Grower (9–18 weeks)'),
+    ('layer',    'Layer (19+ weeks)'),
+    ('broiler',  'Broiler'),
+    ('adult',    'Adult (mixed)'),
+    ('unknown',  'Unknown'),
+]
+
 EXPENSE_CATEGORY_CHOICES = [
-    ('feed', 'Feed'),
-    ('labour', 'Labour'),
-    ('utilities', 'Utilities'),
-    ('equipment', 'Equipment'),
-    ('transport', 'Transport'),
-    ('veterinary', 'Veterinary'),
-    ('chicks', 'Chick Purchase'),
-    ('other', 'Other'),
+    ('transport',     'Transportation'),
+    ('maintenance',   'Maintenance'),
+    ('emergency',     'Emergencies'),
+    ('labour',        'Labour Costs'),
+    ('bills',         'Bills (Water, Power, Internet)'),
+    ('materials',     'Materials & Supplies'),
+    ('feed',          'Feed'),
+    ('veterinary',    'Veterinary / Health'),
+    ('chicks',        'Chick Purchase'),
+    ('equipment',     'Equipment'),
+    ('rent',          'Rent / Lease'),
+    ('security',      'Security'),
+    ('marketing',     'Marketing / Advertising'),
+    ('licenses',      'Licenses & Permits'),
+    ('other',         'Other'),
+]
+
+EXPENSE_PAYMENT_STATUS_CHOICES = [
+    ('paid',    'Paid'),
+    ('partial', 'Partially Paid'),
+    ('credit',  'On Credit'),
+]
+
+EXPENSE_PAYMENT_METHOD_CHOICES = [
+    ('cash',      'Cash'),
+    ('mpesa',     'M-Pesa'),
+    ('bank',      'Bank Transfer'),
+    ('cheque',    'Cheque'),
+    ('credit',    'Credit (pay later)'),
+    ('other',     'Other'),
 ]
 
 INVENTORY_ITEM_TYPE_CHOICES = [
@@ -1288,12 +1358,88 @@ class FeedConsumption(models.Model):
             except Exception:
                 pass
 
+
 # ============================================================
-# HEALTH
+# HEALTH — VACCINES & TREATMENTS
 # ============================================================
 
+class VaccineType(models.Model):
+    """
+    A vaccine, drug, dewormer, vitamin, or other health product.
+
+    Mirrors FeedType so purchases/administrations hit a matching
+    InventoryItem line and stock stays in sync.
+    """
+
+    company = models.ForeignKey(
+        'companies.Company',
+        on_delete=models.CASCADE,
+        related_name='kuku_vaccine_types',
+    )
+    name = models.CharField(max_length=150)
+    brand = models.CharField(max_length=100, blank=True)
+
+    item_kind = models.CharField(
+        max_length=20,
+        choices=HEALTH_ITEM_KIND_CHOICES,
+        default='vaccine',
+    )
+
+    # Which disease does this protect against? (vaccines only)
+    target_disease = models.CharField(
+        max_length=150, blank=True,
+        help_text="e.g. Newcastle, Gumboro, Fowl Typhoid",
+    )
+
+    # Default dosage unit — 'dose', 'ml', 'vial', 'sachet'
+    default_unit = models.CharField(
+        max_length=20, default='dose',
+        help_text="Unit used when this item hits inventory",
+    )
+
+    # For storage / reorder checks
+    cost_per_unit = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text="Typical price per unit (dose, vial, ml…)",
+    )
+
+    # How long between repeat doses (optional — for auto-scheduling)
+    repeat_interval_days = models.PositiveIntegerField(
+        default=0, blank=True,
+        help_text="0 = one-off. E.g. 21 for Gumboro booster reminders.",
+    )
+
+    storage_notes = models.CharField(
+        max_length=200, blank=True,
+        help_text="e.g. 'Keep refrigerated at 2-8°C'",
+    )
+
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['name', 'brand']
+        verbose_name = 'Vaccine / Drug Type'
+        verbose_name_plural = 'Vaccine / Drug Types'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['company', 'name', 'brand'],
+                name='unique_vaccine_type_per_company',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.name}" + (f" ({self.brand})" if self.brand else "")
+
+
 class HealthRecord(models.Model):
-    """Vaccinations, treatments, deworming, vet visits."""
+    """
+    Health-related stock movement or administration.
+
+    record_type='purchase'       → stock IN (buying vials)
+    record_type='administration' → stock OUT (giving doses to a flock)
+
+    On save: auto-adjusts the linked InventoryItem. On delete: reverses.
+    """
 
     company = models.ForeignKey(
         'companies.Company',
@@ -1305,21 +1451,96 @@ class HealthRecord(models.Model):
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_health_records',
-        help_text="Which branch/depot recorded this",
+        help_text="Which branch/depot this belongs to",
     )
     flock = models.ForeignKey(
         Flock, on_delete=models.CASCADE,
+        null=True, blank=True,
         related_name='health_records',
+        help_text="Which flock received this (administration only). Blank for general stock.",
     )
-    date = models.DateField(default=timezone.now)
+
+    vaccine_type = models.ForeignKey(
+        VaccineType,
+        on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='records',
+    )
+
+    # Keep the old free-text field so existing data isn't lost
+    product_used = models.CharField(
+        max_length=150, blank=True,
+        help_text="Legacy free-text product name — prefer vaccine_type now",
+    )
+
     record_type = models.CharField(
-        max_length=20, choices=HEALTH_TYPE_CHOICES, default='vaccination'
+        max_length=20,
+        choices=HEALTH_RECORD_TYPE_CHOICES,
+        default='administration',
     )
-    product_used = models.CharField(max_length=150, blank=True)
-    description = models.TextField(blank=True)
-    cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # Legacy field kept for backward compatibility
+    record_type_legacy = models.CharField(
+        max_length=20,
+        choices=HEALTH_TYPE_CHOICES,
+        default='vaccination',
+        help_text="Old field — kept to preserve existing records",
+    )
+
+    date = models.DateField(default=timezone.now)
+
+    # ── Quantities & money ──
+    quantity = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text="How many units were purchased or administered",
+    )
+    unit = models.CharField(
+        max_length=20, default='dose',
+        help_text="dose, vial, ml, sachet, etc.",
+    )
+    cost = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+        help_text="Total cost (purchase only). 0 for administration.",
+    )
+
+    # ── Purchase-only fields ──
+    supplier = models.CharField(max_length=150, blank=True)
+    supplier_invoice = models.CharField(max_length=50, blank=True)
+    payment_status = models.CharField(
+        max_length=20,
+        choices=HEALTH_PAYMENT_STATUS_CHOICES,
+        default='paid', blank=True,
+    )
+    amount_paid = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+    )
+
+    # ── Administration-only fields ──
+    birds_treated = models.PositiveIntegerField(
+        default=0,
+        help_text="How many birds received this on this date",
+    )
+    admin_method = models.CharField(
+        max_length=20,
+        choices=HEALTH_ADMIN_METHOD_CHOICES,
+        default='drinking_water', blank=True,
+    )
     administered_by = models.CharField(max_length=150, blank=True)
-    next_due_date = models.DateField(null=True, blank=True)
+    next_due_date = models.DateField(
+        null=True, blank=True,
+        help_text="Auto-suggested from vaccine_type.repeat_interval_days if left blank",
+    )
+
+    description = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
+
+    # ── Inventory linkage ──
+    inventory_item = models.ForeignKey(
+        'InventoryItem',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='health_records',
+        help_text="Inventory line this item was drawn from / added to",
+    )
 
     recorded_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True,
@@ -1328,20 +1549,173 @@ class HealthRecord(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-date']
+        ordering = ['-date', '-created_at']
         verbose_name = 'Health Record'
         verbose_name_plural = 'Health Records'
 
     def __str__(self):
-        return f"{self.flock.name} — {self.get_record_type_display()} on {self.date}"
+        kind = 'IN' if self.record_type == 'purchase' else 'OUT'
+        who = self.flock.name if self.flock else 'General'
+        name = self.vaccine_type.name if self.vaccine_type else (self.product_used or '—')
+        return f"[{kind}] {name} — {who} — {self.date}"
 
+    # ------------------------------------------------------------
+    # Computed
+    # ------------------------------------------------------------
+    @property
+    def signed_quantity(self):
+        q = _to_decimal(self.quantity)
+        return q if self.record_type == 'purchase' else -q
+
+    @property
+    def cost_per_unit(self):
+        if not self.quantity:
+            return Decimal('0')
+        return _to_decimal(self.cost) / _to_decimal(self.quantity)
+
+    @property
+    def balance(self):
+        """Unpaid amount on a purchase."""
+        if self.record_type != 'purchase':
+            return Decimal('0')
+        return _to_decimal(self.cost) - _to_decimal(self.amount_paid)
+
+    # ------------------------------------------------------------
+    # Inventory sync — mirrors FeedRecord's pattern
+    # ------------------------------------------------------------
+    def _inventory_name(self):
+        if self.vaccine_type:
+            base = self.vaccine_type.name
+            if self.vaccine_type.brand:
+                return f"{base} ({self.vaccine_type.brand})"
+            return base
+        return self.product_used or 'Health Item'
+
+    def _find_or_create_inventory(self):
+        name = self._inventory_name()
+        unit = (
+            self.vaccine_type.default_unit if self.vaccine_type
+            else (self.unit or 'dose')
+        )
+
+        inv = InventoryItem.objects.filter(
+            company=self.company,
+            branch=self.branch,
+            item_type='medicine',
+            name__iexact=name,
+        ).first()
+
+        if not inv:
+            inv = InventoryItem.objects.create(
+                company=self.company,
+                branch=self.branch,
+                name=name,
+                item_type='medicine',
+                quantity=0,
+                unit=unit,
+                cost_per_unit=(
+                    self.cost_per_unit if self.record_type == 'purchase'
+                    else (self.vaccine_type.cost_per_unit if self.vaccine_type else 0)
+                ),
+            )
+        return inv
+
+    def _apply_inventory_delta(self, sign=1):
+        if not self.quantity:
+            return
+
+        inv = self.inventory_item or self._find_or_create_inventory()
+        if not inv:
+            return
+
+        delta = _to_decimal(self.quantity)
+        if self.record_type == 'administration':
+            delta = -delta
+        delta *= sign
+
+        new_qty = _to_decimal(inv.quantity) + delta
+        if new_qty < 0:
+            new_qty = Decimal('0')
+        inv.quantity = new_qty
+        inv.save(update_fields=['quantity'])
+
+        if self.inventory_item_id != inv.id:
+            HealthRecord.objects.filter(pk=self.pk).update(inventory_item=inv)
+            self.inventory_item = inv
+
+    # ------------------------------------------------------------
+    # Save / delete
+    # ------------------------------------------------------------
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+
+        # Auto-fill branch from flock
+        if not self.branch_id and self.flock_id:
+            self.branch = getattr(self.flock, 'branch', None)
+
+        # Auto-fill cost on purchase if blank
+        if self.record_type == 'purchase' and not self.cost and self.quantity:
+            if self.vaccine_type and self.vaccine_type.cost_per_unit:
+                self.cost = (
+                    _to_decimal(self.vaccine_type.cost_per_unit)
+                    * _to_decimal(self.quantity)
+                )
+
+        # Administration never carries a cost
+        if self.record_type == 'administration':
+            self.cost = Decimal('0')
+            self.amount_paid = Decimal('0')
+            self.payment_status = 'paid'
+
+            # Auto-fill next_due_date from vaccine's repeat interval
+            if (
+                not self.next_due_date
+                and self.vaccine_type
+                and self.vaccine_type.repeat_interval_days
+                and self.date
+            ):
+                from datetime import timedelta as _td
+                self.next_due_date = self.date + _td(
+                    days=self.vaccine_type.repeat_interval_days
+                )
+
+        super().save(*args, **kwargs)
+
+        if is_new:
+            self._apply_inventory_delta(sign=1)
+
+    def delete(self, *args, **kwargs):
+        try:
+            self._apply_inventory_delta(sign=-1)
+        except Exception:
+            pass
+        super().delete(*args, **kwargs)
+
+    def recompute_payment_status(self):
+        if self.record_type != 'purchase':
+            return self.payment_status
+        paid  = _to_decimal(self.amount_paid)
+        total = _to_decimal(self.cost)
+        if paid <= 0:
+            self.payment_status = 'credit'
+        elif paid < total:
+            self.payment_status = 'partial'
+        else:
+            self.payment_status = 'paid'
+        self.save(update_fields=['payment_status'])
+        return self.payment_status
 
 # ============================================================
 # MORTALITY
 # ============================================================
 
 class Mortality(models.Model):
-    """Deaths and culling."""
+    """
+    Deaths and culling.
+
+    On save: recomputes the flock's current_count from
+    (initial_count − total deaths). On delete: reverses that.
+    """
 
     company = models.ForeignKey(
         'companies.Company',
@@ -1360,10 +1734,49 @@ class Mortality(models.Model):
         related_name='mortality_records',
     )
     date = models.DateField(default=timezone.now)
+
+    # ── Core ──
     count = models.PositiveIntegerField(default=0)
     cause = models.CharField(
         max_length=20, choices=MORTALITY_CAUSE_CHOICES, default='unknown'
     )
+
+    # ── NEW: richer detail ──
+    age_group = models.CharField(
+        max_length=20,
+        choices=MORTALITY_AGE_GROUP_CHOICES,
+        default='unknown',
+        help_text="Which age group the deaths occurred in",
+    )
+    symptoms = models.TextField(
+        blank=True,
+        help_text="Observable symptoms before death (e.g. 'ruffled feathers, bloody droppings')",
+    )
+    disposal_method = models.CharField(
+        max_length=20,
+        choices=MORTALITY_DISPOSAL_CHOICES,
+        default='none',
+        help_text="How the carcasses were handled",
+    )
+    action_taken = models.TextField(
+        blank=True,
+        help_text="What was done (isolated flock, called vet, started antibiotics, etc.)",
+    )
+
+    # ── Cost / impact (optional) ──
+    estimated_loss = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+        help_text="Estimated financial loss from these deaths",
+    )
+
+    # ── Link to a health event, if relevant ──
+    related_health_record = models.ForeignKey(
+        'HealthRecord',
+        on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='mortality_records',
+        help_text="Optional — link to a treatment or vaccination record",
+    )
+
     notes = models.TextField(blank=True)
 
     recorded_by = models.ForeignKey(
@@ -1373,14 +1786,23 @@ class Mortality(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-date']
+        ordering = ['-date', '-created_at']
         verbose_name = 'Mortality Record'
         verbose_name_plural = 'Mortality Records'
 
     def __str__(self):
         return f"{self.flock.name} — {self.count} on {self.date}"
 
+    # ------------------------------------------------------------
+    # Save / delete — keep flock count in sync
+    # ------------------------------------------------------------
     def save(self, *args, **kwargs):
+        is_new = self.pk is None
+
+        # Auto-fill branch from flock
+        if not self.branch_id and self.flock_id:
+            self.branch = getattr(self.flock, 'branch', None)
+
         super().save(*args, **kwargs)
         self._sync_flock_count()
 
@@ -1391,7 +1813,11 @@ class Mortality(models.Model):
             self._sync_flock_count(flock)
 
     def _sync_flock_count(self, flock=None):
-        """Recompute the flock's current_count from all mortality records."""
+        """
+        Recompute the flock's current_count from:
+            initial_count − sum(all mortality counts for this flock)
+        Never goes below 0.
+        """
         flock = flock or self.flock
         if not flock:
             return
@@ -1399,16 +1825,33 @@ class Mortality(models.Model):
             flock.mortality_records
             .aggregate(total=models.Sum('count'))['total'] or 0
         )
-        flock.current_count = max(flock.initial_count - total_deaths, 0)
-        flock.save(update_fields=['current_count'])
+        new_count = max(flock.initial_count - total_deaths, 0)
+        if new_count != flock.current_count:
+            flock.current_count = new_count
+            flock.save(update_fields=['current_count'])
 
+        @property
+        def loss_per_bird(self):
+            """Estimated loss per bird."""
+            if not self.count:
+                return Decimal('0')
+            return _to_decimal(self.estimated_loss) / Decimal(self.count)
+
+        @property
+        def has_health_link(self):
+            return self.related_health_record_id is not None
 
 # ============================================================
 # EXPENSES
 # ============================================================
 
 class Expense(models.Model):
-    """General farm expenses."""
+    """
+    General farm expenses — transport, maintenance, labour, bills, etc.
+
+    Auto-computes payment status from cost vs. amount_paid.
+    Optional flock attribution for per-flock cost reports.
+    """
 
     company = models.ForeignKey(
         'companies.Company',
@@ -1427,14 +1870,43 @@ class Expense(models.Model):
         related_name='expenses',
         help_text="Optional — leave blank for general farm expenses",
     )
+
     date = models.DateField(default=timezone.now)
+
     category = models.CharField(
         max_length=20, choices=EXPENSE_CATEGORY_CHOICES, default='other'
     )
     description = models.CharField(max_length=200, blank=True)
-    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    paid_to = models.CharField(max_length=150, blank=True)
-    payment_method = models.CharField(max_length=30, blank=True)
+
+    # ── Money ──
+    amount = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+        help_text="Total cost of this expense",
+    )
+    amount_paid = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+        help_text="How much has been paid so far",
+    )
+    payment_status = models.CharField(
+        max_length=20,
+        choices=EXPENSE_PAYMENT_STATUS_CHOICES,
+        default='paid', blank=True,
+    )
+
+    # ── Vendor / recipient ──
+    paid_to = models.CharField(
+        max_length=150, blank=True,
+        help_text="Who was paid (vendor, employee, supplier)",
+    )
+    payment_method = models.CharField(
+        max_length=30, choices=EXPENSE_PAYMENT_METHOD_CHOICES,
+        default='cash', blank=True,
+    )
+    reference = models.CharField(
+        max_length=100, blank=True,
+        help_text="Receipt #, invoice #, M-Pesa code, etc.",
+    )
+
     notes = models.TextField(blank=True)
 
     recorded_by = models.ForeignKey(
@@ -1444,12 +1916,50 @@ class Expense(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-date']
+        ordering = ['-date', '-created_at']
         verbose_name = 'Expense'
         verbose_name_plural = 'Expenses'
 
     def __str__(self):
         return f"{self.get_category_display()} — KES {self.amount} on {self.date}"
+
+    # ------------------------------------------------------------
+    # Computed
+    # ------------------------------------------------------------
+    @property
+    def balance(self):
+        """Unpaid amount."""
+        return _to_decimal(self.amount) - _to_decimal(self.amount_paid)
+
+    @property
+    def is_fully_paid(self):
+        return self.balance <= 0
+
+    # ------------------------------------------------------------
+    # Save — auto-status
+    # ------------------------------------------------------------
+    def save(self, *args, **kwargs):
+        # Auto-fill branch from flock
+        if not self.branch_id and self.flock_id:
+            self.branch = getattr(self.flock, 'branch', None)
+
+        # Auto-compute payment_status from amounts
+        paid  = _to_decimal(self.amount_paid)
+        total = _to_decimal(self.amount)
+
+        if paid <= 0:
+            self.payment_status = 'credit'
+        elif paid < total:
+            self.payment_status = 'partial'
+        else:
+            self.payment_status = 'paid'
+
+        super().save(*args, **kwargs)
+
+    def recompute_payment_status(self):
+        """Kept for compatibility — save() already handles it."""
+        self.save(update_fields=['payment_status'])
+        return self.payment_status
 
 
 # ============================================================
