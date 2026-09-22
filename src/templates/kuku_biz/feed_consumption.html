@@ -1,0 +1,388 @@
+{% extends 'kuku_base.html' %}
+
+{% block title %}Feed Consumption — Kuku Biz{% endblock %}
+{% block page_title %}Feed Consumption{% endblock %}
+{% block page_subtitle %}
+    <small>{{ record_count }} record{{ record_count|pluralize }}{% if start_date %} · since {{ start_date|date:"d M Y" }}{% endif %}</small>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .page-header h2 { margin: 0; font-size: 1.1rem; font-weight: 700; }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        border-radius: 50px;
+        border: 2px solid #000;
+        background: #fff;
+        color: #000;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.82rem;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.2s;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary {
+        background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
+        color: #fff;
+    }
+    .btn-primary:hover {
+        box-shadow: 0 8px 18px rgba(31,180,210,0.35);
+        color: #fff;
+    }
+    .btn-outline { background: #fff; color: #0a2f45; }
+    .btn-outline:hover { background: #f0fbfd; }
+
+    /* Filter bar */
+    .filter-bar {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 14px 18px;
+        margin-bottom: 20px;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        align-items: flex-end;
+    }
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 140px;
+    }
+    .filter-group label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #6b7280;
+    }
+    .filter-group select,
+    .filter-group input {
+        padding: 8px 12px;
+        border: 2px solid #000;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 0.85rem;
+        background: #fff;
+    }
+    .filter-group select:focus,
+    .filter-group input:focus {
+        outline: none;
+        border-color: #1fb4d2;
+        box-shadow: 0 0 0 3px rgba(31,180,210,0.2);
+    }
+    .filter-actions {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+    }
+
+    /* KPI cards */
+    .kpi-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+    .kpi-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 16px 18px;
+    }
+    .kpi-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #6b7280;
+    }
+    .kpi-value {
+        font-family: 'Courier New', monospace;
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #1f2937;
+        margin-top: 4px;
+    }
+    .kpi-sub { font-size: 0.72rem; color: #9ca3af; margin-top: 3px; }
+
+    /* Table */
+    .data-table {
+        width: 100%;
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        overflow: hidden;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    .data-table thead { background: #f0fbfd; }
+    .data-table th {
+        text-align: left;
+        padding: 14px 18px;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #374151;
+        border-bottom: 2px solid #000;
+        white-space: nowrap;
+        vertical-align: middle;
+    }
+    .data-table td {
+        padding: 12px 18px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.86rem;
+        color: #1f2937;
+        vertical-align: middle;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tbody tr:hover { background: #f9fafb; }
+
+    .cell-num {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        text-align: right !important;
+        white-space: nowrap;
+        width: 1%;
+    }
+    .data-table th.cell-num {
+        text-align: right !important;
+    }
+
+    /* Footer (grand totals) */
+    .data-table tfoot {
+        background: #0a2f45;
+        color: #fff;
+    }
+    .data-table tfoot td {
+        padding: 14px 18px;
+        border-top: 2px solid #000;
+        border-bottom: none;
+        font-weight: 800;
+        font-size: 0.88rem;
+        color: #fff;
+        background: #0a2f45;
+    }
+    .data-table tfoot td.cell-num {
+        font-family: 'Courier New', monospace;
+        font-size: 0.95rem;
+    }
+    .data-table tfoot .totals-label {
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-size: 0.72rem;
+        color: #87CEEB;
+        font-weight: 700;
+    }
+
+    /* Empty */
+    .empty-state {
+        text-align: center;
+        padding: 60px 30px;
+        background: #fff;
+        border: 2px dashed #9ca3af;
+        border-radius: 8px;
+    }
+    .empty-state i { font-size: 3rem; color: #87CEEB; margin-bottom: 16px; }
+    .empty-state h3 { margin: 0 0 8px; color: #1f2937; }
+    .empty-state p { color: #6b7280; margin-bottom: 20px; }
+
+    @media (max-width: 640px) {
+        .filter-actions { margin-left: 0; width: 100%; }
+        .data-table th, .data-table td { padding: 10px 12px; font-size: 0.78rem; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ── Page header ── #}
+<div class="page-header">
+    <h2><i class="fas fa-utensils"></i> Feed Consumption Log</h2>
+    <div>
+        <a href="{% url 'kuku_biz:feed_list' %}" class="btn btn-outline">
+            <i class="fas fa-arrow-left"></i> Back to Feed
+        </a>
+        <a href="{% url 'kuku_biz:feed_list' %}#consume" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Record Consumption
+        </a>
+    </div>
+</div>
+
+{# ── Filters ── #}
+<form method="get" class="filter-bar">
+    {% if can_see_all_branches %}
+    <div class="filter-group">
+        <label>Branch</label>
+        <select name="branch">
+            <option value="">All branches</option>
+            {% for b in branches %}
+                <option value="{{ b.id }}"
+                    {% if selected_branch_id == b.id|stringformat:"s" %}selected{% endif %}>
+                    {{ b.name }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+    {% endif %}
+
+    <div class="filter-group">
+        <label>Flock</label>
+        <select name="flock">
+            <option value="">All flocks</option>
+            {% for f in flocks %}
+                <option value="{{ f.id }}"
+                    {% if selected_flock_id == f.id|stringformat:"s" %}selected{% endif %}>
+                    {{ f.name }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label>Feed Type</label>
+        <select name="feed_type">
+            <option value="">All feeds</option>
+            {% for ft in feed_types %}
+                <option value="{{ ft.id }}"
+                    {% if selected_feed_type_id == ft.id|stringformat:"s" %}selected{% endif %}>
+                    {{ ft.name }}{% if ft.brand %} ({{ ft.brand }}){% endif %}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label>Period</label>
+        <select name="period">
+            <option value="7"  {% if period_days == 7 %}selected{% endif %}>Last 7 days</option>
+            <option value="30" {% if period_days == 30 %}selected{% endif %}>Last 30 days</option>
+            <option value="90" {% if period_days == 90 %}selected{% endif %}>Last 90 days</option>
+            <option value="365" {% if period_days == 365 %}selected{% endif %}>Last year</option>
+            <option value="0"  {% if period_days == 0 %}selected{% endif %}>All time</option>
+        </select>
+    </div>
+
+    <div class="filter-actions">
+        <button type="submit" class="btn btn-primary">
+            <i class="fas fa-filter"></i> Apply
+        </button>
+        <a href="{% url 'kuku_biz:feed_consumption_list' %}" class="btn btn-outline">
+            <i class="fas fa-times"></i> Reset
+        </a>
+    </div>
+</form>
+
+{# ── KPIs ── #}
+<div class="kpi-row">
+    <div class="kpi-card">
+        <div class="kpi-label">Records</div>
+        <div class="kpi-value">{{ record_count }}</div>
+        <div class="kpi-sub">in selected period</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Total Quantity</div>
+        <div class="kpi-value">{{ total_kg|default:0|floatformat:1 }} kg</div>
+        <div class="kpi-sub">feed consumed</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Total Feed Value</div>
+        <div class="kpi-value">KES {{ total_value|default:0|floatformat:0 }}</div>
+        <div class="kpi-sub">at current feed prices</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Avg per Record</div>
+        <div class="kpi-value">
+            {% if record_count %}
+                {{ total_kg|floatformat:1|add:"0" }} / {{ record_count }} = 
+                {% widthratio total_kg record_count 1 %} kg
+            {% else %}
+                0 kg
+            {% endif %}
+        </div>
+        <div class="kpi-sub">average ration</div>
+    </div>
+</div>
+
+{# ── Table ── #}
+{% if records %}
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>Flock</th>
+            <th>Feed Type</th>
+            <th class="cell-num">Feed Quantity (kg)</th>
+            <th class="cell-num">Feed Value (KES)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in records %}
+        <tr>
+            <td>{{ row.date|date:"d M Y" }}</td>
+            <td>
+                <a href="{% url 'kuku_biz:flock_detail' row.flock.pk %}"
+                   style="color:#0a2f45;text-decoration:none;font-weight:600;">
+                    {{ row.flock.name }}
+                </a>
+            </td>
+            <td>
+                {% if row.feed_type %}
+                    {{ row.feed_type.name }}
+                    {% if row.feed_type.brand %}
+                        <small style="color:#9ca3af;">({{ row.feed_type.brand }})</small>
+                    {% endif %}
+                {% else %}
+                    —
+                {% endif %}
+            </td>
+            <td class="cell-num">{{ row.quantity_kg|floatformat:1 }}</td>
+            <td class="cell-num">
+                {% if row.value %}
+                    {{ row.value|floatformat:0 }}
+                {% else %}
+                    —
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+    <tfoot>
+        <tr>
+            <td colspan="3" class="totals-label">
+                <i class="fas fa-calculator"></i> Grand Total
+            </td>
+            <td class="cell-num">{{ total_kg|default:0|floatformat:1 }}</td>
+            <td class="cell-num">{{ total_value|default:0|floatformat:0 }}</td>
+        </tr>
+    </tfoot>
+</table>
+
+{% else %}
+<div class="empty-state">
+    <i class="fas fa-utensils"></i>
+    <h3>No consumption records</h3>
+    <p>No feed consumption matches your current filters.</p>
+    <a href="{% url 'kuku_biz:feed_list' %}" class="btn btn-primary">
+        <i class="fas fa-plus"></i> Record Consumption
+    </a>
+</div>
+{% endif %}
+
+{% endblock %}

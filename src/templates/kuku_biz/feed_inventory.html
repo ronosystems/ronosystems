@@ -1,0 +1,326 @@
+{% extends 'kuku_base.html' %}
+
+{% block title %}Feed Inventory — Kuku Biz{% endblock %}
+{% block page_title %}Feed Inventory{% endblock %}
+{% block page_subtitle %}<small>{{ items.count }} item{{ items.count|pluralize }}</small>{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .page-header h2 { margin: 0; font-size: 1.1rem; font-weight: 700; }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        border-radius: 50px;
+        border: 2px solid #000;
+        background: #fff;
+        color: #000;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.82rem;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.2s;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary {
+        background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
+        color: #fff;
+    }
+    .btn-primary:hover { box-shadow: 0 8px 18px rgba(31,180,210,0.35); color:#fff; }
+    .btn-outline { background: #fff; color: #0a2f45; }
+    .btn-sm { padding: 6px 12px; font-size: 0.72rem; }
+    .btn-danger { background: #fff; border-color: #dc2626; color: #dc2626; }
+    .btn-danger:hover { background: #fee2e2; }
+
+    .filter-bar {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+    .filter-bar select {
+        padding: 8px 14px;
+        border: 2px solid #000;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 0.85rem;
+        background: #fff;
+    }
+
+    .kpi-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+    .kpi-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 16px 18px;
+    }
+    .kpi-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #6b7280;
+    }
+    .kpi-value {
+        font-family: 'Courier New', monospace;
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #1f2937;
+        margin-top: 4px;
+    }
+    .kpi-sub { font-size: 0.72rem; color: #9ca3af; margin-top: 3px; }
+
+    .data-table {
+        width: 100%;
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        overflow: hidden;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    .data-table thead { background: #f0fbfd; }
+    .data-table th {
+        text-align: left;
+        padding: 14px 18px;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #374151;
+        border-bottom: 2px solid #000;
+        white-space: nowrap;
+    }
+    .data-table td {
+        padding: 12px 18px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.86rem;
+        color: #1f2937;
+        vertical-align: middle;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tbody tr:hover { background: #f9fafb; }
+
+    .cell-num {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        text-align: right !important;
+        white-space: nowrap;
+        width: 1%;
+    }
+    .cell-actions {
+        text-align: right;
+        white-space: nowrap;
+        width: 1%;
+    }
+    .cell-actions form { display: inline; }
+
+    .data-table tfoot {
+        background: #0a2f45;
+        color: #fff;
+    }
+    .data-table tfoot td {
+        padding: 14px 18px;
+        background: #0a2f45;
+        color: #fff;
+        border-top: 2px solid #000;
+        font-weight: 800;
+        font-size: 0.88rem;
+    }
+    .data-table tfoot td.cell-num {
+        font-family: 'Courier New', monospace;
+        font-size: 0.95rem;
+    }
+    .data-table tfoot .totals-label {
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-size: 0.72rem;
+        color: #87CEEB;
+        font-weight: 700;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 50px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+    }
+    .badge-low  { background: #fee2e2; color: #991b1b; }
+    .badge-ok   { background: #d1fae5; color: #065f46; }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 30px;
+        background: #fff;
+        border: 2px dashed #9ca3af;
+        border-radius: 8px;
+    }
+    .empty-state i { font-size: 3rem; color: #1fb4d2; margin-bottom: 16px; }
+    .empty-state h3 { margin: 0 0 8px; color: #1f2937; }
+    .empty-state p { color: #6b7280; margin-bottom: 20px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h2><i class="fas fa-wheat-awn" style="color:#1fb4d2;"></i> Feed Inventory</h2>
+    <div style="display:flex;gap:8px;">
+        <a href="{% url 'kuku_biz:inventory_hub' %}" class="btn btn-outline">
+            <i class="fas fa-arrow-left"></i> Inventory
+        </a>
+        <a href="{% url 'kuku_biz:feed_list' %}#purchase" class="btn btn-primary">
+            <i class="fas fa-cart-plus"></i> Buy Feed
+        </a>
+    </div>
+</div>
+
+{% if can_see_all_branches %}
+<form method="get" class="filter-bar">
+    <label style="font-weight:600;font-size:0.82rem;">Branch:</label>
+    <select name="branch" onchange="this.form.submit()">
+        <option value="">All branches</option>
+        {% for b in branches %}
+            <option value="{{ b.id }}"
+                {% if selected_branch_id == b.id|stringformat:"s" %}selected{% endif %}>
+                {{ b.name }}
+            </option>
+        {% endfor %}
+    </select>
+</form>
+{% endif %}
+
+{# ── KPIs ── #}
+<div class="kpi-row">
+    <div class="kpi-card">
+        <div class="kpi-label">Feed Lines</div>
+        <div class="kpi-value">{{ items.count }}</div>
+        <div class="kpi-sub">distinct feeds</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Total Stock</div>
+        <div class="kpi-value">{{ total_kg|floatformat:1 }} kg</div>
+        <div class="kpi-sub">across all feeds</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Stock Value</div>
+        <div class="kpi-value">KES {{ total_value|floatformat:0 }}</div>
+        <div class="kpi-sub">at cost per kg</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Low Stock</div>
+        <div class="kpi-value {% if low_stock %}bad{% endif %}">{{ low_stock.count }}</div>
+        <div class="kpi-sub">below reorder level</div>
+    </div>
+</div>
+
+{% if feed_rows %}
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Feed</th>
+            <th>Brand</th>
+            <th>Branch</th>
+            <th class="cell-num">Kg on Hand</th>
+            <th class="cell-num">Cost/kg</th>
+            <th class="cell-num">Value (KES)</th>
+            <th>Status</th>
+            <th class="cell-actions"></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in feed_rows %}
+        <tr>
+            <td><strong>{{ row.item.name }}</strong></td>
+            <td>
+                {% if row.feed_type and row.feed_type.brand %}
+                    {{ row.feed_type.brand }}
+                {% else %}
+                    —
+                {% endif %}
+            </td>
+            <td>{{ row.item.branch.name|default:"—" }}</td>
+            <td class="cell-num">{{ row.kg|floatformat:1 }}</td>
+            <td class="cell-num">{{ row.item.cost_per_unit|floatformat:2 }}</td>
+            <td class="cell-num">{{ row.value|floatformat:0 }}</td>
+            <td>
+                {% if row.low %}
+                    <span class="badge badge-low">Low</span>
+                {% else %}
+                    <span class="badge badge-ok">OK</span>
+                {% endif %}
+            </td>
+            <td class="cell-actions">
+                {% if row.feed_type %}
+                <button type="button"
+                        class="btn btn-outline btn-sm"
+                        onclick="quickConsume({{ row.feed_type.id }});">
+                    <i class="fas fa-utensils"></i> Use
+                </button>
+                {% endif %}
+                <a href="{% url 'kuku_biz:inventory_edit' row.item.pk %}"
+                   class="btn btn-outline btn-sm">
+                    <i class="fas fa-pen"></i>
+                </a>
+                <form method="post" action="{% url 'kuku_biz:inventory_delete' row.item.pk %}"
+                      onsubmit="return confirm('Delete this feed line?');">
+                    {% csrf_token %}
+                    <button class="btn btn-danger btn-sm">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+    <tfoot>
+        <tr>
+            <td colspan="3" class="totals-label"><i class="fas fa-calculator"></i> Grand Total</td>
+            <td class="cell-num">{{ total_kg|floatformat:1 }}</td>
+            <td class="cell-num">—</td>
+            <td class="cell-num">{{ total_value|floatformat:0 }}</td>
+            <td colspan="2"></td>
+        </tr>
+    </tfoot>
+</table>
+{% else %}
+<div class="empty-state">
+    <i class="fas fa-wheat-awn"></i>
+    <h3>No feed inventory yet</h3>
+    <p>Feed stock appears here automatically when you record a feed purchase.</p>
+    <a href="{% url 'kuku_biz:feed_list' %}" class="btn btn-primary">
+        <i class="fas fa-cart-plus"></i> Buy Feed
+    </a>
+</div>
+{% endif %}
+
+<script>
+    function quickConsume(feedTypeId) {
+        // Send them to the feed page with the consume modal pre-opened
+        window.location.href =
+            "{% url 'kuku_biz:feed_list' %}#consume?feed_type=" + feedTypeId;
+    }
+</script>
+
+{% endblock %}

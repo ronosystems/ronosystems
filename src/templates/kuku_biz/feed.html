@@ -1,8 +1,8 @@
 {% extends 'kuku_base.html' %}
 
-{% block title %}Feed Records — Kuku Biz{% endblock %}
-{% block page_title %}Feed Records{% endblock %}
-{% block page_subtitle %}<small>Feed purchases and consumption</small>{% endblock %}
+{% block title %}Feed — Kuku Biz{% endblock %}
+{% block page_title %}Feed{% endblock %}
+{% block page_subtitle %}<small>Purchases, consumption & stock</small>{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -14,6 +14,9 @@
         flex-wrap: wrap;
         gap: 12px;
     }
+    .page-header h2 { margin: 0; font-size: 1.1rem; font-weight: 700; }
+    .page-header .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
     .btn {
         display: inline-flex;
         align-items: center;
@@ -30,17 +33,39 @@
         font-family: inherit;
         transition: all 0.2s;
     }
+    .btn:hover { transform: translateY(-1px); }
     .btn-primary {
         background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
         color: #fff;
     }
     .btn-primary:hover {
-        transform: translateY(-1px);
         box-shadow: 0 8px 18px rgba(31,180,210,0.35);
         color: #fff;
     }
+    .btn-outline { background: #fff; color: #0a2f45; }
+    .btn-outline:hover { background: #f0fbfd; }
+    .btn-sm { padding: 6px 14px; font-size: 0.75rem; }
+    .btn-danger { background: #fff; border-color: #dc2626; color: #dc2626; }
+    .btn-danger:hover { background: #fee2e2; }
 
-    /* Feed KPIs */
+    /* Branch filter */
+    .filter-bar {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+    .filter-bar select {
+        padding: 8px 14px;
+        border: 2px solid #000;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 0.85rem;
+        background: #fff;
+    }
+
+    /* KPI cards */
     .kpi-row {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -53,6 +78,7 @@
         border-radius: 8px;
         padding: 16px 18px;
     }
+    .kpi-card.warn { border-color: #f59e0b; background: #fffbeb; }
     .kpi-label {
         font-size: 0.7rem;
         text-transform: uppercase;
@@ -66,12 +92,9 @@
         color: #1f2937;
         margin-top: 4px;
     }
-    .kpi-sub {
-        font-size: 0.72rem;
-        color: #9ca3af;
-        margin-top: 3px;
-    }
+    .kpi-sub { font-size: 0.72rem; color: #9ca3af; margin-top: 3px; }
 
+    /* TABLES */
     .data-table {
         width: 100%;
         background: #fff;
@@ -80,32 +103,259 @@
         overflow: hidden;
         border-collapse: separate;
         border-spacing: 0;
+        table-layout: auto;
     }
     .data-table thead { background: #f0fbfd; }
     .data-table th {
         text-align: left;
         padding: 14px 18px;
-        font-size: 0.75rem;
+        font-size: 0.72rem;
         text-transform: uppercase;
         letter-spacing: 1px;
         font-weight: 700;
         color: #374151;
         border-bottom: 2px solid #000;
+        white-space: nowrap;
+        vertical-align: middle;
     }
     .data-table td {
-        padding: 14px 18px;
+        padding: 12px 18px;
         border-bottom: 1px solid #e5e7eb;
-        font-size: 0.88rem;
+        font-size: 0.86rem;
         color: #1f2937;
+        vertical-align: middle;
     }
     .data-table tr:last-child td { border-bottom: none; }
     .data-table tr:hover { background: #f9fafb; }
+
     .cell-num {
         font-family: 'Courier New', monospace;
         font-weight: 700;
+        text-align: right !important;
+        white-space: nowrap;
+        padding-right: 22px;
+        width: 1%;
+    }
+    .data-table th.cell-num {
+        text-align: right !important;
+        padding-right: 22px;
+    }
+    .cell-center { text-align: center; }
+    .cell-actions {
         text-align: right;
+        white-space: nowrap;
+        width: 1%;
+    }
+    .cell-actions form { display: inline; }
+    .cell-actions .btn-sm { padding: 5px 10px; font-size: 0.7rem; }
+
+    .col-branch { width: 12%; }
+
+    /* Badges */
+    .badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 50px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+    }
+    .badge-paid    { background: #d1fae5; color: #065f46; }
+    .badge-partial { background: #fef3c7; color: #92400e; }
+    .badge-credit  { background: #fee2e2; color: #991b1b; }
+
+    /* FEED INVENTORY CARDS */
+    .feed-inv-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 14px;
+        margin-bottom: 24px;
+    }
+    .feed-inv-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 16px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        transition: all 0.2s;
+    }
+    .feed-inv-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+    }
+    .feed-inv-card.is-low {
+        border-color: #f59e0b;
+        background: #fffbeb;
+    }
+    .feed-inv-card.is-empty {
+        border-color: #dc2626;
+        background: #fef2f2;
+    }
+    .feed-inv-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .feed-inv-name {
+        font-weight: 700;
+        font-size: 0.92rem;
+        color: #0a2f45;
+        line-height: 1.2;
+    }
+    .feed-inv-brand {
+        font-size: 0.72rem;
+        color: #6b7280;
+        margin-top: 2px;
+    }
+    .feed-inv-stock {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        margin: 4px 0 2px;
+    }
+    .feed-inv-qty {
+        font-family: 'Courier New', monospace;
+        font-size: 1.6rem;
+        font-weight: 800;
+        color: #1f2937;
+        line-height: 1;
+    }
+    .feed-inv-unit {
+        font-size: 0.82rem;
+        color: #6b7280;
+        font-weight: 600;
+    }
+    .feed-inv-bar {
+        height: 6px;
+        background: #e5e7eb;
+        border-radius: 50px;
+        overflow: hidden;
+        margin-top: 4px;
+    }
+    .feed-inv-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+        transition: width 0.3s;
+    }
+    .feed-inv-card.is-low .feed-inv-bar-fill {
+        background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+    }
+    .feed-inv-card.is-empty .feed-inv-bar-fill {
+        background: #dc2626;
+    }
+    .feed-inv-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding-top: 8px;
+        border-top: 1px solid #e5e7eb;
+    }
+    .feed-inv-meta-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+    .feed-inv-meta-row strong { color: #1f2937; font-weight: 700; }
+    .feed-inv-actions {
+        display: flex;
+        gap: 6px;
+        margin-top: 4px;
+    }
+    .feed-inv-actions .feed-inv-btn {
+        flex: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        padding: 7px 10px;
+        border: 2px solid #000;
+        border-radius: 50px;
+        background: #fff;
+        color: #0a2f45;
+        font-weight: 600;
+        font-size: 0.72rem;
+        text-decoration: none;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+    .feed-inv-actions .feed-inv-btn:hover {
+        background: #0a2f45;
+        color: #fff;
+        transform: translateY(-1px);
+    }
+    .feed-inv-actions .feed-inv-btn.consume-btn:hover {
+        background: #1fb4d2;
+        border-color: #1fb4d2;
     }
 
+    /* Two-column log */
+    .log-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+    @media (max-width: 900px) { .log-grid { grid-template-columns: 1fr; } }
+    .log-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .log-card-header {
+        padding: 12px 18px;
+        border-bottom: 2px solid #000;
+        background: #f0fbfd;
+        font-weight: 700;
+        font-size: 0.82rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #0a2f45;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .log-card-header .count {
+        font-size: 0.7rem;
+        color: #6b7280;
+        font-weight: 600;
+        text-transform: none;
+        letter-spacing: 0;
+    }
+    .log-card .data-table { border: none; border-radius: 0; }
+    .log-card .data-table th {
+        padding: 10px 14px;
+        font-size: 0.68rem;
+        border-bottom: 1px solid #e5e7eb;
+        background: #fff;
+    }
+    .log-card .data-table td {
+        padding: 10px 14px;
+        font-size: 0.82rem;
+    }
+    .log-card .cell-num { padding-right: 16px; }
+    .log-card .data-table th.cell-num { padding-right: 16px; }
+
+    /* Section title */
+    .section-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        margin: 24px 0 12px;
+        color: #0a2f45;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    /* Empty state */
     .empty-state {
         text-align: center;
         padding: 60px 30px;
@@ -116,6 +366,17 @@
     .empty-state i { font-size: 3rem; color: #87CEEB; margin-bottom: 16px; }
     .empty-state h3 { margin: 0 0 8px; color: #1f2937; }
     .empty-state p { color: #6b7280; margin-bottom: 20px; }
+    .empty-inline {
+        padding: 32px 16px;
+        text-align: center;
+        color: #9ca3af;
+        font-size: 0.85rem;
+    }
+    .empty-inline i {
+        font-size: 1.5rem;
+        display: block;
+        margin-bottom: 8px;
+    }
 
     /* Modal */
     .modal-overlay {
@@ -134,23 +395,30 @@
         border: 2px solid #000;
         border-radius: 8px;
         padding: 28px 32px;
-        max-width: 600px;
+        max-width: 620px;
         width: 100%;
         max-height: 90vh;
         overflow-y: auto;
     }
     .modal-box h3 {
-        font-size: 1.1rem;
+        font-size: 1.05rem;
         font-weight: 700;
         margin-bottom: 20px;
         padding-bottom: 10px;
         border-bottom: 2px solid #000;
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
     .form-row {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 14px;
         margin-bottom: 14px;
+    }
+    .form-row.three { grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 600px) {
+        .form-row, .form-row.three { grid-template-columns: 1fr; }
     }
     .form-group { margin-bottom: 14px; }
     .form-group label {
@@ -170,6 +438,7 @@
         font-family: inherit;
         font-size: 0.88rem;
         background: #fff;
+        box-sizing: border-box;
     }
     .form-group input:focus,
     .form-group select:focus,
@@ -190,154 +459,514 @@
         padding-top: 16px;
         border-top: 2px solid #000;
     }
+
+    /* Alert strip */
+    .alert-strip {
+        padding: 12px 18px;
+        border: 2px solid #f59e0b;
+        background: #fffbeb;
+        border-radius: 8px;
+        margin-bottom: 16px;
+        font-size: 0.85rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .alert-strip i { color: #d97706; }
+    .alert-strip a {
+        margin-left: auto;
+        color: #0a2f45;
+        font-weight: 700;
+        text-decoration: underline;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 
+{# ============================================================ #}
+{# Page header #}
+{# ============================================================ #}
 <div class="page-header">
-    <h2 style="margin:0;font-size:1.1rem;font-weight:700;">Feed Log</h2>
-    <button type="button" class="btn btn-primary" onclick="openModal()">
-        <i class="fas fa-plus"></i> Record Feed
-    </button>
-</div>
-
-<!-- Feed KPIs -->
-<div class="kpi-row">
-    <div class="kpi-card">
-        <div class="kpi-label">Feed Cost (Last 30 Days)</div>
-        <div class="kpi-value">KES {{ month_feed_cost|floatformat:0|default:"0" }}</div>
-        <div class="kpi-sub">All flocks</div>
-    </div>
-    <div class="kpi-card">
-        <div class="kpi-label">Feed Consumed (30 Days)</div>
-        <div class="kpi-value">{{ month_feed_kg|floatformat:0|default:"0" }} kg</div>
-        <div class="kpi-sub">Total quantity</div>
-    </div>
-    <div class="kpi-card">
-        <div class="kpi-label">Total Records</div>
-        <div class="kpi-value">{{ records|length }}</div>
-        <div class="kpi-sub">Showing latest 100</div>
-    </div>
-</div>
-
-{% if records %}
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Flock</th>
-                <th>Feed Type</th>
-                <th>Supplier</th>
-                <th style="text-align:right;">Qty (kg)</th>
-                <th style="text-align:right;">Cost (KES)</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for r in records %}
-            <tr>
-                <td>{{ r.date|date:"d M Y" }}</td>
-                <td><strong>{{ r.flock.name }}</strong></td>
-                <td>
-                    {% if r.feed_type %}
-                        {{ r.feed_type.name }}
-                        {% if r.feed_type.brand %}
-                            <small style="color:#9ca3af;">({{ r.feed_type.brand }})</small>
-                        {% endif %}
-                    {% else %}
-                        —
-                    {% endif %}
-                </td>
-                <td>{{ r.supplier|default:"—" }}</td>
-                <td class="cell-num">{{ r.quantity_kg|floatformat:1 }}</td>
-                <td class="cell-num">{{ r.cost|floatformat:0 }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-{% else %}
-    <div class="empty-state">
-        <i class="fas fa-wheat-awn"></i>
-        <h3>No feed records yet</h3>
-        <p>Start recording feed purchases to track your biggest cost.</p>
-        <button type="button" class="btn btn-primary" onclick="openModal()">
-            <i class="fas fa-plus"></i> Record First Feed
+    <h2><i class="fas fa-wheat-awn"></i> Feed Log</h2>
+    <div class="header-actions">
+        <button type="button" class="btn btn-primary" onclick="openModal('purchaseModal')">
+            <i class="fas fa-cart-plus"></i> Feed Purchase
+        </button>
+        <button type="button" class="btn btn-outline" onclick="openModal('consumeModal')">
+            <i class="fas fa-utensils"></i> Record Consumption
         </button>
     </div>
+</div>
+
+{# ============================================================ #}
+{# Branch filter #}
+{# ============================================================ #}
+{% if can_see_all_branches %}
+<form method="get" class="filter-bar">
+    <label style="font-weight:600;font-size:0.82rem;">Branch:</label>
+    <select name="branch" onchange="this.form.submit()">
+        <option value="">All branches</option>
+        {% for b in branches %}
+            <option value="{{ b.id }}"
+                {% if selected_branch_id == b.id|stringformat:"s" %}selected{% endif %}>
+                {{ b.name }}
+            </option>
+        {% endfor %}
+    </select>
+</form>
 {% endif %}
 
-<!-- Add Feed Modal -->
-<div class="modal-overlay" id="feedModal">
+{# ============================================================ #}
+{# Low stock alert #}
+{# ============================================================ #}
+{% if low_feed_count %}
+<div class="alert-strip">
+    <i class="fas fa-exclamation-triangle"></i>
+    <strong>{{ low_feed_count }}</strong> feed item{{ low_feed_count|pluralize }} below reorder level.
+    <a href="{% url 'kuku_biz:inventory_list' %}?item_type=feed_bag">
+        View inventory →
+    </a>
+</div>
+{% endif %}
+
+{# ============================================================ #}
+{# KPI cards #}
+{# ============================================================ #}
+<div class="kpi-row">
+    <div class="kpi-card">
+        <div class="kpi-label">Purchased (30d)</div>
+        <div class="kpi-value">{{ month_feed_kg_bought|default:0|floatformat:0 }} kg</div>
+        <div class="kpi-sub">KES {{ month_feed_cost|default:0|floatformat:0 }}</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Consumed (30d)</div>
+        <div class="kpi-value">{{ month_feed_kg_used|default:0|floatformat:0 }} kg</div>
+        <div class="kpi-sub">{{ week_feed_kg_used|default:0|floatformat:0 }} kg this week</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Feed On Hand</div>
+        <div class="kpi-value">{{ total_feed_kg_on_hand|default:0|floatformat:0 }} kg</div>
+        <div class="kpi-sub">Value KES {{ feed_stock_value|default:0|floatformat:0 }}</div>
+    </div>
+    <div class="kpi-card {% if month_feed_balance > 0 %}warn{% endif %}">
+        <div class="kpi-label">Unpaid Feed (30d)</div>
+        <div class="kpi-value">KES {{ month_feed_balance|default:0|floatformat:0 }}</div>
+        <div class="kpi-sub">
+            {% if low_feed_count %}
+                {{ low_feed_count }} low stock
+            {% else %}
+                All suppliers settled
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# ============================================================ #}
+{# FEED INVENTORY — per feed type, live stock on hand #}
+{# ============================================================ #}
+{% if feed_inventory_rows %}
+<div class="section-title">
+    <i class="fas fa-boxes-stacked"></i> Feed Inventory — Stock On Hand
+    <span style="margin-left:auto;font-size:0.75rem;font-weight:500;color:#6b7280;">
+        {{ feed_inventory_rows|length }} feed{{ feed_inventory_rows|length|pluralize }}
+    </span>
+</div>
+
+<div class="feed-inv-grid">
+    {% for row in feed_inventory_rows %}
+    <div class="feed-inv-card {% if row.empty %}is-empty{% elif row.low %}is-low{% endif %}">
+
+        <div class="feed-inv-head">
+            <div>
+                <div class="feed-inv-name">{{ row.name }}</div>
+                {% if row.brand %}
+                    <div class="feed-inv-brand">{{ row.brand }}</div>
+                {% endif %}
+            </div>
+            {% if row.empty %}
+                <span class="badge badge-credit">Empty</span>
+            {% elif row.low %}
+                <span class="badge badge-partial">Low</span>
+            {% else %}
+                <span class="badge badge-paid">In Stock</span>
+            {% endif %}
+        </div>
+
+        <div class="feed-inv-stock">
+            <span class="feed-inv-qty">{{ row.on_hand_kg|floatformat:1 }}</span>
+            <span class="feed-inv-unit">{{ row.unit }}</span>
+        </div>
+
+        {% if row.purchased_kg > 0 %}
+            <div class="feed-inv-bar">
+                <div class="feed-inv-bar-fill"
+                     style="width: {% widthratio row.on_hand_kg row.purchased_kg 100 %}%;"></div>
+            </div>
+        {% endif %}
+
+        <div class="feed-inv-meta">
+            <div class="feed-inv-meta-row">
+                <span>Bought</span>
+                <strong>{{ row.purchased_kg|floatformat:1 }} kg</strong>
+            </div>
+            <div class="feed-inv-meta-row">
+                <span>Used</span>
+                <strong>{{ row.consumed_kg|floatformat:1 }} kg</strong>
+            </div>
+            <div class="feed-inv-meta-row">
+                <span>Value</span>
+                <strong>KES {{ row.value|floatformat:0 }}</strong>
+            </div>
+        </div>
+
+        <div class="feed-inv-actions">
+            <button type="button"
+                    class="feed-inv-btn"
+                    onclick="openPurchaseFor('{{ row.feed_type.id }}');">
+                <i class="fas fa-plus"></i> Buy
+            </button>
+            <button type="button"
+                    class="feed-inv-btn consume-btn"
+                    onclick="openConsumeFor('{{ row.feed_type.id }}');"
+                    {% if row.empty %}disabled style="opacity:0.45;cursor:not-allowed;"{% endif %}>
+                <i class="fas fa-utensils"></i> Use
+            </button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="empty-state" style="margin-bottom:20px;">
+    <i class="fas fa-seedling"></i>
+    <h3>Store is empty</h3>
+    <p>You have not recorded any feed purchases yet. Start by buying stock — flock attribution happens at consumption time.</p>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+        <button type="button" class="btn btn-primary" onclick="openModal('purchaseModal')">
+            <i class="fas fa-cart-plus"></i> Buy Feed
+        </button>
+        <a href="{% url 'kuku_biz:feed_type_list' %}" class="btn btn-outline">
+            <i class="fas fa-seedling"></i> Manage Feed Types
+        </a>
+    </div>
+</div>
+{% endif %}
+
+{# ============================================================ #}
+{# Two-column log: purchases + consumption #}
+{# ============================================================ #}
+<div class="log-grid">
+
+    {# ── Purchases (no flock column) ── #}
+    <div class="log-card">
+        <div class="log-card-header">
+            <span><i class="fas fa-arrow-down"></i> Recent Purchases</span>
+            <span class="count">{{ recent_purchases|length }}</span>
+        </div>
+        {% if recent_purchases %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Feed</th>
+                    <th class="cell-num">Kg</th>
+                    <th class="cell-num">Cost</th>
+                    <th class="cell-center">Status</th>
+                    <th class="cell-actions"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in recent_purchases %}
+                <tr>
+                    <td>{{ r.date|date:"d M" }}</td>
+                    <td>{{ r.feed_type.name|default:"—" }}</td>
+                    <td class="cell-num">{{ r.quantity_kg|floatformat:1 }}</td>
+                    <td class="cell-num">{{ r.cost|floatformat:0 }}</td>
+                    <td class="cell-center">
+                        {% if r.payment_status == 'paid' %}
+                            <span class="badge badge-paid">Paid</span>
+                        {% elif r.payment_status == 'partial' %}
+                            <span class="badge badge-partial">Partial</span>
+                        {% else %}
+                            <span class="badge badge-credit">Credit</span>
+                        {% endif %}
+                    </td>
+                    <td class="cell-actions">
+                        <a href="{% url 'kuku_biz:feed_edit' r.pk %}"
+                           class="btn btn-outline btn-sm" title="Edit">
+                            <i class="fas fa-pen"></i>
+                        </a>
+                        <form method="post"
+                              action="{% url 'kuku_biz:feed_delete' r.pk %}"
+                              onsubmit="return confirm('Delete this purchase? Stock will be reversed.');">
+                            {% csrf_token %}
+                            <button class="btn btn-danger btn-sm" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-inline">
+            <i class="fas fa-inbox"></i>
+            No purchases yet
+        </div>
+        {% endif %}
+    </div>
+
+    {# ── Consumption (keeps flock) ── #}
+    <div class="log-card">
+        <div class="log-card-header">
+            <span><i class="fas fa-arrow-up"></i> Recent Consumption</span>
+            <span class="count">{{ consumption_log|length }}</span>
+        </div>
+        {% if consumption_log %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Flock</th>
+                    <th>Feed</th>
+                    <th class="cell-num">Kg</th>
+                    <th class="cell-actions"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in consumption_log %}
+                <tr>
+                    <td>{{ c.date|date:"d M" }}</td>
+                    <td><strong>{{ c.flock.name }}</strong></td>
+                    <td>{{ c.feed_type.name|default:"—" }}</td>
+                    <td class="cell-num">{{ c.quantity_kg|floatformat:1 }}</td>
+                    <td class="cell-actions">
+                        <form method="post"
+                              action="{% url 'kuku_biz:feed_consumption_delete' c.pk %}"
+                              onsubmit="return confirm('Delete this consumption? Stock will be returned.');">
+                            {% csrf_token %}
+                            <button class="btn btn-danger btn-sm" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-inline">
+            <i class="fas fa-inbox"></i>
+            No consumption logged yet
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+{# ============================================================ #}
+{# Per-flock feed summary #}
+{# ============================================================ #}
+{% if flock_feed_summary %}
+<div class="section-title">
+    <i class="fas fa-layer-group"></i> Per-Flock Feed (Last 30 Days)
+</div>
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Flock</th>
+            <th class="col-branch">Branch</th>
+            <th class="cell-num">Purchased (kg)</th>
+            <th class="cell-num">Cost (KES)</th>
+            <th class="cell-num">Consumed (kg)</th>
+            <th class="cell-num">Balance (kg)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in flock_feed_summary %}
+        <tr>
+            <td><strong>{{ row.flock.name }}</strong></td>
+            <td>{{ row.flock.branch.name|default:"—" }}</td>
+            <td class="cell-num">{{ row.purchased_kg|default:0|floatformat:1 }}</td>
+            <td class="cell-num">{{ row.purchased_cost|default:0|floatformat:0 }}</td>
+            <td class="cell-num">{{ row.consumed_kg|default:0|floatformat:1 }}</td>
+            <td class="cell-num"
+                style="{% if row.balance_kg < 0 %}color:#dc2626;{% endif %}">
+                {{ row.balance_kg|default:0|floatformat:1 }}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+{# ============================================================ #}
+{# Purchase modal — NO FLOCK #}
+{# ============================================================ #}
+<div class="modal-overlay" id="purchaseModal">
     <div class="modal-box">
-        <h3><i class="fas fa-wheat-awn"></i> Record Feed</h3>
+        <h3><i class="fas fa-cart-plus"></i> Record Feed Purchase (Stock In)</h3>
 
         <form method="post" action="{% url 'kuku_biz:feed_create' %}">
             {% csrf_token %}
+            <input type="hidden" name="record_type" value="purchase">
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
 
             <div class="form-row">
                 <div class="form-group">
-                    <label for="flock">Flock <span class="required">*</span></label>
-                    <select id="flock" name="flock" required>
-                        <option value="">— Select flock —</option>
-                        {% for flock in flocks %}
-                            <option value="{{ flock.id }}">{{ flock.name }}</option>
+                    <label for="p_feed_type">Feed Type <span class="required">*</span></label>
+                    <select id="p_feed_type" name="feed_type" required>
+                        <option value="">— Select —</option>
+                        {% for ft in feed_types %}
+                            <option value="{{ ft.id }}" data-cost="{{ ft.cost_per_kg|default:0 }}">
+                                {{ ft.name }}{% if ft.brand %} ({{ ft.brand }}){% endif %}
+                            </option>
                         {% endfor %}
                     </select>
+                    <div class="help-text">
+                        {% if feed_types %}
+                            Cost auto-fills from the selected feed's price.
+                        {% else %}
+                            No feed types yet —
+                            <a href="{% url 'kuku_biz:feed_type_list' %}">add one →</a>
+                        {% endif %}
+                    </div>
                 </div>
 
                 <div class="form-group">
-                    <label for="date">Date <span class="required">*</span></label>
-                    <input type="date" id="date" name="date"
+                    <label for="p_date">Date <span class="required">*</span></label>
+                    <input type="date" id="p_date" name="date"
                            value="{{ today|date:'Y-m-d' }}" required>
                 </div>
             </div>
 
             <div class="form-row">
                 <div class="form-group">
-                    <label for="feed_type">Feed Type</label>
-                    <select id="feed_type" name="feed_type">
-                        <option value="">— Select —</option>
-                        {% for ft in feed_types %}
-                            <option value="{{ ft.id }}">{{ ft.name }}{% if ft.brand %} ({{ ft.brand }}){% endif %}</option>
-                        {% endfor %}
-                    </select>
-                    <div class="help-text">Add feed types in admin if missing</div>
+                    <label for="p_supplier">Supplier</label>
+                    <input type="text" id="p_supplier" name="supplier"
+                           placeholder="e.g. Pembe Feeds">
                 </div>
 
                 <div class="form-group">
-                    <label for="supplier">Supplier</label>
-                    <input type="text" id="supplier" name="supplier"
-                           placeholder="e.g. Pembe Feeds">
+                    <label for="p_invoice">Supplier Invoice #</label>
+                    <input type="text" id="p_invoice" name="supplier_invoice"
+                           placeholder="Optional">
                 </div>
             </div>
 
-            <div class="form-row">
+            <div class="form-row three">
                 <div class="form-group">
-                    <label for="quantity_kg">Quantity (kg) <span class="required">*</span></label>
-                    <input type="number" id="quantity_kg" name="quantity_kg"
+                    <label for="p_quantity_kg">Quantity (kg) <span class="required">*</span></label>
+                    <input type="number" id="p_quantity_kg" name="quantity_kg"
                            min="0" step="0.01" required
                            placeholder="e.g. 50">
                 </div>
 
                 <div class="form-group">
-                    <label for="cost">Cost (KES) <span class="required">*</span></label>
-                    <input type="number" id="cost" name="cost"
+                    <label for="p_cost">Total Cost (KES) <span class="required">*</span></label>
+                    <input type="number" id="p_cost" name="cost"
                            min="0" step="0.01" required
                            placeholder="e.g. 2800">
+                </div>
+
+                <div class="form-group">
+                    <label for="p_amount_paid">Amount Paid (KES)</label>
+                    <input type="number" id="p_amount_paid" name="amount_paid"
+                           min="0" step="0.01" value="0">
                 </div>
             </div>
 
             <div class="form-group">
-                <label for="notes">Notes</label>
-                <textarea id="notes" name="notes" rows="2"
+                <label for="p_payment_status">Payment Status</label>
+                <select id="p_payment_status" name="payment_status">
+                    <option value="paid">Paid</option>
+                    <option value="partial">Partial</option>
+                    <option value="credit">Credit</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="p_notes">Notes</label>
+                <textarea id="p_notes" name="notes" rows="2"
                           placeholder="Any notes"></textarea>
             </div>
 
             <div class="modal-actions">
                 <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-check"></i> Save Record
+                    <i class="fas fa-check"></i> Save Purchase
                 </button>
-                <button type="button" class="btn" onclick="closeModal()">
+                <button type="button" class="btn" onclick="closeModal('purchaseModal')">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{# ============================================================ #}
+{# Consumption modal — KEEPS FLOCK #}
+{# ============================================================ #}
+<div class="modal-overlay" id="consumeModal">
+    <div class="modal-box">
+        <h3><i class="fas fa-utensils"></i> Record Feed Consumption (Stock Out)</h3>
+
+        <form method="post" action="{% url 'kuku_biz:feed_consume' %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="c_flock">Flock <span class="required">*</span></label>
+                    <select id="c_flock" name="flock" required>
+                        <option value="">— Select flock —</option>
+                        {% for flock in flocks %}
+                            <option value="{{ flock.id }}">{{ flock.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="help-text">Which flock is this feed being given to?</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="c_date">Date <span class="required">*</span></label>
+                    <input type="date" id="c_date" name="date"
+                           value="{{ today|date:'Y-m-d' }}" required>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="c_feed_type">Feed Type <span class="required">*</span></label>
+                    <select id="c_feed_type" name="feed_type" required>
+                        <option value="">— Select —</option>
+                        {% for ft in feed_types %}
+                            <option value="{{ ft.id }}">
+                                {{ ft.name }}{% if ft.brand %} ({{ ft.brand }}){% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="c_quantity_kg">Quantity (kg) <span class="required">*</span></label>
+                    <input type="number" id="c_quantity_kg" name="quantity_kg"
+                           min="0" step="0.01" required
+                           placeholder="e.g. 25">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="c_notes">Notes</label>
+                <textarea id="c_notes" name="notes" rows="2"
+                          placeholder="Any notes"></textarea>
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-check"></i> Save Consumption
+                </button>
+                <button type="button" class="btn" onclick="closeModal('consumeModal')">
                     <i class="fas fa-times"></i> Cancel
                 </button>
             </div>
@@ -346,20 +975,63 @@
 </div>
 
 <script>
-    function openModal() {
-        document.getElementById('feedModal').classList.add('active');
+    function openModal(id) {
+        document.getElementById(id).classList.add('active');
         document.body.style.overflow = 'hidden';
     }
-    function closeModal() {
-        document.getElementById('feedModal').classList.remove('active');
+    function closeModal(id) {
+        document.getElementById(id).classList.remove('active');
         document.body.style.overflow = '';
     }
-    document.getElementById('feedModal').addEventListener('click', function(e) {
-        if (e.target === this) closeModal();
+    document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
+        overlay.addEventListener('click', function (e) {
+            if (e.target === this) closeModal(this.id);
+        });
     });
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') closeModal();
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal-overlay.active').forEach(function (m) {
+                closeModal(m.id);
+            });
+        }
     });
+
+    // Per-card quick actions: pre-select feed type and open the right modal
+    function openPurchaseFor(feedTypeId) {
+        var sel = document.getElementById('p_feed_type');
+        if (sel) {
+            sel.value = feedTypeId;
+            sel.dispatchEvent(new Event('change'));
+        }
+        openModal('purchaseModal');
+    }
+    function openConsumeFor(feedTypeId) {
+        var sel = document.getElementById('c_feed_type');
+        if (sel) sel.value = feedTypeId;
+        openModal('consumeModal');
+    }
+
+    // Cost auto-fill from selected feed type's cost_per_kg × quantity
+    (function () {
+        var feedSelect = document.getElementById('p_feed_type');
+        var qtyInput   = document.getElementById('p_quantity_kg');
+        var costInput  = document.getElementById('p_cost');
+        if (!feedSelect || !qtyInput || !costInput) return;
+
+        function autofill() {
+            var opt   = feedSelect.options[feedSelect.selectedIndex];
+            var perKg = parseFloat(opt.getAttribute('data-cost') || '0');
+            var qty   = parseFloat(qtyInput.value || '0');
+            if (perKg > 0 && qty > 0 && !costInput.dataset.touched) {
+                costInput.value = (perKg * qty).toFixed(2);
+            }
+        }
+        feedSelect.addEventListener('change', autofill);
+        qtyInput.addEventListener('input', autofill);
+        costInput.addEventListener('input', function () {
+            costInput.dataset.touched = '1';
+        });
+    })();
 </script>
 
 {% endblock %}

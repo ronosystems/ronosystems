@@ -242,7 +242,6 @@
         font-weight: 400;
     }
 
-    /* Progress bar for birds */
     .progress-wrap {
         padding: 14px 18px;
         border-bottom: 1px solid #f3f4f6;
@@ -323,12 +322,163 @@
     }
 
     /* ============================================================ */
-    /* RESPONSIVE                                                    */
+    /* FEED CONSUMPTION                                              */
     /* ============================================================ */
+    .feed-kpi-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+    .feed-kpi-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 16px 18px;
+    }
+    .feed-kpi-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #6b7280;
+    }
+    .feed-kpi-value {
+        font-family: 'Courier New', monospace;
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: #1f2937;
+        margin-top: 4px;
+    }
+    .feed-kpi-sub {
+        font-size: 0.72rem;
+        color: #9ca3af;
+        margin-top: 3px;
+    }
+
+    /* Record Feed button in section header */
+    .btn-record-feed {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 14px;
+        border-radius: 50px;
+        border: 2px solid #000;
+        background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
+        color: #fff;
+        font-weight: 700;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        text-decoration: none;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.2s;
+    }
+    .btn-record-feed:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 14px rgba(31,180,210,0.35);
+    }
+
+    /* Modal */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 2000;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 28px 32px;
+        max-width: 560px;
+        width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    .modal-box h3 {
+        font-size: 1.05rem;
+        font-weight: 700;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #000;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        margin-bottom: 14px;
+    }
+    .form-group { margin-bottom: 14px; }
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        font-size: 0.82rem;
+        margin-bottom: 5px;
+    }
+    .form-group label .required { color: #dc2626; }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 9px 12px;
+        border: 2px solid #000;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 0.88rem;
+        background: #fff;
+        box-sizing: border-box;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: #1fb4d2;
+        box-shadow: 0 0 0 3px rgba(31,180,210,0.2);
+    }
+    .modal-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 2px solid #000;
+    }
+    .modal-actions .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 22px;
+        border-radius: 50px;
+        border: 2px solid #000;
+        background: #fff;
+        color: #000;
+        font-weight: 600;
+        font-size: 0.85rem;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.2s;
+    }
+    .modal-actions .btn-primary {
+        background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
+        color: #fff;
+    }
+    .modal-actions .btn-primary:hover { transform: translateY(-1px); }
+
+    /* Responsive */
     @media (max-width: 640px) {
         .flock-header { padding: 18px 20px; }
         .flock-header h2 { font-size: 1.25rem; }
         .hbtn { padding: 8px 14px; font-size: 0.75rem; }
+        .form-row { grid-template-columns: 1fr; }
     }
 </style>
 {% endblock %}
@@ -339,18 +489,14 @@
 <!-- FLOCK HEADER                                                  -->
 <!-- ============================================================ -->
 <div class="flock-header">
-
     <div class="flock-header-left">
         <h2>
             <i class="fas fa-kiwi-bird" style="color:#87CEEB;"></i>
             {{ flock.name }}
         </h2>
-
         <div class="meta">
             {% if flock.breed %}
-            <span class="meta-item">
-                <i class="fas fa-dna"></i> {{ flock.breed }}
-            </span>
+            <span class="meta-item"><i class="fas fa-dna"></i> {{ flock.breed }}</span>
             {% endif %}
             <span class="meta-item">
                 <i class="fas fa-calendar-day"></i>
@@ -366,7 +512,6 @@
             </span>
             {% endif %}
         </div>
-
         <div class="flock-header-badges">
             <span class="flock-badge active" style="background:#87CEEB;color:#0a2f45;border-color:#000;">
                 {{ flock.get_flock_type_display }}
@@ -379,23 +524,19 @@
 
     <div class="flock-header-actions">
         {% if flock.status == 'active' and flock.current_count > 0 %}
-        <a href="{% url 'kuku_biz:bird_sale_create' %}?flock={{ flock.pk }}"
-           class="hbtn warn">
+        <a href="{% url 'kuku_biz:bird_sale_create' %}?flock={{ flock.pk }}" class="hbtn warn">
             <i class="fas fa-drumstick-bite"></i> Sell Birds
         </a>
         {% endif %}
 
         {% if flock.status == 'active' %}
-        <a href="{% url 'kuku_biz:egg_create' %}?flock={{ flock.pk }}"
-           class="hbtn primary">
+        <a href="{% url 'kuku_biz:egg_create' %}?flock={{ flock.pk }}" class="hbtn primary">
             <i class="fas fa-egg"></i> Record Eggs
         </a>
-        <a href="{% url 'kuku_biz:feed_create' %}?flock={{ flock.pk }}"
-           class="hbtn">
-            <i class="fas fa-wheat-awn"></i> Add Feed
-        </a>
-        <a href="{% url 'kuku_biz:health_create' %}?flock={{ flock.pk }}"
-           class="hbtn">
+        <button type="button" class="hbtn" onclick="openFeedModal()">
+            <i class="fas fa-wheat-awn"></i> Record Feed
+        </button>
+        <a href="{% url 'kuku_biz:health_create' %}?flock={{ flock.pk }}" class="hbtn">
             <i class="fas fa-briefcase-medical"></i> Add Health
         </a>
         {% endif %}
@@ -404,7 +545,6 @@
             <i class="fas fa-arrow-left"></i> Back
         </a>
     </div>
-
 </div>
 
 <!-- ============================================================ -->
@@ -417,9 +557,7 @@
             <div class="kpi-label">Current Birds</div>
             <div class="kpi-value">{{ flock.current_count }}</div>
         </div>
-        <div class="kpi-sub">
-            started at {{ flock.initial_count }}
-        </div>
+        <div class="kpi-sub">started at {{ flock.initial_count }}</div>
     </div>
 
     <div class="kpi-card">
@@ -444,12 +582,12 @@
 
     <div class="kpi-card">
         <div>
-            <i class="fas fa-clock kpi-icon"></i>
-            <div class="kpi-label">Age</div>
-            <div class="kpi-value">{{ flock.age_display }}</div>
+            <i class="fas fa-wheat-awn kpi-icon"></i>
+            <div class="kpi-label">Feed Consumed</div>
+            <div class="kpi-value">{{ total_feed_kg_consumed|default:0|floatformat:1 }} kg</div>
         </div>
         <div class="kpi-sub">
-            {{ flock.age_in_days }} days · {{ flock.age_in_weeks }} weeks
+            {% if feed_kg_last_30 %}{{ feed_kg_last_30|floatformat:1 }} kg last 30d{% else %}all-time{% endif %}
         </div>
     </div>
 </div>
@@ -459,7 +597,6 @@
 <!-- ============================================================ -->
 <div class="info-grid">
 
-    <!-- Purchase details -->
     <div class="info-card">
         <div class="info-card-header">
             <i class="fas fa-shopping-bag"></i> Purchase Details
@@ -504,27 +641,21 @@
         </div>
     </div>
 
-    <!-- Flock composition / health -->
     <div class="info-card">
         <div class="info-card-header">
             <i class="fas fa-chart-pie"></i> Flock Composition
         </div>
         <div class="info-card-body">
-
-            <!-- Progress bar: survival -->
             <div class="progress-wrap">
                 <div class="progress-label">
                     <span>Survival Rate</span>
-                    <span>{{ flock.initial_count|add:"-1"|default:0 }}
-                        {% widthratio flock.current_count flock.initial_count 100 %}%
-                    </span>
+                    <span>{% widthratio flock.current_count flock.initial_count 100 %}%</span>
                 </div>
                 <div class="progress-bar">
                     <div class="progress-fill"
                          style="width: {% widthratio flock.current_count flock.initial_count 100 %}%;"></div>
                 </div>
             </div>
-
             <div class="info-row">
                 <span class="label"><i class="fas fa-hashtag"></i> Initial Count</span>
                 <span class="value">{{ flock.initial_count }} birds</span>
@@ -551,6 +682,117 @@
     </div>
 
 </div>
+
+<!-- ============================================================ -->
+<!-- FEED CONSUMPTION — KPIs                                       -->
+<!-- ============================================================ -->
+<div class="section-title">
+    <span>Feed Consumption — {{ flock.name }}</span>
+    <button type="button" class="btn-record-feed" onclick="openFeedModal()">
+        <i class="fas fa-plus"></i> Record Feed
+    </button>
+</div>
+
+<div class="feed-kpi-row">
+    <div class="feed-kpi-card">
+        <div class="feed-kpi-label">Total Consumed</div>
+        <div class="feed-kpi-value">{{ total_feed_kg_consumed|default:0|floatformat:1 }} kg</div>
+        <div class="feed-kpi-sub">{{ total_feed_records }} record{{ total_feed_records|pluralize }}</div>
+    </div>
+    <div class="feed-kpi-card">
+        <div class="feed-kpi-label">Last 7 Days</div>
+        <div class="feed-kpi-value">{{ feed_kg_last_7|default:0|floatformat:1 }} kg</div>
+        <div class="feed-kpi-sub">recent ration</div>
+    </div>
+    <div class="feed-kpi-card">
+        <div class="feed-kpi-label">Last 30 Days</div>
+        <div class="feed-kpi-value">{{ feed_kg_last_30|default:0|floatformat:1 }} kg</div>
+        <div class="feed-kpi-sub">monthly total</div>
+    </div>
+    <div class="feed-kpi-card">
+        <div class="feed-kpi-label">Est. Feed Cost</div>
+        <div class="feed-kpi-value">KES {{ feed_cost_estimate|default:0|floatformat:0 }}</div>
+        <div class="feed-kpi-sub">at current prices</div>
+    </div>
+</div>
+
+<!-- Feed breakdown by type -->
+{% if feed_breakdown %}
+<div class="section-title">
+    <span>Consumption by Feed Type</span>
+</div>
+<table class="data-table" style="margin-bottom: 24px;">
+    <thead>
+        <tr>
+            <th>Feed Type</th>
+            <th>Brand</th>
+            <th class="cell-num">Entries</th>
+            <th class="cell-num">Total (kg)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in feed_breakdown %}
+        <tr>
+            <td><strong>{{ row.feed_type__name|default:"—" }}</strong></td>
+            <td>{{ row.feed_type__brand|default:"—" }}</td>
+            <td class="cell-num">{{ row.entries }}</td>
+            <td class="cell-num">{{ row.total_kg|default:0|floatformat:1 }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+<!-- Full consumption log -->
+{% if feed_consumption %}
+<table class="data-table" style="margin-bottom: 24px;">
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>Feed Type</th>
+            <th>Brand</th>
+            <th>Branch</th>
+            <th class="cell-num">Qty (kg)</th>
+            <th>Recorded By</th>
+            <th>Notes</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for c in feed_consumption %}
+        <tr>
+            <td>{{ c.date|date:"d M Y" }}</td>
+            <td><strong>{{ c.feed_type.name|default:"—" }}</strong></td>
+            <td>{{ c.feed_type.brand|default:"—" }}</td>
+            <td>{{ c.branch.name|default:"—" }}</td>
+            <td class="cell-num">{{ c.quantity_kg|default:0|floatformat:1 }}</td>
+            <td>
+                {% if c.recorded_by %}
+                    {{ c.recorded_by.get_full_name|default:c.recorded_by.username }}
+                {% else %}
+                    —
+                {% endif %}
+            </td>
+            <td style="max-width:220px;color:#6b7280;font-size:0.78rem;">
+                {{ c.notes|default:"—"|truncatechars:60 }}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="empty-block" style="margin-bottom: 24px;">
+    <i class="fas fa-wheat-awn fa-2x" style="display:block;margin-bottom:10px;color:#cbd5e1;"></i>
+    <div style="font-weight:600;color:#1f2937;margin-bottom:6px;">
+        No feed consumption recorded yet
+    </div>
+    <div style="font-size:0.8rem;color:#6b7280;margin-bottom:12px;">
+        Record what this flock eats to track feed cost and efficiency.
+    </div>
+    <button type="button" class="btn-record-feed" onclick="openFeedModal()">
+        <i class="fas fa-plus"></i> Record First Feed
+    </button>
+</div>
+{% endif %}
 
 <!-- ============================================================ -->
 <!-- EGG PRODUCTION — LAST 30 DAYS                                 -->
@@ -657,5 +899,81 @@
     {{ flock.notes|linebreaksbr }}
 </div>
 {% endif %}
+
+<!-- ============================================================ -->
+<!-- RECORD FEED MODAL                                             -->
+<!-- ============================================================ -->
+<div class="modal-overlay" id="flockFeedModal">
+    <div class="modal-box">
+        <h3><i class="fas fa-utensils"></i> Record Feed for {{ flock.name }}</h3>
+
+        <form method="post" action="{% url 'kuku_biz:feed_consume' %}">
+            {% csrf_token %}
+            <input type="hidden" name="flock" value="{{ flock.id }}">
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="f_date">Date <span class="required">*</span></label>
+                    <input type="date" id="f_date" name="date" required
+                           value="{{ today|date:'Y-m-d' }}">
+                </div>
+                <div class="form-group">
+                    <label for="f_quantity_kg">Quantity (kg) <span class="required">*</span></label>
+                    <input type="number" id="f_quantity_kg" name="quantity_kg"
+                           min="0" step="0.01" required placeholder="e.g. 25">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="f_feed_type">Feed Type <span class="required">*</span></label>
+                <select id="f_feed_type" name="feed_type" required>
+                    <option value="">— Select —</option>
+                    {% for ft in feed_types_for_flock %}
+                        <option value="{{ ft.id }}">
+                            {{ ft.name }}{% if ft.brand %} ({{ ft.brand }}){% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="f_notes">Notes</label>
+                <textarea id="f_notes" name="notes" rows="2"
+                          placeholder="Any notes"></textarea>
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-check"></i> Save Consumption
+                </button>
+                <button type="button" class="btn" onclick="closeFeedModal()">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openFeedModal() {
+        var d = document.getElementById('f_date');
+        if (d && !d.value) {
+            d.value = new Date().toISOString().split('T')[0];
+        }
+        document.getElementById('flockFeedModal').classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeFeedModal() {
+        document.getElementById('flockFeedModal').classList.remove('active');
+        document.body.style.overflow = '';
+    }
+    document.getElementById('flockFeedModal')?.addEventListener('click', function (e) {
+        if (e.target === this) closeFeedModal();
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeFeedModal();
+    });
+</script>
 
 {% endblock %}

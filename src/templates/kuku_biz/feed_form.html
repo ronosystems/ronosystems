@@ -1,0 +1,227 @@
+{% extends 'kuku_base.html' %}
+
+{% block title %}Edit Feed Record — Kuku Biz{% endblock %}
+{% block page_title %}Edit Feed Record{% endblock %}
+{% block page_subtitle %}<small>#{{ record.pk }}</small>{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 28px 32px;
+        max-width: 720px;
+    }
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        margin-bottom: 14px;
+    }
+    .form-row.three { grid-template-columns: 1fr 1fr 1fr; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        font-size: 0.82rem;
+        margin-bottom: 5px;
+    }
+    .form-group label .required { color: #dc2626; }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 9px 12px;
+        border: 2px solid #000;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 0.88rem;
+        background: #fff;
+        box-sizing: border-box;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: #1fb4d2;
+        box-shadow: 0 0 0 3px rgba(31,180,210,0.2);
+    }
+    .form-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 2px solid #000;
+    }
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 22px;
+        border-radius: 50px;
+        border: 2px solid #000;
+        background: #fff;
+        color: #000;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.85rem;
+        cursor: pointer;
+        font-family: inherit;
+    }
+    .btn-primary {
+        background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
+        color: #fff;
+    }
+    .section-title {
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #0a2f45;
+        margin: 20px 0 10px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<form method="post">
+    {% csrf_token %}
+    <div class="form-card">
+
+        <div class="section-title">Record Info</div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Record Type <span class="required">*</span></label>
+                <select name="record_type" id="recordType">
+                    <option value="purchase"
+                        {% if record.record_type == 'purchase' %}selected{% endif %}>
+                        Purchase (stock in)
+                    </option>
+                    <option value="consumption"
+                        {% if record.record_type == 'consumption' %}selected{% endif %}>
+                        Consumption (stock out)
+                    </option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Date <span class="required">*</span></label>
+                <input type="date" name="date"
+                       value="{{ record.date|date:'Y-m-d' }}" required>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Flock</label>
+                <select name="flock">
+                    <option value="">— General —</option>
+                    {% for f in flocks %}
+                        <option value="{{ f.id }}"
+                            {% if record.flock_id == f.id %}selected{% endif %}>
+                            {{ f.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Feed Type</label>
+                <select name="feed_type">
+                    <option value="">— Select —</option>
+                    {% for ft in feed_types %}
+                        <option value="{{ ft.id }}"
+                            {% if record.feed_type_id == ft.id %}selected{% endif %}>
+                            {{ ft.name }}{% if ft.brand %} ({{ ft.brand }}){% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Quantity (kg) <span class="required">*</span></label>
+                <input type="number" name="quantity_kg" step="0.01" min="0"
+                       value="{{ record.quantity_kg }}" required>
+            </div>
+            <div class="form-group">
+                <label>Branch</label>
+                <input type="text"
+                       value="{{ record.branch.name|default:'—' }}" disabled>
+            </div>
+        </div>
+
+        <div id="purchaseFields"
+             {% if record.record_type != 'purchase' %}style="display:none;"{% endif %}>
+            <div class="section-title">Purchase Details</div>
+
+            <div class="form-row three">
+                <div class="form-group">
+                    <label>Total Cost (KES)</label>
+                    <input type="number" name="cost" step="0.01" min="0"
+                           value="{{ record.cost }}">
+                </div>
+                <div class="form-group">
+                    <label>Amount Paid (KES)</label>
+                    <input type="number" name="amount_paid" step="0.01" min="0"
+                           value="{{ record.amount_paid }}">
+                </div>
+                <div class="form-group">
+                    <label>Payment Status</label>
+                    <select name="payment_status">
+                        <option value="paid"
+                            {% if record.payment_status == 'paid' %}selected{% endif %}>Paid</option>
+                        <option value="partial"
+                            {% if record.payment_status == 'partial' %}selected{% endif %}>Partial</option>
+                        <option value="credit"
+                            {% if record.payment_status == 'credit' %}selected{% endif %}>Credit</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Supplier</label>
+                    <input type="text" name="supplier"
+                           value="{{ record.supplier }}">
+                </div>
+                <div class="form-group">
+                    <label>Supplier Invoice #</label>
+                    <input type="text" name="supplier_invoice"
+                           value="{{ record.supplier_invoice }}">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Notes</label>
+            <textarea name="notes" rows="3">{{ record.notes }}</textarea>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-check"></i> Update Record
+            </button>
+            <a href="{% url 'kuku_biz:feed_list' %}" class="btn">
+                <i class="fas fa-times"></i> Cancel
+            </a>
+        </div>
+    </div>
+</form>
+
+<script>
+    // Toggle purchase-only fields based on record type
+    (function () {
+        var rt = document.getElementById('recordType');
+        var pf = document.getElementById('purchaseFields');
+        if (!rt || !pf) return;
+        rt.addEventListener('change', function () {
+            pf.style.display = this.value === 'purchase' ? '' : 'none';
+        });
+    })();
+</script>
+
+{% endblock %}

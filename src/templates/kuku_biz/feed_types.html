@@ -1,0 +1,366 @@
+{% extends 'kuku_base.html' %}
+
+{% block title %}Feed Types — Kuku Biz{% endblock %}
+{% block page_title %}Feed Types{% endblock %}
+{% block page_subtitle %}<small>{{ feed_types.count }} defined</small>{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .page-header h2 { margin: 0; font-size: 1.1rem; font-weight: 700; }
+
+    .btn {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 11px 22px; border-radius: 50px; border: 2px solid #000;
+        background: #fff; color: #000; text-decoration: none;
+        font-weight: 600; font-size: 0.85rem; cursor: pointer;
+        font-family: inherit; transition: all 0.2s;
+    }
+    .btn-primary {
+        background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
+        color: #fff;
+    }
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 18px rgba(31,180,210,0.35);
+        color: #fff;
+    }
+    .btn-sm { padding: 6px 14px; font-size: 0.75rem; }
+    .btn-danger {
+        background: #fff; border-color: #dc2626; color: #dc2626;
+    }
+    .btn-danger:hover { background: #fee2e2; }
+
+    .data-table {
+        width: 100%; background: #fff; border: 2px solid #000;
+        border-radius: 8px; overflow: hidden;
+        border-collapse: separate; border-spacing: 0;
+    }
+    .data-table thead { background: #f0fbfd; }
+    .data-table th {
+        text-align: left; padding: 14px 18px;
+        font-size: 0.72rem; text-transform: uppercase;
+        letter-spacing: 1px; font-weight: 700; color: #374151;
+        border-bottom: 2px solid #000;
+    }
+    .data-table td {
+        padding: 12px 18px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.86rem; color: #1f2937;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover { background: #f9fafb; }
+    .cell-num {
+        font-family: 'Courier New', monospace;
+        font-weight: 700; text-align: right;
+    }
+    .cell-actions {
+        text-align: right; white-space: nowrap;
+    }
+    .cell-actions form { display: inline; }
+
+    .badge {
+        display: inline-block; padding: 3px 10px; border-radius: 50px;
+        font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .badge-on  { background: #d1fae5; color: #065f46; }
+    .badge-off { background: #fee2e2; color: #991b1b; }
+
+    .empty-state {
+        text-align: center; padding: 60px 30px; background: #fff;
+        border: 2px dashed #9ca3af; border-radius: 8px;
+    }
+    .empty-state i { font-size: 3rem; color: #87CEEB; margin-bottom: 16px; }
+    .empty-state h3 { margin: 0 0 8px; color: #1f2937; }
+
+    /* Modal */
+    .modal-overlay {
+        display: none; position: fixed; inset: 0;
+        background: rgba(0,0,0,0.5); z-index: 2000;
+        justify-content: center; align-items: center; padding: 20px;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+        background: #fff; border: 2px solid #000; border-radius: 8px;
+        padding: 28px 32px; max-width: 620px; width: 100%;
+        max-height: 90vh; overflow-y: auto;
+    }
+    .modal-box h3 {
+        font-size: 1.05rem; font-weight: 700; margin-bottom: 20px;
+        padding-bottom: 10px; border-bottom: 2px solid #000;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .form-row {
+        display: grid; grid-template-columns: 1fr 1fr;
+        gap: 14px; margin-bottom: 14px;
+    }
+    .form-row.three { grid-template-columns: 1fr 1fr 1fr; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label {
+        display: block; font-weight: 600; font-size: 0.82rem;
+        margin-bottom: 5px;
+    }
+    .form-group label .required { color: #dc2626; }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%; padding: 9px 12px;
+        border: 2px solid #000; border-radius: 6px;
+        font-family: inherit; font-size: 0.88rem;
+        background: #fff; box-sizing: border-box;
+    }
+    .form-group input:focus,
+    .form-group select:focus {
+        outline: none; border-color: #1fb4d2;
+        box-shadow: 0 0 0 3px rgba(31,180,210,0.2);
+    }
+    .modal-actions {
+        display: flex; gap: 10px; margin-top: 20px;
+        padding-top: 16px; border-top: 2px solid #000;
+    }
+    .checkbox-row {
+        display: flex; align-items: center; gap: 8px;
+        font-size: 0.85rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h2><i class="fas fa-seedling"></i> Feed Types</h2>
+    <button type="button" class="btn btn-primary" onclick="openModal('addModal')">
+        <i class="fas fa-plus"></i> Add Feed Type
+    </button>
+</div>
+
+{% if feed_types %}
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Brand</th>
+            <th>Stage</th>
+            <th>Cost Per Kg</th>
+            <th>Default Unit</th>
+            <th>Status</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for ft in feed_types %}
+        <tr>
+            <td><strong>{{ ft.name }}</strong></td>
+            <td>{{ ft.brand|default:"—" }}</td>
+            <td>{{ ft.get_stage_display }}</td>
+            <td>{{ ft.cost_per_kg|floatformat:2 }}</td>
+            <td>{{ ft.default_unit }}</td>
+            <td>
+                {% if ft.is_active %}
+                    <span class="badge badge-on">Active</span>
+                {% else %}
+                    <span class="badge badge-off">Inactive</span>
+                {% endif %}
+            </td>
+            <td class="cell-actions">
+                <button type="button" class="btn btn-sm"
+                        onclick="editFeedType({{ ft.id }}, '{{ ft.name|escapejs }}', '{{ ft.brand|escapejs }}', '{{ ft.stage }}', '{{ ft.cost_per_kg }}', '{{ ft.default_unit }}', '{{ ft.kg_per_bag }}', {{ ft.is_active|yesno:"true,false" }})">
+                    <i class="fas fa-pen"></i>
+                </button>
+                <form method="post"
+                      action="{% url 'kuku_biz:feed_type_delete' ft.pk %}"
+                      onsubmit="return confirm('Delete this feed type?');">
+                    {% csrf_token %}
+                    <button class="btn btn-danger btn-sm">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="empty-state">
+    <i class="fas fa-seedling"></i>
+    <h3>No feed types yet</h3>
+    <p>Add your first feed product — e.g. "Layers Mash (Pembe)".</p>
+    <button type="button" class="btn btn-primary" onclick="openModal('addModal')">
+        <i class="fas fa-plus"></i> Add Feed Type
+    </button>
+</div>
+{% endif %}
+
+{# ── Add modal ── #}
+<div class="modal-overlay" id="addModal">
+    <div class="modal-box">
+        <h3><i class="fas fa-seedling"></i> Add Feed Type</h3>
+        <form method="post" action="{% url 'kuku_biz:feed_type_create' %}">
+            {% csrf_token %}
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Name <span class="required">*</span></label>
+                    <input type="text" name="name" required
+                           placeholder="e.g. Layers Mash">
+                </div>
+                <div class="form-group">
+                    <label>Brand</label>
+                    <input type="text" name="brand" placeholder="e.g. Pembe">
+                </div>
+            </div>
+            <div class="form-row three">
+                <div class="form-group">
+                    <label>Stage</label>
+                    <select name="stage">
+                        {% for code, label in stage_choices %}
+                            <option value="{{ code }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Cost / kg (KES)</label>
+                    <input type="number" name="cost_per_kg" step="0.01" min="0"
+                           placeholder="e.g. 58">
+                </div>
+                <div class="form-group">
+                    <label>Protein %</label>
+                    <input type="number" name="protein_percent" step="0.01"
+                           min="0" max="100" placeholder="Optional">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Default Unit</label>
+                    <select name="default_unit">
+                        <option value="kg">kg</option>
+                        <option value="bag">bag (50kg)</option>
+                        <option value="pcs">pcs</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Kg per bag</label>
+                    <input type="number" name="kg_per_bag" step="0.01"
+                           value="50" min="0">
+                </div>
+            </div>
+            <div class="form-group checkbox-row">
+                <input type="checkbox" name="is_active" id="add_active" checked>
+                <label for="add_active" style="margin:0;">Active</label>
+            </div>
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-check"></i> Add Feed Type
+                </button>
+                <button type="button" class="btn" onclick="closeModal('addModal')">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{# ── Edit modal ── #}
+<div class="modal-overlay" id="editModal">
+    <div class="modal-box">
+        <h3><i class="fas fa-pen"></i> Edit Feed Type</h3>
+        <form method="post" id="editForm" action="">
+            {% csrf_token %}
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Name <span class="required">*</span></label>
+                    <input type="text" name="name" id="e_name" required>
+                </div>
+                <div class="form-group">
+                    <label>Brand</label>
+                    <input type="text" name="brand" id="e_brand">
+                </div>
+            </div>
+            <div class="form-row three">
+                <div class="form-group">
+                    <label>Stage</label>
+                    <select name="stage" id="e_stage">
+                        {% for code, label in stage_choices %}
+                            <option value="{{ code }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Cost / kg (KES)</label>
+                    <input type="number" name="cost_per_kg" id="e_cost"
+                           step="0.01" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Kg per bag</label>
+                    <input type="number" name="kg_per_bag" id="e_kg_per_bag"
+                           step="0.01" min="0" value="50">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Default Unit</label>
+                <select name="default_unit" id="e_unit">
+                    <option value="kg">kg</option>
+                    <option value="bag">bag (50kg)</option>
+                    <option value="pcs">pcs</option>
+                </select>
+            </div>
+            <div class="form-group checkbox-row">
+                <input type="checkbox" name="is_active" id="e_active">
+                <label for="e_active" style="margin:0;">Active</label>
+            </div>
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-check"></i> Save Changes
+                </button>
+                <button type="button" class="btn" onclick="closeModal('editModal')">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openModal(id) {
+        document.getElementById(id).classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeModal(id) {
+        document.getElementById(id).classList.remove('active');
+        document.body.style.overflow = '';
+    }
+    document.querySelectorAll('.modal-overlay').forEach(function (o) {
+        o.addEventListener('click', function (e) {
+            if (e.target === this) closeModal(this.id);
+        });
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal-overlay.active').forEach(function (m) {
+                closeModal(m.id);
+            });
+        }
+    });
+
+    function editFeedType(id, name, brand, stage, cost, unit, kgPerBag, active) {
+        document.getElementById('editForm').action =
+            '/kuku_biz/feed-types/' + id + '/edit/';
+        document.getElementById('e_name').value = name;
+        document.getElementById('e_brand').value = brand;
+        document.getElementById('e_stage').value = stage;
+        document.getElementById('e_cost').value = cost;
+        document.getElementById('e_unit').value = unit;
+        document.getElementById('e_kg_per_bag').value = kgPerBag;
+        document.getElementById('e_active').checked = active;
+        openModal('editModal');
+    }
+</script>
+
+{% endblock %}
