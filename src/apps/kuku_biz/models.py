@@ -40,14 +40,12 @@ FLOCK_STATUS_CHOICES = [
     ('depleted', 'Depleted'),
 ]
 
-# What the customer is buying — one unit at a time
 EGG_UNIT_CHOICES = [
     ('egg', 'Individual Egg'),
     ('tray', 'Tray'),
     ('crate', 'Crate (360 eggs)'),
 ]
 
-# Physical tray size (how many eggs the tray holds)
 TRAY_SIZE_CHOICES = [
     (0,   '— Not an egg container —'),
     (1,   '1-Egg (Individual)'),
@@ -64,6 +62,17 @@ SALE_STATUS_CHOICES = [
     ('partial', 'Partially Paid'),
     ('credit', 'On Credit'),
     ('cancelled', 'Cancelled'),
+]
+
+FEED_RECORD_TYPE_CHOICES = [
+    ('purchase',    'Purchase (stock in)'),
+    ('consumption', 'Consumption (stock out)'),
+]
+
+FEED_PAYMENT_STATUS_CHOICES = [
+    ('paid',    'Paid'),
+    ('partial', 'Partially Paid'),
+    ('credit',  'On Credit'),
 ]
 
 HEALTH_TYPE_CHOICES = [
@@ -786,12 +795,18 @@ class EggSaleItem(models.Model):
         return "Egg"
 
 
+
 # ============================================================
-# FEED
+# FEED MODEL
 # ============================================================
 
 class FeedType(models.Model):
-    """Different feeds — layers mash, growers mash, broiler starter, etc."""
+    """
+    A feed product — layers mash, growers mash, broiler starter, etc.
+
+    Every FeedRecord (purchase or consumption) maps to a matching
+    InventoryItem line so stock levels stay in sync automatically.
+    """
 
     company = models.ForeignKey(
         'companies.Company',
@@ -807,19 +822,79 @@ class FeedType(models.Model):
     cost_per_kg = models.DecimalField(
         max_digits=10, decimal_places=2, default=0,
     )
+
+    STAGE_CHOICES = [
+        ('chick',    'Chick (0–8 weeks)'),
+        ('grower',   'Grower (9–18 weeks)'),
+        ('layer',    'Layer (19+ weeks)'),
+        ('broiler',  'Broiler'),
+        ('finisher', 'Finisher'),
+        ('other',    'Other'),
+    ]
+    stage = models.CharField(
+        max_length=20, choices=STAGE_CHOICES, default='other',
+        help_text="Life stage this feed is designed for",
+    )
+
+    default_unit = models.CharField(
+        max_length=20, default='kg',
+        help_text="Unit used when this feed hits inventory (kg, bag, etc.)",
+    )
+    kg_per_bag = models.DecimalField(
+        max_digits=10, decimal_places=2, default=50,
+        help_text="Only used when default_unit = 'bag'",
+    )
+
     is_active = models.BooleanField(default=True)
 
     class Meta:
         ordering = ['name']
         verbose_name = 'Feed Type'
         verbose_name_plural = 'Feed Types'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['company', 'name', 'brand'],
+                name='unique_feed_type_per_company',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.name}" + (f" ({self.brand})" if self.brand else "")
 
+    # ------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------
+    @property
+    def kg_per_unit(self):
+        """Kg represented by one inventory unit of this feed."""
+        if self.default_unit == 'bag':
+            return _to_decimal(self.kg_per_bag) or Decimal('50')
+        return Decimal('1')
+
+    def kg_to_units(self, kg):
+        """Convert kg → inventory units for this feed (Decimal)."""
+        kg = _to_decimal(kg)
+        per_unit = self.kg_per_unit
+        if not per_unit:
+            return kg
+        return kg / per_unit
+
+    def units_to_kg(self, units):
+        """Inverse of kg_to_units."""
+        units = _to_decimal(units)
+        return units * self.kg_per_unit
+
 
 class FeedRecord(models.Model):
-    """Feed purchased or consumed by a flock."""
+    """
+    Feed purchased OR consumed by a flock.
+
+    - record_type='purchase'    → stock IN (adds to inventory)
+    - record_type='consumption' → stock OUT (subtracts from inventory)
+
+    On save: auto-adjusts the linked InventoryItem's quantity.
+    On delete: reverses the adjustment.
+    """
 
     company = models.ForeignKey(
         'companies.Company',
@@ -831,22 +906,60 @@ class FeedRecord(models.Model):
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_feed_records',
-        help_text="Which branch/depot used this feed",
+        help_text="Which branch/depot this feed belongs to",
     )
     flock = models.ForeignKey(
         Flock, on_delete=models.CASCADE,
         related_name='feed_records',
+        null=True, blank=True,
+        help_text="Which flock this feed is for (blank for general stock)",
     )
     feed_type = models.ForeignKey(
         FeedType, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='records',
     )
-    date = models.DateField(default=timezone.now)
-    quantity_kg = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    supplier = models.CharField(max_length=150, blank=True)
-    notes = models.TextField(blank=True)
 
+    record_type = models.CharField(
+        max_length=20,
+        choices=FEED_RECORD_TYPE_CHOICES,
+        default='purchase',
+        help_text="Purchase = stock in, Consumption = stock out",
+    )
+
+    date = models.DateField(default=timezone.now)
+
+    # ── Quantities & money ──
+    quantity_kg = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+    )
+    cost = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+        help_text="Total cost (purchase only). 0 for consumption.",
+    )
+
+    # ── Purchase-only fields (ignored for consumption) ──
+    supplier = models.CharField(max_length=150, blank=True)
+    supplier_invoice = models.CharField(max_length=50, blank=True)
+    payment_status = models.CharField(
+        max_length=20,
+        choices=FEED_PAYMENT_STATUS_CHOICES,
+        default='paid',
+        blank=True,
+    )
+    amount_paid = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+    )
+
+    # ── Inventory linkage ──
+    inventory_item = models.ForeignKey(
+        'InventoryItem',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='feed_records',
+        help_text="Inventory line this feed was drawn from / added to",
+    )
+
+    notes = models.TextField(blank=True)
     recorded_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='kuku_feed_recorded',
@@ -854,13 +967,326 @@ class FeedRecord(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-date']
+        ordering = ['-date', '-created_at']
         verbose_name = 'Feed Record'
         verbose_name_plural = 'Feed Records'
 
     def __str__(self):
+        kind = 'IN' if self.record_type == 'purchase' else 'OUT'
+        who = self.flock.name if self.flock else 'General'
+        return f"[{kind}] {self.quantity_kg}kg — {who} — {self.date}"
+
+    # ------------------------------------------------------------
+    # Computed properties
+    # ------------------------------------------------------------
+    @property
+    def balance(self):
+        """Unpaid amount on a purchase record."""
+        if self.record_type != 'purchase':
+            return Decimal('0')
+        return _to_decimal(self.cost) - _to_decimal(self.amount_paid)
+
+    @property
+    def cost_per_kg(self):
+        if not self.quantity_kg:
+            return Decimal('0')
+        return _to_decimal(self.cost) / _to_decimal(self.quantity_kg)
+
+    @property
+    def signed_quantity(self):
+        """+kg for purchase, -kg for consumption."""
+        q = _to_decimal(self.quantity_kg)
+        return q if self.record_type == 'purchase' else -q
+
+    # ------------------------------------------------------------
+    # Inventory sync
+    # ------------------------------------------------------------
+    def _inventory_name(self):
+        """Canonical name used for the InventoryItem line."""
+        if self.feed_type:
+            base = self.feed_type.name
+            if self.feed_type.brand:
+                return f"{base} ({self.feed_type.brand})"
+            return base
+        return 'Feed'
+
+    def _find_or_create_inventory(self):
+        """
+        Locate (or create) the InventoryItem line this feed maps to.
+
+        Keyed on company + branch + name + item_type='feed_bag'.
+        IMPORTANT: branch may be None (company-wide stock) — that's fine.
+        """
+        name = self._inventory_name()
+        unit = self.feed_type.default_unit if self.feed_type else 'kg'
+
+        # Try to match an existing line for this feed type. Prefer exact
+        # name match, but fall back to ilike in case of legacy spacing.
+        inv = InventoryItem.objects.filter(
+            company=self.company,
+            branch=self.branch,
+            item_type='feed_bag',
+            name__iexact=name,
+        ).first()
+
+        if not inv:
+            inv = InventoryItem.objects.create(
+                company=self.company,
+                branch=self.branch,
+                name=name,
+                item_type='feed_bag',
+                quantity=0,
+                unit=unit,
+                cost_per_unit=(
+                    self.cost_per_kg
+                    if self.record_type == 'purchase'
+                    else (self.feed_type.cost_per_kg if self.feed_type else 0)
+                ),
+            )
+        return inv
+
+    def _apply_inventory_delta(self, sign=1):
+        """
+        Apply +/- this record's quantity to inventory.
+
+        sign = +1 → apply normally (called from save)
+        sign = -1 → reverse (called from delete)
+        """
+        if not self.quantity_kg:
+            return
+
+        inv = self.inventory_item or self._find_or_create_inventory()
+        if not inv:
+            return
+
+        # Convert kg → inventory units (Decimal throughout)
+        feed = self.feed_type
+        if feed:
+            units = feed.kg_to_units(self.quantity_kg)
+        else:
+            units = _to_decimal(self.quantity_kg)
+
+        # Purchase → +units, Consumption → -units
+        delta = units if self.record_type == 'purchase' else -units
+        delta *= sign
+
+        new_qty = _to_decimal(inv.quantity) + delta
+        if new_qty < 0:
+            new_qty = Decimal('0')
+        inv.quantity = new_qty
+        inv.save(update_fields=['quantity'])
+
+        # Link back to the record without triggering save() recursion
+        if self.inventory_item_id != inv.id:
+            FeedRecord.objects.filter(pk=self.pk).update(inventory_item=inv)
+            self.inventory_item = inv
+
+    # ------------------------------------------------------------
+    # Save / delete
+    # ------------------------------------------------------------
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+
+        # Auto-fill branch from flock
+        if not self.branch_id and self.flock_id:
+            self.branch = getattr(self.flock, 'branch', None)
+
+        # Auto-fill cost on purchase if blank and feed type has a price
+        if self.record_type == 'purchase' and not self.cost and self.quantity_kg:
+            if self.feed_type and self.feed_type.cost_per_kg:
+                self.cost = (
+                    _to_decimal(self.feed_type.cost_per_kg)
+                    * _to_decimal(self.quantity_kg)
+                )
+
+        # Consumption never carries a cost
+        if self.record_type == 'consumption':
+            self.cost = Decimal('0')
+            self.amount_paid = Decimal('0')
+            self.payment_status = 'paid'
+
+        super().save(*args, **kwargs)
+
+        # Only adjust inventory on first save to prevent double-counting
+        if is_new:
+            self._apply_inventory_delta(sign=1)
+
+    def delete(self, *args, **kwargs):
+        # Reverse the inventory delta before removing the row
+        try:
+            self._apply_inventory_delta(sign=-1)
+        except Exception:
+            pass
+        super().delete(*args, **kwargs)
+
+    def recompute_payment_status(self):
+        if self.record_type != 'purchase':
+            return self.payment_status
+        paid  = _to_decimal(self.amount_paid)
+        total = _to_decimal(self.cost)
+        if paid <= 0:
+            self.payment_status = 'credit'
+        elif paid < total:
+            self.payment_status = 'partial'
+        else:
+            self.payment_status = 'paid'
+        self.save(update_fields=['payment_status'])
+        return self.payment_status
+
+
+# ============================================================
+# FEED CONSUMPTION (daily ration per flock)
+# ============================================================
+
+class FeedConsumption(models.Model):
+    """
+    Daily feed given to a flock.
+
+    On save, auto-creates / updates a matching FeedRecord
+    (record_type='consumption') so inventory and cost reports stay in sync.
+    On delete, reverses both the record and its inventory impact.
+    """
+
+    company = models.ForeignKey(
+        'companies.Company',
+        on_delete=models.CASCADE,
+        related_name='kuku_feed_consumption',
+    )
+    branch = models.ForeignKey(
+        'epa_shop.Branch',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='kuku_feed_consumption',
+    )
+    flock = models.ForeignKey(
+        Flock, on_delete=models.CASCADE,
+        related_name='feed_consumption',
+    )
+    feed_type = models.ForeignKey(
+        FeedType, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='consumption_records',
+    )
+    date = models.DateField(default=timezone.now)
+    quantity_kg = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    inventory_item = models.ForeignKey(
+        'InventoryItem',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='feed_consumption',
+    )
+
+    notes = models.TextField(blank=True)
+    recorded_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='kuku_feed_consumption_recorded',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    # The linked stock-out FeedRecord (auto-created)
+    feed_record = models.OneToOneField(
+        FeedRecord,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='consumption_source',
+    )
+
+    class Meta:
+        ordering = ['-date', '-created_at']
+        verbose_name = 'Feed Consumption'
+        verbose_name_plural = 'Feed Consumption'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['flock', 'feed_type', 'date'],
+                name='unique_feed_consumption_per_day',
+            ),
+        ]
+
+    def __str__(self):
         return f"{self.flock.name} — {self.quantity_kg}kg on {self.date}"
 
+    # ------------------------------------------------------------
+    # Cost helper
+    # ------------------------------------------------------------
+    @property
+    def cost(self):
+        """Estimated cost of this consumption, using feed's cost/kg."""
+        if not self.feed_type:
+            return Decimal('0')
+        return (
+            _to_decimal(self.feed_type.cost_per_kg)
+            * _to_decimal(self.quantity_kg)
+        )
+
+    # ------------------------------------------------------------
+    # Save — create or sync the linked FeedRecord
+    # ------------------------------------------------------------
+    def save(self, *args, **kwargs):
+        if not self.branch_id and self.flock_id:
+            self.branch = getattr(self.flock, 'branch', None)
+
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+
+        # Create the matching stock-out FeedRecord on first save
+        if is_new and self.quantity_kg and not self.feed_record_id:
+            fr = FeedRecord.objects.create(
+                company=self.company,
+                branch=self.branch,
+                flock=self.flock,
+                feed_type=self.feed_type,
+                record_type='consumption',
+                date=self.date,
+                quantity_kg=self.quantity_kg,
+                notes=f"Auto from FeedConsumption #{self.pk}",
+                recorded_by=self.recorded_by,
+            )
+            self.feed_record = fr
+            self.inventory_item = fr.inventory_item
+            super().save(update_fields=['feed_record', 'inventory_item'])
+            return
+
+        # Sync on subsequent saves (edit path)
+        if not is_new and self.feed_record_id:
+            fr = self.feed_record
+
+            # Reverse the old inventory impact
+            try:
+                fr._apply_inventory_delta(sign=-1)
+            except Exception:
+                pass
+
+            # Apply the new values
+            fr.quantity_kg = self.quantity_kg
+            fr.date = self.date
+            fr.feed_type = self.feed_type
+            fr.flock = self.flock
+            fr.branch = self.branch
+            fr.recorded_by = self.recorded_by
+
+            # Save without triggering the "new record" hook
+            super(FeedRecord, fr).save()
+
+            # Re-apply inventory with the new quantity
+            fr._apply_inventory_delta(sign=1)
+
+            self.inventory_item = fr.inventory_item
+            super().save(update_fields=['inventory_item'])
+
+    # ------------------------------------------------------------
+    # Delete — clean up the linked FeedRecord too
+    # ------------------------------------------------------------
+    def delete(self, *args, **kwargs):
+        fr = self.feed_record
+        # Unlink first to avoid OneToOne SET_NULL cascade surprises
+        self.feed_record = None
+        super().save(update_fields=['feed_record']) if self.pk else None
+        super().delete(*args, **kwargs)
+        if fr:
+            try:
+                fr.delete()
+            except Exception:
+                pass
 
 # ============================================================
 # HEALTH
@@ -1153,7 +1579,12 @@ class InventoryItem(models.Model):
             media_url += '/'
         return f"{media_url}{key}"
 
+    @property
+    def stock_value(self):
+        return float(self.quantity) * float(self.cost_per_unit)
 
+
+        
 # ============================================================
 # PRICE HISTORY
 # ============================================================
