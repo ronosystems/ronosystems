@@ -1,131 +1,500 @@
 {% extends 'kuku_base.html' %}
 {% block title %}Mortality — Kuku Biz{% endblock %}
 {% block page_title %}Mortality Records{% endblock %}
-{% block page_subtitle %}<small>Deaths and culling</small>{% endblock %}
+{% block page_subtitle %}<small>Deaths, culling & loss tracking</small>{% endblock %}
 
 {% block extra_css %}
 <style>
     .page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px; }
+    .page-header h2 { margin:0; font-size:1.1rem; font-weight:700; }
+    .header-actions { display:flex; gap:10px; flex-wrap:wrap; }
+
     .btn { display:inline-flex; align-items:center; gap:8px; padding:11px 22px; border-radius:50px; border:2px solid #000; background:#fff; color:#000; text-decoration:none; font-weight:600; font-size:0.85rem; cursor:pointer; font-family:inherit; transition:all 0.2s; }
+    .btn:hover { transform:translateY(-1px); }
     .btn-primary { background:linear-gradient(90deg,#0a2f45 0%,#1fb4d2 100%); color:#fff; }
-    .btn-primary:hover { transform:translateY(-1px); box-shadow:0 8px 18px rgba(31,180,210,0.35); color:#fff; }
-    .kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:20px; }
-    .kpi-card { background:#fff; border:2px solid #000; border-radius:8px; padding:16px 18px; }
-    .kpi-label { font-size:0.7rem; text-transform:uppercase; letter-spacing:1px; font-weight:700; color:#6b7280; }
-    .kpi-value { font-size:1.5rem; font-weight:800; color:#1f2937; margin-top:4px; }
+    .btn-primary:hover { box-shadow:0 8px 18px rgba(31,180,210,0.35); color:#fff; }
+    .btn-outline { background:#fff; color:#0a2f45; }
+    .btn-outline:hover { background:#f0fbfd; }
+    .btn-sm { padding:6px 14px; font-size:0.75rem; }
+    .btn-danger { background:#fff; border-color:#dc2626; color:#dc2626; }
+    .btn-danger:hover { background:#fee2e2; }
+
+    /* Filter bar */
+    .filter-bar {
+        display:flex; gap:10px; align-items:flex-end;
+        margin-bottom:20px; flex-wrap:wrap;
+        background:#fff; border:2px solid #000; border-radius:8px;
+        padding:14px 18px;
+    }
+    .filter-group { display:flex; flex-direction:column; gap:4px; min-width:140px; }
+    .filter-group label {
+        font-size:0.7rem; font-weight:700; text-transform:uppercase;
+        letter-spacing:0.5px; color:#6b7280;
+    }
+    .filter-group select,
+    .filter-group input {
+        padding:8px 12px; border:2px solid #000; border-radius:6px;
+        font-family:inherit; font-size:0.85rem; background:#fff;
+    }
+    .filter-actions { margin-left:auto; display:flex; gap:8px; }
+
+    /* KPI cards */
+    .kpi-row {
+        display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+        gap:14px; margin-bottom:20px;
+    }
+    .kpi-card {
+        background:#fff; border:2px solid #000; border-radius:8px;
+        padding:16px 18px;
+    }
+    .kpi-card.bad { border-color:#dc2626; background:#fef2f2; }
+    .kpi-card.warn { border-color:#f59e0b; background:#fffbeb; }
+    .kpi-label {
+        font-size:0.7rem; text-transform:uppercase; letter-spacing:1px;
+        font-weight:700; color:#6b7280;
+    }
+    .kpi-value {
+        font-family:'Courier New',monospace; font-size:1.5rem;
+        font-weight:800; color:#1f2937; margin-top:4px;
+    }
+    .kpi-value.bad { color:#dc2626; }
     .kpi-sub { font-size:0.72rem; color:#9ca3af; margin-top:3px; }
-    .data-table { width:100%; background:#fff; border:2px solid #000; border-radius:8px; overflow:hidden; border-collapse:separate; border-spacing:0; }
+
+    /* Tables */
+    .data-table {
+        width:100%; background:#fff; border:2px solid #000;
+        border-radius:8px; overflow:hidden;
+        border-collapse:separate; border-spacing:0;
+    }
     .data-table thead { background:#f0fbfd; }
-    .data-table th { text-align:left; padding:14px 18px; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; font-weight:700; color:#374151; border-bottom:2px solid #000; }
-    .data-table td { padding:14px 18px; border-bottom:1px solid #e5e7eb; font-size:0.88rem; color:#1f2937; }
+    .data-table th {
+        text-align:left; padding:14px 18px;
+        font-size:0.72rem; text-transform:uppercase;
+        letter-spacing:1px; font-weight:700; color:#374151;
+        border-bottom:2px solid #000; white-space:nowrap;
+        vertical-align:middle;
+    }
+    .data-table td {
+        padding:12px 18px; border-bottom:1px solid #e5e7eb;
+        font-size:0.86rem; color:#1f2937;
+        vertical-align:middle;
+    }
     .data-table tr:last-child td { border-bottom:none; }
-    .data-table tr:hover { background:#f9fafb; }
-    .cell-num { font-family:'Courier New',monospace; font-weight:700; text-align:right; color:#dc2626; }
-    .badge { display:inline-block; padding:3px 10px; border-radius:50px; font-size:0.7rem; font-weight:600; border:1px solid #000; }
+    .data-table tbody tr:hover { background:#f9fafb; }
+
+    .cell-num {
+        font-family:'Courier New',monospace; font-weight:700;
+        text-align:right !important; white-space:nowrap;
+        padding-right:22px; width:1%;
+    }
+    .data-table th.cell-num { text-align:right !important; padding-right:22px; }
+    .cell-num.bad { color:#dc2626; }
+    .cell-actions {
+        text-align:right; white-space:nowrap; width:1%;
+    }
+    .cell-actions form { display:inline; }
+
+    /* Footer totals */
+    .data-table tfoot { background:#0a2f45; color:#fff; }
+    .data-table tfoot td {
+        padding:14px 18px; background:#0a2f45; color:#fff;
+        border-top:2px solid #000; font-weight:800;
+        font-size:0.88rem;
+    }
+    .data-table tfoot td.cell-num {
+        font-family:'Courier New',monospace; font-size:0.95rem;
+    }
+    .data-table tfoot .totals-label {
+        text-transform:uppercase; letter-spacing:1px;
+        font-size:0.72rem; color:#87CEEB; font-weight:700;
+    }
+
+    /* Badges */
+    .badge {
+        display:inline-block; padding:3px 10px; border-radius:50px;
+        font-size:0.68rem; font-weight:700; text-transform:uppercase;
+        letter-spacing:0.5px; white-space:nowrap;
+    }
     .badge-disease  { background:#fee2e2; color:#991b1b; }
     .badge-predator { background:#fef3c7; color:#92400e; }
     .badge-culled   { background:#dbeafe; color:#1e40af; }
     .badge-accident { background:#fce7f3; color:#9f1239; }
     .badge-unknown  { background:#e5e7eb; color:#4b5563; }
-    .empty-state { text-align:center; padding:60px 30px; background:#fff; border:2px dashed #9ca3af; border-radius:8px; }
+
+    .age-badge {
+        display:inline-block; padding:3px 8px; border-radius:50px;
+        font-size:0.65rem; font-weight:600;
+        background:#e0e7ff; color:#3730a3;
+        white-space:nowrap;
+    }
+
+    /* Section title */
+    .section-title {
+        font-size:0.95rem; font-weight:700; margin:24px 0 12px;
+        color:#0a2f45; display:flex; align-items:center; gap:8px;
+    }
+    .section-title .count {
+        margin-left:auto; font-size:0.75rem;
+        font-weight:500; color:#6b7280;
+    }
+
+    /* Cause breakdown bar chart (simple) */
+    .cause-bars { display:flex; flex-direction:column; gap:8px; }
+    .cause-row {
+        display:grid; grid-template-columns:110px 1fr 60px;
+        gap:10px; align-items:center;
+        font-size:0.82rem;
+    }
+    .cause-label { font-weight:600; color:#374151; }
+    .cause-track {
+        height:20px; background:#f3f4f6; border-radius:50px;
+        overflow:hidden;
+    }
+    .cause-fill {
+        height:100%; border-radius:50px;
+        transition:width 0.3s;
+    }
+    .cause-count {
+        font-family:'Courier New',monospace; font-weight:700;
+        text-align:right; color:#1f2937;
+    }
+
+    /* Empty state */
+    .empty-state {
+        text-align:center; padding:60px 30px; background:#fff;
+        border:2px dashed #9ca3af; border-radius:8px;
+    }
     .empty-state i { font-size:3rem; color:#87CEEB; margin-bottom:16px; }
     .empty-state h3 { margin:0 0 8px; color:#1f2937; }
     .empty-state p { color:#6b7280; margin-bottom:20px; }
-    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; justify-content:center; align-items:center; padding:20px; }
+
+    /* Modal */
+    .modal-overlay {
+        display:none; position:fixed; inset:0;
+        background:rgba(0,0,0,0.5); z-index:2000;
+        justify-content:center; align-items:center; padding:20px;
+    }
     .modal-overlay.active { display:flex; }
-    .modal-box { background:#fff; border:2px solid #000; border-radius:8px; padding:28px 32px; max-width:560px; width:100%; max-height:90vh; overflow-y:auto; }
-    .modal-box h3 { font-size:1.1rem; font-weight:700; margin-bottom:20px; padding-bottom:10px; border-bottom:2px solid #000; }
+    .modal-box {
+        background:#fff; border:2px solid #000; border-radius:8px;
+        padding:28px 32px; max-width:640px; width:100%;
+        max-height:90vh; overflow-y:auto;
+    }
+    .modal-box h3 {
+        font-size:1.05rem; font-weight:700; margin-bottom:20px;
+        padding-bottom:10px; border-bottom:2px solid #000;
+        display:flex; align-items:center; gap:8px;
+    }
     .form-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+    .form-row.three { grid-template-columns:1fr 1fr 1fr; }
+    @media (max-width:600px) {
+        .form-row, .form-row.three { grid-template-columns:1fr; }
+    }
     .form-group { margin-bottom:14px; }
-    .form-group label { display:block; font-weight:600; font-size:0.82rem; margin-bottom:5px; }
+    .form-group label {
+        display:block; font-weight:600; font-size:0.82rem; margin-bottom:5px;
+    }
     .form-group label .required { color:#dc2626; }
-    .form-group input, .form-group select, .form-group textarea { width:100%; padding:9px 12px; border:2px solid #000; border-radius:6px; font-family:inherit; font-size:0.88rem; background:#fff; }
-    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline:none; border-color:#1fb4d2; box-shadow:0 0 0 3px rgba(31,180,210,0.2); }
-    .modal-actions { display:flex; gap:10px; margin-top:20px; padding-top:16px; border-top:2px solid #000; }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width:100%; padding:9px 12px;
+        border:2px solid #000; border-radius:6px;
+        font-family:inherit; font-size:0.88rem;
+        background:#fff; box-sizing:border-box;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline:none; border-color:#1fb4d2;
+        box-shadow:0 0 0 3px rgba(31,180,210,0.2);
+    }
+    .form-group .help-text {
+        font-size:0.72rem; color:#6b7280; margin-top:4px;
+    }
+    .modal-actions {
+        display:flex; gap:10px; margin-top:20px;
+        padding-top:16px; border-top:2px solid #000;
+    }
+
+    @media (max-width:640px) {
+        .filter-actions { margin-left:0; width:100%; }
+        .data-table th, .data-table td { padding:10px 12px; font-size:0.78rem; }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 
+{# ============================================================ #}
+{# Page header #}
+{# ============================================================ #}
 <div class="page-header">
-    <h2 style="margin:0;font-size:1.1rem;font-weight:700;">Mortality Log</h2>
-    <button type="button" class="btn btn-primary" onclick="openModal()">
-        <i class="fas fa-plus"></i> Record Death
-    </button>
-</div>
-
-<div class="kpi-row">
-    <div class="kpi-card">
-        <div class="kpi-label">Deaths (Last 30 Days)</div>
-        <div class="kpi-value">{{ month_total }}</div>
-        <div class="kpi-sub">Across all flocks</div>
-    </div>
-    <div class="kpi-card">
-        <div class="kpi-label">Total Records</div>
-        <div class="kpi-value">{{ records|length }}</div>
-        <div class="kpi-sub">Showing latest 100</div>
-    </div>
-</div>
-
-{% if records %}
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Flock</th>
-                <th style="text-align:right;">Count</th>
-                <th>Cause</th>
-                <th>Notes</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for r in records %}
-            <tr>
-                <td>{{ r.date|date:"d M Y" }}</td>
-                <td><strong>{{ r.flock.name }}</strong></td>
-                <td class="cell-num">{{ r.count }}</td>
-                <td><span class="badge badge-{{ r.cause }}">{{ r.get_cause_display }}</span></td>
-                <td>{{ r.notes|default:"—"|truncatechars:60 }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-{% else %}
-    <div class="empty-state">
-        <i class="fas fa-triangle-exclamation"></i>
-        <h3>No mortality records</h3>
-        <p>Record deaths to keep flock counts accurate.</p>
+    <h2><i class="fas fa-triangle-exclamation" style="color:#dc2626;"></i> Mortality Log</h2>
+    <div class="header-actions">
         <button type="button" class="btn btn-primary" onclick="openModal()">
             <i class="fas fa-plus"></i> Record Death
         </button>
     </div>
+</div>
+
+{# ============================================================ #}
+{# Filters #}
+{# ============================================================ #}
+<form method="get" class="filter-bar">
+    <div class="filter-group">
+        <label>Flock</label>
+        <select name="flock">
+            <option value="">All flocks</option>
+            {% for f in flocks %}
+                <option value="{{ f.id }}"
+                    {% if selected_flock_id == f.id|stringformat:"s" %}selected{% endif %}>
+                    {{ f.name }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label>Cause</label>
+        <select name="cause">
+            <option value="">All causes</option>
+            <option value="disease"  {% if selected_cause == 'disease' %}selected{% endif %}>Disease</option>
+            <option value="predator" {% if selected_cause == 'predator' %}selected{% endif %}>Predator</option>
+            <option value="culled"   {% if selected_cause == 'culled' %}selected{% endif %}>Culled</option>
+            <option value="accident" {% if selected_cause == 'accident' %}selected{% endif %}>Accident</option>
+            <option value="unknown"  {% if selected_cause == 'unknown' %}selected{% endif %}>Unknown</option>
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label>Period</label>
+        <select name="period">
+            <option value="7"   {% if period_days == 7 %}selected{% endif %}>Last 7 days</option>
+            <option value="30"  {% if period_days == 30 %}selected{% endif %}>Last 30 days</option>
+            <option value="90"  {% if period_days == 90 %}selected{% endif %}>Last 90 days</option>
+            <option value="365" {% if period_days == 365 %}selected{% endif %}>Last year</option>
+            <option value="0"   {% if period_days == 0 %}selected{% endif %}>All time</option>
+        </select>
+    </div>
+
+    <div class="filter-actions">
+        <button type="submit" class="btn btn-primary">
+            <i class="fas fa-filter"></i> Apply
+        </button>
+        <a href="{% url 'kuku_biz:mortality_list' %}" class="btn btn-outline">
+            <i class="fas fa-times"></i> Reset
+        </a>
+    </div>
+</form>
+
+{# ============================================================ #}
+{# KPI cards #}
+{# ============================================================ #}
+<div class="kpi-row">
+    <div class="kpi-card {% if month_total %}bad{% endif %}">
+        <div class="kpi-label">Birds Lost (Period)</div>
+        <div class="kpi-value {% if month_total %}bad{% endif %}">{{ month_total|default:0 }}</div>
+        <div class="kpi-sub">death{{ month_total|pluralize }} recorded</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Estimated Loss Value</div>
+        <div class="kpi-value {% if total_loss_value %}bad{% endif %}">
+            KES {{ total_loss_value|default:0|floatformat:0 }}
+        </div>
+        <div class="kpi-sub">sum of estimated_loss</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Avg Loss / Bird</div>
+        <div class="kpi-value">KES {{ avg_loss_per_bird|default:0|floatformat:0 }}</div>
+        <div class="kpi-sub">total value ÷ birds lost</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Mortality Rate</div>
+        <div class="kpi-value {% if mortality_rate > 10 %}bad{% elif mortality_rate > 5 %}warn{% endif %}">
+            {{ mortality_rate|default:0|floatformat:1 }}%
+        </div>
+        <div class="kpi-sub">
+            {{ total_birds_lost|default:0 }} of {{ total_initial_birds|default:0 }} birds
+        </div>
+    </div>
+</div>
+
+{# ============================================================ #}
+{# Cause breakdown #}
+{# ============================================================ #}
+{% if cause_breakdown %}
+<div class="section-title">
+    <i class="fas fa-chart-bar"></i> Deaths by Cause
+    <span class="count">{{ month_total }} total in period</span>
+</div>
+
+<div class="cause-bars" style="background:#fff;border:2px solid #000;border-radius:8px;padding:18px 22px;margin-bottom:24px;">
+    {% for c in cause_breakdown %}
+    <div class="cause-row">
+        <span class="cause-label">{{ c.label }}</span>
+        <div class="cause-track">
+            <div class="cause-fill"
+                 style="width: {{ c.percent }}%;
+                        background: {{ c.color }};"></div>
+        </div>
+        <span class="cause-count">{{ c.count }}</span>
+    </div>
+    {% endfor %}
+</div>
 {% endif %}
 
-<!-- Modal -->
+{# ============================================================ #}
+{# Mortality log #}
+{# ============================================================ #}
+<div class="section-title">
+    <i class="fas fa-list"></i> Mortality Records
+    <span class="count">{{ records|length }} record{{ records|length|pluralize }}</span>
+</div>
+
+{% if records %}
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>Flock</th>
+            <th>Age Group</th>
+            <th class="cell-num">Count</th>
+            <th>Cause</th>
+            <th class="cell-num">Loss (KES)</th>
+            <th class="cell-num">Per Bird</th>
+            <th>Disposal</th>
+            <th>Symptoms / Action</th>
+            <th class="cell-actions"></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in records %}
+        <tr>
+            <td>{{ r.date|date:"d M Y" }}</td>
+            <td>
+                <a href="{% url 'kuku_biz:flock_detail' r.flock.pk %}"
+                   style="color:#0a2f45;text-decoration:none;font-weight:600;">
+                    {{ r.flock.name }}
+                </a>
+            </td>
+            <td>
+                {% if r.age_group and r.age_group != 'unknown' %}
+                    <span class="age-badge">{{ r.get_age_group_display }}</span>
+                {% else %}
+                    <span style="color:#9ca3af;">—</span>
+                {% endif %}
+            </td>
+            <td class="cell-num bad">{{ r.count }}</td>
+            <td>
+                <span class="badge badge-{{ r.cause }}">
+                    {{ r.get_cause_display }}
+                </span>
+            </td>
+            <td class="cell-num {% if r.estimated_loss %}bad{% endif %}">
+                {% if r.estimated_loss %}
+                    {{ r.estimated_loss|floatformat:0 }}
+                {% else %}
+                    <span style="color:#9ca3af;">—</span>
+                {% endif %}
+            </td>
+            <td class="cell-num">
+                {% if r.count and r.estimated_loss %}
+                    {{ r.loss_per_bird|floatformat:0 }}
+                {% else %}
+                    <span style="color:#9ca3af;">—</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if r.disposal_method and r.disposal_method != 'none' %}
+                    {{ r.get_disposal_method_display }}
+                {% else %}
+                    <span style="color:#9ca3af;">—</span>
+                {% endif %}
+            </td>
+            <td style="max-width:240px;color:#6b7280;font-size:0.78rem;">
+                {% if r.symptoms %}
+                    <div><strong style="color:#374151;">Symptoms:</strong> {{ r.symptoms|truncatechars:50 }}</div>
+                {% endif %}
+                {% if r.action_taken %}
+                    <div><strong style="color:#374151;">Action:</strong> {{ r.action_taken|truncatechars:50 }}</div>
+                {% endif %}
+                {% if not r.symptoms and not r.action_taken %}
+                    {{ r.notes|default:"—"|truncatechars:60 }}
+                {% endif %}
+            </td>
+            <td class="cell-actions">
+                <form method="post"
+                      action="{% url 'kuku_biz:mortality_delete' r.pk %}"
+                      onsubmit="return confirm('Delete this mortality record? Flock count will be recalculated.');">
+                    {% csrf_token %}
+                    <button class="btn btn-danger btn-sm" title="Delete">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+    <tfoot>
+        <tr>
+            <td colspan="3" class="totals-label">
+                <i class="fas fa-calculator"></i> Grand Total ({{ records|length }} record{{ records|length|pluralize }})
+            </td>
+            <td class="cell-num">{{ month_total|default:0 }}</td>
+            <td></td>
+            <td class="cell-num">{{ total_loss_value|default:0|floatformat:0 }}</td>
+            <td class="cell-num">{{ avg_loss_per_bird|default:0|floatformat:0 }}</td>
+            <td colspan="3"></td>
+        </tr>
+    </tfoot>
+</table>
+{% else %}
+<div class="empty-state">
+    <i class="fas fa-triangle-exclamation"></i>
+    <h3>No mortality records</h3>
+    <p>No deaths match your current filters. Record one to keep flock counts accurate.</p>
+    <button type="button" class="btn btn-primary" onclick="openModal()">
+        <i class="fas fa-plus"></i> Record Death
+    </button>
+</div>
+{% endif %}
+
+{# ============================================================ #}
+{# RECORD MODAL #}
+{# ============================================================ #}
 <div class="modal-overlay" id="mortalityModal">
     <div class="modal-box">
         <h3><i class="fas fa-triangle-exclamation"></i> Record Mortality</h3>
+
         <form method="post" action="{% url 'kuku_biz:mortality_create' %}">
             {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
             <div class="form-row">
                 <div class="form-group">
                     <label for="flock">Flock <span class="required">*</span></label>
                     <select id="flock" name="flock" required>
                         <option value="">— Select flock —</option>
                         {% for f in flocks %}
-                            <option value="{{ f.id }}">{{ f.name }} ({{ f.current_count }} birds)</option>
+                            <option value="{{ f.id }}">
+                                {{ f.name }} ({{ f.current_count }} birds)
+                            </option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="date">Date <span class="required">*</span></label>
-                    <input type="date" id="date" name="date" value="{{ today|date:'Y-m-d' }}" required>
+                    <input type="date" id="date" name="date"
+                           value="{{ today|date:'Y-m-d' }}" required>
                 </div>
             </div>
-            <div class="form-row">
+
+            <div class="form-row three">
                 <div class="form-group">
-                    <label for="count">Count <span class="required">*</span></label>
-                    <input type="number" id="count" name="count" min="1" required placeholder="e.g. 3">
+                    <label for="count">Birds Lost <span class="required">*</span></label>
+                    <input type="number" id="count" name="count"
+                           min="1" required placeholder="e.g. 3">
                 </div>
                 <div class="form-group">
                     <label for="cause">Cause</label>
@@ -134,26 +503,91 @@
                         <option value="predator">Predator</option>
                         <option value="culled">Culled</option>
                         <option value="accident">Accident</option>
+                        <option value="unknown" selected>Unknown</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="age_group">Age Group</label>
+                    <select id="age_group" name="age_group">
                         <option value="unknown">Unknown</option>
+                        <option value="chick">Chick (0–8 weeks)</option>
+                        <option value="grower">Grower (9–18 weeks)</option>
+                        <option value="layer">Layer (19+ weeks)</option>
+                        <option value="broiler">Broiler</option>
+                        <option value="adult">Adult (mixed)</option>
                     </select>
                 </div>
             </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="disposal_method">Disposal Method</label>
+                    <select id="disposal_method" name="disposal_method">
+                        <option value="none">Not recorded</option>
+                        <option value="buried">Buried</option>
+                        <option value="burned">Burned / Incinerated</option>
+                        <option value="compost">Composted</option>
+                        <option value="vet_necropsy">Sent to Vet (Necropsy)</option>
+                        <option value="sold">Sold (culled to market)</option>
+                        <option value="consumed">Consumed</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="estimated_loss">Estimated Loss (KES)</label>
+                    <input type="number" id="estimated_loss" name="estimated_loss"
+                           min="0" step="0.01" value="0"
+                           placeholder="e.g. 1500">
+                    <div class="help-text">Rough financial value lost</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="symptoms">Symptoms Observed</label>
+                <textarea id="symptoms" name="symptoms" rows="2"
+                          placeholder="e.g. ruffled feathers, bloody droppings, gasping"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="action_taken">Action Taken</label>
+                <textarea id="action_taken" name="action_taken" rows="2"
+                          placeholder="e.g. isolated flock, called vet, started antibiotics"></textarea>
+            </div>
+
             <div class="form-group">
                 <label for="notes">Notes</label>
-                <textarea id="notes" name="notes" rows="2" placeholder="Any observations"></textarea>
+                <textarea id="notes" name="notes" rows="2"
+                          placeholder="Anything else relevant"></textarea>
             </div>
+
             <div class="modal-actions">
-                <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Save</button>
-                <button type="button" class="btn" onclick="closeModal()"><i class="fas fa-times"></i> Cancel</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-check"></i> Save Record
+                </button>
+                <button type="button" class="btn" onclick="closeModal()">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
             </div>
         </form>
     </div>
 </div>
 
 <script>
-function openModal(){document.getElementById('mortalityModal').classList.add('active');document.body.style.overflow='hidden';}
-function closeModal(){document.getElementById('mortalityModal').classList.remove('active');document.body.style.overflow='';}
-document.getElementById('mortalityModal').addEventListener('click',function(e){if(e.target===this)closeModal();});
-document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();});
+    function openModal() {
+        var d = document.getElementById('date');
+        if (d && !d.value) d.value = new Date().toISOString().split('T')[0];
+        document.getElementById('mortalityModal').classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeModal() {
+        document.getElementById('mortalityModal').classList.remove('active');
+        document.body.style.overflow = '';
+    }
+    document.getElementById('mortalityModal').addEventListener('click', function (e) {
+        if (e.target === this) closeModal();
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeModal();
+    });
 </script>
+
 {% endblock %}

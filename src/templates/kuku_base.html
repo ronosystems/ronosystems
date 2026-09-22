@@ -566,7 +566,7 @@
         </div>
 
         <!-- Navigation -->
-        <div class="sidebar-nav-wrapper">
+        <div class="sidebar-nav-wrapper" id="sidebarNavWrapper">
             <nav class="sidebar-nav">
                 <ul class="nav flex-column">
 
@@ -582,8 +582,6 @@
                             <i class="fas fa-chart-pie"></i> <span>Dashboard</span>
                         </a>
                     </li>
-
-                    
 
                     {% if company and user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager'  or user.role == 'mpesa_agent' %}
                     <li class="nav-label">MPESA SHOP</li>
@@ -672,7 +670,7 @@
                              <i class="fas fa-utensils"></i> <span>Consumption</span>
                         </a>
                     </li>
-    
+
                     <li class="nav-item">
                         <a class="nav-link {% if '/kuku_biz/health/' in request.path %}active{% endif %}"
                            href="/kuku_biz/health/">
@@ -716,7 +714,7 @@
                     </li>
 
                     <li class="nav-item">
-                        <a class="nav-link {% if '/company/join-requests/' in request.path %}active{% endif %}"
+                        <a class="nav-link {% if request.resolver_match.url_name == 'company-join-requests' %}active{% endif %}"
                            href="{% url 'companies:company-join-requests' company.id %}">
                             <i class="fas fa-user-plus"></i> <span>Join Requests</span>
                             {% if pending_join_requests_count and pending_join_requests_count > 0 %}
@@ -950,7 +948,9 @@
 
     <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
     <script>
-        // Sidebar toggle
+        // ============================================================
+        // SIDEBAR COLLAPSE / EXPAND
+        // ============================================================
         const sidebar = document.getElementById('sidebar');
         const mainContent = document.getElementById('mainContent');
         const toggleBtn = document.getElementById('sidebarToggleBtn');
@@ -973,7 +973,72 @@
             localStorage.setItem('sidebarCollapsed', isCollapsed);
         });
 
-        // Mobile toggle
+        // ============================================================
+        // SIDEBAR SCROLL PERSISTENCE
+        // - Remembers scroll position across page loads
+        // - Scrolls the active link into view when arriving on a page
+        // - Uses try/catch so browsers that block localStorage don't
+        //   crash this script
+        // ============================================================
+        (function () {
+            var wrapper = document.getElementById('sidebarNavWrapper');
+            if (!wrapper) return;
+
+            // Per-user storage key so different users on a shared browser
+            // don't stomp on each other's scroll position.
+            var STORAGE_KEY = 'kuku_sidebar_scroll_{{ user.id|default:"anon" }}';
+
+            function loadScroll() {
+                try { return localStorage.getItem(STORAGE_KEY); }
+                catch (e) { return null; }
+            }
+            function saveScroll(value) {
+                try { localStorage.setItem(STORAGE_KEY, value); }
+                catch (e) { /* localStorage unavailable — silently ignore */ }
+            }
+
+            // 1) Restore previous scroll position on load
+            var savedScroll = loadScroll();
+            if (savedScroll !== null) {
+                wrapper.scrollTop = parseInt(savedScroll, 10) || 0;
+            }
+
+            // 2) If a nav-link is marked .active, scroll it into view
+            var activeLink = wrapper.querySelector('.nav-link.active');
+            if (activeLink) {
+                setTimeout(function () {
+                    activeLink.scrollIntoView({
+                        block: 'center',
+                        behavior: 'smooth'
+                    });
+                }, 50);
+            }
+
+            // 3) Save scroll position continuously as user scrolls (debounced)
+            var saveTimer = null;
+            wrapper.addEventListener('scroll', function () {
+                if (saveTimer) clearTimeout(saveTimer);
+                saveTimer = setTimeout(function () {
+                    saveScroll(wrapper.scrollTop);
+                }, 150);
+            });
+
+            // 4) Also save right before navigating away
+            window.addEventListener('beforeunload', function () {
+                saveScroll(wrapper.scrollTop);
+            });
+
+            // 5) Save the moment a sidebar nav-link is clicked
+            wrapper.querySelectorAll('.nav-link').forEach(function (link) {
+                link.addEventListener('click', function () {
+                    saveScroll(wrapper.scrollTop);
+                });
+            });
+        })();
+
+        // ============================================================
+        // MOBILE SIDEBAR
+        // ============================================================
         const mobileToggle = document.getElementById('sidebarToggleMobile');
         const overlay = document.getElementById('sidebarOverlay');
 
@@ -994,7 +1059,9 @@
             }
         });
 
-        // Ctrl+B shortcut
+        // ============================================================
+        // CTRL+B SHORTCUT — toggle sidebar
+        // ============================================================
         document.addEventListener('keydown', function(e) {
             if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
                 e.preventDefault();
@@ -1002,6 +1069,9 @@
             }
         });
 
+        // ============================================================
+        // SUPPORT MODE TIMER
+        // ============================================================
         {% if is_support_mode %}
         (function() {
             const startedAtStr = "{{ request.session.support_started_at|default:'' }}";

@@ -15,7 +15,6 @@
     <link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-
     <style>
         :root {
             --sidebar-width: 280px;
@@ -488,7 +487,7 @@
         .alert-info    { background: #cce5ff; color: #004085; border-color: #000000; }
 
         /* ============================================
-           SUPPORT MODE BANNER — now INSIDE main-content
+           SUPPORT MODE BANNER
         ============================================ */
         .support-mode-banner {
             background: linear-gradient(135deg, #ff6b35 0%, #dc3545 100%);
@@ -727,7 +726,7 @@
         </div>
 
         <!-- Navigation (Scrollable) -->
-        <div class="sidebar-nav-wrapper">
+        <div class="sidebar-nav-wrapper" id="sidebarNavWrapper">
             <nav class="sidebar-nav">
                 <ul class="nav flex-column">
 
@@ -938,8 +937,8 @@
 
                                     {% if company %}
                                     <li class="nav-item">
-                                        <a class="nav-link {% if '/company/join-requests/' in request.path %}active{% endif %}"
-                                           href="{% url 'companies:company-join-requests' company.id %}">
+                                        <a class="nav-link {% if request.resolver_match.url_name == 'company-join-requests' %}active{% endif %}"
+                                           href="{% url 'companies:company-join-requests' company.id %}">                
                                             <i class="fas fa-user-plus"></i> <span>Join Requests</span>
                                             {% if pending_join_requests_count and pending_join_requests_count > 0 %}
                                                 <span class="badge bg-danger">{{ pending_join_requests_count }}</span>
@@ -1052,9 +1051,7 @@
     ============================================ -->
     <div class="main-content" id="mainContent">
 
-        <!-- ============================================ -->
-        <!-- SUPPORT MODE BANNER — now at top of main content -->
-        <!-- ============================================ -->
+        <!-- SUPPORT MODE BANNER -->
         {% if is_support_mode and support_company %}
         <div class="support-mode-banner">
             <div class="support-mode-content">
@@ -1153,7 +1150,9 @@
     ============================================ -->
     <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
     <script>
-        // Sidebar Toggle
+        // ============================================================
+        // SIDEBAR COLLAPSE / EXPAND
+        // ============================================================
         const sidebar = document.getElementById('sidebar');
         const mainContent = document.getElementById('mainContent');
         const toggleBtn = document.getElementById('sidebarToggleBtn');
@@ -1176,7 +1175,72 @@
             localStorage.setItem('sidebarCollapsed', isCollapsed);
         });
 
-        // Mobile Toggle
+        // ============================================================
+        // SIDEBAR SCROLL PERSISTENCE
+        // - Remembers scroll position across page loads
+        // - Scrolls the active link into view when arriving on a page
+        // - try/catch protects against browsers that block localStorage
+        //   (Safari private mode, some corporate policies)
+        // ============================================================
+        (function () {
+            var wrapper = document.getElementById('sidebarNavWrapper');
+            if (!wrapper) return;
+
+            // Per-user key so multiple users on a shared browser
+            // don't overwrite each other's scroll position.
+            var STORAGE_KEY = 'sidebar_scroll_{{ user.id|default:"anon" }}';
+
+            function loadScroll() {
+                try { return localStorage.getItem(STORAGE_KEY); }
+                catch (e) { return null; }
+            }
+            function saveScroll(value) {
+                try { localStorage.setItem(STORAGE_KEY, value); }
+                catch (e) { /* silently ignore */ }
+            }
+
+            // 1) Restore previous scroll position on load
+            var savedScroll = loadScroll();
+            if (savedScroll !== null) {
+                wrapper.scrollTop = parseInt(savedScroll, 10) || 0;
+            }
+
+            // 2) If a nav-link is marked .active, scroll it into view
+            var activeLink = wrapper.querySelector('.nav-link.active');
+            if (activeLink) {
+                setTimeout(function () {
+                    activeLink.scrollIntoView({
+                        block: 'center',
+                        behavior: 'smooth'
+                    });
+                }, 50);
+            }
+
+            // 3) Save scroll position continuously as user scrolls (debounced)
+            var saveTimer = null;
+            wrapper.addEventListener('scroll', function () {
+                if (saveTimer) clearTimeout(saveTimer);
+                saveTimer = setTimeout(function () {
+                    saveScroll(wrapper.scrollTop);
+                }, 150);
+            });
+
+            // 4) Save right before navigating away
+            window.addEventListener('beforeunload', function () {
+                saveScroll(wrapper.scrollTop);
+            });
+
+            // 5) Save the moment a sidebar nav-link is clicked
+            wrapper.querySelectorAll('.nav-link').forEach(function (link) {
+                link.addEventListener('click', function () {
+                    saveScroll(wrapper.scrollTop);
+                });
+            });
+        })();
+
+        // ============================================================
+        // MOBILE SIDEBAR
+        // ============================================================
         const mobileToggle = document.getElementById('sidebarToggleMobile');
         const overlay = document.getElementById('sidebarOverlay');
 
@@ -1197,7 +1261,9 @@
             }
         });
 
-        // Keyboard Shortcut: Ctrl+B
+        // ============================================================
+        // CTRL+B SHORTCUT — toggle sidebar
+        // ============================================================
         document.addEventListener('keydown', function(e) {
             if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
                 e.preventDefault();
@@ -1205,7 +1271,9 @@
             }
         });
 
-        // Search
+        // ============================================================
+        // GLOBAL SEARCH — filters cards / list-items / table rows
+        // ============================================================
         const globalSearch = document.getElementById('globalSearch');
         if (globalSearch) {
             globalSearch.addEventListener('keyup', function(e) {
@@ -1236,8 +1304,10 @@
             });
         }
 
+        // ============================================================
+        // SUPPORT MODE TIMER
+        // ============================================================
         {% if is_support_mode %}
-        // Live timer for support session
         (function() {
             const startedAtStr = "{{ request.session.support_started_at|default:'' }}";
             const elapsedEl = document.getElementById('supportElapsed');

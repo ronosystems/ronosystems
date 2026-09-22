@@ -1,184 +1,653 @@
 {% extends 'kuku_base.html' %}
 {% block title %}Expenses — Kuku Biz{% endblock %}
 {% block page_title %}Expenses{% endblock %}
-{% block page_subtitle %}<small>Farm operating costs</small>{% endblock %}
+{% block page_subtitle %}<small>Track farm costs and payments</small>{% endblock %}
 
 {% block extra_css %}
 <style>
     .page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px; }
+    .page-header h2 { margin:0; font-size:1.1rem; font-weight:700; }
+    .header-actions { display:flex; gap:10px; flex-wrap:wrap; }
+
     .btn { display:inline-flex; align-items:center; gap:8px; padding:11px 22px; border-radius:50px; border:2px solid #000; background:#fff; color:#000; text-decoration:none; font-weight:600; font-size:0.85rem; cursor:pointer; font-family:inherit; transition:all 0.2s; }
+    .btn:hover { transform:translateY(-1px); }
     .btn-primary { background:linear-gradient(90deg,#0a2f45 0%,#1fb4d2 100%); color:#fff; }
-    .btn-primary:hover { transform:translateY(-1px); box-shadow:0 8px 18px rgba(31,180,210,0.35); color:#fff; }
-    .kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:20px; }
+    .btn-primary:hover { box-shadow:0 8px 18px rgba(31,180,210,0.35); color:#fff; }
+    .btn-outline { background:#fff; color:#0a2f45; }
+    .btn-outline:hover { background:#f0fbfd; }
+    .btn-sm { padding:6px 14px; font-size:0.75rem; }
+    .btn-danger { background:#fff; border-color:#dc2626; color:#dc2626; }
+    .btn-danger:hover { background:#fee2e2; }
+
+    /* Filter bar */
+    .filter-bar {
+        display:flex; gap:10px; align-items:flex-end; margin-bottom:20px;
+        flex-wrap:wrap; background:#fff; border:2px solid #000;
+        border-radius:8px; padding:14px 18px;
+    }
+    .filter-group { display:flex; flex-direction:column; gap:4px; min-width:140px; }
+    .filter-group label {
+        font-size:0.7rem; font-weight:700; text-transform:uppercase;
+        letter-spacing:0.5px; color:#6b7280;
+    }
+    .filter-group select,
+    .filter-group input {
+        padding:8px 12px; border:2px solid #000; border-radius:6px;
+        font-family:inherit; font-size:0.85rem; background:#fff;
+    }
+    .filter-actions { margin-left:auto; display:flex; gap:8px; }
+
+    /* KPI cards */
+    .kpi-row {
+        display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+        gap:14px; margin-bottom:20px;
+    }
     .kpi-card { background:#fff; border:2px solid #000; border-radius:8px; padding:16px 18px; }
-    .kpi-label { font-size:0.7rem; text-transform:uppercase; letter-spacing:1px; font-weight:700; color:#6b7280; }
-    .kpi-value { font-size:1.5rem; font-weight:800; color:#1f2937; margin-top:4px; }
+    .kpi-card.warn { border-color:#f59e0b; background:#fffbeb; }
+    .kpi-label {
+        font-size:0.7rem; text-transform:uppercase; letter-spacing:1px;
+        font-weight:700; color:#6b7280;
+    }
+    .kpi-value {
+        font-family:'Courier New',monospace; font-size:1.5rem;
+        font-weight:800; color:#1f2937; margin-top:4px;
+    }
     .kpi-sub { font-size:0.72rem; color:#9ca3af; margin-top:3px; }
-    .data-table { width:100%; background:#fff; border:2px solid #000; border-radius:8px; overflow:hidden; border-collapse:separate; border-spacing:0; }
+
+    /* Tables */
+    .data-table {
+        width:100%; background:#fff; border:2px solid #000;
+        border-radius:8px; overflow:hidden;
+        border-collapse:separate; border-spacing:0;
+    }
     .data-table thead { background:#f0fbfd; }
-    .data-table th { text-align:left; padding:14px 18px; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; font-weight:700; color:#374151; border-bottom:2px solid #000; }
-    .data-table td { padding:14px 18px; border-bottom:1px solid #e5e7eb; font-size:0.88rem; color:#1f2937; }
+    .data-table th {
+        text-align:left; padding:14px 18px;
+        font-size:0.72rem; text-transform:uppercase;
+        letter-spacing:1px; font-weight:700; color:#374151;
+        border-bottom:2px solid #000; white-space:nowrap;
+    }
+    .data-table td {
+        padding:12px 18px; border-bottom:1px solid #e5e7eb;
+        font-size:0.86rem; color:#1f2937; vertical-align:middle;
+    }
     .data-table tr:last-child td { border-bottom:none; }
-    .data-table tr:hover { background:#f9fafb; }
-    .cell-num { font-family:'Courier New',monospace; font-weight:700; text-align:right; color:#dc2626; }
-    .badge { display:inline-block; padding:3px 10px; border-radius:50px; font-size:0.7rem; font-weight:600; border:1px solid #000; }
-    .badge-feed       { background:#fef3c7; color:#92400e; }
-    .badge-labour     { background:#dbeafe; color:#1e40af; }
-    .badge-utilities  { background:#e0e7ff; color:#3730a3; }
-    .badge-equipment  { background:#fce7f3; color:#9f1239; }
-    .badge-transport  { background:#d1fae5; color:#065f46; }
-    .badge-veterinary { background:#fee2e2; color:#991b1b; }
-    .badge-chicks     { background:#ffedd5; color:#9a3412; }
-    .badge-other      { background:#e5e7eb; color:#4b5563; }
-    .empty-state { text-align:center; padding:60px 30px; background:#fff; border:2px dashed #9ca3af; border-radius:8px; }
+    .data-table tbody tr:hover { background:#f9fafb; }
+
+    .cell-num {
+        font-family:'Courier New',monospace; font-weight:700;
+        text-align:right !important; white-space:nowrap;
+        padding-right:22px; width:1%;
+    }
+    .data-table th.cell-num { text-align:right !important; padding-right:22px; }
+    .cell-actions { text-align:right; white-space:nowrap; width:1%; }
+    .cell-actions form { display:inline; }
+
+    .data-table tfoot { background:#0a2f45; color:#fff; }
+    .data-table tfoot td {
+        padding:14px 18px; background:#0a2f45; color:#fff;
+        border-top:2px solid #000; font-weight:800; font-size:0.88rem;
+    }
+    .data-table tfoot td.cell-num {
+        font-family:'Courier New',monospace; font-size:0.95rem;
+    }
+    .data-table tfoot .totals-label {
+        text-transform:uppercase; letter-spacing:1px;
+        font-size:0.72rem; color:#87CEEB; font-weight:700;
+    }
+
+    /* Badges */
+    .badge {
+        display:inline-block; padding:3px 10px; border-radius:50px;
+        font-size:0.68rem; font-weight:700; text-transform:uppercase;
+        letter-spacing:0.5px; white-space:nowrap;
+    }
+    .badge-paid    { background:#d1fae5; color:#065f46; }
+    .badge-partial { background:#fef3c7; color:#92400e; }
+    .badge-credit  { background:#fee2e2; color:#991b1b; }
+
+    .cat-badge {
+        display:inline-block; padding:3px 10px; border-radius:50px;
+        font-size:0.68rem; font-weight:600;
+        background:#e0e7ff; color:#3730a3;
+        white-space:nowrap;
+    }
+
+    /* Section title */
+    .section-title {
+        font-size:0.95rem; font-weight:700; margin:24px 0 12px;
+        color:#0a2f45; display:flex; align-items:center; gap:8px;
+    }
+    .section-title .count {
+        margin-left:auto; font-size:0.75rem;
+        font-weight:500; color:#6b7280;
+    }
+
+    /* Category bars */
+    .cat-bars {
+        background:#fff; border:2px solid #000; border-radius:8px;
+        padding:18px 22px; margin-bottom:24px;
+    }
+    .cat-row {
+        display:grid; grid-template-columns:160px 1fr 100px 80px;
+        gap:10px; align-items:center; font-size:0.82rem;
+        margin-bottom:8px;
+    }
+    .cat-row:last-child { margin-bottom:0; }
+    .cat-label { font-weight:600; color:#374151; }
+    .cat-track {
+        height:20px; background:#f3f4f6; border-radius:50px;
+        overflow:hidden;
+    }
+    .cat-fill {
+        height:100%; border-radius:50px;
+        background:linear-gradient(90deg,#0a2f45 0%,#1fb4d2 100%);
+        transition:width 0.3s;
+    }
+    .cat-amount {
+        font-family:'Courier New',monospace; font-weight:700;
+        text-align:right; color:#0a2f45;
+    }
+    .cat-count {
+        font-size:0.72rem; color:#9ca3af; text-align:right;
+    }
+
+    /* Empty state */
+    .empty-state {
+        text-align:center; padding:60px 30px; background:#fff;
+        border:2px dashed #9ca3af; border-radius:8px;
+    }
     .empty-state i { font-size:3rem; color:#87CEEB; margin-bottom:16px; }
     .empty-state h3 { margin:0 0 8px; color:#1f2937; }
     .empty-state p { color:#6b7280; margin-bottom:20px; }
-    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; justify-content:center; align-items:center; padding:20px; }
+
+    /* Modal */
+    .modal-overlay {
+        display:none; position:fixed; inset:0;
+        background:rgba(0,0,0,0.5); z-index:2000;
+        justify-content:center; align-items:center; padding:20px;
+    }
     .modal-overlay.active { display:flex; }
-    .modal-box { background:#fff; border:2px solid #000; border-radius:8px; padding:28px 32px; max-width:600px; width:100%; max-height:90vh; overflow-y:auto; }
-    .modal-box h3 { font-size:1.1rem; font-weight:700; margin-bottom:20px; padding-bottom:10px; border-bottom:2px solid #000; }
+    .modal-box {
+        background:#fff; border:2px solid #000; border-radius:8px;
+        padding:28px 32px; max-width:640px; width:100%;
+        max-height:90vh; overflow-y:auto;
+    }
+    .modal-box h3 {
+        font-size:1.05rem; font-weight:700; margin-bottom:20px;
+        padding-bottom:10px; border-bottom:2px solid #000;
+        display:flex; align-items:center; gap:8px;
+    }
     .form-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+    .form-row.three { grid-template-columns:1fr 1fr 1fr; }
+    @media (max-width:600px) {
+        .form-row, .form-row.three { grid-template-columns:1fr; }
+    }
     .form-group { margin-bottom:14px; }
-    .form-group label { display:block; font-weight:600; font-size:0.82rem; margin-bottom:5px; }
+    .form-group label {
+        display:block; font-weight:600; font-size:0.82rem; margin-bottom:5px;
+    }
     .form-group label .required { color:#dc2626; }
-    .form-group input, .form-group select, .form-group textarea { width:100%; padding:9px 12px; border:2px solid #000; border-radius:6px; font-family:inherit; font-size:0.88rem; background:#fff; }
-    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline:none; border-color:#1fb4d2; box-shadow:0 0 0 3px rgba(31,180,210,0.2); }
-    .modal-actions { display:flex; gap:10px; margin-top:20px; padding-top:16px; border-top:2px solid #000; }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width:100%; padding:9px 12px;
+        border:2px solid #000; border-radius:6px;
+        font-family:inherit; font-size:0.88rem;
+        background:#fff; box-sizing:border-box;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline:none; border-color:#1fb4d2;
+        box-shadow:0 0 0 3px rgba(31,180,210,0.2);
+    }
+    .form-group .help-text {
+        font-size:0.72rem; color:#6b7280; margin-top:4px;
+    }
+    .modal-actions {
+        display:flex; gap:10px; margin-top:20px;
+        padding-top:16px; border-top:2px solid #000;
+    }
+
+    @media (max-width:640px) {
+        .filter-actions { margin-left:0; width:100%; }
+        .data-table th, .data-table td { padding:10px 12px; font-size:0.78rem; }
+        .cat-row { grid-template-columns:1fr; gap:4px; }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 
+{# ── Page header ── #}
 <div class="page-header">
-    <h2 style="margin:0;font-size:1.1rem;font-weight:700;">Expense Log</h2>
-    <button type="button" class="btn btn-primary" onclick="openModal()">
+    <h2><i class="fas fa-wallet" style="color:#0a2f45;"></i> Expenses Log</h2>
+    <div class="header-actions">
+        <button type="button" class="btn btn-primary" onclick="openExpenseModal()">
+            <i class="fas fa-plus"></i> Record Expense
+        </button>
+    </div>
+</div>
+
+{# ── Filters ── #}
+<form method="get" class="filter-bar">
+    {% if can_see_all_branches %}
+    <div class="filter-group">
+        <label>Branch</label>
+        <select name="branch">
+            <option value="">All branches</option>
+            {% for b in branches %}
+                <option value="{{ b.id }}"
+                    {% if selected_branch_id == b.id|stringformat:"s" %}selected{% endif %}>
+                    {{ b.name }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+    {% endif %}
+
+    <div class="filter-group">
+        <label>Category</label>
+        <select name="category">
+            <option value="">All categories</option>
+            {% for code, label in categories %}
+                <option value="{{ code }}"
+                    {% if selected_category == code %}selected{% endif %}>
+                    {{ label }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label>Flock</label>
+        <select name="flock">
+            <option value="">All flocks</option>
+            {% for f in flocks %}
+                <option value="{{ f.id }}"
+                    {% if selected_flock_id == f.id|stringformat:"s" %}selected{% endif %}>
+                    {{ f.name }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label>Period</label>
+        <select name="period">
+            <option value="7"   {% if period_days == 7 %}selected{% endif %}>Last 7 days</option>
+            <option value="30"  {% if period_days == 30 %}selected{% endif %}>Last 30 days</option>
+            <option value="90"  {% if period_days == 90 %}selected{% endif %}>Last 90 days</option>
+            <option value="365" {% if period_days == 365 %}selected{% endif %}>Last year</option>
+            <option value="0"   {% if period_days == 0 %}selected{% endif %}>All time</option>
+        </select>
+    </div>
+
+    <div class="filter-actions">
+        <button type="submit" class="btn btn-primary">
+            <i class="fas fa-filter"></i> Apply
+        </button>
+        <a href="{% url 'kuku_biz:expense_list' %}" class="btn btn-outline">
+            <i class="fas fa-times"></i> Reset
+        </a>
+    </div>
+</form>
+
+{# ── KPI cards ── #}
+<div class="kpi-row">
+    <div class="kpi-card">
+        <div class="kpi-label">Total Expenses</div>
+        <div class="kpi-value">KES {{ total_amount|default:0|floatformat:0 }}</div>
+        <div class="kpi-sub">{{ record_count }} record{{ record_count|pluralize }}</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Paid</div>
+        <div class="kpi-value">KES {{ total_paid|default:0|floatformat:0 }}</div>
+        <div class="kpi-sub">settled to date</div>
+    </div>
+    <div class="kpi-card {% if total_balance > 0 %}warn{% endif %}">
+        <div class="kpi-label">Unpaid</div>
+        <div class="kpi-value">KES {{ total_balance|default:0|floatformat:0 }}</div>
+        <div class="kpi-sub">owed to vendors</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Avg / Record</div>
+        <div class="kpi-value">
+            KES {% if record_count %}{{ total_amount|floatformat:0 }}{% else %}0{% endif %}
+        </div>
+        <div class="kpi-sub">per transaction</div>
+    </div>
+</div>
+
+{# ── Category breakdown ── #}
+{% if category_breakdown %}
+<div class="section-title">
+    <i class="fas fa-chart-bar"></i> Breakdown by Category
+    <span class="count">{{ category_breakdown|length }} categor{{ category_breakdown|length|pluralize:"y,ies" }}</span>
+</div>
+
+<div class="cat-bars">
+    {% for c in category_breakdown %}
+    <div class="cat-row">
+        <span class="cat-label">{{ c.label }}</span>
+        <div class="cat-track">
+            <div class="cat-fill" style="width: {{ c.percent }}%;"></div>
+        </div>
+        <span class="cat-amount">KES {{ c.total|floatformat:0 }}</span>
+        <span class="cat-count">{{ c.count }} rec</span>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{# ── Per-flock summary ── #}
+{% if flock_summary %}
+<div class="section-title">
+    <i class="fas fa-kiwi-bird"></i> Top Flocks by Expense (Last 30 Days)
+</div>
+<table class="data-table" style="margin-bottom:24px;">
+    <thead>
+        <tr>
+            <th>Flock</th>
+            <th>Branch</th>
+            <th class="cell-num">Total Expenses (KES)</th>
+            <th class="cell-num">Birds</th>
+            <th class="cell-num">Cost / Bird</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in flock_summary %}
+        <tr>
+            <td>
+                <a href="{% url 'kuku_biz:flock_detail' row.flock.pk %}"
+                   style="color:#0a2f45;text-decoration:none;font-weight:600;">
+                    {{ row.flock.name }}
+                </a>
+            </td>
+            <td>{{ row.flock.branch.name|default:"—" }}</td>
+            <td class="cell-num">{{ row.total|floatformat:0 }}</td>
+            <td class="cell-num">{{ row.flock.current_count }}</td>
+            <td class="cell-num">
+                {% if row.flock.current_count %}
+                    {% widthratio row.total row.flock.current_count 1 %}
+                {% else %}
+                    —
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+{# ── Full log ── #}
+<div class="section-title">
+    <i class="fas fa-list"></i> All Expenses
+    <span class="count">{{ records|length }} record{{ records|length|pluralize }}</span>
+</div>
+
+{% if records %}
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>Category</th>
+            <th>Description</th>
+            <th>Flock</th>
+            <th>Paid To</th>
+            <th>Method</th>
+            <th class="cell-num">Amount</th>
+            <th class="cell-num">Paid</th>
+            <th class="cell-num">Balance</th>
+            <th>Status</th>
+            <th class="cell-actions"></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in records %}
+        <tr>
+            <td>{{ r.date|date:"d M Y" }}</td>
+            <td><span class="cat-badge">{{ r.get_category_display }}</span></td>
+            <td>{{ r.description|default:"—"|truncatechars:40 }}</td>
+            <td>
+                {% if r.flock %}
+                    <a href="{% url 'kuku_biz:flock_detail' r.flock.pk %}"
+                       style="color:#0a2f45;text-decoration:none;">
+                        {{ r.flock.name }}
+                    </a>
+                {% else %}
+                    <span style="color:#9ca3af;">—</span>
+                {% endif %}
+            </td>
+            <td>{{ r.paid_to|default:"—" }}</td>
+            <td>{{ r.get_payment_method_display|default:"—" }}</td>
+            <td class="cell-num">{{ r.amount|floatformat:0 }}</td>
+            <td class="cell-num">{{ r.amount_paid|floatformat:0 }}</td>
+            <td class="cell-num {% if r.balance > 0 %}" style="color:#dc2626;{% endif %}">
+                {{ r.balance|floatformat:0 }}
+            </td>
+            <td>
+                {% if r.payment_status == 'paid' %}
+                    <span class="badge badge-paid">Paid</span>
+                {% elif r.payment_status == 'partial' %}
+                    <span class="badge badge-partial">Partial</span>
+                {% else %}
+                    <span class="badge badge-credit">Credit</span>
+                {% endif %}
+            </td>
+            <td class="cell-actions">
+                {% if not r.is_fully_paid %}
+                <form method="post"
+                      action="{% url 'kuku_biz:expense_mark_paid' r.pk %}"
+                      onsubmit="return confirm('Mark this expense as fully paid?');">
+                    {% csrf_token %}
+                    <button class="btn btn-outline btn-sm" title="Mark Paid">
+                        <i class="fas fa-check"></i>
+                    </button>
+                </form>
+                {% endif %}
+                <button type="button"
+                        class="btn btn-outline btn-sm"
+                        title="Edit"
+                        onclick="openEditExpense(
+                            {{ r.id }},
+                            '{{ r.date|date:"Y-m-d" }}',
+                            '{{ r.category }}',
+                            '{{ r.description|escapejs }}',
+                            '{{ r.flock_id|default:"" }}',
+                            '{{ r.amount }}',
+                            '{{ r.amount_paid }}',
+                            '{{ r.paid_to|escapejs }}',
+                            '{{ r.payment_method }}',
+                            '{{ r.reference|escapejs }}',
+                            '{{ r.notes|escapejs }}'
+                        )">
+                    <i class="fas fa-pen"></i>
+                </button>
+                <form method="post"
+                      action="{% url 'kuku_biz:expense_delete' r.pk %}"
+                      onsubmit="return confirm('Delete this expense?');">
+                    {% csrf_token %}
+                    <button class="btn btn-danger btn-sm" title="Delete">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+    <tfoot>
+        <tr>
+            <td colspan="6" class="totals-label">
+                <i class="fas fa-calculator"></i> Grand Total ({{ record_count }})
+            </td>
+            <td class="cell-num">{{ total_amount|default:0|floatformat:0 }}</td>
+            <td class="cell-num">{{ total_paid|default:0|floatformat:0 }}</td>
+            <td class="cell-num">{{ total_balance|default:0|floatformat:0 }}</td>
+            <td colspan="2"></td>
+        </tr>
+    </tfoot>
+</table>
+{% else %}
+<div class="empty-state">
+    <i class="fas fa-wallet"></i>
+    <h3>No expenses recorded</h3>
+    <p>No expenses match your current filters. Start by recording one.</p>
+    <button type="button" class="btn btn-primary" onclick="openExpenseModal()">
         <i class="fas fa-plus"></i> Record Expense
     </button>
 </div>
-
-<div class="kpi-row">
-    <div class="kpi-card">
-        <div class="kpi-label">Total (Last 30 Days)</div>
-        <div class="kpi-value">KES {{ month_total|floatformat:0 }}</div>
-        <div class="kpi-sub">All categories</div>
-    </div>
-    <div class="kpi-card">
-        <div class="kpi-label">Total Records</div>
-        <div class="kpi-value">{{ expenses|length }}</div>
-        <div class="kpi-sub">Showing latest 100</div>
-    </div>
-</div>
-
-{% if expenses %}
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Category</th>
-                <th>Description</th>
-                <th>Paid To</th>
-                <th>Flock</th>
-                <th style="text-align:right;">Amount</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for e in expenses %}
-            <tr>
-                <td>{{ e.date|date:"d M Y" }}</td>
-                <td><span class="badge badge-{{ e.category }}">{{ e.get_category_display }}</span></td>
-                <td>{{ e.description|default:"—"|truncatechars:50 }}</td>
-                <td>{{ e.paid_to|default:"—" }}</td>
-                <td>{% if e.flock %}{{ e.flock.name }}{% else %}<em style="color:#9ca3af;">General</em>{% endif %}</td>
-                <td class="cell-num">{{ e.amount|floatformat:0 }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-{% else %}
-    <div class="empty-state">
-        <i class="fas fa-wallet"></i>
-        <h3>No expenses yet</h3>
-        <p>Track labour, utilities, equipment and other farm costs.</p>
-        <button type="button" class="btn btn-primary" onclick="openModal()">
-            <i class="fas fa-plus"></i> Record First Expense
-        </button>
-    </div>
 {% endif %}
 
-<!-- Modal -->
+{# ============================================================ #}
+{# ADD / EDIT MODAL #}
+{# ============================================================ #}
 <div class="modal-overlay" id="expenseModal">
     <div class="modal-box">
-        <h3><i class="fas fa-wallet"></i> Record Expense</h3>
-        <form method="post" action="{% url 'kuku_biz:expense_create' %}">
+        <h3 id="expenseModalTitle"><i class="fas fa-wallet"></i> Record Expense</h3>
+
+        <form method="post" id="expenseForm" action="{% url 'kuku_biz:expense_create' %}">
             {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
             <div class="form-row">
                 <div class="form-group">
-                    <label for="date">Date <span class="required">*</span></label>
-                    <input type="date" id="date" name="date" value="{{ today|date:'Y-m-d' }}" required>
+                    <label for="e_date">Date <span class="required">*</span></label>
+                    <input type="date" id="e_date" name="date"
+                           value="{{ today|date:'Y-m-d' }}" required>
                 </div>
                 <div class="form-group">
-                    <label for="category">Category <span class="required">*</span></label>
-                    <select id="category" name="category" required>
-                        <option value="feed">Feed</option>
-                        <option value="labour">Labour</option>
-                        <option value="utilities">Utilities</option>
-                        <option value="equipment">Equipment</option>
-                        <option value="transport">Transport</option>
-                        <option value="veterinary">Veterinary</option>
-                        <option value="chicks">Chick Purchase</option>
-                        <option value="other">Other</option>
+                    <label for="e_category">Category <span class="required">*</span></label>
+                    <select id="e_category" name="category" required>
+                        {% for code, label in categories %}
+                            <option value="{{ code }}">{{ label }}</option>
+                        {% endfor %}
                     </select>
                 </div>
             </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="amount">Amount (KES) <span class="required">*</span></label>
-                    <input type="number" id="amount" name="amount" min="0" step="0.01" required placeholder="e.g. 1500">
-                </div>
-                <div class="form-group">
-                    <label for="flock">Flock (optional)</label>
-                    <select id="flock" name="flock">
-                        <option value="">— General —</option>
-                        {% for f in flocks %}<option value="{{ f.id }}">{{ f.name }}</option>{% endfor %}
-                    </select>
-                </div>
-            </div>
+
             <div class="form-group">
-                <label for="description">Description</label>
-                <input type="text" id="description" name="description" placeholder="e.g. Water bill for September">
+                <label for="e_description">Description</label>
+                <input type="text" id="e_description" name="description"
+                       placeholder="e.g. Diesel for delivery truck">
             </div>
+
             <div class="form-row">
                 <div class="form-group">
-                    <label for="paid_to">Paid To</label>
-                    <input type="text" id="paid_to" name="paid_to" placeholder="e.g. KPLC">
+                    <label for="e_amount">Amount (KES) <span class="required">*</span></label>
+                    <input type="number" id="e_amount" name="amount"
+                           min="0" step="0.01" required placeholder="e.g. 3500">
                 </div>
                 <div class="form-group">
-                    <label for="payment_method">Payment Method</label>
-                    <select id="payment_method" name="payment_method">
-                        <option value="">— Select —</option>
-                        <option value="cash">Cash</option>
-                        <option value="mpesa">M-Pesa</option>
-                        <option value="bank">Bank</option>
+                    <label for="e_amount_paid">Amount Paid (KES)</label>
+                    <input type="number" id="e_amount_paid" name="amount_paid"
+                           min="0" step="0.01" value="0">
+                    <div class="help-text">Leave 0 for on-credit</div>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="e_paid_to">Paid To</label>
+                    <input type="text" id="e_paid_to" name="paid_to"
+                           placeholder="e.g. Total Energies, John (labourer)">
+                </div>
+                <div class="form-group">
+                    <label for="e_payment_method">Payment Method</label>
+                    <select id="e_payment_method" name="payment_method">
+                        {% for code, label in payment_methods %}
+                            <option value="{{ code }}">{{ label }}</option>
+                        {% endfor %}
                     </select>
                 </div>
             </div>
-            <div class="form-group">
-                <label for="notes">Notes</label>
-                <textarea id="notes" name="notes" rows="2"></textarea>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="e_flock">Flock (optional)</label>
+                    <select id="e_flock" name="flock">
+                        <option value="">— General expense —</option>
+                        {% for f in flocks %}
+                            <option value="{{ f.id }}">{{ f.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="help-text">Attach to a flock for per-flock cost tracking</div>
+                </div>
+                <div class="form-group">
+                    <label for="e_reference">Reference #</label>
+                    <input type="text" id="e_reference" name="reference"
+                           placeholder="Receipt / M-Pesa code">
+                </div>
             </div>
+
+            <div class="form-group">
+                <label for="e_notes">Notes</label>
+                <textarea id="e_notes" name="notes" rows="2"
+                          placeholder="Any additional details"></textarea>
+            </div>
+
             <div class="modal-actions">
-                <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Save</button>
-                <button type="button" class="btn" onclick="closeModal()"><i class="fas fa-times"></i> Cancel</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-check"></i> Save Expense
+                </button>
+                <button type="button" class="btn" onclick="closeExpenseModal()">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
             </div>
         </form>
     </div>
 </div>
 
 <script>
-function openModal(){document.getElementById('expenseModal').classList.add('active');document.body.style.overflow='hidden';}
-function closeModal(){document.getElementById('expenseModal').classList.remove('active');document.body.style.overflow='';}
-document.getElementById('expenseModal').addEventListener('click',function(e){if(e.target===this)closeModal();});
-document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();});
+    function openExpenseModal() {
+        // Reset to "add" mode
+        document.getElementById('expenseForm').action =
+            "{% url 'kuku_biz:expense_create' %}";
+        document.getElementById('expenseModalTitle').innerHTML =
+            '<i class="fas fa-wallet"></i> Record Expense';
+        document.getElementById('expenseForm').reset();
+        document.getElementById('e_date').value =
+            new Date().toISOString().split('T')[0];
+        document.getElementById('e_amount_paid').value = 0;
+
+        document.getElementById('expenseModal').classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function openEditExpense(id, date, category, description, flockId, amount,
+                             amountPaid, paidTo, method, reference, notes) {
+        document.getElementById('expenseForm').action =
+            '/kuku_biz/expenses/' + id + '/edit/';
+        document.getElementById('expenseModalTitle').innerHTML =
+            '<i class="fas fa-pen"></i> Edit Expense';
+
+        document.getElementById('e_date').value = date;
+        document.getElementById('e_category').value = category;
+        document.getElementById('e_description').value = description;
+        document.getElementById('e_flock').value = flockId || '';
+        document.getElementById('e_amount').value = amount;
+        document.getElementById('e_amount_paid').value = amountPaid;
+        document.getElementById('e_paid_to').value = paidTo;
+        document.getElementById('e_payment_method').value = method || 'cash';
+        document.getElementById('e_reference').value = reference;
+        document.getElementById('e_notes').value = notes;
+
+        document.getElementById('expenseModal').classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeExpenseModal() {
+        document.getElementById('expenseModal').classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    document.getElementById('expenseModal')?.addEventListener('click', function (e) {
+        if (e.target === this) closeExpenseModal();
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeExpenseModal();
+    });
 </script>
+
 {% endblock %}

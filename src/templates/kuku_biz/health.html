@@ -1,188 +1,881 @@
 {% extends 'kuku_base.html' %}
+
 {% block title %}Health — Kuku Biz{% endblock %}
-{% block page_title %}Health Records{% endblock %}
-{% block page_subtitle %}<small>Vaccinations, treatments, vet visits</small>{% endblock %}
+{% block page_title %}Health{% endblock %}
+{% block page_subtitle %}<small>Vaccine purchases, administration & stock</small>{% endblock %}
 
 {% block extra_css %}
 <style>
-    .page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px; }
-    .btn { display:inline-flex; align-items:center; gap:8px; padding:11px 22px; border-radius:50px; border:2px solid #000; background:#fff; color:#000; text-decoration:none; font-weight:600; font-size:0.85rem; cursor:pointer; font-family:inherit; transition:all 0.2s; }
-    .btn-primary { background:linear-gradient(90deg,#0a2f45 0%,#1fb4d2 100%); color:#fff; }
-    .btn-primary:hover { transform:translateY(-1px); box-shadow:0 8px 18px rgba(31,180,210,0.35); color:#fff; }
-    .kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:20px; }
-    .kpi-card { background:#fff; border:2px solid #000; border-radius:8px; padding:16px 18px; }
-    .kpi-label { font-size:0.7rem; text-transform:uppercase; letter-spacing:1px; font-weight:700; color:#6b7280; }
-    .kpi-value { font-size:1.5rem; font-weight:800; color:#1f2937; margin-top:4px; }
-    .kpi-sub { font-size:0.72rem; color:#9ca3af; margin-top:3px; }
-    .data-table { width:100%; background:#fff; border:2px solid #000; border-radius:8px; overflow:hidden; border-collapse:separate; border-spacing:0; }
-    .data-table thead { background:#f0fbfd; }
-    .data-table th { text-align:left; padding:14px 18px; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; font-weight:700; color:#374151; border-bottom:2px solid #000; }
-    .data-table td { padding:14px 18px; border-bottom:1px solid #e5e7eb; font-size:0.88rem; color:#1f2937; }
-    .data-table tr:last-child td { border-bottom:none; }
-    .data-table tr:hover { background:#f9fafb; }
-    .cell-num { font-family:'Courier New',monospace; font-weight:700; text-align:right; }
-    .badge { display:inline-block; padding:3px 10px; border-radius:50px; font-size:0.7rem; font-weight:600; border:1px solid #000; }
-    .badge-vaccination { background:#d1fae5; color:#065f46; }
-    .badge-treatment   { background:#dbeafe; color:#1e40af; }
-    .badge-deworming   { background:#fef3c7; color:#92400e; }
-    .badge-vitamin     { background:#e0e7ff; color:#3730a3; }
-    .badge-vet_visit   { background:#fce7f3; color:#9f1239; }
-    .badge-other       { background:#e5e7eb; color:#4b5563; }
-    .alert-box { background:#fef3c7; border:2px solid #92400e; border-radius:8px; padding:12px 16px; margin-bottom:16px; color:#92400e; font-size:0.85rem; }
-    .alert-box strong { font-weight:700; }
-    .empty-state { text-align:center; padding:60px 30px; background:#fff; border:2px dashed #9ca3af; border-radius:8px; }
-    .empty-state i { font-size:3rem; color:#87CEEB; margin-bottom:16px; }
-    .empty-state h3 { margin:0 0 8px; color:#1f2937; }
-    .empty-state p { color:#6b7280; margin-bottom:20px; }
-    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; justify-content:center; align-items:center; padding:20px; }
-    .modal-overlay.active { display:flex; }
-    .modal-box { background:#fff; border:2px solid #000; border-radius:8px; padding:28px 32px; max-width:600px; width:100%; max-height:90vh; overflow-y:auto; }
-    .modal-box h3 { font-size:1.1rem; font-weight:700; margin-bottom:20px; padding-bottom:10px; border-bottom:2px solid #000; }
-    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
-    .form-group { margin-bottom:14px; }
-    .form-group label { display:block; font-weight:600; font-size:0.82rem; margin-bottom:5px; }
-    .form-group label .required { color:#dc2626; }
-    .form-group input, .form-group select, .form-group textarea { width:100%; padding:9px 12px; border:2px solid #000; border-radius:6px; font-family:inherit; font-size:0.88rem; background:#fff; }
-    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline:none; border-color:#1fb4d2; box-shadow:0 0 0 3px rgba(31,180,210,0.2); }
-    .modal-actions { display:flex; gap:10px; margin-top:20px; padding-top:16px; border-top:2px solid #000; }
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .page-header h2 { margin: 0; font-size: 1.1rem; font-weight: 700; }
+    .page-header .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 22px;
+        border-radius: 50px;
+        border: 2px solid #000;
+        background: #fff;
+        color: #000;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.85rem;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.2s;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary {
+        background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
+        color: #fff;
+    }
+    .btn-primary:hover { box-shadow: 0 8px 18px rgba(31,180,210,0.35); color: #fff; }
+    .btn-outline { background: #fff; color: #0a2f45; }
+    .btn-outline:hover { background: #f0fbfd; }
+    .btn-sm { padding: 6px 14px; font-size: 0.75rem; }
+    .btn-danger { background: #fff; border-color: #dc2626; color: #dc2626; }
+    .btn-danger:hover { background: #fee2e2; }
+
+    /* Branch filter */
+    .filter-bar {
+        display: flex; gap: 10px; align-items: center;
+        margin-bottom: 16px; flex-wrap: wrap;
+    }
+    .filter-bar select {
+        padding: 8px 14px; border: 2px solid #000; border-radius: 6px;
+        font-family: inherit; font-size: 0.85rem; background: #fff;
+    }
+
+    /* KPI cards */
+    .kpi-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px; margin-bottom: 20px;
+    }
+    .kpi-card {
+        background: #fff; border: 2px solid #000; border-radius: 8px;
+        padding: 16px 18px;
+    }
+    .kpi-card.warn { border-color: #f59e0b; background: #fffbeb; }
+    .kpi-label {
+        font-size: 0.7rem; text-transform: uppercase;
+        letter-spacing: 1px; font-weight: 700; color: #6b7280;
+    }
+    .kpi-value {
+        font-size: 1.5rem; font-weight: 800; color: #1f2937; margin-top: 4px;
+    }
+    .kpi-sub { font-size: 0.72rem; color: #9ca3af; margin-top: 3px; }
+
+    /* Tables */
+    .data-table {
+        width: 100%; background: #fff; border: 2px solid #000;
+        border-radius: 8px; overflow: hidden;
+        border-collapse: separate; border-spacing: 0;
+        table-layout: auto;
+    }
+    .data-table thead { background: #f0fbfd; }
+    .data-table th {
+        text-align: left; padding: 14px 18px;
+        font-size: 0.72rem; text-transform: uppercase;
+        letter-spacing: 1px; font-weight: 700; color: #374151;
+        border-bottom: 2px solid #000; white-space: nowrap;
+    }
+    .data-table td {
+        padding: 12px 18px; border-bottom: 1px solid #e5e7eb;
+        font-size: 0.86rem; color: #1f2937;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover { background: #f9fafb; }
+
+    .cell-num {
+        font-family: 'Courier New', monospace; font-weight: 700;
+        text-align: right !important; white-space: nowrap;
+        padding-right: 22px; width: 1%;
+    }
+    .data-table th.cell-num { text-align: right !important; padding-right: 22px; }
+
+    .cell-center { text-align: center; }
+    .cell-actions { text-align: right; white-space: nowrap; width: 1%; }
+    .cell-actions form { display: inline; }
+
+    /* Badges */
+    .badge {
+        display: inline-block; padding: 3px 10px; border-radius: 50px;
+        font-size: 0.68rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.5px;
+        white-space: nowrap;
+    }
+    .badge-vaccine   { background: #d1fae5; color: #065f46; }
+    .badge-drug      { background: #dbeafe; color: #1e40af; }
+    .badge-dewormer  { background: #fef3c7; color: #92400e; }
+    .badge-vitamin   { background: #e0e7ff; color: #3730a3; }
+    .badge-disinfectant { background: #fce7f3; color: #9f1239; }
+    .badge-other     { background: #e5e7eb; color: #4b5563; }
+    .badge-paid      { background: #d1fae5; color: #065f46; }
+    .badge-partial   { background: #fef3c7; color: #92400e; }
+    .badge-credit    { background: #fee2e2; color: #991b1b; }
+
+    /* Health inventory cards */
+    .health-inv-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 14px; margin-bottom: 24px;
+    }
+    .health-inv-card {
+        background: #fff; border: 2px solid #000; border-radius: 8px;
+        padding: 16px 18px; display: flex; flex-direction: column;
+        gap: 10px; transition: all 0.2s;
+    }
+    .health-inv-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+    }
+    .health-inv-card.is-low { border-color: #f59e0b; background: #fffbeb; }
+    .health-inv-card.is-empty { border-color: #dc2626; background: #fef2f2; }
+
+    .health-inv-head {
+        display: flex; justify-content: space-between;
+        align-items: flex-start; gap: 10px;
+    }
+    .health-inv-name {
+        font-weight: 700; font-size: 0.92rem; color: #0a2f45; line-height: 1.2;
+    }
+    .health-inv-meta {
+        font-size: 0.72rem; color: #6b7280; margin-top: 2px;
+    }
+
+    .health-inv-stock {
+        display: flex; align-items: baseline; gap: 6px; margin: 4px 0 2px;
+    }
+    .health-inv-qty {
+        font-family: 'Courier New', monospace; font-size: 1.6rem;
+        font-weight: 800; color: #1f2937; line-height: 1;
+    }
+    .health-inv-unit {
+        font-size: 0.82rem; color: #6b7280; font-weight: 600;
+    }
+
+    .health-inv-bar {
+        height: 6px; background: #e5e7eb; border-radius: 50px;
+        overflow: hidden; margin-top: 4px;
+    }
+    .health-inv-bar-fill {
+        height: 100%; background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+        transition: width 0.3s;
+    }
+    .health-inv-card.is-low .health-inv-bar-fill {
+        background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+    }
+    .health-inv-card.is-empty .health-inv-bar-fill { background: #dc2626; }
+
+    .health-inv-meta {
+        display: flex; flex-direction: column; gap: 4px;
+        padding-top: 8px; border-top: 1px solid #e5e7eb;
+    }
+    .health-inv-meta-row {
+        display: flex; justify-content: space-between;
+        font-size: 0.75rem; color: #6b7280;
+    }
+    .health-inv-meta-row strong { color: #1f2937; font-weight: 700; }
+
+    .health-inv-actions { display: flex; gap: 6px; margin-top: 4px; }
+    .health-inv-actions .health-inv-btn {
+        flex: 1;
+        display: inline-flex; align-items: center; justify-content: center;
+        gap: 5px; padding: 7px 10px;
+        border: 2px solid #000; border-radius: 50px;
+        background: #fff; color: #0a2f45;
+        font-weight: 600; font-size: 0.72rem;
+        text-decoration: none; cursor: pointer; font-family: inherit;
+        transition: all 0.2s; white-space: nowrap;
+    }
+    .health-inv-actions .health-inv-btn:hover {
+        background: #0a2f45; color: #fff; transform: translateY(-1px);
+    }
+    .health-inv-actions .health-inv-btn.give-btn:hover {
+        background: #1fb4d2; border-color: #1fb4d2;
+    }
+
+    /* Two-column log */
+    .log-grid {
+        display: grid; grid-template-columns: 1fr 1fr;
+        gap: 16px; margin-bottom: 20px;
+    }
+    @media (max-width: 900px) { .log-grid { grid-template-columns: 1fr; } }
+    .log-card {
+        background: #fff; border: 2px solid #000; border-radius: 8px;
+        overflow: hidden;
+    }
+    .log-card-header {
+        padding: 12px 18px; border-bottom: 2px solid #000;
+        background: #f0fbfd; font-weight: 700;
+        font-size: 0.82rem; text-transform: uppercase;
+        letter-spacing: 1px; color: #0a2f45;
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    .log-card-header .count {
+        font-size: 0.7rem; color: #6b7280; font-weight: 600;
+        text-transform: none; letter-spacing: 0;
+    }
+    .log-card .data-table { border: none; border-radius: 0; }
+    .log-card .data-table th {
+        padding: 10px 14px; font-size: 0.68rem;
+        border-bottom: 1px solid #e5e7eb; background: #fff;
+    }
+    .log-card .data-table td {
+        padding: 10px 14px; font-size: 0.82rem;
+    }
+    .log-card .cell-num { padding-right: 16px; }
+    .log-card .data-table th.cell-num { padding-right: 16px; }
+
+    /* Section title */
+    .section-title {
+        font-size: 0.95rem; font-weight: 700; margin: 24px 0 12px;
+        color: #0a2f45; display: flex; align-items: center; gap: 8px;
+    }
+    .section-title .count {
+        margin-left: auto; font-size: 0.75rem;
+        font-weight: 500; color: #6b7280;
+    }
+
+    /* Empty states */
+    .empty-state {
+        text-align: center; padding: 60px 30px; background: #fff;
+        border: 2px dashed #9ca3af; border-radius: 8px;
+    }
+    .empty-state i { font-size: 3rem; color: #87CEEB; margin-bottom: 16px; }
+    .empty-state h3 { margin: 0 0 8px; color: #1f2937; }
+    .empty-state p { color: #6b7280; margin-bottom: 20px; }
+    .empty-inline {
+        padding: 32px 16px; text-align: center;
+        color: #9ca3af; font-size: 0.85rem;
+    }
+    .empty-inline i { font-size: 1.5rem; display: block; margin-bottom: 8px; }
+
+    /* Alert strip */
+    .alert-strip {
+        padding: 12px 18px; border: 2px solid #f59e0b;
+        background: #fffbeb; border-radius: 8px; margin-bottom: 16px;
+        font-size: 0.85rem; display: flex; align-items: center; gap: 10px;
+    }
+    .alert-strip i { color: #d97706; }
+    .alert-strip a {
+        margin-left: auto; color: #0a2f45;
+        font-weight: 700; text-decoration: underline;
+    }
+
+    /* Modal */
+    .modal-overlay {
+        display: none; position: fixed; inset: 0;
+        background: rgba(0,0,0,0.5); z-index: 2000;
+        justify-content: center; align-items: center; padding: 20px;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+        background: #fff; border: 2px solid #000; border-radius: 8px;
+        padding: 28px 32px; max-width: 620px; width: 100%;
+        max-height: 90vh; overflow-y: auto;
+    }
+    .modal-box h3 {
+        font-size: 1.05rem; font-weight: 700; margin-bottom: 20px;
+        padding-bottom: 10px; border-bottom: 2px solid #000;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .form-row {
+        display: grid; grid-template-columns: 1fr 1fr;
+        gap: 14px; margin-bottom: 14px;
+    }
+    .form-row.three { grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 600px) {
+        .form-row, .form-row.three { grid-template-columns: 1fr; }
+    }
+    .form-group { margin-bottom: 14px; }
+    .form-group label {
+        display: block; font-weight: 600; font-size: 0.82rem; margin-bottom: 5px;
+    }
+    .form-group label .required { color: #dc2626; }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%; padding: 9px 12px;
+        border: 2px solid #000; border-radius: 6px;
+        font-family: inherit; font-size: 0.88rem;
+        background: #fff; box-sizing: border-box;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none; border-color: #1fb4d2;
+        box-shadow: 0 0 0 3px rgba(31,180,210,0.2);
+    }
+    .form-group .help-text {
+        font-size: 0.72rem; color: #6b7280; margin-top: 4px;
+    }
+    .modal-actions {
+        display: flex; gap: 10px; margin-top: 20px;
+        padding-top: 16px; border-top: 2px solid #000;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 
+{# ============================================================ #}
+{# Page header #}
+{# ============================================================ #}
 <div class="page-header">
-    <h2 style="margin:0;font-size:1.1rem;font-weight:700;">Health Log</h2>
-    <button type="button" class="btn btn-primary" onclick="openModal()">
-        <i class="fas fa-plus"></i> Record Health
-    </button>
+    <h2><i class="fas fa-briefcase-medical"></i> Health Log</h2>
+    <div class="header-actions">
+        <a href="{% url 'kuku_biz:vaccine_type_list' %}" class="btn btn-outline">
+            <i class="fas fa-syringe"></i> Manage Vaccine Types
+        </a>
+        <button type="button" class="btn btn-primary" onclick="openModal('purchaseModal')">
+            <i class="fas fa-cart-plus"></i> Purchase Vaccines
+        </button>
+        <button type="button" class="btn btn-outline" onclick="openModal('adminModal')">
+            <i class="fas fa-syringe"></i> Record Administration
+        </button>
+    </div>
 </div>
 
+{# ============================================================ #}
+{# Upcoming boosters alert #}
+{# ============================================================ #}
 {% if upcoming %}
-<div class="alert-box">
-    <strong><i class="fas fa-bell"></i> Upcoming ({{ upcoming|length }}):</strong>
+<div class="alert-strip">
+    <i class="fas fa-bell"></i>
+    <strong>Upcoming ({{ upcoming|length }}):</strong>
     {% for u in upcoming %}
-        {{ u.flock.name }} · {{ u.get_record_type_display }} · {{ u.next_due_date|date:"d M Y" }}{% if not forloop.last %} · {% endif %}
+        {{ u.flock.name }} · {{ u.vaccine_type.name|default:u.product_used|default:"—" }}
+        · {{ u.next_due_date|date:"d M Y" }}{% if not forloop.last %} · {% endif %}
     {% endfor %}
 </div>
 {% endif %}
 
+{# ============================================================ #}
+{# KPI cards #}
+{# ============================================================ #}
 <div class="kpi-row">
     <div class="kpi-card">
-        <div class="kpi-label">Health Cost (Last 30 Days)</div>
-        <div class="kpi-value">KES {{ month_cost|floatformat:0 }}</div>
-        <div class="kpi-sub">All flocks</div>
+        <div class="kpi-label">Health Cost (30d)</div>
+        <div class="kpi-value">KES {{ month_cost|default:0|floatformat:0 }}</div>
+        <div class="kpi-sub">vaccines & treatments</div>
+    </div>
+    <div class="kpi-card {% if month_balance > 0 %}warn{% endif %}">
+        <div class="kpi-label">Unpaid (30d)</div>
+        <div class="kpi-value">KES {{ month_balance|default:0|floatformat:0 }}</div>
+        <div class="kpi-sub">owed to suppliers</div>
     </div>
     <div class="kpi-card">
-        <div class="kpi-label">Total Records</div>
-        <div class="kpi-value">{{ records|length }}</div>
-        <div class="kpi-sub">Showing latest 100</div>
+        <div class="kpi-label">Administrations (30d)</div>
+        <div class="kpi-value">{{ month_admin_count|default:0 }}</div>
+        <div class="kpi-sub">doses given</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Birds Treated (30d)</div>
+        <div class="kpi-value">{{ month_birds_treated|default:0 }}</div>
+        <div class="kpi-sub">across all flocks</div>
     </div>
 </div>
 
-{% if records %}
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Flock</th>
-                <th>Type</th>
-                <th>Product</th>
-                <th>Administered By</th>
-                <th style="text-align:right;">Cost</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for r in records %}
-            <tr>
-                <td>{{ r.date|date:"d M Y" }}</td>
-                <td><strong>{{ r.flock.name }}</strong></td>
-                <td><span class="badge badge-{{ r.record_type }}">{{ r.get_record_type_display }}</span></td>
-                <td>{{ r.product_used|default:"—" }}</td>
-                <td>{{ r.administered_by|default:"—" }}</td>
-                <td class="cell-num">{{ r.cost|floatformat:0 }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-{% else %}
-    <div class="empty-state">
-        <i class="fas fa-briefcase-medical"></i>
-        <h3>No health records yet</h3>
-        <p>Record vaccinations and treatments to keep your flock healthy.</p>
-        <button type="button" class="btn btn-primary" onclick="openModal()">
-            <i class="fas fa-plus"></i> Record First Entry
-        </button>
+{# ============================================================ #}
+{# HEALTH INVENTORY — live stock per vaccine type #}
+{# ============================================================ #}
+{% if health_inventory_rows %}
+<div class="section-title">
+    <i class="fas fa-boxes-stacked"></i> Vaccine & Drug Inventory — Stock On Hand
+    <span class="count">{{ health_inventory_rows|length }} item{{ health_inventory_rows|length|pluralize }}</span>
+</div>
+
+<div class="health-inv-grid">
+    {% for row in health_inventory_rows %}
+    <div class="health-inv-card {% if row.empty %}is-empty{% elif row.low %}is-low{% endif %}">
+
+        <div class="health-inv-head">
+            <div>
+                <div class="health-inv-name">{{ row.name }}</div>
+                {% if row.brand %}
+                    <div class="health-inv-meta">{{ row.brand }}</div>
+                {% endif %}
+                {% if row.target_disease %}
+                    <div class="health-inv-meta" style="color:#1fb4d2;font-weight:600;">
+                        <i class="fas fa-shield-virus"></i> {{ row.target_disease }}
+                    </div>
+                {% endif %}
+            </div>
+            {% if row.empty %}
+                <span class="badge badge-credit">Empty</span>
+            {% elif row.low %}
+                <span class="badge badge-partial">Low</span>
+            {% else %}
+                <span class="badge badge-paid">In Stock</span>
+            {% endif %}
+        </div>
+
+        <div class="health-inv-stock">
+            <span class="health-inv-qty">{{ row.on_hand|floatformat:0 }}</span>
+            <span class="health-inv-unit">{{ row.unit }}</span>
+        </div>
+
+        {% if row.purchased_qty > 0 %}
+            <div class="health-inv-bar">
+                <div class="health-inv-bar-fill"
+                     style="width: {% widthratio row.on_hand row.purchased_qty 100 %}%;"></div>
+            </div>
+        {% endif %}
+
+        <div class="health-inv-meta">
+            <div class="health-inv-meta-row">
+                <span>Bought</span>
+                <strong>{{ row.purchased_qty|floatformat:0 }} {{ row.unit }}</strong>
+            </div>
+            <div class="health-inv-meta-row">
+                <span>Given</span>
+                <strong>{{ row.admin_qty|floatformat:0 }} {{ row.unit }}</strong>
+            </div>
+        </div>
+
+        <div class="health-inv-actions">
+            <button type="button"
+                    class="health-inv-btn"
+                    onclick="openPurchaseFor('{{ row.vaccine_type.id }}');">
+                <i class="fas fa-plus"></i> Buy
+            </button>
+            <button type="button"
+                    class="health-inv-btn give-btn"
+                    onclick="openAdminFor('{{ row.vaccine_type.id }}');"
+                    {% if row.empty %}disabled style="opacity:0.45;cursor:not-allowed;"{% endif %}>
+                <i class="fas fa-syringe"></i> Give
+            </button>
+        </div>
     </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="empty-state" style="margin-bottom:20px;">
+    <i class="fas fa-syringe"></i>
+    <h3>No vaccine types defined yet</h3>
+    <p>Define your vaccines and drugs (e.g. "Newcastle", "Gumboro") to start tracking stock.</p>
+    <a href="{% url 'kuku_biz:vaccine_type_list' %}" class="btn btn-primary">
+        <i class="fas fa-plus"></i> Manage Vaccine Types
+    </a>
+</div>
 {% endif %}
 
-<!-- Modal -->
-<div class="modal-overlay" id="healthModal">
+{# ============================================================ #}
+{# Two-column log: purchases + administrations #}
+{# ============================================================ #}
+<div class="log-grid">
+
+    {# ── Purchases ── #}
+    <div class="log-card">
+        <div class="log-card-header">
+            <span><i class="fas fa-arrow-down"></i> Recent Purchases</span>
+            <span class="count">{{ records_purchases|length }}</span>
+        </div>
+        {% if records_purchases %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Product</th>
+                    <th class="cell-num">Qty</th>
+                    <th class="cell-num">Cost</th>
+                    <th class="cell-center">Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in records_purchases %}
+                <tr>
+                    <td>{{ r.date|date:"d M" }}</td>
+                    <td>
+                        {% if r.vaccine_type %}
+                            {{ r.vaccine_type.name }}
+                            {% if r.vaccine_type.brand %}
+                                <small style="color:#9ca3af;">({{ r.vaccine_type.brand }})</small>
+                            {% endif %}
+                        {% else %}
+                            {{ r.product_used|default:"—" }}
+                        {% endif %}
+                    </td>
+                    <td class="cell-num">{{ r.quantity|floatformat:0 }} {{ r.unit }}</td>
+                    <td class="cell-num">{{ r.cost|floatformat:0 }}</td>
+                    <td class="cell-center">
+                        {% if r.payment_status == 'paid' %}
+                            <span class="badge badge-paid">Paid</span>
+                        {% elif r.payment_status == 'partial' %}
+                            <span class="badge badge-partial">Partial</span>
+                        {% else %}
+                            <span class="badge badge-credit">Credit</span>
+                        {% endif %}
+                    </td>
+                    <td class="cell-actions">
+                        <form method="post"
+                              action="{% url 'kuku_biz:health_delete' r.pk %}"
+                              onsubmit="return confirm('Delete this purchase? Stock will be reversed.');">
+                            {% csrf_token %}
+                            <button class="btn btn-danger btn-sm">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-inline">
+            <i class="fas fa-inbox"></i>
+            No purchases yet
+        </div>
+        {% endif %}
+    </div>
+
+    {# ── Administrations ── #}
+    <div class="log-card">
+        <div class="log-card-header">
+            <span><i class="fas fa-syringe"></i> Recent Administrations</span>
+            <span class="count">{{ records_admins|length }}</span>
+        </div>
+        {% if records_admins %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Flock</th>
+                    <th>Product</th>
+                    <th class="cell-num">Birds</th>
+                    <th class="cell-num">Qty</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in records_admins %}
+                <tr>
+                    <td>{{ r.date|date:"d M" }}</td>
+                    <td><strong>{{ r.flock.name|default:"—" }}</strong></td>
+                    <td>
+                        {% if r.vaccine_type %}
+                            {{ r.vaccine_type.name }}
+                        {% else %}
+                            {{ r.product_used|default:"—" }}
+                        {% endif %}
+                    </td>
+                    <td class="cell-num">{{ r.birds_treated|default:0 }}</td>
+                    <td class="cell-num">{{ r.quantity|floatformat:0 }} {{ r.unit }}</td>
+                    <td class="cell-actions">
+                        <form method="post"
+                              action="{% url 'kuku_biz:health_delete' r.pk %}"
+                              onsubmit="return confirm('Delete this administration? Stock will be returned.');">
+                            {% csrf_token %}
+                            <button class="btn btn-danger btn-sm">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-inline">
+            <i class="fas fa-inbox"></i>
+            No administrations logged yet
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+{# ============================================================ #}
+{# PURCHASE MODAL #}
+{# ============================================================ #}
+<div class="modal-overlay" id="purchaseModal">
     <div class="modal-box">
-        <h3><i class="fas fa-briefcase-medical"></i> Record Health Entry</h3>
+        <h3><i class="fas fa-cart-plus"></i> Purchase Vaccines / Drugs</h3>
+
         <form method="post" action="{% url 'kuku_biz:health_create' %}">
             {% csrf_token %}
+            <input type="hidden" name="record_type" value="purchase">
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
             <div class="form-row">
                 <div class="form-group">
-                    <label for="flock">Flock <span class="required">*</span></label>
-                    <select id="flock" name="flock" required>
-                        <option value="">— Select flock —</option>
-                        {% for f in flocks %}<option value="{{ f.id }}">{{ f.name }}</option>{% endfor %}
+                    <label for="p_vaccine_type">Product <span class="required">*</span></label>
+                    <select id="p_vaccine_type" name="vaccine_type" required>
+                        <option value="">— Select —</option>
+                        {% for vt in vaccine_types %}
+                            <option value="{{ vt.id }}" data-cost="{{ vt.cost_per_unit|default:0 }}">
+                                {{ vt.name }}{% if vt.brand %} ({{ vt.brand }}){% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <div class="help-text">
+                        {% if vaccine_types %}
+                            Cost auto-fills from product's price per unit.
+                        {% else %}
+                            No products yet —
+                            <a href="{% url 'kuku_biz:vaccine_type_list' %}">add one →</a>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="p_date">Date <span class="required">*</span></label>
+                    <input type="date" id="p_date" name="date"
+                           value="{{ today|date:'Y-m-d' }}" required>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="p_supplier">Supplier</label>
+                    <input type="text" id="p_supplier" name="supplier"
+                           placeholder="e.g. Vet Supplies Ltd">
+                </div>
+                <div class="form-group">
+                    <label for="p_invoice">Supplier Invoice #</label>
+                    <input type="text" id="p_invoice" name="supplier_invoice"
+                           placeholder="Optional">
+                </div>
+            </div>
+
+            <div class="form-row three">
+                <div class="form-group">
+                    <label for="p_quantity">Quantity <span class="required">*</span></label>
+                    <input type="number" id="p_quantity" name="quantity"
+                           min="0" step="0.01" required
+                           placeholder="e.g. 100">
+                </div>
+                <div class="form-group">
+                    <label for="p_unit">Unit</label>
+                    <select id="p_unit" name="unit">
+                        <option value="dose">Dose</option>
+                        <option value="vial">Vial</option>
+                        <option value="ml">ml</option>
+                        <option value="sachet">Sachet</option>
+                        <option value="pcs">Pieces</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="date">Date <span class="required">*</span></label>
-                    <input type="date" id="date" name="date" value="{{ today|date:'Y-m-d' }}" required>
+                    <label for="p_cost">Total Cost (KES) <span class="required">*</span></label>
+                    <input type="number" id="p_cost" name="cost"
+                           min="0" step="0.01" required
+                           placeholder="e.g. 5000">
                 </div>
             </div>
+
             <div class="form-row">
                 <div class="form-group">
-                    <label for="record_type">Type <span class="required">*</span></label>
-                    <select id="record_type" name="record_type" required>
-                        <option value="vaccination">Vaccination</option>
-                        <option value="treatment">Treatment</option>
-                        <option value="deworming">Deworming</option>
-                        <option value="vitamin">Vitamin / Supplement</option>
-                        <option value="vet_visit">Vet Visit</option>
+                    <label for="p_amount_paid">Amount Paid (KES)</label>
+                    <input type="number" id="p_amount_paid" name="amount_paid"
+                           min="0" step="0.01" value="0">
+                </div>
+                <div class="form-group">
+                    <label for="p_payment_status">Payment Status</label>
+                    <select id="p_payment_status" name="payment_status">
+                        <option value="paid">Paid</option>
+                        <option value="partial">Partial</option>
+                        <option value="credit">Credit</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="p_notes">Notes</label>
+                <textarea id="p_notes" name="notes" rows="2"
+                          placeholder="Any notes"></textarea>
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-check"></i> Save Purchase
+                </button>
+                <button type="button" class="btn" onclick="closeModal('purchaseModal')">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{# ============================================================ #}
+{# ADMINISTRATION MODAL #}
+{# ============================================================ #}
+<div class="modal-overlay" id="adminModal">
+    <div class="modal-box">
+        <h3><i class="fas fa-syringe"></i> Record Administration</h3>
+
+        <form method="post" action="{% url 'kuku_biz:health_create' %}">
+            {% csrf_token %}
+            <input type="hidden" name="record_type" value="administration">
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="a_flock">Flock <span class="required">*</span></label>
+                    <select id="a_flock" name="flock" required>
+                        <option value="">— Select flock —</option>
+                        {% for f in flocks %}
+                            <option value="{{ f.id }}">{{ f.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="a_date">Date <span class="required">*</span></label>
+                    <input type="date" id="a_date" name="date"
+                           value="{{ today|date:'Y-m-d' }}" required>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="a_vaccine_type">Product <span class="required">*</span></label>
+                    <select id="a_vaccine_type" name="vaccine_type" required>
+                        <option value="">— Select —</option>
+                        {% for vt in vaccine_types %}
+                            <option value="{{ vt.id }}">
+                                {{ vt.name }}{% if vt.brand %} ({{ vt.brand }}){% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="a_admin_method">Method</label>
+                    <select id="a_admin_method" name="admin_method">
+                        <option value="drinking_water">Drinking water</option>
+                        <option value="injection">Injection</option>
+                        <option value="eye_drop">Eye drop</option>
+                        <option value="spray">Spray</option>
+                        <option value="oral">Oral</option>
                         <option value="other">Other</option>
                     </select>
                 </div>
+            </div>
+
+            <div class="form-row three">
                 <div class="form-group">
-                    <label for="product_used">Product Used</label>
-                    <input type="text" id="product_used" name="product_used" placeholder="e.g. Newcastle vaccine">
+                    <label for="a_birds_treated">Birds Treated <span class="required">*</span></label>
+                    <input type="number" id="a_birds_treated" name="birds_treated"
+                           min="0" required placeholder="e.g. 500">
+                </div>
+                <div class="form-group">
+                    <label for="a_quantity">Doses Used <span class="required">*</span></label>
+                    <input type="number" id="a_quantity" name="quantity"
+                           min="0" step="0.01" required placeholder="e.g. 500">
+                </div>
+                <div class="form-group">
+                    <label for="a_unit">Unit</label>
+                    <select id="a_unit" name="unit">
+                        <option value="dose">Dose</option>
+                        <option value="vial">Vial</option>
+                        <option value="ml">ml</option>
+                        <option value="sachet">Sachet</option>
+                    </select>
                 </div>
             </div>
+
             <div class="form-row">
                 <div class="form-group">
-                    <label for="cost">Cost (KES)</label>
-                    <input type="number" id="cost" name="cost" min="0" step="0.01" value="0">
+                    <label for="a_administered_by">Administered By</label>
+                    <input type="text" id="a_administered_by" name="administered_by"
+                           placeholder="e.g. Dr. Kimani">
                 </div>
                 <div class="form-group">
-                    <label for="administered_by">Administered By</label>
-                    <input type="text" id="administered_by" name="administered_by" placeholder="e.g. Dr. Kimani">
+                    <label for="a_next_due_date">Next Due Date</label>
+                    <input type="date" id="a_next_due_date" name="next_due_date">
+                    <div class="help-text">Auto-filled from product's repeat interval if left blank.</div>
                 </div>
             </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="next_due_date">Next Due Date</label>
-                    <input type="date" id="next_due_date" name="next_due_date">
-                </div>
-            </div>
+
             <div class="form-group">
-                <label for="description">Description / Notes</label>
-                <textarea id="description" name="description" rows="2" placeholder="What was done, dosage, observations"></textarea>
+                <label for="a_notes">Notes</label>
+                <textarea id="a_notes" name="notes" rows="2"
+                          placeholder="Observations, batch info, etc."></textarea>
             </div>
+
             <div class="modal-actions">
-                <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Save</button>
-                <button type="button" class="btn" onclick="closeModal()"><i class="fas fa-times"></i> Cancel</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-check"></i> Save Administration
+                </button>
+                <button type="button" class="btn" onclick="closeModal('adminModal')">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
             </div>
         </form>
     </div>
 </div>
 
 <script>
-function openModal(){document.getElementById('healthModal').classList.add('active');document.body.style.overflow='hidden';}
-function closeModal(){document.getElementById('healthModal').classList.remove('active');document.body.style.overflow='';}
-document.getElementById('healthModal').addEventListener('click',function(e){if(e.target===this)closeModal();});
-document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();});
+    // ── Modal open/close ──
+    function openModal(id) {
+        document.getElementById(id).classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeModal(id) {
+        document.getElementById(id).classList.remove('active');
+        document.body.style.overflow = '';
+    }
+    document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
+        overlay.addEventListener('click', function (e) {
+            if (e.target === this) closeModal(this.id);
+        });
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal-overlay.active').forEach(function (m) {
+                closeModal(m.id);
+            });
+        }
+    });
+
+    // ── Per-card quick actions ──
+    function openPurchaseFor(vaccineTypeId) {
+        var sel = document.getElementById('p_vaccine_type');
+        if (sel) {
+            sel.value = vaccineTypeId;
+            sel.dispatchEvent(new Event('change'));
+        }
+        openModal('purchaseModal');
+    }
+    function openAdminFor(vaccineTypeId) {
+        var sel = document.getElementById('a_vaccine_type');
+        if (sel) sel.value = vaccineTypeId;
+        openModal('adminModal');
+    }
+
+    // ── Cost auto-fill from selected product's cost_per_unit × quantity ──
+    (function () {
+        var vtSel = document.getElementById('p_vaccine_type');
+        var qtyIn = document.getElementById('p_quantity');
+        var costIn = document.getElementById('p_cost');
+        if (!vtSel || !qtyIn || !costIn) return;
+
+        function autofill() {
+            var opt = vtSel.options[vtSel.selectedIndex];
+            var perUnit = parseFloat(opt.getAttribute('data-cost') || '0');
+            var qty = parseFloat(qtyIn.value || '0');
+            if (perUnit > 0 && qty > 0 && !costIn.dataset.touched) {
+                costIn.value = (perUnit * qty).toFixed(2);
+            }
+        }
+        vtSel.addEventListener('change', autofill);
+        qtyIn.addEventListener('input', autofill);
+        costIn.addEventListener('input', function () {
+            costIn.dataset.touched = '1';
+        });
+    })();
 </script>
+
 {% endblock %}

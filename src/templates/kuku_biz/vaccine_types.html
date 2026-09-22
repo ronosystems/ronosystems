@@ -1,0 +1,523 @@
+{% extends 'kuku_base.html' %}
+
+{% block title %}Vaccine Types — Kuku Biz{% endblock %}
+{% block page_title %}Vaccine Types{% endblock %}
+{% block page_subtitle %}<small>{{ vaccine_types.count }} defined</small>{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .page-header h2 { margin: 0; font-size: 1.1rem; font-weight: 700; }
+    .page-header .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 22px;
+        border-radius: 50px;
+        border: 2px solid #000;
+        background: #fff;
+        color: #000;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.85rem;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.2s;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary {
+        background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
+        color: #fff;
+    }
+    .btn-primary:hover {
+        box-shadow: 0 8px 18px rgba(31,180,210,0.35);
+        color: #fff;
+    }
+    .btn-outline { background: #fff; color: #0a2f45; }
+    .btn-outline:hover { background: #f0fbfd; }
+    .btn-sm { padding: 6px 14px; font-size: 0.75rem; }
+    .btn-danger { background: #fff; border-color: #dc2626; color: #dc2626; }
+    .btn-danger:hover { background: #fee2e2; }
+
+    .data-table {
+        width: 100%;
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        overflow: hidden;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    .data-table thead { background: #f0fbfd; }
+    .data-table th {
+        text-align: left;
+        padding: 14px 18px;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #374151;
+        border-bottom: 2px solid #000;
+        white-space: nowrap;
+    }
+    .data-table td {
+        padding: 12px 18px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.86rem;
+        color: #1f2937;
+        vertical-align: middle;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tbody tr:hover { background: #f9fafb; }
+
+    .cell-num {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        text-align: right !important;
+        white-space: nowrap;
+        width: 1%;
+    }
+    .data-table th.cell-num { text-align: right !important; }
+
+    .cell-actions {
+        text-align: right;
+        white-space: nowrap;
+        width: 1%;
+    }
+    .cell-actions form { display: inline; }
+
+    .badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 50px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+    }
+    .badge-vaccine   { background: #d1fae5; color: #065f46; }
+    .badge-drug      { background: #dbeafe; color: #1e40af; }
+    .badge-dewormer  { background: #fef3c7; color: #92400e; }
+    .badge-vitamin   { background: #e0e7ff; color: #3730a3; }
+    .badge-disinfectant { background: #fce7f3; color: #9f1239; }
+    .badge-other     { background: #e5e7eb; color: #4b5563; }
+    .badge-on        { background: #d1fae5; color: #065f46; }
+    .badge-off       { background: #fee2e2; color: #991b1b; }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 30px;
+        background: #fff;
+        border: 2px dashed #9ca3af;
+        border-radius: 8px;
+    }
+    .empty-state i { font-size: 3rem; color: #87CEEB; margin-bottom: 16px; }
+    .empty-state h3 { margin: 0 0 8px; color: #1f2937; }
+    .empty-state p { color: #6b7280; margin-bottom: 20px; }
+
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 2000;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 28px 32px;
+        max-width: 620px;
+        width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    .modal-box h3 {
+        font-size: 1.05rem;
+        font-weight: 700;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #000;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        margin-bottom: 14px;
+    }
+    .form-row.three { grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 600px) {
+        .form-row, .form-row.three { grid-template-columns: 1fr; }
+    }
+    .form-group { margin-bottom: 14px; }
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        font-size: 0.82rem;
+        margin-bottom: 5px;
+    }
+    .form-group label .required { color: #dc2626; }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 9px 12px;
+        border: 2px solid #000;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 0.88rem;
+        background: #fff;
+        box-sizing: border-box;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: #1fb4d2;
+        box-shadow: 0 0 0 3px rgba(31,180,210,0.2);
+    }
+    .form-group .help-text {
+        font-size: 0.72rem;
+        color: #6b7280;
+        margin-top: 4px;
+    }
+    .checkbox-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.85rem;
+    }
+    .checkbox-row input[type="checkbox"] {
+        width: auto;
+        margin: 0;
+    }
+    .modal-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 2px solid #000;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h2><i class="fas fa-syringe"></i> Vaccine & Drug Catalog</h2>
+    <div class="header-actions">
+        <a href="{% url 'kuku_biz:health_list' %}" class="btn btn-outline">
+            <i class="fas fa-arrow-left"></i> Back to Health
+        </a>
+        <button type="button" class="btn btn-primary" onclick="openAddModal()">
+            <i class="fas fa-plus"></i> Add Vaccine Type
+        </button>
+    </div>
+</div>
+
+{% if vaccine_types %}
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Brand</th>
+            <th>Kind</th>
+            <th>Target Disease</th>
+            <th>Unit</th>
+            <th class="cell-num">Cost/Unit</th>
+            <th class="cell-num">Booster (days)</th>
+            <th>Status</th>
+            <th class="cell-actions"></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for vt in vaccine_types %}
+        <tr>
+            <td><strong>{{ vt.name }}</strong></td>
+            <td>{{ vt.brand|default:"—" }}</td>
+            <td>
+                <span class="badge badge-{{ vt.item_kind }}">
+                    {{ vt.get_item_kind_display }}
+                </span>
+            </td>
+            <td>{{ vt.target_disease|default:"—" }}</td>
+            <td>{{ vt.default_unit }}</td>
+            <td class="cell-num">{{ vt.cost_per_unit|floatformat:2 }}</td>
+            <td class="cell-num">
+                {% if vt.repeat_interval_days %}{{ vt.repeat_interval_days }}{% else %}—{% endif %}
+            </td>
+            <td>
+                {% if vt.is_active %}
+                    <span class="badge badge-on">Active</span>
+                {% else %}
+                    <span class="badge badge-off">Inactive</span>
+                {% endif %}
+            </td>
+            <td class="cell-actions">
+                <button type="button"
+                        class="btn btn-outline btn-sm"
+                        title="Edit"
+                        onclick="openEditModal(
+                            {{ vt.id }},
+                            '{{ vt.name|escapejs }}',
+                            '{{ vt.brand|escapejs }}',
+                            '{{ vt.item_kind }}',
+                            '{{ vt.target_disease|escapejs }}',
+                            '{{ vt.default_unit }}',
+                            '{{ vt.cost_per_unit }}',
+                            '{{ vt.repeat_interval_days|default:0 }}',
+                            '{{ vt.storage_notes|escapejs }}',
+                            {{ vt.is_active|yesno:"true,false" }}
+                        )">
+                    <i class="fas fa-pen"></i>
+                </button>
+                <form method="post"
+                      action="{% url 'kuku_biz:vaccine_type_delete' vt.pk %}"
+                      onsubmit="return confirm('Delete this vaccine type? If it has records, it will be marked inactive instead.');">
+                    {% csrf_token %}
+                    <button class="btn btn-danger btn-sm" title="Delete">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% else %}
+<div class="empty-state">
+    <i class="fas fa-syringe"></i>
+    <h3>No vaccine types yet</h3>
+    <p>Add your first vaccine or drug — e.g. "Newcastle", "Gumboro", "Fowl Typhoid".</p>
+    <button type="button" class="btn btn-primary" onclick="openAddModal()">
+        <i class="fas fa-plus"></i> Add Vaccine Type
+    </button>
+</div>
+{% endif %}
+
+{# ADD MODAL #}
+<div class="modal-overlay" id="addModal">
+    <div class="modal-box">
+        <h3><i class="fas fa-plus"></i> Add Vaccine / Drug</h3>
+        <form method="post" action="{% url 'kuku_biz:vaccine_type_create' %}">
+            {% csrf_token %}
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="add_name">Name <span class="required">*</span></label>
+                    <input type="text" id="add_name" name="name" required
+                           placeholder="e.g. Newcastle">
+                </div>
+                <div class="form-group">
+                    <label for="add_brand">Brand</label>
+                    <input type="text" id="add_brand" name="brand"
+                           placeholder="e.g. KEPROVAC">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="add_kind">Kind</label>
+                    <select id="add_kind" name="item_kind">
+                        {% for code, label in kind_choices %}
+                            <option value="{{ code }}"
+                                {% if code == 'vaccine' %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="add_target">Target Disease</label>
+                    <input type="text" id="add_target" name="target_disease"
+                           placeholder="e.g. Newcastle">
+                </div>
+            </div>
+
+            <div class="form-row three">
+                <div class="form-group">
+                    <label for="add_unit">Default Unit</label>
+                    <select id="add_unit" name="default_unit">
+                        <option value="dose">Dose</option>
+                        <option value="vial">Vial</option>
+                        <option value="ml">ml</option>
+                        <option value="sachet">Sachet</option>
+                        <option value="pcs">Pieces</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="add_cost">Cost / Unit (KES)</label>
+                    <input type="number" id="add_cost" name="cost_per_unit"
+                           min="0" step="0.01" placeholder="e.g. 5">
+                </div>
+                <div class="form-group">
+                    <label for="add_repeat">Booster (days)</label>
+                    <input type="number" id="add_repeat" name="repeat_interval_days"
+                           min="0" value="0">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="add_storage">Storage Notes</label>
+                <input type="text" id="add_storage" name="storage_notes"
+                       placeholder="e.g. Keep refrigerated at 2–8°C">
+            </div>
+
+            <div class="form-group checkbox-row">
+                <input type="checkbox" id="add_active" name="is_active" checked>
+                <label for="add_active" style="margin:0;">Active</label>
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-check"></i> Add
+                </button>
+                <button type="button" class="btn" onclick="closeModal('addModal')">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{# EDIT MODAL #}
+<div class="modal-overlay" id="editModal">
+    <div class="modal-box">
+        <h3><i class="fas fa-pen"></i> Edit Vaccine / Drug</h3>
+        <form method="post" id="editForm" action="">
+            {% csrf_token %}
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="e_name">Name <span class="required">*</span></label>
+                    <input type="text" id="e_name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="e_brand">Brand</label>
+                    <input type="text" id="e_brand" name="brand">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="e_kind">Kind</label>
+                    <select id="e_kind" name="item_kind">
+                        {% for code, label in kind_choices %}
+                            <option value="{{ code }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="e_target">Target Disease</label>
+                    <input type="text" id="e_target" name="target_disease">
+                </div>
+            </div>
+
+            <div class="form-row three">
+                <div class="form-group">
+                    <label for="e_unit">Default Unit</label>
+                    <select id="e_unit" name="default_unit">
+                        <option value="dose">Dose</option>
+                        <option value="vial">Vial</option>
+                        <option value="ml">ml</option>
+                        <option value="sachet">Sachet</option>
+                        <option value="pcs">Pieces</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="e_cost">Cost / Unit (KES)</label>
+                    <input type="number" id="e_cost" name="cost_per_unit"
+                           min="0" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label for="e_repeat">Booster (days)</label>
+                    <input type="number" id="e_repeat" name="repeat_interval_days"
+                           min="0" value="0">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="e_storage">Storage Notes</label>
+                <input type="text" id="e_storage" name="storage_notes">
+            </div>
+
+            <div class="form-group checkbox-row">
+                <input type="checkbox" id="e_active" name="is_active">
+                <label for="e_active" style="margin:0;">Active</label>
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-check"></i> Save Changes
+                </button>
+                <button type="button" class="btn" onclick="closeModal('editModal')">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openModal(id) {
+        document.getElementById(id).classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeModal(id) {
+        document.getElementById(id).classList.remove('active');
+        document.body.style.overflow = '';
+    }
+    document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
+        overlay.addEventListener('click', function (e) {
+            if (e.target === this) closeModal(this.id);
+        });
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal-overlay.active').forEach(function (m) {
+                closeModal(m.id);
+            });
+        }
+    });
+
+    function openAddModal() {
+        var form = document.querySelector('#addModal form');
+        if (form) form.reset();
+        openModal('addModal');
+    }
+
+    function openEditModal(id, name, brand, kind, target, unit, cost, repeat, storage, active) {
+        document.getElementById('editForm').action =
+            '/kuku_biz/health/vaccines/' + id + '/edit/';
+        document.getElementById('e_name').value = name;
+        document.getElementById('e_brand').value = brand;
+        document.getElementById('e_kind').value = kind;
+        document.getElementById('e_target').value = target;
+        document.getElementById('e_unit').value = unit;
+        document.getElementById('e_cost').value = cost;
+        document.getElementById('e_repeat').value = repeat || 0;
+        document.getElementById('e_storage').value = storage;
+        document.getElementById('e_active').checked = active;
+        openModal('editModal');
+    }
+</script>
+
+{% endblock %}
