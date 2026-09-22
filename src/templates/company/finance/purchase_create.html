@@ -100,6 +100,21 @@
         font-weight: 600;
         color: #000000;
     }
+
+    /* Field-level error message */
+    .field-error {
+        display: none;
+        margin-top: 6px;
+        padding: 6px 10px;
+        background: #fee2e2;
+        border: 1px solid #dc2626;
+        border-radius: 4px;
+        color: #991b1b;
+        font-size: 0.8rem;
+    }
+    .field-error.visible {
+        display: block;
+    }
 </style>
 {% endblock %}
 
@@ -120,9 +135,9 @@
 
     <!-- Purchase Form -->
     <div class="form-card">
-        <form method="post" enctype="multipart/form-data">
+        <form method="post" enctype="multipart/form-data" id="purchaseForm">
             {% csrf_token %}
-            
+
             <!-- Branch -->
             <div class="mb-3">
                 <label class="form-label required-field">Branch</label>
@@ -148,26 +163,53 @@
             <!-- Amount -->
             <div class="mb-3">
                 <label class="form-label required-field">Amount (KSh)</label>
-                <input type="number" name="amount" class="form-control" step="0.01" placeholder="0.00" required>
+                <input type="number"
+                       name="amount"
+                       class="form-control"
+                       step="0.01"
+                       min="0.01"
+                       placeholder="0.00"
+                       required>
             </div>
 
             <!-- Reference -->
             <div class="mb-3">
                 <label class="form-label required-field">Reference</label>
-                <input type="text" name="reference" class="form-control" placeholder="Receipt/Invoice Number" required>
+                <input type="text"
+                       name="reference"
+                       class="form-control"
+                       placeholder="Receipt/Invoice Number"
+                       maxlength="100"
+                       required>
             </div>
 
             <!-- Description -->
             <div class="mb-3">
                 <label class="form-label required-field">Description</label>
-                <textarea name="description" class="form-control" rows="2" placeholder="Brief description" required></textarea>
+                <textarea name="description"
+                          class="form-control"
+                          rows="2"
+                          placeholder="Brief description"
+                          maxlength="500"
+                          required></textarea>
             </div>
 
-            <!-- Receipt Upload -->
+            <!-- Receipt Upload (OPTIONAL) -->
             <div class="mb-3">
-                <label class="form-label required-field">Receipt Image</label>
-                <input type="file" name="receipt_image" class="form-control-file" accept="image/*" onchange="previewImage(this)" required>
-                <small class="text-muted">Upload a receipt image (JPEG, PNG, GIF) - Optional</small>
+                <label class="form-label">Receipt Image</label>
+                <input type="file"
+                       name="receipt_image"
+                       id="receiptInput"
+                       class="form-control-file"
+                       accept="image/jpeg,image/png,image/gif,image/webp"
+                       onchange="previewImage(this)">
+                <small class="text-muted">
+                    <i class="fas fa-info-circle"></i>
+                    Optional. If you have the receipt handy, upload it (JPG, PNG, GIF, WEBP — max 5MB). Otherwise leave blank.
+                </small>
+
+                <div class="field-error" id="receiptError"></div>
+
                 <div class="file-preview" id="filePreview">
                     <img id="previewImg" src="#" alt="Receipt Preview">
                     <span class="file-name" id="fileName"></span>
@@ -195,26 +237,93 @@
 </div>
 
 <script>
-function previewImage(input) {
+(function () {
+    // Match the view's validation limits
+    const MAX_BYTES = 5 * 1024 * 1024;  // 5 MB
+    const MAX_BYTES_LABEL = '5MB';
+    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+    const input = document.getElementById('receiptInput');
     const preview = document.getElementById('filePreview');
     const img = document.getElementById('previewImg');
     const fileName = document.getElementById('fileName');
-    
-    if (input.files && input.files[0]) {
-        const reader = new FileReader();
-        
-        reader.onload = function(e) {
-            img.src = e.target.result;
-            fileName.textContent = input.files[0].name;
-            preview.style.display = 'block';
-        }
-        
-        reader.readAsDataURL(input.files[0]);
-    } else {
+    const errorBox = document.getElementById('receiptError');
+
+    function showError(message) {
+        errorBox.textContent = message;
+        errorBox.classList.add('visible');
+    }
+
+    function clearError() {
+        errorBox.textContent = '';
+        errorBox.classList.remove('visible');
+    }
+
+    function resetPreview() {
         preview.style.display = 'none';
         img.src = '#';
         fileName.textContent = '';
     }
-}
+
+    window.previewImage = function (inputEl) {
+        clearError();
+        resetPreview();
+
+        const file = inputEl.files && inputEl.files[0];
+        if (!file) return;
+
+        // Type check
+        if (ALLOWED_TYPES.indexOf(file.type) === -1) {
+            showError('Unsupported file type. Please upload a JPG, PNG, GIF, or WEBP image.');
+            inputEl.value = '';
+            return;
+        }
+
+        // Size check
+        if (file.size > MAX_BYTES) {
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+            showError('File is too large (' + sizeMB + ' MB). Maximum is ' + MAX_BYTES_LABEL + '.');
+            inputEl.value = '';
+            return;
+        }
+
+        // Preview
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            img.src = e.target.result;
+            const sizeKB = (file.size / 1024).toFixed(1);
+            fileName.textContent = file.name + ' (' + sizeKB + ' KB)';
+            preview.style.display = 'block';
+        };
+        reader.onerror = function () {
+            showError('Could not read that file. Please try a different image.');
+            inputEl.value = '';
+        };
+        reader.readAsDataURL(file);
+    };
+
+    // Belt-and-braces: validate again on submit in case the file was set
+    // programmatically or the browser skipped the change event.
+    document.getElementById('purchaseForm').addEventListener('submit', function (e) {
+        if (!input.files || !input.files[0]) return;  // optional — OK to skip
+
+        const file = input.files[0];
+
+        if (ALLOWED_TYPES.indexOf(file.type) === -1) {
+            e.preventDefault();
+            showError('Unsupported file type. Please upload a JPG, PNG, GIF, or WEBP image.');
+            input.focus();
+            return;
+        }
+
+        if (file.size > MAX_BYTES) {
+            e.preventDefault();
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+            showError('File is too large (' + sizeMB + ' MB). Maximum is ' + MAX_BYTES_LABEL + '.');
+            input.focus();
+            return;
+        }
+    });
+})();
 </script>
 {% endblock %}

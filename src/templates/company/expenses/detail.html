@@ -2,58 +2,361 @@
 
 {% block title %}Expense #{{ expense.id }}{% endblock %}
 
+{% block extra_css %}
+<style>
+    .expense-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .expense-meta {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+
+    /* Excel-style detail table */
+    .table-detail {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+    .table-detail th,
+    .table-detail td {
+        border: 1px solid #000000;
+        padding: 10px 14px;
+        vertical-align: middle;
+    }
+    .table-detail th {
+        background-color: #f0f2f5;
+        font-weight: 700;
+        color: #000000;
+        width: 30%;
+    }
+    .table-detail td {
+        background-color: #ffffff;
+        color: #000000;
+        word-break: break-word;
+    }
+
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 50px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        border: 2px solid #000000;
+        display: inline-block;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .status-pending  { background: #fef3c7; color: #92400e; }
+    .status-approved { background: #dbeafe; color: #1e40af; }
+    .status-paid     { background: #d4edda; color: #155724; }
+    .status-rejected { background: #f8d7da; color: #721c24; }
+
+    /* Attachment preview */
+    .attachment-box {
+        margin-top: 20px;
+        padding: 16px;
+        border: 2px dashed #000000;
+        border-radius: 4px;
+        background: #fafbfc;
+        text-align: center;
+    }
+    .attachment-box img {
+        max-width: 100%;
+        max-height: 500px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+    }
+    .attachment-box .attachment-actions {
+        margin-top: 12px;
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    .attachment-box .no-attachment {
+        color: #6c757d;
+        padding: 20px;
+    }
+    .attachment-box .no-attachment i {
+        font-size: 2.5rem;
+        display: block;
+        margin-bottom: 10px;
+        opacity: 0.4;
+    }
+
+    /* Section titles */
+    .section-title {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #6b7280;
+        margin: 20px 0 10px;
+        padding-bottom: 6px;
+        border-bottom: 2px solid #000000;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-12">
 
-        <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
+        <!-- Header card -->
+        <div class="card mb-4" style="border: 2px solid #000;">
+            <div class="card-header expense-header" style="background:#87CEEB; border-bottom: 2px solid #000;">
                 <h6 class="mb-0">
                     <i class="fas fa-file-invoice"></i>
                     Expense #{{ expense.id }}
+                    <span class="expense-meta ms-2">
+                        · {{ expense.get_expense_type_display }}
+                    </span>
                 </h6>
-                <a href="/company/expenses/" class="btn btn-outline-info btn-sm">
-                    <i class="fas fa-arrow-left"></i> Back
-                </a>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'company-expenses-dashboard' %}" class="btn btn-secondary btn-sm" style="border:2px solid #000;">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </a>
+                </div>
             </div>
-            <div class="card-body">
-                <table class="table table-excel">
+        </div>
+
+        <!-- Core info -->
+        <div class="card mb-4" style="border: 2px solid #000;">
+            <div class="card-body p-0">
+                <table class="table-detail">
                     <tbody>
                         <tr>
-                            <th style="width:30%;">Date</th>
-                            <td>{{ expense.date|date:"Y-m-d" }}</td>
+                            <th>Expense Type</th>
+                            <td>
+                                <strong>{{ expense.get_expense_type_display }}</strong>
+                            </td>
                         </tr>
                         <tr>
-                            <th>Category</th>
-                            <td>{{ expense.category|default:"-" }}</td>
+                            <th>Date</th>
+                            <td>{{ expense.expense_date|date:"l, d M Y" }}</td>
                         </tr>
                         <tr>
                             <th>Description</th>
-                            <td>{{ expense.description|default:"-" }}</td>
+                            <td>{{ expense.description|default:"—" }}</td>
                         </tr>
                         <tr>
                             <th>Amount</th>
-                            <td>KSh {{ expense.amount|floatformat:2 }}</td>
+                            <td>
+                                <strong style="font-size:1.1rem; color:#dc3545;">
+                                    KSh {{ expense.amount|floatformat:2 }}
+                                </strong>
+                            </td>
                         </tr>
                         <tr>
                             <th>Branch</th>
-                            <td>{{ expense.branch|default:"-" }}</td>
-                        </tr>
-                        <tr>
-                            <th>Recorded By</th>
-                            <td>{{ expense.created_by|default:"-" }}</td>
+                            <td>
+                                {% if expense.branch %}
+                                    <i class="fas fa-store" style="color:#1fb4d2;"></i>
+                                    {{ expense.branch.name }}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
                         </tr>
                         <tr>
                             <th>Status</th>
                             <td>
-                                <span class="badge bg-{% if expense.status == 'paid' %}success{% elif expense.status == 'pending' %}warning{% else %}danger{% endif %}">
-                                    {{ expense.status|title }}
+                                <span class="status-badge status-{{ expense.status }}">
+                                    {{ expense.status_display }}
                                 </span>
                             </td>
+                        </tr>
+                        <tr>
+                            <th>Payment Method</th>
+                            <td>{{ expense.payment_method_display|default:"—" }}</td>
+                        </tr>
+                        <tr>
+                            <th>Reference</th>
+                            <td>{{ expense.reference|default:"—" }}</td>
+                        </tr>
+
+                        {# ── Type-specific rows ── #}
+                        {% if expense.expense_type == 'salary' %}
+                            <tr>
+                                <th>Employee Name</th>
+                                <td><strong>{{ expense.employee_name|default:"—" }}</strong></td>
+                            </tr>
+                            {% if expense.employee_id %}
+                            <tr>
+                                <th>Employee ID</th>
+                                <td>{{ expense.employee_id }}</td>
+                            </tr>
+                            {% endif %}
+                            {% if expense.employee_phone %}
+                            <tr>
+                                <th>Employee Phone</th>
+                                <td>{{ expense.employee_phone }}</td>
+                            </tr>
+                            {% endif %}
+                            <tr>
+                                <th>Salary Month</th>
+                                <td>{{ expense.salary_month_display|default:"—" }}</td>
+                            </tr>
+                        {% elif expense.expense_type == 'rent' %}
+                            <tr>
+                                <th>Rent Month</th>
+                                <td>{{ expense.rent_month_display|default:"—" }}</td>
+                            </tr>
+                            {% if expense.landlord_name %}
+                            <tr>
+                                <th>Landlord Name</th>
+                                <td>{{ expense.landlord_name }}</td>
+                            </tr>
+                            {% endif %}
+                            {% if expense.landlord_phone %}
+                            <tr>
+                                <th>Landlord Phone</th>
+                                <td>{{ expense.landlord_phone }}</td>
+                            </tr>
+                            {% endif %}
+                            {% if expense.receipt_number %}
+                            <tr>
+                                <th>Receipt Number</th>
+                                <td>{{ expense.receipt_number }}</td>
+                            </tr>
+                            {% endif %}
+                        {% elif expense.expense_type == 'bill' %}
+                            <tr>
+                                <th>Bill Type</th>
+                                <td>{{ expense.bill_type_display|default:"—" }}</td>
+                            </tr>
+                            <tr>
+                                <th>Bill Name</th>
+                                <td><strong>{{ expense.bill_name|default:"—" }}</strong></td>
+                            </tr>
+                            <tr>
+                                <th>Bill Period</th>
+                                <td>{{ expense.bill_period_display|default:"—" }}</td>
+                            </tr>
+                            {% if expense.receipt_number %}
+                            <tr>
+                                <th>Receipt Number</th>
+                                <td>{{ expense.receipt_number }}</td>
+                            </tr>
+                            {% endif %}
+                        {% elif expense.expense_type == 'general' %}
+                            <tr>
+                                <th>Category</th>
+                                <td>
+                                    <span class="badge" style="background:#e8eaf6; color:#283593; border:1px solid #000;">
+                                        {{ expense.category_display }}
+                                    </span>
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Audit trail -->
+        <div class="section-title">Audit Trail</div>
+        <div class="card mb-4" style="border: 2px solid #000;">
+            <div class="card-body p-0">
+                <table class="table-detail">
+                    <tbody>
+                        <tr>
+                            <th>Recorded By</th>
+                            <td>
+                                {% if expense.created_by %}
+                                    {{ expense.created_by.get_full_name|default:expense.created_by.username }}
+                                    <span class="text-muted small">({{ expense.created_by.email }})</span>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Recorded At</th>
+                            <td>{{ expense.created_at|date:"d M Y, H:i" }}</td>
+                        </tr>
+                        {% if expense.approved_by %}
+                        <tr>
+                            <th>Approved By</th>
+                            <td>
+                                {{ expense.approved_by.get_full_name|default:expense.approved_by.username }}
+                                {% if expense.approved_at %}
+                                    <br><span class="text-muted small">on {{ expense.approved_at|date:"d M Y, H:i" }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% if expense.paid_at %}
+                        <tr>
+                            <th>Paid At</th>
+                            <td>{{ expense.paid_at|date:"d M Y, H:i" }}</td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <th>Last Updated</th>
+                            <td>{{ expense.updated_at|date:"d M Y, H:i" }}</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
+        </div>
+
+        <!-- Notes -->
+        {% if expense.notes %}
+        <div class="section-title">Notes</div>
+        <div class="card mb-4" style="border: 2px solid #000;">
+            <div class="card-body">
+                <div style="white-space: pre-wrap;">{{ expense.notes }}</div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Attachment -->
+        <div class="section-title">Receipt / Invoice Attachment</div>
+        <div class="attachment-box">
+            {% if expense.attachment_url %}
+                {% if expense.is_pdf %}
+                    {# PDF — no inline preview, just a link #}
+                    <i class="fas fa-file-pdf" style="font-size:3rem; color:#dc3545;"></i>
+                    <p class="mb-2 mt-2">PDF attachment</p>
+                    <div class="attachment-actions">
+                        <a href="{{ expense.attachment_url }}" target="_blank" rel="noopener"
+                           class="btn btn-danger btn-sm" style="border:2px solid #000;">
+                            <i class="fas fa-external-link-alt"></i> Open PDF
+                        </a>
+                        <a href="{{ expense.attachment_url }}" download
+                           class="btn btn-success btn-sm" style="border:2px solid #000;">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                    </div>
+                {% else %}
+                    {# Image — inline preview #}
+                    <a href="{{ expense.attachment_url }}" target="_blank" rel="noopener">
+                        <img src="{{ expense.attachment_url }}"
+                             alt="Attachment for Expense #{{ expense.id }}"
+                             onerror="this.parentElement.innerHTML='<div class=&quot;no-attachment&quot;><i class=&quot;fas fa-exclamation-triangle&quot;></i><p>Attachment file is missing or unreachable.</p></div>';">
+                    </a>
+                    <div class="attachment-actions">
+                        <a href="{{ expense.attachment_url }}" target="_blank" rel="noopener"
+                           class="btn btn-primary btn-sm" style="border:2px solid #000;">
+                            <i class="fas fa-expand"></i> View Full Size
+                        </a>
+                        <a href="{{ expense.attachment_url }}" download
+                           class="btn btn-success btn-sm" style="border:2px solid #000;">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                    </div>
+                {% endif %}
+            {% else %}
+                <div class="no-attachment">
+                    <i class="fas fa-paperclip"></i>
+                    <p class="mb-0">No attachment uploaded for this expense.</p>
+                </div>
+            {% endif %}
         </div>
 
     </div>

@@ -1,6 +1,56 @@
 {% extends base_template|default:"base.html" %}
+
 {% block title %}
   {% if expense_type == 'salary' %}Salary{% elif expense_type == 'rent' %}Rent{% elif expense_type == 'bill' %}Bill{% else %}General Expense{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .required:after { content: " *"; color: #dc3545; }
+
+    /* Inline error for the file input */
+    .file-error {
+        display: none;
+        margin-top: 6px;
+        padding: 6px 10px;
+        background: #fee2e2;
+        border: 1px solid #dc2626;
+        border-radius: 4px;
+        color: #991b1b;
+        font-size: 0.8rem;
+    }
+    .file-error.visible { display: block; }
+
+    /* File preview chip */
+    .file-preview-chip {
+        display: none;
+        margin-top: 8px;
+        padding: 8px 12px;
+        background: #f0fbfd;
+        border: 1px solid #1fb4d2;
+        border-radius: 4px;
+        font-size: 0.82rem;
+        color: #0a2f45;
+        align-items: center;
+        gap: 8px;
+    }
+    .file-preview-chip.visible { display: flex; }
+    .file-preview-chip i { color: #1fb4d2; }
+
+    /* Attachment preview block on edit */
+    .current-attachment {
+        margin-top: 12px;
+        padding: 12px;
+        border: 2px dashed #000;
+        border-radius: 4px;
+        background: #fafbfc;
+    }
+    .current-attachment img {
+        max-height: 140px;
+        border-radius: 6px;
+        border: 1px solid #dee2e6;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -14,7 +64,7 @@
             {% if expense_type == 'salary' %}Salary{% elif expense_type == 'rent' %}Rent{% elif expense_type == 'bill' %}Bill{% else %}General Expense{% endif %}
           </h5>
 
-          <form method="post" enctype="multipart/form-data">
+          <form method="post" enctype="multipart/form-data" id="expenseForm">
             {% csrf_token %}
 
             <!-- Branch info for non-admin -->
@@ -38,7 +88,7 @@
                 <select name="branch" class="form-select">
                   <option value="">— None —</option>
                   {% for b in branches %}
-                    <option value="{{ b.id }}" {% if expense.branch_id == b.id %}selected{% endif %}>{{ b.name }}</option>
+                    <option value="{{ b.id }}" {% if expense and expense.branch_id == b.id %}selected{% endif %}>{{ b.name }}</option>
                   {% endfor %}
                 </select>
               </div>
@@ -51,16 +101,19 @@
                 <div class="col-md-6 mb-3">
                   <label class="form-label required">Employee Name</label>
                   <input type="text" name="employee_name" class="form-control" required
+                         maxlength="150"
                          value="{{ expense.employee_name|default:'' }}">
                 </div>
                 <div class="col-md-3 mb-3">
                   <label class="form-label">Employee ID</label>
                   <input type="text" name="employee_id" class="form-control"
+                         maxlength="50"
                          value="{{ expense.employee_id|default:'' }}">
                 </div>
                 <div class="col-md-3 mb-3">
                   <label class="form-label">Phone</label>
                   <input type="text" name="employee_phone" class="form-control"
+                         maxlength="20"
                          value="{{ expense.employee_phone|default:'' }}">
                 </div>
               </div>
@@ -68,7 +121,7 @@
                 <div class="col-md-6 mb-3">
                   <label class="form-label required">Salary Month</label>
                   <input type="month" name="salary_month" class="form-control" required
-                         value="{% if expense.salary_month %}{{ expense.salary_month|date:'Y-m' }}{% endif %}">
+                         value="{% if expense and expense.salary_month %}{{ expense.salary_month|date:'Y-m' }}{% endif %}">
                 </div>
                 <div class="col-md-6 mb-3">
                   <label class="form-label required">Salary Amount (KSh)</label>
@@ -84,7 +137,7 @@
                 <div class="col-md-6 mb-3">
                   <label class="form-label required">Rent Month</label>
                   <input type="month" name="rent_month" class="form-control" required
-                         value="{% if expense.rent_month %}{{ expense.rent_month|date:'Y-m' }}{% endif %}">
+                         value="{% if expense and expense.rent_month %}{{ expense.rent_month|date:'Y-m' }}{% endif %}">
                 </div>
                 <div class="col-md-6 mb-3">
                   <label class="form-label required">Rent Amount (KSh)</label>
@@ -96,18 +149,22 @@
                 <div class="col-md-6 mb-3">
                   <label class="form-label">Landlord Name</label>
                   <input type="text" name="landlord_name" class="form-control"
+                         maxlength="150"
                          value="{{ expense.landlord_name|default:'' }}">
                 </div>
                 <div class="col-md-6 mb-3">
                   <label class="form-label">Landlord Phone</label>
                   <input type="text" name="landlord_phone" class="form-control"
+                         maxlength="20"
                          value="{{ expense.landlord_phone|default:'' }}">
                 </div>
               </div>
               <div class="mb-3">
                 <label class="form-label required">Description</label>
                 <input type="text" name="description" class="form-control" required
-                       value="{{ expense.description|default:'' }}" placeholder="e.g. Monthly rent for main branch">
+                       maxlength="200"
+                       value="{{ expense.description|default:'' }}"
+                       placeholder="e.g. Monthly rent for main branch">
               </div>
 
             <!-- ===================== BILL FIELDS ===================== -->
@@ -118,19 +175,21 @@
                   <select name="bill_type" class="form-select" required>
                     <option value="">Select…</option>
                     {% for k,v in bill_types %}
-                      <option value="{{ k }}" {% if expense.bill_type == k %}selected{% endif %}>{{ v }}</option>
+                      <option value="{{ k }}" {% if expense and expense.bill_type == k %}selected{% endif %}>{{ v }}</option>
                     {% endfor %}
                   </select>
                 </div>
                 <div class="col-md-4 mb-3">
                   <label class="form-label required">Bill Name</label>
                   <input type="text" name="bill_name" class="form-control" required
-                         value="{{ expense.bill_name|default:'' }}" placeholder="e.g. KPLC February">
+                         maxlength="150"
+                         value="{{ expense.bill_name|default:'' }}"
+                         placeholder="e.g. KPLC February">
                 </div>
                 <div class="col-md-4 mb-3">
                   <label class="form-label">Bill Period</label>
                   <input type="month" name="bill_period" class="form-control"
-                         value="{% if expense.bill_period %}{{ expense.bill_period|date:'Y-m' }}{% endif %}">
+                         value="{% if expense and expense.bill_period %}{{ expense.bill_period|date:'Y-m' }}{% endif %}">
                 </div>
               </div>
               <div class="row">
@@ -142,13 +201,16 @@
                 <div class="col-md-6 mb-3">
                   <label class="form-label">Receipt / Invoice Number</label>
                   <input type="text" name="receipt_number" class="form-control"
+                         maxlength="100"
                          value="{{ expense.receipt_number|default:'' }}">
                 </div>
               </div>
               <div class="mb-3">
                 <label class="form-label required">Description</label>
                 <input type="text" name="description" class="form-control" required
-                       value="{{ expense.description|default:'' }}" placeholder="Brief description">
+                       maxlength="200"
+                       value="{{ expense.description|default:'' }}"
+                       placeholder="Brief description">
               </div>
 
             <!-- ===================== GENERAL FIELDS ===================== -->
@@ -159,7 +221,7 @@
                   <select name="category" class="form-select" required>
                     <option value="">Select…</option>
                     {% for k,v in general_categories %}
-                      <option value="{{ k }}" {% if expense.category == k %}selected{% endif %}>{{ v }}</option>
+                      <option value="{{ k }}" {% if expense and expense.category == k %}selected{% endif %}>{{ v }}</option>
                     {% endfor %}
                   </select>
                 </div>
@@ -172,6 +234,7 @@
               <div class="mb-3">
                 <label class="form-label required">Description</label>
                 <input type="text" name="description" class="form-control" required
+                       maxlength="200"
                        value="{{ expense.description|default:'' }}">
               </div>
             {% endif %}
@@ -182,13 +245,14 @@
                 <label class="form-label">Payment Method</label>
                 <select name="payment_method" class="form-select">
                   {% for k,v in payment_methods %}
-                    <option value="{{ k }}" {% if expense.payment_method == k %}selected{% endif %}>{{ v }}</option>
+                    <option value="{{ k }}" {% if expense and expense.payment_method == k %}selected{% endif %}>{{ v }}</option>
                   {% endfor %}
                 </select>
               </div>
               <div class="col-md-6 mb-3">
                 <label class="form-label">Reference</label>
                 <input type="text" name="reference" class="form-control"
+                       maxlength="100"
                        value="{{ expense.reference|default:'' }}">
               </div>
             </div>
@@ -196,18 +260,36 @@
             <!-- Receipt upload -->
             <div class="mb-3">
               <label class="form-label">Receipt / Invoice Attachment</label>
-              <input type="file" name="attachment" class="form-control" accept="image/*,application/pdf">
-              <small class="text-muted">JPG, PNG, GIF, PDF · Max 5MB</small>
+              <input type="file"
+                     name="attachment"
+                     id="attachmentInput"
+                     class="form-control"
+                     accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,image/*,application/pdf">
+              <small class="text-muted">
+                <i class="fas fa-info-circle"></i> JPG, PNG, GIF, WEBP or PDF · Max 5MB
+              </small>
 
-              {% if is_edit and expense.attachment %}
-              <div class="mt-2 p-2 border rounded">
+              <div class="file-error" id="attachmentError"></div>
+
+              <div class="file-preview-chip" id="attachmentPreview">
+                <i class="fas fa-file"></i>
+                <span id="attachmentPreviewText"></span>
+              </div>
+
+              {% if is_edit and expense and expense.attachment %}
+              <div class="current-attachment">
+                <div class="small text-muted mb-2">
+                  <i class="fas fa-paperclip"></i> Current attachment
+                </div>
                 {% if expense.is_pdf %}
-                  <a href="{{ expense.attachment.url }}" target="_blank" class="text-danger">
+                  <a href="{{ expense.attachment_url }}" target="_blank" rel="noopener" class="text-danger">
                     <i class="fas fa-file-pdf fa-2x"></i> View current PDF
                   </a>
                 {% else %}
-                  <a href="{{ expense.attachment.url }}" target="_blank">
-                    <img src="{{ expense.attachment.url }}" alt="attachment" style="max-height:120px;border-radius:6px;">
+                  <a href="{{ expense.attachment_url }}" target="_blank" rel="noopener">
+                    <img src="{{ expense.attachment_url }}"
+                         alt="attachment"
+                         onerror="this.parentElement.innerHTML='<div class=&quot;text-muted small&quot;><i class=&quot;fas fa-exclamation-triangle&quot;></i> Attachment file is missing or unreachable</div>';">
                   </a>
                 {% endif %}
                 <div class="form-check mt-2">
@@ -227,18 +309,26 @@
               <button type="submit" class="btn btn-danger">
                 <i class="fas fa-save"></i> {% if is_edit %}Update{% else %}Save{% endif %}
               </button>
-              {% if expense_type == 'salary' %}
-                <a href="{% url 'company-salaries-list' %}" class="btn btn-secondary">Cancel</a>
-              {% elif expense_type == 'rent' %}
-                <a href="{% url 'company-rents-list' %}" class="btn btn-secondary">Cancel</a>
-              {% elif expense_type == 'bill' %}
-                <a href="{% url 'company-bills-list' %}" class="btn btn-secondary">Cancel</a>
+
+              {% if cancel_url %}
+                <a href="{{ cancel_url }}" class="btn btn-secondary">Cancel</a>
               {% else %}
-                <a href="{% url 'company-general-list' %}" class="btn btn-secondary">Cancel</a>
+                {# Fallback if view hasn't been updated to pass cancel_url #}
+                {% if expense_type == 'salary' %}
+                  <a href="{% url 'company-salaries-list' %}" class="btn btn-secondary">Cancel</a>
+                {% elif expense_type == 'rent' %}
+                  <a href="{% url 'company-rents-list' %}" class="btn btn-secondary">Cancel</a>
+                {% elif expense_type == 'bill' %}
+                  <a href="{% url 'company-bills-list' %}" class="btn btn-secondary">Cancel</a>
+                {% else %}
+                  <a href="{% url 'company-general-list' %}" class="btn btn-secondary">Cancel</a>
+                {% endif %}
               {% endif %}
+
               {% if is_edit %}
+                {# Uses the confirmation page — GET renders confirm, POST deletes #}
                 <a href="{% url 'company-expenses-delete' expense.id %}" class="btn btn-outline-danger ms-auto">
-                  <i class="fas fa-trash"></i> Delete
+                  <i class="fas fa-trash"></i> Delete…
                 </a>
               {% endif %}
             </div>
@@ -249,7 +339,76 @@
   </div>
 </div>
 
-<style>
-.required:after { content:" *"; color:#dc3545; }
-</style>
+<script>
+(function () {
+    const MAX_BYTES = 5 * 1024 * 1024;  // 5 MB
+    const MAX_LABEL = '5MB';
+    const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf'];
+
+    const input = document.getElementById('attachmentInput');
+    const errorBox = document.getElementById('attachmentError');
+    const previewBox = document.getElementById('attachmentPreview');
+    const previewText = document.getElementById('attachmentPreviewText');
+
+    if (!input) return;
+
+    function showError(msg) {
+        errorBox.textContent = msg;
+        errorBox.classList.add('visible');
+    }
+    function clearError() {
+        errorBox.textContent = '';
+        errorBox.classList.remove('visible');
+    }
+    function resetPreview() {
+        previewBox.classList.remove('visible');
+        previewText.textContent = '';
+    }
+
+    function validate(file) {
+        const name = (file.name || '').toLowerCase();
+        const dot = name.lastIndexOf('.');
+        const ext = dot === -1 ? '' : name.slice(dot);
+
+        if (!ALLOWED_EXTENSIONS.includes(ext)) {
+            return 'Invalid file type. Allowed: ' + ALLOWED_EXTENSIONS.join(', ');
+        }
+        if (file.size > MAX_BYTES) {
+            const mb = (file.size / (1024 * 1024)).toFixed(2);
+            return 'File is too large (' + mb + ' MB). Maximum is ' + MAX_LABEL + '.';
+        }
+        return null;
+    }
+
+    input.addEventListener('change', function () {
+        clearError();
+        resetPreview();
+
+        const file = this.files && this.files[0];
+        if (!file) return;
+
+        const error = validate(file);
+        if (error) {
+            showError(error);
+            this.value = '';
+            return;
+        }
+
+        const sizeKB = (file.size / 1024).toFixed(1);
+        previewText.textContent = file.name + ' (' + sizeKB + ' KB)';
+        previewBox.classList.add('visible');
+    });
+
+    // Belt-and-braces: validate on submit too
+    document.getElementById('expenseForm').addEventListener('submit', function (e) {
+        if (!input.files || !input.files[0]) return;
+        const error = validate(input.files[0]);
+        if (error) {
+            e.preventDefault();
+            showError(error);
+            input.focus();
+        }
+    });
+})();
+</script>
 {% endblock %}

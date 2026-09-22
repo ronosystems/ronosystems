@@ -4,10 +4,15 @@ from django.contrib import messages
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
+from django.conf import settings as django_settings
 from datetime import datetime, timedelta, date
 from decimal import Decimal
 from django.core.paginator import Paginator
 from django.db import transaction
+
+import time
+import cloudinary
+import cloudinary.uploader
 
 from apps.companies.models import Company
 from apps.company.models import Expense
@@ -25,13 +30,63 @@ from .models import (
 
 
 # ============================================
+# CLOUDINARY HELPERS
+# ============================================
+
+def _cloudinary_configure():
+    """Configure Cloudinary SDK from Django settings. Idempotent."""
+    cfg = getattr(django_settings, 'CLOUDINARY_STORAGE', {})
+    cloudinary.config(
+        cloud_name=cfg.get('CLOUD_NAME', ''),
+        api_key=cfg.get('API_KEY', ''),
+        api_secret=cfg.get('API_SECRET', ''),
+        secure=True,
+    )
+
+
+def _upload_purchase_receipt(file_obj, company_id):
+    """
+    Upload a receipt image to Cloudinary with a unique public_id.
+
+    Returns the public_id, e.g. 'finance/purchases/2_1789754321'.
+    Raises on upload failure — caller should catch and message the user.
+    """
+    if not file_obj:
+        return ''
+    if file_obj.size > 5 * 1024 * 1024:
+        raise ValueError('Receipt image must be less than 5MB.')
+
+    _cloudinary_configure()
+    public_id = f"finance/purchases/{company_id}_{int(time.time())}"
+    result = cloudinary.uploader.upload(
+        file_obj,
+        public_id=public_id,
+        overwrite=False,
+        resource_type='image',
+    )
+    return result.get('public_id') or public_id
+
+
+def _delete_cloudinary_asset(public_id):
+    """Best-effort delete of a Cloudinary asset. Never raises."""
+    if not public_id:
+        return False
+    try:
+        _cloudinary_configure()
+        cloudinary.uploader.destroy(str(public_id).strip().lstrip('/'))
+        return True
+    except Exception:
+        return False
+
+
+# ============================================
 # COGS CALCULATION HELPERS
 # ============================================
 
 def get_cogs_from_sale(sale):
     """Calculate COGS for a single sale"""
     total_cogs = Decimal('0.00')
-    
+
     for item in sale.items.all():
         if item.content_type:
             try:
@@ -44,7 +99,7 @@ def get_cogs_from_sale(sale):
                 total_cogs += item.unit_price * Decimal('0.7') * item.quantity
         else:
             total_cogs += item.unit_price * Decimal('0.7') * item.quantity
-    
+
     return total_cogs
 
 
@@ -53,11 +108,11 @@ def calculate_total_cogs_from_sales(company, branch=None):
     sales = Sale.objects.filter(company=company, payment_status='paid')
     if branch:
         sales = sales.filter(branch=branch)
-    
+
     total_cogs = Decimal('0.00')
     for sale in sales:
         total_cogs += get_cogs_from_sale(sale)
-    
+
     return total_cogs
 
 
@@ -117,7 +172,7 @@ def get_cogs_summary(company, start_date, end_date, branch=None):
     )
     if branch:
         sales = sales.filter(branch=branch)
-    
+
     total_credits = Decimal('0.00')
     sale_count = 0
     for sale in sales:
@@ -125,7 +180,7 @@ def get_cogs_summary(company, start_date, end_date, branch=None):
         if cogs > 0:
             total_credits += cogs
             sale_count += 1
-    
+
     purchases = PurchaseRecord.objects.filter(
         company=company,
         status='completed',
@@ -134,11 +189,11 @@ def get_cogs_summary(company, start_date, end_date, branch=None):
     )
     if branch:
         purchases = purchases.filter(branch=branch)
-    
+
     total_debits = purchases.aggregate(
         total=Sum('total_amount')
     )['total'] or Decimal('0.00')
-    
+
     opening_sales = Sale.objects.filter(
         company=company,
         payment_status='paid',
@@ -146,11 +201,11 @@ def get_cogs_summary(company, start_date, end_date, branch=None):
     )
     if branch:
         opening_sales = opening_sales.filter(branch=branch)
-    
+
     opening_credits = Decimal('0.00')
     for sale in opening_sales:
         opening_credits += get_cogs_from_sale(sale)
-    
+
     opening_purchases = PurchaseRecord.objects.filter(
         company=company,
         status='completed',
@@ -158,14 +213,14 @@ def get_cogs_summary(company, start_date, end_date, branch=None):
     )
     if branch:
         opening_purchases = opening_purchases.filter(branch=branch)
-    
+
     opening_debits = opening_purchases.aggregate(
         total=Sum('total_amount')
     )['total'] or Decimal('0.00')
-    
+
     opening_balance = opening_credits - opening_debits
     closing_balance = opening_balance + total_credits - total_debits
-    
+
     return {
         'opening_balance': opening_balance,
         'closing_balance': closing_balance,
@@ -195,26 +250,23 @@ def update_cogs_from_purchase(purchase_record, user=None):
 @login_required
 def debug_cogs_balance(request):
     """Debug view to check COGS calculation"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     branch_id = request.GET.get('branch')
-    
+
     sales = Sale.objects.filter(company=company, payment_status='paid')
     if branch_id:
         sales = sales.filter(branch_id=branch_id)
-    
+
     total_cogs = Decimal('0.00')
     sale_details = []
-    
+
     for sale in sales:
         cogs = get_cogs_from_sale(sale)
         if cogs > 0:
@@ -227,14 +279,14 @@ def debug_cogs_balance(request):
                 'cogs': float(cogs),
                 'date': sale.sale_date.strftime('%Y-%m-%d'),
             })
-    
+
     purchases = PurchaseRecord.objects.filter(company=company, status='completed')
     if branch_id:
         purchases = purchases.filter(branch_id=branch_id)
-    
+
     total_purchases = purchases.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
     balance = total_cogs - total_purchases
-    
+
     return JsonResponse({
         'total_sales': sales.count(),
         'sales_with_cogs': len(sale_details),
@@ -254,24 +306,21 @@ def debug_cogs_balance(request):
 @login_required
 def finance_dashboard(request):
     """Main finance dashboard with COGS balance and Profit balance"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     branch_id = request.GET.get('branch')
     branches = Branch.objects.filter(company=company, is_active=True)
     today = timezone.now().date()
-    
+
     current_balance = get_effective_cogs_balance(company, branch_id)
     current_profit_balance = get_effective_profit_balance(company, branch_id)
-    
+
     today_sales = Sale.objects.filter(
         company=company,
         payment_status='paid',
@@ -279,11 +328,11 @@ def finance_dashboard(request):
     )
     if branch_id:
         today_sales = today_sales.filter(branch_id=branch_id)
-    
+
     today_cogs = Decimal('0.00')
     for sale in today_sales:
         today_cogs += get_cogs_from_sale(sale)
-    
+
     today_purchases = PurchaseRecord.objects.filter(
         company=company,
         status='completed',
@@ -291,14 +340,14 @@ def finance_dashboard(request):
     )
     if branch_id:
         today_purchases = today_purchases.filter(branch_id=branch_id)
-    
+
     today_purchases_value = today_purchases.aggregate(
         total=Sum('total_amount')
     )['total'] or Decimal('0.00')
-    
+
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
-    
+
     def get_cogs_for_period(start_date, end_date):
         sales = Sale.objects.filter(
             company=company,
@@ -308,31 +357,31 @@ def finance_dashboard(request):
         )
         if branch_id:
             sales = sales.filter(branch_id=branch_id)
-        
+
         total = Decimal('0.00')
         for sale in sales:
             total += get_cogs_from_sale(sale)
         return total
-    
+
     week_cogs = get_cogs_for_period(week_start, week_end)
     month_cogs = get_cogs_for_period(today.replace(day=1), today)
-    
+
     yesterday = today - timedelta(days=1)
     yesterday_cogs = get_cogs_for_period(yesterday, yesterday)
-    
+
     last_week_start = week_start - timedelta(days=7)
     last_week_end = last_week_start + timedelta(days=6)
     last_week_cogs = get_cogs_for_period(last_week_start, last_week_end)
-    
+
     if today.month == 1:
         last_month_start = today.replace(year=today.year-1, month=12, day=1)
         last_month_end = today.replace(year=today.year-1, month=12, day=31)
     else:
         last_month_start = today.replace(month=today.month-1, day=1)
         last_month_end = today.replace(month=today.month, day=1) - timedelta(days=1)
-    
+
     last_month_cogs = get_cogs_for_period(last_month_start, last_month_end)
-    
+
     context = {
         'company': company,
         'branches': branches,
@@ -359,23 +408,20 @@ def finance_dashboard(request):
 @login_required
 def api_cogs_balance(request):
     """API endpoint to get current COGS balance for the sidebar badge"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         return JsonResponse({'error': 'No company assigned'}, status=400)
-    
+
     branch_id = request.GET.get('branch')
-    
+
     balance = get_effective_cogs_balance(company, branch_id)
     profit_balance = get_effective_profit_balance(company, branch_id)
     total_cogs = calculate_total_cogs_from_sales(company, branch_id)
     total_purchases = get_total_purchases(company, branch_id)
     total_revenue = get_total_revenue(company, branch_id)
     total_expenses = get_total_expenses(company, branch_id)
-    
+
     return JsonResponse({
         'balance': float(balance),
         'formatted': f"KSh {balance:,.2f}",
@@ -396,63 +442,60 @@ def api_cogs_balance(request):
 @login_required
 def cogs_report(request):
     """Generate COGS report with Daily, Weekly, Monthly tables"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     branch_id = request.GET.get('branch')
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
-    
+
     branches = Branch.objects.filter(company=company, is_active=True)
     today = timezone.now().date()
-    
+
     if not date_from:
         date_from = today - timedelta(days=30)
     else:
         date_from = datetime.strptime(date_from, '%Y-%m-%d').date()
-    
+
     if not date_to:
         date_to = today
     else:
         date_to = datetime.strptime(date_to, '%Y-%m-%d').date()
-    
+
     sales_qs = Sale.objects.filter(company=company, payment_status='paid')
     if branch_id:
         sales_qs = sales_qs.filter(branch_id=branch_id)
-    
+
     purchases_qs = PurchaseRecord.objects.filter(company=company, status='completed')
     if branch_id:
         purchases_qs = purchases_qs.filter(branch_id=branch_id)
-    
+
     # DAILY COGS RECORDS
     daily_records = []
     week_start = today - timedelta(days=today.weekday())
     current_date = week_start
     running_balance = Decimal('0.00')
-    
+
     while current_date <= week_start + timedelta(days=6):
         day_sales = sales_qs.filter(sale_date__date=current_date)
         day_purchases = purchases_qs.filter(purchase_date=current_date)
-        
+
         day_cogs = Decimal('0.00')
         for sale in day_sales:
             day_cogs += get_cogs_from_sale(sale)
-        
+
         day_purchases_count = day_purchases.count()
         day_purchases_value = day_purchases.aggregate(
             total=Sum('total_amount')
         )['total'] or Decimal('0.00')
-        
+
         running_balance += day_cogs - day_purchases_value
-        
+
         daily_records.append({
             'date': current_date,
             'day_name': current_date.strftime('%A'),
@@ -463,14 +506,14 @@ def cogs_report(request):
             'is_today': current_date == today,
         })
         current_date += timedelta(days=1)
-    
+
     daily_totals = {
         'purchases_count': sum(r['purchases_count'] for r in daily_records),
         'cogs': sum(r['cogs'] for r in daily_records),
         'purchases_value': sum(r['purchases_value'] for r in daily_records),
         'closing_balance': daily_records[-1]['closing_balance'] if daily_records else Decimal('0.00'),
     }
-    
+
     # WEEKLY COGS RECORDS
     weekly_records = []
     month_start = today.replace(day=1)
@@ -478,15 +521,15 @@ def cogs_report(request):
         month_end = today.replace(year=today.year+1, month=1, day=1) - timedelta(days=1)
     else:
         month_end = today.replace(month=today.month+1, day=1) - timedelta(days=1)
-    
+
     running_balance = Decimal('0.00')
     current_week_start = month_start - timedelta(days=month_start.weekday())
-    
+
     while current_week_start <= month_end:
         week_end_date = current_week_start + timedelta(days=6)
         week_start_in_month = max(current_week_start, month_start)
         week_end_in_month = min(week_end_date, month_end)
-        
+
         if week_start_in_month <= week_end_in_month:
             week_sales = sales_qs.filter(
                 sale_date__date__gte=week_start_in_month,
@@ -496,21 +539,21 @@ def cogs_report(request):
                 purchase_date__gte=week_start_in_month,
                 purchase_date__lte=week_end_in_month
             )
-            
+
             week_cogs = Decimal('0.00')
             for sale in week_sales:
                 week_cogs += get_cogs_from_sale(sale)
-            
+
             week_purchases_count = week_purchases.count()
             week_purchases_value = week_purchases.aggregate(
                 total=Sum('total_amount')
             )['total'] or Decimal('0.00')
-            
+
             running_balance += week_cogs - week_purchases_value
-            
+
             thursday = current_week_start + timedelta(days=3)
             iso_week = thursday.isocalendar()
-            
+
             weekly_records.append({
                 'year': iso_week[0],
                 'week': iso_week[1],
@@ -521,28 +564,28 @@ def cogs_report(request):
                 'purchases_value': week_purchases_value,
                 'closing_balance': running_balance,
             })
-        
+
         current_week_start += timedelta(days=7)
-    
+
     weekly_totals = {
         'purchases_count': sum(r['purchases_count'] for r in weekly_records),
         'cogs': sum(r['cogs'] for r in weekly_records),
         'purchases_value': sum(r['purchases_value'] for r in weekly_records),
         'closing_balance': weekly_records[-1]['closing_balance'] if weekly_records else Decimal('0.00'),
     }
-    
+
     # MONTHLY COGS RECORDS
     monthly_records = []
     current_year = today.year
     running_balance = Decimal('0.00')
-    
+
     for month in range(1, 13):
         month_start_date = date(current_year, month, 1)
         if month == 12:
             month_end_date = date(current_year + 1, 1, 1) - timedelta(days=1)
         else:
             month_end_date = date(current_year, month + 1, 1) - timedelta(days=1)
-        
+
         month_sales = sales_qs.filter(
             sale_date__date__gte=month_start_date,
             sale_date__date__lte=month_end_date
@@ -551,18 +594,18 @@ def cogs_report(request):
             purchase_date__gte=month_start_date,
             purchase_date__lte=month_end_date
         )
-        
+
         month_cogs = Decimal('0.00')
         for sale in month_sales:
             month_cogs += get_cogs_from_sale(sale)
-        
+
         month_purchases_count = month_purchases.count()
         month_purchases_value = month_purchases.aggregate(
             total=Sum('total_amount')
         )['total'] or Decimal('0.00')
-        
+
         running_balance += month_cogs - month_purchases_value
-        
+
         monthly_records.append({
             'month': month,
             'month_name': month_start_date.strftime('%B'),
@@ -571,19 +614,19 @@ def cogs_report(request):
             'purchases_value': month_purchases_value,
             'closing_balance': running_balance,
         })
-    
+
     monthly_totals = {
         'purchases_count': sum(r['purchases_count'] for r in monthly_records),
         'cogs': sum(r['cogs'] for r in monthly_records),
         'purchases_value': sum(r['purchases_value'] for r in monthly_records),
         'closing_balance': monthly_records[-1]['closing_balance'] if monthly_records else Decimal('0.00'),
     }
-    
+
     total_cogs_generated = daily_totals['cogs']
     total_cogs_used = daily_totals['purchases_value']
     net_change = total_cogs_generated - total_cogs_used
     closing_balance = daily_totals['closing_balance']
-    
+
     context = {
         'company': company,
         'total_cogs_generated': total_cogs_generated,
@@ -616,34 +659,31 @@ def cogs_report(request):
 @login_required
 def cogs_daily_detail(request, date_str):
     """View detailed daily purchases list"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     report_date = datetime.strptime(date_str, '%Y-%m-%d').date()
     branch_id = request.GET.get('branch')
-    
+
     purchases = PurchaseRecord.objects.filter(
         company=company,
         status='completed',
         purchase_date=report_date
     ).order_by('-purchase_date')
-    
+
     if branch_id:
         purchases = purchases.filter(branch_id=branch_id)
-    
+
     total_purchases_value = purchases.aggregate(
         total=Sum('total_amount')
     )['total'] or Decimal('0.00')
     purchases_count = purchases.count()
-    
+
     context = {
         'company': company,
         'report_date': report_date,
@@ -665,41 +705,38 @@ def cogs_daily_detail(request, date_str):
 @login_required
 def cogs_weekly_detail(request, year, week):
     """View detailed weekly purchases list"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     branch_id = request.GET.get('branch')
-    
+
     first_day = date(year, 1, 1)
     days_to_thursday = (3 - first_day.weekday()) % 7
     first_thursday = first_day + timedelta(days=days_to_thursday)
     week_1_monday = first_thursday - timedelta(days=3)
     week_start = week_1_monday + timedelta(weeks=week-1)
     week_end = week_start + timedelta(days=6)
-    
+
     purchases = PurchaseRecord.objects.filter(
         company=company,
         status='completed',
         purchase_date__gte=week_start,
         purchase_date__lte=week_end
     ).order_by('-purchase_date')
-    
+
     if branch_id:
         purchases = purchases.filter(branch_id=branch_id)
-    
+
     total_purchases_value = purchases.aggregate(
         total=Sum('total_amount')
     )['total'] or Decimal('0.00')
     purchases_count = purchases.count()
-    
+
     context = {
         'company': company,
         'week_start': week_start,
@@ -724,40 +761,37 @@ def cogs_weekly_detail(request, year, week):
 @login_required
 def cogs_monthly_detail(request, year, month):
     """View detailed monthly purchases list"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     branch_id = request.GET.get('branch')
-    
+
     month_start = date(year, month, 1)
     if month == 12:
         month_end = date(year + 1, 1, 1) - timedelta(days=1)
     else:
         month_end = date(year, month + 1, 1) - timedelta(days=1)
-    
+
     purchases = PurchaseRecord.objects.filter(
         company=company,
         status='completed',
         purchase_date__gte=month_start,
         purchase_date__lte=month_end
     ).order_by('-purchase_date')
-    
+
     if branch_id:
         purchases = purchases.filter(branch_id=branch_id)
-    
+
     total_purchases_value = purchases.aggregate(
         total=Sum('total_amount')
     )['total'] or Decimal('0.00')
     purchases_count = purchases.count()
-    
+
     context = {
         'company': company,
         'month_start': month_start,
@@ -783,25 +817,22 @@ def cogs_monthly_detail(request, year, month):
 @login_required
 def cogs_transactions(request):
     """View all COGS transactions"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     branch_id = request.GET.get('branch')
     transaction_type = request.GET.get('transaction_type')
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
     search = request.GET.get('search')
-    
+
     transactions = COGSTransaction.objects.filter(company=company)
-    
+
     if branch_id:
         transactions = transactions.filter(branch_id=branch_id)
     if transaction_type:
@@ -815,21 +846,21 @@ def cogs_transactions(request):
             Q(description__icontains=search) |
             Q(reference__icontains=search)
         )
-    
+
     transactions = transactions.order_by('-transaction_date')
-    
+
     paginator = Paginator(transactions, 50)
     page = request.GET.get('page')
     transactions_page = paginator.get_page(page)
-    
+
     total_credits = transactions.aggregate(
         total=Sum('amount', filter=Q(transaction_type='credit'))
     )['total'] or Decimal('0.00')
-    
+
     total_debits = transactions.aggregate(
         total=Sum('amount', filter=Q(transaction_type='debit'))
     )['total'] or Decimal('0.00')
-    
+
     context = {
         'company': company,
         'transactions': transactions_page,
@@ -854,26 +885,23 @@ def cogs_transactions(request):
 @login_required
 def purchase_records(request):
     """View all purchase records"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     branch_id = request.GET.get('branch')
     purchase_type = request.GET.get('purchase_type')
     status = request.GET.get('status')
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
     search = request.GET.get('search')
-    
+
     purchases = PurchaseRecord.objects.filter(company=company)
-    
+
     if branch_id:
         purchases = purchases.filter(branch_id=branch_id)
     if purchase_type:
@@ -890,19 +918,19 @@ def purchase_records(request):
             Q(purchase_number__icontains=search) |
             Q(description__icontains=search)
         )
-    
+
     purchases = purchases.order_by('-purchase_date')
-    
+
     paginator = Paginator(purchases, 50)
     page = request.GET.get('page')
     purchases_page = paginator.get_page(page)
-    
+
     total_amount = purchases.aggregate(
         total=Sum('total_amount')
     )['total'] or Decimal('0.00')
-    
+
     current_balance = get_effective_cogs_balance(company, branch_id)
-    
+
     context = {
         'company': company,
         'purchases': purchases_page,
@@ -922,35 +950,46 @@ def purchase_records(request):
 
 
 # ============================================
-# CREATE PURCHASE VIEW
+# CREATE PURCHASE VIEW — now with Cloudinary receipts
 # ============================================
 
 @login_required
 def purchase_create(request):
-    """Create a new purchase record"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
+    """Create a new purchase record with optional Cloudinary receipt upload"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     current_balance = get_effective_cogs_balance(company)
-    
+
+    # Helper to build the render context consistently
+    def _form_context():
+        return {
+            'company': company,
+            'branches': Branch.objects.filter(company=company, is_active=True),
+            'cogs_accounts': COGSAccount.objects.filter(company=company, is_active=True),
+            'is_finance': True,
+            'current_balance': current_balance,
+            'purchase_types': PurchaseRecord.PURCHASE_TYPES,
+            'payment_methods': PurchaseRecord.PAYMENT_METHODS,
+            'today': timezone.now().date(),
+            'is_viewing_company': is_viewing_company,
+        }
+
     if request.method == 'POST':
         branch_id = request.POST.get('branch')
         purchase_type = request.POST.get('purchase_type')
         amount = request.POST.get('amount')
         reference = request.POST.get('reference')
         description = request.POST.get('description')
-        receipt_image = request.FILES.get('receipt_image')
-        
+        receipt_image_file = request.FILES.get('receipt_image')
+
         errors = []
-        
+
         if not branch_id:
             errors.append("Branch is required")
         if not purchase_type:
@@ -961,41 +1000,36 @@ def purchase_create(request):
             errors.append("Reference is required")
         if not description:
             errors.append("Description is required")
-        
+
         if errors:
             messages.error(request, "\n".join(errors))
-            return render(request, 'company/finance/purchase_create.html', {
-                'company': company,
-                'branches': Branch.objects.filter(company=company, is_active=True),
-                'cogs_accounts': COGSAccount.objects.filter(company=company, is_active=True),
-                'is_finance': True,
-                'current_balance': current_balance,
-                'purchase_types': PurchaseRecord.PURCHASE_TYPES,
-                'payment_methods': PurchaseRecord.PAYMENT_METHODS,
-                'today': timezone.now().date(),
-                'is_viewing_company': is_viewing_company,
-            })
-        
+            return render(request, 'company/finance/purchase_create.html', _form_context())
+
         try:
             amount = Decimal(amount)
-            
+
             if current_balance < amount:
                 messages.error(
                     request,
                     f"Insufficient COGS balance. Available: {current_balance:,.2f}, Required: {amount:,.2f}"
                 )
-                return render(request, 'company/finance/purchase_create.html', {
-                    'company': company,
-                    'branches': Branch.objects.filter(company=company, is_active=True),
-                    'cogs_accounts': COGSAccount.objects.filter(company=company, is_active=True),
-                    'is_finance': True,
-                    'current_balance': current_balance,
-                    'purchase_types': PurchaseRecord.PURCHASE_TYPES,
-                    'payment_methods': PurchaseRecord.PAYMENT_METHODS,
-                    'today': timezone.now().date(),
-                    'is_viewing_company': is_viewing_company,
-                })
-            
+                return render(request, 'company/finance/purchase_create.html', _form_context())
+
+            # ── Upload receipt to Cloudinary (only if a file was provided) ──
+            receipt_image_key = ''
+            if receipt_image_file:
+                try:
+                    receipt_image_key = _upload_purchase_receipt(
+                        receipt_image_file,
+                        company.id,
+                    )
+                except ValueError as e:
+                    messages.error(request, str(e))
+                    return render(request, 'company/finance/purchase_create.html', _form_context())
+                except Exception as e:
+                    messages.error(request, f"Receipt upload failed: {e}")
+                    return render(request, 'company/finance/purchase_create.html', _form_context())
+
             with transaction.atomic():
                 purchase = PurchaseRecord.objects.create(
                     company=company,
@@ -1015,28 +1049,17 @@ def purchase_create(request):
                     notes=f"Reference: {reference}",
                     status='completed',
                     created_by=request.user,
-                    receipt_image=receipt_image,
+                    receipt_image=receipt_image_key,   # ← Cloudinary public_id
                     receipt_number=reference,
                 )
-                
+
                 messages.success(request, f"Purchase #{purchase.purchase_number} created successfully!")
                 return redirect('finance-dashboard')
-                
+
         except Exception as e:
             messages.error(request, f"Error creating purchase: {str(e)}")
-    
-    context = {
-        'company': company,
-        'branches': Branch.objects.filter(company=company, is_active=True),
-        'cogs_accounts': COGSAccount.objects.filter(company=company, is_active=True),
-        'is_finance': True,
-        'current_balance': current_balance,
-        'purchase_types': PurchaseRecord.PURCHASE_TYPES,
-        'payment_methods': PurchaseRecord.PAYMENT_METHODS,
-        'today': timezone.now().date(),
-        'is_viewing_company': is_viewing_company,
-    }
-    return render(request, 'company/finance/purchase_create.html', context)
+
+    return render(request, 'company/finance/purchase_create.html', _form_context())
 
 
 # ============================================
@@ -1046,19 +1069,16 @@ def purchase_create(request):
 @login_required
 def purchase_detail(request, pk):
     """View purchase record details"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     purchase = get_object_or_404(PurchaseRecord, company=company, pk=pk)
-    
+
     context = {
         'company': company,
         'purchase': purchase,
@@ -1075,19 +1095,16 @@ def purchase_detail(request, pk):
 @login_required
 def cogs_accounts(request):
     """Manage COGS accounts"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     accounts = COGSAccount.objects.filter(company=company, is_active=True)
-    
+
     context = {
         'company': company,
         'accounts': accounts,
@@ -1100,30 +1117,27 @@ def cogs_accounts(request):
 @login_required
 def cogs_account_create(request):
     """Create a new COGS account"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     if request.method == 'POST':
         branch_id = request.POST.get('branch')
         account_name = request.POST.get('account_name')
         account_code = request.POST.get('account_code')
         account_type = request.POST.get('account_type', 'main')
         description = request.POST.get('description', '')
-        
+
         errors = []
         if not account_name:
             errors.append("Account name is required")
         if not account_code:
             errors.append("Account code is required")
-        
+
         if errors:
             messages.error(request, "\n".join(errors))
             return render(request, 'company/finance/cogs_account_create.html', {
@@ -1132,7 +1146,7 @@ def cogs_account_create(request):
                 'is_finance': True,
                 'is_viewing_company': is_viewing_company,
             })
-        
+
         try:
             COGSAccount.objects.create(
                 company=company,
@@ -1147,7 +1161,7 @@ def cogs_account_create(request):
             return redirect('finance-cogs-accounts')
         except Exception as e:
             messages.error(request, f"Error creating account: {str(e)}")
-    
+
     context = {
         'company': company,
         'branches': Branch.objects.filter(company=company, is_active=True),
@@ -1167,16 +1181,16 @@ def get_top_cogs_products(company, branch_id=None, limit=10):
     sales = Sale.objects.filter(company=company, payment_status='paid')
     if branch_id:
         sales = sales.filter(branch_id=branch_id)
-    
+
     product_cogs = {}
-    
+
     for sale in sales:
         sale_cogs = get_cogs_from_sale(sale)
         for item in sale.items.all():
             product_name = item.item_name
             item_share = item.total_price / sale.total_amount if sale.total_amount > 0 else 0
             cogs_for_item = sale_cogs * item_share
-            
+
             if product_name in product_cogs:
                 product_cogs[product_name]['amount'] += cogs_for_item
                 product_cogs[product_name]['quantity'] += item.quantity
@@ -1185,13 +1199,13 @@ def get_top_cogs_products(company, branch_id=None, limit=10):
                     'amount': cogs_for_item,
                     'quantity': item.quantity,
                 }
-    
+
     sorted_products = sorted(
         product_cogs.items(),
         key=lambda x: x[1]['amount'],
         reverse=True
     )[:limit]
-    
+
     return [
         {
             'name': name,
@@ -1206,22 +1220,22 @@ def get_cogs_monthly_trend(company, branch_id=None):
     """Get monthly COGS trend for the last 12 months"""
     today = timezone.now().date()
     trend = []
-    
+
     for i in range(12):
         month = today.month - i
         year = today.year
         if month <= 0:
             month += 12
             year -= 1
-        
+
         month_start = date(year, month, 1)
         if month == 12:
             month_end = date(year + 1, 1, 1) - timedelta(days=1)
         else:
             month_end = date(year, month + 1, 1) - timedelta(days=1)
-        
+
         summary = get_cogs_summary(company, month_start, month_end, branch_id)
-        
+
         trend.append({
             'month': month_start.strftime('%b %Y'),
             'credits': float(summary['total_credits']),
@@ -1229,7 +1243,7 @@ def get_cogs_monthly_trend(company, branch_id=None):
             'net': float(summary['net_change']),
             'balance': float(summary['closing_balance']),
         })
-    
+
     return list(reversed(trend))
 
 
@@ -1237,11 +1251,11 @@ def get_cogs_daily_trend(company, branch_id=None):
     """Get daily COGS trend for the last 30 days"""
     today = timezone.now().date()
     trend = []
-    
+
     for i in range(30):
         day = today - timedelta(days=i)
         summary = get_cogs_summary(company, day, day, branch_id)
-        
+
         trend.append({
             'date': day.strftime('%Y-%m-%d'),
             'credits': float(summary['total_credits']),
@@ -1249,26 +1263,23 @@ def get_cogs_daily_trend(company, branch_id=None):
             'net': float(summary['net_change']),
             'balance': float(summary['closing_balance']),
         })
-    
+
     return list(reversed(trend))
 
 
 @login_required
 def finance_api_data(request):
     """API endpoint for finance charts"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         return JsonResponse({'error': 'No company assigned'}, status=400)
-    
+
     period = request.GET.get('period', 'monthly')
     branch_id = request.GET.get('branch')
-    
+
     data = {}
-    
+
     if period == 'daily':
         trend = get_cogs_daily_trend(company, branch_id)
         data = {
@@ -1287,7 +1298,7 @@ def finance_api_data(request):
             'net': [d['net'] for d in trend],
             'balance': [d['balance'] for d in trend],
         }
-    
+
     return JsonResponse(data)
 
 
@@ -1296,33 +1307,30 @@ def export_cogs_report(request):
     """Export COGS report as CSV"""
     import csv
     from django.http import HttpResponse
-    
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
+
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         return HttpResponse('No company assigned', status=400)
-    
+
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
     branch_id = request.GET.get('branch')
-    
+
     if not date_from or not date_to:
         today = timezone.now().date()
         date_from = today.replace(day=1)
         date_to = today
-    
+
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="cogs_report_{date_from}_{date_to}.csv"'
-    
+
     writer = csv.writer(response)
-    
+
     writer.writerow(['COGS Report'])
     writer.writerow([f'Period: {date_from} to {date_to}'])
     writer.writerow([])
-    
+
     summary = get_cogs_summary(company, date_from, date_to, branch_id)
     writer.writerow(['SUMMARY'])
     writer.writerow(['Opening Balance', float(summary['opening_balance'])])
@@ -1331,19 +1339,19 @@ def export_cogs_report(request):
     writer.writerow(['Net Change', float(summary['net_change'])])
     writer.writerow(['Closing Balance', float(summary['closing_balance'])])
     writer.writerow([])
-    
+
     transactions = COGSTransaction.objects.filter(
         company=company,
         transaction_date__date__gte=date_from,
         transaction_date__date__lte=date_to
     ).order_by('transaction_date')
-    
+
     if branch_id:
         transactions = transactions.filter(branch_id=branch_id)
-    
+
     writer.writerow(['TRANSACTIONS'])
     writer.writerow(['Date', 'Type', 'Description', 'Amount', 'Balance', 'Reference'])
-    
+
     for transaction in transactions:
         writer.writerow([
             transaction.transaction_date.strftime('%Y-%m-%d %H:%M'),
@@ -1353,5 +1361,5 @@ def export_cogs_report(request):
             float(transaction.balance_after),
             transaction.reference or ''
         ])
-    
+
     return response
