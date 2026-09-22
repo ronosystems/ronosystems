@@ -1,6 +1,6 @@
 {% extends base_template|default:"base.html" %}
 
-{% block title %}Purchase Detail{% endblock %}
+{% block title %}Purchase {{ purchase.purchase_number }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -188,6 +188,11 @@
         font-size: 1.1rem;
         margin-top: 2px;
     }
+    .legacy-receipt-warning a {
+        color: #78350f;
+        font-weight: 700;
+        text-decoration: underline;
+    }
 
     .btn-secondary {
         background-color: #f8f9fa;
@@ -231,6 +236,34 @@
         color: #ffffff;
     }
 
+    .btn-outline-secondary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: #ffffff;
+    }
+
+    .btn-outline-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+
+    .btn-outline-danger {
+        border: 2px solid #dc3545;
+        color: #dc3545;
+        border-radius: 4px;
+        font-weight: 600;
+        background: #ffffff;
+    }
+
+    .btn-outline-danger:hover {
+        background-color: #dc3545;
+        border-color: #dc3545;
+        color: #ffffff;
+    }
+
     .btn-outline-primary {
         border: 2px solid #000000;
         color: #000000;
@@ -242,6 +275,17 @@
         background-color: #87CEEB;
         border-color: #000000;
         color: #000000;
+    }
+
+    /* Nav row — keep buttons inline with breathing room */
+    .page-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+    }
+    .page-nav .spacer {
+        flex: 1;
     }
 
     @media (max-width: 992px) {
@@ -301,12 +345,24 @@
 {% block content %}
 <div class="container-fluid">
     <!-- Navigation -->
-    <div class="mb-3">
+    <div class="mb-3 page-nav">
+        <a href="{% url 'finance-purchase-records' %}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i> All Purchases
+        </a>
         <a href="{% url 'finance-purchase-create' %}" class="btn btn-secondary btn-sm">
-            <i class="fas fa-arrow-left"></i> New Purchases
+            <i class="fas fa-plus"></i> New Purchase
         </a>
         <a href="{% url 'finance-dashboard' %}" class="btn btn-secondary btn-sm">
-            <i class="fas fa-home"></i> Back to Dashboard
+            <i class="fas fa-home"></i> Dashboard
+        </a>
+
+        <span class="spacer"></span>
+
+        <a href="{% url 'finance-purchase-edit' purchase.pk %}" class="btn btn-primary btn-sm">
+            <i class="fas fa-edit"></i> Edit Purchase
+        </a>
+        <a href="{% url 'finance-purchase-delete' purchase.pk %}" class="btn btn-outline-danger btn-sm">
+            <i class="fas fa-trash"></i> Delete
         </a>
         <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
             <i class="fas fa-print"></i> Print
@@ -316,7 +372,7 @@
     <!-- Receipt Container -->
     <div class="receipt-container">
 
-        <!-- Legacy receipt warning (only shown when field has a value but URL can't be built) -->
+        <!-- Legacy receipt warning — now links to the edit page -->
         {% if purchase.receipt_image and not purchase.receipt_image_url %}
         <div class="legacy-receipt-warning">
             <i class="fas fa-exclamation-triangle"></i>
@@ -324,7 +380,8 @@
                 <strong>Receipt reference exists but no URL could be built.</strong>
                 This purchase was recorded before Cloudinary support was added.
                 The stored value <code>{{ purchase.receipt_image }}</code> is not a valid public_id.
-                Re-upload the receipt via the purchase form to fix it.
+                <a href="{% url 'finance-purchase-edit' purchase.pk %}">Re-upload the receipt via the edit form</a>
+                to fix it.
             </div>
         </div>
         {% endif %}
@@ -355,7 +412,7 @@
                     {% if purchase.receipt_image_url %}
                         <img src="{{ purchase.receipt_image_url }}"
                              alt="Receipt for Purchase #{{ purchase.purchase_number }}"
-                             onerror="this.parentElement.innerHTML='<div class=&quot;no-receipt&quot;><i class=&quot;fas fa-file-image&quot;></i><p>Receipt file is missing or unreachable</p></div>';">
+                             onerror="this.style.display='none'; this.insertAdjacentHTML('afterend', '<div class=&quot;no-receipt&quot;><i class=&quot;fas fa-file-image&quot;></i><p>Receipt file is missing or unreachable</p></div>');">
                     {% else %}
                         <div class="no-receipt">
                             <i class="fas fa-file-image"></i>
@@ -370,6 +427,10 @@
                         </a>
                         <a href="{{ purchase.receipt_image_url }}" download class="btn btn-success btn-sm">
                             <i class="fas fa-download"></i> Download
+                        </a>
+                    {% else %}
+                        <a href="{% url 'finance-purchase-edit' purchase.pk %}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-upload"></i> Upload Receipt
                         </a>
                     {% endif %}
                 </div>

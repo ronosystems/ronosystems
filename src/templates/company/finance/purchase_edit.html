@@ -1,0 +1,442 @@
+{% extends base_template|default:"base.html" %}
+
+{% block title %}Edit Purchase {{ purchase.purchase_number }}{% endblock %}
+
+
+{% block extra_css %}
+<style>
+    .form-card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 20px;
+        margin-bottom: 20px;
+        background: white;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .form-card .form-label {
+        font-weight: 600;
+        color: #000000;
+    }
+    .form-card .form-control,
+    .form-card .form-select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+    }
+    .form-card .form-control:focus,
+    .form-card .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .form-card .form-control-file {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 8px;
+        width: 100%;
+    }
+    .balance-display {
+        background: #f8f9fa;
+        padding: 15px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        text-align: center;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .balance-display .amount {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #007bff;
+    }
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    .required-field::after {
+        content: " *";
+        color: #dc3545;
+        font-weight: bold;
+    }
+    .file-preview {
+        margin-top: 10px;
+        padding: 10px;
+        border: 2px dashed #000000;
+        border-radius: 4px;
+        text-align: center;
+        display: none;
+        background: #f8f9fa;
+    }
+    .file-preview img {
+        max-width: 200px;
+        max-height: 150px;
+        border: 1px solid #000000;
+        border-radius: 4px;
+    }
+    .file-preview .file-name {
+        display: block;
+        margin-top: 5px;
+        font-weight: 600;
+        color: #000000;
+    }
+
+    /* Field-level error message */
+    .field-error {
+        display: none;
+        margin-top: 6px;
+        padding: 6px 10px;
+        background: #fee2e2;
+        border: 1px solid #dc2626;
+        border-radius: 4px;
+        color: #991b1b;
+        font-size: 0.8rem;
+    }
+    .field-error.visible {
+        display: block;
+    }
+
+    /* Current receipt preview block */
+    .current-receipt {
+        margin-top: 10px;
+        padding: 12px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: #f8f9fa;
+        text-align: center;
+    }
+    .current-receipt img {
+        max-width: 200px;
+        max-height: 150px;
+        border: 1px solid #000000;
+        border-radius: 4px;
+        display: block;
+        margin: 0 auto 10px auto;
+    }
+    .current-receipt .receipt-link {
+        display: inline-block;
+        font-weight: 600;
+        color: #000000;
+        text-decoration: underline;
+        margin-bottom: 8px;
+    }
+    .current-receipt .remove-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #dee2e6;
+    }
+    .current-receipt .remove-row label {
+        color: #dc3545;
+        font-weight: 600;
+        margin: 0;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Navigation -->
+    <div class="mb-3">
+        <a href="{% url 'finance-purchase-detail' purchase.pk %}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i> Back to Purchase
+        </a>
+        <a href="{% url 'finance-dashboard' %}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-home"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Header -->
+    <h1 class="text-center mb-3" style="font-weight: 700;">
+        <i class="fas fa-edit"></i> Edit Purchase #{{ purchase.purchase_number }}
+    </h1>
+
+    <!-- Current Balance -->
+    <div class="balance-display mb-4">
+        <h6>Available COGS Balance</h6>
+        <div class="amount">KSh {{ current_balance|floatformat:2|default:"0.00" }}</div>
+        <small class="text-muted">(Balance shown before this purchase)</small>
+    </div>
+
+    <!-- Messages -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} max-width-600" style="max-width:600px; margin:0 auto 15px auto;">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Purchase Form -->
+    <div class="form-card">
+        <form method="post" enctype="multipart/form-data" id="purchaseForm">
+            {% csrf_token %}
+
+            <!-- Branch -->
+            <div class="mb-3">
+                <label class="form-label required-field">Branch</label>
+                <select name="branch" class="form-select" required>
+                    <option value="">Select Branch</option>
+                    {% for branch in branches %}
+                    <option value="{{ branch.id }}"
+                        {% if purchase.branch_id == branch.id %}selected{% endif %}>
+                        {{ branch.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Purchase Type -->
+            <div class="mb-3">
+                <label class="form-label required-field">Purchase Type</label>
+                <select name="purchase_type" class="form-select" required>
+                    <option value="">Select Type</option>
+                    {% for type in purchase_types %}
+                    <option value="{{ type.0 }}"
+                        {% if purchase.purchase_type == type.0 %}selected{% endif %}>
+                        {{ type.1 }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Amount -->
+            <div class="mb-3">
+                <label class="form-label required-field">Amount (KSh)</label>
+                <input type="number"
+                       name="amount"
+                       class="form-control"
+                       step="0.01"
+                       min="0.01"
+                       placeholder="0.00"
+                       value="{{ purchase.amount }}"
+                       required>
+            </div>
+
+            <!-- Reference -->
+            <div class="mb-3">
+                <label class="form-label required-field">Reference</label>
+                <input type="text"
+                       name="reference"
+                       class="form-control"
+                       placeholder="Receipt/Invoice Number"
+                       maxlength="100"
+                       value="{{ purchase.payment_reference }}"
+                       required>
+            </div>
+
+            <!-- Description -->
+            <div class="mb-3">
+                <label class="form-label required-field">Description</label>
+                <textarea name="description"
+                          class="form-control"
+                          rows="2"
+                          placeholder="Brief description"
+                          maxlength="500"
+                          required>{{ purchase.description }}</textarea>
+            </div>
+
+            <!-- Receipt Upload (OPTIONAL) -->
+            <div class="mb-3">
+                <label class="form-label">Receipt Image</label>
+
+                {% if purchase.receipt_image_url %}
+                <!-- Current receipt preview -->
+                <div class="current-receipt">
+                    <p class="mb-2" style="font-weight:600;">Current receipt:</p>
+                    <img src="{{ purchase.receipt_image_url }}"
+                         alt="Current receipt for Purchase #{{ purchase.purchase_number }}"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='none';">
+                    <a href="{{ purchase.receipt_image_url }}" target="_blank" rel="noopener" class="receipt-link">
+                        <i class="fas fa-external-link-alt"></i> Open in new tab
+                    </a>
+                    <div class="remove-row">
+                        <input class="form-check-input" type="checkbox"
+                               name="remove_receipt" value="1" id="removeReceipt">
+                        <label class="form-check-label" for="removeReceipt">
+                            <i class="fas fa-trash"></i> Remove current receipt
+                        </label>
+                    </div>
+                </div>
+                <small class="text-muted d-block mt-2">
+                    <i class="fas fa-info-circle"></i>
+                    Upload a new file below to <strong>replace</strong> the current receipt.
+                </small>
+                {% else %}
+                <small class="text-muted d-block mb-2">
+                    <i class="fas fa-info-circle"></i>
+                    No receipt currently attached. Upload one below if you have it.
+                </small>
+                {% endif %}
+
+                <input type="file"
+                       name="receipt_image"
+                       id="receiptInput"
+                       class="form-control-file mt-2"
+                       accept="image/jpeg,image/png,image/gif,image/webp"
+                       onchange="previewImage(this)">
+
+                <small class="text-muted">
+                    <i class="fas fa-info-circle"></i>
+                    Optional. JPG, PNG, GIF, WEBP — max 5MB.
+                </small>
+
+                <div class="field-error" id="receiptError"></div>
+
+                <div class="file-preview" id="filePreview">
+                    <img id="previewImg" src="#" alt="Receipt Preview">
+                    <span class="file-name" id="fileName"></span>
+                </div>
+            </div>
+
+            <!-- Hidden fields (parity with create form) -->
+            <input type="hidden" name="cogs_account" value="{{ cogs_accounts.first.id }}">
+            <input type="hidden" name="purchase_date" value="{{ purchase.purchase_date|date:'Y-m-d' }}">
+            <input type="hidden" name="tax" value="0">
+            <input type="hidden" name="total_amount" value="0">
+            <input type="hidden" name="payment_method" value="{{ purchase.payment_method }}">
+
+            <!-- Buttons -->
+            <button type="submit" class="btn btn-primary w-100">
+                <i class="fas fa-save"></i> Save Changes
+            </button>
+            <a href="{% url 'finance-purchase-detail' purchase.pk %}" class="btn btn-secondary w-100 mt-2">
+                <i class="fas fa-times"></i> Cancel
+            </a>
+        </form>
+    </div>
+</div>
+
+<script>
+(function () {
+    // Match the view's validation limits
+    const MAX_BYTES = 5 * 1024 * 1024;  // 5 MB
+    const MAX_BYTES_LABEL = '5MB';
+    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+    const input = document.getElementById('receiptInput');
+    const preview = document.getElementById('filePreview');
+    const img = document.getElementById('previewImg');
+    const fileName = document.getElementById('fileName');
+    const errorBox = document.getElementById('receiptError');
+    const removeCheckbox = document.getElementById('removeReceipt');
+
+    function showError(message) {
+        errorBox.textContent = message;
+        errorBox.classList.add('visible');
+    }
+
+    function clearError() {
+        errorBox.textContent = '';
+        errorBox.classList.remove('visible');
+    }
+
+    function resetPreview() {
+        preview.style.display = 'none';
+        img.src = '#';
+        fileName.textContent = '';
+    }
+
+    window.previewImage = function (inputEl) {
+        clearError();
+        resetPreview();
+
+        const file = inputEl.files && inputEl.files[0];
+        if (!file) return;
+
+        // If the user picks a new file, uncheck "remove current receipt"
+        // (a new upload replaces the old one — remove + upload conflict)
+        if (removeCheckbox) {
+            removeCheckbox.checked = false;
+        }
+
+        // Type check
+        if (ALLOWED_TYPES.indexOf(file.type) === -1) {
+            showError('Unsupported file type. Please upload a JPG, PNG, GIF, or WEBP image.');
+            inputEl.value = '';
+            return;
+        }
+
+        // Size check
+        if (file.size > MAX_BYTES) {
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+            showError('File is too large (' + sizeMB + ' MB). Maximum is ' + MAX_BYTES_LABEL + '.');
+            inputEl.value = '';
+            return;
+        }
+
+        // Preview
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            img.src = e.target.result;
+            const sizeKB = (file.size / 1024).toFixed(1);
+            fileName.textContent = file.name + ' (' + sizeKB + ' KB)';
+            preview.style.display = 'block';
+        };
+        reader.onerror = function () {
+            showError('Could not read that file. Please try a different image.');
+            inputEl.value = '';
+        };
+        reader.readAsDataURL(file);
+    };
+
+    // Mutual exclusion: checking "remove" clears the file input
+    if (removeCheckbox) {
+        removeCheckbox.addEventListener('change', function () {
+            if (this.checked && input) {
+                input.value = '';
+                resetPreview();
+                clearError();
+            }
+        });
+    }
+
+    // Belt-and-braces: validate again on submit in case the file was set
+    // programmatically or the browser skipped the change event.
+    document.getElementById('purchaseForm').addEventListener('submit', function (e) {
+        if (!input.files || !input.files[0]) return;  // optional — OK to skip
+
+        const file = input.files[0];
+
+        if (ALLOWED_TYPES.indexOf(file.type) === -1) {
+            e.preventDefault();
+            showError('Unsupported file type. Please upload a JPG, PNG, GIF, or WEBP image.');
+            input.focus();
+            return;
+        }
+
+        if (file.size > MAX_BYTES) {
+            e.preventDefault();
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+            showError('File is too large (' + sizeMB + ' MB). Maximum is ' + MAX_BYTES_LABEL + '.');
+            input.focus();
+            return;
+        }
+    });
+})();
+</script>
+{% endblock %}

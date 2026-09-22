@@ -1062,6 +1062,203 @@ def purchase_create(request):
     return render(request, 'company/finance/purchase_create.html', _form_context())
 
 
+
+# ============================================
+# EDIT PURCHASE VIEW — Full Cloudinary support
+# ============================================
+
+@login_required
+def purchase_edit(request, pk):
+    """
+    Edit an existing PurchaseRecord.
+
+    Handles three receipt scenarios:
+      1. User uploads a new file   → upload to Cloudinary, delete old asset
+      2. User checks "remove"      → delete old asset, clear field
+      3. Neither                    → keep existing public_id untouched
+
+    The COGS balance shown on the form is adjusted back by this purchase's
+    amount, so the user sees the true "available" figure when editing.
+    """
+    company, is_viewing_company = get_active_company(request)
+
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+
+    # ── Fetch the purchase (company-scoped, 404 if cross-tenant) ──
+    purchase = get_object_or_404(PurchaseRecord, company=company, pk=pk)
+
+    # Capture the current Cloudinary public_id (or None)
+    old_public_id = purchase.receipt_image.name if purchase.receipt_image else None
+
+    # Balance BEFORE this purchase (add it back for display purposes)
+    current_balance = get_effective_cogs_balance(company) + purchase.total_amount
+
+    # ── Context builder (used for every render) ──
+    def _form_context():
+        return {
+            'company': company,
+            'purchase': purchase,
+            'branches': Branch.objects.filter(company=company, is_active=True),
+            'cogs_accounts': COGSAccount.objects.filter(company=company, is_active=True),
+            'is_finance': True,
+            'current_balance': current_balance,
+            'purchase_types': PurchaseRecord.PURCHASE_TYPES,
+            'payment_methods': PurchaseRecord.PAYMENT_METHODS,
+            'today': timezone.now().date(),
+            'is_viewing_company': is_viewing_company,
+            'is_edit': True,
+        }
+
+    # ─────────────────────────────────────────────
+    # POST — process the edit
+    # ─────────────────────────────────────────────
+    if request.method == 'POST':
+        branch_id = request.POST.get('branch')
+        purchase_type = request.POST.get('purchase_type')
+        amount_raw = request.POST.get('amount')
+        reference = (request.POST.get('reference') or '').strip()
+        description = (request.POST.get('description') or '').strip()
+        receipt_image_file = request.FILES.get('receipt_image')
+        remove_receipt = request.POST.get('remove_receipt') == '1'
+
+        # ── Basic validation ──
+        errors = []
+        if not branch_id:
+            errors.append("Branch is required.")
+        if not purchase_type:
+            errors.append("Purchase type is required.")
+        if not amount_raw:
+            errors.append("Amount is required.")
+        if not reference:
+            errors.append("Reference is required.")
+        if not description:
+            errors.append("Description is required.")
+
+        if errors:
+            for err in errors:
+                messages.error(request, err)
+            return render(request, 'company/finance/purchase_edit.html', _form_context())
+
+        # ── Parse amount ──
+        try:
+            amount = Decimal(amount_raw)
+            if amount <= 0:
+                raise ValueError("Amount must be greater than zero.")
+        except (InvalidOperation, ValueError, TypeError):
+            messages.error(request, "Invalid amount. Please enter a positive number.")
+            return render(request, 'company/finance/purchase_edit.html', _form_context())
+
+        # ── Balance check (adjusted) ──
+        if current_balance < amount:
+            messages.error(
+                request,
+                f"Insufficient COGS balance. "
+                f"Available: {current_balance:,.2f}, Required: {amount:,.2f}"
+            )
+            return render(request, 'company/finance/purchase_edit.html', _form_context())
+
+        # ── Verify branch belongs to this company ──
+        try:
+            branch_obj = Branch.objects.get(id=branch_id, company=company)
+        except Branch.DoesNotExist:
+            messages.error(request, "Selected branch does not exist.")
+            return render(request, 'company/finance/purchase_edit.html', _form_context())
+
+        # ─────────────────────────────────────────────
+        # Cloudinary receipt handling
+        # ─────────────────────────────────────────────
+        new_public_id = old_public_id  # default: keep existing
+
+        if receipt_image_file:
+            # Scenario 1: new upload → replace
+            try:
+                new_public_id = _upload_purchase_receipt(
+                    receipt_image_file,
+                    company.id,
+                )
+            except ValueError as e:
+                messages.error(request, str(e))
+                return render(request, 'company/finance/purchase_edit.html', _form_context())
+            except Exception as e:
+                messages.error(request, f"Receipt upload failed: {e}")
+                return render(request, 'company/finance/purchase_edit.html', _form_context())
+
+            # Delete the old asset only AFTER a successful new upload
+            if old_public_id and old_public_id != new_public_id:
+                _delete_cloudinary_asset(old_public_id)
+
+        elif remove_receipt and old_public_id:
+            # Scenario 2: remove → delete asset, clear field
+            _delete_cloudinary_asset(old_public_id)
+            new_public_id = ''
+
+        # Scenario 3: neither → new_public_id stays == old_public_id
+
+        # ─────────────────────────────────────────────
+        # Save inside a transaction
+        # ─────────────────────────────────────────────
+        try:
+            with transaction.atomic():
+                purchase.branch = branch_obj
+                purchase.purchase_type = purchase_type
+                purchase.amount = amount
+                purchase.total_amount = amount
+                purchase.tax = Decimal('0.00')
+                purchase.payment_reference = reference
+                purchase.receipt_number = reference
+                purchase.description = description
+                purchase.notes = f"Reference: {reference}"
+                purchase.receipt_image = new_public_id
+                # purchase_date and payment_method are intentionally NOT changed
+                # (preserve the original transaction metadata)
+                purchase.save()
+
+            messages.success(
+                request,
+                f"✅ Purchase #{purchase.purchase_number} updated successfully!"
+            )
+            return redirect('finance-purchase-detail', pk=purchase.pk)
+
+        except Exception as e:
+            # If the DB write fails, attempt to roll back the Cloudinary change
+            if receipt_image_file and new_public_id and new_public_id != old_public_id:
+                _delete_cloudinary_asset(new_public_id)
+            messages.error(request, f"❌ Error updating purchase: {str(e)}")
+            return render(request, 'company/finance/purchase_edit.html', _form_context())
+
+    # ─────────────────────────────────────────────
+    # GET — render the form
+    # ─────────────────────────────────────────────
+    return render(request, 'company/finance/purchase_edit.html', _form_context())
+
+
+
+@login_required
+def purchase_delete(request, pk):
+    company, _ = get_active_company(request)
+    if not company:
+        return redirect('/dashboard/')
+
+    purchase = get_object_or_404(PurchaseRecord, company=company, pk=pk)
+
+    if request.method == 'POST':
+        # Delete Cloudinary asset before the row
+        if purchase.receipt_image:
+            _delete_cloudinary_asset(purchase.receipt_image.name)
+        purchase.delete()
+        messages.success(request, f"Purchase #{purchase.purchase_number} deleted.")
+        return redirect('finance-purchase-records')
+
+    return render(request, 'company/finance/purchase_confirm_delete.html', {
+        'company': company,
+        'purchase': purchase,
+        'is_finance': True,
+    })
+
 # ============================================
 # PURCHASE DETAIL VIEW
 # ============================================

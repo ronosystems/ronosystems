@@ -1,6 +1,7 @@
 {% extends base_template|default:"base.html" %}
 
-{% block title %}Weekly Purchases {% endblock %}
+{% block title %}Weekly Purchases — Week {{ week }}, {{ year }}{% endblock %}
+
 
 {% block extra_css %}
 <style>
@@ -9,7 +10,7 @@
         width: 100%;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
-    
+
     .table-excel th,
     .table-excel td {
         border-left: 1px solid #000000 !important;
@@ -19,7 +20,7 @@
         padding: 8px 12px;
         vertical-align: middle;
     }
-    
+
     .table-excel thead th {
         background-color: #87CEEB !important;
         color: #000000 !important;
@@ -29,20 +30,20 @@
         top: 0;
         z-index: 10;
     }
-    
+
     .table-excel tbody td {
         background-color: #ffffff;
         color: #000000;
     }
-    
+
     .table-excel tbody tr:nth-child(even) td {
         background-color: #f9f9f9;
     }
-    
+
     .table-excel tbody tr:hover td {
         background-color: #f5f5f5;
     }
-    
+
     .table-excel tfoot td {
         background-color: #e8f4f8 !important;
         font-weight: 700 !important;
@@ -50,7 +51,7 @@
         border-bottom: 2px solid #000000 !important;
         color: #000000 !important;
     }
-    
+
     .stat-card {
         background: white;
         border-radius: 4px;
@@ -77,7 +78,7 @@
     }
     .stat-card.total { border-left: 6px solid #007bff; }
     .stat-card.count { border-left: 6px solid #6f42c1; }
-    
+
     .filter-form {
         background: #f8f9fa;
         padding: 15px 20px;
@@ -85,17 +86,17 @@
         margin-bottom: 20px;
         border: 2px solid #000000;
     }
-    
+
     .filter-form .form-label {
         color: #000000;
         font-weight: 600;
     }
-    
+
     .filter-form .form-select {
         border: 2px solid #000000;
         border-radius: 4px;
     }
-    
+
     .btn-primary {
         background-color: #87CEEB;
         border: 2px solid #000000;
@@ -103,13 +104,13 @@
         border-radius: 4px;
         font-weight: 600;
     }
-    
+
     .btn-primary:hover {
         background-color: #7bb8d8;
         border-color: #000000;
         color: #000000;
     }
-    
+
     .btn-secondary {
         background-color: #f8f9fa;
         border: 2px solid #000000;
@@ -117,31 +118,45 @@
         border-radius: 4px;
         font-weight: 600;
     }
-    
+
     .btn-secondary:hover {
         background-color: #87CEEB;
         border-color: #000000;
         color: #000000;
     }
-    
+
+    .btn-outline-secondary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: #ffffff;
+    }
+
+    .btn-outline-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+
     .card {
         border: 2px solid #000000;
         border-radius: 4px;
         box-shadow: none;
     }
-    
+
     .card-header {
         background-color: #f8f9fa;
         border-bottom: 2px solid #000000;
         padding: 12px 20px;
     }
-    
+
     .card-header h5 {
         color: #000000;
         font-weight: 600;
         margin: 0;
     }
-    
+
     .badge.bg-primary {
         background-color: #87CEEB !important;
         color: #000000 !important;
@@ -149,7 +164,7 @@
         padding: 4px 10px;
         font-weight: 600;
     }
-    
+
     .status-badge {
         padding: 4px 12px;
         border-radius: 4px;
@@ -160,9 +175,9 @@
     .status-completed { background: #d4edda; color: #155724; }
     .status-pending { background: #fff3cd; color: #856404; }
     .status-cancelled { background: #f8d7da; color: #721c24; }
-    
+
     .text-danger { color: #dc3545 !important; font-weight: 600; }
-    
+
     @media (max-width: 768px) {
         .table-excel th,
         .table-excel td {
@@ -179,9 +194,12 @@
 {% block content %}
 <div class="container-fluid">
     <!-- Navigation -->
-    <div class="mb-3">
+    <div class="mb-3 d-flex flex-wrap gap-2">
         <a href="{% url 'finance-cogs-report' %}" class="btn btn-secondary btn-sm">
             <i class="fas fa-arrow-left"></i> Back to COGS Report
+        </a>
+        <a href="{% url 'finance-dashboard' %}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-home"></i> Dashboard
         </a>
         <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
             <i class="fas fa-print"></i> Print
@@ -189,24 +207,29 @@
     </div>
 
     <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h1 class="mb-0">
             <i class="fas fa-calendar-week" style="color: #000000;"></i> Weekly Purchases
             <small class="text-muted fs-6" style="color: #000000 !important;">
-                Week {{ week }}, {{ year }} ({{ week_start|date:"M d" }} - {{ week_end|date:"M d, Y" }})
+                Week {{ week }}, {{ year }}
+                ({{ week_start|date:"M d" }} – {{ week_end|date:"M d, Y" }})
             </small>
         </h1>
+        <a href="{% url 'finance-cogs-report' %}" class="btn btn-primary btn-sm">
+            <i class="fas fa-list"></i> Full COGS Report
+        </a>
     </div>
 
     <!-- Filter Form -->
     <div class="filter-form">
         <form method="get" class="row g-3 align-items-end">
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <label class="form-label">Branch</label>
                 <select name="branch" class="form-select form-select-sm">
                     <option value="">All Branches</option>
                     {% for branch in branches %}
-                    <option value="{{ branch.id }}" {% if selected_branch == branch.id|stringformat:"s" %}selected{% endif %}>
+                    <option value="{{ branch.id }}"
+                        {% if selected_branch == branch.id|stringformat:"s" %}selected{% endif %}>
                         {{ branch.name }}
                     </option>
                     {% endfor %}
@@ -216,7 +239,8 @@
                 <button type="submit" class="btn btn-primary btn-sm">
                     <i class="fas fa-filter"></i> Apply Filter
                 </button>
-                <a href="{% url 'finance-cogs-weekly-detail' year week %}" class="btn btn-secondary btn-sm">
+                <a href="{% url 'finance-cogs-weekly-detail' year week %}"
+                   class="btn btn-secondary btn-sm">
                     <i class="fas fa-sync"></i> Reset
                 </a>
             </div>
@@ -268,14 +292,21 @@
                         {% for purchase in purchases %}
                         <tr>
                             <td>{{ purchase.purchase_date|date:"Y-m-d" }}</td>
-                            <td>{{ purchase.branch.name }}</td>
+                            <td>{{ purchase.branch.name|default:"—" }}</td>
                             <td>{{ purchase.get_purchase_type_display }}</td>
-                            <td>{{ purchase.created_by.get_full_name|default:purchase.created_by.username }}</td>
+                            <td>
+                                {% if purchase.created_by %}
+                                    {{ purchase.created_by.get_full_name|default:purchase.created_by.username }}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
                             <td class="text-end text-danger">
                                 <strong>KSh {{ purchase.total_amount|floatformat:2 }}</strong>
                             </td>
                             <td>
-                                <span class="badge" style="background: #f8f9fa; border: 1px solid #000000; color: #000000; padding: 4px 10px;">
+                                <span class="badge"
+                                      style="background: #f8f9fa; border: 1px solid #000000; color: #000000; padding: 4px 10px;">
                                     {{ purchase.payment_reference|default:"-" }}
                                 </span>
                             </td>
@@ -285,7 +316,8 @@
                                 </span>
                             </td>
                             <td class="text-center">
-                                <a href="{% url 'finance-purchase-detail' purchase.id %}" class="btn btn-primary btn-sm">
+                                <a href="{% url 'finance-purchase-detail' purchase.id %}"
+                                   class="btn btn-primary btn-sm">
                                     <i class="fas fa-eye"></i>
                                 </a>
                             </td>
@@ -294,7 +326,9 @@
                         <tr>
                             <td colspan="8" class="text-center py-4">
                                 <i class="fas fa-inbox fa-2x text-muted d-block mb-2"></i>
-                                <span class="text-muted">No purchases found for week {{ week }}, {{ year }}</span>
+                                <span class="text-muted">
+                                    No purchases found for Week {{ week }}, {{ year }}
+                                </span>
                             </td>
                         </tr>
                         {% endfor %}
@@ -302,7 +336,9 @@
                     <tfoot>
                         <tr>
                             <td colspan="4" class="text-end"><strong>TOTAL</strong></td>
-                            <td class="text-end"><strong>KSh {{ total_purchases_value|floatformat:2 }}</strong></td>
+                            <td class="text-end">
+                                <strong>KSh {{ total_purchases_value|floatformat:2 }}</strong>
+                            </td>
                             <td colspan="3"></td>
                         </tr>
                     </tfoot>
@@ -311,8 +347,9 @@
         </div>
         <div class="card-footer">
             <small>
-                Week {{ week }}, {{ year }} | 
-                Total Purchases: {{ purchases_count }} | 
+                Week {{ week }}, {{ year }}
+                ({{ week_start|date:"M d" }} – {{ week_end|date:"M d, Y" }}) |
+                Total Purchases: {{ purchases_count }} |
                 Total Amount: KSh {{ total_purchases_value|floatformat:2 }}
             </small>
         </div>
