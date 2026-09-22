@@ -58,19 +58,31 @@ urlpatterns = [
     # Mortality
     path('mortality/', views.mortality_list, name='mortality_list'),
     path('mortality/new/', views.mortality_create, name='mortality_create'),
+    path('mortality/<int:pk>/delete/', views.mortality_delete, name='mortality_delete'),
 
     # Health
     path('health/', views.health_list, name='health_list'),
     path('health/new/', views.health_create, name='health_create'),
+    path('health/<int:pk>/delete/', views.health_delete, name='health_delete'),
+
+    # Vaccine types (catalog)
+    path('health/vaccines/', views.vaccine_type_list, name='vaccine_type_list'),
+    path('health/vaccines/new/', views.vaccine_type_create, name='vaccine_type_create'),
+    path('health/vaccines/<int:pk>/edit/', views.vaccine_type_edit, name='vaccine_type_edit'),
+    path('health/vaccines/<int:pk>/delete/', views.vaccine_type_delete, name='vaccine_type_delete'),
 
     # Expenses
     path('expenses/', views.expense_list, name='expense_list'),
     path('expenses/new/', views.expense_create, name='expense_create'),
+    path('expenses/<int:pk>/edit/', views.expense_edit, name='expense_edit'),
+    path('expenses/<int:pk>/delete/', views.expense_delete, name='expense_delete'),
+    path('expenses/<int:pk>/mark-paid/', views.expense_mark_paid, name='expense_mark_paid'),
 
     # Inventory — separated by category
     path('inventory/', views.inventory_hub, name='inventory_hub'),
     path('inventory/eggs/', views.egg_inventory, name='egg_inventory'),
     path('inventory/feed/', views.feed_inventory, name='feed_inventory'),
+    path('inventory/vaccines/', views.vaccine_inventory, name='vaccine_inventory'),
     path('inventory/other/', views.other_inventory, name='other_inventory'),
 
     # Shared create/edit/delete (unchanged)

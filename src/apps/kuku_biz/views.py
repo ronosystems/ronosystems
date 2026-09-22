@@ -24,12 +24,20 @@ from .models import (
     Flock, EggProduction, Customer, EggSale, EggSaleItem,
     FeedType, FeedRecord, FeedConsumption, HealthRecord, Mortality,
     Expense, InventoryItem, PriceHistory,
+    VaccineType,   
     BirdSale,
     INVENTORY_ITEM_TYPE_CHOICES,
     EGG_UNIT_CHOICES,
     TRAY_SIZE_CHOICES,
     FEED_RECORD_TYPE_CHOICES,
     FEED_PAYMENT_STATUS_CHOICES,
+    HEALTH_RECORD_TYPE_CHOICES,         
+    HEALTH_ITEM_KIND_CHOICES,               
+    HEALTH_ADMIN_METHOD_CHOICES,            
+    HEALTH_PAYMENT_STATUS_CHOICES, 
+    MORTALITY_CAUSE_CHOICES,   
+    EXPENSE_CATEGORY_CHOICES,  
+    EXPENSE_PAYMENT_METHOD_CHOICES,      
 )
 import time
 import cloudinary
@@ -3027,35 +3035,125 @@ def feed_consumption_delete(request, pk):
 
 @login_required
 def mortality_list(request):
+    """
+    Mortality log with cost/loss tracking and cause breakdown.
+    """
     company, is_viewing_company = _require_company(request)
     redir = _redirect_if_no_company(request, company)
     if redir:
         return redir
 
     today = timezone.now().date()
-    month_ago = today - timedelta(days=30)
 
-    records = (
+    # ── Filters ──
+    flock_id = request.GET.get('flock', '').strip()
+    cause = request.GET.get('cause', '').strip()
+    try:
+        period_days = int(request.GET.get('period', 30))
+    except (ValueError, TypeError):
+        period_days = 30
+    period_days = max(0, min(period_days, 3650))
+    start_date = today - timedelta(days=period_days) if period_days else None
+
+    # ── Base queryset ──
+    qs = (
         Mortality.objects
         .filter(company=company)
-        .select_related('flock', 'branch')
-        .order_by('-date')[:100]
+        .select_related('flock', 'branch', 'related_health_record')
+    )
+    if flock_id:
+        qs = qs.filter(flock_id=flock_id)
+    if cause:
+        qs = qs.filter(cause=cause)
+    if start_date:
+        qs = qs.filter(date__gte=start_date)
+
+    records = qs.order_by('-date', '-created_at')[:200]
+
+    # ── Aggregates (respect filters) ──
+    agg = qs.aggregate(
+        total_deaths=Sum('count'),
+        total_loss=Sum('estimated_loss'),
+        total_records=Count('id'),
+    )
+    month_total = agg['total_deaths'] or 0
+    total_loss_value = agg['total_loss'] or 0
+    total_records = agg['total_records'] or 0
+
+    avg_loss_per_bird = (
+        round(float(total_loss_value) / float(month_total), 2)
+        if month_total else 0
     )
 
-    month_total = (
-        Mortality.objects
-        .filter(company=company, date__gte=month_ago)
-        .aggregate(total=Sum('count'))['total'] or 0
+    # ── Flock-wide mortality rate (all-time, all flocks) ──
+    all_flocks = Flock.objects.filter(company=company)
+    total_initial_birds = (
+        all_flocks.aggregate(t=Sum('initial_count'))['t'] or 0
     )
+    total_birds_lost = (
+        Mortality.objects.filter(company=company)
+        .aggregate(t=Sum('count'))['t'] or 0
+    )
+    mortality_rate = (
+        round((total_birds_lost / total_initial_birds) * 100, 2)
+        if total_initial_birds else 0
+    )
+
+    # ── Cause breakdown for the bar chart ──
+    cause_counts = (
+        qs.values('cause')
+        .annotate(total=Sum('count'))
+        .order_by('-total')
+    )
+
+    cause_colors = {
+        'disease':  'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)',
+        'predator': 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)',
+        'culled':   'linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%)',
+        'accident': 'linear-gradient(90deg, #ec4899 0%, #be185d 100%)',
+        'unknown':  'linear-gradient(90deg, #9ca3af 0%, #6b7280 100%)',
+    }
+    cause_labels = dict(MORTALITY_CAUSE_CHOICES)
+
+    cause_breakdown = []
+    for row in cause_counts:
+        code = row['cause']
+        count = row['total'] or 0
+        percent = round((count / month_total) * 100, 1) if month_total else 0
+        cause_breakdown.append({
+            'code': code,
+            'label': cause_labels.get(code, code.title()),
+            'count': count,
+            'percent': percent,
+            'color': cause_colors.get(code, 'linear-gradient(90deg,#9ca3af,#6b7280)'),
+        })
 
     context = {
         'company': company,
         'is_viewing_company': is_viewing_company,
         'records': records,
-        'flocks': Flock.objects.filter(company=company, status='active'),
-        'month_total': month_total,
+        'flocks': Flock.objects.filter(company=company, status='active').order_by('name'),
         'today': today,
-        'page_title': 'Mortality Records',
+
+        # Filters
+        'selected_flock_id': flock_id,
+        'selected_cause': cause,
+        'period_days': period_days,
+
+        # KPIs
+        'month_total': month_total,
+        'total_loss_value': total_loss_value,
+        'avg_loss_per_bird': avg_loss_per_bird,
+        'mortality_rate': mortality_rate,
+        'total_birds_lost': total_birds_lost,
+        'total_initial_birds': total_initial_birds,
+        'total_records': total_records,
+
+        # Breakdown
+        'cause_breakdown': cause_breakdown,
+
+        'page_title': 'Mortality',
+        'page_subtitle': 'Deaths, culling & loss tracking',
     }
     return render(request, 'kuku_biz/mortality.html', context)
 
@@ -3078,6 +3176,11 @@ def mortality_create(request):
                 date=request.POST.get('date') or timezone.now().date(),
                 count=int(request.POST.get('count') or 0),
                 cause=request.POST.get('cause', 'unknown'),
+                age_group=request.POST.get('age_group', 'unknown'),
+                symptoms=request.POST.get('symptoms', '').strip(),
+                disposal_method=request.POST.get('disposal_method', 'none'),
+                action_taken=request.POST.get('action_taken', '').strip(),
+                estimated_loss=_to_decimal(request.POST.get('estimated_loss')),
                 notes=request.POST.get('notes', '').strip(),
                 recorded_by=request.user,
             )
@@ -3085,8 +3188,27 @@ def mortality_create(request):
         except Exception as e:
             messages.error(request, f'Error recording mortality: {e}')
 
+    # Return to wherever the user came from
+    next_url = request.POST.get('next') or request.META.get('HTTP_REFERER') or ''
+    if next_url:
+        return redirect(next_url)
     return redirect('kuku_biz:mortality_list')
 
+
+@login_required
+@kuku_write_access
+@require_POST
+def mortality_delete(request, pk):
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    record = get_object_or_404(Mortality, pk=pk, company=company)
+    label = f"{record.count} bird{'s' if record.count != 1 else ''} — {record.flock.name} — {record.date}"
+    record.delete()
+    messages.success(request, f'Mortality record deleted ({label}). Flock count recalculated.')
+    return redirect('kuku_biz:mortality_list')
 
 # ============================================================
 # HEALTH
@@ -3102,35 +3224,90 @@ def health_list(request):
     today = timezone.now().date()
     month_ago = today - timedelta(days=30)
 
-    records = (
+    records_qs = (
         HealthRecord.objects
         .filter(company=company)
-        .select_related('flock', 'branch')
-        .order_by('-date')[:100]
+        .select_related('flock', 'branch', 'vaccine_type', 'inventory_item')
+        .order_by('-date', '-created_at')
     )
 
+    purchases_qs = records_qs.filter(record_type='purchase')
+    admin_qs     = records_qs.filter(record_type='administration')
+
     month_cost = (
-        HealthRecord.objects
-        .filter(company=company, date__gte=month_ago)
-        .aggregate(total=Sum('cost'))['total'] or 0
+        purchases_qs.filter(date__gte=month_ago)
+        .aggregate(t=Sum('cost'))['t'] or 0
+    )
+    month_paid = (
+        purchases_qs.filter(date__gte=month_ago)
+        .aggregate(t=Sum('amount_paid'))['t'] or 0
+    )
+    month_balance = month_cost - month_paid
+
+    month_admin_count = admin_qs.filter(date__gte=month_ago).count()
+    month_birds_treated = (
+        admin_qs.filter(date__gte=month_ago)
+        .aggregate(t=Sum('birds_treated'))['t'] or 0
     )
 
     upcoming = (
-        HealthRecord.objects
-        .filter(company=company, next_due_date__gte=today)
-        .select_related('flock')
+        admin_qs.filter(next_due_date__gte=today)
+        .select_related('flock', 'vaccine_type')
         .order_by('next_due_date')[:10]
     )
+
+    # Live inventory rows per vaccine type
+    health_inventory_rows = []
+    all_vts = VaccineType.objects.filter(company=company, is_active=True).order_by('name')
+    for vt in all_vts:
+        f_purch = purchases_qs.filter(vaccine_type=vt)
+        f_admin = admin_qs.filter(vaccine_type=vt)
+
+        purchased_qty = f_purch.aggregate(t=Sum('quantity'))['t'] or 0
+        admin_qty     = f_admin.aggregate(t=Sum('quantity'))['t'] or 0
+
+        inv_filter = InventoryItem.objects.filter(
+            company=company, item_type='medicine',
+            name__icontains=vt.name,
+        )
+        if vt.brand:
+            inv_filter = inv_filter.filter(name__icontains=vt.brand)
+
+        inv_qty = sum(float(i.quantity) for i in inv_filter)
+        on_hand = inv_qty if inv_qty > 0 else max(purchased_qty - admin_qty, 0)
+
+        health_inventory_rows.append({
+            'vaccine_type': vt,
+            'name': vt.name,
+            'brand': vt.brand,
+            'target_disease': vt.target_disease,
+            'unit': vt.default_unit or 'dose',
+            'purchased_qty': purchased_qty,
+            'admin_qty': admin_qty,
+            'on_hand': on_hand,
+            'low': 0 < on_hand <= 10,
+            'empty': on_hand <= 0,
+        })
+
+    records_purchases = purchases_qs[:15]
+    records_admins    = admin_qs[:15]
 
     context = {
         'company': company,
         'is_viewing_company': is_viewing_company,
-        'records': records,
-        'flocks': Flock.objects.filter(company=company, status='active'),
+        'records_purchases': records_purchases,
+        'records_admins': records_admins,
+        'flocks': Flock.objects.filter(company=company, status='active').order_by('name'),
+        'vaccine_types': all_vts,
+        'health_inventory_rows': health_inventory_rows,
         'month_cost': month_cost,
+        'month_balance': month_balance,
+        'month_admin_count': month_admin_count,
+        'month_birds_treated': month_birds_treated,
         'upcoming': upcoming,
         'today': today,
-        'page_title': 'Health Records',
+        'page_title': 'Health',
+        'page_subtitle': 'Vaccine purchases, administration & stock',
     }
     return render(request, 'kuku_biz/health.html', context)
 
@@ -3138,6 +3315,144 @@ def health_list(request):
 @login_required
 @kuku_write_access
 def health_create(request):
+    """
+    Handles both purchase and administration records.
+    Field `record_type` in POST decides which.
+    """
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    if request.method != 'POST':
+        return redirect('kuku_biz:health_list')
+
+    try:
+        record_type = request.POST.get('record_type', 'administration')
+        branch = _resolve_branch(request, company)
+        flock_id = request.POST.get('flock') or None
+        vaccine_type_id = request.POST.get('vaccine_type') or None
+
+        quantity = _to_decimal(request.POST.get('quantity'))
+        if quantity <= 0:
+            messages.error(request, 'Quantity must be greater than zero.')
+            return redirect('kuku_biz:health_list')
+
+        if record_type == 'purchase':
+            cost = _to_decimal(request.POST.get('cost'))
+            amount_paid = _to_decimal(request.POST.get('amount_paid'))
+
+            # Auto-fill cost from vaccine_type.cost_per_unit if blank
+            if cost <= 0 and vaccine_type_id:
+                vt = VaccineType.objects.filter(id=vaccine_type_id, company=company).first()
+                if vt and vt.cost_per_unit:
+                    cost = _to_decimal(vt.cost_per_unit) * quantity
+
+            record = HealthRecord.objects.create(
+                company=company,
+                branch=branch,
+                flock_id=None,   # purchases are general stock
+                vaccine_type_id=vaccine_type_id,
+                product_used=request.POST.get('product_used', '').strip(),
+                record_type='purchase',
+                date=request.POST.get('date') or timezone.now().date(),
+                quantity=quantity,
+                unit=request.POST.get('unit', 'dose'),
+                cost=cost,
+                amount_paid=amount_paid,
+                supplier=request.POST.get('supplier', '').strip(),
+                supplier_invoice=request.POST.get('supplier_invoice', '').strip(),
+                payment_status=request.POST.get('payment_status', 'paid'),
+                notes=request.POST.get('notes', '').strip(),
+                recorded_by=request.user,
+            )
+            record.recompute_payment_status()
+            messages.success(
+                request,
+                f'Health purchase recorded: {quantity} {record.unit} for KES {cost:,.0f}.'
+            )
+
+        else:  # administration
+            record = HealthRecord.objects.create(
+                company=company,
+                branch=branch,
+                flock_id=flock_id,
+                vaccine_type_id=vaccine_type_id,
+                product_used=request.POST.get('product_used', '').strip(),
+                record_type='administration',
+                date=request.POST.get('date') or timezone.now().date(),
+                quantity=quantity,
+                unit=request.POST.get('unit', 'dose'),
+                birds_treated=int(request.POST.get('birds_treated') or 0),
+                admin_method=request.POST.get('admin_method', 'drinking_water'),
+                administered_by=request.POST.get('administered_by', '').strip(),
+                next_due_date=request.POST.get('next_due_date') or None,
+                description=request.POST.get('description', '').strip(),
+                notes=request.POST.get('notes', '').strip(),
+                recorded_by=request.user,
+            )
+            messages.success(
+                request,
+                f'Administration recorded: {quantity} {record.unit} to {record.birds_treated} birds.'
+            )
+
+    except Exception as e:
+        messages.error(request, f'Error recording health event: {e}')
+
+    return redirect('kuku_biz:health_list')
+
+
+@login_required
+@kuku_write_access
+@require_POST
+def health_delete(request, pk):
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    record = get_object_or_404(HealthRecord, pk=pk, company=company)
+    label = (
+        f"{record.vaccine_type.name if record.vaccine_type else (record.product_used or 'Record')} "
+        f"— {record.date}"
+    )
+    record.delete()
+    messages.success(request, f'Health record deleted ({label}).')
+    return redirect('kuku_biz:health_list')
+
+# ============================================================
+# VACCINE / DRUG TYPES (catalog — admin)
+# ============================================================
+
+@login_required
+@kuku_write_access
+def vaccine_type_list(request):
+    """Manage the catalog of vaccine / drug products for the company."""
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    vaccine_types = (
+        VaccineType.objects
+        .filter(company=company)
+        .order_by('name', 'brand')
+    )
+
+    context = {
+        'company': company,
+        'is_viewing_company': is_viewing_company,
+        'vaccine_types': vaccine_types,
+        'kind_choices': HEALTH_ITEM_KIND_CHOICES,
+        'page_title': 'Vaccine Types',
+        'page_subtitle': f'{vaccine_types.count()} defined',
+    }
+    return render(request, 'kuku_biz/vaccine_types.html', context)
+
+
+@login_required
+@kuku_write_access
+def vaccine_type_create(request):
     company, is_viewing_company = _require_company(request)
     redir = _redirect_if_no_company(request, company)
     if redir:
@@ -3145,26 +3460,158 @@ def health_create(request):
 
     if request.method == 'POST':
         try:
-            branch = _resolve_branch(request, company)
-            HealthRecord.objects.create(
+            name = request.POST.get('name', '').strip()
+            if not name:
+                messages.error(request, 'Name is required.')
+                return redirect('kuku_biz:vaccine_type_list')
+
+            brand = request.POST.get('brand', '').strip()
+            existing = VaccineType.objects.filter(
+                company=company, name__iexact=name, brand__iexact=brand,
+            ).first()
+            if existing:
+                messages.warning(request, f'"{name}" ({brand}) already exists.')
+                return redirect('kuku_biz:vaccine_type_list')
+
+            VaccineType.objects.create(
                 company=company,
-                branch=branch,
-                flock_id=request.POST.get('flock'),
-                date=request.POST.get('date') or timezone.now().date(),
-                record_type=request.POST.get('record_type', 'vaccination'),
-                product_used=request.POST.get('product_used', '').strip(),
-                description=request.POST.get('description', '').strip(),
-                cost=_to_decimal(request.POST.get('cost')),
-                administered_by=request.POST.get('administered_by', '').strip(),
-                next_due_date=request.POST.get('next_due_date') or None,
-                recorded_by=request.user,
+                name=name,
+                brand=brand,
+                item_kind=request.POST.get('item_kind', 'vaccine'),
+                target_disease=request.POST.get('target_disease', '').strip(),
+                default_unit=request.POST.get('default_unit', 'dose'),
+                cost_per_unit=_to_decimal(request.POST.get('cost_per_unit')),
+                repeat_interval_days=int(request.POST.get('repeat_interval_days') or 0),
+                storage_notes=request.POST.get('storage_notes', '').strip(),
+                is_active=request.POST.get('is_active') == 'on',
             )
-            messages.success(request, 'Health record saved.')
+            messages.success(request, f'"{name}" added.')
         except Exception as e:
-            messages.error(request, f'Error saving health record: {e}')
+            messages.error(request, f'Error adding vaccine type: {e}')
 
-    return redirect('kuku_biz:health_list')
+    return redirect('kuku_biz:vaccine_type_list')
 
+
+@login_required
+@kuku_write_access
+def vaccine_type_edit(request, pk):
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    vt = get_object_or_404(VaccineType, pk=pk, company=company)
+
+    if request.method == 'POST':
+        try:
+            vt.name = request.POST.get('name', '').strip()
+            vt.brand = request.POST.get('brand', '').strip()
+            vt.item_kind = request.POST.get('item_kind', vt.item_kind)
+            vt.target_disease = request.POST.get('target_disease', '').strip()
+            vt.default_unit = request.POST.get('default_unit', vt.default_unit)
+            vt.cost_per_unit = _to_decimal(request.POST.get('cost_per_unit'))
+            vt.repeat_interval_days = int(request.POST.get('repeat_interval_days') or 0)
+            vt.storage_notes = request.POST.get('storage_notes', '').strip()
+            vt.is_active = request.POST.get('is_active') == 'on'
+            vt.save()
+            messages.success(request, f'"{vt.name}" updated.')
+        except Exception as e:
+            messages.error(request, f'Error updating vaccine type: {e}')
+
+    return redirect('kuku_biz:vaccine_type_list')
+
+
+@login_required
+@kuku_write_access
+@require_POST
+def vaccine_type_delete(request, pk):
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    vt = get_object_or_404(VaccineType, pk=pk, company=company)
+
+    used = HealthRecord.objects.filter(vaccine_type=vt).exists()
+    if used:
+        vt.is_active = False
+        vt.save(update_fields=['is_active'])
+        messages.warning(
+            request,
+            f'"{vt.name}" is used by existing records — marked inactive instead of deleting.'
+        )
+    else:
+        vt.delete()
+        messages.success(request, f'"{vt.name}" deleted.')
+
+    return redirect('kuku_biz:vaccine_type_list')
+
+@login_required
+def vaccine_inventory(request):
+    """
+    Vaccine/drug inventory — sourced from InventoryItem lines
+    (item_type='medicine') that were auto-created by HealthRecord
+    purchases and administrations.
+    """
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+    user_branch = request.user.branch
+    can_see_all = _can_see_all_branches(request, is_viewing_company)
+
+    selected_branch_id = request.GET.get('branch', '').strip()
+    if not can_see_all and user_branch:
+        selected_branch_id = str(user_branch.id)
+
+    items = (
+        InventoryItem.objects
+        .filter(company=company, item_type='medicine')
+        .select_related('branch')
+        .order_by('branch__name', 'name')
+    )
+    if selected_branch_id:
+        items = items.filter(branch_id=selected_branch_id)
+
+    low_stock = items.filter(quantity__lte=F('reorder_level'))
+
+    total_units = sum(float(i.quantity) for i in items)
+    total_value = sum(i.stock_value for i in items)
+
+    # Match each inventory line to its VaccineType for the "Give" quick action
+    vaccine_rows = []
+    for item in items:
+        base = item.name.split('(')[0].strip()
+        vt = VaccineType.objects.filter(
+            company=company, name__iexact=base
+        ).first()
+        vaccine_rows.append({
+            'item': item,
+            'vaccine_type': vt,
+            'units': float(item.quantity),
+            'value': item.stock_value,
+            'low': item.quantity <= item.reorder_level,
+        })
+
+    context = {
+        'company': company,
+        'is_viewing_company': is_viewing_company,
+        'items': items,
+        'vaccine_rows': vaccine_rows,
+        'low_stock': low_stock,
+        'branches': branches,
+        'selected_branch_id': selected_branch_id,
+        'can_see_all_branches': can_see_all,
+        'user_branch': user_branch,
+        'total_units': total_units,
+        'total_value': total_value,
+        'today': timezone.now().date(),
+        'page_title': 'Vaccine Inventory',
+        'page_subtitle': f'{items.count()} item{"s" if items.count() != 1 else ""}',
+    }
+    return render(request, 'kuku_biz/vaccine_inventory.html', context)
 
 # ============================================================
 # EXPENSES
@@ -3172,35 +3619,127 @@ def health_create(request):
 
 @login_required
 def expense_list(request):
+    """
+    Expenses hub — KPIs, category breakdown, filtered log with totals.
+    """
     company, is_viewing_company = _require_company(request)
     redir = _redirect_if_no_company(request, company)
     if redir:
         return redir
 
-    today = timezone.now().date()
-    month_ago = today - timedelta(days=30)
+    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+    user_branch = request.user.branch
+    can_see_all = _can_see_all_branches(request, is_viewing_company)
 
-    expenses = (
+    selected_branch_id = request.GET.get('branch', '').strip()
+    if not can_see_all and user_branch:
+        selected_branch_id = str(user_branch.id)
+
+    today = timezone.now().date()
+    try:
+        period_days = int(request.GET.get('period', 30))
+    except (ValueError, TypeError):
+        period_days = 30
+    period_days = max(0, min(period_days, 3650))
+    start_date = today - timedelta(days=period_days) if period_days else None
+
+    # ── Filters ──
+    category = request.GET.get('category', '').strip()
+    flock_id = request.GET.get('flock', '').strip()
+
+    qs = (
         Expense.objects
         .filter(company=company)
         .select_related('flock', 'branch')
-        .order_by('-date')[:100]
     )
+    if selected_branch_id:
+        qs = qs.filter(branch_id=selected_branch_id)
+    if start_date:
+        qs = qs.filter(date__gte=start_date)
+    if category:
+        qs = qs.filter(category=category)
+    if flock_id:
+        qs = qs.filter(flock_id=flock_id)
 
-    month_total = (
-        Expense.objects
-        .filter(company=company, date__gte=month_ago)
-        .aggregate(total=Sum('amount'))['total'] or 0
+    records = qs.order_by('-date', '-created_at')[:200]
+
+    # ── KPIs ──
+    agg = qs.aggregate(
+        total=Sum('amount'),
+        paid=Sum('amount_paid'),
+        count=Count('id'),
     )
+    total_amount = agg['total'] or 0
+    total_paid   = agg['paid'] or 0
+    total_balance = _to_decimal(total_amount) - _to_decimal(total_paid)
+    record_count = agg['count'] or 0
+
+    # ── Category breakdown ──
+    cat_counts = (
+        qs.values('category')
+        .annotate(total=Sum('amount'), count=Count('id'))
+        .order_by('-total')
+    )
+    cat_labels = dict(EXPENSE_CATEGORY_CHOICES)
+
+    category_breakdown = []
+    for row in cat_counts:
+        code = row['category']
+        total = row['total'] or 0
+        percent = round((float(total) / float(total_amount)) * 100, 1) if total_amount else 0
+        category_breakdown.append({
+            'code': code,
+            'label': cat_labels.get(code, code.title()),
+            'total': total,
+            'count': row['count'],
+            'percent': percent,
+        })
+
+    # ── Per-flock summary (last 30d) ──
+    month_ago = today - timedelta(days=30)
+    flock_summary = []
+    flocks = Flock.objects.filter(company=company, status='active')
+    if selected_branch_id:
+        flocks = flocks.filter(branch_id=selected_branch_id)
+
+    for f in flocks:
+        f_total = (
+            Expense.objects
+            .filter(company=company, flock=f, date__gte=month_ago)
+            .aggregate(t=Sum('amount'))['t'] or 0
+        )
+        if f_total:
+            flock_summary.append({'flock': f, 'total': f_total})
+
+    flock_summary.sort(key=lambda x: -float(x['total']))
 
     context = {
         'company': company,
         'is_viewing_company': is_viewing_company,
-        'expenses': expenses,
-        'flocks': Flock.objects.filter(company=company, status='active'),
-        'month_total': month_total,
+        'branches': branches,
+        'selected_branch_id': selected_branch_id,
+        'can_see_all_branches': can_see_all,
+        'user_branch': user_branch,
+
+        'records': records,
+        'total_amount': total_amount,
+        'total_paid': total_paid,
+        'total_balance': total_balance,
+        'record_count': record_count,
+        'category_breakdown': category_breakdown,
+        'flock_summary': flock_summary,
+
+        'flocks': Flock.objects.filter(company=company, status='active').order_by('name'),
+        'categories': EXPENSE_CATEGORY_CHOICES,
+        'payment_methods': EXPENSE_PAYMENT_METHOD_CHOICES,
+
+        'selected_category': category,
+        'selected_flock_id': flock_id,
+        'period_days': period_days,
         'today': today,
+
         'page_title': 'Expenses',
+        'page_subtitle': 'Track farm costs and payments',
     }
     return render(request, 'kuku_biz/expenses.html', context)
 
@@ -3213,40 +3752,121 @@ def expense_create(request):
     if redir:
         return redir
 
-    if request.method == 'POST':
-        try:
-            branch = _resolve_branch(request, company)
-            Expense.objects.create(
-                company=company,
-                branch=branch,
-                flock_id=request.POST.get('flock') or None,
-                date=request.POST.get('date') or timezone.now().date(),
-                category=request.POST.get('category', 'other'),
-                description=request.POST.get('description', '').strip(),
-                amount=_to_decimal(request.POST.get('amount')),
-                paid_to=request.POST.get('paid_to', '').strip(),
-                payment_method=request.POST.get('payment_method', '').strip(),
-                notes=request.POST.get('notes', '').strip(),
-                recorded_by=request.user,
-            )
-            messages.success(request, 'Expense recorded.')
-        except Exception as e:
-            messages.error(request, f'Error recording expense: {e}')
+    if request.method != 'POST':
+        return redirect('kuku_biz:expense_list')
+
+    try:
+        branch = _resolve_branch(request, company)
+
+        amount = _to_decimal(request.POST.get('amount'))
+        if amount <= 0:
+            messages.error(request, 'Amount must be greater than zero.')
+            return redirect('kuku_biz:expense_list')
+
+        Expense.objects.create(
+            company=company,
+            branch=branch,
+            flock_id=request.POST.get('flock') or None,
+            date=request.POST.get('date') or timezone.now().date(),
+            category=request.POST.get('category', 'other'),
+            description=request.POST.get('description', '').strip(),
+            amount=amount,
+            amount_paid=_to_decimal(request.POST.get('amount_paid')),
+            paid_to=request.POST.get('paid_to', '').strip(),
+            payment_method=request.POST.get('payment_method', 'cash'),
+            reference=request.POST.get('reference', '').strip(),
+            notes=request.POST.get('notes', '').strip(),
+            recorded_by=request.user,
+        )
+        messages.success(request, f'Expense recorded: KES {amount:,.0f}.')
+    except Exception as e:
+        messages.error(request, f'Error recording expense: {e}')
+
+    next_url = request.POST.get('next') or request.META.get('HTTP_REFERER') or ''
+    if next_url:
+        return redirect(next_url)
+    return redirect('kuku_biz:expense_list')
+
+
+@login_required
+@kuku_write_access
+def expense_edit(request, pk):
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    expense = get_object_or_404(Expense, pk=pk, company=company)
+
+    if request.method != 'POST':
+        return redirect('kuku_biz:expense_list')
+
+    try:
+        branch = _resolve_branch(request, company)
+
+        expense.branch = branch
+        expense.flock_id = request.POST.get('flock') or None
+        expense.date = request.POST.get('date') or expense.date
+        expense.category = request.POST.get('category', expense.category)
+        expense.description = request.POST.get('description', '').strip()
+        expense.amount = _to_decimal(request.POST.get('amount'))
+        expense.amount_paid = _to_decimal(request.POST.get('amount_paid'))
+        expense.paid_to = request.POST.get('paid_to', '').strip()
+        expense.payment_method = request.POST.get('payment_method', expense.payment_method)
+        expense.reference = request.POST.get('reference', '').strip()
+        expense.notes = request.POST.get('notes', '').strip()
+        expense.save()
+
+        messages.success(request, 'Expense updated.')
+    except Exception as e:
+        messages.error(request, f'Error updating expense: {e}')
 
     return redirect('kuku_biz:expense_list')
 
+
+@login_required
+@kuku_write_access
+@require_POST
+def expense_delete(request, pk):
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    expense = get_object_or_404(Expense, pk=pk, company=company)
+    label = f"{expense.get_category_display()} — KES {expense.amount}"
+    expense.delete()
+    messages.success(request, f'Expense deleted ({label}).')
+    return redirect('kuku_biz:expense_list')
+
+
+@login_required
+@kuku_write_access
+@require_POST
+def expense_mark_paid(request, pk):
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    expense = get_object_or_404(Expense, pk=pk, company=company)
+    expense.amount_paid = expense.amount
+    expense.save(update_fields=['amount_paid', 'payment_status'])
+    messages.success(request, f'Expense marked as paid (KES {expense.amount:,.0f}).')
+    return redirect('kuku_biz:expense_list')
 
 # ============================================================
 # INVENTORY
 # ============================================================
 
-
 @login_required
 def inventory_hub(request):
     """
-    Inventory landing page — shows two cards linking to:
+    Inventory landing page — shows four cards linking to:
       - Egg Inventory (trays & crates)
       - Feed Inventory (bags)
+      - Vaccine Inventory (medicine lines)
+      - Other Supplies (equipment, misc)
     with summary KPIs for each.
     """
     company, is_viewing_company = _require_company(request)
@@ -3262,45 +3882,73 @@ def inventory_hub(request):
     if not can_see_all and user_branch:
         selected_branch_id = str(user_branch.id)
 
-    # ── Egg inventory ──
-    egg_qs = InventoryItem.objects.filter(
-        company=company,
-        item_type__in=['egg_tray', 'egg_crate'],
+    # ── Shared helper: filter a queryset by selected branch ──
+    def _scope(qs):
+        if selected_branch_id:
+            return qs.filter(branch_id=selected_branch_id)
+        return qs
+
+    # ============================================================
+    # EGG INVENTORY (trays + crates)
+    # ============================================================
+    egg_qs = _scope(
+        InventoryItem.objects.filter(
+            company=company,
+            item_type__in=['egg_tray', 'egg_crate'],
+        )
     )
-    if selected_branch_id:
-        egg_qs = egg_qs.filter(branch_id=selected_branch_id)
 
     egg_item_count = egg_qs.count()
     egg_total_eggs = sum(item.total_eggs for item in egg_qs)
-    egg_value = sum(
-        float(item.quantity) * float(item.cost_per_unit)
-        for item in egg_qs
-    )
+    egg_value = sum(item.stock_value for item in egg_qs)
     egg_low = egg_qs.filter(quantity__lte=F('reorder_level')).count()
 
-    # ── Feed inventory ──
-    feed_qs = InventoryItem.objects.filter(
-        company=company, item_type='feed_bag',
+    # ============================================================
+    # FEED INVENTORY (bags)
+    # ============================================================
+    feed_qs = _scope(
+        InventoryItem.objects.filter(
+            company=company, item_type='feed_bag',
+        )
     )
-    if selected_branch_id:
-        feed_qs = feed_qs.filter(branch_id=selected_branch_id)
 
     feed_item_count = feed_qs.count()
     feed_total_kg = sum(float(item.quantity) for item in feed_qs)
-    feed_value = sum(
-        float(item.quantity) * float(item.cost_per_unit)
-        for item in feed_qs
-    )
+    feed_value = sum(item.stock_value for item in feed_qs)
     feed_low = feed_qs.filter(quantity__lte=F('reorder_level')).count()
 
-    # ── Other (equipment, medicine, misc) ──
-    other_qs = InventoryItem.objects.filter(company=company).exclude(
-        item_type__in=['egg_tray', 'egg_crate', 'feed_bag']
+    # ============================================================
+    # VACCINE INVENTORY (medicine)
+    # ============================================================
+    vaccine_qs = _scope(
+        InventoryItem.objects.filter(
+            company=company, item_type='medicine',
+        )
     )
-    if selected_branch_id:
-        other_qs = other_qs.filter(branch_id=selected_branch_id)
-    other_count = other_qs.count()
 
+    vaccine_item_count = vaccine_qs.count()
+    vaccine_total_units = sum(float(item.quantity) for item in vaccine_qs)
+    vaccine_value = sum(item.stock_value for item in vaccine_qs)
+    vaccine_low = vaccine_qs.filter(quantity__lte=F('reorder_level')).count()
+
+    # ============================================================
+    # OTHER SUPPLIES (equipment, misc — everything else)
+    # ============================================================
+    other_qs = _scope(
+        InventoryItem.objects
+        .filter(company=company)
+        .exclude(item_type__in=[
+            'egg_tray', 'egg_crate',
+            'feed_bag',
+            'medicine',
+        ])
+    )
+    other_count = other_qs.count()
+    other_value = sum(item.stock_value for item in other_qs)
+
+    # ============================================================
+    # CONTEXT
+    # ============================================================
     context = {
         'company': company,
         'is_viewing_company': is_viewing_company,
@@ -3321,11 +3969,18 @@ def inventory_hub(request):
         'feed_value': feed_value,
         'feed_low': feed_low,
 
-        # Other
+        # Vaccine summary
+        'vaccine_item_count': vaccine_item_count,
+        'vaccine_total_units': vaccine_total_units,
+        'vaccine_value': vaccine_value,
+        'vaccine_low': vaccine_low,
+
+        # Other supplies
         'other_count': other_count,
+        'other_value': other_value,
 
         'page_title': 'Inventory',
-        'page_subtitle': 'Eggs, feed and supplies',
+        'page_subtitle': 'Eggs, feed, vaccines and supplies',
     }
     return render(request, 'kuku_biz/inventory_hub.html', context)
 
