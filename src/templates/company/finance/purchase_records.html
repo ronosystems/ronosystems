@@ -1,0 +1,460 @@
+{% extends base_template|default:"base.html" %}
+
+{% block title %}Purchase Records{% endblock %}
+
+
+{% block extra_css %}
+<style>
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+
+    .table-excel thead th {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 4px;
+        padding: 20px;
+        border: 2px solid #000000;
+        height: 100%;
+        transition: all 0.3s;
+    }
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+    .stat-card .stat-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #000000;
+    }
+    .stat-card .stat-label {
+        font-size: 0.85rem;
+        color: #000000;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+    .stat-card.total { border-left: 6px solid #007bff; }
+    .stat-card.balance { border-left: 6px solid #28a745; }
+
+    .filter-form {
+        background: #f8f9fa;
+        padding: 15px 20px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        border: 2px solid #000000;
+    }
+    .filter-form .form-label {
+        color: #000000;
+        font-weight: 600;
+    }
+    .filter-form .form-select,
+    .filter-form .form-control {
+        border: 2px solid #000000;
+        border-radius: 4px;
+    }
+    .filter-form .form-select:focus,
+    .filter-form .form-control:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-outline-primary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: #ffffff;
+    }
+    .btn-outline-primary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+    }
+    .card-header h5 {
+        color: #000000;
+        font-weight: 600;
+        margin: 0;
+    }
+    .card-footer {
+        border-top: 2px solid #000000;
+        background-color: #f8f9fa;
+    }
+
+    .badge.bg-primary {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        border: 1px solid #000000;
+        padding: 4px 10px;
+        font-weight: 600;
+    }
+
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 0.8rem;
+        border: 1px solid #000000;
+        display: inline-block;
+    }
+    .status-completed { background: #d4edda; color: #155724; }
+    .status-pending { background: #fff3cd; color: #856404; }
+    .status-cancelled { background: #f8d7da; color: #721c24; }
+
+    .text-danger { color: #dc3545 !important; font-weight: 600; }
+    .text-success { color: #28a745 !important; font-weight: 600; }
+
+    .pagination .page-link {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        margin: 0 2px;
+        font-weight: 600;
+    }
+    .pagination .page-item.active .page-link {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    .pagination .page-item.disabled .page-link {
+        background-color: #f8f9fa;
+        color: #6c757d;
+    }
+
+    @media (max-width: 768px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 12px;
+        }
+        .stat-card .stat-value {
+            font-size: 1.3rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h1 class="mb-0">
+            <i class="fas fa-shopping-bag" style="color: #000000;"></i> Purchase Records
+            <small class="text-muted fs-6" style="color: #000000 !important;">
+                All purchase transactions
+            </small>
+        </h1>
+        <div class="d-flex gap-2">
+            <a href="{% url 'finance-dashboard' %}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-home"></i> Dashboard
+            </a>
+            <a href="{% url 'finance-purchase-create' %}" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus"></i> New Purchase
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3">
+            <div class="stat-card total">
+                <div class="stat-label">Total Purchase Value (filtered)</div>
+                <div class="stat-value">KSh {{ total_amount|floatformat:2|default:"0.00" }}</div>
+                <small>Sum of filtered results</small>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="stat-card balance">
+                <div class="stat-label">Current COGS Balance</div>
+                <div class="stat-value">KSh {{ current_balance|floatformat:2|default:"0.00" }}</div>
+                <small>Available to spend</small>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="stat-card" style="border-left: 6px solid #6f42c1;">
+                <div class="stat-label">Matching Records</div>
+                <div class="stat-value">{{ purchases.paginator.count }}</div>
+                <small>Purchases on this query</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Form -->
+    <div class="filter-form">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Branch</label>
+                <select name="branch" class="form-select form-select-sm">
+                    <option value="">All Branches</option>
+                    {% for branch in branches %}
+                    <option value="{{ branch.id }}"
+                        {% if selected_branch == branch.id|stringformat:"s" %}selected{% endif %}>
+                        {{ branch.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Purchase Type</label>
+                <select name="purchase_type" class="form-select form-select-sm">
+                    <option value="">All Types</option>
+                    {% for value, label in purchase_types %}
+                    <option value="{{ value }}" {% if selected_type == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Status</label>
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    <option value="completed" {% if selected_status == 'completed' %}selected{% endif %}>Completed</option>
+                    <option value="pending"   {% if selected_status == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="cancelled" {% if selected_status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">From</label>
+                <input type="date" name="date_from" class="form-control form-control-sm"
+                       value="{{ date_from|default:'' }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">To</label>
+                <input type="date" name="date_to" class="form-control form-control-sm"
+                       value="{{ date_to|default:'' }}">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Search</label>
+                <input type="text" name="search" class="form-control form-control-sm"
+                       placeholder="Supplier, purchase number, or description…"
+                       value="{{ search|default:'' }}">
+            </div>
+            <div class="col-md-6 d-flex gap-2">
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="fas fa-filter"></i> Apply Filter
+                </button>
+                <a href="{% url 'finance-purchase-records' %}" class="btn btn-secondary btn-sm">
+                    <i class="fas fa-sync"></i> Reset
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Purchases Table -->
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-list"></i> Purchases</h5>
+                <span class="badge bg-primary">{{ purchases.paginator.count }} records</span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="border: 2px solid #000000;">
+                <table class="table-excel table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Purchase #</th>
+                            <th>Date</th>
+                            <th>Branch</th>
+                            <th>Type</th>
+                            <th>User</th>
+                            <th class="text-end">Amount</th>
+                            <th>Reference</th>
+                            <th>Receipt</th>
+                            <th>Status</th>
+                            <th class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for purchase in purchases %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'finance-purchase-detail' purchase.pk %}"
+                                   style="font-weight:700; color:#000; text-decoration:underline;">
+                                    {{ purchase.purchase_number }}
+                                </a>
+                            </td>
+                            <td>{{ purchase.purchase_date|date:"Y-m-d" }}</td>
+                            <td>{{ purchase.branch.name|default:"—" }}</td>
+                            <td>{{ purchase.get_purchase_type_display }}</td>
+                            <td>
+                                {% if purchase.created_by %}
+                                    {{ purchase.created_by.get_full_name|default:purchase.created_by.username }}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end text-danger">
+                                <strong>KSh {{ purchase.total_amount|floatformat:2 }}</strong>
+                            </td>
+                            <td>
+                                <span class="badge"
+                                      style="background:#f8f9fa; border:1px solid #000; color:#000; padding:4px 10px;">
+                                    {{ purchase.payment_reference|default:"-" }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                {% if purchase.receipt_image_url %}
+                                    <a href="{{ purchase.receipt_image_url }}" target="_blank" rel="noopener"
+                                       title="View receipt" style="color:#28a745; font-size:1.1rem;">
+                                        <i class="fas fa-image"></i>
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="status-badge status-{{ purchase.status }}">
+                                    {{ purchase.get_status_display }}
+                                </span>
+                            </td>
+                            <td class="text-center" style="white-space:nowrap;">
+                                <a href="{% url 'finance-purchase-detail' purchase.pk %}"
+                                   class="btn btn-primary btn-sm" title="View">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'finance-purchase-edit' purchase.pk %}"
+                                   class="btn btn-secondary btn-sm" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{% url 'finance-purchase-delete' purchase.pk %}"
+                                   class="btn btn-outline-danger btn-sm" title="Delete"
+                                   style="border:2px solid #dc3545; color:#dc3545; background:#fff;">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="10" class="text-center py-4">
+                                <i class="fas fa-inbox fa-2x text-muted d-block mb-2"></i>
+                                <span class="text-muted">No purchase records found.</span>
+                                <div class="mt-2">
+                                    <a href="{% url 'finance-purchase-create' %}" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-plus"></i> Create the first purchase
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if purchases.has_other_pages %}
+        <div class="card-footer">
+            <nav aria-label="Purchase pagination">
+                <ul class="pagination justify-content-center mb-0">
+                    {% if purchases.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link"
+                               href="?page={{ purchases.previous_page_number }}{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_type %}&purchase_type={{ selected_type }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if search %}&search={{ search }}{% endif %}">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link"><i class="fas fa-chevron-left"></i></span></li>
+                    {% endif %}
+
+                    {% for num in purchases.paginator.page_range %}
+                        {% if purchases.number == num %}
+                            <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                        {% elif num > purchases.number|add:'-3' and num < purchases.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link"
+                                   href="?page={{ num }}{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_type %}&purchase_type={{ selected_type }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if search %}&search={{ search }}{% endif %}">
+                                    {{ num }}
+                                </a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if purchases.has_next %}
+                        <li class="page-item">
+                            <a class="page-link"
+                               href="?page={{ purchases.next_page_number }}{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_type %}&purchase_type={{ selected_type }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if search %}&search={{ search }}{% endif %}">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link"><i class="fas fa-chevron-right"></i></span></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

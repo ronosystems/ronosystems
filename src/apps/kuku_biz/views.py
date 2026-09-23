@@ -3984,6 +3984,64 @@ def inventory_hub(request):
     }
     return render(request, 'kuku_biz/inventory_hub.html', context)
 
+@login_required
+def inventory_list(request):
+    """
+    Full inventory list — all item types in one page.
+    This is the canonical 'all inventory' view used by create/edit/delete flows.
+    """
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+    user_branch = request.user.branch
+    can_see_all = _can_see_all_branches(request, is_viewing_company)
+
+    selected_branch_id = request.GET.get('branch', '').strip()
+    if not can_see_all and user_branch:
+        selected_branch_id = str(user_branch.id)
+
+    items = (
+        InventoryItem.objects
+        .filter(company=company)
+        .select_related('branch')
+        .order_by('branch__name', 'item_type', 'name')
+    )
+    if selected_branch_id:
+        items = items.filter(branch_id=selected_branch_id)
+
+    # Optional type filter
+    item_type = request.GET.get('type', '').strip()
+    if item_type:
+        items = items.filter(item_type=item_type)
+
+    low_stock = items.filter(quantity__lte=F('reorder_level'))
+
+    total_value = sum(
+        float(i.quantity) * float(i.cost_per_unit)
+        for i in items
+    )
+
+    context = {
+        'company': company,
+        'is_viewing_company': is_viewing_company,
+        'items': items,
+        'low_stock': low_stock,
+        'branches': branches,
+        'selected_branch_id': selected_branch_id,
+        'can_see_all_branches': can_see_all,
+        'user_branch': user_branch,
+        'total_value': total_value,
+        'item_types': INVENTORY_ITEM_TYPE_CHOICES,
+        'selected_item_type': item_type,
+        'today': timezone.now().date(),
+        'page_title': 'Inventory',
+        'page_subtitle': f'{items.count()} item{"s" if items.count() != 1 else ""}',
+    }
+    return render(request, 'kuku_biz/inventory.html', context)
+
 
 # ============================================================
 # INVENTORY — EGGS ONLY

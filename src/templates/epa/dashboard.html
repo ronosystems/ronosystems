@@ -413,6 +413,68 @@
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
+        align-items: center;
+    }
+
+    /* Dropdown menu styling for the "New Expense" split button */
+    .quick-actions .dropdown-menu {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 4px;
+        min-width: 200px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .quick-actions .dropdown-item {
+        border-radius: 3px;
+        font-weight: 600;
+        color: #000000;
+        padding: 8px 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .quick-actions .dropdown-item:hover,
+    .quick-actions .dropdown-item:focus {
+        background-color: #87CEEB;
+        color: #000000;
+    }
+    .quick-actions .dropdown-divider {
+        border-top: 1px solid #000000;
+        margin: 4px 0;
+        opacity: 0.15;
+    }
+    /* Split button — main action */
+    .quick-actions .btn-expense-main {
+        background-color: #f8d7da;
+        border: 2px solid #000000;
+        color: #721c24;
+        border-radius: 4px 0 0 4px;
+        font-weight: 600;
+        padding: 4px 12px;
+        font-size: 12px;
+    }
+    .quick-actions .btn-expense-main:hover {
+        background-color: #f5c6cb;
+        color: #721c24;
+    }
+    /* Split button — caret toggle */
+    .quick-actions .btn-expense-toggle {
+        background-color: #f8d7da;
+        border: 2px solid #000000;
+        border-left: none;
+        color: #721c24;
+        border-radius: 0 4px 4px 0;
+        font-weight: 600;
+        padding: 4px 10px;
+        font-size: 12px;
+    }
+    .quick-actions .btn-expense-toggle:hover,
+    .quick-actions .btn-expense-toggle:focus {
+        background-color: #f5c6cb;
+        color: #721c24;
+    }
+    .quick-actions .btn-expense-toggle::after {
+        margin-left: 4px;
     }
 
     /* ============================================
@@ -455,10 +517,15 @@
         .stat-card .stat-icon { font-size: 1.5rem; }
         .quick-actions {
             flex-direction: column;
+            align-items: stretch;
         }
-        .quick-actions .btn {
+        .quick-actions .btn,
+        .quick-actions .btn-group {
             width: 100%;
             text-align: center;
+        }
+        .quick-actions .btn-group .btn {
+            width: 50%;
         }
         .table-excel th,
         .table-excel td {
@@ -751,6 +818,7 @@
             </div>
             <div class="card-body">
                 <div class="quick-actions">
+
                     {% if user.role == 'company_manager' or user.role == 'company_admin' or user.role == 'super_admin' %}
                     <a href="/epa_shop/pos/" class="btn btn-info btn-sm">
                         <i class="fas fa-shopping-cart"></i> POS
@@ -758,15 +826,14 @@
                     <a href="/epa_shop/sales/single/" class="btn btn-success btn-sm">
                         <i class="fas fa-cart-plus"></i> New Sale
                     </a>
-                    {% endif %}
 
-                    {% if user.role == 'company_manager' or user.role == 'company_admin' or user.role == 'super_admin' %}
                     <a href="/epa_shop/products/" class="btn btn-secondary btn-sm">
                         <i class="fas fa-box"></i> Products
                     </a>
                     <a href="/company/expenses/" class="btn btn-danger btn-sm">
                         <i class="fas fa-chart-bar"></i> Expenses
                     </a>
+
                     <a href="/epa_shop/products/add/" class="btn btn-primary btn-sm">
                         <i class="fas fa-plus"></i> Add Product
                     </a>
@@ -783,6 +850,57 @@
                         <i class="fas fa-warehouse"></i> Inventory
                     </a>
                     {% endif %}
+
+
+                    {# ============================================ #}
+                    {# New Expense dropdown (split button)           #}
+                    {# ============================================ #}
+                    <div class="btn-group" role="group" aria-label="New Expense">
+                        <a href="{% url 'company-general-create' %}" class="btn btn-expense-main">
+                            <i class="fas fa-plus"></i> New Expense
+                        </a>
+                        <button type="button"
+                                class="btn btn-expense-toggle dropdown-toggle"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Choose expense category">
+                            <span class="visually-hidden">Toggle expense options</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            {% if user.role == 'company_admin' or user.role == 'super_admin' %}
+                            <li>
+                                <a class="dropdown-item" href="{% url 'company-salaries-create' %}">
+                                    <i class="fas fa-users text-success"></i>
+                                    <span>Pay Salary</span>
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="{% url 'company-rents-create' %}">
+                                    <i class="fas fa-building text-primary"></i>
+                                    <span>Pay Rent</span>
+                                </a>
+                            </li>
+                            {% endif %}
+                            
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="{% url 'company-bills-create' %}">
+                                    <i class="fas fa-file-invoice text-danger"></i>
+                                    <span>Pay Bills</span>
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="{% url 'company-general-create' %}">
+                                    <i class="fas fa-shopping-cart text-info"></i>
+                                    <span>General Expense</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                    {# ============================================ #}
+
                 </div>
             </div>
         </div>

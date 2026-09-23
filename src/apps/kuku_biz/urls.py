@@ -80,6 +80,7 @@ urlpatterns = [
 
     # Inventory — separated by category
     path('inventory/', views.inventory_hub, name='inventory_hub'),
+    path('inventory/all/', views.inventory_list, name='inventory_list'), 
     path('inventory/eggs/', views.egg_inventory, name='egg_inventory'),
     path('inventory/feed/', views.feed_inventory, name='feed_inventory'),
     path('inventory/vaccines/', views.vaccine_inventory, name='vaccine_inventory'),
