@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from django.conf import settings as django_settings
 from apps.companies.models import Company
 from apps.epa_shop.models import Branch
 
@@ -173,10 +174,15 @@ class Expense(models.Model):
     # ============================================
     # ATTACHMENT (receipt / invoice)
     # ============================================
+    # NOTE: The view layer uploads to Cloudinary manually and stores the
+    # returned public_id in this field. `upload_to` is unused in that flow
+    # but kept so that FileField validation still works if anything ever
+    # assigns a raw file here.
     attachment = models.FileField(
         upload_to='expense_attachments/%Y/%m/',
         blank=True, null=True,
-        help_text="Upload receipt or invoice (JPG, PNG, GIF, or PDF)"
+        max_length=500,
+        help_text="Cloudinary public_id for the receipt/invoice (JPG, PNG, GIF, or PDF)"
     )
 
     # ============================================
@@ -262,6 +268,46 @@ class Expense(models.Model):
             return False
         return self.attachment.name.lower().endswith('.pdf')
 
+    # ── NEW: Cloudinary-ready URL ──
+    @property
+    def attachment_url(self):
+        """
+        Fully-formed Cloudinary URL for the attachment, or None.
+
+        The view layer uploads to Cloudinary via cloudinary.uploader.upload()
+        and stores the returned public_id in `self.attachment`. This property
+        builds the delivery URL that templates can use directly.
+
+        Mirrors `_build_cloudinary_url()` in apps/epa_shop/models.py.
+        """
+        if not self.attachment:
+            return None
+
+        key = getattr(self.attachment, 'name', None) or str(self.attachment)
+        key = key.strip().lstrip('/')
+        if not key:
+            return None
+
+        # Already a full URL (legacy data) — return as-is
+        if key.startswith('http://') or key.startswith('https://'):
+            return key
+
+        # Strip legacy /media/ prefix
+        if key.startswith('media/'):
+            key = key[len('media/'):]
+
+        cfg = getattr(django_settings, 'CLOUDINARY_STORAGE', {})
+        cloud_name = cfg.get('CLOUD_NAME', '')
+
+        if cloud_name:
+            return f"https://res.cloudinary.com/{cloud_name}/image/upload/{key}"
+
+        # Local dev fallback
+        media_url = getattr(django_settings, 'MEDIA_URL', '/media/')
+        if not media_url.endswith('/'):
+            media_url += '/'
+        return f"{media_url}{key}"
+
     @property
     def salary_month_display(self):
         if self.salary_month:
@@ -279,19 +325,6 @@ class Expense(models.Model):
         if self.bill_period:
             return self.bill_period.strftime('%B %Y')
         return '—'
-
-    # ============================================
-    # SAVE OVERRIDE (delete old attachment on replace)
-    # ============================================
-    def save(self, *args, **kwargs):
-        if self.pk:
-            try:
-                old = Expense.objects.get(pk=self.pk)
-                if old.attachment and old.attachment != self.attachment:
-                    old.attachment.delete(save=False)
-            except Expense.DoesNotExist:
-                pass
-        super().save(*args, **kwargs)
 
     # ============================================
     # STATUS ACTIONS
