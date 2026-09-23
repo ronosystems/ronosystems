@@ -17,7 +17,7 @@ from apps.companies.support_utils import (
     get_effective_branch,
 )
 from .models import Expense
-from .cloudinary_utils import upload_attachment, delete_attachment   # ← NEW
+from .cloudinary_utils import upload_attachment, delete_attachment
 
 
 # ============================================
@@ -108,16 +108,14 @@ def expenses_dashboard(request):
     user_branch = get_user_branch(request.user)
     is_admin = is_viewing_company or request.user.role in ['super_admin', 'company_admin']
 
-    # Base queryset — ALL expense types
     expenses_qs = Expense.objects.filter(company=company)
     if not is_admin and not is_viewing_company and user_branch:
         expenses_qs = expenses_qs.filter(branch=user_branch)
 
-    # Apply filters
     branch_id = request.GET.get('branch')
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
-    expense_type_filter = request.GET.get('type')  # Optional type filter
+    expense_type_filter = request.GET.get('type')
 
     if branch_id:
         expenses_qs = expenses_qs.filter(branch_id=branch_id)
@@ -136,9 +134,6 @@ def expenses_dashboard(request):
     month_start = today.replace(day=1)
     week_start = today - timedelta(days=today.weekday())
 
-    # ============================================
-    # PER-TYPE SUMMARIES (this month) — for the 4 cards
-    # ============================================
     def type_summary(etype):
         qs = expenses_qs.filter(expense_type=etype, expense_date__gte=month_start)
         s = get_expenses_summary(qs)
@@ -148,21 +143,12 @@ def expenses_dashboard(request):
             'pending': qs.filter(status=Expense.STATUS_PENDING).count(),
         }
 
-    # ============================================
-    # TIME-BASED SUMMARIES (all types combined)
-    # ============================================
     today_summary = get_expenses_summary(expenses_qs.filter(expense_date=today))
     week_summary = get_expenses_summary(expenses_qs.filter(expense_date__gte=week_start))
     month_summary = get_expenses_summary(expenses_qs.filter(expense_date__gte=month_start))
 
-    # ============================================
-    # DAILY RECORDS TABLE (all types combined)
-    # ============================================
     daily_records = get_daily_expense_records_with_submitters(expenses_qs, month_start, today)
 
-    # ============================================
-    # CATEGORY BREAKDOWN (general only — salaries/rents/bills have their own pages)
-    # ============================================
     category_breakdown = get_category_breakdown(
         expenses_qs.filter(expense_type=Expense.TYPE_GENERAL)
     )
@@ -188,7 +174,6 @@ def expenses_dashboard(request):
         'is_admin': is_admin,
         'user_branch': user_branch,
         'is_viewing_company': is_viewing_company,
-        # 4 category card summaries
         'salary_summary': type_summary(Expense.TYPE_SALARY),
         'rent_summary': type_summary(Expense.TYPE_RENT),
         'bill_summary': type_summary(Expense.TYPE_BILL),
@@ -216,18 +201,15 @@ def expenses_daily_detail(request, date_str):
     user_branch = get_user_branch(request.user)
     is_admin = is_viewing_company or request.user.role in ['super_admin', 'company_admin']
 
-    # Base queryset — all expense types for that day
     expenses_qs = Expense.objects.filter(company=company, expense_date=report_date)
 
     if not is_admin and not is_viewing_company and user_branch:
         expenses_qs = expenses_qs.filter(branch=user_branch)
 
-    # Optional branch filter via GET
     branch_id = request.GET.get('branch')
     if branch_id:
         expenses_qs = expenses_qs.filter(branch_id=branch_id)
 
-    # Optional type filter via GET
     expense_type = request.GET.get('type')
     if expense_type:
         expenses_qs = expenses_qs.filter(expense_type=expense_type)
@@ -278,9 +260,8 @@ def salaries_list(request):
     if not is_admin and not context['is_viewing_company'] and user_branch:
         qs = qs.filter(branch=user_branch)
 
-    # Filters
     status = request.GET.get('status')
-    month = request.GET.get('month')  # YYYY-MM
+    month = request.GET.get('month')
     branch_id = request.GET.get('branch')
 
     if status:
@@ -513,9 +494,24 @@ def _expense_type_create(request, expense_type, redirect_name):
             data = _parse_expense_post(request, expense_type, company, is_admin, user_branch)
             if data is None:
                 return redirect(request.path)
+
+            # ── Cloudinary: upload the attachment ONCE, here in the view ──
+            attachment_file = data.pop('attachment_file', None)
+            if attachment_file:
+                uploaded = upload_attachment(
+                    attachment_file,
+                    folder='expenses',
+                    tags=[expense_type, str(company.id)],
+                )
+                if not uploaded:
+                    messages.error(request, '❌ Attachment upload failed. Please try again.')
+                    return redirect(request.path)
+                data['attachment'] = uploaded['public_id']
+
             Expense.objects.create(**data)
             messages.success(request, f'✅ {expense_type.title()} expense recorded successfully!')
             return redirect(redirect_name)
+
         except (InvalidOperation, ValueError):
             messages.error(request, 'Invalid amount entered.')
             return redirect(request.path)
@@ -549,38 +545,40 @@ def _expense_type_edit(request, pk, expense_type, redirect_name):
             if data is None:
                 return redirect(request.path)
 
-            # ---- NEW: Cloudinary attachment handling ----
+            # ── Cloudinary: single upload path in the view ──
             old_public_id = expense.attachment.name if expense.attachment else None
-            attachment_file = request.FILES.get('attachment')
+            new_file = data.pop('attachment_file', None)      # raw file from parser
             remove_attachment = request.POST.get('remove_attachment') == '1'
 
-            if attachment_file:
+            if new_file:
+                # Replace: upload new → delete old on success → set new
                 uploaded = upload_attachment(
-                    attachment_file,
+                    new_file,
                     folder='expenses',
                     tags=[expense_type, str(company.id)],
                 )
                 if not uploaded:
                     messages.error(request, '❌ Attachment upload failed. Please try again.')
                     return redirect(request.path)
-                # Delete old asset only AFTER successful new upload
                 if old_public_id:
                     delete_attachment(old_public_id)
                 data['attachment'] = uploaded['public_id']
 
             elif remove_attachment and old_public_id:
+                # Remove without replacing
                 delete_attachment(old_public_id)
                 data['attachment'] = None
 
-            # ---------------------------------------------
+            # else: no change — don't touch expense.attachment at all
 
             for key, value in data.items():
                 if key != 'company':
                     setattr(expense, key, value)
 
             expense.save()
-            messages.success(request, f'✅ Expense updated successfully!')
+            messages.success(request, '✅ Expense updated successfully!')
             return redirect(redirect_name)
+
         except (InvalidOperation, ValueError):
             messages.error(request, 'Invalid amount entered.')
             return redirect(request.path)
@@ -596,10 +594,12 @@ def _parse_expense_post(request, expense_type, company, is_admin, user_branch, i
     """
     Parse POST data into a dict suitable for Expense create/update.
 
-    IMPORTANT: The attachment is uploaded to Cloudinary here and the returned
-    `public_id` is stored in data['attachment']. We never store the raw
-    UploadedFile because STORAGES['default'] is FileSystemStorage while
-    MEDIA_URL points at Cloudinary — the raw file would produce a broken URL.
+    IMPORTANT: This function does NOT upload anything. If a file is present,
+    it puts the raw UploadedFile under data['attachment_file'] and lets the
+    view layer decide what to do with it (upload / replace / remove).
+
+    This avoids reading the UploadedFile stream twice — the reason previous
+    versions failed with 'Empty file' on the second cloudinary upload call.
     """
     expense_date_str = request.POST.get('expense_date')
     description = request.POST.get('description', '').strip()
@@ -647,21 +647,14 @@ def _parse_expense_post(request, expense_type, company, is_admin, user_branch, i
         'status': Expense.STATUS_PENDING,
     }
 
-    # ---- NEW: upload attachment to Cloudinary, store public_id ----
+    # Pass the raw file up to the view — do NOT upload here.
     if attachment:
-        uploaded = upload_attachment(
-            attachment,
-            folder='expenses',
-            tags=[expense_type, str(company.id)],
-        )
-        if not uploaded:
-            messages.error(request, '❌ Attachment upload failed. Please try again.')
-            return None
-        data['attachment'] = uploaded['public_id']
+        data['attachment_file'] = attachment
     elif instance is None:
+        # New record with no attachment → explicitly clear
         data['attachment'] = None
-    # else: editing without a new file → instance.attachment is left untouched
-    #       (the view layer handles replace/remove explicitly)
+    # Editing without a new file: leave 'attachment' out of data entirely,
+    # so the view layer doesn't overwrite the existing public_id.
 
     # ---- Type-specific fields ----
     if expense_type == Expense.TYPE_SALARY:
@@ -759,7 +752,6 @@ def expense_delete(request, pk):
         messages.error(request, 'You do not have permission to delete this expense.')
         return redirect('company-expenses-dashboard')
 
-    # Determine redirect based on type
     redirect_map = {
         Expense.TYPE_SALARY: 'company-salaries-list',
         Expense.TYPE_RENT: 'company-rents-list',
@@ -770,10 +762,8 @@ def expense_delete(request, pk):
 
     if request.method == 'POST':
         try:
-            # ---- NEW: delete from Cloudinary instead of local filesystem ----
             if expense.attachment:
                 delete_attachment(expense.attachment.name)
-            # ------------------------------------------------------------------
             expense.delete()
             messages.success(request, '✅ Expense deleted successfully!')
         except Exception as e:
@@ -855,7 +845,6 @@ def get_daily_expense_records_with_submitters(expenses_qs, start_date, end_date)
         day_expenses = expenses_qs.filter(expense_date=current_date)
         summary = get_expenses_summary(day_expenses)
 
-        # Collect distinct submitters for this day
         submitters_qs = day_expenses.values(
             'created_by__id',
             'created_by__username',
@@ -915,7 +904,7 @@ def get_daily_expense_records_with_submitters(expenses_qs, start_date, end_date)
 
 def get_category_breakdown(expenses_qs):
     """Get expense breakdown by general expense category."""
-    from .models import Expense as _Expense  # local import avoids circular issues
+    from .models import Expense as _Expense
 
     breakdown = {}
     for category in _Expense.GENERAL_CATEGORIES:
