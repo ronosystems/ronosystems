@@ -1323,16 +1323,23 @@ def daily_records_list(request, company_id=None, branch_id=None):
     records = records.order_by('-date')
 
     # ============================================
-    # PAGINATION
+    # PAGINATION (with per_page support: 10 / 25 / 50 / 100)
     # ============================================
-    paginator = Paginator(records, 30)
+    try:
+        per_page = int(request.GET.get('per_page', 10))
+    except (TypeError, ValueError):
+        per_page = 10
+    if per_page not in (10, 25, 50, 100):
+        per_page = 10
+
+    paginator = Paginator(records, per_page)
     page = request.GET.get('page', 1)
     records_page = paginator.get_page(page)
 
     # ============================================
     # BULK PREFETCH PREVIOUS-DAY RECORDS
     # Feeds `_cached_prev` on each record so the day-chain check
-    # doesn't hit the DB per row (kills 30+ extra queries).
+    # doesn't hit the DB per row (kills N+1 queries).
     # ============================================
     page_records = list(records_page.object_list)
 
@@ -1397,6 +1404,7 @@ def daily_records_list(request, company_id=None, branch_id=None):
         'branch': branch,
         'treasury': treasury,
         'records': records_page,
+        'per_page': per_page,                    # <-- NEW: passes selected value to template
         'total_records': record_count,
         'avg_net': avg_net,
         'total_net': total_net,
@@ -1413,7 +1421,8 @@ def daily_records_list(request, company_id=None, branch_id=None):
         'user_branch': user_branch,
     }
     return render(request, 'treasury/daily_records_list.html', context)
-    
+
+
 
 # ============================================
 # DAILY RECORD APPROVE / UNAPPROVE
@@ -1805,14 +1814,6 @@ def movement_create(request, company_id=None, branch_id=None):
     return render(request, 'treasury/movement_form.html', context)
 
     
-# ============================================
-# MOVEMENTS LIST
-# ============================================
-
-# ============================================
-# MOVEMENTS LIST
-# ============================================
-
 # ============================================
 # MOVEMENTS LIST
 # ============================================
