@@ -899,7 +899,7 @@ def company_payments(request, pk):
             messages.error(request, "You don't have access to this payment page.")
             return redirect('subscription-expired')
 
-    plans = Plan.objects.filter(is_active=True).order_by('order', 'price')
+    plans = Plan.objects.filter(is_active=True, is_featured=True).order_by('order', 'price')
 
     context = {
         'company': company,
