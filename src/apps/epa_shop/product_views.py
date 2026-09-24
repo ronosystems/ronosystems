@@ -8,7 +8,8 @@ from decimal import Decimal
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.http import JsonResponse
 from django.utils import timezone
-from .models import Electronic, Phone, Accessory, Category, Branch, Supplier, Unit, Sale, SaleItem, Customer, Owner
+from apps.company.models import Branch
+from .models import Electronic, Phone, Accessory, Category, Supplier, Unit, Sale, SaleItem, Customer, Owner
 from django.contrib.auth import get_user_model
 from .utils import record_stock_movement
 from apps.companies.support_utils import (

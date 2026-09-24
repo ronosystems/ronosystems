@@ -7,9 +7,10 @@ from django.utils import timezone
 from datetime import timedelta
 from django.contrib.contenttypes.models import ContentType
 
+from apps.company.models import Branch
 from .models import (
     Category, Electronic, Phone, Accessory, 
-    Sale, SaleItem, Customer, Branch, Supplier,
+    Sale, SaleItem, Customer, Supplier,
     StockMovement, PurchaseOrder, PurchaseOrderItem,
     Warranty, Repair
 )

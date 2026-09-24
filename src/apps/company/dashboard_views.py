@@ -51,7 +51,7 @@ def company_dashboard_view(request):
     branches_count = 0
     branches = []
     try:
-        from apps.epa_shop.models import Branch
+        from apps.company.models import Branch
         branches = Branch.objects.filter(company=company, is_active=True)
         branches_count = branches.count()
     except:

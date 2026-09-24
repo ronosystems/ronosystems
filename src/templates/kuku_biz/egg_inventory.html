@@ -132,6 +132,7 @@
         width: 1%;
     }
     .cell-actions form { display: inline; }
+    .cell-actions .btn { margin-left: 4px; }
 
     .data-table tfoot {
         background: #0a2f45;
@@ -191,9 +192,13 @@
         <a href="{% url 'kuku_biz:inventory_hub' %}" class="btn btn-outline">
             <i class="fas fa-arrow-left"></i> Inventory
         </a>
+
+        {# ── Add Stock button: HQ + Stock Controller only ── #}
+        {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'stock_controller' or user.is_superuser %}
         <a href="{% url 'kuku_biz:inventory_create' %}?item_type=egg_tray" class="btn btn-primary">
             <i class="fas fa-plus"></i> Add Egg Stock
         </a>
+        {% endif %}
     </div>
 </div>
 
@@ -248,7 +253,9 @@
             <th class="cell-num">Cost/Unit</th>
             <th class="cell-num">Value (KES)</th>
             <th>Status</th>
+            {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'stock_controller' or user.is_superuser %}
             <th class="cell-actions"></th>
+            {% endif %}
         </tr>
     </thead>
     <tbody>
@@ -268,10 +275,7 @@
             <td class="cell-num">{{ item.quantity|floatformat:0 }}</td>
             <td class="cell-num">{{ item.total_eggs|floatformat:0 }}</td>
             <td class="cell-num">{{ item.cost_per_unit|floatformat:2 }}</td>
-            <td class="cell-num">
-                {% widthratio item.quantity 1 1 as qty %}
-                {{ item.cost_per_unit|floatformat:2 }}
-            </td>
+            <td class="cell-num">{{ item.value|floatformat:2 }}</td>
             <td>
                 {% if item.needs_reorder %}
                     <span class="badge badge-low">Low</span>
@@ -279,19 +283,23 @@
                     <span class="badge badge-ok">OK</span>
                 {% endif %}
             </td>
+
+            {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'stock_controller' or user.is_superuser %}
             <td class="cell-actions">
                 <a href="{% url 'kuku_biz:inventory_edit' item.pk %}"
-                   class="btn btn-outline btn-sm">
+                   class="btn btn-outline btn-sm"
+                   title="Edit">
                     <i class="fas fa-pen"></i>
                 </a>
                 <form method="post" action="{% url 'kuku_biz:inventory_delete' item.pk %}"
-                      onsubmit="return confirm('Delete this item?');">
+                      onsubmit="return confirm('Delete &quot;{{ item.name|escapejs }}&quot;?');">
                     {% csrf_token %}
-                    <button class="btn btn-danger btn-sm">
+                    <button class="btn btn-danger btn-sm" title="Delete">
                         <i class="fas fa-trash"></i>
                     </button>
                 </form>
             </td>
+            {% endif %}
         </tr>
         {% endfor %}
     </tbody>
@@ -302,7 +310,7 @@
             <td class="cell-num">{{ total_eggs|floatformat:0 }}</td>
             <td class="cell-num">—</td>
             <td class="cell-num">{{ total_value|floatformat:0 }}</td>
-            <td colspan="2"></td>
+            <td {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'stock_controller' or user.is_superuser %}colspan="2"{% else %}colspan="1"{% endif %}></td>
         </tr>
     </tfoot>
 </table>
@@ -311,9 +319,12 @@
     <i class="fas fa-egg"></i>
     <h3>No egg inventory yet</h3>
     <p>Add trays or crates to start tracking egg stock.</p>
+
+    {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'stock_controller' or user.is_superuser %}
     <a href="{% url 'kuku_biz:inventory_create' %}?item_type=egg_tray" class="btn btn-primary">
         <i class="fas fa-plus"></i> Add Egg Stock
     </a>
+    {% endif %}
 </div>
 {% endif %}
 

@@ -6,7 +6,8 @@ from django.contrib import messages
 from django.utils import timezone
 from django.http import JsonResponse
 from django.db import transaction
-from .models import Phone, Electronic, Accessory, Category, Branch, Unit, Sale, SaleItem, Customer, Owner
+from apps.company.models import Branch
+from .models import Phone, Electronic, Accessory, Category, Unit, Sale, SaleItem, Customer, Owner
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from .utils import record_stock_movement

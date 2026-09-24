@@ -55,39 +55,6 @@ def _build_cloudinary_url(field_value, resource_type='image'):
 
 
 # ============================================
-# BRANCH / STORE LOCATION
-# ============================================
-
-class Branch(models.Model):
-    """Physical store locations/branches"""
-    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='epa_branches')
-    name = models.CharField(max_length=200)
-    code = models.CharField(max_length=20, unique=True)
-    address = models.TextField()
-    city = models.CharField(max_length=100, blank=True)
-    country = models.CharField(max_length=100, blank=True)
-    phone = models.CharField(max_length=20)
-    email = models.EmailField(blank=True)
-    manager = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='managed_branches')
-
-    # Currency fields
-    currency = models.CharField(max_length=10, default='KES', help_text="Currency code (KES, USD, EUR, etc.)")
-    currency_symbol = models.CharField(max_length=10, default='KSh', help_text="Currency symbol (KSh, $, €, etc.)")
-
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = 'epa_branches'
-        ordering = ['name']
-        unique_together = ['company', 'code']
-
-    def __str__(self):
-        return f"{self.name} ({self.code})"
-
-
-# ============================================
 # PRODUCT CATEGORIES
 # ============================================
 
@@ -101,7 +68,7 @@ class Category(models.Model):
     )
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='epa_categories')
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='categories', null=True, blank=True)
+    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='categories', null=True, blank=True)
     name = models.CharField(max_length=100)
     category_type = models.CharField(max_length=20, choices=CATEGORY_TYPES)
     description = models.TextField(blank=True)
@@ -151,7 +118,7 @@ class Supplier(models.Model):
 class Owner(models.Model):
     """Product owner/customer who purchased the product"""
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='epa_owners')
-    branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True, related_name='owners')
+    branch = models.ForeignKey('company.Branch', on_delete=models.SET_NULL, null=True, blank=True, related_name='owners')
 
     name = models.CharField(max_length=200)
     phone = models.CharField(max_length=20, db_index=True)
@@ -304,7 +271,7 @@ class Phone(BaseProduct):
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='epa_phone_products')
 
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='phones')
+    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='phones')
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='phones')
     supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, related_name='phones')
 
@@ -432,7 +399,7 @@ class Electronic(BaseProduct):
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='epa_electronic_products')
 
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='electronics')
+    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='electronics')
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='electronics')
     supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, related_name='electronics')
 
@@ -527,7 +494,7 @@ class Accessory(BaseProduct):
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='epa_accessory_products')
 
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='accessories')
+    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='accessories')
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='accessories')
     supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, related_name='accessories')
 
@@ -695,7 +662,7 @@ class Sale(models.Model):
     )
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='epa_sales')
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='sales')
+    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='sales')
     customer = models.ForeignKey('Customer', on_delete=models.SET_NULL, null=True, blank=True, related_name='sales')
 
     # Company-specific sale number (auto-incremented per company)
@@ -803,7 +770,7 @@ class StockMovement(models.Model):
     )
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='stock_movements')
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='stock_movements', null=True, blank=True)
+    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='stock_movements', null=True, blank=True)
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField(db_index=True)
@@ -852,7 +819,7 @@ class PurchaseOrder(models.Model):
     )
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='purchase_orders')
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='purchase_orders')
+    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='purchase_orders')
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, related_name='purchase_orders')
 
     order_number = models.CharField(max_length=50, unique=True)
@@ -917,7 +884,7 @@ class Warranty(models.Model):
     )
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='warranties')
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='warranties')
+    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='warranties')
     sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name='warranties', null=True, blank=True)
     customer = models.ForeignKey('Customer', on_delete=models.CASCADE, related_name='warranties')
 
@@ -973,7 +940,7 @@ class Repair(models.Model):
     )
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='repairs')
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='repairs')
+    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='repairs')
     customer = models.ForeignKey('Customer', on_delete=models.CASCADE, related_name='repairs')
     warranty = models.ForeignKey(Warranty, on_delete=models.SET_NULL, null=True, blank=True, related_name='repairs')
 
@@ -1032,7 +999,7 @@ class Repair(models.Model):
 class Customer(models.Model):
     """Customer profiles for loyalty and tracking"""
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='epa_customers')
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='customers', null=True, blank=True)
+    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='customers', null=True, blank=True)
 
     name = models.CharField(max_length=200)
     phone = models.CharField(max_length=20, db_index=True)
@@ -1091,7 +1058,7 @@ class COGSAccount(models.Model):
     )
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='cogs_accounts')
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='cogs_accounts', null=True, blank=True)
+    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='cogs_accounts', null=True, blank=True)
 
     account_name = models.CharField(max_length=200)
     account_code = models.CharField(max_length=50, unique=True)
@@ -1180,7 +1147,7 @@ class COGSTransaction(models.Model):
     )
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='cogs_transactions')
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='cogs_transactions', null=True, blank=True)
+    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='cogs_transactions', null=True, blank=True)
     cogs_account = models.ForeignKey(COGSAccount, on_delete=models.CASCADE, related_name='transactions')
 
     transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES)
@@ -1237,7 +1204,7 @@ class PurchaseRecord(models.Model):
     )
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='purchase_records')
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='purchase_records')
+    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='purchase_records')
     cogs_account = models.ForeignKey(
         COGSAccount,
         on_delete=models.SET_NULL,
@@ -1361,7 +1328,7 @@ class PurchaseRecord(models.Model):
 class COGSAllocationRule(models.Model):
     """Rules for how COGS should be allocated from sales to accounts"""
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='cogs_rules')
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='cogs_rules', null=True, blank=True)
+    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='cogs_rules', null=True, blank=True)
 
     rule_name = models.CharField(max_length=200)
     is_active = models.BooleanField(default=True)
@@ -1401,7 +1368,7 @@ class COGSSummary(models.Model):
     )
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='cogs_summaries')
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='cogs_summaries', null=True, blank=True)
+    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='cogs_summaries', null=True, blank=True)
     cogs_account = models.ForeignKey(COGSAccount, on_delete=models.CASCADE, related_name='summaries')
 
     period_type = models.CharField(max_length=20, choices=PERIOD_TYPES)

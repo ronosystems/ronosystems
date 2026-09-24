@@ -9,7 +9,7 @@ from django.http import JsonResponse
 from django.core.paginator import Paginator
 
 from apps.companies.models import Company
-from apps.epa_shop.models import Branch
+from apps.company.models import Branch
 from apps.companies.support_utils import (
     get_active_company,
     is_support_mode,

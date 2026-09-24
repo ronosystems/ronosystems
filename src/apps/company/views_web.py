@@ -8,7 +8,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.views.generic import ListView, DeleteView, TemplateView, UpdateView
 from django.urls import reverse_lazy
 from django.db.models import Count, Q
-from apps.epa_shop.models import Branch
+from apps.company.models import Branch
 from apps.companies.utils import get_current_company
 
 User = get_user_model()

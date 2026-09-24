@@ -1,13 +1,86 @@
 from django.db import models
-from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.conf import settings as django_settings
-from apps.companies.models import Company
-from apps.epa_shop.models import Branch
 
-User = get_user_model()
+# NOTE:
+# `Branch` used to live in `epa_shop`, which is loaded after `companies`,
+# so importing `Company` directly worked fine there.
+#
+# Now that `Branch` lives in `company`, importing `Company` (or calling
+# `get_user_model()` at module level) creates a circular / partial import.
+# Django falls back to a string forward-reference on the FK, and then
+# `check_user_model` crashes with:
+#
+#     TypeError: isinstance() arg 2 must be a type, a tuple of types, or a union
+#
+# Fix: use string references ('companies.Company') and
+# settings.AUTH_USER_MODEL. The app registry resolves them after all apps
+# have finished loading, so load order no longer matters.
 
 
+# ============================================
+# BRANCH / STORE LOCATION
+# ============================================
+
+class Branch(models.Model):
+    """Physical store locations/branches"""
+    company = models.ForeignKey(
+        'companies.Company',
+        on_delete=models.CASCADE,
+        related_name='company_branches',
+    )
+    is_mother_branch = models.BooleanField(
+        default=False,
+        help_text="Marks this branch as the HQ/feeder for the company.",
+    )
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='children',
+        help_text="Mother branch this branch belongs to (blank for mother/HQ).",
+    )
+    name = models.CharField(max_length=200)
+    code = models.CharField(max_length=20, unique=True)
+    address = models.TextField()
+    city = models.CharField(max_length=100, blank=True)
+    country = models.CharField(max_length=100, blank=True)
+    phone = models.CharField(max_length=20)
+    email = models.EmailField(blank=True)
+
+    manager = models.ForeignKey(
+        django_settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='managed_branches',
+    )
+
+    # Currency fields
+    currency = models.CharField(max_length=10, default='KES', help_text="Currency code (KES, USD, EUR, etc.)")
+    currency_symbol = models.CharField(max_length=10, default='KSh', help_text="Currency symbol (KSh, $, €, etc.)")
+
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'epa_branches'
+        ordering = ['name']
+        unique_together = ['company', 'code']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['company'],
+                condition=models.Q(is_mother_branch=True),
+                name='one_mother_branch_per_company',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
+
+# ============================================
+# COMPANY EXPENSES
+# ============================================
 class Expense(models.Model):
     """Unified expense model supporting Salaries, Rents, Bills, and General expenses"""
 
@@ -100,17 +173,20 @@ class Expense(models.Model):
     # BASIC INFORMATION
     # ============================================
     company = models.ForeignKey(
-        Company, on_delete=models.CASCADE, related_name='expenses'
+        'companies.Company',
+        on_delete=models.CASCADE,
+        related_name='expenses',
     )
     branch = models.ForeignKey(
-        Branch, on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='expenses'
+        Branch,
+        on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='expenses',
     )
 
     # Determines which page/form this expense belongs to
     expense_type = models.CharField(
         max_length=20, choices=EXPENSE_TYPES, default=TYPE_GENERAL,
-        db_index=True
+        db_index=True,
     )
 
     # ============================================
@@ -128,7 +204,7 @@ class Expense(models.Model):
     employee_phone = models.CharField(max_length=20, blank=True)
     salary_month = models.DateField(
         null=True, blank=True,
-        help_text="Month the salary is for (use 1st of month)"
+        help_text="Month the salary is for (use 1st of month)",
     )
 
     # ============================================
@@ -136,7 +212,7 @@ class Expense(models.Model):
     # ============================================
     rent_month = models.DateField(
         null=True, blank=True,
-        help_text="Month the rent is for (use 1st of month)"
+        help_text="Month the rent is for (use 1st of month)",
     )
     landlord_name = models.CharField(max_length=150, blank=True)
     landlord_phone = models.CharField(max_length=20, blank=True)
@@ -148,27 +224,27 @@ class Expense(models.Model):
     bill_name = models.CharField(max_length=150, blank=True)
     bill_period = models.DateField(
         null=True, blank=True,
-        help_text="Billing period (use 1st of month)"
+        help_text="Billing period (use 1st of month)",
     )
 
     # ============================================
     # GENERAL EXPENSE CATEGORY
     # ============================================
     category = models.CharField(
-        max_length=20, choices=GENERAL_CATEGORIES, blank=True
+        max_length=20, choices=GENERAL_CATEGORIES, blank=True,
     )
 
     # ============================================
     # PAYMENT DETAILS
     # ============================================
     payment_method = models.CharField(
-        max_length=20, choices=PAYMENT_METHODS, default='cash'
+        max_length=20, choices=PAYMENT_METHODS, default='cash',
     )
     reference = models.CharField(
-        max_length=100, blank=True, help_text="Invoice or receipt number"
+        max_length=100, blank=True, help_text="Invoice or receipt number",
     )
     receipt_number = models.CharField(
-        max_length=100, blank=True, help_text="Receipt number for rent/bills"
+        max_length=100, blank=True, help_text="Receipt number for rent/bills",
     )
 
     # ============================================
@@ -182,7 +258,7 @@ class Expense(models.Model):
         upload_to='expense_attachments/%Y/%m/',
         blank=True, null=True,
         max_length=500,
-        help_text="Cloudinary public_id for the receipt/invoice (JPG, PNG, GIF, or PDF)"
+        help_text="Cloudinary public_id for the receipt/invoice (JPG, PNG, GIF, or PDF)",
     )
 
     # ============================================
@@ -190,7 +266,7 @@ class Expense(models.Model):
     # ============================================
     notes = models.TextField(blank=True)
     status = models.CharField(
-        max_length=20, choices=EXPENSE_STATUS, default=STATUS_PENDING
+        max_length=20, choices=EXPENSE_STATUS, default=STATUS_PENDING,
     )
     paid_at = models.DateTimeField(null=True, blank=True)
 
@@ -198,12 +274,14 @@ class Expense(models.Model):
     # AUDIT TRAIL
     # ============================================
     created_by = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True,
-        related_name='expenses_created'
+        django_settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL, null=True,
+        related_name='expenses_created',
     )
     approved_by = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='expenses_approved'
+        django_settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='expenses_approved',
     )
     approved_at = models.DateTimeField(null=True, blank=True)
 

@@ -21,7 +21,7 @@ from django.utils.dateparse import parse_datetime
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
-from apps.epa_shop.models import Branch
+from apps.company.models import Branch
 from apps.plans.models import Plan, Subscription
 
 from .models import Company, BusinessType, CompanyJoinRequest

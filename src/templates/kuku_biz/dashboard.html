@@ -591,7 +591,7 @@
 
 {% else %}
 
-    <!-- Branch filter (admins / managers only) -->
+    <!-- Branch filter (HQ only) -->
     {% if can_see_all_branches %}
     <div style="display:flex;align-items:center;gap:12px;padding:14px 18px;background:#fff;border:2px solid #000;border-radius:8px;margin-bottom:20px;flex-wrap:wrap;">
         <label style="font-size:0.8rem;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.5px;margin:0;">
@@ -616,77 +616,129 @@
     </div>
     {% endif %}
 
-    <!-- Quick actions -->
+    <!-- ============================================ -->
+    <!-- QUICK ACTIONS — role-aware                    -->
+    <!-- Only show buttons whose server views are      -->
+    <!-- actually accessible to the logged-in user.    -->
+    <!-- ============================================ -->
     <div class="section-title">
         <span>Quick Actions</span>
     </div>
     <div class="quick-actions">
 
-        {% if can_write_eggs %}
-        <a href="{% url 'kuku_biz:egg_create' %}" class="qa-btn primary">
-            <span class="qa-icon"><i class="fas fa-egg"></i></span>
-            <span class="qa-text">
-                Record Eggs
-                <small>Today's collection</small>
-            </span>
-        </a>
-        {% endif %}
-
-        {% if can_write_sales %}
-        <a href="{% url 'kuku_biz:sale_create' %}" class="qa-btn {% if not can_write_eggs %}primary{% endif %}">
-            <span class="qa-icon"><i class="fas fa-shopping-cart"></i></span>
-            <span class="qa-text">
-                New Sale
-                <small>Record egg sale</small>
-            </span>
-        </a>
-        {% endif %}
-
-        {% if can_write_sales %}
-        <a href="{% url 'kuku_biz:bird_sale_create' %}" class="qa-btn bird">
-            <span class="qa-icon"><i class="fas fa-drumstick-bite"></i></span>
-            <span class="qa-text">
-                Sell Birds
-                <small>Broilers / spent hens</small>
-            </span>
-        </a>
-        {% endif %}
-
-        {% if can_write_eggs %}
-        <a href="{% url 'kuku_biz:flock_create' %}" class="qa-btn">
-            <span class="qa-icon"><i class="fas fa-kiwi-bird"></i></span>
-            <span class="qa-text">
-                Add Flock
-                <small>Register a new batch</small>
-            </span>
-        </a>
-        <a href="{% url 'kuku_biz:inventory_create' %}" class="qa-btn">
-            <span class="qa-icon"><i class="fas fa-warehouse"></i></span>
-            <span class="qa-text">
-                Add Stock
-                <small>Inventory intake</small>
-            </span>
-        </a>
-        {% endif %}
-
-        {% if can_write_sales %}
-        <a href="{% url 'kuku_biz:customer_list' %}" class="qa-btn">
-            <span class="qa-icon"><i class="fas fa-users"></i></span>
-            <span class="qa-text">
-                Customers
-                <small>Browse / add</small>
-            </span>
-        </a>
-        {% endif %}
-
         {% if is_admin_or_manager %}
-        <a href="{% url 'kuku_biz:reports' %}" class="qa-btn">
-            <span class="qa-icon"><i class="fas fa-file-alt"></i></span>
-            <span class="qa-text">
-                Reports
-                <small>Production &amp; finance</small>
-            </span>
-        </a>
+
+            {# ── HQ: every action ── #}
+            <a href="{% url 'kuku_biz:egg_create' %}" class="qa-btn primary">
+                <span class="qa-icon"><i class="fas fa-egg"></i></span>
+                <span class="qa-text">
+                    Record Eggs
+                    <small>Today's collection</small>
+                </span>
+            </a>
+
+            <a href="{% url 'kuku_biz:sale_create' %}" class="qa-btn">
+                <span class="qa-icon"><i class="fas fa-shopping-cart"></i></span>
+                <span class="qa-text">
+                    New Sale
+                    <small>Record egg sale</small>
+                </span>
+            </a>
+
+            <a href="{% url 'kuku_biz:bird_sale_create' %}" class="qa-btn bird">
+                <span class="qa-icon"><i class="fas fa-drumstick-bite"></i></span>
+                <span class="qa-text">
+                    Sell Birds
+                    <small>Broilers / spent hens</small>
+                </span>
+            </a>
+
+            <a href="{% url 'kuku_biz:flock_create' %}" class="qa-btn">
+                <span class="qa-icon"><i class="fas fa-kiwi-bird"></i></span>
+                <span class="qa-text">
+                    Add Flock
+                    <small>Register a new batch</small>
+                </span>
+            </a>
+
+            <a href="{% url 'kuku_biz:inventory_create' %}" class="qa-btn">
+                <span class="qa-icon"><i class="fas fa-warehouse"></i></span>
+                <span class="qa-text">
+                    Add Stock
+                    <small>Inventory intake</small>
+                </span>
+            </a>
+
+            <a href="{% url 'kuku_biz:customer_list' %}" class="qa-btn">
+                <span class="qa-icon"><i class="fas fa-users"></i></span>
+                <span class="qa-text">
+                    Customers
+                    <small>Browse / add</small>
+                </span>
+            </a>
+
+            <a href="{% url 'kuku_biz:reports' %}" class="qa-btn">
+                <span class="qa-icon"><i class="fas fa-file-alt"></i></span>
+                <span class="qa-text">
+                    Reports
+                    <small>Production &amp; finance</small>
+                </span>
+            </a>
+
+        {% elif is_stock_controller %}
+
+            {# ── Stock controller: production + sales + own stock ── #}
+            <a href="{% url 'kuku_biz:egg_create' %}" class="qa-btn primary">
+                <span class="qa-icon"><i class="fas fa-egg"></i></span>
+                <span class="qa-text">
+                    Record Eggs
+                    <small>Today's collection</small>
+                </span>
+            </a>
+
+            <a href="{% url 'kuku_biz:sale_create' %}" class="qa-btn">
+                <span class="qa-icon"><i class="fas fa-shopping-cart"></i></span>
+                <span class="qa-text">
+                    New Sale
+                    <small>Record egg sale</small>
+                </span>
+            </a>
+
+            <a href="{% url 'kuku_biz:inventory_create' %}" class="qa-btn">
+                <span class="qa-icon"><i class="fas fa-warehouse"></i></span>
+                <span class="qa-text">
+                    Add Stock
+                    <small>Inventory intake</small>
+                </span>
+            </a>
+
+            <a href="{% url 'kuku_biz:customer_list' %}" class="qa-btn">
+                <span class="qa-icon"><i class="fas fa-users"></i></span>
+                <span class="qa-text">
+                    Customers
+                    <small>Browse / add</small>
+                </span>
+            </a>
+
+        {% elif is_sales_role %}
+
+            {# ── Cashier / agent: sales + customers only ── #}
+            <a href="{% url 'kuku_biz:sale_create' %}" class="qa-btn primary">
+                <span class="qa-icon"><i class="fas fa-shopping-cart"></i></span>
+                <span class="qa-text">
+                    New Sale
+                    <small>Record egg sale</small>
+                </span>
+            </a>
+
+            <a href="{% url 'kuku_biz:customer_list' %}" class="qa-btn">
+                <span class="qa-icon"><i class="fas fa-users"></i></span>
+                <span class="qa-text">
+                    Customers
+                    <small>Browse / add</small>
+                </span>
+            </a>
+
         {% endif %}
 
     </div>

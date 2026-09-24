@@ -17,9 +17,9 @@ from django.http import JsonResponse
 
 from decimal import Decimal, InvalidOperation
 from django.views.decorators.http import require_POST
-
+from datetime import date, timedelta
 from apps.companies.support_utils import get_active_company
-from apps.epa_shop.models import Branch
+from apps.company.models import Branch
 from .models import (
     Flock, EggProduction, Customer, EggSale, EggSaleItem,
     FeedType, FeedRecord, FeedConsumption, HealthRecord, Mortality,
@@ -112,30 +112,199 @@ def _to_decimal(value, default='0'):
         return Decimal(default)
 
 
-def _resolve_branch(request, company):
+def _resolve_branch(request, company, is_viewing_company=False):
     """
     Determine the branch for a create/save operation.
 
-    Priority:
-      1. POST['branch'] (if valid and belongs to company)
-      2. request.user.branch
-      3. None
+    HQ users can pick any branch via POST. Everyone else is locked
+    to their own branch, regardless of POST.
     """
-    branch_id = request.POST.get('branch') or None
-    if branch_id:
-        b = Branch.objects.filter(
-            id=branch_id, company=company, is_active=True
-        ).first()
-        if b:
-            return b
+    if _is_hq_user(request, is_viewing_company):
+        branch_id = request.POST.get('branch') or None
+        if branch_id:
+            b = Branch.objects.filter(
+                id=branch_id, company=company, is_active=True
+            ).first()
+            if b:
+                return b
     return getattr(request.user, 'branch', None)
-
+    
 
 def _can_see_all_branches(request, is_viewing_company):
     return (
         request.user.role in ['super_admin', 'company_admin', 'company_manager']
         or is_viewing_company
     )
+
+
+def _mother_branch(company):
+    """Return the company's mother branch, or None."""
+    return Branch.objects.filter(
+        company=company, is_mother_branch=True, is_active=True
+    ).first()
+
+def _user_branch_ids(request):
+    """
+    Branch IDs a user is allowed to see.
+
+    HQ → all branches in the company
+    Everyone else → just their own branch
+    """
+    from apps.companies.support_utils import get_active_company
+    company, is_viewing = get_active_company(request)
+
+    if _is_hq_user(request, is_viewing):
+        return list(Branch.objects.filter(
+            company=company, is_active=True
+        ).values_list('id', flat=True))
+
+    user_b = _user_branch(request)
+    return [user_b.id] if user_b else []
+
+
+# ============================================================
+# BRANCH ACCESS CONTROL
+# ============================================================
+
+# Roles that should always see the whole company (feeder / HQ)
+HQ_ROLES = {
+    'super_admin',
+    'company_admin',
+    'company_manager',
+    'stock_controller',
+}
+
+# Roles that are shop-based — they only see sales + their own inventory
+SHOP_ROLES = {
+    'company_cashier',
+    'company_agent',
+    'mpesa_agent',
+}
+
+# Roles that are warehouse/farm-based — full operations but branch-scoped
+BRANCH_OPS_ROLES = {
+    'stock_controller',
+}
+
+
+def _user_branch(request):
+    """Return the branch object the user belongs to, or None."""
+    return getattr(request.user, 'branch', None)
+
+
+def _is_hq_user(request, is_viewing_company=False):
+    """
+    True if this user should see the whole company (all branches).
+    Super admin, company admin/manager, or a super admin in support mode.
+    """
+    if is_viewing_company:
+        return True
+    role = getattr(request.user, 'role', '') or ''
+    if getattr(request.user, 'is_superuser', False):
+        return True
+    return role in HQ_ROLES
+
+
+def _is_shop_user(request):
+    """True if the user is restricted to shop-level views (sales + shop stock)."""
+    role = getattr(request.user, 'role', '') or ''
+    return role in SHOP_ROLES
+
+
+def _is_branch_ops_user(request):
+    """True if this user operates at branch level (stock controller, etc.)."""
+    role = getattr(request.user, 'role', '') or ''
+    return role in BRANCH_OPS_ROLES
+
+
+
+
+def _scope_to_user_branch(request, qs, is_viewing_company=False):
+    """
+    Apply the correct branch filter to a queryset.
+
+    - HQ users (or super admin viewing a company) → no filter
+    - Everyone else → force branch = user.branch
+    - Users with no branch → return empty queryset (safe default)
+    """
+    if _is_hq_user(request, is_viewing_company):
+        return qs
+
+    user_b = _user_branch(request)
+    if not user_b:
+        # No branch assigned — return nothing so they don't see other branches
+        return qs.none()
+
+    return qs.filter(branch_id=user_b.id)
+
+
+def _resolve_scope_branch(request, is_viewing_company=False):
+    """
+    Return the single branch a non-HQ user is locked to, or None if
+    they can see all branches.
+
+    This is what templates should use for hiding the branch dropdown.
+    """
+    if _is_hq_user(request, is_viewing_company):
+        return None
+    return _user_branch(request)
+
+
+def kuku_shop_or_hq(view_func):
+    """
+    Decorator — only shop roles OR HQ roles may pass.
+    Use on views that shops need access to (sales, customers, prices, shop stock).
+    """
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        role = getattr(request.user, 'role', '') or ''
+        if role in HQ_ROLES or role in SHOP_ROLES or request.user.is_superuser:
+            return view_func(request, *args, **kwargs)
+        messages.error(request, 'You do not have permission for this action.')
+        return redirect('kuku_biz:dashboard')
+    return wrapper
+
+
+def kuku_hq_only(view_func):
+    """
+    Decorator — only HQ roles may pass.
+    Use on feeder-only views: feed, health, flocks, mortality, expenses,
+    reports, purchase inventory, etc.
+    """
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        role = getattr(request.user, 'role', '') or ''
+        if role in HQ_ROLES or request.user.is_superuser:
+            return view_func(request, *args, **kwargs)
+        messages.error(
+            request,
+            'This section is managed by Head Office. Please contact your manager.'
+        )
+        return redirect('kuku_biz:dashboard')
+    return wrapper
+
+
+def _branch_scope_qs(company, request, is_viewing_company):
+    """
+    Branch IDs the user can see. Mother branch users see
+    their children too; shops see only themselves.
+    """
+    if _is_hq_user(request, is_viewing_company):
+        return Branch.objects.filter(company=company, is_active=True)
+
+    user_b = _user_branch(request)
+    if not user_b:
+        return Branch.objects.none()
+
+    if user_b.is_mother_branch:
+        ids = [user_b.id] + list(
+            user_b.children.values_list('id', flat=True)
+        )
+        return Branch.objects.filter(id__in=ids)
+
+    return Branch.objects.filter(id=user_b.id)
+
+
 
 
 # ============================================================
@@ -320,13 +489,37 @@ def dashboard(request):
     # ============================================================
     # BRANCH SCOPING
     # ============================================================
-    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
-    user_branch = request.user.branch
-    can_see_all = _can_see_all_branches(request, is_viewing_company)
+    user_branch = _user_branch(request)
+    is_hq = _is_hq_user(request, is_viewing_company)
+    is_shop = _is_shop_user(request)
 
-    selected_branch_id = request.GET.get('branch', '').strip()
-    if not can_see_all and user_branch:
-        selected_branch_id = str(user_branch.id)
+    # ── Branch scoping ──
+    # HQ: sees all branches, can filter via ?branch=X
+    # Mother branch user: sees mother + children
+    # Shop user: sees only their own branch
+    from apps.companies.support_utils import get_active_company
+
+    if is_hq:
+        branches = Branch.objects.filter(
+            company=company, is_active=True
+        ).order_by('name')
+        can_see_all = True
+        selected_branch_id = request.GET.get('branch', '').strip()
+    else:
+        # Use the mother-branch-aware helper
+        visible_branches = _branch_scope_qs(company, request, is_viewing_company)
+        branches = visible_branches.order_by('name')
+
+        # If the user has exactly one visible branch, lock them to it
+        if user_branch and user_branch.is_mother_branch:
+            # Mother branch user — can filter to a specific child
+            can_see_all = False
+            selected_branch_id = request.GET.get('branch', '').strip()
+            if not selected_branch_id:
+                selected_branch_id = ''  # no filter → show all visible
+        else:
+            can_see_all = False
+            selected_branch_id = str(user_branch.id) if user_branch else ''
 
     selected_branch = None
     if selected_branch_id:
@@ -335,10 +528,13 @@ def dashboard(request):
         ).first()
 
     def _scope(qs):
-        """Apply branch filter when a branch is selected."""
         if selected_branch_id:
             return qs.filter(branch_id=selected_branch_id)
-        return qs
+        if is_hq:
+            return qs
+        # Non-HQ, no explicit branch selected → filter by visible branches
+        visible_ids = list(branches.values_list('id', flat=True))
+        return qs.filter(branch_id__in=visible_ids)
 
     # ============================================================
     # BASE QUERYSETS
@@ -494,6 +690,8 @@ def dashboard(request):
                 'sales_month': b_sales_month,
                 'bird_sales_month': b_bird_sales_month,
                 'low_stock': b_low_stock,
+                'is_hq': is_hq,
+                'is_shop': is_shop,
             })
 
     # ============================================================
@@ -607,34 +805,61 @@ def dashboard(request):
 # ============================================================
 
 @login_required
+@kuku_hq_only
 def reports(request):
-    """Kuku Biz reports — production, sales, profit/loss."""
+    """Kuku Biz reports — production, sales, profit/loss, monthly ranking."""
     company, is_viewing_company = _require_company(request)
     redir = _redirect_if_no_company(request, company)
     if redir:
         return redir
 
     today = timezone.now().date()
+
+    # ── Period ──
     try:
         period_days = int(request.GET.get('period', 30))
     except (ValueError, TypeError):
         period_days = 30
-    period_days = max(1, min(period_days, 365))
+    period_days = max(1, min(period_days, 3650))
     start_date = today - timedelta(days=period_days)
 
+    # ── Branch scoping ──
+    user_branch = _user_branch(request)
+    is_hq = _is_hq_user(request, is_viewing_company)
+    is_shop = _is_shop_user(request)
+
+    if is_hq:
+        branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+        can_see_all = True
+        selected_branch_id = request.GET.get('branch', '').strip()
+    else:
+        branches = Branch.objects.filter(
+            company=company, is_active=True, id=user_branch.id
+        ) if user_branch else Branch.objects.none()
+        can_see_all = False
+        selected_branch_id = str(user_branch.id) if user_branch else ''
+
+    selected_branch = None
+    if selected_branch_id:
+        selected_branch = Branch.objects.filter(
+            id=selected_branch_id, company=company
+        ).first()
+
+    def _scope(qs):
+        if selected_branch_id:
+            return qs.filter(branch_id=selected_branch_id)
+        return qs
+
     # ============================================================
-    # EGG PRODUCTION SUMMARY
+    # EGG PRODUCTION
     # ============================================================
-    egg_agg = (
-        EggProduction.objects
-        .filter(company=company, date__gte=start_date)
-        .aggregate(
-            collected=Sum('eggs_collected'),
-            cracked=Sum('eggs_cracked'),
-            broken=Sum('eggs_broken'),
-            consumed=Sum('eggs_consumed'),
-            discarded=Sum('eggs_discarded'),
-        )
+    egg_qs = _scope(EggProduction.objects.filter(company=company, date__gte=start_date))
+    egg_agg = egg_qs.aggregate(
+        collected=Sum('eggs_collected'),
+        cracked=Sum('eggs_cracked'),
+        broken=Sum('eggs_broken'),
+        consumed=Sum('eggs_consumed'),
+        discarded=Sum('eggs_discarded'),
     )
     eggs_collected = egg_agg['collected'] or 0
     eggs_cracked = egg_agg['cracked'] or 0
@@ -644,12 +869,14 @@ def reports(request):
     eggs_good = eggs_collected - eggs_cracked - eggs_broken
 
     # ============================================================
-    # EGG SALES SUMMARY
+    # EGG SALES
     # ============================================================
-    egg_sales_qs = EggSale.objects.filter(
-        company=company,
-        sale_date__gte=start_date,
-        status__in=['paid', 'partial', 'credit', 'pending'],
+    egg_sales_qs = _scope(
+        EggSale.objects.filter(
+            company=company,
+            sale_date__gte=start_date,
+            status__in=['paid', 'partial', 'credit', 'pending'],
+        )
     )
     egg_sales_agg = egg_sales_qs.aggregate(
         total=Sum('total_amount'),
@@ -658,15 +885,16 @@ def reports(request):
     egg_sales_total = egg_sales_agg['total'] or 0
     egg_sales_collected = egg_sales_agg['paid'] or 0
 
-    items_in_period = EggSaleItem.objects.filter(sale__in=egg_sales_qs)
-    eggs_sold = sum(item.eggs_count for item in items_in_period)
+    eggs_sold = sum(
+        item.eggs_count
+        for item in EggSaleItem.objects.filter(sale__in=egg_sales_qs)
+    )
 
     # ============================================================
-    # BIRD SALES SUMMARY
+    # BIRD SALES
     # ============================================================
-    bird_sales_qs = BirdSale.objects.filter(
-        company=company,
-        date__gte=start_date,
+    bird_sales_qs = _scope(
+        BirdSale.objects.filter(company=company, date__gte=start_date)
     )
     bird_sales_agg = bird_sales_qs.aggregate(
         total=Sum('total_amount'),
@@ -686,30 +914,240 @@ def reports(request):
     total_outstanding = total_sales - total_collected
 
     # ============================================================
-    # COST SUMMARY
+    # COSTS
     # ============================================================
     feed_cost = (
-        FeedRecord.objects
-        .filter(company=company, date__gte=start_date)
+        _scope(FeedRecord.objects.filter(company=company, date__gte=start_date,
+                                          record_type='purchase'))
         .aggregate(total=Sum('cost'))['total'] or 0
     )
     health_cost = (
-        HealthRecord.objects
-        .filter(company=company, date__gte=start_date)
+        _scope(HealthRecord.objects.filter(company=company, date__gte=start_date,
+                                            record_type='purchase'))
         .aggregate(total=Sum('cost'))['total'] or 0
     )
-    other_cost = (
-        Expense.objects
-        .filter(company=company, date__gte=start_date)
-        .aggregate(total=Sum('amount'))['total'] or 0
-    )
-    total_cost = feed_cost + health_cost + other_cost
 
-    # Profit = all revenue − all costs
+    # Expense breakdown by category
+    expense_qs = _scope(Expense.objects.filter(company=company, date__gte=start_date))
+    expense_agg = expense_qs.aggregate(
+        total=Sum('amount'),
+        paid=Sum('amount_paid'),
+    )
+    other_cost = expense_agg['total'] or 0
+    other_cost_paid = expense_agg['paid'] or 0
+
+    # Per-category breakdown (bills, salaries/labour, maintenance, etc.)
+    expense_by_category = []
+    cat_rows = (
+        expense_qs.values('category')
+        .annotate(total=Sum('amount'), count=Count('id'))
+        .order_by('-total')
+    )
+    cat_labels = dict(EXPENSE_CATEGORY_CHOICES)
+    for row in cat_rows:
+        expense_by_category.append({
+            'code': row['category'],
+            'label': cat_labels.get(row['category'], row['category'].title()),
+            'total': row['total'] or 0,
+            'count': row['count'],
+        })
+
+    total_cost = feed_cost + health_cost + other_cost
     profit = total_sales - total_cost
 
     # ============================================================
-    # TOP CUSTOMERS (combined egg + bird sales)
+    # INVENTORY SNAPSHOT (current, not period-bound)
+    # ============================================================
+    inv_qs = _scope(InventoryItem.objects.filter(company=company))
+
+    # Eggs in stock
+    egg_inv_items = inv_qs.filter(
+        item_type__in=['egg_tray', 'egg_crate'], tray_size__gt=0
+    )
+    egg_stock_eggs = sum(i.total_eggs for i in egg_inv_items)
+    egg_stock_value = sum(
+        float(i.quantity) * float(i.cost_per_unit) for i in egg_inv_items
+    )
+
+    # Feed in stock
+    feed_inv_items = inv_qs.filter(item_type='feed_bag')
+    feed_stock_kg = sum(float(i.quantity) for i in feed_inv_items)
+    feed_stock_value = sum(
+        float(i.quantity) * float(i.cost_per_unit) for i in feed_inv_items
+    )
+
+    # Birds in stock
+    birds_qs = _scope(Flock.objects.filter(company=company, status='active'))
+    total_birds = birds_qs.aggregate(t=Sum('current_count'))['t'] or 0
+    layers_count = (
+        birds_qs.filter(flock_type='layer')
+        .aggregate(t=Sum('current_count'))['t'] or 0
+    )
+    broilers_count = (
+        birds_qs.filter(flock_type='broiler')
+        .aggregate(t=Sum('current_count'))['t'] or 0
+    )
+
+    # Low-stock counts
+    low_stock_count = inv_qs.filter(quantity__lte=F('reorder_level')).count()
+
+    # ============================================================
+    # MONTHLY PERFORMANCE (last 6 months) — BEST / WORST
+    # ============================================================
+    monthly_rows = []
+    # Start from the 1st of the month, 5 months ago
+    first_of_this_month = today.replace(day=1)
+    for i in range(5, -1, -1):
+        # Compute year/month offset
+        m = first_of_this_month.month - i
+        y = first_of_this_month.year
+        while m <= 0:
+            m += 12
+            y -= 1
+        month_start = date(y, m, 1)
+        if m == 12:
+            month_end = date(y + 1, 1, 1)
+        else:
+            month_end = date(y, m + 1, 1)
+
+        # Revenue
+        egg_rev = (
+            _scope(EggSale.objects.filter(
+                company=company,
+                sale_date__gte=month_start, sale_date__lt=month_end,
+                status__in=['paid', 'partial', 'credit', 'pending'],
+            )).aggregate(t=Sum('total_amount'))['t'] or 0
+        )
+        bird_rev = (
+            _scope(BirdSale.objects.filter(
+                company=company,
+                date__gte=month_start, date__lt=month_end,
+            )).aggregate(t=Sum('total_amount'))['t'] or 0
+        )
+        revenue = float(egg_rev) + float(bird_rev)
+
+        # Costs
+        m_feed = (
+            _scope(FeedRecord.objects.filter(
+                company=company, record_type='purchase',
+                date__gte=month_start, date__lt=month_end,
+            )).aggregate(t=Sum('cost'))['t'] or 0
+        )
+        m_health = (
+            _scope(HealthRecord.objects.filter(
+                company=company, record_type='purchase',
+                date__gte=month_start, date__lt=month_end,
+            )).aggregate(t=Sum('cost'))['t'] or 0
+        )
+        m_other = (
+            _scope(Expense.objects.filter(
+                company=company,
+                date__gte=month_start, date__lt=month_end,
+            )).aggregate(t=Sum('amount'))['t'] or 0
+        )
+        cost = float(m_feed) + float(m_health) + float(m_other)
+        m_profit = revenue - cost
+        margin = round((m_profit / revenue) * 100, 1) if revenue else 0
+
+        # Production
+        m_eggs = (
+            _scope(EggProduction.objects.filter(
+                company=company,
+                date__gte=month_start, date__lt=month_end,
+            )).aggregate(t=Sum('eggs_collected'))['t'] or 0
+        )
+        m_birds_sold = (
+            _scope(BirdSale.objects.filter(
+                company=company,
+                date__gte=month_start, date__lt=month_end,
+            )).aggregate(t=Sum('birds_sold'))['t'] or 0
+        )
+
+        monthly_rows.append({
+            'month_start': month_start,
+            'month_label': month_start.strftime('%b %Y'),
+            'short_label': month_start.strftime('%b'),
+            'revenue': revenue,
+            'cost': cost,
+            'profit': m_profit,
+            'margin': margin,
+            'eggs': m_eggs,
+            'birds_sold': m_birds_sold,
+        })
+
+    # Best & worst month (exclude current month if it has no data)
+    meaningful = [r for r in monthly_rows if r['revenue'] > 0 or r['cost'] > 0]
+    best_month = max(meaningful, key=lambda r: r['profit']) if meaningful else None
+    worst_month = min(meaningful, key=lambda r: r['profit']) if meaningful else None
+
+    # Scale for the bar chart — max absolute profit
+    max_abs_profit = max((abs(r['profit']) for r in monthly_rows), default=1) or 1
+
+    # ============================================================
+    # BRANCH BREAKDOWN (only when no specific branch selected)
+    # ============================================================
+    branch_breakdown = []
+    if can_see_all and not selected_branch_id:
+        for b in branches:
+            b_egg_rev = (
+                EggSale.objects.filter(
+                    company=company, branch=b,
+                    sale_date__gte=start_date,
+                    status__in=['paid', 'partial', 'credit', 'pending'],
+                ).aggregate(t=Sum('total_amount'))['t'] or 0
+            )
+            b_bird_rev = (
+                BirdSale.objects.filter(
+                    company=company, branch=b, date__gte=start_date,
+                ).aggregate(t=Sum('total_amount'))['t'] or 0
+            )
+            b_revenue = float(b_egg_rev) + float(b_bird_rev)
+
+            b_feed = (
+                FeedRecord.objects.filter(
+                    company=company, branch=b, record_type='purchase',
+                    date__gte=start_date,
+                ).aggregate(t=Sum('cost'))['t'] or 0
+            )
+            b_health = (
+                HealthRecord.objects.filter(
+                    company=company, branch=b, record_type='purchase',
+                    date__gte=start_date,
+                ).aggregate(t=Sum('cost'))['t'] or 0
+            )
+            b_other = (
+                Expense.objects.filter(
+                    company=company, branch=b, date__gte=start_date,
+                ).aggregate(t=Sum('amount'))['t'] or 0
+            )
+            b_cost = float(b_feed) + float(b_health) + float(b_other)
+            b_profit = b_revenue - b_cost
+            b_margin = round((b_profit / b_revenue) * 100, 1) if b_revenue else 0
+
+            b_birds = (
+                Flock.objects.filter(company=company, branch=b, status='active')
+                .aggregate(t=Sum('current_count'))['t'] or 0
+            )
+            b_eggs = (
+                EggProduction.objects.filter(
+                    company=company, branch=b, date__gte=start_date,
+                ).aggregate(t=Sum('eggs_collected'))['t'] or 0
+            )
+
+            branch_breakdown.append({
+                'branch': b,
+                'revenue': b_revenue,
+                'cost': b_cost,
+                'profit': b_profit,
+                'margin': b_margin,
+                'birds': b_birds,
+                'eggs': b_eggs,
+            })
+
+    branch_breakdown.sort(key=lambda r: -r['profit'])
+
+    # ============================================================
+    # TOP CUSTOMERS
     # ============================================================
     top_customers = (
         egg_sales_qs
@@ -722,33 +1160,29 @@ def reports(request):
     # ============================================================
     # PER-FLOCK SUMMARY
     # ============================================================
+    flock_qs = _scope(Flock.objects.filter(company=company).order_by('name'))
     flock_summary = []
-    for f in Flock.objects.filter(company=company).order_by('name'):
+    for f in flock_qs:
         eggs = (
-            EggProduction.objects
-            .filter(flock=f, date__gte=start_date)
-            .aggregate(total=Sum('eggs_collected'))['total'] or 0
+            EggProduction.objects.filter(flock=f, date__gte=start_date)
+            .aggregate(t=Sum('eggs_collected'))['t'] or 0
         )
         deaths = (
-            Mortality.objects
-            .filter(flock=f, date__gte=start_date)
-            .aggregate(total=Sum('count'))['total'] or 0
+            Mortality.objects.filter(flock=f, date__gte=start_date)
+            .aggregate(t=Sum('count'))['t'] or 0
         )
         feed_kg = (
-            FeedRecord.objects
-            .filter(flock=f, date__gte=start_date)
-            .aggregate(total=Sum('quantity_kg'))['total'] or 0
+            FeedRecord.objects.filter(flock=f, record_type='consumption',
+                                       date__gte=start_date)
+            .aggregate(t=Sum('quantity_kg'))['t'] or 0
         )
-        # Bird sales from this flock in the period
         birds_sold = (
-            BirdSale.objects
-            .filter(flock=f, date__gte=start_date)
-            .aggregate(total=Sum('birds_sold'))['total'] or 0
+            BirdSale.objects.filter(flock=f, date__gte=start_date)
+            .aggregate(t=Sum('birds_sold'))['t'] or 0
         )
         bird_revenue = (
-            BirdSale.objects
-            .filter(flock=f, date__gte=start_date)
-            .aggregate(total=Sum('total_amount'))['total'] or 0
+            BirdSale.objects.filter(flock=f, date__gte=start_date)
+            .aggregate(t=Sum('total_amount'))['t'] or 0
         )
         flock_summary.append({
             'flock': f,
@@ -781,6 +1215,13 @@ def reports(request):
         'start_date': start_date,
         'today': today,
 
+        # Branch scoping
+        'branches': branches,
+        'selected_branch_id': selected_branch_id,
+        'selected_branch': selected_branch,
+        'can_see_all_branches': can_see_all,
+        'user_branch': user_branch,
+
         # Egg production
         'eggs_collected': eggs_collected,
         'eggs_cracked': eggs_cracked,
@@ -800,7 +1241,7 @@ def reports(request):
         'bird_sales_count': bird_sales_count,
         'birds_sold_count': birds_sold_count,
 
-        # Combined
+        # Combined revenue
         'total_sales': total_sales,
         'total_collected': total_collected,
         'total_outstanding': total_outstanding,
@@ -811,6 +1252,28 @@ def reports(request):
         'other_cost': other_cost,
         'total_cost': total_cost,
         'profit': profit,
+        'expense_by_category': expense_by_category,
+
+        # Inventory snapshot
+        'egg_stock_eggs': egg_stock_eggs,
+        'egg_stock_value': egg_stock_value,
+        'feed_stock_kg': feed_stock_kg,
+        'feed_stock_value': feed_stock_value,
+        'total_birds': total_birds,
+        'layers_count': layers_count,
+        'broilers_count': broilers_count,
+        'low_stock_count': low_stock_count,
+
+        # Monthly performance
+        'monthly_rows': monthly_rows,
+        'best_month': best_month,
+        'worst_month': worst_month,
+        'max_abs_profit': max_abs_profit,
+
+        # Branch breakdown
+        'branch_breakdown': branch_breakdown,
+        'is_hq': is_hq,
+        'is_shop': is_shop,
 
         # Lists
         'top_customers': top_customers,
@@ -825,7 +1288,9 @@ def reports(request):
 # FLOCKS
 # ============================================================
 
+
 @login_required
+@kuku_hq_only
 def flock_list(request):
     company, is_viewing_company = _require_company(request)
     redir = _redirect_if_no_company(request, company)
@@ -861,6 +1326,7 @@ def flock_list(request):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 def flock_create(request):
     company, is_viewing_company = _require_company(request)
@@ -900,6 +1366,7 @@ def flock_create(request):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 def flock_edit(request, pk):
     company, is_viewing_company = _require_company(request)
@@ -950,6 +1417,7 @@ def flock_edit(request, pk):
     
 
 @login_required
+@kuku_hq_only
 def flock_detail(request, pk):
     company, is_viewing_company = _require_company(request)
     redir = _redirect_if_no_company(request, company)
@@ -1077,6 +1545,7 @@ def flock_detail(request, pk):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 @require_POST
 def flock_delete(request, pk):
@@ -1124,6 +1593,7 @@ def flock_delete(request, pk):
 # ============================================================
 
 @login_required
+@kuku_hq_only
 @kuku_sales_access
 def bird_sale_create(request):
     """Record a sale of live birds (broilers, spent hens, surplus males)."""
@@ -1207,6 +1677,7 @@ def bird_sale_create(request):
 
 
 @login_required
+@kuku_hq_only
 def bird_sale_list(request):
     """List recent bird sales."""
     company, is_viewing_company = _require_company(request)
@@ -1255,6 +1726,7 @@ def bird_sale_list(request):
 
 
 @login_required
+@kuku_hq_only
 @kuku_sales_access
 @require_POST
 def bird_sale_mark_paid(request, pk):
@@ -1309,6 +1781,7 @@ def bird_sale_receipt(request, pk):
 
 
 @login_required
+@kuku_hq_only
 @kuku_sales_access
 def bird_sale_edit(request, pk):
     """Edit an existing bird sale."""
@@ -1385,6 +1858,7 @@ def bird_sale_edit(request, pk):
 
 
 @login_required
+@kuku_hq_only
 @kuku_sales_access
 @require_POST
 def bird_sale_delete(request, pk):
@@ -1417,6 +1891,7 @@ def bird_sale_delete(request, pk):
 # ============================================================
 
 @login_required
+@kuku_hq_only
 def egg_list(request):
     company, is_viewing_company = _require_company(request)
     redir = _redirect_if_no_company(request, company)
@@ -1529,6 +2004,7 @@ def egg_list(request):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 def egg_create(request):
     company, is_viewing_company = _require_company(request)
@@ -1579,6 +2055,7 @@ def egg_create(request):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 def egg_edit(request, pk):
     """Edit an existing egg production record."""
@@ -1630,6 +2107,7 @@ def egg_edit(request, pk):
 
 @login_required
 @kuku_write_access
+@kuku_hq_only
 @require_POST
 def egg_delete(request, pk):
     """Delete an egg production record."""
@@ -1658,13 +2136,20 @@ def sale_list(request):
     if redir:
         return redir
 
-    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
-    user_branch = request.user.branch
-    can_see_all = _can_see_all_branches(request, is_viewing_company)
+    user_branch = _user_branch(request)
+    is_hq = _is_hq_user(request, is_viewing_company)
+    is_shop = _is_shop_user(request)
 
-    selected_branch_id = request.GET.get('branch', '').strip()
-    if not can_see_all and user_branch:
-        selected_branch_id = str(user_branch.id)
+    if is_hq:
+        branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+        can_see_all = True
+        selected_branch_id = request.GET.get('branch', '').strip()
+    else:
+        branches = Branch.objects.filter(
+            company=company, is_active=True, id=user_branch.id
+        ) if user_branch else Branch.objects.none()
+        can_see_all = False
+        selected_branch_id = str(user_branch.id) if user_branch else ''
 
     sales_qs = (
         EggSale.objects
@@ -1672,12 +2157,17 @@ def sale_list(request):
         .select_related('customer', 'recorded_by', 'branch')
     )
 
-    # ── FIXED: filter by the sale's own branch FK, not recorded_by.branch ──
+    # Branch scope
     if selected_branch_id:
         sales_qs = sales_qs.filter(branch_id=selected_branch_id)
 
+    # Agents see only their own entries
     if request.user.role == 'company_agent' and not is_viewing_company:
         sales_qs = sales_qs.filter(recorded_by=request.user)
+
+    # Shops see only their own branch's stock too
+    if is_shop and user_branch:
+        sales_qs = sales_qs.filter(branch_id=user_branch.id)
 
     sales = sales_qs.order_by('-sale_date', '-created_at')[:200]
 
@@ -2038,9 +2528,10 @@ def price_list(request):
     if redir:
         return redir
 
-    can_edit = request.user.role in [
-        'super_admin', 'company_admin', 'company_manager', 'stock_controller'
-    ] or is_viewing_company
+    can_edit = (
+        request.user.role in ['super_admin', 'company_admin', 'company_manager']
+        or is_viewing_company
+    )
 
     if request.method == 'POST':
         if not can_edit:
@@ -2182,13 +2673,67 @@ def customer_list(request):
     if redir:
         return redir
 
-    customers = Customer.objects.filter(company=company).order_by('name')
+    user_branch = _user_branch(request)
+    is_hq = _is_hq_user(request, is_viewing_company)
+    is_shop = _is_shop_user(request)
+
+    # ── Branch scoping ──
+    if is_hq:
+        branches = Branch.objects.filter(
+            company=company, is_active=True
+        ).order_by('name')
+        can_see_all = True
+        selected_branch_id = request.GET.get('branch', '').strip()
+    else:
+        visible_branches = _branch_scope_qs(company, request, is_viewing_company)
+        branches = visible_branches.order_by('name')
+
+        if user_branch and user_branch.is_mother_branch:
+            can_see_all = False
+            selected_branch_id = request.GET.get('branch', '').strip()
+        else:
+            can_see_all = False
+            selected_branch_id = str(user_branch.id) if user_branch else ''
+
+    # ── Base queryset ──
+    customers = (
+        Customer.objects
+        .filter(company=company)
+        .select_related('branch', 'created_by')
+        .order_by('name')
+    )
+
+    # Apply branch filter
+    if selected_branch_id:
+        customers = customers.filter(branch_id=selected_branch_id)
+    elif not is_hq:
+        # Non-HQ, no explicit branch → filter by visible branches
+        visible_ids = list(branches.values_list('id', flat=True))
+        customers = customers.filter(branch_id__in=visible_ids)
+
+    # Shops: only see customers they created OR that belong to their branch
+    if is_shop and user_branch:
+        customers = customers.filter(branch_id=user_branch.id)
+
+    # Agents: only their own
+    if request.user.role == 'company_agent' and not is_viewing_company:
+        customers = customers.filter(created_by=request.user)
+
+    total_count = customers.count()
 
     context = {
         'company': company,
         'is_viewing_company': is_viewing_company,
         'customers': customers,
+        'branches': branches,
+        'selected_branch_id': selected_branch_id,
+        'can_see_all_branches': can_see_all,
+        'user_branch': user_branch,
+        'is_hq': is_hq,
+        'is_shop': is_shop,
+        'total_count': total_count,
         'page_title': 'Customers',
+        'page_subtitle': f'{total_count} total',
     }
     return render(request, 'kuku_biz/customers.html', context)
 
@@ -2217,18 +2762,26 @@ def customer_create(request):
     location = request.POST.get('location', '').strip()
     notes = request.POST.get('notes', '').strip()
 
+    # Resolve branch — HQ picks from POST, everyone else is locked
+    branch = _resolve_branch(request, company, is_viewing_company)
+
     if not name:
         if is_modal:
             return JsonResponse({'success': False, 'error': 'Customer name is required.'}, status=400)
         messages.error(request, 'Customer name is required.')
         return redirect('kuku_biz:customer_list')
 
-    dup = Customer.objects.filter(company=company, name__iexact=name, phone=phone).first()
+    # Duplicate check — scoped to company + branch
+    dup_qs = Customer.objects.filter(company=company, name__iexact=name, phone=phone)
+    if branch:
+        dup_qs = dup_qs.filter(branch=branch)
+    dup = dup_qs.first()
+
     if dup:
         if is_modal:
             return JsonResponse({
                 'success': False,
-                'error': 'A customer with this name and phone already exists.',
+                'error': 'A customer with this name and phone already exists in this branch.',
                 'existing_id': dup.id,
             }, status=409)
         messages.warning(request, f'Customer "{name}" already exists.')
@@ -2237,6 +2790,7 @@ def customer_create(request):
     try:
         customer = Customer.objects.create(
             company=company,
+            branch=branch,
             name=name,
             customer_type=customer_type,
             phone=phone,
@@ -2262,6 +2816,142 @@ def customer_create(request):
 
     messages.success(request, 'Customer added successfully.')
     return redirect('kuku_biz:customer_list')
+
+@login_required
+@kuku_sales_access
+def customer_edit(request, pk):
+    """Edit an existing customer."""
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    customer = get_object_or_404(Customer, pk=pk, company=company)
+
+    # ── Permission: shops can only edit their own branch's customers ──
+    user_branch = _user_branch(request)
+    is_hq = _is_hq_user(request, is_viewing_company)
+    is_shop = _is_shop_user(request)
+
+    if not is_hq:
+        if not user_branch or customer.branch_id != user_branch.id:
+            messages.error(
+                request,
+                'You can only edit customers in your own branch.'
+            )
+            return redirect('kuku_biz:customer_list')
+
+    if is_shop and customer.created_by and customer.created_by != request.user:
+        if request.user.role == 'company_agent':
+            messages.error(request, 'You can only edit customers you created.')
+            return redirect('kuku_biz:customer_list')
+
+    # ── Branch options for the form ──
+    if is_hq:
+        branches = Branch.objects.filter(
+            company=company, is_active=True
+        ).order_by('name')
+    else:
+        branches = Branch.objects.filter(
+            id=user_branch.id
+        ) if user_branch else Branch.objects.none()
+
+    if request.method == 'POST':
+        try:
+            name = request.POST.get('name', '').strip()
+            customer_type = request.POST.get('customer_type', 'individual')
+            phone = request.POST.get('phone', '').strip()
+            email = request.POST.get('email', '').strip()
+            location = request.POST.get('location', '').strip()
+            notes = request.POST.get('notes', '').strip()
+            is_active = request.POST.get('is_active') == 'on'
+
+            # Branch: HQ can change, everyone else keeps their own
+            if is_hq:
+                branch_id = request.POST.get('branch') or None
+                new_branch = None
+                if branch_id:
+                    new_branch = Branch.objects.filter(
+                        id=branch_id, company=company, is_active=True
+                    ).first()
+                customer.branch = new_branch
+            # else: leave customer.branch unchanged (locked to user's branch)
+
+            if not name:
+                messages.error(request, 'Customer name is required.')
+            else:
+                # Duplicate check (same branch, different pk)
+                dup_qs = Customer.objects.filter(
+                    company=company,
+                    name__iexact=name,
+                    phone=phone,
+                ).exclude(pk=customer.pk)
+                if customer.branch:
+                    dup_qs = dup_qs.filter(branch=customer.branch)
+                if dup_qs.exists():
+                    messages.warning(
+                        request,
+                        f'Another customer with name "{name}" and phone "{phone}" already exists.'
+                    )
+                else:
+                    customer.name = name
+                    customer.customer_type = customer_type
+                    customer.phone = phone
+                    customer.email = email
+                    customer.location = location
+                    customer.notes = notes
+                    customer.is_active = is_active
+                    customer.save()
+
+                    messages.success(request, f'Customer "{name}" updated.')
+                    return redirect('kuku_biz:customer_list')
+
+        except Exception as e:
+            messages.error(request, f'Error updating customer: {e}')
+
+    context = {
+        'company': company,
+        'is_viewing_company': is_viewing_company,
+        'customer': customer,
+        'branches': branches,
+        'user_branch': user_branch,
+        'is_hq': is_hq,
+        'is_shop': is_shop,
+        'can_see_all_branches': is_hq,
+        'page_title': f'Edit {customer.name}',
+        'page_subtitle': 'Update customer details',
+    }
+    return render(request, 'kuku_biz/customer_form.html', context)
+
+@login_required
+@kuku_sales_access
+@require_POST
+def customer_delete(request, pk):
+    """Delete a customer."""
+    company, is_viewing_company = _require_company(request)
+    redir = _redirect_if_no_company(request, company)
+    if redir:
+        return redir
+
+    customer = get_object_or_404(Customer, pk=pk, company=company)
+
+    # ── Permission: shops can only delete their own branch's customers ──
+    is_hq = _is_hq_user(request, is_viewing_company)
+    if not is_hq:
+        user_branch = _user_branch(request)
+        if not user_branch or customer.branch_id != user_branch.id:
+            messages.error(
+                request,
+                'You can only delete customers in your own branch.'
+            )
+            return redirect('kuku_biz:customer_list')
+
+    name = customer.name
+    customer.delete()
+    messages.success(request, f'Customer "{name}" deleted.')
+    return redirect('kuku_biz:customer_list')
+
+
 
 # ============================================================
 # FEED TYPES (admin)
@@ -2294,6 +2984,7 @@ def feed_type_list(request):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 def feed_type_create(request):
     company, is_viewing_company = _require_company(request)
@@ -2338,6 +3029,7 @@ def feed_type_create(request):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 def feed_type_edit(request, pk):
     company, is_viewing_company = _require_company(request)
@@ -2367,6 +3059,7 @@ def feed_type_edit(request, pk):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 @require_POST
 def feed_type_delete(request, pk):
@@ -2398,6 +3091,7 @@ def feed_type_delete(request, pk):
 # ============================================================
 
 @login_required
+@kuku_hq_only
 def feed_list(request):
     """
     Feed hub — shows:
@@ -2411,13 +3105,21 @@ def feed_list(request):
     if redir:
         return redir
 
-    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
-    user_branch = request.user.branch
-    can_see_all = _can_see_all_branches(request, is_viewing_company)
+    user_branch = _user_branch(request)
+    is_hq = _is_hq_user(request, is_viewing_company)
+    is_shop = _is_shop_user(request)
 
-    selected_branch_id = request.GET.get('branch', '').strip()
-    if not can_see_all and user_branch:
-        selected_branch_id = str(user_branch.id)
+    if is_hq:
+        branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+        can_see_all = True
+        selected_branch_id = request.GET.get('branch', '').strip()
+    else:
+        branches = Branch.objects.filter(
+            company=company, is_active=True, id=user_branch.id
+        ) if user_branch else Branch.objects.none()
+        can_see_all = False
+        selected_branch_id = str(user_branch.id) if user_branch else ''
+        
 
     today = timezone.now().date()
     month_ago = today - timedelta(days=30)
@@ -2597,6 +3299,7 @@ def feed_list(request):
 # ============================================================
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 def feed_create(request):
     """
@@ -2675,6 +3378,7 @@ def feed_create(request):
 # ============================================================
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 def feed_consume(request):
     """
@@ -2747,6 +3451,7 @@ def feed_consume(request):
 # ============================================================
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 def feed_edit(request, pk):
     """Edit an existing FeedRecord (purchase or consumption)."""
@@ -2842,6 +3547,7 @@ def feed_edit(request, pk):
 # ============================================================
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 @require_POST
 def feed_delete(request, pk):
@@ -2872,6 +3578,7 @@ def feed_delete(request, pk):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 @require_POST
 def feed_mark_paid(request, pk):
@@ -2898,6 +3605,7 @@ def feed_mark_paid(request, pk):
 # ============================================================
 
 @login_required
+@kuku_hq_only
 def feed_consumption_list(request):
     """
     Dedicated feed consumption log page.
@@ -3009,6 +3717,7 @@ def feed_consumption_list(request):
     
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 @require_POST
 def feed_consumption_delete(request, pk):
@@ -3034,6 +3743,7 @@ def feed_consumption_delete(request, pk):
 # ============================================================
 
 @login_required
+@kuku_hq_only
 def mortality_list(request):
     """
     Mortality log with cost/loss tracking and cause breakdown.
@@ -3157,8 +3867,8 @@ def mortality_list(request):
     }
     return render(request, 'kuku_biz/mortality.html', context)
 
-
 @login_required
+@kuku_hq_only
 @kuku_write_access
 def mortality_create(request):
     company, is_viewing_company = _require_company(request)
@@ -3196,6 +3906,7 @@ def mortality_create(request):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 @require_POST
 def mortality_delete(request, pk):
@@ -3215,6 +3926,7 @@ def mortality_delete(request, pk):
 # ============================================================
 
 @login_required
+@kuku_hq_only
 def health_list(request):
     company, is_viewing_company = _require_company(request)
     redir = _redirect_if_no_company(request, company)
@@ -3313,6 +4025,7 @@ def health_list(request):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 def health_create(request):
     """
@@ -3403,6 +4116,7 @@ def health_create(request):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 @require_POST
 def health_delete(request, pk):
@@ -3425,6 +4139,7 @@ def health_delete(request, pk):
 # ============================================================
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 def vaccine_type_list(request):
     """Manage the catalog of vaccine / drug products for the company."""
@@ -3451,6 +4166,7 @@ def vaccine_type_list(request):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 def vaccine_type_create(request):
     company, is_viewing_company = _require_company(request)
@@ -3493,6 +4209,7 @@ def vaccine_type_create(request):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 def vaccine_type_edit(request, pk):
     company, is_viewing_company = _require_company(request)
@@ -3522,6 +4239,7 @@ def vaccine_type_edit(request, pk):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 @require_POST
 def vaccine_type_delete(request, pk):
@@ -3546,7 +4264,10 @@ def vaccine_type_delete(request, pk):
 
     return redirect('kuku_biz:vaccine_type_list')
 
+
+
 @login_required
+@kuku_hq_only
 def vaccine_inventory(request):
     """
     Vaccine/drug inventory — sourced from InventoryItem lines
@@ -3618,6 +4339,7 @@ def vaccine_inventory(request):
 # ============================================================
 
 @login_required
+@kuku_hq_only
 def expense_list(request):
     """
     Expenses hub — KPIs, category breakdown, filtered log with totals.
@@ -3745,6 +4467,7 @@ def expense_list(request):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 def expense_create(request):
     company, is_viewing_company = _require_company(request)
@@ -3789,6 +4512,7 @@ def expense_create(request):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 def expense_edit(request, pk):
     company, is_viewing_company = _require_company(request)
@@ -3825,6 +4549,7 @@ def expense_edit(request, pk):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 @require_POST
 def expense_delete(request, pk):
@@ -3841,6 +4566,7 @@ def expense_delete(request, pk):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 @require_POST
 def expense_mark_paid(request, pk):
@@ -3874,12 +4600,22 @@ def inventory_hub(request):
     if redir:
         return redir
 
-    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
-    user_branch = request.user.branch
-    can_see_all = _can_see_all_branches(request, is_viewing_company)
+    user_branch = _user_branch(request)
+    is_hq = _is_hq_user(request, is_viewing_company)
+    is_shop = _is_shop_user(request)
 
-    selected_branch_id = request.GET.get('branch', '').strip()
-    if not can_see_all and user_branch:
+    if is_hq:
+        branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+        can_see_all = True
+        selected_branch_id = request.GET.get('branch', '').strip()
+    else:
+        branches = Branch.objects.filter(
+            company=company, is_active=True, id=user_branch.id
+        ) if user_branch else Branch.objects.none()
+        can_see_all = False
+        selected_branch_id = str(user_branch.id) if user_branch else ''
+
+    if is_shop and user_branch:
         selected_branch_id = str(user_branch.id)
 
     # ── Shared helper: filter a queryset by selected branch ──
@@ -3979,12 +4715,17 @@ def inventory_hub(request):
         'other_count': other_count,
         'other_value': other_value,
 
+        # Role flags
+        'is_hq': is_hq,
+        'is_shop': is_shop,
+
         'page_title': 'Inventory',
         'page_subtitle': 'Eggs, feed, vaccines and supplies',
     }
     return render(request, 'kuku_biz/inventory_hub.html', context)
 
 @login_required
+@kuku_hq_only
 def inventory_list(request):
     """
     Full inventory list — all item types in one page.
@@ -3994,14 +4735,21 @@ def inventory_list(request):
     redir = _redirect_if_no_company(request, company)
     if redir:
         return redir
+ 
+    user_branch = _user_branch(request)
+    is_hq = _is_hq_user(request, is_viewing_company)
 
-    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
-    user_branch = request.user.branch
-    can_see_all = _can_see_all_branches(request, is_viewing_company)
+    if is_hq:
+        branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+        can_see_all = True
+        selected_branch_id = request.GET.get('branch', '').strip()
+    else:
+        branches = Branch.objects.filter(
+            company=company, is_active=True, id=user_branch.id
+        ) if user_branch else Branch.objects.none()
+        can_see_all = False
+        selected_branch_id = str(user_branch.id) if user_branch else ''
 
-    selected_branch_id = request.GET.get('branch', '').strip()
-    if not can_see_all and user_branch:
-        selected_branch_id = str(user_branch.id)
 
     items = (
         InventoryItem.objects
@@ -4009,6 +4757,7 @@ def inventory_list(request):
         .select_related('branch')
         .order_by('branch__name', 'item_type', 'name')
     )
+    
     if selected_branch_id:
         items = items.filter(branch_id=selected_branch_id)
 
@@ -4036,6 +4785,7 @@ def inventory_list(request):
         'total_value': total_value,
         'item_types': INVENTORY_ITEM_TYPE_CHOICES,
         'selected_item_type': item_type,
+        'is_hq': is_hq,
         'today': timezone.now().date(),
         'page_title': 'Inventory',
         'page_subtitle': f'{items.count()} item{"s" if items.count() != 1 else ""}',
@@ -4059,13 +4809,19 @@ def egg_inventory(request):
     if redir:
         return redir
 
-    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
-    user_branch = request.user.branch
-    can_see_all = _can_see_all_branches(request, is_viewing_company)
+    user_branch = _user_branch(request)
+    is_hq = _is_hq_user(request, is_viewing_company)
 
-    selected_branch_id = request.GET.get('branch', '').strip()
-    if not can_see_all and user_branch:
-        selected_branch_id = str(user_branch.id)
+    if is_hq:
+        branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+        can_see_all = True
+        selected_branch_id = request.GET.get('branch', '').strip()
+    else:
+        branches = Branch.objects.filter(
+            company=company, is_active=True, id=user_branch.id
+        ) if user_branch else Branch.objects.none()
+        can_see_all = False
+        selected_branch_id = str(user_branch.id) if user_branch else ''
 
     items = (
         InventoryItem.objects
@@ -4073,6 +4829,7 @@ def egg_inventory(request):
             company=company,
             item_type__in=['egg_tray', 'egg_crate'],
         )
+
         .select_related('branch')
         .order_by('branch__name', '-tray_size', 'name')
     )
@@ -4103,6 +4860,8 @@ def egg_inventory(request):
         'total_eggs': total_eggs,
         'total_value': total_value,
 
+        'is_hq': is_hq,
+
         'today': timezone.now().date(),
         'page_title': 'Egg Inventory',
         'page_subtitle': f'{items.count()} item{"s" if items.count() != 1 else ""}',
@@ -4115,6 +4874,7 @@ def egg_inventory(request):
 # ============================================================
 
 @login_required
+@kuku_hq_only
 def feed_inventory(request):
     """
     Feed inventory — bags only, sourced from InventoryItem lines
@@ -4125,13 +4885,19 @@ def feed_inventory(request):
     if redir:
         return redir
 
-    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
-    user_branch = request.user.branch
-    can_see_all = _can_see_all_branches(request, is_viewing_company)
+    user_branch = _user_branch(request)
+    is_hq = _is_hq_user(request, is_viewing_company)
 
-    selected_branch_id = request.GET.get('branch', '').strip()
-    if not can_see_all and user_branch:
-        selected_branch_id = str(user_branch.id)
+    if is_hq:
+        branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+        can_see_all = True
+        selected_branch_id = request.GET.get('branch', '').strip()
+    else:
+        branches = Branch.objects.filter(
+            company=company, is_active=True, id=user_branch.id
+        ) if user_branch else Branch.objects.none()
+        can_see_all = False
+        selected_branch_id = str(user_branch.id) if user_branch else ''
 
     items = (
         InventoryItem.objects
@@ -4181,6 +4947,8 @@ def feed_inventory(request):
         'total_kg': total_kg,
         'total_value': total_value,
 
+        'is_hq': is_hq,
+
         'today': timezone.now().date(),
         'page_title': 'Feed Inventory',
         'page_subtitle': f'{items.count()} item{"s" if items.count() != 1 else ""}',
@@ -4199,13 +4967,24 @@ def other_inventory(request):
     if redir:
         return redir
 
-    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
-    user_branch = request.user.branch
-    can_see_all = _can_see_all_branches(request, is_viewing_company)
+    user_branch = _user_branch(request)
+    is_hq = _is_hq_user(request, is_viewing_company)
+    is_shop = _is_shop_user(request)
 
-    selected_branch_id = request.GET.get('branch', '').strip()
-    if not can_see_all and user_branch:
+    if is_hq:
+        branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+        can_see_all = True
+        selected_branch_id = request.GET.get('branch', '').strip()
+    else:
+        branches = Branch.objects.filter(
+            company=company, is_active=True, id=user_branch.id
+        ) if user_branch else Branch.objects.none()
+        can_see_all = False
+        selected_branch_id = str(user_branch.id) if user_branch else ''
+
+    if is_shop and user_branch:
         selected_branch_id = str(user_branch.id)
+
 
     items = (
         InventoryItem.objects
@@ -4221,6 +5000,8 @@ def other_inventory(request):
 
     context = {
         'company': company,
+        'is_hq': is_hq,
+        'is_shop': is_shop,
         'is_viewing_company': is_viewing_company,
         'items': items,
         'branches': branches,
@@ -4236,6 +5017,7 @@ def other_inventory(request):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 def inventory_create(request):
     company, is_viewing_company = _require_company(request)
@@ -4247,12 +5029,18 @@ def inventory_create(request):
 
     if request.method == 'POST':
         try:
-            branch_id = request.POST.get('branch') or None
-            branch = None
-            if branch_id:
-                branch = Branch.objects.filter(
-                    id=branch_id, company=company, is_active=True
-                ).first()
+            is_hq = _is_hq_user(request, is_viewing_company)
+            user_branch = _user_branch(request)
+
+            if is_hq:
+                branch_id = request.POST.get('branch') or None
+                branch = None
+                if branch_id:
+                    branch = Branch.objects.filter(
+                        id=branch_id, company=company, is_active=True
+                    ).first()
+            else:
+                branch = user_branch
 
             name = request.POST.get('name', '').strip()
             item_type = request.POST.get('item_type', 'other')
@@ -4361,14 +5149,21 @@ def inventory_create(request):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 def inventory_edit(request, pk):
     company, is_viewing_company = _require_company(request)
     redir = _redirect_if_no_company(request, company)
     if redir:
         return redir
-
     item = get_object_or_404(InventoryItem, pk=pk, company=company)
+
+    if not _is_hq_user(request, is_viewing_company):
+        user_b = _user_branch(request)
+        if not user_b or item.branch_id != user_b.id:
+            messages.error(request, 'You can only manage items in your own branch.')
+            return redirect('kuku_biz:inventory_list')
+
     branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
 
     if request.method == 'POST':
@@ -4451,6 +5246,7 @@ def inventory_edit(request, pk):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 @require_POST
 def inventory_delete(request, pk):
@@ -4458,8 +5254,15 @@ def inventory_delete(request, pk):
     redir = _redirect_if_no_company(request, company)
     if redir:
         return redir
-
+        
     item = get_object_or_404(InventoryItem, pk=pk, company=company)
+
+    if not _is_hq_user(request, is_viewing_company):
+        user_b = _user_branch(request)
+        if not user_b or item.branch_id != user_b.id:
+            messages.error(request, 'You can only manage items in your own branch.')
+            return redirect('kuku_biz:inventory_list')
+
     name = item.name
 
     if item.image:
@@ -4471,6 +5274,7 @@ def inventory_delete(request, pk):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 @require_POST
 def inventory_adjust(request, pk):
@@ -4516,6 +5320,7 @@ def inventory_adjust(request, pk):
 
 
 @login_required
+@kuku_hq_only
 @kuku_write_access
 @require_POST
 def inventory_transfer(request):

@@ -11,7 +11,7 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q
 
 from apps.companies.models import Company, BusinessType
-from apps.epa_shop.models import Branch
+from apps.company.models import Branch
 
 User = get_user_model()
 

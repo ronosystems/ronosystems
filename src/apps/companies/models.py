@@ -621,7 +621,7 @@ class CompanyJoinRequest(models.Model):
         help_text="The User account created when this request was approved.",
     )
     assigned_branch = models.ForeignKey(
-        'epa_shop.Branch',
+        'company.Branch',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

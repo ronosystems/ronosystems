@@ -9,7 +9,8 @@ from decimal import Decimal
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 
-from apps.epa_shop.models import Sale, SaleItem, Electronic, Phone, Accessory, Branch, StockMovement
+from apps.company.models import Branch
+from apps.epa_shop.models import Sale, SaleItem, Electronic, Phone, Accessory, StockMovement
 from apps.companies.models import Company
 from apps.company.models import Expense
 from apps.companies.support_utils import (

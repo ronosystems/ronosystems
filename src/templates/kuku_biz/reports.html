@@ -2,15 +2,27 @@
 
 {% block title %}Reports — Kuku Biz{% endblock %}
 {% block page_title %}Reports{% endblock %}
-{% block page_subtitle %}<small>{{ period_label }}</small>{% endblock %}
+{% block page_subtitle %}
+    <small>
+        {{ period_label }}
+        {% if selected_branch %} · {{ selected_branch.name }}{% endif %}
+    </small>
+{% endblock %}
 
 {% block extra_css %}
 <style>
-    /* Period selector */
+    /* Period + branch selector */
+    .filter-bar {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+    }
     .period-bar {
         display: flex;
         gap: 8px;
-        margin-bottom: 24px;
         flex-wrap: wrap;
     }
     .period-btn {
@@ -27,19 +39,24 @@
         font-size: 0.82rem;
         transition: all 0.2s;
     }
-    .period-btn:hover {
-        background: #f0fbfd;
-        border-color: #1fb4d2;
-    }
+    .period-btn:hover { background: #f0fbfd; border-color: #1fb4d2; }
     .period-btn.active {
         background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
         color: #fff;
     }
+    .branch-select {
+        padding: 8px 14px;
+        border: 2px solid #000;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        background: #fff;
+        cursor: pointer;
+        min-width: 180px;
+    }
 
     /* Section */
-    .section {
-        margin-bottom: 32px;
-    }
+    .section { margin-bottom: 32px; }
     .section-title {
         font-size: 0.95rem;
         font-weight: 700;
@@ -51,6 +68,16 @@
         display: flex;
         align-items: center;
         gap: 8px;
+    }
+    .section-title .badge {
+        margin-left: auto;
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 50px;
+        background: #e0f4fa;
+        color: #0a2f45;
+        letter-spacing: 0.5px;
     }
 
     /* KPI grid */
@@ -89,6 +116,111 @@
     .kpi-value.bad  { color: #dc2626; }
     .kpi-value.warn { color: #d97706; }
 
+    /* Best / worst cards */
+    .highlight-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        margin-bottom: 14px;
+    }
+    .highlight-card {
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 20px 22px;
+        position: relative;
+        overflow: hidden;
+    }
+    .highlight-card.best {
+        background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+        border-color: #059669;
+    }
+    .highlight-card.worst {
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        border-color: #dc2626;
+    }
+    .highlight-card .hc-title {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 800;
+        margin-bottom: 8px;
+    }
+    .highlight-card.best .hc-title { color: #065f46; }
+    .highlight-card.worst .hc-title { color: #991b1b; }
+    .highlight-card .hc-month {
+        font-size: 1.3rem;
+        font-weight: 800;
+        color: #1f2937;
+    }
+    .highlight-card .hc-profit {
+        font-size: 1.8rem;
+        font-weight: 800;
+        font-family: 'Courier New', monospace;
+        margin-top: 6px;
+    }
+    .highlight-card.best .hc-profit { color: #059669; }
+    .highlight-card.worst .hc-profit { color: #dc2626; }
+    .highlight-card .hc-detail {
+        font-size: 0.78rem;
+        color: #4b5563;
+        margin-top: 6px;
+    }
+    .highlight-card .hc-icon {
+        position: absolute;
+        right: 18px;
+        top: 18px;
+        font-size: 2rem;
+        opacity: 0.15;
+    }
+
+    /* Monthly bar chart */
+    .month-chart {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 20px;
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-around;
+        gap: 12px;
+        height: 240px;
+    }
+    .month-bar-wrap {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-end;
+        height: 100%;
+        gap: 6px;
+    }
+    .month-bar {
+        width: 100%;
+        max-width: 60px;
+        border-radius: 6px 6px 0 0;
+        transition: opacity 0.15s;
+        min-height: 4px;
+        position: relative;
+    }
+    .month-bar.positive {
+        background: linear-gradient(180deg, #34d399 0%, #059669 100%);
+    }
+    .month-bar.negative {
+        background: linear-gradient(180deg, #f87171 0%, #dc2626 100%);
+    }
+    .month-bar-value {
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: #374151;
+        font-family: 'Courier New', monospace;
+    }
+    .month-bar-label {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #6b7280;
+        text-transform: uppercase;
+    }
+
     /* Data table */
     .data-table {
         width: 100%;
@@ -123,6 +255,8 @@
         font-weight: 700;
         text-align: right;
     }
+    .cell-good { color: #059669; }
+    .cell-bad  { color: #dc2626; }
 
     .empty-block {
         text-align: center;
@@ -161,32 +295,65 @@
     }
     .summary-banner .big.good { color: #059669; }
     .summary-banner .big.bad  { color: #dc2626; }
+
+    /* Two-column grid */
+    .two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+    }
+    @media (max-width: 900px) {
+        .two-col { grid-template-columns: 1fr; }
+        .highlight-grid { grid-template-columns: 1fr; }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 
-<!-- Period selector -->
-<div class="period-bar">
-    <a href="?period=7"
-       class="period-btn {% if period_days == 7 %}active{% endif %}">
-        <i class="fas fa-calendar-day"></i> Last 7 days
-    </a>
-    <a href="?period=30"
-       class="period-btn {% if period_days == 30 %}active{% endif %}">
-        <i class="fas fa-calendar-week"></i> Last 30 days
-    </a>
-    <a href="?period=90"
-       class="period-btn {% if period_days == 90 %}active{% endif %}">
-        <i class="fas fa-calendar-alt"></i> Last 90 days
-    </a>
-    <a href="?period=365"
-       class="period-btn {% if period_days == 365 %}active{% endif %}">
-        <i class="fas fa-calendar"></i> Last 12 months
-    </a>
+<!-- ============================================================ -->
+<!-- FILTERS: PERIOD + BRANCH                                      -->
+<!-- ============================================================ -->
+<div class="filter-bar">
+    <div class="period-bar">
+        <a href="?period=7{% if selected_branch_id %}&branch={{ selected_branch_id }}{% endif %}"
+           class="period-btn {% if period_days == 7 %}active{% endif %}">
+            <i class="fas fa-calendar-day"></i> Last 7 days
+        </a>
+        <a href="?period=30{% if selected_branch_id %}&branch={{ selected_branch_id }}{% endif %}"
+           class="period-btn {% if period_days == 30 %}active{% endif %}">
+            <i class="fas fa-calendar-week"></i> Last 30 days
+        </a>
+        <a href="?period=90{% if selected_branch_id %}&branch={{ selected_branch_id }}{% endif %}"
+           class="period-btn {% if period_days == 90 %}active{% endif %}">
+            <i class="fas fa-calendar-alt"></i> Last 90 days
+        </a>
+        <a href="?period=365{% if selected_branch_id %}&branch={{ selected_branch_id }}{% endif %}"
+           class="period-btn {% if period_days == 365 %}active{% endif %}">
+            <i class="fas fa-calendar"></i> Last 12 months
+        </a>
+    </div>
+
+    {% if can_see_all_branches %}
+    <form method="get" style="display:flex;gap:8px;align-items:center;">
+        <input type="hidden" name="period" value="{{ period_days }}">
+        <i class="fas fa-code-branch" style="color:#6b7280;"></i>
+        <select name="branch" class="branch-select" onchange="this.form.submit()">
+            <option value="">All Branches</option>
+            {% for b in branches %}
+                <option value="{{ b.id }}"
+                    {% if selected_branch_id == b.id|stringformat:"s" %}selected{% endif %}>
+                    {{ b.name }}
+                </option>
+            {% endfor %}
+        </select>
+    </form>
+    {% endif %}
 </div>
 
-<!-- Headline summary -->
+<!-- ============================================================ -->
+<!-- HEADLINE SUMMARY                                              -->
+<!-- ============================================================ -->
 <div class="summary-banner">
     <div>
         <div class="label">Profit ({{ period_label }})</div>
@@ -208,6 +375,289 @@
             {{ start_date|date:"d M" }} → {{ today|date:"d M Y" }}
         </div>
     </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- BEST / WORST MONTH (priority section)                         -->
+<!-- ============================================================ -->
+<div class="section">
+    <div class="section-title">
+        <i class="fas fa-chart-line"></i> Monthly Performance Ranking
+        <span class="badge">Last 6 months</span>
+    </div>
+
+    {% if best_month or worst_month %}
+    <div class="highlight-grid">
+        {% if best_month %}
+        <div class="highlight-card best">
+            <i class="fas fa-trophy hc-icon"></i>
+            <div class="hc-title">🏆 Best Month</div>
+            <div class="hc-month">{{ best_month.month_label }}</div>
+            <div class="hc-profit">+ KES {{ best_month.profit|floatformat:0 }}</div>
+            <div class="hc-detail">
+                Revenue KES {{ best_month.revenue|floatformat:0 }} ·
+                Cost KES {{ best_month.cost|floatformat:0 }} ·
+                Margin {{ best_month.margin }}%
+            </div>
+            <div class="hc-detail">
+                {{ best_month.eggs|floatformat:0 }} eggs ·
+                {{ best_month.birds_sold }} birds sold
+            </div>
+        </div>
+        {% endif %}
+
+        {% if worst_month %}
+        <div class="highlight-card worst">
+            <i class="fas fa-arrow-trend-down hc-icon"></i>
+            <div class="hc-title">📉 Worst Month</div>
+            <div class="hc-month">{{ worst_month.month_label }}</div>
+            <div class="hc-profit">
+                {% if worst_month.profit >= 0 %}+{% endif %}
+                KES {{ worst_month.profit|floatformat:0 }}
+            </div>
+            <div class="hc-detail">
+                Revenue KES {{ worst_month.revenue|floatformat:0 }} ·
+                Cost KES {{ worst_month.cost|floatformat:0 }} ·
+                Margin {{ worst_month.margin }}%
+            </div>
+            <div class="hc-detail">
+                {{ worst_month.eggs|floatformat:0 }} eggs ·
+                {{ worst_month.birds_sold }} birds sold
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Monthly bar chart -->
+    {% if monthly_rows %}
+    <div class="month-chart">
+        {% for m in monthly_rows %}
+        <div class="month-bar-wrap">
+            <div class="month-bar-value">
+                {% if m.profit >= 0 %}+{% endif %}{{ m.profit|floatformat:0 }}
+            </div>
+            <div class="month-bar {% if m.profit >= 0 %}positive{% else %}negative{% endif %}"
+                 style="height: {% widthratio m.profit max_abs_profit 100 %}%;
+                        {% if m.profit < 0 %}height: {% widthratio m.profit max_abs_profit 100 %}%;{% endif %}">
+            </div>
+            <div class="month-bar-label">{{ m.short_label }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Monthly detail table -->
+    {% if monthly_rows %}
+    <table class="data-table" style="margin-top:14px;">
+        <thead>
+            <tr>
+                <th>Month</th>
+                <th style="text-align:right;">Revenue</th>
+                <th style="text-align:right;">Cost</th>
+                <th style="text-align:right;">Profit</th>
+                <th style="text-align:right;">Margin</th>
+                <th style="text-align:right;">Eggs</th>
+                <th style="text-align:right;">Birds Sold</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in monthly_rows %}
+            <tr>
+                <td><strong>{{ m.month_label }}</strong></td>
+                <td class="cell-num">{{ m.revenue|floatformat:0 }}</td>
+                <td class="cell-num">{{ m.cost|floatformat:0 }}</td>
+                <td class="cell-num {% if m.profit >= 0 %}cell-good{% else %}cell-bad{% endif %}">
+                    {% if m.profit >= 0 %}+{% endif %}{{ m.profit|floatformat:0 }}
+                </td>
+                <td class="cell-num {% if m.margin >= 0 %}cell-good{% else %}cell-bad{% endif %}">
+                    {{ m.margin }}%
+                </td>
+                <td class="cell-num">{{ m.eggs|floatformat:0 }}</td>
+                <td class="cell-num">{{ m.birds_sold }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>
+
+<!-- ============================================================ -->
+<!-- BRANCH BREAKDOWN (only when viewing all)                      -->
+<!-- ============================================================ -->
+{% if can_see_all_branches and not selected_branch_id %}
+<div class="section">
+    <div class="section-title">
+        <i class="fas fa-code-branch"></i> Branch Performance
+        <span class="badge">{{ branch_breakdown|length }} branch{{ branch_breakdown|length|pluralize:"es" }}</span>
+    </div>
+    {% if branch_breakdown %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Branch</th>
+                <th style="text-align:right;">Birds</th>
+                <th style="text-align:right;">Eggs</th>
+                <th style="text-align:right;">Revenue</th>
+                <th style="text-align:right;">Cost</th>
+                <th style="text-align:right;">Profit</th>
+                <th style="text-align:right;">Margin</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in branch_breakdown %}
+            <tr>
+                <td><strong>{{ row.branch.name }}</strong></td>
+                <td class="cell-num">{{ row.birds }}</td>
+                <td class="cell-num">{{ row.eggs|floatformat:0 }}</td>
+                <td class="cell-num">{{ row.revenue|floatformat:0 }}</td>
+                <td class="cell-num">{{ row.cost|floatformat:0 }}</td>
+                <td class="cell-num {% if row.profit >= 0 %}cell-good{% else %}cell-bad{% endif %}">
+                    {% if row.profit >= 0 %}+{% endif %}{{ row.profit|floatformat:0 }}
+                </td>
+                <td class="cell-num {% if row.margin >= 0 %}cell-good{% else %}cell-bad{% endif %}">
+                    {{ row.margin }}%
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-block">No branch data in this period.</div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- ============================================================ -->
+<!-- INVENTORY SNAPSHOT                                            -->
+<!-- ============================================================ -->
+<div class="section">
+    <div class="section-title">
+        <i class="fas fa-boxes-stacked"></i> Inventory Snapshot
+        <span class="badge">
+            {% if selected_branch %}{{ selected_branch.name }}{% else %}All Branches{% endif %}
+        </span>
+    </div>
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label"><i class="fas fa-egg" style="color:#1fb4d2;"></i> Eggs in Stock</div>
+            <div class="kpi-value">{{ egg_stock_eggs|floatformat:0 }}</div>
+            <div class="kpi-sub">worth KES {{ egg_stock_value|floatformat:0 }}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label"><i class="fas fa-wheat-awn" style="color:#d97706;"></i> Feed in Stock</div>
+            <div class="kpi-value">{{ feed_stock_kg|floatformat:0 }} kg</div>
+            <div class="kpi-sub">worth KES {{ feed_stock_value|floatformat:0 }}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label"><i class="fas fa-kiwi-bird" style="color:#059669;"></i> Birds in Stock</div>
+            <div class="kpi-value">{{ total_birds }}</div>
+            <div class="kpi-sub">{{ layers_count }} layers · {{ broilers_count }} broilers</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label"><i class="fas fa-triangle-exclamation" style="color:#dc2626;"></i> Low Stock Items</div>
+            <div class="kpi-value {% if low_stock_count %}bad{% endif %}">{{ low_stock_count }}</div>
+            <div class="kpi-sub">at or below reorder level</div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- REVENUE BREAKDOWN                                             -->
+<!-- ============================================================ -->
+<div class="section">
+    <div class="section-title">
+        <i class="fas fa-coins"></i> Revenue Breakdown
+    </div>
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">
+                <i class="fas fa-egg" style="color:#1fb4d2;margin-right:4px;"></i>
+                Egg Sales
+            </div>
+            <div class="kpi-value">KES {{ egg_sales_total|floatformat:0 }}</div>
+            <div class="kpi-sub">{{ eggs_sold }} eggs sold</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">
+                <i class="fas fa-drumstick-bite" style="color:#1fb4d2;margin-right:4px;"></i>
+                Bird Sales
+            </div>
+            <div class="kpi-value">KES {{ bird_sales_total|floatformat:0 }}</div>
+            <div class="kpi-sub">
+                {{ birds_sold_count }} birds
+                {% if bird_sales_count %} · {{ bird_sales_count }} sale{{ bird_sales_count|pluralize }}{% endif %}
+            </div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Total Collected</div>
+            <div class="kpi-value good">KES {{ total_collected|floatformat:0 }}</div>
+            <div class="kpi-sub">cash received</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Outstanding</div>
+            <div class="kpi-value {% if total_outstanding > 0 %}bad{% endif %}">
+                KES {{ total_outstanding|floatformat:0 }}
+            </div>
+            <div class="kpi-sub">owed by customers</div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- COSTS + EXPENSE CATEGORY BREAKDOWN                            -->
+<!-- ============================================================ -->
+<div class="section">
+    <div class="section-title">
+        <i class="fas fa-wallet"></i> Costs
+    </div>
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">Feed</div>
+            <div class="kpi-value bad">KES {{ feed_cost|floatformat:0 }}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Health / Veterinary</div>
+            <div class="kpi-value bad">KES {{ health_cost|floatformat:0 }}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Other Expenses</div>
+            <div class="kpi-value bad">KES {{ other_cost|floatformat:0 }}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Total Cost</div>
+            <div class="kpi-value bad">KES {{ total_cost|floatformat:0 }}</div>
+        </div>
+    </div>
+
+    {% if expense_by_category %}
+    <table class="data-table" style="margin-top:16px;">
+        <thead>
+            <tr>
+                <th>Expense Category</th>
+                <th style="text-align:right;">Entries</th>
+                <th style="text-align:right;">Amount (KES)</th>
+                <th style="text-align:right;">% of Other</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in expense_by_category %}
+            <tr>
+                <td><strong>{{ row.label }}</strong></td>
+                <td class="cell-num">{{ row.count }}</td>
+                <td class="cell-num">{{ row.total|floatformat:0 }}</td>
+                <td class="cell-num">
+                    {% if other_cost %}
+                        {% widthratio row.total other_cost 100 %}%
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
 </div>
 
 <!-- ============================================================ -->
@@ -242,169 +692,81 @@
 </div>
 
 <!-- ============================================================ -->
-<!-- REVENUE — EGG SALES + BIRD SALES                             -->
+<!-- TOP CUSTOMERS + FLOCK PERFORMANCE (two-column)                -->
 <!-- ============================================================ -->
-<div class="section">
-    <div class="section-title">
-        <i class="fas fa-coins"></i> Revenue Breakdown
+<div class="two-col">
+    <div class="section">
+        <div class="section-title">
+            <i class="fas fa-trophy"></i> Top Customers
+        </div>
+        {% if top_customers %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Customer</th>
+                        <th style="text-align:right;">Sales</th>
+                        <th style="text-align:right;">Total (KES)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in top_customers %}
+                    <tr>
+                        <td><strong>{{ c.customer__name }}</strong></td>
+                        <td class="cell-num">{{ c.count }}</td>
+                        <td class="cell-num">{{ c.total|floatformat:0 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="empty-block">No customer sales in this period.</div>
+        {% endif %}
     </div>
-    <div class="kpi-grid">
-        <!-- Egg Sales -->
-        <div class="kpi-card">
-            <div class="kpi-label">
-                <i class="fas fa-egg" style="color:#1fb4d2;margin-right:4px;"></i>
-                Egg Sales
-            </div>
-            <div class="kpi-value">KES {{ egg_sales_total|floatformat:0 }}</div>
-            <div class="kpi-sub">{{ eggs_sold }} eggs sold</div>
-        </div>
 
-        <!-- Bird Sales -->
-        <div class="kpi-card">
-            <div class="kpi-label">
-                <i class="fas fa-drumstick-bite" style="color:#1fb4d2;margin-right:4px;"></i>
-                Bird Sales
-            </div>
-            <div class="kpi-value">KES {{ bird_sales_total|floatformat:0 }}</div>
-            <div class="kpi-sub">
-                {{ birds_sold_count }} birds
-                {% if bird_sales_count %} · {{ bird_sales_count }} sale{{ bird_sales_count|pluralize }}{% endif %}
-            </div>
+    <div class="section">
+        <div class="section-title">
+            <i class="fas fa-kiwi-bird"></i> Flock Performance
         </div>
-
-        <!-- Collected -->
-        <div class="kpi-card">
-            <div class="kpi-label">Total Collected</div>
-            <div class="kpi-value good">KES {{ total_collected|floatformat:0 }}</div>
-            <div class="kpi-sub">cash received</div>
-        </div>
-
-        <!-- Outstanding -->
-        <div class="kpi-card">
-            <div class="kpi-label">Outstanding</div>
-            <div class="kpi-value {% if total_outstanding > 0 %}bad{% endif %}">
-                KES {{ total_outstanding|floatformat:0 }}
-            </div>
-            <div class="kpi-sub">owed by customers</div>
-        </div>
+        {% if flock_summary %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Flock</th>
+                        <th style="text-align:right;">Birds</th>
+                        <th style="text-align:right;">Eggs</th>
+                        <th style="text-align:right;">Deaths</th>
+                        <th style="text-align:right;">Feed (kg)</th>
+                        <th style="text-align:right;">Birds Sold</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in flock_summary %}
+                    <tr>
+                        <td>
+                            <strong>{{ row.flock.name }}</strong><br>
+                            <small style="color:#9ca3af;">
+                                {{ row.flock.get_flock_type_display }} · {{ row.flock.age_in_weeks }}w
+                            </small>
+                        </td>
+                        <td class="cell-num">{{ row.flock.current_count }}</td>
+                        <td class="cell-num">{{ row.eggs }}</td>
+                        <td class="cell-num">{{ row.deaths }}</td>
+                        <td class="cell-num">{{ row.feed_kg|floatformat:0 }}</td>
+                        <td class="cell-num">
+                            {% if row.birds_sold %}
+                                <strong>{{ row.birds_sold }}</strong>
+                            {% else %}
+                                <span style="color:#d1d5db;">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="empty-block">No flocks recorded yet.</div>
+        {% endif %}
     </div>
-</div>
-
-<!-- ============================================================ -->
-<!-- COSTS                                                         -->
-<!-- ============================================================ -->
-<div class="section">
-    <div class="section-title">
-        <i class="fas fa-wallet"></i> Costs
-    </div>
-    <div class="kpi-grid">
-        <div class="kpi-card">
-            <div class="kpi-label">Feed</div>
-            <div class="kpi-value bad">KES {{ feed_cost|floatformat:0 }}</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">Health</div>
-            <div class="kpi-value bad">KES {{ health_cost|floatformat:0 }}</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">Other Expenses</div>
-            <div class="kpi-value bad">KES {{ other_cost|floatformat:0 }}</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">Total Cost</div>
-            <div class="kpi-value bad">KES {{ total_cost|floatformat:0 }}</div>
-        </div>
-    </div>
-</div>
-
-<!-- ============================================================ -->
-<!-- TOP CUSTOMERS                                                 -->
-<!-- ============================================================ -->
-<div class="section">
-    <div class="section-title">
-        <i class="fas fa-trophy"></i> Top Customers
-    </div>
-    {% if top_customers %}
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Customer</th>
-                    <th style="text-align:right;">Sales</th>
-                    <th style="text-align:right;">Total (KES)</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for c in top_customers %}
-                <tr>
-                    <td><strong>{{ c.customer__name }}</strong></td>
-                    <td class="cell-num">{{ c.count }}</td>
-                    <td class="cell-num">{{ c.total|floatformat:0 }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    {% else %}
-        <div class="empty-block">
-            No customer sales in this period.
-        </div>
-    {% endif %}
-</div>
-
-<!-- ============================================================ -->
-<!-- FLOCK PERFORMANCE                                             -->
-<!-- ============================================================ -->
-<div class="section">
-    <div class="section-title">
-        <i class="fas fa-kiwi-bird"></i> Flock Performance
-    </div>
-    {% if flock_summary %}
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Flock</th>
-                    <th>Type</th>
-                    <th>Age</th>
-                    <th style="text-align:right;">Current Birds</th>
-                    <th style="text-align:right;">Eggs</th>
-                    <th style="text-align:right;">Deaths</th>
-                    <th style="text-align:right;">Feed (kg)</th>
-                    <th style="text-align:right;">Birds Sold</th>
-                    <th style="text-align:right;">Bird Revenue</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in flock_summary %}
-                <tr>
-                    <td><strong>{{ row.flock.name }}</strong></td>
-                    <td>{{ row.flock.get_flock_type_display }}</td>
-                    <td>{{ row.flock.age_in_weeks }}w</td>
-                    <td class="cell-num">{{ row.flock.current_count }}</td>
-                    <td class="cell-num">{{ row.eggs }}</td>
-                    <td class="cell-num">{{ row.deaths }}</td>
-                    <td class="cell-num">{{ row.feed_kg|floatformat:0 }}</td>
-                    <td class="cell-num">
-                        {% if row.birds_sold %}
-                            <strong>{{ row.birds_sold }}</strong>
-                        {% else %}
-                            <span style="color:#d1d5db;">—</span>
-                        {% endif %}
-                    </td>
-                    <td class="cell-num">
-                        {% if row.bird_revenue %}
-                            KES {{ row.bird_revenue|floatformat:0 }}
-                        {% else %}
-                            <span style="color:#d1d5db;">—</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    {% else %}
-        <div class="empty-block">
-            No flocks recorded yet.
-        </div>
-    {% endif %}
 </div>
 
 {% endblock %}

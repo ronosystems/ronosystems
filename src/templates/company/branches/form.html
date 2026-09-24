@@ -1,7 +1,87 @@
 {% extends base_template|default:"base.html" %}
 
-{% block title %}Branch Form{% endblock %}
+{% block title %}{% if branch %}Edit{% else %}Create{% endif %} Branch{% endblock %}
 
+{% block extra_css %}
+<style>
+    .form-label {
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+    .form-label.required::after {
+        content: ' *';
+        color: #dc3545;
+    }
+    .form-control, .form-select {
+        border: 2px solid #000;
+        border-radius: 4px;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135, 206, 235, 0.25);
+    }
+    .card {
+        border: 2px solid #000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000;
+        color: #000;
+        font-weight: 600;
+    }
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000;
+        color: #000;
+    }
+    .btn-secondary {
+        border: 2px solid #000;
+        font-weight: 600;
+    }
+
+    /* Mother branch card */
+    .mother-branch-box {
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        border: 2px solid #000;
+        border-radius: 8px;
+        padding: 16px 18px;
+        margin-bottom: 20px;
+    }
+    .mother-branch-box .mb-title {
+        font-weight: 800;
+        color: #92400e;
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+    }
+    .mother-branch-box .mb-title i {
+        color: #d97706;
+        font-size: 1.2rem;
+    }
+    .mother-branch-box .mb-help {
+        color: #78350f;
+        font-size: 0.8rem;
+        line-height: 1.5;
+        margin: 0;
+    }
+
+    /* Warning when another mother already exists */
+    .mother-warning {
+        background: #fef3c7;
+        border-left: 4px solid #d97706;
+        padding: 10px 14px;
+        border-radius: 4px;
+        font-size: 0.82rem;
+        color: #78350f;
+        margin-top: 8px;
+    }
+    .mother-warning strong { color: #92400e; }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -10,7 +90,7 @@
             <div class="card-body p-4">
                 <form method="post">
                     {% csrf_token %}
-                    
+
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label required">Branch Name</label>
@@ -68,6 +148,44 @@
                         </div>
                     </div>
 
+                    <!-- ============================================================ -->
+                    <!-- MOTHER BRANCH                                                  -->
+                    <!-- The mother branch is the feeder / HQ / warehouse for the       -->
+                    <!-- company. Other branches draw stock from it. Only one mother    -->
+                    <!-- branch is allowed per company.                                  -->
+                    <!-- ============================================================ -->
+                    <div class="mother-branch-box">
+                        <div class="mb-title">
+                            <i class="fas fa-crown"></i>
+                            Mother Branch (HQ / Feeder)
+                        </div>
+                        <div class="form-check mb-0">
+                            <input type="checkbox"
+                                   class="form-check-input"
+                                   name="is_mother_branch"
+                                   id="isMotherBranch"
+                                   {% if branch.is_mother_branch %}checked{% endif %}>
+                            <label class="form-check-label fw-bold" for="isMotherBranch">
+                                Mark this branch as the Mother Branch
+                            </label>
+                        </div>
+                        <p class="mb-help mt-2">
+                            The mother branch is the source of stock for all other branches.
+                            It is typically the warehouse or HQ. Only <strong>one</strong> mother branch
+                            is allowed per company — marking this one will unmark any existing mother branch.
+                        </p>
+
+                        {% if existing_mother_branch and not branch or existing_mother_branch.id != branch.id %}
+                        <div class="mother-warning">
+                            <i class="fas fa-info-circle"></i>
+                            Currently, <strong>{{ existing_mother_branch.name }}</strong>
+                            ({{ existing_mother_branch.code }}) is the mother branch.
+                            Checking this box will transfer the mother-branch designation to
+                            {% if branch %}<strong>{{ branch.name }}</strong>{% else %}this new branch{% endif %}.
+                        </div>
+                        {% endif %}
+                    </div>
+
                     <div class="mb-3 form-check">
                         <input type="checkbox" class="form-check-input" name="is_active" id="isActive" {% if branch.is_active or not branch %}checked{% endif %}>
                         <label class="form-check-label" for="isActive">Active</label>
@@ -75,7 +193,7 @@
 
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i> 
+                            <i class="fas fa-save"></i>
                             {% if branch %}Update Branch{% else %}Create Branch{% endif %}
                         </button>
                         <a href="/company/branches/" class="btn btn-secondary">Cancel</a>

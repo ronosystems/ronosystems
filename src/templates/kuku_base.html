@@ -99,6 +99,26 @@
         .sidebar.collapsed .sidebar-brand .logo-img { max-width: 45px; max-height: 45px; }
         .sidebar.collapsed .sidebar-brand .logo-icon { font-size: 1.5rem; }
 
+        /* Branch chip under company name */
+        .sidebar-brand .user-branch-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 8px;
+            padding: 3px 10px;
+            background: rgba(135, 206, 235, 0.2);
+            border: 1px solid #87CEEB;
+            border-radius: 50px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            color: #e0f7fa;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            transition: opacity 0.2s;
+        }
+        .sidebar-brand .user-branch-chip i { font-size: 0.7rem; color: #87CEEB; }
+        .sidebar.collapsed .sidebar-brand .user-branch-chip { display: none; }
+
         /* Nav wrapper */
         .sidebar-nav-wrapper {
             flex: 1;
@@ -491,6 +511,7 @@
             }
             .sidebar.collapsed .sidebar-brand h5,
             .sidebar.collapsed .sidebar-brand .company-name,
+            .sidebar.collapsed .sidebar-brand .user-branch-chip,
             .sidebar.collapsed .sidebar-nav .nav-label,
             .sidebar.collapsed .sidebar-nav .nav-link span:not(.badge),
             .sidebar.collapsed .sidebar-nav .nav-link .badge {
@@ -526,7 +547,9 @@
     <!-- Sidebar overlay (mobile) -->
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-    <!-- Sidebar -->
+    <!-- ============================================================ -->
+    <!-- SIDEBAR                                                       -->
+    <!-- ============================================================ -->
     <aside class="sidebar" id="sidebar">
 
         <!-- Brand -->
@@ -563,6 +586,13 @@
                     <h5>Kuku Biz</h5>
                 </span>
             {% endif %}
+
+            {# Show which branch this user belongs to #}
+            {% if user.is_authenticated and user.branch %}
+                <div class="user-branch-chip">
+                    <i class="fas fa-code-branch"></i> {{ user.branch.name }}
+                </div>
+            {% endif %}
         </div>
 
         <!-- Navigation -->
@@ -570,20 +600,25 @@
             <nav class="sidebar-nav">
                 <ul class="nav flex-column">
 
-                    {# ============================================ #}
-                    {# KUKU BIZ OPERATIONS                          #}
-                    {# ============================================ #}
-                    <li class="nav-label">KUKU MANAGEMENT</li>
+                    {% with role=user.role %}
 
-                    {# Dashboard — everyone #}
+                    {# ============================================================ #}
+                    {# KUKU MANAGEMENT — Dashboard for all Kuku Biz roles            #}
+                    {# ============================================================ #}
+                    {% if role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or role == 'stock_controller' or role == 'company_cashier' or role == 'company_agent' or role == 'mpesa_agent' or user.is_superuser %}
+                    <li class="nav-label">KUKU MANAGEMENT</li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.path == '/kuku_biz/dashboard/' %}active{% endif %}"
-                           href="/kuku_biz/dashboard/">
+                           href="{% url 'kuku_biz:dashboard' %}">
                             <i class="fas fa-chart-pie"></i> <span>Dashboard</span>
                         </a>
                     </li>
+                    {% endif %}
 
-                    {% if company and user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager'  or user.role == 'mpesa_agent' %}
+                    {# ============================================================ #}
+                    {# M-PESA SHOP — HQ + mpesa_agent only                          #}
+                    {# ============================================================ #}
+                    {% if company and role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or role == 'mpesa_agent' or user.is_superuser %}
                     <li class="nav-label">MPESA SHOP</li>
                     <li class="nav-item">
                         <a class="nav-link {% if '/treasury/' in request.path %}active{% endif %}"
@@ -593,17 +628,18 @@
                     </li>
                     {% endif %}
 
-
+                    {# ============================================================ #}
+                    {# KUKU SALES SHOP — cashiers, agents, stock controllers, HQ    #}
+                    {# ============================================================ #}
+                    {% if role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or role == 'stock_controller' or role == 'company_cashier' or role == 'company_agent' or user.is_superuser %}
                     <li class="nav-label">KUKU SALES SHOP</li>
-                    {# Sales — everyone except guest & mpesa_agent #}
-                    {% if user.role != 'guest' and user.role != 'mpesa_agent' %}
+
                     <li class="nav-item">
                         <a class="nav-link {% if '/kuku_biz/sales/' in request.path %}active{% endif %}"
-                           href="/kuku_biz/sales/">
-                            <i class="fas fa-shopping-cart"></i> <span>Shop Sales </span>
+                           href="{% url 'kuku_biz:sale_list' %}">
+                            <i class="fas fa-shopping-cart"></i> <span>Shop Sales</span>
                         </a>
                     </li>
-                    {% endif %}
 
                     <li class="nav-item">
                         <a class="nav-link {% if '/kuku_biz/prices/' in request.path %}active{% endif %}"
@@ -612,85 +648,89 @@
                         </a>
                     </li>
 
-                    {# Customers — full-access + cashier + agent #}
-                    {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'stock_controller' or user.role == 'company_cashier' or user.role == 'company_agent' %}
                     <li class="nav-item">
                         <a class="nav-link {% if '/kuku_biz/customers/' in request.path %}active{% endif %}"
-                           href="/kuku_biz/customers/">
+                           href="{% url 'kuku_biz:customer_list' %}">
                             <i class="fas fa-users"></i> <span>Customers</span>
                         </a>
                     </li>
                     {% endif %}
 
-                    {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'stock_controller'  %}
-                    {# Flocks — everyone can view #}
-                    <li class="nav-label">KUKU MANAGEMENT</li>
+                    {# ============================================================ #}
+                    {# KUKU PRODUCTION — HQ + stock controller                      #}
+                    {# ============================================================ #}
+                    {% if role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or role == 'stock_controller' or user.is_superuser %}
+                    <li class="nav-label">KUKU PRODUCTION</li>
+
                     <li class="nav-item">
                         <a class="nav-link {% if '/kuku_biz/flocks/' in request.path %}active{% endif %}"
-                           href="/kuku_biz/flocks/">
+                           href="{% url 'kuku_biz:flock_list' %}">
                             <i class="fas fa-kiwi-bird"></i> <span>Flocks</span>
                         </a>
                     </li>
 
                     <li class="nav-item">
                         <a class="nav-link {% if '/kuku_biz/bird-sales/' in request.path %}active{% endif %}"
-                           href="/kuku_biz/bird-sales/">
+                           href="{% url 'kuku_biz:bird_sale_list' %}">
                             <i class="fas fa-drumstick-bite"></i> <span>Bird Sales</span>
                         </a>
                     </li>
 
-                    {# Egg Production — everyone can view #}
                     <li class="nav-item">
-                        <a class="nav-link {% if '/kuku_biz/eggs/' in request.path %}active{% endif %}"
-                           href="/kuku_biz/eggs/">
+                        <a class="nav-link {% if '/kuku_biz/eggs/' in request.path and 'inventory' not in request.path %}active{% endif %}"
+                           href="{% url 'kuku_biz:egg_list' %}">
                             <i class="fas fa-egg"></i> <span>Production</span>
                         </a>
                     </li>
-                    {% endif %}
 
-                    {# ---------- FULL-ACCESS OPERATIONS ---------- #}
-                    {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'stock_controller' %}
                     <li class="nav-item">
-                       <a class="nav-link {% if request.path == '/kuku_biz/feed/' %}active{% endif %}"
-                          href="/kuku_biz/feed/">
-                          <i class="fas fa-wheat-awn"></i> <span>Feed Store</span>
+                        <a class="nav-link {% if request.path == '/kuku_biz/feed/' %}active{% endif %}"
+                           href="{% url 'kuku_biz:feed_list' %}">
+                            <i class="fas fa-wheat-awn"></i> <span>Feed Store</span>
                         </a>
                     </li>
 
                     <li class="nav-item">
                         <a class="nav-link {% if '/kuku_biz/feed-types/' in request.path %}active{% endif %}"
                            href="{% url 'kuku_biz:feed_type_list' %}">
-                             <i class="fas fa-seedling"></i> <span>Feed Types</span>
+                            <i class="fas fa-seedling"></i> <span>Feed Types</span>
                         </a>
                     </li>
 
                     <li class="nav-item">
                         <a class="nav-link {% if '/kuku_biz/feed/consumption/' in request.path %}active{% endif %}"
-                            href="{% url 'kuku_biz:feed_consumption_list' %}">
-                             <i class="fas fa-utensils"></i> <span>Consumption</span>
+                           href="{% url 'kuku_biz:feed_consumption_list' %}">
+                            <i class="fas fa-utensils"></i> <span>Consumption</span>
                         </a>
                     </li>
 
                     <li class="nav-item">
                         <a class="nav-link {% if '/kuku_biz/health/' in request.path %}active{% endif %}"
-                           href="/kuku_biz/health/">
+                           href="{% url 'kuku_biz:health_list' %}">
                             <i class="fas fa-briefcase-medical"></i> <span>Health</span>
                         </a>
                     </li>
 
                     <li class="nav-item">
                         <a class="nav-link {% if '/kuku_biz/mortality/' in request.path %}active{% endif %}"
-                           href="/kuku_biz/mortality/">
+                           href="{% url 'kuku_biz:mortality_list' %}">
                             <i class="fas fa-triangle-exclamation"></i> <span>Mortality</span>
                         </a>
                     </li>
 
                     <li class="nav-item">
                         <a class="nav-link {% if '/kuku_biz/expenses/' in request.path %}active{% endif %}"
-                           href="/kuku_biz/expenses/">
+                           href="{% url 'kuku_biz:expense_list' %}">
                             <i class="fas fa-wallet"></i> <span>Expenses</span>
                         </a>
                     </li>
+                    {% endif %}
+
+                    {# ============================================================ #}
+                    {# STOCK / INVENTORY — cashiers, agents, stock, HQ              #}
+                    {# ============================================================ #}
+                    {% if role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or role == 'stock_controller' or role == 'company_cashier' or role == 'company_agent' or role == 'mpesa_agent' or user.is_superuser %}
+                    <li class="nav-label">STOCK</li>
 
                     <li class="nav-item">
                         <a class="nav-link {% if '/kuku_biz/inventory/' in request.path %}active{% endif %}"
@@ -700,10 +740,24 @@
                     </li>
                     {% endif %}
 
-                    {# ============================================ #}
-                    {# COMPANY — super admin, admin, manager only    #}
-                    {# ============================================ #}
-                    {% if company and user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' %}
+                    {# ============================================================ #}
+                    {# KUKU REPORTS — HQ + stock controller                         #}
+                    {# ============================================================ #}
+                    {% if role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or role == 'stock_controller' or user.is_superuser %}
+                    <li class="nav-label">REPORTS</li>
+
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/kuku_biz/reports/' in request.path %}active{% endif %}"
+                           href="{% url 'kuku_biz:reports' %}">
+                            <i class="fas fa-file-alt"></i> <span>Kuku Reports</span>
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    {# ============================================================ #}
+                    {# EMPLOYEES SETTINGS — admin / manager / super_admin           #}
+                    {# ============================================================ #}
+                    {% if company and role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or user.is_superuser %}
                     <li class="nav-label">EMPLOYEES SETTINGS</li>
 
                     <li class="nav-item">
@@ -724,24 +778,16 @@
                     </li>
                     {% endif %}
 
-                    {# ============================================ #}
-                    {# ACCOUNT — everyone with a company            #}
-                    {# ============================================ #}
-                    {% if company and user.role != 'guest' and user.role != 'mpesa_agent' %}
-                    {% if user.role == 'super_admin' or user.role == 'company_admin' %}
-                    <li class="nav-label">COMPANY SETTINGS </li>
+                    {# ============================================================ #}
+                    {# COMPANY SETTINGS — admin / super_admin only                  #}
+                    {# ============================================================ #}
+                    {% if company and role == 'super_admin' or role == 'company_admin' %}
+                    <li class="nav-label">COMPANY SETTINGS</li>
 
                     <li class="nav-item">
                         <a class="nav-link {% if '/company/branches/' in request.path %}active{% endif %}"
                            href="/company/branches/">
                             <i class="fas fa-building"></i> <span>Company Branches</span>
-                        </a>
-                    </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/kuku_biz/reports/' in request.path %}active{% endif %}"
-                           href="/kuku_biz/reports/">
-                            <i class="fas fa-file-alt"></i> <span>Company Reports</span>
                         </a>
                     </li>
 
@@ -759,13 +805,12 @@
                         </a>
                     </li>
                     {% endif %}
-                    {% endif %}
 
-                    {# ============================================ #}
-                    {# SUPER ADMIN — only outside support mode       #}
-                    {# ============================================ #}
-                    {% if user.is_authenticated and user.role == 'super_admin' and not is_support_mode %}
-                    <li class="nav-label">Super Admin</li>
+                    {# ============================================================ #}
+                    {# SUPER ADMIN — outside support mode only                      #}
+                    {# ============================================================ #}
+                    {% if user.is_authenticated and role == 'super_admin' and not is_support_mode %}
+                    <li class="nav-label">SUPER ADMIN</li>
 
                     <li class="nav-item">
                         <a class="nav-link {% if '/support/' in request.path %}active{% endif %}"
@@ -776,7 +821,7 @@
 
                     <li class="nav-item">
                         <a class="nav-link" href="/admin/">
-                            <i class="fas fa-tag"></i> <span>Admin Panel</span>
+                            <i class="fas fa-user-shield"></i> <span>Admin Panel</span>
                         </a>
                     </li>
 
@@ -809,7 +854,7 @@
                     </li>
 
                     <li class="nav-item">
-                        <a class="nav-link {% if '/reports/' in request.path %}active{% endif %}"
+                        <a class="nav-link {% if '/reports/' in request.path and '/kuku_biz/' not in request.path %}active{% endif %}"
                            href="/reports/">
                             <i class="fas fa-file-alt"></i> <span>Platform Reports</span>
                         </a>
@@ -823,11 +868,11 @@
                     </li>
                     {% endif %}
 
-                    {# ============================================ #}
-                    {# GUEST — minimal #}
-                    {# ============================================ #}
-                    {% if user.role == 'guest' %}
-                    <li class="nav-label">Home</li>
+                    {# ============================================================ #}
+                    {# GUEST — minimal fallback                                     #}
+                    {# ============================================================ #}
+                    {% if role == 'guest' %}
+                    <li class="nav-label">HOME</li>
                     <li class="nav-item">
                         <a class="nav-link {% if '/no-access/' in request.path %}active{% endif %}"
                            href="/no-access/">
@@ -835,6 +880,8 @@
                         </a>
                     </li>
                     {% endif %}
+
+                    {% endwith %}
 
                 </ul>
             </nav>
@@ -849,7 +896,9 @@
         </div>
     </aside>
 
-    <!-- Main content -->
+    <!-- ============================================================ -->
+    <!-- MAIN CONTENT                                                  -->
+    <!-- ============================================================ -->
     <div class="main-content" id="mainContent">
 
         <!-- Support mode banner -->
@@ -975,17 +1024,11 @@
 
         // ============================================================
         // SIDEBAR SCROLL PERSISTENCE
-        // - Remembers scroll position across page loads
-        // - Scrolls the active link into view when arriving on a page
-        // - Uses try/catch so browsers that block localStorage don't
-        //   crash this script
         // ============================================================
         (function () {
             var wrapper = document.getElementById('sidebarNavWrapper');
             if (!wrapper) return;
 
-            // Per-user storage key so different users on a shared browser
-            // don't stomp on each other's scroll position.
             var STORAGE_KEY = 'kuku_sidebar_scroll_{{ user.id|default:"anon" }}';
 
             function loadScroll() {
@@ -994,16 +1037,14 @@
             }
             function saveScroll(value) {
                 try { localStorage.setItem(STORAGE_KEY, value); }
-                catch (e) { /* localStorage unavailable — silently ignore */ }
+                catch (e) { /* localStorage unavailable */ }
             }
 
-            // 1) Restore previous scroll position on load
             var savedScroll = loadScroll();
             if (savedScroll !== null) {
                 wrapper.scrollTop = parseInt(savedScroll, 10) || 0;
             }
 
-            // 2) If a nav-link is marked .active, scroll it into view
             var activeLink = wrapper.querySelector('.nav-link.active');
             if (activeLink) {
                 setTimeout(function () {
@@ -1014,7 +1055,6 @@
                 }, 50);
             }
 
-            // 3) Save scroll position continuously as user scrolls (debounced)
             var saveTimer = null;
             wrapper.addEventListener('scroll', function () {
                 if (saveTimer) clearTimeout(saveTimer);
@@ -1023,12 +1063,10 @@
                 }, 150);
             });
 
-            // 4) Also save right before navigating away
             window.addEventListener('beforeunload', function () {
                 saveScroll(wrapper.scrollTop);
             });
 
-            // 5) Save the moment a sidebar nav-link is clicked
             wrapper.querySelectorAll('.nav-link').forEach(function (link) {
                 link.addEventListener('click', function () {
                     saveScroll(wrapper.scrollTop);

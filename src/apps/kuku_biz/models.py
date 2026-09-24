@@ -245,7 +245,7 @@ class Flock(models.Model):
         related_name='kuku_flocks',
     )
     branch = models.ForeignKey(
-        'epa_shop.Branch',
+        'company.Branch',
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_flocks',
@@ -403,7 +403,7 @@ class BirdSale(models.Model):
         related_name='kuku_bird_sales',
     )
     branch = models.ForeignKey(
-        'epa_shop.Branch',
+        'company.Branch',
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_bird_sales',
@@ -528,7 +528,7 @@ class EggProduction(models.Model):
         related_name='kuku_egg_production',
     )
     branch = models.ForeignKey(
-        'epa_shop.Branch',
+        'company.Branch',
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_egg_production',
@@ -597,6 +597,15 @@ class Customer(models.Model):
         on_delete=models.CASCADE,
         related_name='kuku_customers',
     )
+    # ── NEW: which branch this customer belongs to ──
+    branch = models.ForeignKey(
+        'company.Branch',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='kuku_customers',
+        help_text="Which branch this customer belongs to",
+    )
+
     name = models.CharField(max_length=150)
     customer_type = models.CharField(
         max_length=20, choices=CUSTOMER_TYPE_CHOICES, default='individual'
@@ -617,9 +626,15 @@ class Customer(models.Model):
         ordering = ['name']
         verbose_name = 'Customer'
         verbose_name_plural = 'Customers'
+        indexes = [
+            models.Index(fields=['company', 'branch', 'is_active']),
+            models.Index(fields=['company', 'is_active']),
+        ]
 
     def __str__(self):
         return self.name
+
+
 
 
 # ============================================================
@@ -641,7 +656,7 @@ class EggSale(models.Model):
         related_name='kuku_egg_sales',
     )
     branch = models.ForeignKey(
-        'epa_shop.Branch',
+        'company.Branch',
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_egg_sales',
@@ -972,7 +987,7 @@ class FeedRecord(models.Model):
         related_name='kuku_feed_records',
     )
     branch = models.ForeignKey(
-        'epa_shop.Branch',
+        'company.Branch',
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_feed_records',
@@ -1223,7 +1238,7 @@ class FeedConsumption(models.Model):
         related_name='kuku_feed_consumption',
     )
     branch = models.ForeignKey(
-        'epa_shop.Branch',
+        'company.Branch',
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_feed_consumption',
@@ -1447,7 +1462,7 @@ class HealthRecord(models.Model):
         related_name='kuku_health_records',
     )
     branch = models.ForeignKey(
-        'epa_shop.Branch',
+        'company.Branch',
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_health_records',
@@ -1723,7 +1738,7 @@ class Mortality(models.Model):
         related_name='kuku_mortality',
     )
     branch = models.ForeignKey(
-        'epa_shop.Branch',
+        'company.Branch',
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_mortality',
@@ -1830,17 +1845,22 @@ class Mortality(models.Model):
             flock.current_count = new_count
             flock.save(update_fields=['current_count'])
 
-        @property
-        def loss_per_bird(self):
-            """Estimated loss per bird."""
-            if not self.count:
-                return Decimal('0')
-            return _to_decimal(self.estimated_loss) / Decimal(self.count)
+    # ------------------------------------------------------------
+    # Display / computed properties
+    # ------------------------------------------------------------
+    @property
+    def loss_per_bird(self):
+        """Estimated loss per bird."""
+        if not self.count:
+            return Decimal('0')
+        return _to_decimal(self.estimated_loss) / Decimal(self.count)
 
-        @property
-        def has_health_link(self):
-            return self.related_health_record_id is not None
+    @property
+    def has_health_link(self):
+        return self.related_health_record_id is not None
 
+
+        
 # ============================================================
 # EXPENSES
 # ============================================================
@@ -1859,7 +1879,7 @@ class Expense(models.Model):
         related_name='kuku_expenses',
     )
     branch = models.ForeignKey(
-        'epa_shop.Branch',
+        'company.Branch',
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_expenses',
@@ -1980,7 +2000,7 @@ class InventoryItem(models.Model):
         related_name='kuku_inventory',
     )
     branch = models.ForeignKey(
-        'epa_shop.Branch',
+        'company.Branch',
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_inventory',

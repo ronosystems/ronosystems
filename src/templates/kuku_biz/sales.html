@@ -575,12 +575,12 @@
                     {% endif %}
                 </td>
 
-                <!-- trays -->
+                <!-- Trays × eggs breakdown -->
                 <td class="cell-eggs">
                     {{ sale.eggs_breakdown }}
                 </td>
 
-                <!-- Eggs sold -->
+                <!-- Total eggs sold -->
                 <td class="cell-eggs">
                     {{ sale.total_eggs|floatformat:0 }}
                 </td>
@@ -595,29 +595,42 @@
                         {{ sale.get_status_display }}
                     </span>
                 </td>
+
+                <!-- ============================================================ -->
+                <!-- ACTION BUTTONS                                                 -->
+                <!-- Receipt: everyone. Mark Paid + Edit: Manager/Admin/Stock only  -->
+                <!-- ============================================================ -->
                 <td class="cell-actions">
+                    {# ── Receipt — visible to every user ── #}
                     <a href="{% url 'kuku_biz:sale_receipt' sale.pk %}"
                        class="btn btn-sm btn-receipt"
                        title="View receipt">
                         <i class="fas fa-receipt"></i> Receipt
                     </a>
-                    {% if sale.status != 'paid' and sale.status != 'cancelled' %}
-                        <form method="post"
-                              action="{% url 'kuku_biz:sale_mark_paid' sale.pk %}"
-                              style="display:inline;">
-                            {% csrf_token %}
-                            <button type="submit"
-                                    class="btn btn-sm btn-paid"
-                                    onclick="return confirm('Mark sale #{{ sale.pk }} as fully paid (KES {{ sale.total_amount|floatformat:0 }})?')">
-                                <i class="fas fa-check"></i> Mark Paid
-                            </button>
-                        </form>
+
+                    {# ── Manager / Admin / Stock Controller only ── #}
+                    {% if user.role == 'company_manager' or user.role == 'company_admin' or user.role == 'super_admin' or user.role == 'stock_controller' or user.is_superuser %}
+
+                        {% if sale.status != 'paid' and sale.status != 'cancelled' %}
+                            <form method="post"
+                                  action="{% url 'kuku_biz:sale_mark_paid' sale.pk %}"
+                                  style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit"
+                                        class="btn btn-sm btn-paid"
+                                        onclick="return confirm('Mark sale #{{ sale.pk }} as fully paid (KES {{ sale.total_amount|floatformat:0 }})?')">
+                                    <i class="fas fa-check"></i> Mark Paid
+                                </button>
+                            </form>
+                        {% endif %}
+
+                        <a href="{% url 'kuku_biz:sale_edit' sale.pk %}"
+                           class="btn btn-sm btn-icon"
+                           title="Edit sale">
+                            <i class="fas fa-edit"></i>
+                        </a>
+
                     {% endif %}
-                    <a href="{% url 'kuku_biz:sale_edit' sale.pk %}"
-                       class="btn btn-sm btn-icon"
-                       title="Edit sale">
-                        <i class="fas fa-edit"></i>
-                    </a>
                 </td>
             </tr>
             {% endfor %}

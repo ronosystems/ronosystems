@@ -12,7 +12,7 @@ import csv
 from django.http import HttpResponse
 
 from apps.companies.models import Company
-from apps.epa_shop.models import Branch
+from apps.company.models import Branch
 from .models import (
     Treasury, BankAccount, MpesaAccount, DailyRecord, 
     DailyBankBalance, DailyMpesaBalance, Movement, 

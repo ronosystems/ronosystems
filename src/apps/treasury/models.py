@@ -4,7 +4,6 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from decimal import Decimal
-from apps.epa_shop.models import Branch
 from apps.companies.models import Company
 
 User = get_user_model()
@@ -24,7 +23,7 @@ class Treasury(models.Model):
         related_name='treasuries'
     )
     branch = models.OneToOneField(
-        Branch,
+        'company.Branch',
         on_delete=models.CASCADE,
         related_name='treasury'
     )
@@ -103,7 +102,7 @@ class BankAccount(models.Model):
         related_name='bank_accounts'
     )
     branch = models.ForeignKey(
-        Branch,
+        'company.Branch',
         on_delete=models.CASCADE,
         related_name='bank_accounts'
     )
@@ -195,7 +194,7 @@ class MpesaAccount(models.Model):
         related_name='mpesa_accounts'
     )
     branch = models.ForeignKey(
-        Branch,
+        'company.Branch',
         on_delete=models.CASCADE,
         related_name='mpesa_accounts'
     )
@@ -283,7 +282,7 @@ class DailyRecord(models.Model):
         related_name='daily_records'
     )
     branch = models.ForeignKey(
-        Branch,
+        'company.Branch',
         on_delete=models.CASCADE,
         related_name='daily_records'
     )
@@ -591,7 +590,7 @@ class Movement(models.Model):
         related_name='treasury_movements'
     )
     branch = models.ForeignKey(
-        Branch,
+        'company.Branch',
         on_delete=models.CASCADE,
         related_name='treasury_movements'
     )

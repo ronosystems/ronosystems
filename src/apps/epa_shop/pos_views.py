@@ -1,7 +1,8 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import Phone, Electronic, Accessory, Branch, Unit
+from apps.company.models import Branch
+from .models import Phone, Electronic, Accessory, Unit
 from django.db.models import Q
 from django.http import JsonResponse
 from apps.companies.support_utils import (

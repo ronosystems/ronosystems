@@ -24,7 +24,7 @@ class User(AbstractUser):
         null=True, blank=True, related_name='users',
     )
     branch = models.ForeignKey(
-        'epa_shop.Branch', on_delete=models.SET_NULL,
+        'company.Branch', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='staff',
     )
     phone = models.CharField(max_length=20, blank=True)

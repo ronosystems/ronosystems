@@ -127,12 +127,29 @@
         font-size: 0.85rem;
         background: #fff;
     }
+
+    /* Empty-state block */
+    .hub-empty {
+        text-align: center;
+        padding: 50px 24px;
+        background: #fff;
+        border: 2px dashed #d1d5db;
+        border-radius: 12px;
+        color: #6b7280;
+        font-size: 0.9rem;
+    }
+    .hub-empty i {
+        font-size: 2.5rem;
+        color: #d1d5db;
+        display: block;
+        margin-bottom: 12px;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 
-{% if can_see_all_branches %}
+{% if can_see_all_branches and branches %}
 <form method="get" class="filter-bar">
     <label style="font-weight:600;font-size:0.82rem;">Branch:</label>
     <select name="branch" onchange="this.form.submit()">
@@ -147,133 +164,323 @@
 </form>
 {% endif %}
 
-<div class="hub-grid">
 
-    {# ── Egg Inventory ── #}
-    <a href="{% url 'kuku_biz:egg_inventory' %}{% if selected_branch_id %}?branch={{ selected_branch_id }}{% endif %}"
-       class="hub-card eggs">
-        <i class="fas fa-arrow-right hub-arrow"></i>
-        <div>
-            <div class="hub-icon"><i class="fas fa-egg"></i></div>
-            <div class="hub-title">Egg Inventory</div>
-            <div class="hub-sub">Trays & crates in stock</div>
-        </div>
+{% if is_hq %}
 
-        <div class="hub-stats">
+    {# ══════════════════════════════════════════════════════════════ #}
+    {# HQ VIEW — full hub with all four categories                    #}
+    {# ══════════════════════════════════════════════════════════════ #}
+
+    <div class="hub-grid">
+
+        {# ── Egg Inventory ── #}
+        <a href="{% url 'kuku_biz:egg_inventory' %}{% if selected_branch_id %}?branch={{ selected_branch_id }}{% endif %}"
+           class="hub-card eggs">
+            <i class="fas fa-arrow-right hub-arrow"></i>
             <div>
-                <div class="hub-stat-label">Items</div>
-                <div class="hub-stat-value">{{ egg_item_count }}</div>
+                <div class="hub-icon"><i class="fas fa-egg"></i></div>
+                <div class="hub-title">Egg Inventory</div>
+                <div class="hub-sub">Trays &amp; crates in stock</div>
             </div>
-            <div>
-                <div class="hub-stat-label">Total Eggs</div>
-                <div class="hub-stat-value">{{ egg_total_eggs|floatformat:0 }}</div>
-            </div>
-            <div>
-                <div class="hub-stat-label">Stock Value</div>
-                <div class="hub-stat-value">KES {{ egg_value|floatformat:0 }}</div>
-            </div>
-            <div>
-                <div class="hub-stat-label">Low Stock</div>
-                <div class="hub-stat-value">
-                    {% if egg_low %}
-                        <span class="hub-low-badge">{{ egg_low }} item{{ egg_low|pluralize }}</span>
-                    {% else %}
-                        <span style="color:#059669;">All good</span>
-                    {% endif %}
+
+            <div class="hub-stats">
+                <div>
+                    <div class="hub-stat-label">Items</div>
+                    <div class="hub-stat-value">{{ egg_item_count }}</div>
+                </div>
+                <div>
+                    <div class="hub-stat-label">Total Eggs</div>
+                    <div class="hub-stat-value">{{ egg_total_eggs|floatformat:0 }}</div>
+                </div>
+                <div>
+                    <div class="hub-stat-label">Stock Value</div>
+                    <div class="hub-stat-value">KES {{ egg_value|floatformat:0 }}</div>
+                </div>
+                <div>
+                    <div class="hub-stat-label">Low Stock</div>
+                    <div class="hub-stat-value">
+                        {% if egg_low %}
+                            <span class="hub-low-badge">{{ egg_low }} item{{ egg_low|pluralize }}</span>
+                        {% else %}
+                            <span style="color:#059669;">All good</span>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
-        </div>
-    </a>
+        </a>
 
-    {# ── Feed Inventory ── #}
-    <a href="{% url 'kuku_biz:feed_inventory' %}{% if selected_branch_id %}?branch={{ selected_branch_id }}{% endif %}"
-       class="hub-card feed">
-        <i class="fas fa-arrow-right hub-arrow"></i>
-        <div>
-            <div class="hub-icon"><i class="fas fa-wheat-awn"></i></div>
-            <div class="hub-title">Feed Inventory</div>
-            <div class="hub-sub">Feed bags in stock</div>
-        </div>
+        {# ── Feed Inventory ── #}
+        <a href="{% url 'kuku_biz:feed_inventory' %}{% if selected_branch_id %}?branch={{ selected_branch_id }}{% endif %}"
+           class="hub-card feed">
+            <i class="fas fa-arrow-right hub-arrow"></i>
+            <div>
+                <div class="hub-icon"><i class="fas fa-wheat-awn"></i></div>
+                <div class="hub-title">Feed Inventory</div>
+                <div class="hub-sub">Feed bags in stock</div>
+            </div>
 
-        <div class="hub-stats">
-            <div>
-                <div class="hub-stat-label">Items</div>
-                <div class="hub-stat-value">{{ feed_item_count }}</div>
-            </div>
-            <div>
-                <div class="hub-stat-label">Total kg</div>
-                <div class="hub-stat-value">{{ feed_total_kg|floatformat:1 }}</div>
-            </div>
-            <div>
-                <div class="hub-stat-label">Stock Value</div>
-                <div class="hub-stat-value">KES {{ feed_value|floatformat:0 }}</div>
-            </div>
-            <div>
-                <div class="hub-stat-label">Low Stock</div>
-                <div class="hub-stat-value">
-                    {% if feed_low %}
-                        <span class="hub-low-badge">{{ feed_low }} item{{ feed_low|pluralize }}</span>
-                    {% else %}
-                        <span style="color:#059669;">All good</span>
-                    {% endif %}
+            <div class="hub-stats">
+                <div>
+                    <div class="hub-stat-label">Items</div>
+                    <div class="hub-stat-value">{{ feed_item_count }}</div>
+                </div>
+                <div>
+                    <div class="hub-stat-label">Total kg</div>
+                    <div class="hub-stat-value">{{ feed_total_kg|floatformat:1 }}</div>
+                </div>
+                <div>
+                    <div class="hub-stat-label">Stock Value</div>
+                    <div class="hub-stat-value">KES {{ feed_value|floatformat:0 }}</div>
+                </div>
+                <div>
+                    <div class="hub-stat-label">Low Stock</div>
+                    <div class="hub-stat-value">
+                        {% if feed_low %}
+                            <span class="hub-low-badge">{{ feed_low }} item{{ feed_low|pluralize }}</span>
+                        {% else %}
+                            <span style="color:#059669;">All good</span>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
-        </div>
-    </a>
+        </a>
 
-    {# ── Vaccine Inventory ── #}
-    <a href="{% url 'kuku_biz:vaccine_inventory' %}{% if selected_branch_id %}?branch={{ selected_branch_id }}{% endif %}"
-       class="hub-card vaccine">
-        <i class="fas fa-arrow-right hub-arrow"></i>
-        <div>
-            <div class="hub-icon"><i class="fas fa-syringe"></i></div>
-            <div class="hub-title">Vaccine Inventory</div>
-            <div class="hub-sub">Vaccines, drugs & treatments</div>
-        </div>
+        {# ── Vaccine Inventory ── #}
+        <a href="{% url 'kuku_biz:vaccine_inventory' %}{% if selected_branch_id %}?branch={{ selected_branch_id }}{% endif %}"
+           class="hub-card vaccine">
+            <i class="fas fa-arrow-right hub-arrow"></i>
+            <div>
+                <div class="hub-icon"><i class="fas fa-syringe"></i></div>
+                <div class="hub-title">Vaccine Inventory</div>
+                <div class="hub-sub">Vaccines, drugs &amp; treatments</div>
+            </div>
 
-        <div class="hub-stats">
-            <div>
-                <div class="hub-stat-label">Items</div>
-                <div class="hub-stat-value">{{ vaccine_item_count }}</div>
-            </div>
-            <div>
-                <div class="hub-stat-label">Total Units</div>
-                <div class="hub-stat-value">{{ vaccine_total_units|floatformat:0 }}</div>
-            </div>
-            <div>
-                <div class="hub-stat-label">Stock Value</div>
-                <div class="hub-stat-value">KES {{ vaccine_value|floatformat:0 }}</div>
-            </div>
-            <div>
-                <div class="hub-stat-label">Low Stock</div>
-                <div class="hub-stat-value">
-                    {% if vaccine_low %}
-                        <span class="hub-low-badge">{{ vaccine_low }} item{{ vaccine_low|pluralize }}</span>
-                    {% else %}
-                        <span style="color:#059669;">All good</span>
-                    {% endif %}
+            <div class="hub-stats">
+                <div>
+                    <div class="hub-stat-label">Items</div>
+                    <div class="hub-stat-value">{{ vaccine_item_count }}</div>
+                </div>
+                <div>
+                    <div class="hub-stat-label">Total Units</div>
+                    <div class="hub-stat-value">{{ vaccine_total_units|floatformat:0 }}</div>
+                </div>
+                <div>
+                    <div class="hub-stat-label">Stock Value</div>
+                    <div class="hub-stat-value">KES {{ vaccine_value|floatformat:0 }}</div>
+                </div>
+                <div>
+                    <div class="hub-stat-label">Low Stock</div>
+                    <div class="hub-stat-value">
+                        {% if vaccine_low %}
+                            <span class="hub-low-badge">{{ vaccine_low }} item{{ vaccine_low|pluralize }}</span>
+                        {% else %}
+                            <span style="color:#059669;">All good</span>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
-        </div>
-    </a>
+        </a>
 
-</div>
-
-{# ── Other supplies — full-width below the 3 cards ── #}
-<a href="{% url 'kuku_biz:other_inventory' %}{% if selected_branch_id %}?branch={{ selected_branch_id }}{% endif %}"
-   class="hub-card other">
-    <i class="fas fa-arrow-right hub-arrow"></i>
-    <div>
-        <div class="hub-icon"><i class="fas fa-boxes-stacked"></i></div>
-        <div class="hub-title">Other Supplies</div>
-        <div class="hub-sub">Equipment, tools, misc items — {{ other_count }} item{{ other_count|pluralize }}</div>
     </div>
-    <div class="hub-stats" style="grid-template-columns: repeat(4, 1fr);">
+
+    {# ── Other supplies — full-width below the 3 cards ── #}
+    <a href="{% url 'kuku_biz:other_inventory' %}{% if selected_branch_id %}?branch={{ selected_branch_id }}{% endif %}"
+       class="hub-card other">
+        <i class="fas fa-arrow-right hub-arrow"></i>
         <div>
-            <div class="hub-stat-label">Total Items</div>
-            <div class="hub-stat-value">{{ other_count }}</div>
+            <div class="hub-icon"><i class="fas fa-boxes-stacked"></i></div>
+            <div class="hub-title">Other Supplies</div>
+            <div class="hub-sub">Equipment, tools, misc items — {{ other_count }} item{{ other_count|pluralize }}</div>
         </div>
-    </div>
-</a>
+        <div class="hub-stats" style="grid-template-columns: repeat(4, 1fr);">
+            <div>
+                <div class="hub-stat-label">Total Items</div>
+                <div class="hub-stat-value">{{ other_count }}</div>
+            </div>
+        </div>
+    </a>
+
+
+{% else %}
+
+    {# ══════════════════════════════════════════════════════════════ #}
+    {# NON-HQ VIEW — shops & stock controllers                        #}
+    {#                                                                #}
+    {# Shops see only eggs + other supplies (their own branch).       #}
+    {# Stock controllers see everything except vaccine (which is      #}
+    {# HQ-managed).                                                   #}
+    {# ══════════════════════════════════════════════════════════════ #}
+
+    {% if is_shop %}
+
+        {# Shops: eggs + other only #}
+
+        <div class="hub-grid" style="grid-template-columns: repeat(2, 1fr);">
+
+            {# ── Egg Inventory (shop) ── #}
+            <a href="{% url 'kuku_biz:egg_inventory' %}{% if selected_branch_id %}?branch={{ selected_branch_id }}{% endif %}"
+               class="hub-card eggs">
+                <i class="fas fa-arrow-right hub-arrow"></i>
+                <div>
+                    <div class="hub-icon"><i class="fas fa-egg"></i></div>
+                    <div class="hub-title">Egg Inventory</div>
+                    <div class="hub-sub">Trays &amp; crates in stock</div>
+                </div>
+
+                <div class="hub-stats">
+                    <div>
+                        <div class="hub-stat-label">Items</div>
+                        <div class="hub-stat-value">{{ egg_item_count }}</div>
+                    </div>
+                    <div>
+                        <div class="hub-stat-label">Total Eggs</div>
+                        <div class="hub-stat-value">{{ egg_total_eggs|floatformat:0 }}</div>
+                    </div>
+                    <div>
+                        <div class="hub-stat-label">Stock Value</div>
+                        <div class="hub-stat-value">KES {{ egg_value|floatformat:0 }}</div>
+                    </div>
+                    <div>
+                        <div class="hub-stat-label">Low Stock</div>
+                        <div class="hub-stat-value">
+                            {% if egg_low %}
+                                <span class="hub-low-badge">{{ egg_low }} item{{ egg_low|pluralize }}</span>
+                            {% else %}
+                                <span style="color:#059669;">All good</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </a>
+
+            {# ── Other Supplies (shop) ── #}
+            <a href="{% url 'kuku_biz:other_inventory' %}{% if selected_branch_id %}?branch={{ selected_branch_id }}{% endif %}"
+               class="hub-card other">
+                <i class="fas fa-arrow-right hub-arrow"></i>
+                <div>
+                    <div class="hub-icon"><i class="fas fa-boxes-stacked"></i></div>
+                    <div class="hub-title">Other Supplies</div>
+                    <div class="hub-sub">Equipment, tools, misc items</div>
+                </div>
+
+                <div class="hub-stats">
+                    <div>
+                        <div class="hub-stat-label">Total Items</div>
+                        <div class="hub-stat-value">{{ other_count }}</div>
+                    </div>
+                    <div>
+                        <div class="hub-stat-label">Stock Value</div>
+                        <div class="hub-stat-value">KES {{ other_value|floatformat:0 }}</div>
+                    </div>
+                </div>
+            </a>
+
+        </div>
+
+    {% else %}
+
+        {# Stock controller: eggs + feed + other (no vaccine — HQ-only view) #}
+
+        <div class="hub-grid">
+
+            {# ── Egg Inventory ── #}
+            <a href="{% url 'kuku_biz:egg_inventory' %}{% if selected_branch_id %}?branch={{ selected_branch_id }}{% endif %}"
+               class="hub-card eggs">
+                <i class="fas fa-arrow-right hub-arrow"></i>
+                <div>
+                    <div class="hub-icon"><i class="fas fa-egg"></i></div>
+                    <div class="hub-title">Egg Inventory</div>
+                    <div class="hub-sub">Trays &amp; crates in stock</div>
+                </div>
+
+                <div class="hub-stats">
+                    <div>
+                        <div class="hub-stat-label">Items</div>
+                        <div class="hub-stat-value">{{ egg_item_count }}</div>
+                    </div>
+                    <div>
+                        <div class="hub-stat-label">Total Eggs</div>
+                        <div class="hub-stat-value">{{ egg_total_eggs|floatformat:0 }}</div>
+                    </div>
+                    <div>
+                        <div class="hub-stat-label">Stock Value</div>
+                        <div class="hub-stat-value">KES {{ egg_value|floatformat:0 }}</div>
+                    </div>
+                    <div>
+                        <div class="hub-stat-label">Low Stock</div>
+                        <div class="hub-stat-value">
+                            {% if egg_low %}
+                                <span class="hub-low-badge">{{ egg_low }} item{{ egg_low|pluralize }}</span>
+                            {% else %}
+                                <span style="color:#059669;">All good</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </a>
+
+            {# ── Feed Inventory ── #}
+            <a href="{% url 'kuku_biz:feed_inventory' %}{% if selected_branch_id %}?branch={{ selected_branch_id }}{% endif %}"
+               class="hub-card feed">
+                <i class="fas fa-arrow-right hub-arrow"></i>
+                <div>
+                    <div class="hub-icon"><i class="fas fa-wheat-awn"></i></div>
+                    <div class="hub-title">Feed Inventory</div>
+                    <div class="hub-sub">Feed bags in stock</div>
+                </div>
+
+                <div class="hub-stats">
+                    <div>
+                        <div class="hub-stat-label">Items</div>
+                        <div class="hub-stat-value">{{ feed_item_count }}</div>
+                    </div>
+                    <div>
+                        <div class="hub-stat-label">Total kg</div>
+                        <div class="hub-stat-value">{{ feed_total_kg|floatformat:1 }}</div>
+                    </div>
+                    <div>
+                        <div class="hub-stat-label">Stock Value</div>
+                        <div class="hub-stat-value">KES {{ feed_value|floatformat:0 }}</div>
+                    </div>
+                    <div>
+                        <div class="hub-stat-label">Low Stock</div>
+                        <div class="hub-stat-value">
+                            {% if feed_low %}
+                                <span class="hub-low-badge">{{ feed_low }} item{{ feed_low|pluralize }}</span>
+                            {% else %}
+                                <span style="color:#059669;">All good</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </a>
+
+            {# ── Other Supplies ── #}
+            <a href="{% url 'kuku_biz:other_inventory' %}{% if selected_branch_id %}?branch={{ selected_branch_id }}{% endif %}"
+               class="hub-card other">
+                <i class="fas fa-arrow-right hub-arrow"></i>
+                <div>
+                    <div class="hub-icon"><i class="fas fa-boxes-stacked"></i></div>
+                    <div class="hub-title">Other Supplies</div>
+                    <div class="hub-sub">Equipment, tools, misc items</div>
+                </div>
+
+                <div class="hub-stats">
+                    <div>
+                        <div class="hub-stat-label">Total Items</div>
+                        <div class="hub-stat-value">{{ other_count }}</div>
+                    </div>
+                    <div>
+                        <div class="hub-stat-label">Stock Value</div>
+                        <div class="hub-stat-value">KES {{ other_value|floatformat:0 }}</div>
+                    </div>
+                </div>
+            </a>
+
+        </div>
+
+    {% endif %}
+
+{% endif %}
 
 {% endblock %}

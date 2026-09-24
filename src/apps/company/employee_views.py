@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from apps.epa_shop.models import Branch
+from apps.company.models import Branch
 from apps.companies.support_utils import (
     get_active_company,
     is_support_mode,

@@ -10,7 +10,7 @@ from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.conf import settings
 from apps.companies.models import Company
-from apps.epa_shop.models import Branch
+from apps.company.models import Branch
 from .serializers import (
     UserSerializer, RegisterSerializer, LoginSerializer, 
     UserUpdateSerializer, UserRoleUpdateSerializer, 

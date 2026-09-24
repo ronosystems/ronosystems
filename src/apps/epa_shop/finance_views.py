@@ -22,8 +22,9 @@ from apps.companies.support_utils import (
     is_effective_admin,
     get_effective_branch,
 )
+from apps.company.models import Branch
 from .models import (
-    Branch, Sale, SaleItem, PurchaseOrder,
+    Sale, SaleItem, PurchaseOrder,
     COGSAccount, COGSTransaction, PurchaseRecord,
     COGSAllocationRule, COGSSummary
 )
