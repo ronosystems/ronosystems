@@ -1,0 +1,119 @@
+{% if user.is_authenticated %}
+<script>
+(function () {
+    const TIMEOUT_MS = 30 * 60 * 1000;   // 30 minutes
+    const WARN_MS    = 60 * 1000;         // warn 60s before logout
+    const CSRF_TOKEN = "{{ csrf_token }}";
+
+    let idleTimer, warnTimer;
+
+    function doLogout() {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = "{% url 'account_logout' %}";
+        const csrf = document.createElement('input');
+        csrf.type = 'hidden';
+        csrf.name = 'csrfmiddlewaretoken';
+        csrf.value = CSRF_TOKEN;
+        form.appendChild(csrf);
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+    function showWarning() {
+        // Remove any existing warning first
+        const existing = document.getElementById('idle-warning');
+        if (existing) existing.remove();
+
+        // Build the warning banner
+        const warn = document.createElement('div');
+        warn.id = 'idle-warning';
+        warn.className = 'alert alert-warning alert-dismissible fade show';
+        warn.setAttribute('role', 'alert');
+        warn.style.cssText = `
+            border: 2px solid #000000;
+            border-radius: 4px;
+            background: #fff3cd;
+            color: #856404;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 0.95rem;
+            animation: idleWarnFadeIn 0.3s ease-out;
+        `;
+
+        warn.innerHTML = `
+            <i class="fas fa-exclamation-triangle" style="font-size:1.2rem;color:#856404;flex-shrink:0;"></i>
+            <span style="flex:1;font-weight:600;">
+                You will be logged out in 1 minute due to inactivity.
+            </span>
+            <button id="stay-logged-in" type="button"
+                    style="padding:6px 14px;border:2px solid #000000;border-radius:4px;
+                           background:#856404;color:#fff;font-weight:600;cursor:pointer;
+                           font-size:0.85rem;transition:all 0.2s;">
+                <i class="fas fa-check"></i> Stay logged in
+            </button>
+        `;
+
+        // Find the content area to inject into
+        const contentArea = document.querySelector('.content-area');
+
+        if (contentArea) {
+            // Insert as the FIRST child of .content-area (above messages & page content)
+            contentArea.insertBefore(warn, contentArea.firstChild);
+        } else {
+            // Fallback: insert right after .top-navbar if .content-area isn't found
+            const navbar = document.querySelector('.top-navbar');
+            if (navbar && navbar.parentNode) {
+                navbar.parentNode.insertBefore(warn, navbar.nextSibling);
+            } else {
+                // Last resort — fixed at top of body
+                warn.style.cssText += 'position:fixed;top:0;left:0;right:0;z-index:99999;';
+                document.body.appendChild(warn);
+            }
+        }
+
+        // Wire up the "Stay logged in" button
+        document.getElementById('stay-logged-in').onclick = function () {
+            warn.remove();
+            resetTimers();
+        };
+
+        // Scroll warning into view (in case user is scrolled down)
+        warn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function resetTimers() {
+        clearTimeout(idleTimer);
+        clearTimeout(warnTimer);
+        const old = document.getElementById('idle-warning');
+        if (old) old.remove();
+
+        warnTimer = setTimeout(showWarning, TIMEOUT_MS - WARN_MS);
+        idleTimer = setTimeout(doLogout, TIMEOUT_MS);
+    }
+
+    // Reset on real user activity
+    ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(function (evt) {
+        window.addEventListener(evt, resetTimers, { passive: true });
+    });
+
+    resetTimers();
+})();
+</script>
+
+<style>
+    @keyframes idleWarnFadeIn {
+        from { opacity: 0; transform: translateY(-6px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    #idle-warning #stay-logged-in:hover {
+        background: #000000 !important;
+        color: #ffffff !important;
+    }
+</style>
+{% endif %}

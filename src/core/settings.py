@@ -118,6 +118,10 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
+
+    # >>> AUTO-LOGOUT ON INACTIVITY <<<
+    'apps.accounts.middleware.InactivityLogoutMiddleware',
+
     'apps.companies.middleware.CustomDomainMiddleware',
     'apps.companies.middleware.SubscriptionExpiryMiddleware',
 ]
@@ -223,6 +227,17 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
+
+# ============================================
+# SESSION / AUTO-LOGOUT ON INACTIVITY (30 MIN)
+# ============================================
+# Session cookie expires after 30 minutes of inactivity.
+SESSION_COOKIE_AGE = 60 * 30            # 30 minutes
+SESSION_SAVE_EVERY_REQUEST = True        # Refresh expiry on every request → makes it inactivity-based
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
+# Custom: inactivity timeout enforced by InactivityLogoutMiddleware.
+INACTIVITY_TIMEOUT_SECONDS = 60 * 30     # 30 minutes
 
 # ============================================
 # DJANGO-ALLAUTH CONFIGURATION
