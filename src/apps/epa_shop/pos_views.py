@@ -217,6 +217,163 @@ def pos_search_products(request):
 
 
 @login_required
+def pos_search_barcode(request):
+    """
+    Unified barcode / IMEI / serial lookup for the POS search bar.
+
+    Query params:
+        q        — the scanned/typed code (required, min length 3)
+        add      — '1' to only return the first exact/partial match
+                   (used by the auto-add-on-Enter flow)
+
+    Returns:
+        {
+          "match": { ...product payload... } | null,
+          "units": [ ...all matching units... ]
+        }
+    """
+    try:
+        company, is_viewing_company = get_active_company(request)
+        if not company:
+            return JsonResponse({'error': 'No company assigned', 'match': None, 'units': []}, status=400)
+
+        q = request.GET.get('q', '').strip()
+        if len(q) < 3:
+            return JsonResponse({'match': None, 'units': []})
+
+        # Branch scoping (same rule as pos_search_products)
+        if is_viewing_company:
+            user_branch = None
+        elif request.user.role == 'company_cashier':
+            user_branch = request.user.branch
+        else:
+            user_branch = None
+
+        units_payload = []
+
+        # ---------- Phone units ----------
+        phone_units = (
+            Unit.objects
+            .filter(
+                phone__company=company,
+                identifier__icontains=q,
+                status='available',
+            )
+            .select_related('phone', 'phone__branch')
+        )
+        if user_branch:
+            phone_units = phone_units.filter(phone__branch=user_branch)
+
+        for u in phone_units:
+            p = u.phone
+            units_payload.append({
+                'identifier': u.identifier,
+                'unit_type': 'IMEI',
+                'category': 'Phone',
+                'product_code': p.product_code,
+                'name': p.name,
+                'brand': p.brand,
+                'model': p.model,
+                'price': float(p.selling_price),
+                'stock': Unit.objects.filter(phone=p, status='available').count(),
+                'branch_id': p.branch_id,
+                'specs': {
+                    'ram': p.ram or '',
+                    'storage_capacity': p.storage_capacity or '',
+                    'screen_size': p.screen_size or '',
+                    'color': p.color or '',
+                    'condition': p.condition or 'new',
+                    'battery_capacity': p.battery_capacity or '',
+                },
+                'image': p.image.url if p.image else None,
+            })
+
+        # ---------- Electronic units ----------
+        electronic_units = (
+            Unit.objects
+            .filter(
+                electronic__company=company,
+                identifier__icontains=q,
+                status='available',
+            )
+            .select_related('electronic', 'electronic__branch')
+        )
+        if user_branch:
+            electronic_units = electronic_units.filter(electronic__branch=user_branch)
+
+        for u in electronic_units:
+            p = u.electronic
+            units_payload.append({
+                'identifier': u.identifier,
+                'unit_type': 'Serial',
+                'category': 'Electronics',
+                'product_code': p.product_code,
+                'name': p.name,
+                'brand': p.brand,
+                'model': p.model_number,
+                'price': float(p.selling_price),
+                'stock': Unit.objects.filter(electronic=p, status='available').count(),
+                'branch_id': p.branch_id,
+                'specs': {
+                    'ram': p.ram or '',
+                    'storage': p.storage or '',
+                    'processor': p.processor or '',
+                    'device_type': p.device_type or 'other',
+                    'screen_size': p.screen_size or '',
+                    'color': p.color or '',
+                },
+                'image': p.image.url if p.image else None,
+            })
+
+        # ---------- Accessories (no Unit table — use product_code) ----------
+        # Optional: barcode scanners on accessories usually scan the product_code.
+        accessories = Accessory.objects.filter(
+            company=company,
+            is_active=True,
+            product_code__icontains=q,
+        )
+        if user_branch:
+            accessories = accessories.filter(branch=user_branch)
+
+        for a in accessories:
+            units_payload.append({
+                'identifier': a.product_code,
+                'unit_type': 'SKU',
+                'category': 'Accessories',
+                'product_code': a.product_code,
+                'name': a.name,
+                'brand': a.brand,
+                'model': a.model,
+                'price': float(a.selling_price),
+                'stock': a.quantity_in_stock,
+                'branch_id': a.branch_id,
+                'specs': {
+                    'accessory_type': a.accessory_type or 'other',
+                    'compatible_phone_models': a.compatible_phone_models or '',
+                },
+                'image': a.image.url if a.image else None,
+            })
+
+        # Prefer exact matches first
+        units_payload.sort(key=lambda x: (x['identifier'] != q, x['identifier']))
+
+        match = units_payload[0] if units_payload else None
+
+        return JsonResponse({
+            'match': match,
+            'units': units_payload,
+        })
+
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return JsonResponse(
+            {'error': str(e), 'match': None, 'units': []},
+            status=500,
+        )
+
+
+@login_required
 def pos_search_imei(request):
     """Search IMEI/Serial for POS"""
     try:

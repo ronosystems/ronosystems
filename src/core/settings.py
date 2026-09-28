@@ -4,56 +4,85 @@ from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
 
-# Define BASE_DIR FIRST so we know where .env lives
+# ============================================
+# BASE DIR & ENV LOADING
+# ============================================
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Explicitly load .env from BASE_DIR  →  /home/rs/ronosystems/src/.env
+# Explicitly load .env from BASE_DIR → /home/rs/ronosystems/src/.env
 load_dotenv(BASE_DIR / '.env')
 
-# ============================================
-# SECURITY - Production Ready
-# ============================================
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-ronosystems-key-12345')
-DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 # ============================================
-# ENVIRONMENT FLAGS (used everywhere below)
+# ENVIRONMENT FLAGS
 # ============================================
 ON_RENDER = 'RENDER' in os.environ
+
+def env_bool(key: str, default: bool = False) -> bool:
+    """Parse a boolean env var case-insensitively."""
+    val = os.getenv(key)
+    if val is None:
+        return default
+    return val.strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+# ============================================
+# SECURITY
+# ============================================
+SECRET_KEY = os.getenv('SECRET_KEY')
+if not SECRET_KEY:
+    if ON_RENDER:
+        raise RuntimeError(
+            "SECRET_KEY environment variable must be set in production."
+        )
+    SECRET_KEY = 'django-insecure-ronosystems-dev-only-key'
+
+DEBUG = env_bool('DEBUG', default=False)
+
 
 # ============================================
 # ALLOWED HOSTS
 # ============================================
 ALLOWED_HOSTS = []
-allowed = os.getenv('ALLOWED_HOSTS', '')
-if allowed:
-    ALLOWED_HOSTS = [host.strip() for host in allowed.split(',') if host.strip()]
+
+_allowed = os.getenv('ALLOWED_HOSTS', '')
+if _allowed:
+    ALLOWED_HOSTS.extend(h.strip() for h in _allowed.split(',') if h.strip())
 else:
-    ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+    ALLOWED_HOSTS.extend(['localhost', '127.0.0.1'])
 
 if ON_RENDER:
     ALLOWED_HOSTS.append('ronosystems.onrender.com')
     ALLOWED_HOSTS.append('.onrender.com')
 
-# Allow all hosts because custom domains are dynamic.
-# Security is enforced by CustomDomainMiddleware (DB lookup) + Cloudflare.
+# Dynamic custom domains are validated by CustomDomainMiddleware (DB lookup)
+# and Cloudflare in front. Django's own host check is opened up to '*'.
+# If you later remove the middleware, replace this with a real whitelist.
 ALLOWED_HOSTS.append('*')
+
 
 # ============================================
 # CSRF TRUSTED ORIGINS
 # ============================================
 CSRF_TRUSTED_ORIGINS = []
-csrf_origins = os.getenv('CSRF_TRUSTED_ORIGINS', '')
-if csrf_origins:
-    CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_origins.split(',') if origin.strip()]
+
+_csrf = os.getenv('CSRF_TRUSTED_ORIGINS', '')
+if _csrf:
+    CSRF_TRUSTED_ORIGINS.extend(o.strip() for o in _csrf.split(',') if o.strip())
 else:
-    CSRF_TRUSTED_ORIGINS = ['http://localhost:8000', 'http://127.0.0.1:8000']
+    CSRF_TRUSTED_ORIGINS.extend([
+        'http://localhost:8000',
+        'http://127.0.0.1:8000',
+    ])
 
 if ON_RENDER:
     CSRF_TRUSTED_ORIGINS.append('https://ronosystems.onrender.com')
 
-# Filter out any origins that don't start with http:// or https://
-CSRF_TRUSTED_ORIGINS = [origin for origin in CSRF_TRUSTED_ORIGINS if origin.startswith('http')]
+# Only keep entries that look like real origins
+CSRF_TRUSTED_ORIGINS = [
+    o for o in CSRF_TRUSTED_ORIGINS if o.startswith(('http://', 'https://'))
+]
+
 
 # ============================================
 # INSTALLED APPS
@@ -104,6 +133,7 @@ INSTALLED_APPS = [
 # Required by django.contrib.sites / allauth
 SITE_ID = 1
 
+
 # ============================================
 # MIDDLEWARE
 # ============================================
@@ -119,14 +149,16 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
 
-    # >>> AUTO-LOGOUT ON INACTIVITY <<<
+    # Auto-logout on inactivity
     'apps.accounts.middleware.InactivityLogoutMiddleware',
 
+    # Custom domain + subscription handling
     'apps.companies.middleware.CustomDomainMiddleware',
     'apps.companies.middleware.SubscriptionExpiryMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
+
 
 # ============================================
 # TEMPLATES
@@ -154,10 +186,11 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
+
 # ============================================
 # DATABASE
 # ============================================
-USE_SQLITE = os.getenv('USE_SQLITE', 'False') == 'True'
+USE_SQLITE = env_bool('USE_SQLITE', default=False)
 
 if ON_RENDER:
     DATABASE_URL = os.getenv('DATABASE_URL')
@@ -213,6 +246,7 @@ else:
             }
         }
 
+
 # ============================================
 # AUTHENTICATION
 # ============================================
@@ -228,19 +262,23 @@ AUTHENTICATION_BACKENDS = [
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
+
 # ============================================
 # SESSION / AUTO-LOGOUT ON INACTIVITY (30 MIN)
 # ============================================
-# Session cookie expires after 30 minutes of inactivity.
-SESSION_COOKIE_AGE = 60 * 30            # 30 minutes
-SESSION_SAVE_EVERY_REQUEST = True        # Refresh expiry on every request → makes it inactivity-based
+# The cookie itself lives for 7 days; the real 30-minute inactivity rule
+# is enforced by InactivityLogoutMiddleware. We do NOT save the session on
+# every request (that would hit the DB for every static file & API call).
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 7    # 7 days cookie lifetime
+SESSION_SAVE_EVERY_REQUEST = False
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
-# Custom: inactivity timeout enforced by InactivityLogoutMiddleware.
+# Enforced by InactivityLogoutMiddleware
 INACTIVITY_TIMEOUT_SECONDS = 60 * 30     # 30 minutes
 
+
 # ============================================
-# DJANGO-ALLAUTH CONFIGURATION
+# DJANGO-ALLAUTH
 # ============================================
 ACCOUNT_LOGIN_METHODS = {'email'}
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
@@ -252,7 +290,6 @@ ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 ACCOUNT_SESSION_REMEMBER = True
 
 ACCOUNT_SIGNUP_REDIRECT_URL = '/dashboard/'
-LOGIN_REDIRECT_URL = '/dashboard/'
 ACCOUNT_LOGOUT_REDIRECT_URL = '/auth/login/'
 
 SOCIALACCOUNT_ADAPTER = 'apps.accounts.adapters.RonoSocialAccountAdapter'
@@ -298,7 +335,11 @@ SOCIALACCOUNT_PROVIDERS = {
             'client_id': os.getenv('APPLE_CLIENT_ID', ''),
             'secret': os.getenv('APPLE_CLIENT_SECRET', ''),
             'key': os.getenv('APPLE_KEY_ID', ''),
-            'certificate_key': os.getenv('APPLE_PRIVATE_KEY', ''),
+            # NOTE: certificate_key must live inside APP.settings for
+            # recent django-allauth versions (silences the UserWarning).
+            'settings': {
+                'certificate_key': os.getenv('APPLE_PRIVATE_KEY', ''),
+            },
         },
         'SCOPE': ['name', 'email'],
     },
@@ -307,6 +348,7 @@ SOCIALACCOUNT_PROVIDERS = {
 SOCIALACCOUNT_LOGIN_ON_GET = True
 SOCIALACCOUNT_STORE_TOKENS = False
 
+
 # ============================================
 # INTERNATIONALIZATION
 # ============================================
@@ -314,6 +356,7 @@ LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Africa/Nairobi'
 USE_I18N = True
 USE_TZ = True
+
 
 # ============================================
 # CLOUDINARY
@@ -324,6 +367,7 @@ CLOUDINARY_STORAGE = {
     'API_SECRET': os.getenv('CLOUDINARY_API_SECRET', ''),
 }
 
+
 # ============================================
 # STATIC & MEDIA
 # ============================================
@@ -331,19 +375,16 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Whether to store media on Cloudinary. Default: True in production, False in dev.
-# Set `USE_CLOUDINARY_MEDIA=True` in your .env to test Cloudinary in dev too.
-USE_CLOUDINARY_MEDIA = os.getenv(
+# Store media on Cloudinary by default in production; opt-in for dev via env.
+USE_CLOUDINARY_MEDIA = env_bool(
     'USE_CLOUDINARY_MEDIA',
-    'True' if ON_RENDER else 'False'
-) == 'True'
+    default=ON_RENDER,
+)
 
 if USE_CLOUDINARY_MEDIA:
-    # ---------- Media on Cloudinary ----------
-    # We upload to Cloudinary MANUALLY via cloudinary.uploader.upload().
-    # We do NOT want django-cloudinary-storage to intercept those uploads
-    # (its 0.3.0 release mangles public_ids and generates broken URLs).
-    # So the default storage stays on the local filesystem, unused.
+    # Media is uploaded to Cloudinary manually via cloudinary.uploader.upload().
+    # We deliberately keep the default Django storage on FileSystemStorage so
+    # django-cloudinary-storage does not rewrite public_ids / URLs.
     STORAGES = {
         "default": {
             "BACKEND": "django.core.files.storage.FileSystemStorage",
@@ -356,17 +397,14 @@ if USE_CLOUDINARY_MEDIA:
             ),
         },
     }
-    # Point MEDIA_URL at the correct Cloudinary delivery prefix.
-    # The /image/upload/ segment is REQUIRED — without it, Cloudinary 404s.
+    # The /image/upload/ segment is REQUIRED for Cloudinary URLs to resolve.
     MEDIA_URL = (
         f"https://res.cloudinary.com/"
         f"{CLOUDINARY_STORAGE['CLOUD_NAME']}/image/upload/"
     )
     print("✅ Using Cloudinary for media files (direct SDK uploads)")
 
-    
 else:
-    # ---------- Media on local filesystem (dev only) ----------
     STORAGES = {
         "default": {
             "BACKEND": "django.core.files.storage.FileSystemStorage",
@@ -382,24 +420,30 @@ else:
 os.makedirs(STATIC_ROOT, exist_ok=True)
 
 
-
+# ============================================
+# UPLOAD LIMITS
+# ============================================
 DATA_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024   # 100 MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024   # 100 MB
 
 
 # ============================================
-# DEFAULT SETTINGS
+# DEFAULTS
 # ============================================
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'accounts.User'
+
 
 # ============================================
 # CORS
 # ============================================
 CORS_ALLOW_ALL_ORIGINS = DEBUG
+
 if not DEBUG:
-    CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', '').split(',')
+    _cors = os.getenv('CORS_ALLOWED_ORIGINS', '')
+    CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors.split(',') if o.strip()]
     CORS_ALLOW_CREDENTIALS = True
+
 
 # ============================================
 # JWT
@@ -421,12 +465,14 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
+
 # ============================================
-# LOGIN / LOGOUT URLs
+# LOGIN / LOGOUT URLs (Django auth, not allauth)
 # ============================================
 LOGIN_URL = '/auth/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/auth/login/'
+
 
 # ============================================
 # SECURITY (Production)
@@ -440,6 +486,7 @@ if not DEBUG and ON_RENDER:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
+
 # ============================================
 # EMAIL
 # ============================================
@@ -447,15 +494,18 @@ if ON_RENDER:
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
     EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
-    EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
+    EMAIL_USE_TLS = env_bool('EMAIL_USE_TLS', default=True)
     EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
     EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-    DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'noreply@ronosystems.com')
+    DEFAULT_FROM_EMAIL = os.getenv(
+        'DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'noreply@ronosystems.com'
+    )
 else:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
     DEFAULT_FROM_EMAIL = 'noreply@ronosystems.com'
 
 SYSTEM_NAME = os.getenv('SYSTEM_NAME', 'RonoSystems')
+
 
 # ============================================
 # KOPOKOPO PAYMENT GATEWAY
@@ -481,6 +531,7 @@ KOPOKOPO_REDIRECT_URL = os.getenv(
     'https://ronosystems.onrender.com/'
 )
 
+
 # ============================================
 # KCB BUNI PAYMENT GATEWAY
 # ============================================
@@ -499,6 +550,7 @@ KCB_CALLBACK_URL = os.getenv(
     'KCB_CALLBACK_URL',
     'https://ronosystems.onrender.com/payments/kcb/callback/'
 )
+
 
 # ============================================
 # LOGGING

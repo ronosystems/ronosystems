@@ -5,7 +5,7 @@
 {% block extra_css %}
 <style>
     /* ============================================
-       EXCEL-LIKE STYLING
+       LAYOUT
     ============================================ */
     .pos-wrapper {
         background: #f8f9fa;
@@ -14,7 +14,6 @@
         border: 2px solid #000000;
         min-height: calc(100vh - 250px);
     }
-    
     .pos-container {
         display: grid;
         grid-template-columns: 1fr 380px;
@@ -22,9 +21,9 @@
         height: calc(100vh - 280px);
         min-height: 500px;
     }
-    
+
     /* ============================================
-       PRODUCTS SECTION
+       PRODUCTS PANEL
     ============================================ */
     .pos-products {
         background: rgb(43, 92, 88);
@@ -33,7 +32,6 @@
         overflow-y: auto;
         border: 2px solid #000000;
     }
-    
     .pos-products-header {
         display: flex;
         gap: 10px;
@@ -73,13 +71,112 @@
         background: #87CEEB;
         border-color: #000000;
     }
-    
+
+    /* Search wrap for barcode dropdown positioning */
+    .pos-search-wrap {
+        position: relative;
+        flex: 1;
+        min-width: 220px;
+    }
+    .pos-search-wrap input {
+        width: 100%;
+    }
+    .pos-search-wrap.scanning input {
+        border-color: #28a745 !important;
+        box-shadow: 0 0 0 3px rgba(40,167,69,0.25) !important;
+    }
+    .pos-search-wrap .barcode-hint {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 10px;
+        color: #6c757d;
+        background: #fff;
+        padding: 2px 6px;
+        border-radius: 3px;
+        border: 1px solid #000;
+        pointer-events: none;
+        display: none;
+    }
+    .pos-search-wrap.scanning .barcode-hint {
+        display: block;
+    }
+
+    /* Barcode dropdown */
+    .pos-search-wrap .barcode-results {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        max-height: 260px;
+        overflow-y: auto;
+        z-index: 500;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        display: none;
+        margin-top: 4px;
+    }
+    .pos-search-wrap .barcode-results.active {
+        display: block;
+    }
+    .barcode-result-item {
+        padding: 10px 12px;
+        cursor: pointer;
+        border-bottom: 1px solid #e0e0e0;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+    .barcode-result-item:last-child { border-bottom: none; }
+    .barcode-result-item:hover { background: #f0f8ff; }
+    .barcode-result-item .row-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .barcode-result-item .identifier {
+        font-family: monospace;
+        font-weight: 700;
+        font-size: 13px;
+        color: #000000;
+    }
+    .barcode-result-item .badge {
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 3px;
+        border: 1px solid #000;
+        font-weight: 600;
+    }
+    .barcode-result-item .badge.imei { background: #d4edda; }
+    .barcode-result-item .badge.serial { background: #cce5ff; }
+    .barcode-result-item .badge.sku { background: #fff3cd; }
+    .barcode-result-item .product-name {
+        font-size: 12px;
+        color: #000000;
+    }
+    .barcode-result-item .row-bottom {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: #555;
+    }
+    .barcode-no-match {
+        padding: 14px;
+        text-align: center;
+        color: #dc3545;
+        font-size: 13px;
+    }
+
+    /* Product grid */
     .pos-products-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
         gap: 12px;
     }
-    
+
     /* ============================================
        PRODUCT CARDS
     ============================================ */
@@ -102,10 +199,7 @@
         opacity: 0.5;
         cursor: not-allowed;
     }
-    .product-card.out-of-stock:hover {
-        border-color: #dc3545;
-    }
-    
+    .product-card.out-of-stock:hover { border-color: #dc3545; }
     .product-card .product-name {
         font-weight: 700;
         font-size: 14px;
@@ -140,13 +234,9 @@
     .stock-badge.in-stock { background: #d4edda; color: #155724; }
     .stock-badge.low-stock { background: #fff3cd; color: #856404; }
     .stock-badge.out-of-stock { background: #f8d7da; color: #721c24; }
-    
     .product-card .out-of-stock-overlay {
         position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
+        top: 0; left: 0; right: 0; bottom: 0;
         background: rgba(255,255,255,0.7);
         border-radius: 4px;
         display: flex;
@@ -159,9 +249,9 @@
         letter-spacing: 1px;
         border: 2px solid #dc3545;
     }
-    
+
     /* ============================================
-       CART SECTION
+       CART
     ============================================ */
     .pos-cart {
         background: rgb(43, 92, 88);
@@ -194,7 +284,6 @@
         border: 1px solid #000000;
         font-weight: 600;
     }
-    
     .pos-cart-items {
         flex: 1;
         overflow-y: auto;
@@ -271,13 +360,6 @@
         opacity: 0.4;
         color: #000000;
     }
-    .cart-empty p {
-        color: #000000;
-    }
-    .cart-empty small {
-        color: #000000;
-    }
-    
     .pos-cart-totals {
         border-top: 2px solid #000000;
         background-color: rgb(252, 252, 252);
@@ -298,10 +380,6 @@
         padding-top: 8px;
         margin-top: 4px;
     }
-    
-    /* ============================================
-       PAYMENT ACTIONS
-    ============================================ */
     .payment-actions {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -323,9 +401,7 @@
         gap: 4px;
         color: #000000;
     }
-    .payment-actions .btn-payment i {
-        font-size: 20px;
-    }
+    .payment-actions .btn-payment i { font-size: 20px; }
     .payment-actions .btn-payment:hover {
         border-color: #87CEEB;
         background: #f0f8ff;
@@ -334,7 +410,6 @@
     .payment-actions .btn-payment.btn-mpesa:hover { border-color: #25b978; background: #e8f5e9; }
     .payment-actions .btn-payment.btn-bank:hover { border-color: #007bff; background: #e8f5e9; }
     .payment-actions .btn-payment.btn-points:hover { border-color: #ffc107; background: #fff8e1; }
-    
     .pos-cart-actions {
         display: flex;
         gap: 8px;
@@ -364,7 +439,8 @@
         opacity: 0.5;
         cursor: not-allowed;
     }
-    
+
+    /* Customer box */
     .pos-customer {
         margin-bottom: 10px;
         padding: 10px;
@@ -389,11 +465,6 @@
         border-color: #87CEEB;
         box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
     }
-    .pos-customer label {
-        color: #000000;
-        font-weight: 600;
-        font-size: 12px;
-    }
     .pos-customer .branch-display {
         background: #e7f1ff;
         padding: 8px 12px;
@@ -404,25 +475,21 @@
         font-weight: 600;
         color: #000000;
     }
-    
+
     /* ============================================
-       MODAL STYLES
+       MODALS
     ============================================ */
     .pos-modal-overlay {
         position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
         background: rgba(0,0,0,0.5);
         z-index: 9999;
         display: none;
         align-items: center;
         justify-content: center;
     }
-    .pos-modal-overlay.active {
-        display: flex;
-    }
+    .pos-modal-overlay.active { display: flex; }
     .pos-modal {
         background: white;
         border-radius: 4px;
@@ -452,9 +519,6 @@
         font-weight: 700;
         color: #000000;
     }
-    .pos-modal-header h3 i {
-        margin-right: 10px;
-    }
     .pos-modal-close {
         background: none;
         border: none;
@@ -465,7 +529,6 @@
         font-weight: 700;
     }
     .pos-modal-close:hover { color: #dc3545; }
-    
     .pos-modal-body .product-info {
         background: #f8f9fa;
         padding: 15px;
@@ -484,10 +547,7 @@
         flex-wrap: wrap;
         gap: 10px;
     }
-    
-    .modal-field {
-        margin-bottom: 15px;
-    }
+    .modal-field { margin-bottom: 15px; }
     .modal-field label {
         display: block;
         font-weight: 700;
@@ -511,19 +571,11 @@
         border-color: #87CEEB;
         box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
     }
-    .modal-field small {
-        color: #000000;
-    }
-    .modal-field .text-danger {
-        color: #dc3545 !important;
-    }
-    .modal-field .text-muted {
-        color: #000000 !important;
-    }
-    
-    /* ============================================
-       PAYMENT MODAL
-    ============================================ */
+    .modal-field small { color: #000000; }
+    .modal-field .text-danger { color: #dc3545 !important; }
+    .modal-field .text-muted { color: #000000 !important; }
+
+    /* Payment modal */
     .payment-amount-display {
         background: #f8f9fa;
         padding: 15px;
@@ -541,7 +593,6 @@
         font-size: 13px;
         color: #000000;
     }
-    
     .btn-payment-action {
         width: 100%;
         padding: 12px;
@@ -553,39 +604,15 @@
         transition: all 0.3s;
         color: #000000;
     }
-    .btn-payment-action.btn-cash {
-        background: #28a745;
-        color: white;
-    }
-    .btn-payment-action.btn-cash:hover {
-        background: #218838;
-    }
-    .btn-payment-action.btn-mpesa {
-        background: #25b978;
-        color: white;
-    }
-    .btn-payment-action.btn-mpesa:hover {
-        background: #1e9e65;
-    }
-    .btn-payment-action.btn-bank {
-        background: #87CEEB;
-        color: #000000;
-    }
-    .btn-payment-action.btn-bank:hover {
-        background: #7bb8d8;
-    }
-    .btn-payment-action.btn-points {
-        background: #ffc107;
-        color: #000000;
-    }
-    .btn-payment-action.btn-points:hover {
-        background: #e0a800;
-    }
-    .btn-payment-action:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-    
+    .btn-payment-action.btn-cash { background: #28a745; color: white; }
+    .btn-payment-action.btn-cash:hover { background: #218838; }
+    .btn-payment-action.btn-mpesa { background: #25b978; color: white; }
+    .btn-payment-action.btn-mpesa:hover { background: #1e9e65; }
+    .btn-payment-action.btn-bank { background: #87CEEB; color: #000000; }
+    .btn-payment-action.btn-bank:hover { background: #7bb8d8; }
+    .btn-payment-action.btn-points { background: #ffc107; color: #000000; }
+    .btn-payment-action.btn-points:hover { background: #e0a800; }
+    .btn-payment-action:disabled { opacity: 0.5; cursor: not-allowed; }
     .payment-status {
         margin-top: 15px;
         padding: 10px;
@@ -594,25 +621,9 @@
         display: none;
         border: 2px solid #000000;
     }
-    .payment-status.success {
-        display: block;
-        background: #d4edda;
-        color: #155724;
-        border-color: #000000;
-    }
-    .payment-status.error {
-        display: block;
-        background: #f8d7da;
-        color: #721c24;
-        border-color: #000000;
-    }
-    .payment-status.pending {
-        display: block;
-        background: #fff3cd;
-        color: #856404;
-        border-color: #000000;
-    }
-    
+    .payment-status.success { display: block; background: #d4edda; color: #155724; }
+    .payment-status.error { display: block; background: #f8d7da; color: #721c24; }
+    .payment-status.pending { display: block; background: #fff3cd; color: #856404; }
     .pos-modal-footer {
         display: flex;
         gap: 10px;
@@ -644,10 +655,8 @@
         opacity: 0.5;
         cursor: not-allowed;
     }
-    
-    /* ============================================
-       TOASTS
-    ============================================ */
+
+    /* Toasts */
     .success-toast {
         position: fixed;
         bottom: 30px;
@@ -667,7 +676,6 @@
         from { transform: translateX(100px); opacity: 0; }
         to { transform: translateX(0); opacity: 1; }
     }
-    
     .stock-update-indicator {
         position: fixed;
         top: 20px;
@@ -683,43 +691,9 @@
         animation: slideInRight 0.3s ease;
         display: none;
     }
-    
-    /* ============================================
-       SELECTED UNIT DISPLAY
-    ============================================ */
-    .selected-unit {
-        background: #e7f1ff;
-        padding: 10px 15px;
-        border-radius: 4px;
-        margin-top: 10px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border: 2px solid #000000;
-    }
-    .selected-unit .unit-label {
-        font-weight: 600;
-        color: #000000;
-    }
-    .selected-unit .unit-value {
-        font-family: monospace;
-        color: #000000;
-    }
-    .selected-unit .unit-remove {
-        background: none;
-        border: none;
-        color: #dc3545;
-        cursor: pointer;
-        font-size: 18px;
-        font-weight: 700;
-    }
-    
-    /* ============================================
-       UNIT SEARCH
-    ============================================ */
-    .unit-search-container {
-        position: relative;
-    }
+
+    /* Unit search (inside product modal) */
+    .unit-search-container { position: relative; }
     .unit-search-container .unit-results {
         position: absolute;
         top: 100%;
@@ -734,9 +708,7 @@
         box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         display: none;
     }
-    .unit-search-container .unit-results.active {
-        display: block;
-    }
+    .unit-search-container .unit-results.active { display: block; }
     .unit-result-item {
         padding: 8px 12px;
         cursor: pointer;
@@ -749,163 +721,70 @@
     .unit-result-item:hover { background: #f8f9fa; }
     .unit-result-item .unit-id { font-family: monospace; color: #000000; }
     .unit-result-item .unit-status.available { color: #28a745; }
-    
-    /* ============================================
-       RESPONSIVE
-    ============================================ */
+
+    .selected-unit {
+        background: #e7f1ff;
+        padding: 10px 15px;
+        border-radius: 4px;
+        margin-top: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border: 2px solid #000000;
+    }
+    .selected-unit .unit-label { font-weight: 600; color: #000000; }
+    .selected-unit .unit-value { font-family: monospace; color: #000000; }
+    .selected-unit .unit-remove {
+        background: none;
+        border: none;
+        color: #dc3545;
+        cursor: pointer;
+        font-size: 18px;
+        font-weight: 700;
+    }
+
+    /* Responsive */
     @media (max-width: 992px) {
-        .pos-container {
-            grid-template-columns: 1fr;
-            height: auto;
-        }
+        .pos-container { grid-template-columns: 1fr; height: auto; }
         .pos-cart { height: 400px; }
-        .pos-products-grid {
-            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-        }
+        .pos-products-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
         .pos-modal { max-width: 95%; padding: 20px; }
-        .payment-actions {
-            grid-template-columns: 1fr 1fr;
-        }
     }
-    
     @media (max-width: 768px) {
-        .pos-wrapper {
-            padding: 10px;
-        }
-        .pos-products-header {
-            flex-direction: column;
-        }
+        .pos-wrapper { padding: 10px; }
+        .pos-products-header { flex-direction: column; }
         .pos-products-header input,
-        .pos-products-header select {
-            width: 100%;
-            min-width: auto;
-        }
-        .pos-products-header .btn-refresh {
-            width: 100%;
-        }
-        .pos-cart {
-            height: 350px;
-        }
-        .pos-cart-items {
-            max-height: 150px;
-        }
-        .payment-actions {
-            grid-template-columns: 1fr 1fr;
-        }
-        .pos-cart-actions {
-            flex-wrap: wrap;
-        }
-        .pos-cart-actions button {
-            flex: 1;
-            min-width: 80px;
-        }
-        .pos-cart-actions .btn-clear {
-            flex: 0.3;
-        }
-        .pos-modal {
-            padding: 15px;
-        }
-        .pos-modal-header h3 {
-            font-size: 1.1rem;
-        }
-        .pos-modal-body .product-info h4 {
-            font-size: 1rem;
-        }
-        .pos-modal-body .product-info .details {
-            font-size: 11px;
-            gap: 5px;
-        }
-        .product-card {
-            padding: 10px;
-        }
-        .product-card .product-name {
-            font-size: 12px;
-        }
-        .product-card .product-price {
-            font-size: 14px;
-        }
+        .pos-products-header select,
+        .pos-products-header .btn-refresh { width: 100%; min-width: auto; }
+        .pos-cart { height: 350px; }
+        .pos-cart-items { max-height: 150px; }
+        .pos-cart-actions { flex-wrap: wrap; }
+        .pos-cart-actions button { flex: 1; min-width: 80px; }
+        .pos-cart-actions .btn-clear { flex: 0.3; }
+        .pos-modal { padding: 15px; }
     }
-    
     @media (max-width: 480px) {
-        .pos-wrapper {
-            padding: 5px;
-        }
-        .pos-container {
-            gap: 10px;
-        }
-        .pos-products {
-            padding: 10px;
-        }
-        .pos-products-grid {
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 8px;
-        }
-        .pos-cart {
-            padding: 10px;
-            height: 300px;
-        }
-        .pos-cart-items {
-            max-height: 120px;
-        }
-        .payment-actions {
-            grid-template-columns: 1fr 1fr;
-        }
-        .payment-actions .btn-payment {
-            font-size: 11px;
-            padding: 8px;
-        }
-        .payment-actions .btn-payment i {
-            font-size: 16px;
-        }
-        .pos-cart-actions button {
-            font-size: 11px;
-            padding: 8px;
-        }
-        .pos-modal {
-            padding: 12px;
-        }
-        .pos-modal-header h3 {
-            font-size: 1rem;
-        }
-        .pos-modal-footer button {
-            font-size: 12px;
-            padding: 10px;
-        }
-        .modal-field label {
-            font-size: 12px;
-        }
-        .modal-field input {
-            padding: 8px 10px;
-            font-size: 12px;
-        }
-        .cart-item {
-            font-size: 11px;
-            padding: 6px 8px;
-        }
-        .cart-item .item-price {
-            min-width: 50px;
-            font-size: 11px;
-        }
-        .cart-item .item-qty button {
-            width: 18px;
-            height: 18px;
-            font-size: 12px;
-        }
-        .payment-amount-display .amount {
-            font-size: 22px;
-        }
+        .pos-wrapper { padding: 5px; }
+        .pos-container { gap: 10px; }
+        .pos-products { padding: 10px; }
+        .pos-products-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+        .pos-cart { padding: 10px; height: 300px; }
+        .pos-cart-items { max-height: 120px; }
+        .payment-actions .btn-payment { font-size: 11px; padding: 8px; }
+        .payment-actions .btn-payment i { font-size: 16px; }
+        .pos-modal { padding: 12px; }
+        .pos-modal-footer button { font-size: 12px; padding: 10px; }
+        .modal-field input { padding: 8px 10px; font-size: 12px; }
+        .cart-item { font-size: 11px; padding: 6px 8px; }
+        .cart-item .item-price { min-width: 50px; font-size: 11px; }
+        .cart-item .item-qty button { width: 18px; height: 18px; font-size: 12px; }
+        .payment-amount-display .amount { font-size: 22px; }
         .success-toast {
-            bottom: 15px;
-            right: 15px;
-            padding: 10px 15px;
-            font-size: 12px;
-            max-width: 90%;
+            bottom: 15px; right: 15px; padding: 10px 15px;
+            font-size: 12px; max-width: 90%;
         }
         .stock-update-indicator {
-            top: 10px;
-            right: 10px;
-            padding: 8px 12px;
-            font-size: 12px;
+            top: 10px; right: 10px; padding: 8px 12px; font-size: 12px;
         }
     }
 </style>
@@ -914,12 +793,20 @@
 {% block content %}
 <div class="pos-wrapper">
     <div class="pos-container">
-        
-        <!-- LEFT: Products -->
+
+        <!-- ========================== -->
+        <!-- LEFT: PRODUCTS             -->
+        <!-- ========================== -->
         <div class="pos-products">
             <div class="pos-products-header">
-                <input type="text" id="searchProducts" placeholder="Search by name, brand, code..." class="form-control">
-                <select id="categoryFilter" class="form-select">
+                <div class="pos-search-wrap">
+                    <input type="text" id="searchProducts"
+                           placeholder="Search or scan barcode / IMEI / serial..."
+                           autocomplete="off">
+                    <span class="barcode-hint">SCAN</span>
+                    <div class="barcode-results" id="barcodeResults"></div>
+                </div>
+                <select id="categoryFilter">
                     <option value="all">All Categories</option>
                     <option value="phones">📱 Phones</option>
                     <option value="electronics">💻 Electronics</option>
@@ -929,27 +816,28 @@
                     <i class="fas fa-sync"></i>
                 </button>
             </div>
-            
+
             <div class="pos-products-grid" id="productsGrid">
                 <div class="text-center py-5" style="color: #000000;">
-                    <i class="fas fa-spinner fa-spin fa-2x d-block mb-3" style="color: #000000;"></i>
-                    <p style="color: #000000;">Loading products...</p>
+                    <i class="fas fa-spinner fa-spin fa-2x d-block mb-3"></i>
+                    <p>Loading products...</p>
                 </div>
             </div>
         </div>
-        
-        <!-- RIGHT: Cart -->
+
+        <!-- ========================== -->
+        <!-- RIGHT: CART                -->
+        <!-- ========================== -->
         <div class="pos-cart">
             <div class="pos-cart-header">
                 <h5><i class="fas fa-shopping-cart"></i> Cart</h5>
                 <span class="cart-count" id="cartCount">0</span>
             </div>
-            
+
             <div class="pos-customer">
-                <!-- Branch Display/Selector -->
                 {% if user.role == 'company_cashier' %}
                     <div class="branch-display">
-                        <i class="fas fa-store"></i> 
+                        <i class="fas fa-store"></i>
                         Branch: {{ user.branch.name|default:"Not Assigned" }}
                         {% if user.branch %}
                             <span style="font-size:11px; display:block; color:#6c757d;">{{ user.branch.code }}</span>
@@ -964,19 +852,19 @@
                         {% endfor %}
                     </select>
                 {% endif %}
-                
+
                 <input type="text" id="customerName" placeholder="Customer Name">
                 <input type="text" id="customerPhone" placeholder="Phone Number">
             </div>
-            
+
             <div class="pos-cart-items" id="cartItems">
                 <div class="cart-empty">
                     <i class="fas fa-shopping-cart"></i>
                     <p>Cart is empty</p>
-                    <small>Click a product to add</small>
+                    <small>Click a product or scan a barcode</small>
                 </div>
             </div>
-            
+
             <div class="pos-cart-totals">
                 <div class="total-row">
                     <span>Subtotal</span>
@@ -987,8 +875,7 @@
                     <span id="total">KSh 0.00</span>
                 </div>
             </div>
-            
-            <!-- Payment Actions -->
+
             <div class="payment-actions">
                 <button class="btn-payment btn-cash" onclick="openPaymentModal('cash')">
                     <i class="fas fa-money-bill-wave"></i> Cash
@@ -1003,7 +890,7 @@
                     <i class="fas fa-star"></i> Points
                 </button>
             </div>
-            
+
             <div class="pos-cart-actions">
                 <button class="btn-clear" onclick="clearCart()">🗑️</button>
                 <button class="btn-checkout" onclick="completeSale()" id="checkoutBtn" disabled>
@@ -1015,7 +902,7 @@
 </div>
 
 <!-- ============================================ -->
-<!-- PRODUCT MODAL -->
+<!-- PRODUCT MODAL                                 -->
 <!-- ============================================ -->
 <div class="pos-modal-overlay" id="productModal">
     <div class="pos-modal">
@@ -1050,7 +937,7 @@
 </div>
 
 <!-- ============================================ -->
-<!-- PAYMENT MODAL -->
+<!-- PAYMENT MODAL                                 -->
 <!-- ============================================ -->
 <div class="pos-modal-overlay" id="paymentModal">
     <div class="pos-modal">
@@ -1059,49 +946,38 @@
             <button class="pos-modal-close" onclick="closePaymentModal()">✕</button>
         </div>
         <div class="pos-modal-body">
-            <!-- Amount Display -->
             <div class="payment-amount-display">
                 <div class="label">Amount to Pay</div>
                 <div class="amount" id="paymentAmount">KSh 0.00</div>
             </div>
-            
-            <!-- Payment Fields Container -->
-            <div id="paymentFields">
-                <!-- Dynamic content loaded by JavaScript -->
-            </div>
-            
-            <!-- Payment Status -->
+            <div id="paymentFields"></div>
             <div class="payment-status" id="paymentStatus"></div>
         </div>
-
         <div class="pos-modal-footer">
             <button class="btn-cancel-modal" onclick="closePaymentModal()">Cancel</button>
             <button class="btn-add-to-cart" id="paymentActionBtn" onclick="processPayment()" style="flex:1;">
                 Process Payment
             </button>
-        </div>               
+        </div>
     </div>
 </div>
 
-<!-- Success Toast -->
+<!-- Toasts -->
 <div class="success-toast" id="successToast">
-    <i class="fas fa-check-circle"></i> 
+    <i class="fas fa-check-circle"></i>
     <span id="successMessage">Sale completed!</span>
 </div>
-
-<!-- Stock Update Indicator -->
 <div class="stock-update-indicator" id="stockUpdateIndicator">
     ✅ Stock Updated!
 </div>
 
 <script>
 // ============================================
-// CSRF Token
+// CSRF
 // ============================================
 function getCsrfToken() {
     const name = 'csrftoken';
-    const cookies = document.cookie.split(';');
-    for (let cookie of cookies) {
+    for (let cookie of document.cookie.split(';')) {
         cookie = cookie.trim();
         if (cookie.startsWith(name + '=')) {
             return cookie.substring(name.length + 1);
@@ -1111,106 +987,111 @@ function getCsrfToken() {
 }
 
 // ============================================
-// VARIABLES
+// STATE
 // ============================================
 let cart = [];
 let allProducts = [];
 let currentProduct = null;
 let selectedUnit = null;
 let isRefreshing = false;
-let autoRefreshInterval = null;
 let currentPaymentMethod = 'cash';
 let currentTotal = 0;
 
-// Category mapping
 const CATEGORY_MAP = {
     'phones': 'Phone',
     'electronics': 'Electronics',
     'accessories': 'Accessories'
 };
-
 const CATEGORY_EMOJI = {
     'Phone': '📱',
     'Electronics': '💻',
     'Accessories': '🎧'
 };
 
+// Barcode detection
+const BARCODE_MIN_LEN = 6;
+const ID_PATTERN = /^[0-9A-Za-z\-_]+$/;
+
+// DOM references
+const searchInput = document.getElementById('searchProducts');
+const searchWrap = searchInput.closest('.pos-search-wrap');
+const barcodeResults = document.getElementById('barcodeResults');
+
+let barcodeDebounce = null;
+
 // ============================================
-// LOAD PRODUCTS
+// PRODUCTS: LOAD / FILTER / RENDER
 // ============================================
 async function loadProducts() {
     try {
-        const response = await fetch('/epa_shop/pos/search/');
-        if (!response.ok) throw new Error('Network error');
-        const data = await response.json();
+        const res = await fetch('/epa_shop/pos/search/');
+        if (!res.ok) throw new Error('Network error');
+        const data = await res.json();
+
         if (data.error) {
-            console.error('Error:', data.error);
-            showError(data.error);
+            showProductsError(data.error);
             return;
         }
         allProducts = data.products || [];
         applyFilters();
-    } catch (error) {
-        console.error('Error loading products:', error);
-        showError('Failed to load products. Please refresh.');
+    } catch (err) {
+        console.error('Error loading products:', err);
+        showProductsError('Failed to load products. Please refresh.');
     }
 }
 
-function showError(message) {
+function showProductsError(message) {
     document.getElementById('productsGrid').innerHTML = `
         <div class="text-center text-danger py-5">
             <i class="fas fa-exclamation-circle fa-2x d-block mb-3"></i>
-            <p style="color: #dc3545;">${message}</p>
-            <button class="btn btn-primary btn-sm" onclick="loadProducts()" style="border: 2px solid #000000; background: #87CEEB; color: #000000; font-weight: 600;">Retry</button>
+            <p>${message}</p>
+            <button class="btn btn-primary btn-sm" onclick="loadProducts()"
+                    style="border: 2px solid #000000; background: #87CEEB; color: #000000; font-weight: 600;">
+                Retry
+            </button>
         </div>
     `;
 }
 
-// ============================================
-// APPLY FILTERS
-// ============================================
 function applyFilters() {
-    const search = document.getElementById('searchProducts').value.toLowerCase().trim();
+    const search = searchInput.value.toLowerCase().trim();
     const category = document.getElementById('categoryFilter').value;
-    
+
     let filtered = allProducts;
-    
+
     if (search) {
-        filtered = filtered.filter(p => 
+        filtered = filtered.filter(p =>
             p.name.toLowerCase().includes(search) ||
             p.brand.toLowerCase().includes(search) ||
             p.model.toLowerCase().includes(search) ||
             p.product_code.toLowerCase().includes(search)
         );
     }
-    
+
     if (category !== 'all') {
         const targetCategory = CATEGORY_MAP[category];
         if (targetCategory) {
             filtered = filtered.filter(p => p.category === targetCategory);
         }
     }
-    
+
     renderProducts(filtered);
 }
 
-// ============================================
-// RENDER PRODUCTS
-// ============================================
 function renderProducts(products) {
     const grid = document.getElementById('productsGrid');
-    
+
     if (!products || products.length === 0) {
         grid.innerHTML = '<div class="text-center py-5" style="color: #000000;">No products found</div>';
         return;
     }
-    
+
     grid.innerHTML = products.map(product => {
         const inStock = product.stock > 0;
         const stockClass = product.stock > 5 ? 'in-stock' : (product.stock > 0 ? 'low-stock' : 'out-of-stock');
         const stockLabel = product.stock > 5 ? 'In Stock' : (product.stock > 0 ? 'Low Stock' : 'Out of Stock');
         const emoji = CATEGORY_EMOJI[product.category] || '';
-        
+
         let specs = '-';
         if (product.category === 'Phone') {
             const ram = product.ram || '';
@@ -1223,9 +1104,9 @@ function renderProducts(products) {
         } else if (product.category === 'Accessories') {
             specs = product.accessory_type ? product.accessory_type.replace('_', ' ').toUpperCase() : '-';
         }
-        
+
         return `
-            <div class="product-card ${inStock ? '' : 'out-of-stock'}" 
+            <div class="product-card ${inStock ? '' : 'out-of-stock'}"
                  onclick="${inStock ? `openModal('${product.product_code}')` : ''}">
                 <div class="product-name">${emoji} ${product.name}</div>
                 <div class="product-model">${product.brand} ${product.model}</div>
@@ -1243,96 +1124,204 @@ function renderProducts(products) {
     }).join('');
 }
 
-// ============================================
-// REFRESH PRODUCTS AFTER SALE
-// ============================================
 async function refreshProductsAfterSale() {
     if (isRefreshing) return;
     isRefreshing = true;
-    
-    const refreshBtn = document.querySelector('.btn-refresh i');
-    if (refreshBtn) {
-        refreshBtn.className = 'fas fa-spinner fa-spin';
-    }
-    
+
+    const refreshIcon = document.querySelector('.btn-refresh i');
+    if (refreshIcon) refreshIcon.className = 'fas fa-spinner fa-spin';
+
     try {
-        const response = await fetch('/epa_shop/pos/search/');
-        if (!response.ok) throw new Error('Network error');
-        const data = await response.json();
-        
+        const res = await fetch('/epa_shop/pos/search/');
+        if (!res.ok) throw new Error('Network error');
+        const data = await res.json();
         if (data.error) {
             console.error('Error:', data.error);
             return;
         }
-        
         allProducts = data.products || [];
         applyFilters();
-        showStockUpdateIndicator();
-        
-    } catch (error) {
-        console.error('Error refreshing products:', error);
+        showIndicator('✅ Stock Updated!');
+    } catch (err) {
+        console.error('Error refreshing products:', err);
     } finally {
         isRefreshing = false;
-        if (refreshBtn) {
-            refreshBtn.className = 'fas fa-sync';
-        }
+        if (refreshIcon) refreshIcon.className = 'fas fa-sync';
     }
 }
 
-function showStockUpdateIndicator() {
-    const indicator = document.getElementById('stockUpdateIndicator');
-    indicator.style.display = 'block';
-    indicator.style.opacity = '1';
-    
-    setTimeout(() => {
-        indicator.style.opacity = '0';
-        indicator.style.transition = 'opacity 0.5s ease';
-        setTimeout(() => {
-            indicator.style.display = 'none';
-            indicator.style.opacity = '1';
-            indicator.style.transition = '';
-        }, 500);
-    }, 2000);
+// ============================================
+// BARCODE / IMEI / SERIAL SEARCH
+// ============================================
+function looksLikeIdentifier(value) {
+    const v = value.trim();
+    if (v.length < BARCODE_MIN_LEN) return false;
+    if (!ID_PATTERN.test(v)) return false;
+    const digitCount = (v.match(/\d/g) || []).length;
+    return (digitCount / v.length) >= 0.5 || v.includes('-');
 }
 
-// ============================================
-// SEARCH AND FILTER EVENT HANDLERS
-// ============================================
-document.getElementById('searchProducts').addEventListener('input', function() {
+searchInput.addEventListener('input', function () {
+    const q = this.value.trim();
+
+    if (looksLikeIdentifier(q)) {
+        searchWrap.classList.add('scanning');
+        clearTimeout(barcodeDebounce);
+        barcodeDebounce = setTimeout(() => runBarcodeSearch(q), 180);
+        return;
+    }
+
+    searchWrap.classList.remove('scanning');
+    hideBarcodeResults();
     applyFilters();
 });
 
-document.getElementById('searchProducts').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        const visibleProducts = document.querySelectorAll('.product-card:not(.out-of-stock)');
-        if (visibleProducts.length > 0) {
-            const firstProduct = visibleProducts[0];
-            if (firstProduct && firstProduct.onclick) {
-                firstProduct.click();
+searchInput.addEventListener('keydown', async function (e) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+
+    const q = this.value.trim();
+    if (!q) return;
+
+    // If it looks like an identifier, try the barcode endpoint first
+    if (looksLikeIdentifier(q)) {
+        const result = await runBarcodeSearch(q, /* silent */ true);
+        if (result && result.match) {
+            autoAddBarcodeMatch(result.match);
+            return;
+        }
+        // fall through if no barcode match
+    }
+
+    // Normal Enter → open first visible in-stock product
+    const first = document.querySelector('.product-card:not(.out-of-stock)');
+    if (first && first.onclick) first.click();
+});
+
+document.addEventListener('click', function (e) {
+    if (!searchWrap.contains(e.target)) hideBarcodeResults();
+});
+
+async function runBarcodeSearch(q, silent = false) {
+    try {
+        const res = await fetch(`/epa_shop/pos/search/barcode/?q=${encodeURIComponent(q)}`);
+        if (!res.ok) throw new Error('Network error');
+        const data = await res.json();
+
+        if (!data.units || data.units.length === 0) {
+            if (!silent) {
+                barcodeResults.innerHTML =
+                    `<div class="barcode-no-match">No match for "${q}"</div>`;
+                barcodeResults.classList.add('active');
             }
+            return null;
         }
-    }
-});
 
-document.getElementById('categoryFilter').addEventListener('change', function() {
-    applyFilters();
-});
+        if (!silent) renderBarcodeResults(data.units);
+        return data;
+    } catch (err) {
+        console.error('Barcode search failed:', err);
+        if (!silent) {
+            barcodeResults.innerHTML =
+                `<div class="barcode-no-match">Search error</div>`;
+            barcodeResults.classList.add('active');
+        }
+        return null;
+    }
+}
+
+function renderBarcodeResults(units) {
+    barcodeResults.innerHTML = units.map((u, i) => {
+        const badgeClass = u.unit_type === 'IMEI' ? 'imei'
+                          : u.unit_type === 'Serial' ? 'serial'
+                          : 'sku';
+        const emoji = CATEGORY_EMOJI[u.category] || '';
+        return `
+            <div class="barcode-result-item" data-index="${i}">
+                <div class="row-top">
+                    <span class="identifier">${emoji} ${u.identifier}</span>
+                    <span class="badge ${badgeClass}">${u.unit_type}</span>
+                </div>
+                <div class="product-name">
+                    ${u.name} <span style="color:#6c757d;">(${u.brand} ${u.model})</span>
+                </div>
+                <div class="row-bottom">
+                    <span>KSh ${u.price.toLocaleString()}</span>
+                    <span>Stock: ${u.stock}</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Attach handlers with real JS objects (avoids JSON-in-attribute issues)
+    barcodeResults.querySelectorAll('.barcode-result-item').forEach((el, idx) => {
+        el.addEventListener('click', () => autoAddBarcodeMatch(units[idx]));
+    });
+
+    barcodeResults.classList.add('active');
+}
+
+function hideBarcodeResults() {
+    barcodeResults.classList.remove('active');
+    barcodeResults.innerHTML = '';
+}
+
+/**
+ * Auto-add a barcode/IMEI/serial match to cart.
+ * Handles accessories (SKU) vs unit-tracked products differently.
+ */
+function autoAddBarcodeMatch(match) {
+    if (!match) return;
+
+    const isAccessory = match.category === 'Accessories';
+    const unitIdentifier = match.unit_type === 'SKU' ? null : match.identifier;
+
+    // Duplicate check
+    const existing = cart.find(item => {
+        if (isAccessory) return item.product_code === match.product_code;
+        return item.unit === unitIdentifier;
+    });
+
+    if (existing) {
+        existing.quantity += 1;
+    } else {
+        cart.push({
+            product_code: match.product_code,
+            name: match.name,
+            brand: match.brand,
+            model: match.model,
+            category: match.category,
+            price: match.price,
+            quantity: 1,
+            unit: unitIdentifier,
+        });
+    }
+
+    renderCart();
+
+    // Reset search & refocus for next scan
+    searchInput.value = '';
+    searchWrap.classList.remove('scanning');
+    hideBarcodeResults();
+    searchInput.focus();
+
+    showIndicator(`✅ Added: ${match.name} (${match.identifier})`);
+}
 
 // ============================================
-// MODAL FUNCTIONS
+// PRODUCT MODAL
 // ============================================
 function openModal(productCode) {
     const product = allProducts.find(p => p.product_code === productCode);
     if (!product) return;
-    
+
     currentProduct = product;
     selectedUnit = null;
-    
+
     document.getElementById('modalTitle').textContent = `Add to Cart - ${product.category}`;
     document.getElementById('modalProductName').textContent = product.name;
     document.getElementById('modalProductModel').textContent = `Model: ${product.brand} ${product.model}`;
-    
+
     let specs = '-';
     if (product.category === 'Phone') {
         const ram = product.ram || '';
@@ -1349,46 +1338,46 @@ function openModal(productCode) {
     document.getElementById('modalProductPrice').textContent = `Price: KSh ${product.price.toLocaleString()}`;
     document.getElementById('modalProductStock').textContent = `Stock: ${product.stock}`;
     document.getElementById('modalProductCode').textContent = `Code: ${product.product_code}`;
-    
-    const fieldsContainer = document.getElementById('modalFields');
-    
+
+    const fields = document.getElementById('modalFields');
+
     if (product.category === 'Accessories') {
-        fieldsContainer.innerHTML = `
+        fields.innerHTML = `
             <div class="modal-field">
                 <label>Quantity <span class="text-danger">*</span></label>
-                <input type="number" id="modalQuantity" value="1" min="1" max="${product.stock}" 
-                       onchange="validateAccessoryFields()" oninput="validateAccessoryFields()">
+                <input type="number" id="modalQuantity" value="1" min="1" max="${product.stock}">
                 <small class="text-muted">Max: ${product.stock}</small>
             </div>
             <div class="modal-field">
                 <label>Selling Price per Item <span class="text-danger">*</span></label>
-                <input type="number" id="modalPrice" value="${product.price}" step="0.01" min="0.01" 
-                       onchange="validateAccessoryFields()" oninput="validateAccessoryFields()">
+                <input type="number" id="modalPrice" value="${product.price}" step="0.01" min="0.01">
                 <small class="text-muted">Default: KSh ${product.price.toLocaleString()}</small>
             </div>
             <div class="modal-field" style="background: #f8f9fa; padding: 12px; border-radius: 4px; border: 2px solid #000000;">
-                <strong style="color: #000000;">Total: </strong>
-                <span id="modalTotalDisplay" style="color: #000000; font-weight: 700;">KSh ${(product.price * 1).toLocaleString()}</span>
+                <strong>Total: </strong>
+                <span id="modalTotalDisplay" style="font-weight: 700;">KSh ${(product.price * 1).toLocaleString()}</span>
             </div>
         `;
         document.getElementById('addToCartBtn').disabled = false;
+        document.getElementById('modalQuantity').addEventListener('input', validateAccessoryFields);
         document.getElementById('modalQuantity').addEventListener('input', updateTotalDisplay);
+        document.getElementById('modalPrice').addEventListener('input', validateAccessoryFields);
         document.getElementById('modalPrice').addEventListener('input', updateTotalDisplay);
-        
+
     } else {
         const isPhone = product.category === 'Phone';
         const label = isPhone ? 'IMEI Number' : 'Serial Number';
-        const placeholder = isPhone ? 'Enter IMEI number...' : 'Enter Serial number...';
-        
-        fieldsContainer.innerHTML = `
+        const placeholder = isPhone ? 'Enter or scan IMEI...' : 'Enter or scan Serial...';
+
+        fields.innerHTML = `
             <div class="modal-field">
                 <label>Search ${label} <span class="text-danger">*</span></label>
                 <div class="unit-search-container">
                     <input type="text" id="unitSearch" placeholder="${placeholder}"
-                           oninput="searchUnits(this.value)" autocomplete="off" style="border: 2px solid #000000; border-radius: 4px; padding: 10px 12px; width: 100%;">
+                           oninput="searchUnits(this.value)" autocomplete="off">
                     <div class="unit-results" id="unitResults"></div>
                 </div>
-                <small class="text-muted">Type to search available ${label}s</small>
+                <small class="text-muted">Type or scan to search available ${label}s</small>
             </div>
             <div id="selectedUnitDisplay">
                 <div class="selected-unit" style="display:none;">
@@ -1401,7 +1390,7 @@ function openModal(productCode) {
             </div>
             <div class="modal-field">
                 <label>Selling Price <span class="text-danger">*</span></label>
-                <input type="number" id="modalUnitPrice" value="${product.price}" step="0.01" min="0.01" style="border: 2px solid #000000; border-radius: 4px; padding: 10px 12px; width: 100%;">
+                <input type="number" id="modalUnitPrice" value="${product.price}" step="0.01" min="0.01">
                 <small class="text-muted">Default: KSh ${product.price.toLocaleString()}</small>
             </div>
         `;
@@ -1409,12 +1398,12 @@ function openModal(productCode) {
         window._availableUnits = product.units || [];
         window._isPhone = isPhone;
     }
-    
+
     document.getElementById('productModal').classList.add('active');
-    
+
     setTimeout(() => {
-        const firstInput = document.querySelector('#modalFields input');
-        if (firstInput) firstInput.focus();
+        const first = document.querySelector('#modalFields input');
+        if (first) first.focus();
     }, 100);
 }
 
@@ -1423,50 +1412,54 @@ function closeModal() {
     currentProduct = null;
     selectedUnit = null;
     window._availableUnits = [];
-    document.getElementById('searchProducts').focus();
+    searchInput.focus();
 }
 
 function searchUnits(query) {
     const resultsDiv = document.getElementById('unitResults');
     const availableUnits = window._availableUnits || [];
-    
+
     if (query.length < 2) {
         resultsDiv.classList.remove('active');
         return;
     }
-    
-    const filtered = availableUnits.filter(u => 
-        u.identifier.toLowerCase().includes(query.toLowerCase()) && 
+
+    const filtered = availableUnits.filter(u =>
+        u.identifier.toLowerCase().includes(query.toLowerCase()) &&
         u.status === 'available'
     );
-    
+
     if (filtered.length === 0) {
         resultsDiv.innerHTML = '<div class="unit-result-item">No units found</div>';
         resultsDiv.classList.add('active');
         return;
     }
-    
+
     resultsDiv.innerHTML = filtered.map(unit => `
-        <div class="unit-result-item" onclick="selectUnit('${unit.identifier}')">
+        <div class="unit-result-item" data-identifier="${unit.identifier}">
             <span class="unit-id">${unit.identifier}</span>
             <span class="unit-status available">✅ Available</span>
         </div>
     `).join('');
+
+    resultsDiv.querySelectorAll('.unit-result-item[data-identifier]').forEach(el => {
+        el.addEventListener('click', () => selectUnit(el.dataset.identifier));
+    });
+
     resultsDiv.classList.add('active');
 }
 
 function selectUnit(identifier) {
-    const availableUnits = window._availableUnits || [];
-    const unit = availableUnits.find(u => u.identifier === identifier);
+    const unit = (window._availableUnits || []).find(u => u.identifier === identifier);
     if (!unit) return;
-    
+
     selectedUnit = unit;
-    
+
     const display = document.querySelector('.selected-unit');
     const valueDisplay = document.getElementById('selectedUnitValue');
     display.style.display = 'flex';
     valueDisplay.textContent = unit.identifier;
-    
+
     document.getElementById('unitSearch').value = '';
     document.getElementById('unitResults').classList.remove('active');
     document.getElementById('addToCartBtn').disabled = false;
@@ -1484,13 +1477,8 @@ function validateAccessoryFields() {
     const qty = parseInt(document.getElementById('modalQuantity')?.value) || 0;
     const price = parseFloat(document.getElementById('modalPrice')?.value) || 0;
     const stock = currentProduct?.stock || 0;
-    
-    const btn = document.getElementById('addToCartBtn');
-    if (qty > 0 && price > 0 && qty <= stock) {
-        btn.disabled = false;
-    } else {
-        btn.disabled = true;
-    }
+
+    document.getElementById('addToCartBtn').disabled = !(qty > 0 && price > 0 && qty <= stock);
 }
 
 function updateTotalDisplay() {
@@ -1500,24 +1488,21 @@ function updateTotalDisplay() {
     document.getElementById('modalTotalDisplay').textContent = `KSh ${total.toLocaleString()}`;
 }
 
-// ============================================
-// ADD TO CART FROM MODAL
-// ============================================
 function addToCartFromModal() {
     if (!currentProduct) return;
-    
+
     const isAccessory = currentProduct.category === 'Accessories';
-    
+
     if (isAccessory) {
         const qty = parseInt(document.getElementById('modalQuantity').value) || 1;
         const price = parseFloat(document.getElementById('modalPrice').value) || currentProduct.price;
-        
+
         if (qty <= 0 || price <= 0) {
             alert('Please enter valid quantity and price');
             return;
         }
-        
-        const existing = cart.find(item => item.product_code === currentProduct.product_code);
+
+        const existing = cart.find(i => i.product_code === currentProduct.product_code);
         if (existing) {
             existing.quantity += qty;
             existing.price = price;
@@ -1528,26 +1513,24 @@ function addToCartFromModal() {
                 brand: currentProduct.brand,
                 model: currentProduct.model,
                 category: currentProduct.category,
-                price: price,
+                price,
                 quantity: qty,
-                unit: null
+                unit: null,
             });
         }
-        
     } else {
         if (!selectedUnit) {
             alert('Please select a unit');
             return;
         }
-        
+
         const price = parseFloat(document.getElementById('modalUnitPrice').value) || currentProduct.price;
-        
         if (price <= 0) {
             alert('Please enter valid price');
             return;
         }
-        
-        const existing = cart.find(item => item.unit === selectedUnit.identifier);
+
+        const existing = cart.find(i => i.unit === selectedUnit.identifier);
         if (existing) {
             existing.quantity += 1;
         } else {
@@ -1557,20 +1540,20 @@ function addToCartFromModal() {
                 brand: currentProduct.brand,
                 model: currentProduct.model,
                 category: currentProduct.category,
-                price: price,
+                price,
                 quantity: 1,
-                unit: selectedUnit.identifier
+                unit: selectedUnit.identifier,
             });
         }
     }
-    
+
     closeModal();
     renderCart();
-    document.getElementById('searchProducts').focus();
+    searchInput.focus();
 }
 
 // ============================================
-// CART FUNCTIONS
+// CART
 // ============================================
 function removeFromCart(index) {
     cart.splice(index, 1);
@@ -1585,20 +1568,20 @@ function updateQuantity(index, delta) {
 
 function renderCart() {
     const container = document.getElementById('cartItems');
-    const count = document.getElementById('cartCount');
+    const countEl = document.getElementById('cartCount');
     const subtotalEl = document.getElementById('subtotal');
     const totalEl = document.getElementById('total');
     const checkoutBtn = document.getElementById('checkoutBtn');
-    
-    count.textContent = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+    countEl.textContent = cart.reduce((sum, i) => sum + i.quantity, 0);
     checkoutBtn.disabled = cart.length === 0;
-    
+
     if (cart.length === 0) {
         container.innerHTML = `
             <div class="cart-empty">
                 <i class="fas fa-shopping-cart"></i>
                 <p>Cart is empty</p>
-                <small>Click a product to add</small>
+                <small>Click a product or scan a barcode</small>
             </div>
         `;
         subtotalEl.textContent = 'KSh 0.00';
@@ -1607,31 +1590,31 @@ function renderCart() {
         updateCheckoutButton();
         return;
     }
-    
+
     let subtotal = 0;
     container.innerHTML = cart.map((item, index) => {
-        const total = item.price * item.quantity;
-        subtotal += total;
-        const unitDisplay = item.unit ? `<div class="item-unit">${item.unit}</div>` : '';
-        const codeDisplay = `<div style="font-size:10px; color:#000000;">${item.product_code}</div>`;
+        const lineTotal = item.price * item.quantity;
+        subtotal += lineTotal;
+        const unitLine = item.unit ? `<div class="item-unit">${item.unit}</div>` : '';
+        const codeLine = `<div style="font-size:10px;">${item.product_code}</div>`;
         return `
             <div class="cart-item">
                 <div class="item-name">
                     ${item.name}
-                    ${unitDisplay}
-                    ${codeDisplay}
+                    ${unitLine}
+                    ${codeLine}
                 </div>
                 <div class="item-qty">
                     <button onclick="updateQuantity(${index}, -1)">−</button>
                     <span>${item.quantity}</span>
                     <button onclick="updateQuantity(${index}, 1)">+</button>
                 </div>
-                <div class="item-price">KSh ${total.toLocaleString()}</div>
+                <div class="item-price">KSh ${lineTotal.toLocaleString()}</div>
                 <button class="item-remove" onclick="removeFromCart(${index})">✕</button>
             </div>
         `;
     }).join('');
-    
+
     currentTotal = subtotal;
     subtotalEl.textContent = `KSh ${subtotal.toLocaleString()}`;
     totalEl.textContent = `KSh ${currentTotal.toLocaleString()}`;
@@ -1654,34 +1637,31 @@ function clearCart() {
     if (!confirm('Clear all items from cart?')) return;
     cart = [];
     renderCart();
-    document.getElementById('searchProducts').focus();
+    searchInput.focus();
 }
 
 // ============================================
-// PAYMENT MODAL FUNCTIONS
+// PAYMENT MODAL
 // ============================================
 function openPaymentModal(method) {
     if (cart.length === 0) {
         alert('Cart is empty. Please add items first.');
         return;
     }
-    
+
     currentPaymentMethod = method;
     const modal = document.getElementById('paymentModal');
     const title = document.getElementById('paymentModalTitle');
     const fields = document.getElementById('paymentFields');
     const status = document.getElementById('paymentStatus');
     const actionBtn = document.getElementById('paymentActionBtn');
-    
-    // Reset status
+
     status.className = 'payment-status';
     status.style.display = 'none';
     status.innerHTML = '';
-    
-    // Set amount
+
     document.getElementById('paymentAmount').textContent = `KSh ${currentTotal.toFixed(2)}`;
-    
-    // Set title and fields based on method
+
     const icons = {
         cash: 'fa-money-bill-wave',
         mpesa: 'fa-mobile-alt',
@@ -1694,19 +1674,18 @@ function openPaymentModal(method) {
         bank: 'Bank Card Payment',
         points: 'Points Redemption'
     };
-    
     title.innerHTML = `<i class="fas ${icons[method]}"></i> ${titles[method]}`;
-    
-    // Generate fields
+
     let fieldsHTML = '';
     let actionLabel = 'Process Payment';
-    
-    switch(method) {
+
+    switch (method) {
         case 'cash':
             fieldsHTML = `
                 <div class="modal-field">
                     <label>Amount Tendered <span class="text-danger">*</span></label>
-                    <input type="number" id="cashTendered" placeholder="Enter amount tendered" step="0.01" min="0" oninput="calculateCashChange()" style="border: 2px solid #000000; border-radius: 4px; padding: 10px 12px; width: 100%;">
+                    <input type="number" id="cashTendered" placeholder="Enter amount tendered"
+                           step="0.01" min="0" oninput="calculateCashChange()">
                 </div>
                 <div class="modal-field">
                     <label>Change Due</label>
@@ -1715,217 +1694,194 @@ function openPaymentModal(method) {
             `;
             actionLabel = 'Complete Cash Payment';
             break;
-            
+
         case 'mpesa':
             fieldsHTML = `
                 <div class="modal-field">
                     <label>M-Pesa Phone Number <span class="text-danger">*</span></label>
-                    <input type="text" id="mpesaPhone" placeholder="07XX XXX XXX" style="border: 2px solid #000000; border-radius: 4px; padding: 10px 12px; width: 100%;">
+                    <input type="text" id="mpesaPhone" placeholder="07XX XXX XXX">
                 </div>
                 <div class="modal-field">
                     <div style="display:flex; gap:10px;">
-                        <button type="button" class="btn-payment-action btn-mpesa" onclick="sendSTKPush()" style="flex:1;">
+                        <button type="button" class="btn-payment-action btn-mpesa"
+                                onclick="sendSTKPush()" style="flex:1;">
                             <i class="fas fa-paper-plane"></i> Send STK Push
                         </button>
-                        <button type="button" class="btn-payment-action btn-mpesa" onclick="searchMpesaTransaction()" style="flex:1; background: #87CEEB; color: #000000; border: 2px solid #000000;">
+                        <button type="button" class="btn-payment-action btn-mpesa"
+                                onclick="searchMpesaTransaction()"
+                                style="flex:1; background:#87CEEB; color:#000000;">
                             <i class="fas fa-search"></i> Search
                         </button>
                     </div>
                 </div>
-                <div id="mpesaStatusDisplay" style="margin-top:10px; font-size:13px; display:none; color: #000000;"></div>
+                <div id="mpesaStatusDisplay" style="margin-top:10px; font-size:13px; display:none;"></div>
             `;
             actionLabel = 'Confirm M-Pesa Payment';
             break;
-            
+
         case 'bank':
             fieldsHTML = `
                 <div class="modal-field">
                     <label>Card Number <span class="text-danger">*</span></label>
-                    <input type="text" id="cardNumber" placeholder="XXXX XXXX XXXX XXXX" maxlength="19" oninput="formatCardNumber(this)" style="border: 2px solid #000000; border-radius: 4px; padding: 10px 12px; width: 100%;">
+                    <input type="text" id="cardNumber" placeholder="XXXX XXXX XXXX XXXX"
+                           maxlength="19" oninput="formatCardNumber(this)">
                 </div>
                 <div class="modal-field" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                     <div>
-                        <label>Expiry Date <span class="text-danger">*</span></label>
-                        <input type="text" id="cardExpiry" placeholder="MM/YY" maxlength="5" oninput="formatExpiry(this)" style="border: 2px solid #000000; border-radius: 4px; padding: 10px 12px; width: 100%;">
+                        <label>Expiry <span class="text-danger">*</span></label>
+                        <input type="text" id="cardExpiry" placeholder="MM/YY"
+                               maxlength="5" oninput="formatExpiry(this)">
                     </div>
                     <div>
                         <label>CVV <span class="text-danger">*</span></label>
-                        <input type="password" id="cardCvv" placeholder="***" maxlength="4" inputmode="numeric" style="border: 2px solid #000000; border-radius: 4px; padding: 10px 12px; width: 100%;">
+                        <input type="password" id="cardCvv" placeholder="***"
+                               maxlength="4" inputmode="numeric">
                     </div>
                 </div>
-                <div id="bankStatusDisplay" style="margin-top:10px; font-size:13px; display:none; color: #000000;"></div>
+                <div id="bankStatusDisplay" style="margin-top:10px; font-size:13px; display:none;"></div>
             `;
             actionLabel = 'Process Card Payment';
             break;
-            
+
         case 'points':
             const availablePoints = 500;
             fieldsHTML = `
                 <div class="modal-field">
                     <label>Available Points</label>
-                    <div style="font-size:20px; font-weight:700; color:#000000;">${availablePoints}</div>
+                    <div style="font-size:20px; font-weight:700;">${availablePoints}</div>
                 </div>
                 <div class="modal-field">
                     <label>Points to Redeem <span class="text-danger">*</span></label>
-                    <input type="number" id="pointsToRedeem" placeholder="Enter points" min="0" max="${availablePoints}" oninput="calculatePointsValue()" style="border: 2px solid #000000; border-radius: 4px; padding: 10px 12px; width: 100%;">
+                    <input type="number" id="pointsToRedeem" placeholder="Enter points"
+                           min="0" max="${availablePoints}" oninput="calculatePointsValue()">
                 </div>
                 <div class="modal-field">
                     <label>Points Value</label>
                     <div style="font-size:20px; font-weight:700; color:#28a745;" id="pointsValueDisplay">KSh 0.00</div>
                 </div>
-                <div style="font-size:12px; color:#000000;">
-                    <i class="fas fa-info-circle"></i> 1 point = KSh 1.00
-                </div>
+                <div style="font-size:12px;"><i class="fas fa-info-circle"></i> 1 point = KSh 1.00</div>
             `;
             actionLabel = 'Redeem Points';
             break;
     }
-    
+
     fields.innerHTML = fieldsHTML;
     actionBtn.textContent = actionLabel;
     actionBtn.className = 'btn-add-to-cart';
-    actionBtn.onclick = function() { processPayment(); };
-    
+    actionBtn.onclick = processPayment;
+
     modal.classList.add('active');
 }
 
 function closePaymentModal() {
     document.getElementById('paymentModal').classList.remove('active');
-    document.getElementById('paymentStatus').className = 'payment-status';
-    document.getElementById('paymentStatus').style.display = 'none';
+    const status = document.getElementById('paymentStatus');
+    status.className = 'payment-status';
+    status.style.display = 'none';
 }
 
-// ============================================
-// PAYMENT HELPER FUNCTIONS
-// ============================================
 function calculateCashChange() {
     const tendered = parseFloat(document.getElementById('cashTendered').value) || 0;
-    const total = currentTotal;
-    const change = tendered - total;
-    const changeDisplay = document.getElementById('cashChange');
-    
+    const change = tendered - currentTotal;
+    const el = document.getElementById('cashChange');
+
     if (change >= 0) {
-        changeDisplay.textContent = `KSh ${change.toFixed(2)}`;
-        changeDisplay.style.color = '#28a745';
+        el.textContent = `KSh ${change.toFixed(2)}`;
+        el.style.color = '#28a745';
     } else {
-        changeDisplay.textContent = `KSh ${Math.abs(change).toFixed(2)} short`;
-        changeDisplay.style.color = '#dc3545';
+        el.textContent = `KSh ${Math.abs(change).toFixed(2)} short`;
+        el.style.color = '#dc3545';
     }
 }
 
 function calculatePointsValue() {
     const points = parseInt(document.getElementById('pointsToRedeem').value) || 0;
-    const value = points * 1;
-    document.getElementById('pointsValueDisplay').textContent = `KSh ${value.toFixed(2)}`;
+    document.getElementById('pointsValueDisplay').textContent = `KSh ${points.toFixed(2)}`;
 }
 
 function formatCardNumber(input) {
-    let value = input.value.replace(/\D/g, '');
-    if (value.length > 16) value = value.slice(0, 16);
-    let formatted = '';
-    for (let i = 0; i < value.length; i++) {
-        if (i > 0 && i % 4 === 0) formatted += ' ';
-        formatted += value[i];
+    let v = input.value.replace(/\D/g, '').slice(0, 16);
+    let out = '';
+    for (let i = 0; i < v.length; i++) {
+        if (i > 0 && i % 4 === 0) out += ' ';
+        out += v[i];
     }
-    input.value = formatted;
+    input.value = out;
 }
 
 function formatExpiry(input) {
-    let value = input.value.replace(/\D/g, '');
-    if (value.length > 4) value = value.slice(0, 4);
-    if (value.length >= 2) {
-        const month = parseInt(value.slice(0, 2));
-        if (month > 12) {
-            value = '12' + value.slice(2);
-        }
-        if (value.length >= 3) {
-            input.value = value.slice(0, 2) + '/' + value.slice(2);
-        } else {
-            input.value = value;
-        }
-    } else {
-        input.value = value;
+    let v = input.value.replace(/\D/g, '').slice(0, 4);
+    if (v.length >= 2) {
+        let month = parseInt(v.slice(0, 2));
+        if (month > 12) month = 12;
+        if (month < 1) month = 1;
+        v = String(month).padStart(2, '0') + v.slice(2);
     }
+    input.value = v.length > 2 ? v.slice(0, 2) + '/' + v.slice(2) : v;
 }
 
-// ============================================
-// M-PESA PAYMENT FUNCTIONS
-// ============================================
 function sendSTKPush() {
     const phone = document.getElementById('mpesaPhone').value.trim();
     const statusDiv = document.getElementById('mpesaStatusDisplay');
-    
-    if (!phone) {
-        statusDiv.innerHTML = '<span style="color:#dc3545;">Please enter phone number</span>';
-        statusDiv.style.display = 'block';
-        return;
-    }
-    
-    if (phone.length < 10) {
+
+    if (!phone || phone.length < 10) {
         statusDiv.innerHTML = '<span style="color:#dc3545;">Please enter a valid phone number</span>';
         statusDiv.style.display = 'block';
         return;
     }
-    
+
     statusDiv.innerHTML = '<span style="color:#ffc107;"><i class="fas fa-spinner fa-spin"></i> Sending STK Push...</span>';
     statusDiv.style.display = 'block';
-    
+
     setTimeout(() => {
-        const success = Math.random() > 0.3;
-        if (success) {
-            statusDiv.innerHTML = '<span style="color:#28a745;"><i class="fas fa-check-circle"></i> STK Push sent! Please check your phone and enter PIN.</span>';
-            setTimeout(() => {
-                statusDiv.innerHTML = '<span style="color:#28a745;"><i class="fas fa-check-circle"></i> Payment confirmed! KSh ' + currentTotal.toFixed(2) + ' received.</span>';
-                document.getElementById('paymentActionBtn').disabled = false;
-                document.getElementById('paymentActionBtn').textContent = '✅ Payment Confirmed';
-                document.getElementById('paymentActionBtn').style.background = '#28a745';
-            }, 5000);
-        } else {
-            statusDiv.innerHTML = '<span style="color:#dc3545;"><i class="fas fa-times-circle"></i> STK Push failed. Please try again.</span>';
-        }
+        statusDiv.innerHTML = '<span style="color:#28a745;"><i class="fas fa-check-circle"></i> STK Push sent! Please check your phone and enter PIN.</span>';
+        setTimeout(() => {
+            statusDiv.innerHTML = `<span style="color:#28a745;"><i class="fas fa-check-circle"></i> Payment confirmed! KSh ${currentTotal.toFixed(2)} received.</span>`;
+            const btn = document.getElementById('paymentActionBtn');
+            btn.disabled = false;
+            btn.textContent = '✅ Payment Confirmed';
+            btn.style.background = '#28a745';
+        }, 5000);
     }, 2000);
 }
 
 function searchMpesaTransaction() {
     const phone = document.getElementById('mpesaPhone').value.trim();
     const statusDiv = document.getElementById('mpesaStatusDisplay');
-    
+
     if (!phone) {
         statusDiv.innerHTML = '<span style="color:#dc3545;">Please enter phone number</span>';
         statusDiv.style.display = 'block';
         return;
     }
-    
-    statusDiv.innerHTML = '<span style="color:#ffc107;"><i class="fas fa-spinner fa-spin"></i> Searching for transactions...</span>';
+
+    statusDiv.innerHTML = '<span style="color:#ffc107;"><i class="fas fa-spinner fa-spin"></i> Searching...</span>';
     statusDiv.style.display = 'block';
-    
+
     setTimeout(() => {
-        statusDiv.innerHTML = '<span style="color:#28a745;"><i class="fas fa-check-circle"></i> Transaction found! Payment of KSh ' + currentTotal.toFixed(2) + ' confirmed.</span>';
-        document.getElementById('paymentActionBtn').disabled = false;
-        document.getElementById('paymentActionBtn').textContent = '✅ Payment Confirmed';
-        document.getElementById('paymentActionBtn').style.background = '#28a745';
+        statusDiv.innerHTML = `<span style="color:#28a745;"><i class="fas fa-check-circle"></i> Payment of KSh ${currentTotal.toFixed(2)} confirmed.</span>`;
+        const btn = document.getElementById('paymentActionBtn');
+        btn.disabled = false;
+        btn.textContent = '✅ Payment Confirmed';
+        btn.style.background = '#28a745';
     }, 2000);
 }
 
-// ============================================
-// PROCESS PAYMENT
-// ============================================
 function processPayment() {
     const statusDiv = document.getElementById('paymentStatus');
-    
-    // Validate based on payment method
+
     if (currentPaymentMethod === 'cash') {
         const tendered = parseFloat(document.getElementById('cashTendered').value) || 0;
-        if (tendered < currentTotal) {
-            statusDiv.className = 'payment-status error';
-            statusDiv.style.display = 'block';
-            statusDiv.innerHTML = '❌ Amount tendered is less than total amount. Please enter correct amount.';
-            return;
-        }
         if (tendered === 0) {
             statusDiv.className = 'payment-status error';
             statusDiv.style.display = 'block';
             statusDiv.innerHTML = '❌ Please enter amount tendered.';
+            return;
+        }
+        if (tendered < currentTotal) {
+            statusDiv.className = 'payment-status error';
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '❌ Amount tendered is less than total.';
             return;
         }
     } else if (currentPaymentMethod === 'mpesa') {
@@ -1944,7 +1900,7 @@ function processPayment() {
             return;
         }
     } else if (currentPaymentMethod === 'bank') {
-        const cardNumber = document.getElementById('cardNumber').value.trim().replace(/\s/g, '');
+        const cardNumber = document.getElementById('cardNumber').value.replace(/\s/g, '');
         if (cardNumber.length < 16) {
             statusDiv.className = 'payment-status error';
             statusDiv.style.display = 'block';
@@ -1973,20 +1929,18 @@ function processPayment() {
             statusDiv.innerHTML = '❌ Please enter points to redeem.';
             return;
         }
-        const value = points * 1;
-        if (value < currentTotal) {
+        if (points < currentTotal) {
             statusDiv.className = 'payment-status error';
             statusDiv.style.display = 'block';
-            statusDiv.innerHTML = '❌ Insufficient points. You need ' + Math.ceil(currentTotal) + ' points.';
+            statusDiv.innerHTML = `❌ Insufficient points. You need ${Math.ceil(currentTotal)} points.`;
             return;
         }
     }
-    
-    // Payment successful - close modal and complete sale
+
     statusDiv.className = 'payment-status success';
     statusDiv.style.display = 'block';
     statusDiv.innerHTML = '✅ Payment processed successfully!';
-    
+
     setTimeout(() => {
         closePaymentModal();
         completeSale();
@@ -1998,33 +1952,33 @@ function processPayment() {
 // ============================================
 async function completeSale() {
     if (cart.length === 0) return;
-    
+
     const customerName = document.getElementById('customerName').value || 'Walk-in Customer';
     const customerPhone = document.getElementById('customerPhone').value || '';
-    
-    let branchId;
-    const branchSelect = document.getElementById('branchSelect');
-    if (branchSelect && branchSelect.tagName === 'SELECT') {
-        branchId = branchSelect.value;
-    } else {
-        branchId = document.getElementById('branchSelect').value;
-    }
-    
+
+    const branchEl = document.getElementById('branchSelect');
+    const branchId = branchEl ? branchEl.value : '';
+
     if (!branchId) {
         alert('Please select a branch');
         return;
     }
-    
+
     const total = currentTotal;
-    
-    let itemsList = cart.map(item => 
+
+    const itemsList = cart.map(item =>
         `  - ${item.name} (${item.product_code}) × ${item.quantity} = KSh ${(item.price * item.quantity).toLocaleString()}`
     ).join('\n');
-    
-    if (!confirm(`Customer: ${customerName}\nPhone: ${customerPhone || 'N/A'}\nPayment: ${currentPaymentMethod.toUpperCase()}\n\nItems:\n${itemsList}\n\nTotal: KSh ${total.toLocaleString()}\n\nProceed with sale?`)) {
-        return;
-    }
-    
+
+    if (!confirm(
+        `Customer: ${customerName}\n` +
+        `Phone: ${customerPhone || 'N/A'}\n` +
+        `Payment: ${currentPaymentMethod.toUpperCase()}\n\n` +
+        `Items:\n${itemsList}\n\n` +
+        `Total: KSh ${total.toLocaleString()}\n\n` +
+        `Proceed with sale?`
+    )) return;
+
     const saleData = {
         branch_id: branchId,
         customer_name: customerName,
@@ -2035,39 +1989,33 @@ async function completeSale() {
             quantity: item.quantity,
             price: item.price,
             unit_identifier: item.unit || null,
-        }))
+        })),
     };
-    
+
     try {
-        const response = await fetch('/epa_shop/sale/process/', {
+        const res = await fetch('/epa_shop/sale/process/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCsrfToken()
+                'X-CSRFToken': getCsrfToken(),
             },
-            body: JSON.stringify(saleData)
+            body: JSON.stringify(saleData),
         });
-        
-        const data = await response.json();
-        
+
+        const data = await res.json();
+
         if (data.success) {
-            // Show success message
-            const saleId = data.sale_id || '';
-            showSuccessToast(`✅ Sale completed! Total: KSh ${total.toLocaleString()} (${currentPaymentMethod.toUpperCase()})`);
-            
-            // Clear cart
+            showSuccessToast(`✅ Sale completed! Total: KSh ${total.toLocaleString()}`);
+
             cart = [];
             renderCart();
             document.getElementById('customerName').value = '';
             document.getElementById('customerPhone').value = '';
-            
+
             await refreshProductsAfterSale();
-            
-            setTimeout(() => {
-                document.getElementById('searchProducts').focus();
-            }, 300);
-            
-            // Redirect to receipt page (same tab)
+
+            setTimeout(() => searchInput.focus(), 300);
+
             if (data.sale_id) {
                 setTimeout(() => {
                     window.location.href = `/epa_shop/sale/receipt/${data.sale_id}/`;
@@ -2076,61 +2024,67 @@ async function completeSale() {
         } else {
             alert('Error: ' + (data.error || 'Unknown error'));
         }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Error processing sale: ' + error.message);
+    } catch (err) {
+        console.error('Error:', err);
+        alert('Error processing sale: ' + err.message);
     }
 }
 
+// ============================================
+// UI HELPERS
+// ============================================
 function showSuccessToast(message) {
     const toast = document.getElementById('successToast');
     document.getElementById('successMessage').textContent = message;
     toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 4000);
+}
+
+function showIndicator(message) {
+    const indicator = document.getElementById('stockUpdateIndicator');
+    indicator.textContent = message;
+    indicator.style.display = 'block';
+    indicator.style.opacity = '1';
+
     setTimeout(() => {
-        toast.style.display = 'none';
-    }, 4000);
+        indicator.style.opacity = '0';
+        indicator.style.transition = 'opacity 0.5s ease';
+        setTimeout(() => {
+            indicator.style.display = 'none';
+            indicator.style.opacity = '1';
+            indicator.style.transition = '';
+        }, 500);
+    }, 2000);
 }
 
 // ============================================
-// KEYBOARD SHORTCUTS
+// EVENTS
 // ============================================
-document.addEventListener('keydown', function(e) {
+document.getElementById('categoryFilter').addEventListener('change', applyFilters);
+
+document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
-        const modal = document.getElementById('productModal');
-        if (modal.classList.contains('active')) {
-            closeModal();
-        }
-        const paymentModal = document.getElementById('paymentModal');
-        if (paymentModal.classList.contains('active')) {
-            closePaymentModal();
-        }
+        if (document.getElementById('productModal').classList.contains('active')) closeModal();
+        if (document.getElementById('paymentModal').classList.contains('active')) closePaymentModal();
     }
-    
     if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
         e.preventDefault();
         refreshProductsAfterSale();
     }
 });
 
-// ============================================
-// INIT
-// ============================================
-document.addEventListener('DOMContentLoaded', function() {
+// Close modals when clicking overlay
+document.getElementById('productModal').addEventListener('click', function (e) {
+    if (e.target === this) closeModal();
+});
+document.getElementById('paymentModal').addEventListener('click', function (e) {
+    if (e.target === this) closePaymentModal();
+});
+
+// Init
+document.addEventListener('DOMContentLoaded', function () {
     loadProducts();
-    document.getElementById('searchProducts').focus();
-});
-
-// Modal close on overlay click
-document.getElementById('productModal').addEventListener('click', function(e) {
-    if (e.target === this) {
-        closeModal();
-    }
-});
-
-document.getElementById('paymentModal').addEventListener('click', function(e) {
-    if (e.target === this) {
-        closePaymentModal();
-    }
+    searchInput.focus();
 });
 </script>
 

@@ -57,6 +57,7 @@ urlpatterns = [
     path('pos/', pos_views.pos_dashboard, name='epa-pos'),
     path('pos/search/', pos_views.pos_search_products, name='epa-pos-search'),
     path('pos/search-imei/', pos_views.pos_search_imei, name='epa-pos-search-imei'),
+    path('pos/search/barcode/', pos_views.pos_search_barcode, name='epa-pos-search-barcode'),
     path('pos/branches/', sale_views.get_branches, name='epa-pos-branches'),
     
     # ============================================
