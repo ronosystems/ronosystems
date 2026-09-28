@@ -266,15 +266,20 @@ AUTHENTICATION_BACKENDS = [
 # ============================================
 # SESSION / AUTO-LOGOUT ON INACTIVITY (30 MIN)
 # ============================================
-# The cookie itself lives for 7 days; the real 30-minute inactivity rule
-# is enforced by InactivityLogoutMiddleware. We do NOT save the session on
-# every request (that would hit the DB for every static file & API call).
-SESSION_COOKIE_AGE = 60 * 60 * 24 * 7    # 7 days cookie lifetime
-SESSION_SAVE_EVERY_REQUEST = False
+# The session cookie expires after 30 minutes of inactivity.
+# SESSION_SAVE_EVERY_REQUEST=True makes the expiry inactivity-based:
+# every request pushes the expiry forward, so an idle user is logged out
+# after 30 minutes, but an active user stays logged in indefinitely.
+#
+# InactivityLogoutMiddleware is a server-side backup that enforces the
+# same 30-minute rule by tracking _last_activity in the session and
+# flushing the session if it's exceeded.
+SESSION_COOKIE_AGE = 60 * 30             # 30 minutes
+SESSION_SAVE_EVERY_REQUEST = True         # refresh expiry on every request
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
-# Enforced by InactivityLogoutMiddleware
-INACTIVITY_TIMEOUT_SECONDS = 60 * 30     # 30 minutes
+# Enforced by InactivityLogoutMiddleware (belt-and-suspenders)
+INACTIVITY_TIMEOUT_SECONDS = 60 * 30      # 30 minutes
 
 
 # ============================================
@@ -335,7 +340,7 @@ SOCIALACCOUNT_PROVIDERS = {
             'client_id': os.getenv('APPLE_CLIENT_ID', ''),
             'secret': os.getenv('APPLE_CLIENT_SECRET', ''),
             'key': os.getenv('APPLE_KEY_ID', ''),
-            # NOTE: certificate_key must live inside APP.settings for
+            # certificate_key must live inside APP.settings for
             # recent django-allauth versions (silences the UserWarning).
             'settings': {
                 'certificate_key': os.getenv('APPLE_PRIVATE_KEY', ''),
