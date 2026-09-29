@@ -46,6 +46,7 @@ def _upload_company_media(file_obj, company_id, field_name, resource_type='image
     Examples:
         companies/42/logo_1789754321
         companies/42/favicon_1789754321
+        companies/42/login_background_1789754321
 
     Why unique: Cloudinary's CDN caches by public_id. Replacing a file with
     a fixed public_id + overwrite=True serves the OLD cached version. A
@@ -78,7 +79,7 @@ def _delete_company_media(public_id, resource_type='image'):
 
 def _current_public_id(field_value):
     """
-    Extract the stored public_id from a Company.logo / Company.favicon value.
+    Extract the stored public_id from a Company media field value.
 
     The model stores these as plain strings (CharField). This helper is
     defensive against legacy data where the value may still be a FieldFile.
@@ -91,7 +92,7 @@ def _current_public_id(field_value):
 
 def _handle_media_upload(request, company, field_name, post_file_key):
     """
-    Shared upload handler for logo and favicon.
+    Shared upload handler for logo, favicon, and login_background.
 
     Returns True if an upload was processed, False otherwise.
     Raises ValueError with a user-facing message on invalid input.
@@ -112,11 +113,11 @@ def _handle_media_upload(request, company, field_name, post_file_key):
         new_public_id = _upload_company_media(
             file_obj,
             company.id or company.pk,
-            field_name,           # 'logo' or 'favicon'
+            field_name,           # 'logo' | 'favicon' | 'login_background'
             resource_type='image',
         )
     except Exception as e:
-        raise ValueError(f'{field_name.title()} upload failed: {e}')
+        raise ValueError(f'{field_name.replace("_", " ").title()} upload failed: {e}')
 
     setattr(company, field_name, new_public_id)
     company.save(update_fields=[field_name])
@@ -130,7 +131,7 @@ def _handle_media_upload(request, company, field_name, post_file_key):
 
 def _handle_media_remove(request, company, field_name, post_remove_key):
     """
-    Shared removal handler for logo and favicon.
+    Shared removal handler for logo, favicon, and login_background.
 
     Returns True if a removal was processed, False otherwise.
     """
@@ -172,11 +173,11 @@ def settings_dashboard(request):
 
 
 # ============================================
-# COMPANY SETTINGS (with Cloudinary logo + favicon upload)
+# COMPANY SETTINGS (Cloudinary logo + favicon + login background)
 # ============================================
 @login_required
 def settings_company(request):
-    """Company settings — update company info, logo and favicon"""
+    """Company settings — update company info, logo, favicon and login background"""
     company, is_viewing_company = get_active_company(request)
 
     if not company:
@@ -195,15 +196,21 @@ def settings_company(request):
             removed_favicon = _handle_media_remove(
                 request, company, 'favicon', 'remove_favicon'
             )
+            removed_bg = _handle_media_remove(
+                request, company, 'login_background', 'remove_login_background'
+            )
 
             if removed_logo:
                 messages.success(request, 'Company logo removed.')
             if removed_favicon:
                 messages.success(request, 'Favicon removed.')
+            if removed_bg:
+                messages.success(request, 'Login background removed.')
 
             # ---------- 2) Media uploads ----------
             uploaded_logo = False
             uploaded_favicon = False
+            uploaded_bg = False
 
             try:
                 if not removed_logo:
@@ -214,6 +221,11 @@ def settings_company(request):
                     uploaded_favicon = _handle_media_upload(
                         request, company, 'favicon', 'company_favicon'
                     )
+                if not removed_bg:
+                    uploaded_bg = _handle_media_upload(
+                        request, company, 'login_background',
+                        'company_login_background'
+                    )
             except ValueError as e:
                 messages.error(request, str(e))
                 return redirect('company-settings-company')
@@ -222,6 +234,8 @@ def settings_company(request):
                 messages.success(request, 'Company logo updated.')
             if uploaded_favicon:
                 messages.success(request, 'Favicon updated.')
+            if uploaded_bg:
+                messages.success(request, 'Login background updated.')
 
             # ---------- 3) Text fields ----------
             company_name = request.POST.get('company_name')
@@ -252,8 +266,9 @@ def settings_company(request):
             save_company_settings(company, request.POST)
 
             # ---------- 5) Final message ----------
-            if not any([removed_logo, removed_favicon,
-                        uploaded_logo, uploaded_favicon, text_changed]):
+            if not any([removed_logo, removed_favicon, removed_bg,
+                        uploaded_logo, uploaded_favicon, uploaded_bg,
+                        text_changed]):
                 messages.info(request, 'No changes.')
             else:
                 messages.success(request, 'Company settings updated successfully!')

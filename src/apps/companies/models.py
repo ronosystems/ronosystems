@@ -189,6 +189,14 @@ class Company(models.Model):
         help_text="Cloudinary public_id for the company favicon "
                   "(e.g. companies/42/favicon_1789754321).",
     )
+    login_background = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="Cloudinary public_id for the login page background "
+                  "(e.g. companies/42/login_background_1789754321). "
+                  "Only shown when the user is on this company's domain.",
+    )
 
     
     primary_color = models.CharField(
@@ -353,6 +361,18 @@ class Company(models.Model):
             {% endif %}
         """
         return self._build_media_url(self.favicon)
+
+    @property
+    def login_background_url(self):
+        """
+        Cloudinary URL for the login-page background, or None.
+
+        Usage (in your login template):
+            {% if login_background_url %}
+                body::before { background: url('{{ login_background_url }}') ... }
+            {% endif %}
+        """
+        return self._build_media_url(self.login_background)
 
     @property
     def display_name(self):

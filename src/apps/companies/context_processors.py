@@ -179,6 +179,10 @@ def company_branding_context(request):
     if company.favicon_url:
         ctx['site_favicon_url'] = company.favicon_url
 
+    if company.login_background_url:                              
+        ctx['login_background_url'] = company.login_background_url
+
+
     if company.primary_color:
         ctx['site_primary_color'] = company.primary_color
 
