@@ -24,6 +24,9 @@ from apps.companies.models import Company
 # ============================================
 # CLOUDINARY HELPERS
 # ============================================
+ALLOWED_IMAGE_EXTS = ('.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp')
+
+
 def _cloudinary_configure():
     cfg = getattr(django_settings, 'CLOUDINARY_STORAGE', {})
     cloudinary.config(
@@ -34,34 +37,113 @@ def _cloudinary_configure():
     )
 
 
-def _upload_company_logo(file_obj, company_id):
+def _upload_company_media(file_obj, company_id, field_name, resource_type='image'):
     """
-    Upload company logo to Cloudinary at a UNIQUE public_id:
-        companies/<company_id>_<timestamp>
+    Upload a company media file to Cloudinary at a UNIQUE public_id:
 
-    Unique ID → new asset every upload → CDN never serves stale content.
+        companies/<company_id>/<field_name>_<timestamp>
+
+    Examples:
+        companies/42/logo_1789754321
+        companies/42/favicon_1789754321
+
+    Why unique: Cloudinary's CDN caches by public_id. Replacing a file with
+    a fixed public_id + overwrite=True serves the OLD cached version. A
+    unique public_id makes every upload a brand-new asset → no stale content.
+
     Returns the public_id Cloudinary used.
     """
     _cloudinary_configure()
-    public_id = f"companies/{company_id}_{int(time.time())}"
+    public_id = f"companies/{company_id}/{field_name}_{int(time.time())}"
+
     result = cloudinary.uploader.upload(
         file_obj,
         public_id=public_id,
         overwrite=False,
-        resource_type='image',
+        resource_type=resource_type,
     )
     return result.get('public_id') or public_id
 
 
-def _delete_company_logo(public_id):
+def _delete_company_media(public_id, resource_type='image'):
     """Delete a Cloudinary asset by its exact public_id. Silent on failure."""
     if not public_id:
         return
     try:
         _cloudinary_configure()
-        cloudinary.uploader.destroy(public_id, resource_type='image')
+        cloudinary.uploader.destroy(public_id, resource_type=resource_type)
     except Exception:
         pass
+
+
+def _current_public_id(field_value):
+    """
+    Extract the stored public_id from a Company.logo / Company.favicon value.
+
+    The model stores these as plain strings (CharField). This helper is
+    defensive against legacy data where the value may still be a FieldFile.
+    """
+    if not field_value:
+        return ''
+    key = getattr(field_value, 'name', None) or str(field_value)
+    return key.strip().lstrip('/')
+
+
+def _handle_media_upload(request, company, field_name, post_file_key):
+    """
+    Shared upload handler for logo and favicon.
+
+    Returns True if an upload was processed, False otherwise.
+    Raises ValueError with a user-facing message on invalid input.
+    """
+    file_obj = request.FILES.get(post_file_key)
+    if not file_obj:
+        return False
+
+    ext = os.path.splitext(file_obj.name)[1].lower()
+    if ext not in ALLOWED_IMAGE_EXTS:
+        raise ValueError(
+            'Invalid file format. Please upload JPG, PNG, GIF, SVG, or WEBP.'
+        )
+
+    old_public_id = _current_public_id(getattr(company, field_name, ''))
+
+    try:
+        new_public_id = _upload_company_media(
+            file_obj,
+            company.id or company.pk,
+            field_name,           # 'logo' or 'favicon'
+            resource_type='image',
+        )
+    except Exception as e:
+        raise ValueError(f'{field_name.title()} upload failed: {e}')
+
+    setattr(company, field_name, new_public_id)
+    company.save(update_fields=[field_name])
+
+    # Clean up the old asset (only if it was a different one)
+    if old_public_id and old_public_id != new_public_id:
+        _delete_company_media(old_public_id, resource_type='image')
+
+    return True
+
+
+def _handle_media_remove(request, company, field_name, post_remove_key):
+    """
+    Shared removal handler for logo and favicon.
+
+    Returns True if a removal was processed, False otherwise.
+    """
+    if request.POST.get(post_remove_key) != 'true':
+        return False
+
+    old_public_id = _current_public_id(getattr(company, field_name, ''))
+    if old_public_id:
+        _delete_company_media(old_public_id, resource_type='image')
+
+    setattr(company, field_name, '')
+    company.save(update_fields=[field_name])
+    return True
 
 
 # ============================================
@@ -90,11 +172,11 @@ def settings_dashboard(request):
 
 
 # ============================================
-# COMPANY SETTINGS (with Cloudinary logo upload)
+# COMPANY SETTINGS (with Cloudinary logo + favicon upload)
 # ============================================
 @login_required
 def settings_company(request):
-    """Company settings — update company info and logo"""
+    """Company settings — update company info, logo and favicon"""
     company, is_viewing_company = get_active_company(request)
 
     if not company:
@@ -105,75 +187,77 @@ def settings_company(request):
 
     if request.method == 'POST':
         try:
-            # ---------- Text fields ----------
+            # ---------- 1) Media removals (checked first — an explicit
+            #              "remove" should win over a same-request upload) ----------
+            removed_logo = _handle_media_remove(
+                request, company, 'logo', 'remove_logo'
+            )
+            removed_favicon = _handle_media_remove(
+                request, company, 'favicon', 'remove_favicon'
+            )
+
+            if removed_logo:
+                messages.success(request, 'Company logo removed.')
+            if removed_favicon:
+                messages.success(request, 'Favicon removed.')
+
+            # ---------- 2) Media uploads ----------
+            uploaded_logo = False
+            uploaded_favicon = False
+
+            try:
+                if not removed_logo:
+                    uploaded_logo = _handle_media_upload(
+                        request, company, 'logo', 'company_logo'
+                    )
+                if not removed_favicon:
+                    uploaded_favicon = _handle_media_upload(
+                        request, company, 'favicon', 'company_favicon'
+                    )
+            except ValueError as e:
+                messages.error(request, str(e))
+                return redirect('company-settings-company')
+
+            if uploaded_logo:
+                messages.success(request, 'Company logo updated.')
+            if uploaded_favicon:
+                messages.success(request, 'Favicon updated.')
+
+            # ---------- 3) Text fields ----------
             company_name = request.POST.get('company_name')
             company_email = request.POST.get('company_email')
             company_phone = request.POST.get('company_phone')
             company_address = request.POST.get('company_address')
 
-            if company_name:
+            text_changed = False
+            if company_name and company.name != company_name:
                 company.name = company_name
-            if company_email:
+                text_changed = True
+            if company_email and company.email != company_email:
                 company.email = company_email
-            if company_phone:
+                text_changed = True
+            if company_phone and company.phone != company_phone:
                 company.phone = company_phone
-            if company_address:
+                text_changed = True
+            if company_address and company.address != company_address:
                 company.address = company_address
+                text_changed = True
 
-            # ---------- Logo removal (checked first) ----------
-            if request.POST.get('remove_logo') == 'true':
-                if company.logo:
-                    old_key = getattr(company.logo, 'name', '') or str(company.logo)
-                    old_key = old_key.strip().lstrip('/')
-                    _delete_company_logo(old_key)
-                    company.logo = None
-                    company.save()
-                messages.success(request, 'Company logo removed successfully!')
-                return redirect('company-settings-company')
-
-            # ---------- Logo upload (Cloudinary, unique public_id) ----------
-            if request.FILES.get('company_logo'):
-                logo = request.FILES['company_logo']
-                valid_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp']
-                ext = os.path.splitext(logo.name)[1].lower()
-
-                if ext not in valid_extensions:
-                    messages.error(
-                        request,
-                        'Invalid file format. Please upload JPG, PNG, GIF, SVG, or WEBP.'
-                    )
-                    return redirect('company-settings-company')
-
-                # Remember the current key so we can delete the old asset after
-                old_key = ''
-                if company.logo:
-                    old_key = getattr(company.logo, 'name', '') or str(company.logo)
-                    old_key = old_key.strip().lstrip('/')
-
-                try:
-                    new_key = _upload_company_logo(logo, company.id or company.pk)
-                except Exception as e:
-                    messages.error(request, f'Logo upload failed: {e}')
-                    return redirect('company-settings-company')
-
-                company.logo = new_key
+            if text_changed:
                 company.save()
 
-                # Delete the previous asset (best-effort)
-                if old_key and old_key != new_key:
-                    _delete_company_logo(old_key)
-
-                # Also persist any other fields submitted with the same form
-                save_company_settings(company, request.POST)
-
-                messages.success(request, 'Company settings updated successfully!')
-                return redirect('company-settings-company')
-
-            # ---------- Save text-only changes ----------
-            company.save()
+            # ---------- 4) Other JSON-backed settings ----------
+            #    Only run this if the request came from the main settings form
+            #    (it re-saves the 'company' section values).
             save_company_settings(company, request.POST)
 
-            messages.success(request, 'Company settings updated successfully!')
+            # ---------- 5) Final message ----------
+            if not any([removed_logo, removed_favicon,
+                        uploaded_logo, uploaded_favicon, text_changed]):
+                messages.info(request, 'No changes.')
+            else:
+                messages.success(request, 'Company settings updated successfully!')
+
             return redirect('company-settings-company')
 
         except Exception as e:

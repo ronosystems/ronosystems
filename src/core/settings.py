@@ -179,6 +179,7 @@ TEMPLATES = [
                 'apps.company.context_processors.company_context',
                 'apps.companies.context_processors.support_mode_context',
                 'apps.companies.context_processors.pending_join_requests',
+                'apps.companies.context_processors.company_branding_context', 
             ],
         },
     },

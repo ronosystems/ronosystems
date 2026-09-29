@@ -8,7 +8,7 @@
 
     {% if site_favicon_url %}
         <link rel="icon" type="image/png" href="{{ site_favicon_url }}">
-        <link rel="shortcut icon" href="{{ site_favicon_url }}">
+        <link rel="shortcut icon" type="image/png" href="{{ site_favicon_url }}">
         <link rel="apple-touch-icon" href="{{ site_favicon_url }}">
     {% endif %}
 
@@ -16,13 +16,25 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
+        /* ============================================
+           TENANT-THEMED CSS VARIABLES
+           `site_primary_color` / `site_accent_color`
+           are injected by `company_branding_context`.
+           Fallbacks keep the platform look when there's
+           no active tenant (mother site, public pages).
+        ============================================ */
         :root {
             --sidebar-width: 280px;
             --sidebar-collapsed: 70px;
-            --primary-color: #87CEEB;
-            --secondary-color: #7bb8d8;
-            --sidebar-bg: #036a77;
-            --sidebar-hover: #02515b;
+
+            /* Per-tenant palette */
+            --primary-color: {{ site_primary_color|default:"#87CEEB" }};
+            --sidebar-bg: {{ site_accent_color|default:"#036a77" }};
+
+            /* Derived shades — color-mix keeps them in sync with --sidebar-bg */
+            --sidebar-hover: color-mix(in srgb, var(--sidebar-bg) 80%, #000);
+            --secondary-color: color-mix(in srgb, var(--primary-color) 85%, #000);
+
             --text-light: #e0f7fa;
         }
 
@@ -55,7 +67,7 @@
         .sidebar::-webkit-scrollbar { width: 4px; }
         .sidebar::-webkit-scrollbar-track { background: var(--sidebar-bg); }
         .sidebar::-webkit-scrollbar-thumb {
-            background: #87CEEB;
+            background: var(--primary-color);
             border-radius: 10px;
             border: 1px solid #000000;
         }
@@ -106,8 +118,8 @@
             gap: 5px;
             margin-top: 8px;
             padding: 3px 10px;
-            background: rgba(135, 206, 235, 0.2);
-            border: 1px solid #87CEEB;
+            background: color-mix(in srgb, var(--primary-color) 20%, transparent);
+            border: 1px solid var(--primary-color);
             border-radius: 50px;
             font-size: 0.68rem;
             font-weight: 700;
@@ -116,7 +128,7 @@
             text-transform: uppercase;
             transition: opacity 0.2s;
         }
-        .sidebar-brand .user-branch-chip i { font-size: 0.7rem; color: #87CEEB; }
+        .sidebar-brand .user-branch-chip i { font-size: 0.7rem; color: var(--primary-color); }
         .sidebar.collapsed .sidebar-brand .user-branch-chip { display: none; }
 
         /* Nav wrapper */
@@ -129,7 +141,7 @@
         .sidebar-nav-wrapper::-webkit-scrollbar { width: 4px; }
         .sidebar-nav-wrapper::-webkit-scrollbar-track { background: var(--sidebar-bg); }
         .sidebar-nav-wrapper::-webkit-scrollbar-thumb {
-            background: #87CEEB;
+            background: var(--primary-color);
             border-radius: 10px;
             border: 1px solid #000000;
         }
@@ -167,18 +179,18 @@
         .sidebar-nav .nav-link.active {
             background: var(--sidebar-hover);
             color: #fff;
-            border-left-color: #87CEEB;
+            border-left-color: var(--primary-color);
         }
         .sidebar-nav .nav-link i {
             width: 22px;
             text-align: center;
             font-size: 1.1rem;
             flex-shrink: 0;
-            color: #87CEEB;
+            color: var(--primary-color);
         }
         .sidebar-nav .nav-link .badge {
             margin-left: auto;
-            background: #87CEEB;
+            background: var(--primary-color);
             color: #000000;
             font-size: 0.6rem;
             padding: 2px 8px;
@@ -232,7 +244,7 @@
         .sidebar-toggle-btn:hover {
             background: rgba(255,255,255,0.1);
             color: #fff;
-            border-color: #87CEEB;
+            border-color: var(--primary-color);
         }
         .sidebar.collapsed .sidebar-footer { padding: 15px 10px; }
         .sidebar.collapsed .sidebar-toggle-btn { padding: 10px; justify-content: center; }
@@ -295,7 +307,7 @@
         }
         .top-navbar .user-profile:hover {
             background: #f8f9fa;
-            border-color: #87CEEB;
+            border-color: var(--primary-color);
         }
         .top-navbar .user-profile .avatar-sm {
             width: 36px;
@@ -303,7 +315,7 @@
             border-radius: 50%;
             overflow: hidden;
             flex-shrink: 0;
-            background: #87CEEB;
+            background: var(--primary-color);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -372,7 +384,7 @@
         }
         .footer .powered-by a:hover {
             text-decoration: underline;
-            color: #87CEEB;
+            color: var(--primary-color);
         }
 
         /* Overlay */
@@ -552,38 +564,52 @@
     <!-- ============================================================ -->
     <aside class="sidebar" id="sidebar">
 
-        <!-- Brand -->
+        <!-- Brand — three explicit cases:
+             1. Support mode → impersonated company
+             2. Custom domain → the tenant that owns the hostname
+             3. Else (mother site) → platform branding from system_settings
+        -->
         <div class="sidebar-brand">
             {% if is_support_mode and support_company %}
-                {% if support_company.logo %}
-                    <img src="{{ support_company.logo_url }}" alt="{{ support_company.name }}" class="logo-img">
+                {# ── SUPPORT MODE ── #}
+                {% if support_company.logo_url %}
+                    <img src="{{ support_company.logo_url }}"
+                         alt="{{ support_company.display_name }}" class="logo-img">
                 {% elif site_logo_url %}
-                    <img src="{{ site_logo_url }}" alt="{{ system_name }}" class="logo-img">
+                    <img src="{{ site_logo_url }}"
+                         alt="{{ system_name }}" class="logo-img">
                 {% else %}
                     <div class="logo-icon"><i class="fas fa-drumstick-bite"></i></div>
                 {% endif %}
                 <span class="company-name">
-                    <h5>{{ support_company.name }}</h5>
+                    <h5>{{ support_company.display_name }}</h5>
                 </span>
-            {% elif user.is_authenticated and user.company %}
-                {% if user.company.logo %}
-                    <img src="{{ user.company.logo_url }}" alt="{{ user.company.name }}" class="logo-img">
+
+            {% elif is_custom_domain and current_company %}
+                {# ── CUSTOM DOMAIN ── #}
+                {% if current_company.logo_url %}
+                    <img src="{{ current_company.logo_url }}"
+                         alt="{{ current_company.display_name }}" class="logo-img">
                 {% elif site_logo_url %}
-                    <img src="{{ site_logo_url }}" alt="{{ system_name }}" class="logo-img">
+                    <img src="{{ site_logo_url }}"
+                         alt="{{ system_name }}" class="logo-img">
                 {% else %}
                     <div class="logo-icon"><i class="fas fa-drumstick-bite"></i></div>
                 {% endif %}
                 <span class="company-name">
-                    <h5>{{ user.company.name }}</h5>
+                    <h5>{{ current_company.display_name }}</h5>
                 </span>
+
             {% else %}
+                {# ── MOTHER SITE / PLATFORM ── #}
                 {% if site_logo_url %}
-                    <img src="{{ site_logo_url }}" alt="{{ system_name }}" class="logo-img">
+                    <img src="{{ site_logo_url }}"
+                         alt="{{ system_name|default:'Kuku Biz' }}" class="logo-img">
                 {% else %}
                     <div class="logo-icon"><i class="fas fa-drumstick-bite"></i></div>
                 {% endif %}
                 <span class="company-name">
-                    <h5>Kuku Biz</h5>
+                    <h5>{{ system_name|default:"Kuku Biz" }}</h5>
                 </span>
             {% endif %}
 
@@ -909,7 +935,7 @@
                     <i class="fas fa-headset"></i>
                     <span class="support-mode-title">SUPPORT MODE</span>
                     <span class="support-mode-company">
-                        Viewing as: <strong>{{ support_company.name }}</strong>
+                        Viewing as: <strong>{{ support_company.display_name }}</strong>
                     </span>
                 </div>
                 <div class="support-mode-right">

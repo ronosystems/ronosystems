@@ -1,5 +1,6 @@
 # apps/companies/middleware.py
 
+from django.conf import settings
 from django.shortcuts import redirect
 from django.urls import reverse, NoReverseMatch
 from django.contrib import messages
@@ -9,12 +10,6 @@ from django.http import Http404
 # ============================================
 # PATHS THAT BYPASS CUSTOM-DOMAIN RESOLUTION
 # ============================================
-# Requests to these paths never need a tenant company resolved from
-# the Host header. This keeps webhooks (KCB, M-Pesa), admin, static
-# files, auth flows, and the payments UI reachable from any host —
-# including ngrok tunnels, Render preview URLs, and platform domains.
-#
-# IMPORTANT: keep this in sync with EXEMPT_URL_PREFIXES below.
 BYPASS_DOMAIN_PREFIXES = (
     '/payments/',        # KCB / M-Pesa callbacks + payment UI
     '/admin/',           # Django admin
@@ -27,73 +22,108 @@ BYPASS_DOMAIN_PREFIXES = (
 )
 
 
+# ============================================
+# PLATFORM HOSTS (never treated as tenant domains)
+# ============================================
+PLATFORM_HOSTS = frozenset({
+    'ronosystems.com',
+    'www.ronosystems.com',
+    'ronosystems.onrender.com',
+    'localhost',
+    '127.0.0.1',
+})
+
+PLATFORM_HOST_SUFFIXES = (
+    '.onrender.com',
+)
+
+
+# ============================================
+# CSRF TRUSTED ORIGINS — runtime cache
+# ============================================
+# Custom domains arrive at runtime and can't be pre-listed in settings.
+# We append them to CSRF_TRUSTED_ORIGINS lazily. This set avoids re-scanning
+# the full list on every request (which is what `if origin not in list` does).
+_RUNTIME_TRUSTED_ORIGINS = set()
+
+
+def _trust_csrf_origin(origin: str) -> None:
+    """Register `origin` as a trusted CSRF origin (idempotent, cached)."""
+    if origin in _RUNTIME_TRUSTED_ORIGINS:
+        return
+    if origin not in settings.CSRF_TRUSTED_ORIGINS:
+        settings.CSRF_TRUSTED_ORIGINS.append(origin)
+    _RUNTIME_TRUSTED_ORIGINS.add(origin)
+
+
 class CustomDomainMiddleware:
     """
-    Resolves Company from the request's Host header when a custom
-    domain is being used.
+    Resolves the tenant Company from the request's Host header when a
+    custom domain is being used.
 
-    - Sets `request.tenant_company` to the matched Company (or None).
+    - Sets `request.company` AND `request.tenant_company` to the matched
+      Company (or None).
     - Runs BEFORE SubscriptionExpiryMiddleware.
     - Skips lookup for:
-        * platform hosts (localhost, 127.0.0.1, *.onrender.com)
+        * platform hosts (localhost, 127.0.0.1, *.onrender.com, ronosystems.com)
         * explicitly bypassed paths (webhooks, admin, static, auth, ...)
     """
 
     def __init__(self, get_response):
         self.get_response = get_response
-        self.platform_hosts = {
-            'ronosystems.onrender.com',
-            'localhost',
-            '127.0.0.1',
-        }
 
     def __call__(self, request):
         host = request.get_host().split(':')[0].lower()
 
         # ------------------------------------------------------------
-        # BYPASS 1: Explicit paths that never resolve a tenant company
+        # BYPASS 1: Paths that never resolve a tenant company
         # ------------------------------------------------------------
-        # This is critical for webhooks (KCB / M-Pesa callbacks) which
-        # arrive at arbitrary hosts (ngrok, Render) that may not be
-        # registered as a custom_domain on any Company.
+        # Critical for webhooks (KCB / M-Pesa callbacks) which arrive at
+        # arbitrary hosts (ngrok, Render) that may not be registered as a
+        # custom_domain on any Company.
         if any(request.path_info.startswith(p) for p in BYPASS_DOMAIN_PREFIXES):
+            request.company = None
             request.tenant_company = None
             return self.get_response(request)
 
         # ------------------------------------------------------------
         # BYPASS 2: Platform's own hosts
         # ------------------------------------------------------------
-        if host in self.platform_hosts or host.endswith('.onrender.com'):
+        if host in PLATFORM_HOSTS or host.endswith(PLATFORM_HOST_SUFFIXES):
+            request.company = None
             request.tenant_company = None
             return self.get_response(request)
 
         # ------------------------------------------------------------
         # Resolve company by custom domain
         # ------------------------------------------------------------
+        # `find_by_domain` normalizes `host` (strips www., protocols, ports)
+        # and only returns is_active=True companies.
+        # `require_verified=True` means unverified domains 404 — flip to
+        # False if you want super admins to be able to preview DNS-pending
+        # domains from the settings UI.
         from apps.companies.models import Company
-        try:
-            company = Company.objects.get(
-                custom_domain__iexact=host,
-                domain_verified=True,
-            )
-            request.tenant_company = company
 
-            # Trust this custom domain for CSRF on this request.
-            # Django doesn't support wildcards in CSRF_TRUSTED_ORIGINS,
-            # so we add it dynamically.
-            from django.conf import settings
-            origin = f"https://{host}"
-            if origin not in settings.CSRF_TRUSTED_ORIGINS:
-                settings.CSRF_TRUSTED_ORIGINS.append(origin)
+        company = Company.find_by_domain(host, require_verified=True)
 
-        except Company.DoesNotExist:
+        if company is None:
+            # No tenant for this hostname. 404 rather than redirect — we
+            # don't want to leak which domains are (or aren't) registered.
             raise Http404("No company registered for this domain.")
+
+        request.company = company
+        request.tenant_company = company
+
+        # Trust this domain for CSRF on this and future requests.
+        # Django doesn't support wildcards in CSRF_TRUSTED_ORIGINS.
+        _trust_csrf_origin(f"https://{host}")
+        _trust_csrf_origin(f"http://{host}")
 
         return self.get_response(request)
 
 
 # ============================================
-# URL names that remain accessible even when the subscription is expired
+# URL names that remain accessible when subscription is expired
 # ============================================
 EXEMPT_URL_NAMES = {
     'login',
@@ -113,7 +143,7 @@ EXEMPT_URL_NAMES = {
 
 
 # ============================================
-# Path prefixes that bypass the subscription-expiry check entirely
+# Path prefixes that bypass subscription-expiry check
 # ============================================
 EXEMPT_URL_PREFIXES = (
     '/admin/',
@@ -145,23 +175,21 @@ class SubscriptionExpiryMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        # ---------- Path-based exemptions ----------
         path = request.path_info
         if any(path.startswith(p) for p in EXEMPT_URL_PREFIXES):
             return self.get_response(request)
 
-        # ---------- Auth exemptions ----------
         if not request.user.is_authenticated:
             return self.get_response(request)
 
         if request.user.is_superuser:
             return self.get_response(request)
 
-        # ---------- Support-mode exemptions ----------
+        # Support-mode exemption
         if request.session.get('support_mode') or request.session.get('viewing_company_id'):
             return self.get_response(request)
 
-        # ---------- Name-based exemptions ----------
+        # Name-based exemptions
         try:
             match = request.resolver_match
             if match and match.url_name in EXEMPT_URL_NAMES:
@@ -169,16 +197,17 @@ class SubscriptionExpiryMiddleware:
         except Exception:
             pass
 
-        # ---------- Resolve current company ----------
-        # Prefer the custom-domain-resolved company, fall back to user's company.
+        # Resolve current company.
+        # Prefer custom-domain-resolved company, then support-mode company,
+        # then the user's own company.
         company = (
-            getattr(request, 'tenant_company', None)
+            getattr(request, 'company', None)
+            or getattr(request, 'tenant_company', None)
             or getattr(request.user, 'company', None)
         )
         if company is None:
             return self.get_response(request)
 
-        # ---------- Access check ----------
         allowed, reason = company.can_access_system()
 
         if not allowed:

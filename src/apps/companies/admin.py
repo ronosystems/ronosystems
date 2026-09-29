@@ -7,26 +7,36 @@ class BusinessTypeAdmin(admin.ModelAdmin):
     search_fields = ('name', 'description')
     list_filter = ('is_active',)
 
+
+
 @admin.register(Company)
 class CompanyAdmin(admin.ModelAdmin):
-    list_display = ('name', 'business_type', 'plan', 'status', 'is_active', 'created_at')
-    list_filter = ('plan', 'status', 'is_active', 'business_type')
-    search_fields = ('name', 'email', 'registration_number')
-    readonly_fields = ('created_at', 'updated_at')
+    list_display = ('name', 'company_id', 'custom_domain', 'domain_verified', 'status')
+    list_filter = ('status', 'domain_verified', 'business_type')
+    search_fields = ('name', 'company_id', 'custom_domain', 'email')
+    readonly_fields = ('company_id', 'created_at', 'updated_at')
     fieldsets = (
-        ('Company Information', {
-            'fields': ('name', 'business_type', 'registration_number', 'email', 'phone', 'website')
+        ('Identity', {
+            'fields': ('company_id', 'name', 'business_type', 'registration_number')
         }),
         ('Address', {
             'fields': ('address', 'city', 'state', 'country', 'postal_code')
         }),
+        ('Contact', {
+            'fields': ('email', 'phone', 'website')
+        }),
+        ('Branding', {
+            'fields': ('logo', 'favicon', 'primary_color', 'accent_color', 'system_name')
+        }),
+        ('Custom Domain', {
+            'fields': ('custom_domain', 'domain_verified'),
+            'description': 'Enter just the hostname, e.g. myshop.co.ke. '
+                           'DNS must point to ronosystems.onrender.com first.'
+        }),
         ('Subscription', {
-            'fields': ('plan', 'subscription_start', 'subscription_end')
-        }),
-        ('Status', {
-            'fields': ('status', 'is_active')
-        }),
-        ('Metadata', {
-            'fields': ('created_by', 'logo', 'created_at', 'updated_at')
+            'fields': ('plan', 'subscription_start', 'subscription_end', 'status', 'is_active')
         }),
     )
+
+
+

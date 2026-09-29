@@ -8,7 +8,7 @@
 
     {% if site_favicon_url %}
         <link rel="icon" type="image/png" href="{{ site_favicon_url }}">
-        <link rel="shortcut icon" href="{{ site_favicon_url }}">
+        <link rel="shortcut icon" type="image/png" href="{{ site_favicon_url }}">
         <link rel="apple-touch-icon" href="{{ site_favicon_url }}">
     {% endif %}
 
@@ -16,13 +16,25 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
+        /* ============================================
+           TENANT-THEMED CSS VARIABLES
+           `site_primary_color` and `site_accent_color`
+           are injected by `company_branding_context`.
+           Fallbacks keep the platform look on pages
+           without an active tenant.
+        ============================================ */
         :root {
             --sidebar-width: 280px;
             --sidebar-collapsed: 70px;
-            --primary-color: #87CEEB;
-            --secondary-color: #7bb8d8;
-            --sidebar-bg: #036a77;
-            --sidebar-hover: #02515b;
+
+            /* Per-tenant palette */
+            --primary-color: {{ site_primary_color|default:"#87CEEB" }};
+            --sidebar-bg: {{ site_accent_color|default:"#036a77" }};
+
+            /* Derived shades — color-mix keeps them in sync with --sidebar-bg */
+            --sidebar-hover: color-mix(in srgb, var(--sidebar-bg) 80%, #000);
+            --secondary-color: color-mix(in srgb, var(--primary-color) 85%, #000);
+
             --text-light: #e0f7fa;
         }
 
@@ -59,7 +71,7 @@
         .sidebar::-webkit-scrollbar { width: 4px; }
         .sidebar::-webkit-scrollbar-track { background: var(--sidebar-bg); }
         .sidebar::-webkit-scrollbar-thumb {
-            background: #87CEEB;
+            background: var(--primary-color);
             border-radius: 10px;
             border: 1px solid #000000;
         }
@@ -116,7 +128,7 @@
         .sidebar.collapsed .sidebar-brand .logo-icon { font-size: 1.5rem; }
 
         /* ============================================
-           SIDEBAR NAVIGATION (Scrollable)
+           SIDEBAR NAVIGATION
         ============================================ */
         .sidebar-nav-wrapper {
             flex: 1;
@@ -128,7 +140,7 @@
         .sidebar-nav-wrapper::-webkit-scrollbar { width: 4px; }
         .sidebar-nav-wrapper::-webkit-scrollbar-track { background: var(--sidebar-bg); }
         .sidebar-nav-wrapper::-webkit-scrollbar-thumb {
-            background: #87CEEB;
+            background: var(--primary-color);
             border-radius: 10px;
             border: 1px solid #000000;
         }
@@ -166,13 +178,13 @@
         .sidebar-nav .nav-link:hover {
             background: var(--sidebar-hover);
             color: #fff;
-            border-left-color: #87CEEB;
+            border-left-color: var(--primary-color);
         }
 
         .sidebar-nav .nav-link.active {
             background: var(--sidebar-hover);
             color: #fff;
-            border-left-color: #87CEEB;
+            border-left-color: var(--primary-color);
         }
 
         .sidebar-nav .nav-link i {
@@ -180,12 +192,12 @@
             text-align: center;
             font-size: 1.1rem;
             flex-shrink: 0;
-            color: #87CEEB;
+            color: var(--primary-color);
         }
 
         .sidebar-nav .nav-link .badge {
             margin-left: auto;
-            background: #87CEEB;
+            background: var(--primary-color);
             color: #000000;
             font-size: 0.6rem;
             padding: 2px 8px;
@@ -231,7 +243,7 @@
         }
 
         /* ============================================
-           SIDEBAR FOOTER (Fixed at bottom)
+           SIDEBAR FOOTER
         ============================================ */
         .sidebar-footer {
             flex-shrink: 0;
@@ -260,7 +272,7 @@
         .sidebar-toggle-btn:hover {
             background: rgba(255,255,255,0.1);
             color: #fff;
-            border-color: #87CEEB;
+            border-color: var(--primary-color);
         }
 
         .sidebar.collapsed .sidebar-footer { padding: 15px 10px; }
@@ -330,7 +342,7 @@
 
         .top-navbar .user-profile:hover {
             background: #f8f9fa;
-            border-color: #87CEEB;
+            border-color: var(--primary-color);
         }
 
         .top-navbar .user-profile .avatar-sm {
@@ -339,7 +351,7 @@
             border-radius: 50%;
             overflow: hidden;
             flex-shrink: 0;
-            background: #87CEEB;
+            background: var(--primary-color);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -422,7 +434,7 @@
 
         .footer .powered-by a:hover {
             text-decoration: underline;
-            color: #87CEEB;
+            color: var(--primary-color);
         }
 
         /* ============================================
@@ -458,8 +470,8 @@
         .search-input:focus {
             width: 280px;
             background: #fff;
-            border-color: #87CEEB;
-            box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 30%, transparent);
             outline: none;
         }
 
@@ -622,7 +634,6 @@
                 padding: 15px;
             }
 
-            /* Show all content when collapsed on mobile */
             .sidebar.collapsed .sidebar-brand h5,
             .sidebar.collapsed .sidebar-brand .company-name,
             .sidebar.collapsed .sidebar-user .user-info,
@@ -673,9 +684,6 @@
 </head>
 <body>
 
-    <!-- ============================================
-    SIDEBAR OVERLAY (Mobile)
-    ============================================ -->
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
     <!-- ============================================
@@ -683,33 +691,22 @@
     ============================================ -->
     <aside class="sidebar" id="sidebar">
 
-        <!-- Brand -->
+        <!-- Brand — uses `current_company` (support-mode, custom-domain, or
+             user's own company, in that precedence). Falls back to platform
+             defaults for super-admin / logged-out pages. -->
         <div class="sidebar-brand">
-            {% if is_support_mode and support_company %}
-                {% if support_company.logo %}
-                    <img src="{{ support_company.logo_url }}" alt="{{ support_company.name }}" class="logo-img">
+            {% if current_company %}
+                {% if current_company.logo %}
+                    <img src="{{ current_company.logo_url }}" alt="{{ current_company.display_name }}" class="logo-img">
                 {% elif site_logo_url %}
-                    <img src="{{ site_logo_url }}" alt="{{ system_name }}" class="logo-img">
+                    <img src="{{ site_logo_url }}" alt="{{ current_company.display_name }}" class="logo-img">
                 {% else %}
                     <div class="logo-icon">
                         <i class="fas fa-rocket"></i>
                     </div>
                 {% endif %}
                 <span class="company-name">
-                    <h5>{{ support_company.name }}</h5>
-                </span>
-            {% elif user.is_authenticated and user.company %}
-                {% if user.company.logo %}
-                    <img src="{{ user.company.logo_url }}" alt="{{ user.company.name }}" class="logo-img">
-                {% elif site_logo_url %}
-                    <img src="{{ site_logo_url }}" alt="{{ system_name }}" class="logo-img">
-                {% else %}
-                    <div class="logo-icon">
-                        <i class="fas fa-rocket"></i>
-                    </div>
-                {% endif %}
-                <span class="company-name">
-                    <h5>{{ user.company.name }}</h5>
+                    <h5>{{ current_company.display_name }}</h5>
                 </span>
             {% else %}
                 {% if site_logo_url %}
@@ -720,19 +717,16 @@
                     </div>
                 {% endif %}
                 <span class="company-name">
-                    <h5>Enterprise Platform</h5>
+                    <h5>{{ system_name|default:"Enterprise Platform" }}</h5>
                 </span>
             {% endif %}
         </div>
 
-        <!-- Navigation (Scrollable) -->
+        <!-- Navigation -->
         <div class="sidebar-nav-wrapper" id="sidebarNavWrapper">
             <nav class="sidebar-nav">
                 <ul class="nav flex-column">
 
-                    {# ============================================ #}
-                    {# MAIN — Dashboard #}
-                    {# ============================================ #}
                     {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'company_cashier' or user.role == 'company_agent' or user.role == 'mpesa_agent' or user.role == 'stock_controller' %}
                     <li class="nav-label">SHOP OVERVIEW</li>
 
@@ -749,9 +743,6 @@
                     </li>
                     {% endif %}
 
-                    {# ============================================ #}
-                    {# SUPPORT MODE — Show target company's menu   #}
-                    {# ============================================ #}
                     {% if is_support_mode and support_company %}
                         <li class="nav-label">SHOP MANAGEMENT</li>
 
@@ -929,7 +920,7 @@
                                     {% if company %}
                                     <li class="nav-item">
                                         <a class="nav-link {% if request.resolver_match.url_name == 'company-join-requests' %}active{% endif %}"
-                                           href="{% url 'companies:company-join-requests' company.id %}">                
+                                           href="{% url 'companies:company-join-requests' company.id %}">
                                             <i class="fas fa-user-plus"></i> <span>Join Requests</span>
                                             {% if pending_join_requests_count and pending_join_requests_count > 0 %}
                                                 <span class="badge bg-danger">{{ pending_join_requests_count }}</span>
@@ -962,9 +953,6 @@
                         {% endif %}
                     {% endif %}
 
-                    {# ============================================ #}
-                    {# SUPER ADMIN LINKS — HIDDEN IN SUPPORT MODE  #}
-                    {# ============================================ #}
                     {% if user.is_authenticated and user.role == 'super_admin' and not is_support_mode %}
                     <li class="nav-label">Administration</li>
 
@@ -1035,7 +1023,6 @@
             </nav>
         </div>
 
-        <!-- Sidebar Footer (Fixed at bottom) -->
         <div class="sidebar-footer">
             <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Sidebar">
                 <i class="fas fa-chevron-left" id="toggleIcon"></i>
@@ -1049,7 +1036,6 @@
     ============================================ -->
     <div class="main-content" id="mainContent">
 
-        <!-- SUPPORT MODE BANNER -->
         {% if is_support_mode and support_company %}
         <div class="support-mode-banner">
             <div class="support-mode-content">
@@ -1073,7 +1059,6 @@
         </div>
         {% endif %}
 
-        <!-- Top Navbar -->
         <nav class="top-navbar">
             <div class="d-flex align-items-center gap-3">
                 <button class="sidebar-toggle-mobile" id="sidebarToggleMobile">
@@ -1117,7 +1102,6 @@
             </div>
         </nav>
 
-        <!-- Content -->
         <div class="content-area">
             {% if messages %}
                 {% for message in messages %}
@@ -1132,7 +1116,6 @@
             {% block content %}{% endblock %}
         </div>
 
-        <!-- Footer -->
         <footer class="footer">
             <div class="copyright">
                 <i class="fas fa-copyright"></i> {% now "Y" %}.
@@ -1143,11 +1126,11 @@
         </footer>
     </div>
 
-    <!-- ============================================
-    SCRIPTS
-    ============================================ -->
     <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
     <script>
+        // Tenant-aware highlight color for the global search
+        const HIGHLIGHT_COLOR = "{{ site_primary_color|default:'#87CEEB' }}";
+
         // ============================================================
         // SIDEBAR COLLAPSE / EXPAND
         // ============================================================
@@ -1175,17 +1158,11 @@
 
         // ============================================================
         // SIDEBAR SCROLL PERSISTENCE
-        // - Remembers scroll position across page loads
-        // - Scrolls the active link into view when arriving on a page
-        // - try/catch protects against browsers that block localStorage
-        //   (Safari private mode, some corporate policies)
         // ============================================================
         (function () {
             var wrapper = document.getElementById('sidebarNavWrapper');
             if (!wrapper) return;
 
-            // Per-user key so multiple users on a shared browser
-            // don't overwrite each other's scroll position.
             var STORAGE_KEY = 'sidebar_scroll_{{ user.id|default:"anon" }}';
 
             function loadScroll() {
@@ -1197,13 +1174,11 @@
                 catch (e) { /* silently ignore */ }
             }
 
-            // 1) Restore previous scroll position on load
             var savedScroll = loadScroll();
             if (savedScroll !== null) {
                 wrapper.scrollTop = parseInt(savedScroll, 10) || 0;
             }
 
-            // 2) If a nav-link is marked .active, scroll it into view
             var activeLink = wrapper.querySelector('.nav-link.active');
             if (activeLink) {
                 setTimeout(function () {
@@ -1214,7 +1189,6 @@
                 }, 50);
             }
 
-            // 3) Save scroll position continuously as user scrolls (debounced)
             var saveTimer = null;
             wrapper.addEventListener('scroll', function () {
                 if (saveTimer) clearTimeout(saveTimer);
@@ -1223,12 +1197,10 @@
                 }, 150);
             });
 
-            // 4) Save right before navigating away
             window.addEventListener('beforeunload', function () {
                 saveScroll(wrapper.scrollTop);
             });
 
-            // 5) Save the moment a sidebar nav-link is clicked
             wrapper.querySelectorAll('.nav-link').forEach(function (link) {
                 link.addEventListener('click', function () {
                     saveScroll(wrapper.scrollTop);
@@ -1260,7 +1232,7 @@
         });
 
         // ============================================================
-        // CTRL+B SHORTCUT — toggle sidebar
+        // CTRL+B SHORTCUT
         // ============================================================
         document.addEventListener('keydown', function(e) {
             if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
@@ -1270,7 +1242,7 @@
         });
 
         // ============================================================
-        // GLOBAL SEARCH — filters cards / list-items / table rows
+        // GLOBAL SEARCH
         // ============================================================
         const globalSearch = document.getElementById('globalSearch');
         if (globalSearch) {
@@ -1284,7 +1256,7 @@
                             const text = item.textContent.toLowerCase();
                             if (text.includes(query.toLowerCase())) {
                                 item.style.display = '';
-                                item.style.border = '2px solid #87CEEB';
+                                item.style.border = '2px solid ' + HIGHLIGHT_COLOR;
                                 found = true;
                                 setTimeout(() => { item.style.border = ''; }, 3000);
                             } else {
@@ -1337,6 +1309,7 @@
         })();
         {% endif %}
     </script>
+
     {# ============================================ #}
     {# AUTO-LOGOUT IDLE WARNING (30 min inactivity) #}
     {# ============================================ #}

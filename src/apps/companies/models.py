@@ -34,12 +34,10 @@ def generate_company_id(name, exclude_pk=None):
     The number is derived by finding the highest existing trailing number
     across ALL company_ids, then adding 1.
     """
-    # --- First letter ---
     first_char = (name or '').strip()[:1].upper()
     if not first_char.isalpha():
         first_char = 'X'
 
-    # --- Find the highest existing sequence number ---
     pattern = re.compile(r'^[A-Z]@RS(\d+)$')
     highest = 0
 
@@ -128,6 +126,12 @@ class Company(models.Model):
 
     Access control is enforced through `can_access_system()`,
     which the SubscriptionExpiryMiddleware calls on every request.
+
+    Multi-tenancy:
+        - `custom_domain` identifies the tenant when a request comes in on
+          a non-platform hostname (resolved by CustomDomainMiddleware).
+        - Branding fields (`logo`, `favicon`, `primary_color`, ...) let each
+          company customize the UI their users see.
     """
 
     STATUS_CHOICES = (
@@ -166,7 +170,43 @@ class Company(models.Model):
     email = models.EmailField()
     phone = models.CharField(max_length=20)
     website = models.URLField(blank=True)
-    logo = models.ImageField(upload_to='company_logos/', blank=True, null=True)
+
+    # ---------- Branding ----------
+    # We do NOT use Django's ImageField here — file uploads go to Cloudinary
+    # explicitly via `apps.companies.media.upload_company_media()`, and the
+    # resulting public_id is stored as plain text (mirrors apps.settings).
+    logo = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="Cloudinary public_id for the company logo "
+                  "(e.g. companies/42/logo_1789754321).",
+    )
+    favicon = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="Cloudinary public_id for the company favicon "
+                  "(e.g. companies/42/favicon_1789754321).",
+    )
+
+    
+    primary_color = models.CharField(
+        max_length=7,
+        default='#87CEEB',
+        help_text="Hex color used for primary UI accents.",
+    )
+    accent_color = models.CharField(
+        max_length=7,
+        default='#036a77',
+        help_text="Hex color used for the sidebar and secondary UI accents.",
+    )
+    system_name = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Display name override for the sidebar and page titles "
+                  "(defaults to `name` if blank).",
+    )
 
     # ---------- Custom Domain ----------
     custom_domain = models.CharField(
@@ -175,7 +215,7 @@ class Company(models.Model):
         null=True,
         unique=True,
         db_index=True,
-        help_text="e.g., clientcompany.co.ke (no https:// or trailing slash)",
+        help_text="e.g., clientcompany.co.ke (no https://, no www., no trailing slash)",
     )
     domain_verified = models.BooleanField(
         default=False,
@@ -216,12 +256,16 @@ class Company(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     # ============================================
-    # SAVE — AUTO-GENERATE company_id
+    # SAVE — NORMALIZE DOMAIN, GENERATE company_id
     # ============================================
 
     def save(self, *args, **kwargs):
+        # Normalize the custom domain before persisting so lookups stay
+        # consistent (no `https://`, `www.`, trailing slash, or mixed case).
+        self.custom_domain = self.normalize_domain(self.custom_domain)
+
+        # Auto-generate company_id if missing (with retry on race-condition)
         if not self.company_id:
-            # Retry a few times in case of a race-condition collision
             for _ in range(10):
                 candidate = generate_company_id(self.name, exclude_pk=self.pk)
                 if not Company.objects.filter(company_id=candidate).exists():
@@ -231,7 +275,12 @@ class Company(models.Model):
                 raise RuntimeError(
                     "Could not generate a unique company_id after 10 attempts."
                 )
+
         super().save(*args, **kwargs)
+
+    def clean(self):
+        super().clean()
+        self.custom_domain = self.normalize_domain(self.custom_domain)
 
     # ============================================
     # STRING / META
@@ -247,41 +296,29 @@ class Company(models.Model):
         verbose_name_plural = 'Companies'
 
     # ============================================
-    # LOGO URL (Cloudinary)
+    # MEDIA URL HELPERS (Cloudinary / local)
     # ============================================
 
-    @property
-    def logo_url(self):
+    @staticmethod
+    def _build_media_url(key) -> str | None:
         """
-        Fully-formed Cloudinary URL for the company logo, or None.
+        Build a delivery URL for a stored Cloudinary public_id.
 
-        The view (apps/companies/views.py::settings_company) uploads the
-        file to Cloudinary via cloudinary.uploader.upload() with a unique
-        public_id like 'companies/<id>_<timestamp>' and stores that key in
-        `self.logo`. This property builds the delivery URL for templates:
-
-            {% if company.logo_url %}
-                <img src="{{ company.logo_url }}" alt="{{ company.name }}">
-            {% endif %}
-
-        Because each upload uses a unique public_id, the URL changes on every
-        replacement — Cloudinary's CDN never serves stale content.
+        Falls back to the local MEDIA_URL prefix if Cloudinary isn't
+        configured (dev with USE_CLOUDINARY_MEDIA=False).
         """
-        if not self.logo:
+        if not key:
             return None
-
-        key = getattr(self.logo, 'name', None) or str(self.logo)
-        key = key.strip().lstrip('/')
+        key = str(key).strip().lstrip('/')
         if not key:
             return None
 
-        # Strip legacy /media/ prefix if present
+        # Strip legacy /media/ prefix if present (old uploads)
         if key.startswith('media/'):
             key = key[len('media/'):]
 
         cfg = getattr(django_settings, 'CLOUDINARY_STORAGE', {})
         cloud_name = cfg.get('CLOUD_NAME', '')
-
         if cloud_name:
             return f"https://res.cloudinary.com/{cloud_name}/image/upload/{key}"
 
@@ -290,6 +327,37 @@ class Company(models.Model):
         if not media_url.endswith('/'):
             media_url += '/'
         return f"{media_url}{key}"
+
+
+        
+    @property
+    def logo_url(self):
+        """
+        Fully-formed URL for the company logo, or None.
+
+        Usage:
+            {% if company.logo_url %}
+                <img src="{{ company.logo_url }}" alt="{{ company.name }}">
+            {% endif %}
+        """
+        return self._build_media_url(self.logo)
+
+    @property
+    def favicon_url(self):
+        """
+        Fully-formed URL for the company favicon, or None.
+
+        Usage (in base.html <head>):
+            {% if site_favicon_url %}
+                <link rel="icon" href="{{ site_favicon_url }}">
+            {% endif %}
+        """
+        return self._build_media_url(self.favicon)
+
+    @property
+    def display_name(self):
+        """`system_name` if set, otherwise fall back to `name`."""
+        return (self.system_name or '').strip() or self.name
 
     # ============================================
     # SUBSCRIPTION ACCESSORS
@@ -403,11 +471,9 @@ class Company(models.Model):
         Master gate. Returns (allowed: bool, reason: str).
         Used by SubscriptionExpiryMiddleware on every request.
         """
-        # 1. Suspended
         if self.status == 'suspended':
             return False, "Your company account is suspended. Contact support."
 
-        # 2. Subscription expired — most informative message
         latest = self.latest_subscription
         if latest and latest.end_date and timezone.now() > latest.end_date:
             return False, (
@@ -415,23 +481,19 @@ class Company(models.Model):
                 f"{latest.end_date:%Y-%m-%d}. Please renew to continue."
             )
 
-        # 3. Deactivated but subscription is not expired
         if not self.is_active:
             return False, "Your company account has been deactivated. Contact support."
 
-        # 4. No active subscription
         sub = self.active_subscription
         if not sub:
             return False, "No active subscription found. Please renew to continue."
 
-        # 5. Subscription exists but status isn't 'active'
         if sub.status != 'active':
             return False, (
                 f"Your subscription is {sub.get_status_display().lower()}. "
                 "Please renew to continue."
             )
 
-        # 6. All good
         return True, "OK"
 
     def mark_subscription_expired(self):
@@ -537,6 +599,64 @@ class Company(models.Model):
     # CUSTOM DOMAIN HELPERS
     # ============================================
 
+    @staticmethod
+    def normalize_domain(value) -> str | None:
+        """
+        Turn any user-supplied domain string into a canonical form:
+
+            'HTTPS://WWW.MyShop.co.ke/'        → 'myshop.co.ke'
+            'http://MyShop.com:8000/path'      → 'myshop.com'
+            'www.othershop.com'                → 'othershop.com'
+            'shop.io'                          → 'shop.io'
+
+        Returns None for empty / falsy input.
+        """
+        if not value:
+            return None
+
+        d = str(value).strip().lower()
+        for prefix in ('https://', 'http://'):
+            if d.startswith(prefix):
+                d = d[len(prefix):]
+        d = d.split('/')[0]     # strip anything after the first slash
+        d = d.split(':')[0]     # strip port
+        if d.startswith('www.'):
+            d = d[4:]
+        return d or None
+
+    def clean_custom_domain(self):
+        """
+        [Deprecated] Instance method kept for backwards compatibility.
+        Use `Company.normalize_domain(value)` (static) instead.
+        """
+        return self.normalize_domain(self.custom_domain)
+
+    @property
+    def normalized_domain(self):
+        """Read-only view of `custom_domain` in its canonical form."""
+        return self.normalize_domain(self.custom_domain)
+
+    @classmethod
+    def find_by_domain(cls, host, require_verified: bool = True) -> "Company | None":
+        """
+        Look up an active company by custom domain.
+
+        - Canonicalizes `host` first (strips www., protocols, ports).
+        - Only returns companies with `is_active=True`.
+        - When `require_verified=True` (the default), also requires
+          `domain_verified=True` — so DNS-pending domains don't serve traffic.
+          Set to False for super-admin preview / DNS-check flows.
+        """
+        canonical = cls.normalize_domain(host)
+        if not canonical:
+            return None
+
+        qs = cls.objects.filter(custom_domain__iexact=canonical, is_active=True)
+        if require_verified:
+            qs = qs.filter(domain_verified=True)
+
+        return qs.select_related('business_type', 'plan').first()
+
     def get_full_url(self, request=None):
         """
         Return the best URL for this company.
@@ -552,14 +672,13 @@ class Company(models.Model):
         """Check if the company's plan allows custom domains."""
         return self.has_feature('has_custom_domain')
 
-    def clean_custom_domain(self):
-        """Normalize a custom domain string (strip protocol, slashes, lowercase)."""
-        if not self.custom_domain:
-            return None
-        d = self.custom_domain.strip().lower()
-        d = d.replace('https://', '').replace('http://', '')
-        d = d.rstrip('/')
-        return d or None
+    def is_domain_ready(self) -> bool:
+        """
+        True when the company has a custom_domain set AND it's verified.
+        Used by the settings UI to decide whether to display the domain
+        as "live" or "pending DNS".
+        """
+        return bool(self.custom_domain and self.domain_verified)
 
 
 # ============================================
@@ -599,10 +718,8 @@ class CompanyJoinRequest(models.Model):
     email = models.EmailField()
     phone = models.CharField(max_length=20, blank=True)
 
-    # Django password hash (ready to assign to User.password on approval)
     password_hash = models.CharField(max_length=255)
 
-    # What role the applicant asked for at signup time
     requested_role = models.CharField(max_length=20, default='company_staff')
 
     # ---------- Assignment (filled in on approval) ----------
@@ -691,10 +808,6 @@ class CompanyJoinRequest(models.Model):
                       assigned_role=None, assigned_branch=None):
         """
         Flip to approved, stamp the reviewer, and record what was assigned.
-
-        `assigned_role` falls back to `requested_role` when not provided.
-        `updated_at` is set explicitly because save(update_fields=[...])
-        skips auto_now fields.
         """
         now = timezone.now()
         self.status = 'approved'
@@ -715,9 +828,6 @@ class CompanyJoinRequest(models.Model):
     def mark_rejected(self, reviewed_by, reason=''):
         """
         Flip to rejected and record the reviewer + reason.
-
-        Clears any assignment so a later reset starts clean.
-        NOTE: `updated_at` is set explicitly (see `mark_approved`).
         """
         now = timezone.now()
         self.status = 'rejected'
@@ -740,9 +850,6 @@ class CompanyJoinRequest(models.Model):
     def mark_pending(self):
         """
         Reset a reviewed request back to 'pending'.
-
-        Clears the review stamp and any assignment so the request
-        re-enters the pending queue with a clean slate.
         """
         now = timezone.now()
         self.status = 'pending'
