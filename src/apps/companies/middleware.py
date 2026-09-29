@@ -15,7 +15,10 @@ BYPASS_DOMAIN_PREFIXES = (
     '/admin/',           # Django admin
     '/static/',          # static assets
     '/media/',           # user-uploaded media
-    '/auth/',            # login / logout / register / password reset
+    # NOTE: '/auth/' is intentionally NOT bypassed so that login / register /
+    # password-reset pages on a custom domain render that tenant's branding
+    # (favicon, logo, colours). Platform hosts still bypass earlier, so
+    # /auth/ on ronosystems.onrender.com keeps showing platform branding.
     '/api/support/',     # support-mode API
     '/subscription-expired/',
     '/plans/',           # plans list (super admin)
