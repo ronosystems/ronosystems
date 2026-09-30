@@ -98,6 +98,26 @@
     .recent-month { font-weight: 600; color: #000000; }
     .recent-amount { color: #155724; font-weight: 700; }
     .alert { border: 2px solid #000000; border-radius: 4px; }
+    .btn-danger {
+        background-color: #dc3545;
+        border: 2px solid #000000;
+        color: #ffffff;
+        font-weight: 600;
+    }
+    .btn-danger:hover {
+        background-color: #bb2d3b;
+        color: #ffffff;
+    }
+    .btn-outline-primary {
+        border: 2px solid #000000;
+        color: #000000;
+        background: transparent;
+        font-weight: 600;
+    }
+    .btn-outline-primary:hover {
+        background-color: #87CEEB;
+        color: #000000;
+    }
 </style>
 {% endblock %}
 
@@ -164,10 +184,35 @@
 
                         <!-- Branch -->
                         <div class="mb-3">
-                            <label class="form-label">
-                                <i class="fas fa-store"></i> Branch
+                            <label class="form-label" for="branchSelect">
+                                <i class="fas fa-store"></i> Branch <span style="color: red;">*</span>
                             </label>
-                            <input type="text" class="form-control" value="{{ branch.name }}" readonly>
+
+                            {% if is_admin and all_branches.count > 1 %}
+                                <!-- Admin: branch dropdown, reloads form on change -->
+                                <select name="branch_id"
+                                        id="branchSelect"
+                                        class="form-select"
+                                        onchange="switchBranch(this.value)"
+                                        required>
+                                    {% for b in all_branches %}
+                                        <option value="{{ b.id }}"
+                                                {% if b.id == branch.id %}selected{% endif %}>
+                                            {{ b.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                <div class="help-text">
+                                    Changing branch reloads the form so M-Pesa accounts and recent commissions match.
+                                </div>
+                            {% else %}
+                                <!-- Non-admin, or single-branch company: read-only -->
+                                <input type="text" class="form-control" value="{{ branch.name }}" readonly>
+                                <input type="hidden" name="branch_id" value="{{ branch.id }}">
+                                {% if all_branches.count <= 1 %}
+                                    <div class="help-text">Only one branch available.</div>
+                                {% endif %}
+                            {% endif %}
                         </div>
 
                         <!-- Month -->
@@ -206,49 +251,6 @@
                                    value="{% if is_edit %}{{ commission.amount }}{% endif %}"
                                    required>
                             <div class="help-text">Total commission received from M-Pesa for this month.</div>
-                        </div>
-
-                        <!-- M-Pesa Account -->
-                        <div class="mb-3">
-                            <label class="form-label" for="mpesaAccountSelect">
-                                <i class="fas fa-mobile-alt"></i> M-Pesa Account <span class="text-muted">(optional)</span>
-                            </label>
-                            <select name="mpesa_account" id="mpesaAccountSelect" class="form-select">
-                                <option value="">— Not tied to a specific account —</option>
-                                {% for m in mpesa_accounts %}
-                                    <option value="{{ m.id }}"
-                                        {% if is_edit and commission.mpesa_account_id == m.id %}selected{% endif %}>
-                                        {{ m.till_name }} ({{ m.till_number }})
-                                    </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        <!-- Reference -->
-                        <div class="mb-3">
-                            <label class="form-label" for="referenceInput">
-                                <i class="fas fa-hashtag"></i> Reference <span class="text-muted">(optional)</span>
-                            </label>
-                            <input type="text"
-                                   name="reference"
-                                   id="referenceInput"
-                                   class="form-control"
-                                   maxlength="100"
-                                   placeholder="e.g. M-Pesa statement ref"
-                                   value="{% if is_edit %}{{ commission.reference }}{% endif %}">
-                        </div>
-
-                        <!-- Notes -->
-                        <div class="mb-3">
-                            <label class="form-label" for="notesInput">
-                                <i class="fas fa-sticky-note"></i> Notes <span class="text-muted">(optional)</span>
-                            </label>
-                            <textarea name="notes"
-                                      id="notesInput"
-                                      class="form-control"
-                                      rows="3"
-                                      maxlength="500"
-                                      placeholder="Any additional notes...">{% if is_edit %}{{ commission.notes }}{% endif %}</textarea>
                         </div>
 
                         <!-- Buttons -->
@@ -325,4 +327,19 @@
         </div>
     </div>
 </div>
+
+<script>
+    function switchBranch(newBranchId) {
+        // Current URL pattern:
+        //   /treasury/<company_id>/branch/<branch_id>/commission/create/
+        //   /treasury/<company_id>/branch/<branch_id>/commission/<id>/edit/
+        // Replace the branch_id segment and reload.
+        var currentPath = window.location.pathname;
+        var newPath = currentPath.replace(
+            /\/branch\/\d+\//,
+            '/branch/' + newBranchId + '/'
+        );
+        window.location.href = newPath;
+    }
+</script>
 {% endblock %}

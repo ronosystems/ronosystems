@@ -2228,7 +2228,22 @@ def commission_create(request, company_id=None, branch_id=None):
     ).order_by('till_name')
 
     if request.method == 'POST':
-        month_str = request.POST.get('month')  # "YYYY-MM"
+        # ── Branch may be re-selected by admin via the form ──
+        posted_branch_id = request.POST.get('branch_id')
+
+        if posted_branch_id and request.user.role in ['super_admin', 'company_admin']:
+            try:
+                branch = Branch.objects.get(
+                    id=posted_branch_id, company=company
+                )
+            except Branch.DoesNotExist:
+                messages.error(request, 'Selected branch does not exist.')
+                return redirect(
+                    'treasury:commission_create',
+                    company_id=company.id, branch_id=branch_id,
+                )
+
+        month_str = request.POST.get('month')
         amount_str = request.POST.get('amount', '0')
         mpesa_account_id = request.POST.get('mpesa_account') or None
         reference = request.POST.get('reference', '')
@@ -2472,6 +2487,21 @@ def commission_edit(request, company_id=None, branch_id=None, commission_id=None
     ).order_by('till_name')
 
     if request.method == 'POST':
+        # ── Branch may be re-selected by admin via the form ──
+        posted_branch_id = request.POST.get('branch_id')
+
+        if posted_branch_id and request.user.role in ['super_admin', 'company_admin']:
+            try:
+                branch = Branch.objects.get(
+                    id=posted_branch_id, company=company
+                )
+            except Branch.DoesNotExist:
+                messages.error(request, 'Selected branch does not exist.')
+                return redirect(
+                    'treasury:commission_create',
+                    company_id=company.id, branch_id=branch_id,
+                )
+
         month_str = request.POST.get('month')
         amount_str = request.POST.get('amount', '0')
         mpesa_account_id = request.POST.get('mpesa_account') or None

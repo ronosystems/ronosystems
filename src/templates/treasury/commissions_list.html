@@ -108,6 +108,36 @@
     .badge.bg-success { background: #d4edda !important; color: #155724 !important; }
     .badge.bg-info { background: #cce5ff !important; color: #004085 !important; }
 
+    /* Branch selector styling */
+    .branch-selector-wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #ffffff;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 6px 12px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #000000;
+    }
+    .branch-selector-wrap i {
+        color: #007bff;
+    }
+    .branch-selector-wrap select {
+        border: none;
+        background: transparent;
+        font-weight: 700;
+        color: #000000;
+        font-size: 0.85rem;
+        padding: 2px 4px;
+        cursor: pointer;
+        outline: none;
+    }
+    .branch-selector-wrap select:focus {
+        outline: none;
+    }
+
     @media (max-width: 768px) {
         .table-excel th,
         .table-excel td {
@@ -135,7 +165,23 @@
                 {{ branch.name }} — {{ company.name }}
             </small>
         </div>
-        <div class="d-flex gap-2 flex-wrap">
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+
+            <!-- Branch selector (admins only, multi-branch companies) -->
+            {% if is_admin and all_branches.count > 1 %}
+            <div class="branch-selector-wrap">
+                <i class="fas fa-store"></i>
+                <label for="branchSwitch" style="margin: 0;">Branch:</label>
+                <select id="branchSwitch" onchange="switchBranch(this.value)">
+                    {% for b in all_branches %}
+                        <option value="{{ b.id }}" {% if b.id == branch.id %}selected{% endif %}>
+                            {{ b.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
             <a href="{% url 'treasury:commission_create' company.id branch.id %}"
                class="btn btn-success">
                 <i class="fas fa-plus"></i> Record Commission
@@ -294,4 +340,17 @@
     </div>
 
 </div>
+
+<script>
+    function switchBranch(newBranchId) {
+        // Pattern: /treasury/<company_id>/branch/<branch_id>/commissions/
+        // Replace the branch_id segment and reload.
+        var currentPath = window.location.pathname;
+        var newPath = currentPath.replace(
+            /\/branch\/\d+\//,
+            '/branch/' + newBranchId + '/'
+        );
+        window.location.href = newPath;
+    }
+</script>
 {% endblock %}
