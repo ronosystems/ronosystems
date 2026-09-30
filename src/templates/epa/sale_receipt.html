@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Fiscal Receipt{% endblock %}
+{% block title %}{{ receipt_settings.receipt_title|default:"Fiscal Receipt" }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -9,7 +9,7 @@
         margin: 0 auto;
         padding: 20px;
     }
-    
+
     .receipt-container {
         background: #ffffff;
         border: 2px solid #2d3436;
@@ -17,23 +17,30 @@
         padding: 20px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.08);
     }
-    
-    /* ETR Receipt - Fiscal Style */
+
     .etr-receipt {
         font-family: 'Courier New', monospace;
-        font-size: 12px;
+        font-size: {{ receipt_settings.receipt_font_size|default:12 }}px;
         line-height: 1.5;
         color: #000000;
     }
-    
+
     /* ============================================ */
-    /* HEADER — each field on its own centered row  */
+    /* HEADER — each field on its own centered row   */
     /* ============================================ */
     .etr-receipt .etr-header {
         text-align: center;
         border-bottom: 2px dashed #000000;
         padding-bottom: 12px;
         margin-bottom: 10px;
+    }
+
+    .etr-receipt .etr-header .etr-receipt-header-text {
+        display: block;
+        margin: 0 0 8px;
+        font-size: 11px;
+        font-style: italic;
+        color: #000000;
     }
 
     .etr-receipt .etr-header .etr-logo {
@@ -79,7 +86,6 @@
         word-break: break-word;
     }
 
-    /* Combined location row — address + branch on one line */
     .etr-receipt .etr-header .etr-details.etr-location {
         display: flex;
         flex-wrap: wrap;
@@ -92,18 +98,10 @@
         margin-top: 1px;
     }
 
-    .etr-receipt .etr-header .etr-location .etr-sep {
-        opacity: 0.6;
-        font-weight: 400;
-    }
+    .etr-receipt .etr-header .etr-location .etr-sep { opacity: 0.6; font-weight: 400; }
+    .etr-receipt .etr-header .etr-location .etr-branch { font-weight: 600; }
 
-    .etr-receipt .etr-header .etr-location .etr-branch {
-        font-weight: 600;
-    }
-
-    .etr-receipt .etr-header .etr-details.etr-email {
-        font-size: 10px;
-    }
+    .etr-receipt .etr-header .etr-details.etr-email { font-size: 10px; }
 
     .etr-receipt .etr-header .etr-title {
         display: block;
@@ -118,7 +116,7 @@
         border-top: 1px solid #000000;
         border-bottom: 1px solid #000000;
     }
-    
+
     .etr-receipt .etr-info {
         display: flex;
         justify-content: space-between;
@@ -131,16 +129,16 @@
         padding-bottom: 4px;
         margin-bottom: 4px;
     }
-    
+
     .etr-receipt .etr-info .label { color: #000000; }
     .etr-receipt .etr-info .value { font-weight: 600; color: #000000; }
-    
+
     .etr-receipt .etr-customer-section {
         border-bottom: 1px solid #000000;
         padding: 6px 0;
         margin-bottom: 6px;
     }
-    
+
     .etr-receipt .etr-customer-section .etr-customer-title {
         font-weight: 700;
         font-size: 11px;
@@ -149,7 +147,7 @@
         margin-bottom: 3px;
         color: #000000;
     }
-    
+
     .etr-receipt .etr-customer-section .etr-customer-row {
         display: flex;
         justify-content: space-between;
@@ -157,19 +155,19 @@
         font-size: 11px;
         color: #000000;
     }
-    
+
     .etr-receipt .etr-customer-section .etr-customer-row .clabel { color: #000000; }
     .etr-receipt .etr-customer-section .etr-customer-row .cvalue { font-weight: 600; color: #000000; }
-    
+
     /* ============================================ */
-    /* ITEMS - ALIGNED HEADER AND ROWS */
+    /* ITEMS — aligned header and rows               */
     /* ============================================ */
     .etr-receipt .etr-items {
         border-bottom: 2px dashed #000000;
         padding-bottom: 8px;
         margin-bottom: 8px;
     }
-    
+
     .etr-receipt .etr-items .item-header,
     .etr-receipt .etr-items .etr-item .item-row {
         display: grid;
@@ -178,7 +176,7 @@
         align-items: center;
         padding: 3px 0;
     }
-    
+
     .etr-receipt .etr-items .item-header {
         font-weight: 700;
         border-bottom: 1px solid #000000;
@@ -189,24 +187,24 @@
         letter-spacing: 0.5px;
         color: #000000;
     }
-    
+
     .etr-receipt .etr-items .item-header .col-description { text-align: left; }
     .etr-receipt .etr-items .item-header .col-qty         { text-align: center; }
     .etr-receipt .etr-items .item-header .col-total       { text-align: right; }
-    
+
     .etr-receipt .etr-items .etr-item {
         padding: 2px 0;
         font-size: 11px;
         border-bottom: 1px dotted #e0e0e0;
         color: #000000;
     }
-    
+
     .etr-receipt .etr-items .etr-item:last-child { border-bottom: none; }
-    
+
     .etr-receipt .etr-items .etr-item .item-name  { font-weight: 500; color: #000000; text-align: left; }
     .etr-receipt .etr-items .etr-item .item-qty   { text-align: center; color: #000000; }
     .etr-receipt .etr-items .etr-item .item-total { text-align: right; font-weight: 600; color: #000000; }
-    
+
     .etr-receipt .etr-items .etr-item .item-identifier {
         font-size: 10px;
         color: #6c757d;
@@ -214,7 +212,7 @@
         margin-top: 1px;
         margin-bottom: 2px;
     }
-    
+
     .etr-receipt .etr-items .etr-item-empty {
         text-align: center;
         padding: 8px;
@@ -222,13 +220,13 @@
         color: #6c757d;
         font-size: 11px;
     }
-    
+
     .etr-receipt .etr-totals {
         border-top: 2px solid #000000;
         padding-top: 6px;
         margin-top: 6px;
     }
-    
+
     .etr-receipt .etr-total-row {
         display: flex;
         justify-content: space-between;
@@ -236,20 +234,53 @@
         font-size: 12px;
         color: #000000;
     }
-    
+
     .etr-receipt .etr-total-row .label { color: #000000; font-weight: 500; }
     .etr-receipt .etr-total-row .value { font-weight: 600; color: #000000; }
-    
+
     .etr-receipt .etr-total-row.grand-total {
         border-top: 2px solid #000000;
         padding-top: 5px;
         margin-top: 3px;
         font-size: 15px;
     }
-    
+
     .etr-receipt .etr-total-row.grand-total .label { font-weight: 700; color: #000000; }
     .etr-receipt .etr-total-row.grand-total .value { font-weight: 700; color: #000000; font-size: 15px; }
-    
+
+    /* ============================================ */
+    /* PAYMENT & SIGNATURE                           */
+    /* ============================================ */
+    .etr-receipt .etr-payment-section {
+        border-top: 1px solid #000000;
+        padding-top: 6px;
+        margin-top: 6px;
+    }
+
+    .etr-receipt .etr-signature-section {
+        margin-top: 18px;
+        padding-top: 6px;
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        font-size: 10px;
+        color: #000000;
+    }
+
+    .etr-receipt .etr-signature-section .sig-block {
+        flex: 1;
+        text-align: center;
+    }
+
+    .etr-receipt .etr-signature-section .sig-line {
+        border-top: 1px solid #000000;
+        margin-bottom: 2px;
+        height: 22px;
+    }
+
+    /* ============================================ */
+    /* FOOTER                                        */
+    /* ============================================ */
     .etr-receipt .etr-footer {
         text-align: center;
         border-top: 2px dashed #000000;
@@ -258,14 +289,34 @@
         font-size: 10px;
         color: #000000;
     }
-    
+
+    .etr-receipt .etr-footer .etr-footer-note {
+        font-size: 10px;
+        color: #000000;
+        margin-bottom: 4px;
+    }
+
     .etr-receipt .etr-footer .etr-thankyou {
         font-size: 12px;
         font-weight: 600;
         color: #000000;
     }
-    
-    /* Action Buttons */
+
+    .etr-receipt .etr-footer .etr-barcode {
+        margin-top: 8px;
+        font-family: 'Courier New', monospace;
+        letter-spacing: 2px;
+        font-size: 14px;
+        color: #000000;
+        border-top: 1px solid #000000;
+        border-bottom: 1px solid #000000;
+        padding: 2px 0;
+        display: inline-block;
+    }
+
+    /* ============================================ */
+    /* ACTION BUTTONS                                */
+    /* ============================================ */
     .action-buttons {
         display: flex;
         gap: 10px;
@@ -273,7 +324,7 @@
         margin-top: 20px;
         justify-content: center;
     }
-    
+
     .action-buttons .btn {
         padding: 10px 24px;
         font-weight: 600;
@@ -284,7 +335,7 @@
         display: inline-block;
         cursor: pointer;
     }
-    
+
     .btn-print { background: #036a77; color: white; border-color: #036a77 !important; }
     .btn-print:hover { background: #02515b; color: white; }
     .btn-back { background: #6c757d; color: white; border-color: #6c757d !important; }
@@ -293,8 +344,10 @@
     .btn-back-dashboard:hover { background: #02515b; color: white; }
     .btn-success { background: #28a745; color: white; border-color: #28a745 !important; }
     .btn-success:hover { background: #218838; color: white; }
-    
-    /* Unauthorized */
+
+    /* ============================================ */
+    /* UNAUTHORIZED                                  */
+    /* ============================================ */
     .unauthorized-container {
         max-width: 500px;
         margin: 50px auto;
@@ -307,28 +360,39 @@
     .unauthorized-container i { font-size: 4rem; color: #dc3545; display: block; margin-bottom: 20px; }
     .unauthorized-container h2 { color: #721c24; margin-bottom: 10px; }
     .unauthorized-container p { color: #721c24; margin-bottom: 20px; }
-    
-    /* Print */
+
+    /* ============================================ */
+    /* PRINT                                         */
+    /* ============================================ */
     @media print {
+        @page {
+            size: auto;
+            margin: 6mm;
+        }
+
         .navbar, .sidebar, .sidebar-overlay, .sidebar-footer,
         .sidebar-toggle-btn, .top-navbar, .footer, .action-buttons,
         .btn, .alert, .breadcrumb, .page-title small,
         .notification-btn, .search-wrapper, .user-profile,
         .dropdown-menu, #sidebarToggleBtn, #sidebarToggleMobile,
         .sidebar-toggle-mobile { display: none !important; }
-        
+
         .main-content { margin-left: 0 !important; padding: 0 !important; width: 100% !important; }
         .sidebar { display: none !important; }
         .content-area { padding: 10px !important; margin: 0 !important; width: 100% !important; }
-        .receipt-wrapper { max-width: 100% !important; padding: 10px !important; margin: 0 !important; }
+        .receipt-wrapper {
+            max-width: {{ receipt_settings.receipt_width|default:80 }}mm !important;
+            padding: 0 !important;
+            margin: 0 auto !important;
+        }
         .receipt-container {
             border: 2px solid #000000 !important;
             border-radius: 0 !important;
-            padding: 15px !important;
+            padding: 12px !important;
             box-shadow: none !important;
             background: #ffffff !important;
         }
-        
+
         .etr-receipt, .etr-receipt * { border-color: #000000 !important; color: #000000 !important; }
         .etr-receipt .etr-header { border-bottom-color: #000000 !important; }
         .etr-receipt .etr-items  { border-bottom-color: #000000 !important; }
@@ -336,25 +400,30 @@
         .etr-receipt .etr-footer { border-top-color:    #000000 !important; }
         .etr-receipt .etr-customer-section { border-color: #000000 !important; }
         .etr-receipt .etr-info  { border-color: #000000 !important; }
-        
+        .etr-receipt .etr-payment-section { border-color: #000000 !important; }
+        .etr-receipt .etr-signature-section .sig-line { border-color: #000000 !important; }
+
         * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     }
-    
+
     @media (max-width: 576px) {
         .receipt-wrapper { padding: 10px; }
         .receipt-container { padding: 15px; }
-        
+
         .etr-receipt .etr-items .item-header,
         .etr-receipt .etr-items .etr-item .item-row {
             grid-template-columns: 2fr 1fr 1fr;
             font-size: 10px;
             gap: 4px;
         }
-        
+
         .etr-receipt .etr-customer-section .etr-customer-row { flex-direction: column; gap: 0; }
         .action-buttons .btn { width: 100%; text-align: center; }
     }
 </style>
+{% if receipt_settings.custom_css %}
+<style>{{ receipt_settings.custom_css|safe }}</style>
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -370,50 +439,73 @@
 {% else %}
 
 <div class="receipt-wrapper">
-    
+
     <div class="receipt-container">
         <div class="etr-receipt">
-            
-            <!-- HEADER — each field on its own centered row -->
+
+            <!-- ============================================ -->
+            <!-- HEADER                                        -->
+            <!-- ============================================ -->
             <div class="etr-header">
 
-                {# Row 1: Logo #}
-                {% if sale.company.logo_url %}
-                    <img src="{{ sale.company.logo_url }}" alt="{{ sale.company.name }}" class="etr-logo">
-                {% elif user.company.logo_url %}
-                    <img src="{{ user.company.logo_url }}" alt="{{ user.company.name }}" class="etr-logo">
-                {% elif site_logo_url %}
-                    <img src="{{ site_logo_url }}" alt="{{ system_name|default:'RonoSystems' }}" class="etr-logo">
-                {% else %}
-                    <span class="etr-logo-fallback"><i class="fas fa-rocket"></i></span>
+                {% if receipt_settings.receipt_header %}
+                    <span class="etr-receipt-header-text">{{ receipt_settings.receipt_header }}</span>
                 {% endif %}
 
-                {# Row 2: Company name #}
-                <span class="etr-company">{{ sale.company.name }}</span>
-
-                {# Row 3: Address + Branch on same row #}
-                <span class="etr-details etr-location">
-                    <span class="etr-address">{{ sale.company.address|default:"-" }}</span>
-                    {% if sale.branch.name %}
-                        <span class="etr-sep">|</span>
-                        <span class="etr-branch">Branch: {{ sale.branch.name }}</span>
+                {% if receipt_settings.show_logo %}
+                    {% if sale.company.receipt_logo_url %}
+                        <img src="{{ sale.company.receipt_logo_url }}"
+                             alt="{{ sale.company.name }}"
+                             class="etr-logo">
+                    {% elif sale.company.logo_url %}
+                        <img src="{{ sale.company.logo_url }}"
+                             alt="{{ sale.company.name }}"
+                             class="etr-logo">
+                    {% elif user.company.logo_url %}
+                        <img src="{{ user.company.logo_url }}"
+                             alt="{{ user.company.name }}"
+                             class="etr-logo">
+                    {% elif site_logo_url %}
+                        <img src="{{ site_logo_url }}"
+                             alt="{{ system_name|default:'RonoSystems' }}"
+                             class="etr-logo">
+                    {% else %}
+                        <span class="etr-logo-fallback"><i class="fas fa-rocket"></i></span>
                     {% endif %}
+                {% endif %}
+
+                <span class="etr-company">
+                    {{ receipt_settings.receipt_company_name|default:sale.company.name }}
                 </span>
 
-                {# Row 4: Telephone #}
-                <span class="etr-details">Tel: {{ sale.company.phone|default:"-" }}</span>
+                {% if receipt_settings.show_company_details %}
+                    <span class="etr-details etr-location">
+                        <span class="etr-address">
+                            {{ receipt_settings.receipt_address|default:sale.company.address|default:"-" }}
+                        </span>
+                        {% if sale.branch.name %}
+                            <span class="etr-sep">|</span>
+                            <span class="etr-branch">Branch: {{ sale.branch.name }}</span>
+                        {% endif %}
+                    </span>
 
-                {# Row 5: Email #}
-                <span class="etr-details etr-email">Email: {{ sale.company.email|default:"-" }}</span>
+                    <span class="etr-details">
+                        Tel: {{ receipt_settings.receipt_phone|default:sale.company.phone|default:"-" }}
+                    </span>
 
-                {# Row 6: PIN #}
-                <span class="etr-details">PIN: {{ sale.company.pin|default:"N/A" }}</span>
+                    <span class="etr-details etr-email">
+                        Email: {{ receipt_settings.receipt_email|default:sale.company.email|default:"-" }}
+                    </span>
 
-                {# Title band #}
-                <span class="etr-title">Fiscal Receipt</span>
+                    <span class="etr-details">PIN: {{ sale.company.pin|default:"N/A" }}</span>
+                {% endif %}
+
+                <span class="etr-title">{{ receipt_settings.receipt_title|default:"Fiscal Receipt" }}</span>
             </div>
 
-            <!-- Receipt Info -->
+            <!-- ============================================ -->
+            <!-- RECEIPT INFO                                  -->
+            <!-- ============================================ -->
             <div class="etr-info">
                 <span><span class="label">User:</span> {{ sale.sold_by.get_full_name|default:sale.sold_by.username|title }}</span>
                 <span><span class="label">RCPT:</span> #{{ sale.company_sale_id }}</span>
@@ -422,104 +514,169 @@
                 <span><span class="label">Time:</span> {{ sale.sale_date|date:"H:i" }}</span>
                 <span><span class="label">Date:</span> {{ sale.sale_date|date:"Y-m-d" }}</span>
             </div>
-            
-            <!-- Customer Details -->
-            <div class="etr-customer-section">
-                <div class="etr-customer-title">Customer Details</div>
-                <div class="etr-customer-row">
-                    <span class="clabel">Full Name:</span>
-                    <span class="cvalue">{{ sale.customer_name }}</span>
-                </div>
-                <div class="etr-customer-row">
-                    <span class="clabel">Phone:</span>
-                    <span class="cvalue">{{ sale.customer_phone|default:"-" }}</span>
-                </div>
-                <div class="etr-customer-row">
-                    <span class="clabel">ID Number:</span>
-                    <span class="cvalue">{{ sale.customer.id_number|default:"-" }}</span>
-                </div>
-            </div>
-            
-            <!-- Next of Kin -->
-            {% if sale.customer.next_of_keen_name or sale.customer.next_of_keen_phone %}
-                <div class="etr-customer-section" style="border-top: none; padding-top: 4px; margin-top: 0;">
-                    <div class="etr-customer-title">Next of Kin</div>
+
+            <!-- ============================================ -->
+            <!-- CUSTOMER DETAILS                              -->
+            <!-- ============================================ -->
+            {% if receipt_settings.show_customer_details %}
+                <div class="etr-customer-section">
+                    <div class="etr-customer-title">Customer Details</div>
                     <div class="etr-customer-row">
                         <span class="clabel">Full Name:</span>
-                        <span class="cvalue">{{ sale.customer.next_of_keen_name|default:"-" }}</span>
+                        <span class="cvalue">{{ sale.customer_name }}</span>
                     </div>
                     <div class="etr-customer-row">
                         <span class="clabel">Phone:</span>
-                        <span class="cvalue">{{ sale.customer.next_of_keen_phone|default:"-" }}</span>
+                        <span class="cvalue">{{ sale.customer_phone|default:"-" }}</span>
+                    </div>
+                    <div class="etr-customer-row">
+                        <span class="clabel">ID Number:</span>
+                        <span class="cvalue">{{ sale.customer.id_number|default:"-" }}</span>
+                    </div>
+                </div>
+
+                {% if sale.customer.next_of_keen_name or sale.customer.next_of_keen_phone %}
+                    <div class="etr-customer-section" style="border-top: none; padding-top: 4px; margin-top: 0;">
+                        <div class="etr-customer-title">Next of Kin</div>
+                        <div class="etr-customer-row">
+                            <span class="clabel">Full Name:</span>
+                            <span class="cvalue">{{ sale.customer.next_of_keen_name|default:"-" }}</span>
+                        </div>
+                        <div class="etr-customer-row">
+                            <span class="clabel">Phone:</span>
+                            <span class="cvalue">{{ sale.customer.next_of_keen_phone|default:"-" }}</span>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endif %}
+
+            <!-- ============================================ -->
+            <!-- ITEMS                                         -->
+            <!-- ============================================ -->
+            {% if receipt_settings.show_items %}
+                <div class="etr-items">
+                    <div class="item-header">
+                        <span class="col-description">Description</span>
+                        <span class="col-qty">Qty × Price</span>
+                        <span class="col-total">Total</span>
+                    </div>
+
+                    {% for item in items %}
+                    <div class="etr-item">
+                        <div class="item-row">
+                            <span class="item-name">{{ forloop.counter }}. {{ item.item_name }}</span>
+                            <span class="item-qty">{{ item.quantity }} × KSh {{ item.unit_price|floatformat:0 }}</span>
+                            <span class="item-total">KSh {{ item.total_price|floatformat:0 }}</span>
+                        </div>
+                        {% if item.unit %}
+                            <div class="item-identifier">
+                                {% if item.unit.unit_type == 'imei' %}
+                                    IMEI: {{ item.unit.identifier }}
+                                {% elif item.unit.unit_type == 'serial' %}
+                                    Serial: {{ item.unit.identifier }}
+                                {% else %}
+                                    Identifier: {{ item.unit.identifier }}
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    {% empty %}
+                    <div class="etr-item-empty">No items found</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <!-- ============================================ -->
+            <!-- TOTALS                                        -->
+            <!-- ============================================ -->
+            {% if receipt_settings.show_totals %}
+                <div class="etr-totals">
+                    <div class="etr-total-row">
+                        <span class="label">Subtotal</span>
+                        <span class="value">KSh {{ sale.total_amount|floatformat:0 }}</span>
+                    </div>
+                    {% if sale.discount > 0 %}
+                    <div class="etr-total-row" style="color:#dc3545;">
+                        <span class="label">Discount</span>
+                        <span class="value">- KSh {{ sale.discount|floatformat:0 }}</span>
+                    </div>
+                    {% endif %}
+                    {% if sale.tax > 0 %}
+                    <div class="etr-total-row">
+                        <span class="label">VAT</span>
+                        <span class="value">KSh {{ sale.tax|floatformat:0 }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="etr-total-row grand-total">
+                        <span class="label">TOTAL</span>
+                        <span class="value">KSh {{ sale.net_amount|floatformat:0 }}</span>
                     </div>
                 </div>
             {% endif %}
 
-            <!-- Items -->
-            <div class="etr-items">
-                <div class="item-header">
-                    <span class="col-description">Description</span>
-                    <span class="col-qty">Qty × Price</span>
-                    <span class="col-total">Total</span>
-                </div>
-                
-                {% for item in items %}
-                <div class="etr-item">
-                    <div class="item-row">
-                        <span class="item-name">{{ forloop.counter }}. {{ item.item_name }}</span>
-                        <span class="item-qty">{{ item.quantity }} × KSh {{ item.unit_price|floatformat:0 }}</span>
-                        <span class="item-total">KSh {{ item.total_price|floatformat:0 }}</span>
+            <!-- ============================================ -->
+            <!-- PAYMENT DETAILS                               -->
+            <!-- ============================================ -->
+            {% if receipt_settings.show_payment %}
+                <div class="etr-payment-section">
+                    <div class="etr-total-row">
+                        <span class="label">Payment Method</span>
+                        <span class="value">{{ sale.payment_method|default:"-" }}</span>
                     </div>
-                    {% if item.unit %}
-                        <div class="item-identifier">
-                            {% if item.unit.unit_type == 'imei' %}
-                                IMEI: {{ item.unit.identifier }}
-                            {% elif item.unit.unit_type == 'serial' %}
-                                Serial: {{ item.unit.identifier }}
-                            {% else %}
-                                Identifier: {{ item.unit.identifier }}
-                            {% endif %}
-                        </div>
+                    {% if sale.payment_status %}
+                    <div class="etr-total-row">
+                        <span class="label">Payment Status</span>
+                        <span class="value">{{ sale.payment_status }}</span>
+                    </div>
+                    {% endif %}
+                    {% if sale.payment_reference %}
+                    <div class="etr-total-row">
+                        <span class="label">Reference</span>
+                        <span class="value">{{ sale.payment_reference }}</span>
+                    </div>
                     {% endif %}
                 </div>
-                {% empty %}
-                <div class="etr-item-empty">No items found</div>
-                {% endfor %}
-            </div>
+            {% endif %}
 
-            <!-- Totals -->
-            <div class="etr-totals">
-                <div class="etr-total-row">
-                    <span class="label">Subtotal</span>
-                    <span class="value">KSh {{ sale.total_amount|floatformat:0 }}</span>
+            <!-- ============================================ -->
+            <!-- SIGNATURE                                     -->
+            <!-- ============================================ -->
+            {% if receipt_settings.show_signature %}
+                <div class="etr-signature-section">
+                    <div class="sig-block">
+                        <div class="sig-line"></div>
+                        <div>Customer</div>
+                    </div>
+                    <div class="sig-block">
+                        <div class="sig-line"></div>
+                        <div>Cashier</div>
+                    </div>
                 </div>
-                {% if sale.discount > 0 %}
-                <div class="etr-total-row" style="color:#dc3545;">
-                    <span class="label">Discount</span>
-                    <span class="value">- KSh {{ sale.discount|floatformat:0 }}</span>
-                </div>
-                {% endif %}
-                {% if sale.tax > 0 %}
-                <div class="etr-total-row">
-                    <span class="label">VAT</span>
-                    <span class="value">KSh {{ sale.tax|floatformat:0 }}</span>
-                </div>
-                {% endif %}
-                <div class="etr-total-row grand-total">
-                    <span class="label">TOTAL</span>
-                    <span class="value">KSh {{ sale.net_amount|floatformat:0 }}</span>
-                </div>
-            </div>
+            {% endif %}
 
-            <!-- Footer -->
+            <!-- ============================================ -->
+            <!-- FOOTER                                        -->
+            <!-- ============================================ -->
             <div class="etr-footer">
-                <div class="etr-thankyou">{{ sale.company.receipt_footer|default:"Thank you for your business!" }}</div>
+                {% if receipt_settings.receipt_footer %}
+                    <div class="etr-footer-note">{{ receipt_settings.receipt_footer }}</div>
+                {% endif %}
+
+                <div class="etr-thankyou">
+                    {{ receipt_settings.thank_you_message|default:"Thank you for your business!" }}
+                </div>
+
+                {% if receipt_settings.include_barcode %}
+                    <div class="etr-barcode">*{{ sale.company_sale_id }}*</div>
+                {% endif %}
             </div>
-            
+
         </div>
     </div>
-    
-    <!-- Action Buttons -->
+
+    <!-- ============================================ -->
+    <!-- ACTION BUTTONS                                -->
+    <!-- ============================================ -->
     <div class="action-buttons">
         {% if user.role == 'company_agent' %}
         <a href="/epa_shop/sales/single/" class="btn btn-success">
@@ -538,22 +695,25 @@
             <i class="fas fa-arrow-left"></i> Back to Sales
         </a>
         {% endif %}
-        
+
         <button class="btn btn-print" onclick="window.print()">
             <i class="fas fa-print"></i> Print ETR
         </button>
     </div>
-    
+
 </div>
 {% endif %}
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    if (window.location.search.includes('print=1')) {
+    // Auto-print when ?print=1 in URL OR company has enabled auto_print.
+    var autoPrint = {{ receipt_settings.auto_print|yesno:"true,false" }};
+    if (window.location.search.includes('print=1') || autoPrint) {
         setTimeout(function() { window.print(); }, 500);
     }
 
-    const unauthorized = document.querySelector('.unauthorized-container');
+    // Hide action buttons on the unauthorized page.
+    var unauthorized = document.querySelector('.unauthorized-container');
     if (unauthorized) {
         document.querySelectorAll('.action-buttons .btn').forEach(function(btn) {
             btn.style.display = 'none';

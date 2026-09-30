@@ -193,3 +193,66 @@ def company_branding_context(request):
         ctx['system_name'] = company.system_name
 
     return ctx
+
+
+
+
+
+# ============================================
+# RECEIPT SETTINGS
+# ============================================
+def receipt_settings_context(request):
+    """
+    Inject `receipt_settings` (dict) into every template context, so the
+    receipt template can read show_* / title / footer / etc. without the
+    epa_shop view needing to know about them.
+
+    Cached on `request._receipt_settings` — parsed once per request.
+    Falls back to platform defaults when no tenant is active
+    (super admin on mother site, public pages, etc.).
+    """
+    if hasattr(request, '_receipt_settings'):
+        return {'receipt_settings': request._receipt_settings}
+
+    company = _get_effective_company(request)
+
+    settings_dict = None
+    if company is not None:
+        try:
+            # Import inside the function — views.py has no dependency on this
+            # module, so no circular import. Importing at module level would
+            # force views to load on every startup.
+            from apps.companies.views import get_company_settings
+            settings_dict = get_company_settings(company).get('receipt', {})
+        except Exception:
+            settings_dict = None
+
+    if not settings_dict:
+        settings_dict = {
+            'receipt_header': '',
+            'receipt_footer': '',
+            'receipt_format': 'standard',
+            'show_logo': True,
+            'show_company_details': True,
+            'show_customer_details': True,
+            'show_items': True,
+            'show_totals': True,
+            'show_payment': True,
+            'show_signature': True,
+            'receipt_title': 'RECEIPT',
+            'thank_you_message': 'Thank you for your business!',
+            'include_barcode': False,
+            'print_copies': 1,
+            'auto_print': False,
+            'receipt_font_size': '14',
+            'receipt_width': '80',
+            'custom_css': '',
+        }
+
+    request._receipt_settings = settings_dict
+    return {'receipt_settings': settings_dict}
+
+
+
+
+    

@@ -180,6 +180,7 @@ TEMPLATES = [
                 'apps.companies.context_processors.support_mode_context',
                 'apps.companies.context_processors.pending_join_requests',
                 'apps.companies.context_processors.company_branding_context', 
+                'apps.companies.context_processors.receipt_settings_context', 
             ],
         },
     },

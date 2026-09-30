@@ -197,7 +197,14 @@ class Company(models.Model):
                   "(e.g. companies/42/login_background_1789754321). "
                   "Only shown when the user is on this company's domain.",
     )
-
+    receipt_logo = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="Cloudinary public_id for the receipt/ETR logo "
+                  "(e.g. companies/42/receipt_logo_1789754321). "
+                  "If empty, the main `logo` is used on receipts.",
+    )
     
     primary_color = models.CharField(
         max_length=7,
@@ -374,6 +381,19 @@ class Company(models.Model):
         """
         return self._build_media_url(self.login_background)
 
+    @property
+    def receipt_logo_url(self):
+        """
+        Fully-formed URL for the receipt-specific logo, or None.
+
+        Deliberately does NOT fall back to `logo_url` — the settings UI
+        needs to know whether a dedicated receipt logo was actually set
+        (to show the "Remove" checkbox and preview correctly).
+        Fallback happens in the receipt template itself.
+        """
+        return self._build_media_url(self.receipt_logo)
+
+        
     @property
     def display_name(self):
         """`system_name` if set, otherwise fall back to `name`."""
