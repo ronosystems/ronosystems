@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}{{ receipt_settings.receipt_title|default:"Fiscal Receipt" }}{% endblock %}
 
@@ -338,6 +339,7 @@
 
     .btn-print { background: #036a77; color: white; border-color: #036a77 !important; }
     .btn-print:hover { background: #02515b; color: white; }
+    .btn-print:disabled { opacity: 0.6; cursor: wait; }
     .btn-back { background: #6c757d; color: white; border-color: #6c757d !important; }
     .btn-back:hover { background: #5a6268; color: white; }
     .btn-back-dashboard { background: #036a77; color: white; border-color: #036a77 !important; }
@@ -440,7 +442,7 @@
 
 <div class="receipt-wrapper">
 
-    <div class="receipt-container">
+    <div class="receipt-container" id="receiptContainer">
         <div class="etr-receipt">
 
             <!-- ============================================ -->
@@ -696,27 +698,131 @@
         </a>
         {% endif %}
 
-        <button class="btn btn-print" onclick="window.print()">
-            <i class="fas fa-print"></i> Print ETR
+        <button class="btn btn-print" id="btnPrintEtr" onclick="qzPrintReceipt()">
+            <i class="fas fa-print"></i> <span id="btnPrintLabel">Print ETR</span>
         </button>
     </div>
 
 </div>
 {% endif %}
 
+<!-- QZ Tray library -->
+<script src="{% static 'vendor/qz-tray/qz-tray.js' %}"></script>
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Auto-print when ?print=1 in URL OR company has enabled auto_print.
+// ============================================================
+// QZ TRAY — silent thermal printing
+// Falls back to window.print() if QZ Tray isn't available.
+// ============================================================
+
+// Optional: set to a printer name substring (e.g. "EPSON", "Zebra")
+// to target a specific printer. null = use OS default printer.
+var QZ_PRINTER_NAME = null;
+
+// ------------------------------------------------------------
+// Build a standalone HTML document from the receipt container.
+// QZ Tray's HTML engine doesn't inherit this page's <style> tags,
+// so we inject them manually.
+// ------------------------------------------------------------
+function buildReceiptHTML() {
+    var el = document.getElementById('receiptContainer');
+    if (!el) return '<html><body>Receipt not found</body></html>';
+
+    var styles = '';
+    document.querySelectorAll('style').forEach(function (s) {
+        styles += s.outerHTML;
+    });
+
+    var clone = el.cloneNode(true);
+
+    return '<!DOCTYPE html>'
+         + '<html><head><meta charset="utf-8">'
+         + '<style>'
+         + '  @page { margin: 0; }'
+         + '  html, body { margin:0; padding:0; background:#fff; }'
+         + '  .receipt-container { border:none !important; box-shadow:none !important;'
+         + '     padding:0 !important; margin:0 auto !important; background:#fff !important; }'
+         + styles
+         + '</style></head><body>'
+         + clone.outerHTML
+         + '</body></html>';
+}
+
+// ------------------------------------------------------------
+// Print via QZ Tray. Falls back to window.print() on failure.
+// ------------------------------------------------------------
+function qzPrintReceipt() {
+    var btn = document.getElementById('btnPrintEtr');
+    var label = document.getElementById('btnPrintLabel');
+
+    // No QZ Tray loaded → browser print
+    if (typeof qz === 'undefined') {
+        console.warn('QZ Tray library not loaded — using browser print.');
+        window.print();
+        return;
+    }
+
+    if (btn) btn.disabled = true;
+    if (label) label.textContent = 'Printing…';
+
+    var connectPromise = qz.websocket.isActive()
+        ? Promise.resolve()
+        : qz.websocket.connect();
+
+    connectPromise
+        .then(function () {
+            return QZ_PRINTER_NAME
+                ? qz.printers.find(QZ_PRINTER_NAME)
+                : qz.printers.getDefault();
+        })
+        .then(function (printerName) {
+            console.log('QZ Tray printing to:', printerName);
+
+            var config = qz.configs.create(printerName, {
+                size:  { width: {{ receipt_settings.receipt_width|default:80 }}, height: null },
+                units: 'mm',
+                margins: 0,
+                colorType: 'blackwhite',
+                rasterize: true,
+                density: 200,
+            });
+
+            var data = [{
+                type:   'html',
+                format: 'plain',
+                data:   buildReceiptHTML(),
+            }];
+
+            return qz.print(config, data);
+        })
+        .then(function () {
+            console.log('✓ Receipt sent to printer.');
+        })
+        .catch(function (err) {
+            console.error('QZ Tray print failed:', err);
+            // Any failure → fall back to browser print
+            window.print();
+        })
+        .finally(function () {
+            if (btn) btn.disabled = false;
+            if (label) label.textContent = 'Print ETR';
+        });
+}
+
+// ------------------------------------------------------------
+// Auto-print on load if ?print=1 or company enabled auto_print.
+// ------------------------------------------------------------
+document.addEventListener('DOMContentLoaded', function () {
     var autoPrint = {{ receipt_settings.auto_print|yesno:"true,false" }};
     if (window.location.search.includes('print=1') || autoPrint) {
-        setTimeout(function() { window.print(); }, 500);
+        setTimeout(qzPrintReceipt, 800);
     }
 
     // Hide action buttons on the unauthorized page.
     var unauthorized = document.querySelector('.unauthorized-container');
     if (unauthorized) {
-        document.querySelectorAll('.action-buttons .btn').forEach(function(btn) {
-            btn.style.display = 'none';
+        document.querySelectorAll('.action-buttons .btn').forEach(function (b) {
+            b.style.display = 'none';
         });
     }
 });
