@@ -16,7 +16,7 @@ from apps.company.models import Branch
 from .models import (
     Treasury, BankAccount, MpesaAccount, DailyRecord, 
     DailyBankBalance, DailyMpesaBalance, Movement, 
-    TreasurySummary, TreasuryTransactionLog
+    TreasurySummary, TreasuryTransactionLog, MpesaCommission
 )
 from .utils import create_boost_movement, create_transfer_movement, create_daily_record, update_daily_balances
 
@@ -2178,3 +2178,484 @@ def export_movements_csv(request, company_id=None, branch_id=None):
         ])
     
     return response
+
+
+
+
+
+
+# ============================================
+# MPESA COMMISSIONS
+# ============================================
+
+@login_required
+def commission_create(request, company_id=None, branch_id=None):
+    """Record an M-Pesa commission for a month (manager/admin only)"""
+    company = get_user_company(request, company_id)
+    if not company:
+        return redirect('dashboard')
+
+    # Permission: admins and managers only
+    if not is_admin_or_manager(request.user):
+        messages.error(request, 'Only admins and managers can record commissions.')
+        return redirect('treasury:dashboard', company_id=company.id)
+
+    user_branch = get_user_branch(request.user)
+    branch = None
+
+    if request.user.role in ['super_admin', 'company_admin']:
+        if branch_id:
+            branch = get_object_or_404(Branch, id=branch_id, company=company)
+        else:
+            branch = user_branch or Branch.objects.filter(company=company, is_active=True).first()
+    else:
+        if not user_branch:
+            messages.error(request, 'You are not assigned to any branch.')
+            return redirect('treasury:dashboard', company_id=company.id)
+
+        if branch_id and int(branch_id) != user_branch.id:
+            messages.error(request, f'You can only record commissions for your branch: {user_branch.name}')
+            return redirect('treasury:commission_create', company_id=company.id, branch_id=user_branch.id)
+
+        branch = user_branch
+
+    if not branch:
+        messages.error(request, 'No branch available.')
+        return redirect('treasury:dashboard', company_id=company.id)
+
+    mpesa_accounts = MpesaAccount.objects.filter(
+        company=company, branch=branch, is_active=True
+    ).order_by('till_name')
+
+    if request.method == 'POST':
+        month_str = request.POST.get('month')  # "YYYY-MM"
+        amount_str = request.POST.get('amount', '0')
+        mpesa_account_id = request.POST.get('mpesa_account') or None
+        reference = request.POST.get('reference', '')
+        notes = request.POST.get('notes', '')
+
+        if not month_str:
+            messages.error(request, 'Please select a month.')
+            return redirect('treasury:commission_create', company_id=company.id, branch_id=branch.id)
+
+        # month_str is "YYYY-MM" from <input type="month">
+        try:
+            year, month = map(int, month_str.split('-'))
+            from datetime import date
+            month_date = date(year, month, 1)
+        except (ValueError, AttributeError):
+            messages.error(request, 'Invalid month format.')
+            return redirect('treasury:commission_create', company_id=company.id, branch_id=branch.id)
+
+        try:
+            amount = Decimal(amount_str)
+        except Exception:
+            amount = Decimal('0')
+
+        if amount <= 0:
+            messages.error(request, 'Amount must be greater than 0.')
+            return redirect('treasury:commission_create', company_id=company.id, branch_id=branch.id)
+
+        mpesa_account = None
+        if mpesa_account_id:
+            mpesa_account = MpesaAccount.objects.filter(
+                id=mpesa_account_id, company=company, branch=branch
+            ).first()
+
+        # Block duplicate for same month/branch
+        existing = MpesaCommission.objects.filter(
+            company=company, branch=branch, month=month_date
+        ).first()
+
+        if existing:
+            messages.error(
+                request,
+                f'A commission for {month_date.strftime("%B %Y")} already exists '
+                f'(KES {existing.amount:,.2f}). Edit or delete it first.'
+            )
+            return redirect('treasury:commission_create', company_id=company.id, branch_id=branch.id)
+
+        with transaction.atomic():
+            commission = MpesaCommission.objects.create(
+                company=company,
+                branch=branch,
+                month=month_date,
+                amount=amount,
+                mpesa_account=mpesa_account,
+                reference=reference,
+                notes=notes,
+                recorded_by=request.user,
+            )
+
+            # Log it
+            treasury = get_treasury(company, branch)
+            log_transaction(
+                treasury,
+                'manual_adjustment',
+                {'net': amount, 'mpesa': amount},
+                f'M-Pesa commission for {month_date.strftime("%B %Y")}: KES {amount:,.2f}',
+                request.user,
+            )
+
+        messages.success(
+            request,
+            f'✅ Commission for {month_date.strftime("%B %Y")} '
+            f'of KES {amount:,.2f} recorded successfully!'
+        )
+        return redirect('treasury:commissions_list', company_id=company.id, branch_id=branch.id)
+
+    # GET — show the form
+    today = timezone.now().date()
+    default_month = today.strftime('%Y-%m')  # for <input type="month">
+
+    all_branches = Branch.objects.filter(company=company, is_active=True)
+    is_admin = request.user.role in ['super_admin', 'company_admin']
+
+    # Recent commissions for this branch (last 5)
+    recent_commissions = MpesaCommission.objects.filter(
+        company=company, branch=branch
+    ).order_by('-month')[:5]
+
+    context = {
+        'company': company,
+        'branch': branch,
+        'mpesa_accounts': mpesa_accounts,
+        'default_month': default_month,
+        'recent_commissions': recent_commissions,
+        'is_admin': is_admin,
+        'all_branches': all_branches,
+        'user_branch': user_branch,
+    }
+    return render(request, 'treasury/commissions_form.html', context)
+
+
+@login_required
+def commissions_list(request, company_id=None, branch_id=None):
+    """List all recorded M-Pesa commissions for a branch"""
+    company = get_user_company(request, company_id)
+    if not company:
+        return redirect('dashboard')
+
+    # Permission: admins and managers only
+    if not is_admin_or_manager(request.user):
+        messages.error(request, 'Only admins and managers can view commissions.')
+        return redirect('treasury:dashboard', company_id=company.id)
+
+    user_branch = get_user_branch(request.user)
+    branch = None
+
+    if request.user.role in ['super_admin', 'company_admin']:
+        if branch_id:
+            branch = get_object_or_404(Branch, id=branch_id, company=company)
+        else:
+            branch = user_branch or Branch.objects.filter(company=company, is_active=True).first()
+    else:
+        if not user_branch:
+            messages.error(request, 'You are not assigned to any branch.')
+            return redirect('treasury:dashboard', company_id=company.id)
+
+        if branch_id and int(branch_id) != user_branch.id:
+            messages.error(request, f'You can only view commissions for your branch: {user_branch.name}')
+            return redirect('treasury:commissions_list', company_id=company.id, branch_id=user_branch.id)
+
+        branch = user_branch
+
+    if not branch:
+        messages.error(request, 'No branch available.')
+        return redirect('treasury:dashboard', company_id=company.id)
+
+    # Optional year filter
+    year = request.GET.get('year')
+    commissions = MpesaCommission.objects.filter(
+        company=company, branch=branch
+    ).select_related('mpesa_account', 'recorded_by')
+
+    if year:
+        try:
+            commissions = commissions.filter(month__year=int(year))
+        except ValueError:
+            pass
+
+    commissions = commissions.order_by('-month')
+
+    # Pagination
+    paginator = Paginator(commissions, 25)
+    page = request.GET.get('page', 1)
+    commissions_page = paginator.get_page(page)
+
+    # Summary
+    total_commission = commissions.aggregate(total=Sum('amount'))['total'] or 0
+
+    # Current year total
+    current_year = timezone.now().year
+    year_total = MpesaCommission.objects.filter(
+        company=company, branch=branch, month__year=current_year
+    ).aggregate(total=Sum('amount'))['total'] or 0
+
+    all_branches = Branch.objects.filter(company=company, is_active=True)
+    is_admin = request.user.role in ['super_admin', 'company_admin']
+
+    # Available years for filter
+    available_years = (
+        MpesaCommission.objects
+        .filter(company=company, branch=branch)
+        .dates('month', 'year')
+    )
+    year_list = sorted({d.year for d in available_years}, reverse=True)
+
+    context = {
+        'company': company,
+        'branch': branch,
+        'commissions': commissions_page,
+        'total_commission': total_commission,
+        'year_total': year_total,
+        'current_year': current_year,
+        'selected_year': year,
+        'year_list': year_list,
+        'is_admin': is_admin,
+        'all_branches': all_branches,
+        'user_branch': user_branch,
+    }
+    return render(request, 'treasury/commissions_list.html', context)
+
+
+
+# ============================================
+# MPESA COMMISSION - EDIT
+# ============================================
+
+@login_required
+def commission_edit(request, company_id=None, branch_id=None, commission_id=None):
+    """Edit an M-Pesa commission record (admin/manager only)"""
+    company = get_user_company(request, company_id)
+    if not company:
+        return redirect('dashboard')
+
+    if not is_admin_or_manager(request.user):
+        messages.error(request, 'Only admins and managers can edit commissions.')
+        return redirect('treasury:dashboard', company_id=company.id)
+
+    user_branch = get_user_branch(request.user)
+    branch = None
+
+    if request.user.role in ['super_admin', 'company_admin']:
+        if branch_id:
+            branch = get_object_or_404(Branch, id=branch_id, company=company)
+        else:
+            branch = user_branch or Branch.objects.filter(company=company, is_active=True).first()
+    else:
+        if not user_branch:
+            messages.error(request, 'You are not assigned to any branch.')
+            return redirect('treasury:dashboard', company_id=company.id)
+
+        if branch_id and int(branch_id) != user_branch.id:
+            messages.error(request, f'You can only edit commissions for your branch: {user_branch.name}')
+            return redirect(
+                'treasury:commission_edit',
+                company_id=company.id,
+                branch_id=user_branch.id,
+                commission_id=commission_id,
+            )
+
+        branch = user_branch
+
+    if not branch:
+        messages.error(request, 'No branch available.')
+        return redirect('treasury:dashboard', company_id=company.id)
+
+    commission = get_object_or_404(
+        MpesaCommission, id=commission_id, company=company, branch=branch
+    )
+
+    mpesa_accounts = MpesaAccount.objects.filter(
+        company=company, branch=branch, is_active=True
+    ).order_by('till_name')
+
+    if request.method == 'POST':
+        month_str = request.POST.get('month')
+        amount_str = request.POST.get('amount', '0')
+        mpesa_account_id = request.POST.get('mpesa_account') or None
+        reference = request.POST.get('reference', '')
+        notes = request.POST.get('notes', '')
+
+        if not month_str:
+            messages.error(request, 'Please select a month.')
+            return redirect(
+                'treasury:commission_edit',
+                company_id=company.id, branch_id=branch.id, commission_id=commission.id,
+            )
+
+        try:
+            year, month = map(int, month_str.split('-'))
+            from datetime import date
+            month_date = date(year, month, 1)
+        except (ValueError, AttributeError):
+            messages.error(request, 'Invalid month format.')
+            return redirect(
+                'treasury:commission_edit',
+                company_id=company.id, branch_id=branch.id, commission_id=commission.id,
+            )
+
+        try:
+            amount = Decimal(amount_str)
+        except Exception:
+            amount = Decimal('0')
+
+        if amount <= 0:
+            messages.error(request, 'Amount must be greater than 0.')
+            return redirect(
+                'treasury:commission_edit',
+                company_id=company.id, branch_id=branch.id, commission_id=commission.id,
+            )
+
+        # Check for duplicate month (excluding this record)
+        duplicate = MpesaCommission.objects.filter(
+            company=company, branch=branch, month=month_date
+        ).exclude(id=commission.id).first()
+
+        if duplicate:
+            messages.error(
+                request,
+                f'A commission for {month_date.strftime("%B %Y")} already exists '
+                f'(KES {duplicate.amount:,.2f}). Choose a different month.'
+            )
+            return redirect(
+                'treasury:commission_edit',
+                company_id=company.id, branch_id=branch.id, commission_id=commission.id,
+            )
+
+        mpesa_account = None
+        if mpesa_account_id:
+            mpesa_account = MpesaAccount.objects.filter(
+                id=mpesa_account_id, company=company, branch=branch
+            ).first()
+
+        with transaction.atomic():
+            old_amount = commission.amount
+            commission.month = month_date
+            commission.amount = amount
+            commission.mpesa_account = mpesa_account
+            commission.reference = reference
+            commission.notes = notes
+            commission.save()
+
+            treasury = get_treasury(company, branch)
+            log_transaction(
+                treasury,
+                'manual_adjustment',
+                {'net': amount - old_amount, 'mpesa': amount - old_amount},
+                f'M-Pesa commission for {month_date.strftime("%B %Y")} edited '
+                f'(was KES {old_amount:,.2f}, now KES {amount:,.2f})',
+                request.user,
+            )
+
+        messages.success(
+            request,
+            f'✅ Commission for {month_date.strftime("%B %Y")} updated successfully!'
+        )
+        return redirect('treasury:commissions_list', company_id=company.id, branch_id=branch.id)
+
+    # GET — show form pre-filled
+    all_branches = Branch.objects.filter(company=company, is_active=True)
+    is_admin = request.user.role in ['super_admin', 'company_admin']
+
+    recent_commissions = MpesaCommission.objects.filter(
+        company=company, branch=branch
+    ).exclude(id=commission.id).order_by('-month')[:5]
+
+    context = {
+        'company': company,
+        'branch': branch,
+        'commission': commission,
+        'is_edit': True,
+        'mpesa_accounts': mpesa_accounts,
+        'default_month': commission.month.strftime('%Y-%m'),
+        'recent_commissions': recent_commissions,
+        'is_admin': is_admin,
+        'all_branches': all_branches,
+        'user_branch': user_branch,
+    }
+    return render(request, 'treasury/commissions_form.html', context)
+
+
+# ============================================
+# MPESA COMMISSION - DELETE
+# ============================================
+
+@login_required
+def commission_delete(request, company_id=None, branch_id=None, commission_id=None):
+    """Delete an M-Pesa commission record (admin/manager only)"""
+    company = get_user_company(request, company_id)
+    if not company:
+        return redirect('dashboard')
+
+    if not is_admin_or_manager(request.user):
+        messages.error(request, 'Only admins and managers can delete commissions.')
+        return redirect('treasury:dashboard', company_id=company.id)
+
+    user_branch = get_user_branch(request.user)
+    branch = None
+
+    if request.user.role in ['super_admin', 'company_admin']:
+        if branch_id:
+            branch = get_object_or_404(Branch, id=branch_id, company=company)
+        else:
+            branch = user_branch or Branch.objects.filter(company=company, is_active=True).first()
+    else:
+        if not user_branch:
+            messages.error(request, 'You are not assigned to any branch.')
+            return redirect('treasury:dashboard', company_id=company.id)
+
+        if branch_id and int(branch_id) != user_branch.id:
+            messages.error(request, f'You can only delete commissions for your branch: {user_branch.name}')
+            return redirect(
+                'treasury:commission_delete',
+                company_id=company.id,
+                branch_id=user_branch.id,
+                commission_id=commission_id,
+            )
+
+        branch = user_branch
+
+    if not branch:
+        messages.error(request, 'No branch available.')
+        return redirect('treasury:dashboard', company_id=company.id)
+
+    commission = get_object_or_404(
+        MpesaCommission, id=commission_id, company=company, branch=branch
+    )
+
+    if request.method == 'POST':
+        month_label = commission.month.strftime('%B %Y')
+        amount = commission.amount
+
+        with transaction.atomic():
+            treasury = get_treasury(company, branch)
+            log_transaction(
+                treasury,
+                'manual_adjustment',
+                {'net': -amount, 'mpesa': -amount},
+                f'M-Pesa commission for {month_label} deleted (KES {amount:,.2f})',
+                request.user,
+            )
+            commission.delete()
+
+        messages.success(
+            request,
+            f'🗑️ Commission for {month_label} (KES {amount:,.2f}) deleted successfully!'
+        )
+        return redirect('treasury:commissions_list', company_id=company.id, branch_id=branch.id)
+
+    # GET — confirmation page
+    all_branches = Branch.objects.filter(company=company, is_active=True)
+    is_admin = request.user.role in ['super_admin', 'company_admin']
+
+    context = {
+        'company': company,
+        'branch': branch,
+        'commission': commission,
+        'is_admin': is_admin,
+        'all_branches': all_branches,
+        'user_branch': user_branch,
+    }
+    return render(request, 'treasury/commissions_confirm_delete.html', context)

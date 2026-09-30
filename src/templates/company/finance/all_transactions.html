@@ -1,0 +1,683 @@
+{% extends base_template|default:"base.html" %}
+{% load static %}
+
+{% block title %}All Transactions - {{ company.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       PAGE HEADER
+    ============================================ */
+    .tx-page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .tx-page-header h2 {
+        margin: 0;
+        font-weight: 800;
+        color: #000000;
+        font-size: 1.4rem;
+    }
+
+    .tx-page-header h2 i {
+        margin-right: 8px;
+        color: #007bff;
+    }
+
+    .tx-page-header .subtitle {
+        color: #6c757d;
+        font-size: 0.85rem;
+        margin-top: 4px;
+    }
+
+    .tx-page-header .back-btn {
+        background: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 0.85rem;
+        transition: all 0.2s ease;
+    }
+
+    .tx-page-header .back-btn:hover {
+        background: #87CEEB;
+        color: #000000;
+        text-decoration: none;
+    }
+
+    /* ============================================
+       STATS CARDS
+    ============================================ */
+    .tx-stat {
+        background: #ffffff;
+        border: 2px solid #000000;
+        border-radius: 8px;
+        padding: 16px 20px;
+        position: relative;
+        overflow: hidden;
+        height: 100%;
+    }
+
+    .tx-stat .stat-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #6c757d;
+        margin-bottom: 6px;
+    }
+
+    .tx-stat .stat-value {
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: #000000;
+    }
+
+    .tx-stat .stat-icon {
+        position: absolute;
+        right: 15px;
+        bottom: 15px;
+        font-size: 2rem;
+        opacity: 0.15;
+    }
+
+    .tx-stat.income {
+        border-left: 5px solid #28a745;
+    }
+    .tx-stat.income .stat-value { color: #155724; }
+
+    .tx-stat.outflow {
+        border-left: 5px solid #dc3545;
+    }
+    .tx-stat.outflow .stat-value { color: #721c24; }
+
+    .tx-stat.net {
+        border-left: 5px solid #007bff;
+    }
+    .tx-stat.net .stat-value { color: #004085; }
+
+    .tx-stat.count {
+        border-left: 5px solid #6f42c1;
+    }
+    .tx-stat.count .stat-value { color: #6f42c1; }
+
+    /* ============================================
+       FILTER BAR
+    ============================================ */
+    .tx-filter-card {
+        background: #ffffff;
+        border: 2px solid #000000;
+        border-radius: 8px;
+        padding: 16px 20px;
+        margin-bottom: 20px;
+    }
+
+    .tx-filter-card .form-label {
+        font-weight: 700;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #000000;
+        margin-bottom: 4px;
+    }
+
+    .tx-filter-card .form-control,
+    .tx-filter-card .form-select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        color: #000000;
+    }
+
+    .tx-filter-card .form-control:focus,
+    .tx-filter-card .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 0.2rem rgba(135, 206, 235, 0.35);
+    }
+
+    .btn-filter {
+        background: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        font-weight: 700;
+        padding: 8px 20px;
+        border-radius: 4px;
+        width: 100%;
+    }
+
+    .btn-filter:hover {
+        background: #7bb8d8;
+        color: #000000;
+    }
+
+    .btn-clear {
+        background: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        font-weight: 600;
+        padding: 8px 20px;
+        border-radius: 4px;
+        width: 100%;
+    }
+
+    .btn-clear:hover {
+        background: #e2e6ea;
+        color: #000000;
+    }
+
+    /* ============================================
+       TRANSACTIONS TABLE
+    ============================================ */
+    .tx-table-card {
+        background: #ffffff;
+        border: 2px solid #000000;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .tx-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .tx-table thead th {
+        background: #f1f5f9;
+        color: #000000;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 12px 14px;
+        border-bottom: 2px solid #000000;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .tx-table tbody td {
+        padding: 12px 14px;
+        border-bottom: 1px solid #e9ecef;
+        font-size: 0.85rem;
+        color: #000000;
+        vertical-align: middle;
+    }
+
+    .tx-table tbody tr:hover td {
+        background-color: #f9fafb;
+    }
+
+    .tx-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .tx-date {
+        font-weight: 700;
+        color: #000000;
+        font-size: 0.82rem;
+    }
+
+    .tx-time {
+        font-size: 0.7rem;
+        color: #6c757d;
+        margin-top: 2px;
+    }
+
+    .tx-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 50px;
+        border: 1px solid #000000;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+    }
+
+    .tx-badge-success { background: #d4edda; color: #155724; }
+    .tx-badge-danger  { background: #f8d7da; color: #721c24; }
+    .tx-badge-warning { background: #fff3cd; color: #856404; }
+    .tx-badge-info    { background: #cce5ff; color: #004085; }
+
+    .tx-ref {
+        font-family: 'Courier New', monospace;
+        font-size: 0.78rem;
+        background: #f1f5f9;
+        padding: 3px 8px;
+        border-radius: 4px;
+        color: #000000;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .tx-desc { color: #333; font-size: 0.82rem; }
+    .tx-user { font-size: 0.8rem; color: #333; font-weight: 500; }
+    .tx-muted { color: #adb5bd; }
+
+    .tx-amount {
+        font-weight: 700;
+        font-size: 0.88rem;
+        white-space: nowrap;
+    }
+
+    .tx-amount-success { color: #155724; }
+    .tx-amount-danger  { color: #721c24; }
+    .tx-amount-warning { color: #856404; }
+    .tx-amount-info    { color: #004085; }
+
+    .tx-empty {
+        text-align: center;
+        padding: 40px 14px !important;
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+
+    .tx-empty i {
+        font-size: 2rem;
+        display: block;
+        margin-bottom: 10px;
+        opacity: 0.4;
+    }
+
+    /* ============================================
+       PAGINATION + PER-PAGE
+    ============================================ */
+    .tx-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 14px 20px;
+        background: #f9fafb;
+        border-top: 2px solid #000000;
+    }
+
+    .tx-footer .results-info {
+        font-size: 0.8rem;
+        color: #000000;
+        font-weight: 600;
+    }
+
+    .tx-pagination {
+        display: flex;
+        gap: 4px;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        flex-wrap: wrap;
+    }
+
+    .tx-pagination a,
+    .tx-pagination span {
+        display: inline-block;
+        padding: 6px 12px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #000000;
+        text-decoration: none;
+        background: #ffffff;
+        transition: all 0.2s ease;
+    }
+
+    .tx-pagination a:hover {
+        background: #87CEEB;
+        text-decoration: none;
+        color: #000000;
+    }
+
+    .tx-pagination .current {
+        background: #000000;
+        color: #ffffff;
+    }
+
+    .tx-pagination .disabled {
+        opacity: 0.4;
+        pointer-events: none;
+    }
+
+    .per-page-select {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #000000;
+    }
+
+    .per-page-select select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 4px 8px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #000000;
+        background: #ffffff;
+    }
+
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .tx-table thead th,
+        .tx-table tbody td {
+            padding: 8px 8px;
+            font-size: 0.72rem;
+        }
+
+        .tx-ref { font-size: 0.65rem; padding: 2px 5px; }
+
+        .tx-badge {
+            font-size: 0.6rem;
+            padding: 3px 7px;
+        }
+
+        .tx-stat .stat-value { font-size: 1.1rem; }
+
+        .tx-footer {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .tx-pagination { justify-content: center; }
+
+        .per-page-select { justify-content: center; }
+    }
+
+    @media (max-width: 480px) {
+        .tx-table thead th,
+        .tx-table tbody td {
+            padding: 6px 5px;
+            font-size: 0.68rem;
+        }
+
+        .tx-date { font-size: 0.72rem; }
+        .tx-time { font-size: 0.62rem; }
+
+        .tx-badge {
+            font-size: 0.55rem;
+            padding: 2px 6px;
+            gap: 3px;
+        }
+
+        .tx-badge i { display: none; }
+
+        .tx-page-header h2 { font-size: 1.1rem; }
+        .tx-stat .stat-value { font-size: 1rem; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- ============================================ -->
+    <!-- PAGE HEADER -->
+    <!-- ============================================ -->
+    <div class="tx-page-header">
+        <div>
+            <h2><i class="fas fa-list-alt"></i> All Transactions</h2>
+            <div class="subtitle">
+                {{ company.name }}
+                {% if selected_branch and branches %}
+                    — filtered by branch
+                {% endif %}
+            </div>
+        </div>
+        <a href="{% url 'finance-dashboard' %}" class="back-btn">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- STATS CARDS -->
+    <!-- ============================================ -->
+    <div class="row mb-3">
+        <div class="col-md-3 col-6 mb-2">
+            <div class="tx-stat income">
+                <div class="stat-label">Total Income</div>
+                <div class="stat-value">KSh {{ total_income|floatformat:2 }}</div>
+                <i class="fas fa-arrow-down stat-icon" style="color: #28a745;"></i>
+            </div>
+        </div>
+        <div class="col-md-3 col-6 mb-2">
+            <div class="tx-stat outflow">
+                <div class="stat-label">Total Outflow</div>
+                <div class="stat-value">KSh {{ total_outflow|floatformat:2 }}</div>
+                <i class="fas fa-arrow-up stat-icon" style="color: #dc3545;"></i>
+            </div>
+        </div>
+        <div class="col-md-3 col-6 mb-2">
+            <div class="tx-stat net">
+                <div class="stat-label">Net</div>
+                <div class="stat-value">KSh {{ net_total|floatformat:2 }}</div>
+                <i class="fas fa-balance-scale stat-icon" style="color: #007bff;"></i>
+            </div>
+        </div>
+        <div class="col-md-3 col-6 mb-2">
+            <div class="tx-stat count">
+                <div class="stat-label">Total Records</div>
+                <div class="stat-value">{{ total_count }}</div>
+                <i class="fas fa-hashtag stat-icon" style="color: #6f42c1;"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- FILTERS -->
+    <!-- ============================================ -->
+    <div class="tx-filter-card">
+        <form method="GET">
+            <div class="row g-2 align-items-end">
+                <!-- Branch -->
+                {% if branches %}
+                <div class="col-md-2 col-6">
+                    <label class="form-label">Branch</label>
+                    <select name="branch" class="form-select">
+                        <option value="">All Branches</option>
+                        {% for b in branches %}
+                            <option value="{{ b.id }}" {% if selected_branch == b.id|stringformat:"s" %}selected{% endif %}>
+                                {{ b.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
+                <!-- Type -->
+                <div class="col-md-2 col-6">
+                    <label class="form-label">Type</label>
+                    <select name="type" class="form-select">
+                        <option value="">All Types</option>
+                        <option value="sale" {% if selected_type == 'sale' %}selected{% endif %}>Sale</option>
+                        <option value="purchase" {% if selected_type == 'purchase' %}selected{% endif %}>Purchase</option>
+                        <option value="expense" {% if selected_type == 'expense' %}selected{% endif %}>Expense</option>
+                        <option value="commission" {% if selected_type == 'commission' %}selected{% endif %}>M-Pesa Commission</option>
+                    </select>
+                </div>
+
+                <!-- Date from -->
+                <div class="col-md-2 col-6">
+                    <label class="form-label">From</label>
+                    <input type="date" name="date_from" class="form-control" value="{{ date_from|default:'' }}">
+                </div>
+
+                <!-- Date to -->
+                <div class="col-md-2 col-6">
+                    <label class="form-label">To</label>
+                    <input type="date" name="date_to" class="form-control" value="{{ date_to|default:'' }}">
+                </div>
+
+                <!-- Search -->
+                <div class="col-md-2 col-12">
+                    <label class="form-label">Search</label>
+                    <input type="text" name="search" class="form-control"
+                           placeholder="Reference, name..."
+                           value="{{ search|default:'' }}">
+                </div>
+
+                <!-- Buttons -->
+                <div class="col-md-1 col-6">
+                    <button type="submit" class="btn-filter">
+                        <i class="fas fa-filter"></i>
+                    </button>
+                </div>
+                <div class="col-md-1 col-6">
+                    <a href="{% url 'all-teansactions-records' %}" class="btn-clear d-block text-center">
+                        <i class="fas fa-times"></i>
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- TRANSACTIONS TABLE -->
+    <!-- ============================================ -->
+    <div class="tx-table-card">
+        <div class="table-responsive">
+            <table class="tx-table">
+                <thead>
+                    <tr>
+                        <th style="width: 14%;">Date</th>
+                        <th style="width: 11%;">Type</th>
+                        <th style="width: 18%;">Reference</th>
+                        <th style="width: 25%;">Description</th>
+                        <th style="width: 14%;">Recorded By</th>
+                        <th style="width: 18%;" class="text-end">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tx in transactions %}
+                    <tr>
+                        <td>
+                            <div class="tx-date">{{ tx.date|date:"M d, Y" }}</div>
+                            <div class="tx-time">{{ tx.date|date:"H:i" }}</div>
+                        </td>
+                        <td>
+                            <span class="tx-badge tx-badge-{{ tx.type_class }}">
+                                <i class="fas {{ tx.icon }}"></i>
+                                {{ tx.type_label }}
+                            </span>
+                        </td>
+                        <td><span class="tx-ref">{{ tx.reference }}</span></td>
+                        <td><div class="tx-desc">{{ tx.description }}</div></td>
+                        <td>
+                            {% if tx.user %}
+                                <div class="tx-user">
+                                    {{ tx.user.get_full_name|default:tx.user.username }}
+                                </div>
+                            {% else %}
+                                <span class="tx-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <span class="tx-amount tx-amount-{{ tx.type_class }}">
+                                {{ tx.sign }} KSh {{ tx.amount|floatformat:2 }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="tx-empty">
+                            <i class="fas fa-inbox"></i>
+                            No transactions found matching your filters.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- FOOTER: RESULTS INFO + PER-PAGE + PAGINATION -->
+        <!-- ============================================ -->
+        <div class="tx-footer">
+            <div class="results-info">
+                Showing
+                {{ transactions.start_index }}–{{ transactions.end_index }}
+                of {{ total_count }} records
+            </div>
+
+            <div class="per-page-select">
+                <label for="perPageSelect">Per page:</label>
+                <select id="perPageSelect"
+                        onchange="updatePerPage(this.value)">
+                    <option value="10"  {% if per_page == 10 %}selected{% endif %}>10</option>
+                    <option value="25"  {% if per_page == 25 %}selected{% endif %}>25</option>
+                    <option value="50"  {% if per_page == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                </select>
+            </div>
+
+            {% if transactions.has_other_pages %}
+            <ul class="tx-pagination">
+                {% if transactions.has_previous %}
+                    <li>
+                        <a href="?{% if querystring %}{{ querystring }}&{% endif %}page=1">
+                            <i class="fas fa-angle-double-left"></i>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ transactions.previous_page_number }}">
+                            <i class="fas fa-angle-left"></i> Prev
+                        </a>
+                    </li>
+                {% else %}
+                    <li><span class="disabled"><i class="fas fa-angle-double-left"></i></span></li>
+                    <li><span class="disabled"><i class="fas fa-angle-left"></i> Prev</span></li>
+                {% endif %}
+
+                {% for num in transactions.paginator.page_range %}
+                    {% if transactions.number == num %}
+                        <li><span class="current">{{ num }}</span></li>
+                    {% elif num > transactions.number|add:'-3' and num < transactions.number|add:'3' %}
+                        <li>
+                            <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ num }}">{{ num }}</a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if transactions.has_next %}
+                    <li>
+                        <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ transactions.next_page_number }}">
+                            Next <i class="fas fa-angle-right"></i>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ transactions.paginator.num_pages }}">
+                            <i class="fas fa-angle-double-right"></i>
+                        </a>
+                    </li>
+                {% else %}
+                    <li><span class="disabled">Next <i class="fas fa-angle-right"></i></span></li>
+                    <li><span class="disabled"><i class="fas fa-angle-double-right"></i></span></li>
+                {% endif %}
+            </ul>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<script>
+    function updatePerPage(value) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('per_page', value);
+        url.searchParams.delete('page');  // reset to page 1
+        window.location.href = url.toString();
+    }
+</script>
+{% endblock %}

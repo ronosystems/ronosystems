@@ -147,4 +147,30 @@ urlpatterns = [
         views.api_get_daily_record,
         name='api_daily_record_date'
     ),
+
+
+
+    # ============================================
+    # MPESA COMMISSIONS
+    # ============================================
+    path(
+        '<int:company_id>/branch/<int:branch_id>/commission/create/',
+        views.commission_create,
+        name='commission_create'
+    ),
+    path(
+        '<int:company_id>/branch/<int:branch_id>/commissions/',
+        views.commissions_list,
+        name='commissions_list'
+    ),
+    path(
+        '<int:company_id>/branch/<int:branch_id>/commission/<int:commission_id>/edit/',
+        views.commission_edit,
+        name='commission_edit'
+    ),
+    path(
+        '<int:company_id>/branch/<int:branch_id>/commission/<int:commission_id>/delete/',
+        views.commission_delete,
+        name='commission_delete'
+    ),
 ]

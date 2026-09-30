@@ -28,6 +28,7 @@ from .models import (
     COGSAccount, COGSTransaction, PurchaseRecord,
     COGSAllocationRule, COGSSummary
 )
+from apps.treasury.models import MpesaCommission
 
 
 # ============================================
@@ -141,6 +142,241 @@ def get_total_expenses(company, branch=None):
     return expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
 
+def get_all_transactions(company, branch=None, 
+                          tx_type=None, date_from=None, date_to=None, 
+                          search=None):
+    """
+    Build a unified list of every financial event:
+      • Sales (revenue +)
+      • Purchases (COGS -)
+      • Expenses (-)
+      • M-Pesa Commissions (income +, from treasury app)
+
+    Returns a sorted list of dicts (newest first).
+    Filtering is done in Python so all four sources apply the same rules.
+    """
+    from apps.company.models import Expense
+
+    events = []
+
+    # ── Sales ──
+    if not tx_type or tx_type == 'sale':
+        sales_qs = Sale.objects.filter(company=company, payment_status='paid')
+        if branch:
+            sales_qs = sales_qs.filter(branch_id=branch)
+        if date_from:
+            sales_qs = sales_qs.filter(sale_date__date__gte=date_from)
+        if date_to:
+            sales_qs = sales_qs.filter(sale_date__date__lte=date_to)
+        if search:
+            sales_qs = sales_qs.filter(
+                Q(company_sale_id__icontains=search) |
+                Q(customer_name__icontains=search)
+            )
+        for s in sales_qs.select_related('sold_by'):
+            events.append({
+                'date': s.sale_date,
+                'type': 'sale',
+                'type_label': 'Sale',
+                'type_class': 'success',
+                'icon': 'fa-shopping-cart',
+                'reference': s.company_sale_id or f"#{s.id}",
+                'description': s.customer_name or 'Walk-in customer',
+                'amount': s.net_amount,
+                'sign': '+',
+                'user': s.sold_by,
+            })
+
+    # ── Purchases ──
+    if not tx_type or tx_type == 'purchase':
+        purchases_qs = PurchaseRecord.objects.filter(company=company, status='completed')
+        if branch:
+            purchases_qs = purchases_qs.filter(branch_id=branch)
+        if date_from:
+            purchases_qs = purchases_qs.filter(created_at__date__gte=date_from)
+        if date_to:
+            purchases_qs = purchases_qs.filter(created_at__date__lte=date_to)
+        if search:
+            purchases_qs = purchases_qs.filter(
+                Q(purchase_number__icontains=search) |
+                Q(supplier_name__icontains=search)
+            )
+        for p in purchases_qs.select_related('created_by'):
+            events.append({
+                'date': p.created_at,
+                'type': 'purchase',
+                'type_label': 'Purchase',
+                'type_class': 'danger',
+                'icon': 'fa-box',
+                'reference': p.purchase_number,
+                'description': p.supplier_name or 'Supplier',
+                'amount': p.total_amount,
+                'sign': '-',
+                'user': p.created_by,
+            })
+
+    # ── Expenses ──
+    if not tx_type or tx_type == 'expense':
+        expenses_qs = Expense.objects.filter(company=company)
+        if branch:
+            expenses_qs = expenses_qs.filter(branch_id=branch)
+        if date_from:
+            expenses_qs = expenses_qs.filter(
+                created_at__date__gte=date_from
+            ) if hasattr(Expense, 'created_at') else expenses_qs
+        if date_to:
+            expenses_qs = expenses_qs.filter(
+                created_at__date__lte=date_to
+            ) if hasattr(Expense, 'created_at') else expenses_qs
+        if search:
+            expenses_qs = expenses_qs.filter(
+                Q(description__icontains=search) |
+                Q(reference__icontains=search)
+            )
+        for e in expenses_qs:
+            events.append({
+                'date': getattr(e, 'created_at', getattr(e, 'date', timezone.now())),
+                'type': 'expense',
+                'type_label': 'Expense',
+                'type_class': 'warning',
+                'icon': 'fa-receipt',
+                'reference': getattr(e, 'reference', '') or f"EXP-{e.id}",
+                'description': getattr(e, 'description', '') or 'Expense',
+                'amount': e.amount,
+                'sign': '-',
+                'user': getattr(e, 'created_by', None),
+            })
+
+    # ── M-Pesa Commissions ──
+    if not tx_type or tx_type == 'commission':
+        commissions_qs = MpesaCommission.objects.filter(company=company)
+        if branch:
+            commissions_qs = commissions_qs.filter(branch_id=branch)
+        if date_from:
+            commissions_qs = commissions_qs.filter(created_at__date__gte=date_from)
+        if date_to:
+            commissions_qs = commissions_qs.filter(created_at__date__lte=date_to)
+        if search:
+            commissions_qs = commissions_qs.filter(
+                Q(reference__icontains=search) |
+                Q(notes__icontains=search)
+            )
+        for c in commissions_qs.select_related('recorded_by'):
+            events.append({
+                'date': c.created_at,
+                'type': 'commission',
+                'type_label': 'M-Pesa Comm',
+                'type_class': 'info',
+                'icon': 'fa-hand-holding-usd',
+                'reference': 'mpesa comm',
+                'description': f"M-Pesa commission — {c.month.strftime('%B %Y')}",
+                'amount': c.amount,
+                'sign': '+',
+                'user': c.recorded_by,
+            })
+
+    events.sort(key=lambda x: x['date'], reverse=True)
+    return events
+
+
+def get_recent_transactions(company, branch=None, limit=5):
+    """
+    Return the most recent financial events across:
+      • Sales (revenue +)
+      • Purchases (COGS -)
+      • Commissions (income +)
+
+    Returns a list of dicts sorted by datetime descending, capped at `limit`.
+    """
+    from apps.company.models import Expense  # already imported elsewhere
+
+    events = []
+
+    # ── Sales ──
+    sales_qs = Sale.objects.filter(company=company, payment_status='paid')
+    if branch:
+        sales_qs = sales_qs.filter(branch_id=branch)
+    for s in sales_qs.order_by('-sale_date')[:limit]:
+        events.append({
+            'date': s.sale_date,
+            'type': 'sale',
+            'type_label': 'Sale',
+            'type_class': 'success',
+            'icon': 'fa-shopping-cart',
+            'reference': s.company_sale_id or f"#{s.id}",
+            'description': s.customer_name or 'Walk-in customer',
+            'amount': s.net_amount,
+            'sign': '+',
+            'user': s.sold_by,
+        })
+
+    # ── Purchases ──
+    purchases_qs = PurchaseRecord.objects.filter(company=company, status='completed')
+    if branch:
+        purchases_qs = purchases_qs.filter(branch_id=branch)
+    for p in purchases_qs.order_by('-purchase_date', '-created_at')[:limit]:
+        events.append({
+            'date': p.created_at,
+            'type': 'purchase',
+            'type_label': 'Purchase',
+            'type_class': 'danger',
+            'icon': 'fa-box',
+            'reference': p.purchase_number,
+            'description': p.supplier_name or 'Supplier',
+            'amount': p.total_amount,
+            'sign': '-',
+            'user': p.created_by,
+        })
+
+    # ── Expenses ──
+    expenses_qs = Expense.objects.filter(company=company)
+    if branch:
+        expenses_qs = expenses_qs.filter(branch_id=branch)
+    for e in expenses_qs.order_by('-created_at')[:limit]:
+        events.append({
+            'date': e.created_at,
+            'type': 'expense',
+            'type_label': 'Expense',
+            'type_class': 'warning',
+            'icon': 'fa-receipt',
+            'reference': getattr(e, 'reference', '') or f"EXP-{e.id}",
+            'description': getattr(e, 'description', '') or 'Expense',
+            'amount': e.amount,
+            'sign': '-',
+            'user': getattr(e, 'created_by', None),
+        })
+
+    # ── M-Pesa Commissions (from treasury app) ──
+    commissions_qs = MpesaCommission.objects.filter(company=company)
+    if branch:
+        commissions_qs = commissions_qs.filter(branch_id=branch)
+    for c in commissions_qs.order_by('-created_at')[:limit]:
+        events.append({
+            'date': c.created_at,
+            'type': 'commission',
+            'type_label': 'M-Pesa Comm',
+            'type_class': 'info',
+            'icon': 'fa-hand-holding-usd',
+            'reference': 'mpesa comm',
+            'description': f"M-Pesa commission — {c.month.strftime('%B %Y')}",
+            'amount': c.amount,
+            'sign': '+',
+            'user': c.recorded_by,
+        })
+
+    # Sort all events newest-first, return top N
+    events.sort(key=lambda x: x['date'], reverse=True)
+    return events[:limit]
+
+
+def get_total_commissions(company, branch=None):
+    """Get total M-Pesa commission income (source of truth: treasury app)."""
+    commissions = MpesaCommission.objects.filter(company=company)
+    if branch:
+        commissions = commissions.filter(branch_id=branch)
+    return commissions.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+
+
 def get_effective_cogs_balance(company, branch=None):
     """COGS Balance = Total COGS from sales - Total Purchases"""
     total_cogs = calculate_total_cogs_from_sales(company, branch)
@@ -149,11 +385,18 @@ def get_effective_cogs_balance(company, branch=None):
 
 
 def get_effective_profit_balance(company, branch=None):
-    """Profit Balance = Total Revenue - Total COGS - Total Expenses"""
+    """
+    Profit Balance = (Revenue + M-Pesa Commissions) - COGS - Expenses
+
+    Commissions from the treasury app count as income.
+    """
     total_revenue = get_total_revenue(company, branch)
+    total_commissions = get_total_commissions(company, branch)
     total_cogs = calculate_total_cogs_from_sales(company, branch)
     total_expenses = get_total_expenses(company, branch)
-    gross_profit = total_revenue - total_cogs
+
+    total_income = total_revenue + total_commissions
+    gross_profit = total_income - total_cogs
     net_profit = gross_profit - total_expenses
     return net_profit
 
@@ -306,7 +549,7 @@ def debug_cogs_balance(request):
 
 @login_required
 def finance_dashboard(request):
-    """Main finance dashboard with COGS balance and Profit balance"""
+    """Main finance dashboard with COGS balance, Profit balance, and recent transactions"""
     company, is_viewing_company = get_active_company(request)
 
     if not company:
@@ -319,9 +562,14 @@ def finance_dashboard(request):
     branches = Branch.objects.filter(company=company, is_active=True)
     today = timezone.now().date()
 
+    # ── Balances ──
     current_balance = get_effective_cogs_balance(company, branch_id)
     current_profit_balance = get_effective_profit_balance(company, branch_id)
+    total_commissions = get_total_commissions(company, branch_id)
+    total_revenue = get_total_revenue(company, branch_id)
+    total_expenses = get_total_expenses(company, branch_id)
 
+    # ── Today's COGS ──
     today_sales = Sale.objects.filter(
         company=company,
         payment_status='paid',
@@ -334,6 +582,7 @@ def finance_dashboard(request):
     for sale in today_sales:
         today_cogs += get_cogs_from_sale(sale)
 
+    # ── Today's purchases ──
     today_purchases = PurchaseRecord.objects.filter(
         company=company,
         status='completed',
@@ -346,6 +595,7 @@ def finance_dashboard(request):
         total=Sum('total_amount')
     )['total'] or Decimal('0.00')
 
+    # ── Week / month boundaries ──
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
 
@@ -375,20 +625,30 @@ def finance_dashboard(request):
     last_week_cogs = get_cogs_for_period(last_week_start, last_week_end)
 
     if today.month == 1:
-        last_month_start = today.replace(year=today.year-1, month=12, day=1)
-        last_month_end = today.replace(year=today.year-1, month=12, day=31)
+        last_month_start = today.replace(year=today.year - 1, month=12, day=1)
+        last_month_end = today.replace(year=today.year - 1, month=12, day=31)
     else:
-        last_month_start = today.replace(month=today.month-1, day=1)
+        last_month_start = today.replace(month=today.month - 1, day=1)
         last_month_end = today.replace(month=today.month, day=1) - timedelta(days=1)
 
     last_month_cogs = get_cogs_for_period(last_month_start, last_month_end)
+
+    # ── Recent transactions (last 5 across all sources) ──
+    recent_transactions = get_recent_transactions(company, branch_id, limit=5)
 
     context = {
         'company': company,
         'branches': branches,
         'selected_branch': branch_id,
+
+        # Balances
         'current_balance': current_balance,
         'current_profit_balance': current_profit_balance,
+        'total_commissions': total_commissions,
+        'total_revenue': total_revenue,
+        'total_expenses': total_expenses,
+
+        # COGS period stats
         'today_cogs': today_cogs,
         'yesterday_cogs': yesterday_cogs,
         'week_cogs': week_cogs,
@@ -396,10 +656,111 @@ def finance_dashboard(request):
         'month_cogs': month_cogs,
         'last_month_cogs': last_month_cogs,
         'today_purchases': today_purchases_value,
+
+        # Recent activity
+        'recent_transactions': recent_transactions,
+
+        # Flags
         'is_finance': True,
         'is_viewing_company': is_viewing_company,
     }
     return render(request, 'company/finance/dashboard.html', context)
+
+
+
+@login_required
+def all_transactions(request):
+    """Unified transaction history with filters and pagination"""
+    company, is_viewing_company = get_active_company(request)
+
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+
+    # ── Filters ──
+    branch_id = request.GET.get('branch') or None
+    tx_type = request.GET.get('type') or None
+    date_from_str = request.GET.get('date_from') or None
+    date_to_str = request.GET.get('date_to') or None
+    search = (request.GET.get('search') or '').strip() or None
+
+    # Parse dates
+    date_from = None
+    date_to = None
+    if date_from_str:
+        try:
+            date_from = datetime.strptime(date_from_str, '%Y-%m-%d').date()
+        except ValueError:
+            pass
+    if date_to_str:
+        try:
+            date_to = datetime.strptime(date_to_str, '%Y-%m-%d').date()
+        except ValueError:
+            pass
+
+    # ── Fetch all matching events ──
+    events = get_all_transactions(
+        company,
+        branch=branch_id,
+        tx_type=tx_type,
+        date_from=date_from,
+        date_to=date_to,
+        search=search,
+    )
+
+    # ── Summary stats (over the full filtered set, not just the page) ──
+    total_income = sum(
+        (e['amount'] for e in events if e['sign'] == '+'),
+        Decimal('0.00'),
+    )
+    total_outflow = sum(
+        (e['amount'] for e in events if e['sign'] == '-'),
+        Decimal('0.00'),
+    )
+    net_total = total_income - total_outflow
+
+    # ── Pagination ──
+    try:
+        per_page = int(request.GET.get('per_page', 25))
+    except (TypeError, ValueError):
+        per_page = 25
+    if per_page not in (10, 25, 50, 100):
+        per_page = 25
+
+    paginator = Paginator(events, per_page)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
+    # ── Extra filter data for the template ──
+    branches = Branch.objects.filter(company=company, is_active=True)
+
+    # Preserve filters across pagination links
+    query_params = request.GET.copy()
+    query_params.pop('page', None)
+    querystring = query_params.urlencode()
+
+    context = {
+        'company': company,
+        'branches': branches,
+        'selected_branch': branch_id,
+        'selected_type': tx_type,
+        'date_from': date_from_str,
+        'date_to': date_to_str,
+        'search': search,
+        'transactions': page_obj,
+        'paginator': paginator,
+        'per_page': per_page,
+        'querystring': querystring,
+        'total_count': len(events),
+        'total_income': total_income,
+        'total_outflow': total_outflow,
+        'net_total': net_total,
+        'is_finance': True,
+        'is_viewing_company': is_viewing_company,
+    }
+    return render(request, 'company/finance/all_transactions.html', context)
+
 
 
 # ============================================
@@ -421,7 +782,9 @@ def api_cogs_balance(request):
     total_cogs = calculate_total_cogs_from_sales(company, branch_id)
     total_purchases = get_total_purchases(company, branch_id)
     total_revenue = get_total_revenue(company, branch_id)
+    total_commissions = get_total_commissions(company, branch_id)
     total_expenses = get_total_expenses(company, branch_id)
+    total_income = total_revenue + total_commissions
 
     return JsonResponse({
         'balance': float(balance),
@@ -431,8 +794,10 @@ def api_cogs_balance(request):
         'total_cogs': float(total_cogs),
         'total_purchases': float(total_purchases),
         'total_revenue': float(total_revenue),
+        'total_commissions': float(total_commissions),
+        'total_income': float(total_income),
         'total_expenses': float(total_expenses),
-        'gross_profit': float(total_revenue - total_cogs),
+        'gross_profit': float(total_income - total_cogs),
     })
 
 

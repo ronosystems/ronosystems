@@ -119,6 +119,14 @@ urlpatterns = [
     path('finance/api/balance/', finance_views.api_cogs_balance, name='finance-api-balance'),
     path('finance/export/', finance_views.export_cogs_report, name='finance-export-cogs'),
     path('finance/debug/', finance_views.debug_cogs_balance, name='finance-debug'),
+    # ============================================
+    # FINANCE - ALL TRANSACTIONS
+    # ============================================
+    path(
+        'finance/transactions/',
+        finance_views.all_transactions,
+        name='all-teansactions-records',
+    ),
 
     # ============================================
     # FINANCE - COGS Detail Views

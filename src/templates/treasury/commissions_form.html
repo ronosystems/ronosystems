@@ -1,0 +1,328 @@
+{% extends base_template|default:"base.html" %}
+{% load static %}
+
+{% block title %}
+{% if is_edit %}Edit{% else %}Record{% endif %} M-Pesa Commission - {{ company.name }}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: #ffffff;
+    }
+    .form-card .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 14px 20px;
+        border-radius: 0 !important;
+    }
+    .form-card .card-header h4 {
+        margin: 0;
+        color: #000000;
+        font-weight: 700;
+    }
+    .form-card .card-header h4 i {
+        margin-right: 8px;
+    }
+    .form-label {
+        font-weight: 600;
+        color: #000000;
+        font-size: 0.9rem;
+        margin-bottom: 4px;
+    }
+    .form-control, .form-select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        color: #000000;
+        font-weight: 500;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 0.2rem rgba(135, 206, 235, 0.35);
+    }
+    .help-text {
+        font-size: 0.78rem;
+        color: #555;
+        margin-top: 2px;
+    }
+    .btn-save {
+        background-color: #28a745;
+        border: 2px solid #000000;
+        color: #ffffff;
+        font-weight: 700;
+        padding: 10px 24px;
+        border-radius: 4px;
+    }
+    .btn-save:hover {
+        background-color: #218838;
+        color: #ffffff;
+    }
+    .btn-cancel {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        font-weight: 600;
+        padding: 10px 24px;
+        border-radius: 4px;
+    }
+    .btn-cancel:hover {
+        background-color: #e2e6ea;
+        color: #000000;
+    }
+    .info-panel {
+        background: #f9f9f9;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 15px;
+    }
+    .info-panel h6 {
+        font-weight: 700;
+        color: #000000;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        font-size: 0.8rem;
+        letter-spacing: 1px;
+    }
+    .recent-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+        border-bottom: 1px dashed #ccc;
+        font-size: 0.85rem;
+    }
+    .recent-row:last-child {
+        border-bottom: none;
+    }
+    .recent-month { font-weight: 600; color: #000000; }
+    .recent-amount { color: #155724; font-weight: 700; }
+    .alert { border: 2px solid #000000; border-radius: 4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb mb-0" style="background: transparent; padding: 0;">
+            <li class="breadcrumb-item">
+                <a href="{% url 'treasury:dashboard' company.id %}" style="color: #000000;">Treasury</a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'treasury:branch_treasury' company.id branch.id %}" style="color: #000000;">
+                    {{ branch.name }}
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'treasury:commissions_list' company.id branch.id %}" style="color: #000000;">
+                    Commissions
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                {% if is_edit %}Edit{% else %}Record{% endif %}
+            </li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <!-- FORM COLUMN -->
+        <div class="col-lg-7 mb-4">
+            <div class="card form-card">
+                <div class="card-header">
+                    <h4>
+                        <i class="fas fa-hand-holding-usd"></i>
+                        {% if is_edit %}
+                            Edit M-Pesa Commission
+                        {% else %}
+                            Record M-Pesa Commission
+                        {% endif %}
+                    </h4>
+                </div>
+                <div class="card-body">
+
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    {% if is_edit %}
+                        <div class="alert alert-warning" role="alert">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Editing commission for <strong>{{ commission.month|date:"F Y" }}</strong>
+                            (currently KES {{ commission.amount|floatformat:2 }}).
+                        </div>
+                    {% endif %}
+
+                    <form method="POST" novalidate>
+                        {% csrf_token %}
+
+                        <!-- Branch -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-store"></i> Branch
+                            </label>
+                            <input type="text" class="form-control" value="{{ branch.name }}" readonly>
+                        </div>
+
+                        <!-- Month -->
+                        <div class="mb-3">
+                            <label class="form-label" for="monthInput">
+                                <i class="fas fa-calendar-alt"></i> Month <span style="color: red;">*</span>
+                            </label>
+                            <input type="month"
+                                   name="month"
+                                   id="monthInput"
+                                   class="form-control"
+                                   value="{{ default_month }}"
+                                   max="{{ default_month }}"
+                                   required>
+                            <div class="help-text">
+                                {% if is_edit %}
+                                    Change the month if this record was filed under the wrong period.
+                                {% else %}
+                                    Select the month the commission was received for.
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Amount -->
+                        <div class="mb-3">
+                            <label class="form-label" for="amountInput">
+                                <i class="fas fa-money-bill-wave"></i> Commission Amount (KES) <span style="color: red;">*</span>
+                            </label>
+                            <input type="number"
+                                   name="amount"
+                                   id="amountInput"
+                                   class="form-control"
+                                   step="0.01"
+                                   min="0.01"
+                                   placeholder="0.00"
+                                   value="{% if is_edit %}{{ commission.amount }}{% endif %}"
+                                   required>
+                            <div class="help-text">Total commission received from M-Pesa for this month.</div>
+                        </div>
+
+                        <!-- M-Pesa Account -->
+                        <div class="mb-3">
+                            <label class="form-label" for="mpesaAccountSelect">
+                                <i class="fas fa-mobile-alt"></i> M-Pesa Account <span class="text-muted">(optional)</span>
+                            </label>
+                            <select name="mpesa_account" id="mpesaAccountSelect" class="form-select">
+                                <option value="">— Not tied to a specific account —</option>
+                                {% for m in mpesa_accounts %}
+                                    <option value="{{ m.id }}"
+                                        {% if is_edit and commission.mpesa_account_id == m.id %}selected{% endif %}>
+                                        {{ m.till_name }} ({{ m.till_number }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Reference -->
+                        <div class="mb-3">
+                            <label class="form-label" for="referenceInput">
+                                <i class="fas fa-hashtag"></i> Reference <span class="text-muted">(optional)</span>
+                            </label>
+                            <input type="text"
+                                   name="reference"
+                                   id="referenceInput"
+                                   class="form-control"
+                                   maxlength="100"
+                                   placeholder="e.g. M-Pesa statement ref"
+                                   value="{% if is_edit %}{{ commission.reference }}{% endif %}">
+                        </div>
+
+                        <!-- Notes -->
+                        <div class="mb-3">
+                            <label class="form-label" for="notesInput">
+                                <i class="fas fa-sticky-note"></i> Notes <span class="text-muted">(optional)</span>
+                            </label>
+                            <textarea name="notes"
+                                      id="notesInput"
+                                      class="form-control"
+                                      rows="3"
+                                      maxlength="500"
+                                      placeholder="Any additional notes...">{% if is_edit %}{{ commission.notes }}{% endif %}</textarea>
+                        </div>
+
+                        <!-- Buttons -->
+                        <div class="d-flex gap-2 mt-4">
+                            <button type="submit" class="btn btn-save flex-fill">
+                                <i class="fas fa-save"></i>
+                                {% if is_edit %}Update Commission{% else %}Save Commission{% endif %}
+                            </button>
+                            <a href="{% url 'treasury:commissions_list' company.id branch.id %}"
+                               class="btn btn-cancel flex-fill text-center">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- SIDEBAR -->
+        <div class="col-lg-5 mb-4">
+
+            {% if is_edit %}
+            <!-- Danger Zone -->
+            <div class="info-panel mb-3" style="border-color: #dc3545;">
+                <h6 style="color: #dc3545;">
+                    <i class="fas fa-exclamation-triangle"></i> Danger Zone
+                </h6>
+                <p style="font-size: 0.85rem; color: #333; margin-bottom: 10px;">
+                    Deleting this commission is permanent and cannot be undone.
+                </p>
+                <a href="{% url 'treasury:commission_delete' company.id branch.id commission.id %}"
+                   class="btn btn-danger w-100">
+                    <i class="fas fa-trash"></i> Delete This Commission
+                </a>
+            </div>
+            {% endif %}
+
+            <!-- Info Panel -->
+            <div class="info-panel mb-3">
+                <h6><i class="fas fa-info-circle"></i> About Commissions</h6>
+                <p style="font-size: 0.85rem; margin-bottom: 8px; color: #333;">
+                    Record commissions you receive from M-Pesa for each month.
+                    These are tracked separately from daily balances.
+                </p>
+                <p style="font-size: 0.85rem; margin-bottom: 0; color: #333;">
+                    <strong>One record per month per branch.</strong>
+                </p>
+            </div>
+
+            <!-- Recent -->
+            <div class="info-panel">
+                <h6><i class="fas fa-history"></i> Other Commissions</h6>
+                {% if recent_commissions %}
+                    {% for c in recent_commissions %}
+                        <div class="recent-row">
+                            <span class="recent-month">{{ c.month|date:"M Y" }}</span>
+                            <span class="recent-amount">KES {{ c.amount|floatformat:2 }}</span>
+                        </div>
+                    {% endfor %}
+                    <div class="mt-3">
+                        <a href="{% url 'treasury:commissions_list' company.id branch.id %}"
+                           class="btn btn-sm btn-outline-primary w-100">
+                            <i class="fas fa-list"></i> View All Commissions
+                        </a>
+                    </div>
+                {% else %}
+                    <p style="font-size: 0.85rem; color: #777; margin: 0;">
+                        No other commissions recorded yet.
+                    </p>
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

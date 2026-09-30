@@ -1,0 +1,297 @@
+{% extends base_template|default:"base.html" %}
+{% load static %}
+
+{% block title %}M-Pesa Commissions - {{ company.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .table-excel th,
+    .table-excel td {
+        border: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    .table-excel thead th {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        font-weight: 700;
+        border-bottom: 2px solid #000000 !important;
+    }
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    .table-excel tbody tr:hover td {
+        background-color: #f0f0f0;
+    }
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+    }
+    .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+        color: #000000 !important;
+    }
+    .card-header h5 {
+        color: #000000 !important;
+        font-weight: 700;
+        margin: 0;
+    }
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        font-weight: 600;
+    }
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        color: #000000;
+    }
+    .btn-success {
+        background-color: #28a745;
+        border: 2px solid #000000;
+        color: #ffffff;
+        font-weight: 600;
+    }
+    .btn-success:hover {
+        background-color: #218838;
+        color: #ffffff;
+    }
+    .btn-danger {
+        background-color: #dc3545;
+        border: 2px solid #000000;
+        color: #ffffff;
+        font-weight: 600;
+    }
+    .btn-danger:hover {
+        background-color: #bb2d3b;
+        color: #ffffff;
+    }
+    .btn-sm {
+        padding: 4px 10px;
+        font-size: 12px;
+    }
+    .stat-box {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 15px;
+        background: #ffffff;
+        text-align: center;
+    }
+    .stat-box .label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #555;
+        font-weight: 700;
+    }
+    .stat-box .value {
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: #000000;
+        margin-top: 5px;
+    }
+    .badge {
+        padding: 4px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #000000;
+    }
+    .badge.bg-dark { background: #2d3436 !important; color: #fff !important; }
+    .badge.bg-success { background: #d4edda !important; color: #155724 !important; }
+    .badge.bg-info { background: #cce5ff !important; color: #004085 !important; }
+
+    @media (max-width: 768px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 11px;
+        }
+        .btn-sm {
+            font-size: 10px;
+            padding: 2px 6px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+            <h4 style="margin: 0; font-weight: 800;">
+                <i class="fas fa-hand-holding-usd"></i> M-Pesa Commissions
+            </h4>
+            <small class="text-muted">
+                {{ branch.name }} — {{ company.name }}
+            </small>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'treasury:commission_create' company.id branch.id %}"
+               class="btn btn-success">
+                <i class="fas fa-plus"></i> Record Commission
+            </a>
+            <a href="{% url 'treasury:branch_treasury' company.id branch.id %}"
+               class="btn btn-primary">
+                <i class="fas fa-arrow-left"></i> Back to Branch
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="row mb-3">
+        <div class="col-md-4 mb-2">
+            <div class="stat-box">
+                <div class="label">Total All-Time</div>
+                <div class="value">KES {{ total_commission|floatformat:2 }}</div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-2">
+            <div class="stat-box">
+                <div class="label">{{ current_year }} Total</div>
+                <div class="value">KES {{ year_total|floatformat:2 }}</div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-2">
+            <div class="stat-box">
+                <div class="label">Records</div>
+                <div class="value">{{ commissions.paginator.count }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <form method="GET" class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label" style="font-weight: 600; font-size: 0.85rem;">Year</label>
+                    <select name="year" class="form-select" style="border: 2px solid #000000;">
+                        <option value="">All Years</option>
+                        {% for y in year_list %}
+                            <option value="{{ y }}" {% if selected_year == y|stringformat:"s" %}selected{% endif %}>
+                                {{ y }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter"></i> Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="card">
+        <div class="card-header">
+            <h5><i class="fas fa-list"></i> Commission Records</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="border: 2px solid #000000;">
+                <table class="table-excel mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 16%;">Month</th>
+                            <th style="width: 10%;" class="text-center">Year</th>
+                            <th style="width: 20%;" class="text-end">Commission Amount</th>
+                            <th style="width: 18%;">Date Recorded</th>
+                            <th style="width: 22%;">Recorded By</th>
+                            <th style="width: 14%;" class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in commissions %}
+                        <tr>
+                            <td><strong>{{ c.month|date:"F" }}</strong></td>
+                            <td class="text-center">
+                                <span class="badge bg-info">{{ c.month|date:"Y" }}</span>
+                            </td>
+                            <td class="text-end">
+                                <span class="badge bg-success">KES {{ c.amount|floatformat:2 }}</span>
+                            </td>
+                            <td>{{ c.created_at|date:"M d, Y H:i" }}</td>
+                            <td>
+                                {% if c.recorded_by %}
+                                    <strong>{{ c.recorded_by.get_full_name|default:c.recorded_by.username }}</strong>
+                                    {% if c.recorded_by.role %}
+                                        <br><small class="text-muted">{{ c.recorded_by.get_role_display }}</small>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div class="d-flex gap-1 justify-content-center">
+                                    <a href="{% url 'treasury:commission_edit' company.id branch.id c.id %}"
+                                       class="btn btn-sm btn-primary"
+                                       title="Edit">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </a>
+                                    <a href="{% url 'treasury:commission_delete' company.id branch.id c.id %}"
+                                       class="btn btn-sm btn-danger"
+                                       title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-4">
+                                <i class="fas fa-info-circle"></i>
+                                No commissions recorded yet.
+                                <a href="{% url 'treasury:commission_create' company.id branch.id %}">
+                                    Record one now
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if commissions.has_other_pages %}
+        <div class="card-footer" style="border-top: 2px solid #000000;">
+            <nav>
+                <ul class="pagination mb-0 justify-content-center">
+                    {% if commissions.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ commissions.previous_page_number }}{% if selected_year %}&year={{ selected_year }}{% endif %}">
+                                &laquo; Prev
+                            </a>
+                        </li>
+                    {% endif %}
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Page {{ commissions.number }} of {{ commissions.paginator.num_pages }}
+                        </span>
+                    </li>
+                    {% if commissions.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ commissions.next_page_number }}{% if selected_year %}&year={{ selected_year }}{% endif %}">
+                                Next &raquo;
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

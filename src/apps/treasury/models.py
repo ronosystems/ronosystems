@@ -804,3 +804,77 @@ class TreasuryTransactionLog(models.Model):
 
     def __str__(self):
         return f"{self.company.name} - {self.transaction_type} - {self.created_at.strftime('%Y-%m-%d %H:%M')}"
+
+
+
+
+
+# ============================================
+# MPESA COMMISSION RECORD
+# ============================================
+class MpesaCommission(models.Model):
+    """
+    Manually recorded M-Pesa commissions received per month.
+    Managers and admins record the commission amount they received
+    from M-Pesa for a given month.
+    """
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name='mpesa_commissions'
+    )
+    branch = models.ForeignKey(
+        'company.Branch',
+        on_delete=models.CASCADE,
+        related_name='mpesa_commissions'
+    )
+
+    # The month the commission is for (stored as first day of month)
+    month = models.DateField(help_text="First day of the month the commission is for")
+
+    # Amount received
+    amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        help_text="Commission amount received from M-Pesa"
+    )
+
+    # Optional linkage to a specific M-Pesa account
+    mpesa_account = models.ForeignKey(
+        MpesaAccount,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='commissions'
+    )
+
+    reference = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Optional M-Pesa transaction/reference code"
+    )
+    notes = models.TextField(blank=True)
+
+    # User tracking
+    recorded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='mpesa_commissions_recorded'
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['company', 'branch', '-month']
+        unique_together = ['company', 'branch', 'month']
+        indexes = [
+            models.Index(fields=['company', 'branch', 'month']),
+        ]
+        verbose_name = "M-Pesa Commission"
+        verbose_name_plural = "M-Pesa Commissions"
+
+    def __str__(self):
+        return f"{self.branch.name} - {self.month.strftime('%B %Y')} - KES {self.amount:,.2f}"
