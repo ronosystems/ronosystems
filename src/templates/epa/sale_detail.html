@@ -867,12 +867,14 @@
         <div class="receipt-header">
             <div class="company-section">
                 <div class="company-logo">
-                    {% if sale.company.logo %}
-                        <img src="{{ sale.company.logo.url }}" alt="{{ sale.company.name }}">
-                    {% elif user.company.logo %}
-                        <img src="{{ user.company.logo.url }}" alt="{{ user.company.name }}">
+                    {% if sale.company.receipt_logo_url %}
+                        <img src="{{ sale.company.receipt_logo_url }}" alt="{{ sale.company.name }}">
+                    {% elif sale.company.logo_url %}
+                        <img src="{{ sale.company.logo_url }}" alt="{{ sale.company.name }}">
+                    {% elif user.company.logo_url %}
+                        <img src="{{ user.company.logo_url }}" alt="{{ user.company.name }}">
                     {% elif site_logo_url %}
-                        <img src="{{ site_logo_url }}" alt="{{ system_name }}">
+                        <img src="{{ site_logo_url }}" alt="{{ system_name|default:'RonoSystems' }}">
                     {% else %}
                         {{ sale.company.name|slice:":2"|upper }}
                     {% endif %}
@@ -1108,18 +1110,20 @@
         <!-- ACTION BUTTONS -->
         <!-- ============================================ -->
         <div class="action-buttons">
+            {% if request.user.is_company_admin or request.user.is_company_manager or request.user.is_super_admin or request.user.is_superuser %}
             <a href="/epa_shop/sales/single/" class="btn btn-success">
                 <i class="fas fa-plus-circle"></i> New Sale
             </a>
+            {% endif %}
             <a href="/epa_shop/sales/" class="btn btn-secondary">
                 <i class="fas fa-arrow-left"></i> Back to Sales
             </a>
             <button class="btn btn-primary" onclick="printReceipt()">
                 <i class="fas fa-print"></i> Print Receipt
             </button>
-            <button class="btn btn-fiscal" onclick="openETRModal()">
+            <a href="/epa_shop/sale/receipt/{{ sale.id }}/" class="btn btn-info">
                 <i class="fas fa-receipt"></i> Fiscal Receipt (ETR)
-            </button>
+            </a>
             
             <!-- Mark Sale Completed - Company Admin & Manager Only -->
             {% if request.user.is_company_admin or request.user.is_company_manager or request.user.is_super_admin or request.user.is_superuser or request.user.is_staff %}
@@ -1447,7 +1451,7 @@ function renderETRReceipt() {
         company_phone: "{{ sale.company.phone }}",
         company_email: "{{ sale.company.email }}",
         company_pin: "{{ sale.company.pin|default:'N/A' }}",
-        company_logo_url: "{% if sale.company.logo %}{{ sale.company.logo.url }}{% elif user.company.logo %}{{ user.company.logo.url }}{% elif site_logo_url %}{{ site_logo_url }}{% else %}{% endif %}",
+        company_logo_url: "{% if sale.company.receipt_logo_url %}{{ sale.company.receipt_logo_url }}{% elif sale.company.logo_url %}{{ sale.company.logo_url }}{% elif user.company.logo_url %}{{ user.company.logo_url }}{% elif site_logo_url %}{{ site_logo_url }}{% endif %}",
         etr_serial: "{{ sale.company.etr_serial|default:'N/A' }}",
         receipt_footer: "{{ sale.company.receipt_footer|default:'Thank you for your business!' }}",
         items: [

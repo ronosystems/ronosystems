@@ -7,6 +7,7 @@ from django.db.models import Q, Count, Sum
 from decimal import Decimal
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.http import JsonResponse
+from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
 from apps.company.models import Branch
 from .models import Electronic, Phone, Accessory, Category, Supplier, Unit, Sale, SaleItem, Customer, Owner
@@ -786,7 +787,7 @@ def unit_delete(request, product_code, identifier):
 
 @login_required
 def product_list(request):
-    """List all products with proper data from database with pagination"""
+    """List all products with proper data from database."""
     company, is_viewing_company = get_active_company(request)
     
     if not company:
@@ -797,7 +798,7 @@ def product_list(request):
     
     all_products = []
     
-    # Electronics
+    # ---- Electronics ----
     electronics = Electronic.objects.filter(company=company)
     if not is_viewing_company:
         electronics = filter_by_user_access(electronics, request.user, 'product')
@@ -816,13 +817,11 @@ def product_list(request):
             'purchase_price': float(item.purchase_price),
             'selling_price': float(item.selling_price),
             'best_price': float(item.best_price) if item.best_price else 0,
-            'sku': item.model_number or '-',
             'is_active': item.is_active,
-            'created_at': item.created_at,
-            'image': item.image.url if item.image else None,
+            'created_at': item.created_at.isoformat() if item.created_at else None,
         })
     
-    # Phones
+    # ---- Phones ----
     phones = Phone.objects.filter(company=company)
     if not is_viewing_company:
         phones = filter_by_user_access(phones, request.user, 'product')
@@ -830,17 +829,11 @@ def product_list(request):
     for item in phones:
         phone_type = 'Smartphone'
         if hasattr(item, 'phone_type'):
-            if item.phone_type == 'feature':
-                phone_type = 'Feature Phone'
-            else:
-                phone_type = 'Smartphone'
+            phone_type = 'Feature Phone' if item.phone_type == 'feature' else 'Smartphone'
         else:
-            ram_empty = not item.ram or item.ram == 'N/A' or item.ram == ''
-            rom_empty = not item.storage_capacity or item.storage_capacity == 'N/A' or item.storage_capacity == ''
-            if ram_empty and rom_empty:
-                phone_type = 'Feature Phone'
-            else:
-                phone_type = 'Smartphone'
+            ram_empty = not item.ram or item.ram in ('N/A', '')
+            rom_empty = not item.storage_capacity or item.storage_capacity in ('N/A', '')
+            phone_type = 'Feature Phone' if (ram_empty and rom_empty) else 'Smartphone'
         
         all_products.append({
             'id': item.id,
@@ -855,13 +848,11 @@ def product_list(request):
             'purchase_price': float(item.purchase_price),
             'selling_price': float(item.selling_price),
             'best_price': float(item.best_price) if item.best_price else 0,
-            'sku': item.imei or '-',
             'is_active': item.is_active,
-            'created_at': item.created_at,
-            'image': item.image.url if item.image else None,
+            'created_at': item.created_at.isoformat() if item.created_at else None,
         })
     
-    # Accessories
+    # ---- Accessories ----
     accessories = Accessory.objects.filter(company=company)
     if not is_viewing_company:
         accessories = filter_by_user_access(accessories, request.user, 'product')
@@ -880,48 +871,19 @@ def product_list(request):
             'purchase_price': float(item.purchase_price),
             'selling_price': float(item.selling_price),
             'best_price': float(item.best_price) if item.best_price else 0,
-            'sku': item.model or '-',
             'is_active': item.is_active,
-            'created_at': item.created_at,
-            'image': item.image.url if item.image else None,
+            'created_at': item.created_at.isoformat() if item.created_at else None,
         })
     
-    all_products.sort(key=lambda x: x['created_at'], reverse=True)
+    # Sort by created_at descending (newest first)
+    all_products.sort(key=lambda x: x['created_at'] or '', reverse=True)
     
-    search_query = request.GET.get('search', '')
-    if search_query:
-        search_lower = search_query.lower()
-        all_products = [p for p in all_products if 
-                       search_lower in p['name'].lower() or 
-                       search_lower in p['brand'].lower() or
-                       search_lower in p['model'].lower() or
-                       search_lower in p['product_code'].lower()]
-    
-    category_filter = request.GET.get('category', '')
-    if category_filter:
-        if category_filter == 'Phone':
-            all_products = [p for p in all_products if p['type'] in ['Smartphone', 'Feature Phone']]
-        else:
-            all_products = [p for p in all_products if p['type'] == category_filter]
-    
-    per_page = int(request.GET.get('per_page', 10))
-    paginator = Paginator(all_products, per_page)
-    page = request.GET.get('page', 1)
-    
-    try:
-        page_obj = paginator.page(page)
-    except PageNotAnInteger:
-        page_obj = paginator.page(1)
-    except EmptyPage:
-        page_obj = paginator.page(paginator.num_pages)
+    # Serialize to JSON for the template
+    all_products_json = all_products
     
     context = {
-        'products': page_obj.object_list,
-        'page_obj': page_obj,
+        'all_products_json': all_products_json,
         'total_count': len(all_products),
-        'search_query': search_query,
-        'category_filter': category_filter,
-        'per_page': per_page,
         'is_viewing_company': is_viewing_company,
         'page_title': 'Products',
         'page_subtitle': 'Manage your products',

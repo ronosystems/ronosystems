@@ -507,7 +507,7 @@
                 <a href="/epa_shop/sales/single/" class="btn btn-primary">
                     <i class="fas fa-plus"></i> New Sale
                 </a>
-                {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' or user.role == 'stock_controller'%}  
+                {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' or user.role == 'stock_controller' %}  
                 <a href="/epa_shop/sales/pending/" class="btn btn-danger">
                     <i class="fas fa-clock"></i> Pending
                 </a>
@@ -606,60 +606,70 @@
                                     {% endif %}
                                 </td>
 
-                                {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' or user.role == 'stock_controller'%}  
                                 <td>
                                     <div class="d-flex gap-1 justify-content-center">
-                                        <a href="/epa_shop/sales/{{ sale.id }}/" class="btn btn-outline-info btn-sm" title="View Sale">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                        <a href="/epa_shop/sale/receipt/{{ sale.id }}/" class="btn btn-outline-info btn-sm" title="View Receipt">
-                                            <i class="fas fa-receipt"></i>
-                                        </a>
-                                        
-                                        <!-- Actions based on payment status -->
-                                        {% if sale.payment_status == 'refunded' %}
-                                            <!-- Refunded: Show Delete Button -->
-                                            {% if user.role == 'company_admin' or user.role == 'super_admin' %}
-                                                <a href="/epa_shop/sale/{{ sale.id }}/delete/" 
-                                                   class="btn btn-danger btn-sm" 
-                                                   title="Delete Sale" 
-                                                   onclick="return confirm('Are you sure you want to delete this sale? This action cannot be undone.')">
-                                                    <i class="fas fa-trash"></i>
-                                                </a>
-                                            {% endif %}
-                                        {% elif sale.payment_status == 'pending' %}
-                                            <!-- Pending: Show Reverse and Complete -->
-                                            {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' %}
-                                                {% if sale.items.exists %}
-                                                    <a href="/epa_shop/sale/{{ sale.id }}/reverse/?next={{ request.path }}" 
-                                                       class="btn btn-reverse btn-sm" 
-                                                       title="Reverse Sale (Return to Available)" 
-                                                       onclick="return confirm('Are you sure you want to reverse this sale? This will return the unit to inventory.')">
-                                                        <i class="fas fa-undo"></i>
-                                                    </a>
-                                                {% endif %}
-                                            {% endif %}
-                                            <a href="/epa_shop/sale/{{ sale.id }}/complete/" class="btn btn-success btn-sm" title="Complete Sale">
-                                                <i class="fas fa-check"></i>
+                                        {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' or user.role == 'stock_controller' %}
+                                            <!-- Full actions for admins/managers/stock controllers -->
+                                            <a href="/epa_shop/sales/{{ sale.id }}/" class="btn btn-outline-info btn-sm" title="View Sale">
+                                                <i class="fas fa-eye"></i>
                                             </a>
-                                        {% else %}
-                                            <!-- Paid: Show Reverse only -->
-                                            {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' %}
-                                                {% if sale.items.exists %}
-                                                    <a href="/epa_shop/sale/{{ sale.id }}/reverse/?next={{ request.path }}" 
-                                                       class="btn btn-reverse btn-sm" 
-                                                       title="Reverse Sale (Return to Available)" 
-                                                       onclick="return confirm('Are you sure you want to reverse this sale? This will return the unit to inventory.')">
-                                                        <i class="fas fa-undo"></i>
+                                            <a href="/epa_shop/sale/receipt/{{ sale.id }}/" class="btn btn-outline-info btn-sm" title="View Receipt">
+                                                <i class="fas fa-receipt"></i>
+                                            </a>
+
+                                            {% if sale.payment_status == 'refunded' %}
+                                                <!-- Refunded: Show Delete Button -->
+                                                {% if user.role == 'company_admin' or user.role == 'super_admin' %}
+                                                    <a href="/epa_shop/sale/{{ sale.id }}/delete/" 
+                                                       class="btn btn-danger btn-sm" 
+                                                       title="Delete Sale" 
+                                                       onclick="return confirm('Are you sure you want to delete this sale? This action cannot be undone.')">
+                                                        <i class="fas fa-trash"></i>
                                                     </a>
                                                 {% endif %}
+                                            {% elif sale.payment_status == 'pending' %}
+                                                <!-- Pending: Show Reverse and Complete -->
+                                                {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' %}
+                                                    {% if sale.items.exists %}
+                                                        <a href="/epa_shop/sale/{{ sale.id }}/reverse/?next={{ request.path }}" 
+                                                           class="btn btn-reverse btn-sm" 
+                                                           title="Reverse Sale (Return to Available)" 
+                                                           onclick="return confirm('Are you sure you want to reverse this sale? This will return the unit to inventory.')">
+                                                            <i class="fas fa-undo"></i>
+                                                        </a>
+                                                    {% endif %}
+                                                {% endif %}
+                                                <a href="/epa_shop/sale/{{ sale.id }}/complete/" class="btn btn-success btn-sm" title="Complete Sale">
+                                                    <i class="fas fa-check"></i>
+                                                </a>
+                                            {% else %}
+                                                <!-- Paid: Show Reverse only -->
+                                                {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' %}
+                                                    {% if sale.items.exists %}
+                                                        <a href="/epa_shop/sale/{{ sale.id }}/reverse/?next={{ request.path }}" 
+                                                           class="btn btn-reverse btn-sm" 
+                                                           title="Reverse Sale (Return to Available)" 
+                                                           onclick="return confirm('Are you sure you want to reverse this sale? This will return the unit to inventory.')">
+                                                            <i class="fas fa-undo"></i>
+                                                        </a>
+                                                    {% endif %}
+                                                {% endif %}
                                             {% endif %}
+
+                                        {% elif user.role == 'company_cashier' %}
+                                            <!-- Cashier: view sale + receipt only -->
+                                            <a href="/epa_shop/sales/{{ sale.id }}/" class="btn btn-outline-info btn-sm" title="View Sale">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="/epa_shop/sale/receipt/{{ sale.id }}/" class="btn btn-outline-info btn-sm" title="View Receipt">
+                                                <i class="fas fa-receipt"></i>
+                                            </a>
+
+                                        {% else %}
+                                            <span style="color: #000000;">N/A</span>
                                         {% endif %}
                                     </div>
                                 </td>
-                                {% else %}
-                                <td class="text-center" style="color: #000000;">N/A</td>
-                                {% endif %}
                                 
                             </tr>
                             {% empty %}

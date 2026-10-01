@@ -69,18 +69,10 @@
         transition: opacity 0.2s;
         color: #000000;
     }
-    .sortable-header:hover .sort-icon {
-        opacity: 1;
-    }
-    .sortable-header.active .sort-icon {
-        opacity: 1;
-    }
-    .sortable-header.asc .sort-icon::after {
-        content: '▲';
-    }
-    .sortable-header.desc .sort-icon::after {
-        content: '▼';
-    }
+    .sortable-header:hover .sort-icon { opacity: 1; }
+    .sortable-header.active .sort-icon { opacity: 1; }
+    .sortable-header.asc .sort-icon::after { content: '▲'; }
+    .sortable-header.desc .sort-icon::after { content: '▼'; }
 
     /* ============================================
        CATEGORY BADGES
@@ -92,6 +84,7 @@
         font-weight: 600;
         border: 1px solid #000000;
         display: inline-block;
+        white-space: nowrap;
     }
     .category-smartphone { background: #dbeafe; color: #1e40af; }
     .category-feature-phone { background: #e0e7ff; color: #3730a3; }
@@ -107,6 +100,7 @@
         font-size: 11px;
         font-weight: 600;
         border: 1px solid #000000;
+        white-space: nowrap;
     }
     .stock-in-stock { background: #d4edda; color: #155724; }
     .stock-low-stock { background: #fff3cd; color: #856404; }
@@ -127,10 +121,9 @@
         letter-spacing: 0.5px;
         border: 2px solid #000000;
         cursor: pointer;
+        white-space: nowrap;
     }
-    .product-code:hover {
-        background: #87CEEB;
-    }
+    .product-code:hover { background: #87CEEB; }
     
     /* ============================================
        PRODUCT NAME CELL
@@ -139,19 +132,9 @@
         display: flex;
         flex-direction: column;
     }
-    .product-name {
-        font-weight: 600;
-        color: #000000;
-    }
-    .price-cell {
-        font-weight: 500;
-        color: #000000;
-    }
-    .product-id {
-        color: #000000;
-        font-size: 12px;
-        font-weight: 600;
-    }
+    .product-name { font-weight: 600; color: #000000; }
+    .price-cell { font-weight: 500; color: #000000; }
+    .product-id { color: #000000; font-size: 12px; font-weight: 600; }
     
     /* ============================================
        STOCK CELL
@@ -162,11 +145,7 @@
         align-items: center;
         gap: 4px;
     }
-    .stock-quantity {
-        font-weight: 700;
-        font-size: 16px;
-        color: #000000;
-    }
+    .stock-quantity { font-weight: 700; font-size: 16px; color: #000000; }
     
     /* ============================================
        ACTION BUTTON
@@ -410,7 +389,7 @@
     }
     
     /* ============================================
-       PAGINATION
+       PAGINATION (client-side)
     ============================================ */
     .pagination-container {
         display: flex;
@@ -432,6 +411,9 @@
     .pagination-container .pagination {
         margin: 0;
         gap: 4px;
+        display: flex;
+        list-style: none;
+        padding: 0;
     }
     .pagination-container .pagination .page-link {
         padding: 6px 14px;
@@ -442,6 +424,8 @@
         transition: all 0.3s;
         background: white;
         font-weight: 600;
+        cursor: pointer;
+        display: inline-block;
     }
     .pagination-container .pagination .page-link:hover {
         background: #87CEEB;
@@ -495,9 +479,7 @@
         transition: opacity 0.3s;
         border: 1px solid #ffffff;
     }
-    .copy-tooltip.show {
-        opacity: 1;
-    }
+    .copy-tooltip.show { opacity: 1; }
     
     /* ============================================
        EMPTY STATE
@@ -542,6 +524,54 @@
         display: flex;
         gap: 10px;
         flex-wrap: wrap;
+    }
+
+    /* Filter feedback chip */
+    .filter-status {
+        display: none;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        background: #e7f1ff;
+        border: 2px solid #0d6efd;
+        border-radius: 4px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #0d6efd;
+    }
+    .filter-status.show { display: inline-flex; }
+    .filter-status button {
+        background: none;
+        border: none;
+        color: #0d6efd;
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 14px;
+        padding: 0;
+        line-height: 1;
+    }
+    .filter-status button:hover { color: #dc3545; }
+
+    /* Loading indicator for first paint */
+    #loadingIndicator {
+        text-align: center;
+        padding: 30px;
+        color: #000000;
+        font-weight: 600;
+    }
+    #loadingIndicator .spinner {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        border: 3px solid #87CEEB;
+        border-top-color: #000000;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        margin-right: 10px;
+        vertical-align: middle;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
     }
     
     /* ============================================
@@ -620,7 +650,7 @@
         <div class="products-header">
             <div>
                 <h3><i class="fas fa-box"></i> Product Management</h3>
-                <p class="text-muted">Total: {{ total_count }} products</p>
+                <p class="text-muted">Total: <span id="headerTotalCount">{{ total_count }}</span> products</p>
             </div>
             <div class="header-right">
                 {% if user.role == 'company_admin' or user.role == 'super_admin' %}
@@ -640,14 +670,18 @@
 
         <!-- Search and Filters -->
         <div class="products-filters">
-            <input type="text" class="search-input" placeholder="Search products by name, brand, or code..." id="searchInput" value="{{ search_query }}">
+            <input type="text" class="search-input" placeholder="Search ALL products by name, brand, model, SKU, or code..." id="searchInput" autocomplete="off">
             <select class="filter-select" id="categoryFilter">
                 <option value="">All Categories</option>
-                <option value="Smartphone" {% if category_filter == 'Smartphone' %}selected{% endif %}>📱 Smartphones</option>
-                <option value="Feature Phone" {% if category_filter == 'Feature Phone' %}selected{% endif %}>📞 Feature Phones</option>
-                <option value="Electronic" {% if category_filter == 'Electronic' %}selected{% endif %}>💻 Electronics</option>
-                <option value="Accessory" {% if category_filter == 'Accessory' %}selected{% endif %}>🎧 Accessories</option>
+                <option value="Smartphone">📱 Smartphones</option>
+                <option value="Feature Phone">📞 Feature Phones</option>
+                <option value="Electronic">💻 Electronics</option>
+                <option value="Accessory">🎧 Accessories</option>
             </select>
+            <span class="filter-status" id="filterStatus">
+                <span id="filterStatusText"></span>
+                <button type="button" onclick="clearFilters()" title="Clear filters">✕</button>
+            </span>
             <button class="btn-refresh" onclick="location.reload()">
                 <i class="fas fa-sync"></i> Refresh
             </button>
@@ -684,175 +718,47 @@
                                 <th style="width:10%;" class="sortable-header" data-sort="stock" onclick="sortTable('stock')">
                                     Stock Balance <span class="sort-icon"></span>
                                 </th>
-                                <th style="width:12%;" class="sortable-header" data-sort="selling" onclick="sortTable('buying')">
+                                <th style="width:12%;" class="sortable-header" data-sort="selling" onclick="sortTable('selling')">
                                     Selling Price <span class="sort-icon"></span>
                                 </th>
-                                <th style="width:12%;" class="sortable-header" data-sort="best" onclick="sortTable('selling')">
+                                <th style="width:12%;" class="sortable-header" data-sort="best" onclick="sortTable('best')">
                                     Best Price <span class="sort-icon"></span>
                                 </th>
                                 <th style="width:6%;" class="text-center">Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {% for product in page_obj %}
-                            <tr data-id="{{ forloop.counter|add:page_obj.start_index|add:-1 }}"
-                                data-sku="{{ product.product_code }}"
-                                data-name="{{ product.name }}"
-                                data-category="{{ product.type }}"
-                                data-brand="{{ product.brand }}"
-                                data-model="{{ product.model }}"
-                                data-specs="{{ product.specs|default:'-' }}"
-                                data-stock="{{ product.stock }}"
-                                data-buying="{{ product.purchase_price }}"
-                                data-selling="{{ product.selling_price }}">
-                                <td>
-                                    <span class="product-id">#{{ forloop.counter|add:page_obj.start_index|add:-1 }}</span>
-                                </td>
-                                <td>
-                                    <span class="product-code" onclick="copyToClipboard('{{ product.product_code }}')" title="Click to copy product code">
-                                        {{ product.product_code }}
-                                    </span>
-                                </td>
-                                <td>
-                                    <div class="product-name-cell">
-                                        <span class="product-name">{{ product.name }}</span>
-                                    </div>
-                                </td>
-                                <td>
-                                    {% if product.type == 'Smartphone' %}
-                                        <span class="category-badge category-smartphone">📱 Smartphone</span>
-                                    {% elif product.type == 'Feature Phone' %}
-                                        <span class="category-badge category-feature-phone">📞 Feature Phone</span>
-                                    {% elif product.type == 'Electronic' %}
-                                        <span class="category-badge category-electronic">💻 Electronic</span>
-                                    {% elif product.type == 'Accessory' %}
-                                        <span class="category-badge category-accessory">🎧 Accessory</span>
-                                    {% else %}
-                                        <span class="category-badge">{{ product.type }}</span>
-                                    {% endif %}
-                                </td>
-                                <td>{{ product.brand }}</td>
-                                <td>{{ product.model }}</td>
-                                <td>{{ product.specs|default:"-" }}</td>
-                                <td>
-                                    <div class="stock-cell">
-                                        <span class="stock-quantity">{{ product.stock }}</span>
-                                        {% if product.stock > 10 %}
-                                            <span class="stock-badge stock-in-stock">In Stock</span>
-                                        {% elif product.stock > 0 %}
-                                            <span class="stock-badge stock-low-stock">Low Stock</span>
-                                        {% else %}
-                                            <span class="stock-badge stock-out-of-stock">Out of Stock</span>
-                                        {% endif %}
-                                    </div>
-                                </td>
-                                <td class="price-cell">KSh {{ product.selling_price|floatformat:0 }}</td>
-                                <td class="price-cell">KSh {{ product.best_price|floatformat:0 }}</td>
-
-                                {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' or user.role == 'stock_controller' %} 
-                                <td class="text-center">
-                                    <button class="btn-action-menu" 
-                                            onclick="openActionModal('{{ product.product_code }}', '{{ product.name|escapejs }}', '{{ product.type }}')" 
-                                            title="Actions">
-                                        ⋮
-                                    </button>
-                                </td>
-                                {% else %}
-                                <td class="text-center" style="color: #000000;">N/A</td>
-                                {% endif %}
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="11" class="text-center py-4">
-                                    <div class="empty-state">
-                                        <span class="empty-icon">📦</span>
-                                        <h3>No Products Found</h3>
-                                        <p>Start by adding your first product</p>
-
-                                        {% if user.role == 'company_admin' or user.role == 'super_admin' or user.role == 'stock_controller'%}  
-                                        <a href="/epa_shop/products/add/" class="btn btn-primary">
-                                            <i class="fas fa-plus"></i> Add Product
-                                        </a>
-                                        {% endif %}
-
+                        <tbody id="productTbody">
+                            <tr id="loadingRow">
+                                <td colspan="11">
+                                    <div id="loadingIndicator">
+                                        <span class="spinner"></span> Loading all products…
                                     </div>
                                 </td>
                             </tr>
-                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
             
-            <!-- Pagination -->
+            <!-- Pagination (client-side) -->
             <div class="pagination-container">
                 <div class="entries-info">
-                    Showing <strong>{{ page_obj.start_index }}</strong> to <strong>{{ page_obj.end_index }}</strong> of <strong>{{ total_count }}</strong> products
+                    Showing <strong id="visibleCount">0</strong> of <strong id="filteredTotalCount">0</strong> products
+                    <span id="paginationText"></span>
                 </div>
                 <div class="d-flex align-items-center gap-3">
                     <div class="d-flex align-items-center">
                         <span class="pagination-label">Per page:</span>
-                        <select class="per-page-select" id="perPageSelect" onchange="changePerPage(this.value)">
-                            <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
-                            <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
-                            <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
-                            <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                        <select class="per-page-select" id="perPageSelect">
+                            <option value="10">10</option>
+                            <option value="25" selected>25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                            <option value="all">All</option>
                         </select>
                     </div>
                     <nav aria-label="Page navigation">
-                        <ul class="pagination">
-                            {% if page_obj.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}" aria-label="First">
-                                    <i class="fas fa-angle-double-left"></i>
-                                </a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}" aria-label="Previous">
-                                    <i class="fas fa-angle-left"></i>
-                                </a>
-                            </li>
-                            {% else %}
-                            <li class="page-item disabled">
-                                <span class="page-link"><i class="fas fa-angle-double-left"></i></span>
-                            </li>
-                            <li class="page-item disabled">
-                                <span class="page-link"><i class="fas fa-angle-left"></i></span>
-                            </li>
-                            {% endif %}
-                            
-                            {% for num in page_obj.paginator.page_range %}
-                                {% if num == page_obj.number %}
-                                <li class="page-item active">
-                                    <span class="page-link">{{ num }}</span>
-                                </li>
-                                {% elif num > page_obj.number|add:-3 and num < page_obj.number|add:3 %}
-                                <li class="page-item">
-                                    <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}">{{ num }}</a>
-                                </li>
-                                {% endif %}
-                            {% endfor %}
-                            
-                            {% if page_obj.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}" aria-label="Next">
-                                    <i class="fas fa-angle-right"></i>
-                                </a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}" aria-label="Last">
-                                    <i class="fas fa-angle-double-right"></i>
-                                </a>
-                            </li>
-                            {% else %}
-                            <li class="page-item disabled">
-                                <span class="page-link"><i class="fas fa-angle-right"></i></span>
-                            </li>
-                            <li class="page-item disabled">
-                                <span class="page-link"><i class="fas fa-angle-double-right"></i></span>
-                            </li>
-                            {% endif %}
-                        </ul>
+                        <ul class="pagination" id="paginationControls"></ul>
                     </nav>
                 </div>
             </div>
@@ -907,129 +813,380 @@
 <!-- Copy Tooltip -->
 <div class="copy-tooltip" id="copyTooltip">Copied!</div>
 
-<script>
-// Sorting state
-let sortState = {
-    column: null,
-    direction: 'asc'
-};
+<!-- ============================================================
+     ALL PRODUCTS DATA (safe JSON embedding)
+     ============================================================ -->
+{{ all_products_json|json_script:"allProductsData" }}
 
-// Sort table function
-function sortTable(column) {
-    const table = document.getElementById('productTable');
-    if (!table) return;
-    
-    const tbody = table.querySelector('tbody');
-    const rows = Array.from(tbody.querySelectorAll('tr'));
-    
-    if (rows.length === 0 || rows[0].cells.length === 1) return;
-    
-    let direction = 'asc';
-    if (sortState.column === column) {
-        direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+<script>
+// ============================================================
+// PARSE DATA — DEFENSIVE (handles single, double, or triple encoding)
+// ============================================================
+function parseAllProducts() {
+    const el = document.getElementById('allProductsData');
+    if (!el) {
+        console.error('❌ #allProductsData script tag not found in DOM');
+        return [];
     }
-    sortState.column = column;
-    sortState.direction = direction;
-    
-    table.querySelectorAll('.sortable-header').forEach(header => {
-        header.classList.remove('active', 'asc', 'desc');
-        const icon = header.querySelector('.sort-icon');
-        if (header.dataset.sort === column) {
-            header.classList.add('active', direction);
-        } else {
-            icon.textContent = '';
+
+    let value = el.textContent;
+
+    // Try up to 3 rounds of JSON.parse — handles the case where the
+    // view passed a json.dumps() string that json_script then re-encoded.
+    for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+            value = JSON.parse(value);
+        } catch (e) {
+            console.error('JSON.parse failed on attempt ' + (attempt + 1) + ':', e);
+            break;
         }
-    });
-    
-    rows.sort((a, b) => {
-        let valueA, valueB;
-        
-        switch(column) {
-            case 'id':
-                valueA = parseInt(a.dataset.id) || 0;
-                valueB = parseInt(b.dataset.id) || 0;
-                break;
-            case 'sku':
-                valueA = a.dataset.sku || '';
-                valueB = b.dataset.sku || '';
-                break;
-            case 'name':
-                valueA = a.dataset.name || '';
-                valueB = b.dataset.name || '';
-                break;
-            case 'category':
-                valueA = a.dataset.category || '';
-                valueB = b.dataset.category || '';
-                break;
-            case 'brand':
-                valueA = a.dataset.brand || '';
-                valueB = b.dataset.brand || '';
-                break;
-            case 'model':
-                valueA = a.dataset.model || '';
-                valueB = b.dataset.model || '';
-                break;
-            case 'specs':
-                valueA = a.dataset.specs || '';
-                valueB = b.dataset.specs || '';
-                break;
-            case 'stock':
-                valueA = parseInt(a.dataset.stock) || 0;
-                valueB = parseInt(b.dataset.stock) || 0;
-                break;
-            case 'buying':
-                valueA = parseFloat(a.dataset.buying) || 0;
-                valueB = parseFloat(b.dataset.buying) || 0;
-                break;
-            case 'selling':
-                valueA = parseFloat(a.dataset.selling) || 0;
-                valueB = parseFloat(b.dataset.selling) || 0;
-                break;
-            default:
-                return 0;
+
+        if (Array.isArray(value)) {
+            console.log('✓ Parsed all products:', value.length, '(after ' + (attempt + 1) + ' parse round(s))');
+            return value;
         }
-        
-        let comparison = 0;
-        if (typeof valueA === 'number' && typeof valueB === 'number') {
-            comparison = valueA - valueB;
-        } else {
-            comparison = String(valueA).localeCompare(String(valueB), undefined, { sensitivity: 'base' });
+
+        // If we got an object with a products/items key, unwrap it
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+            if (Array.isArray(value.products)) return value.products;
+            if (Array.isArray(value.items)) return value.items;
+            // Otherwise keep drilling (it's a JSON string that needs another parse)
         }
-        
-        return direction === 'asc' ? comparison : -comparison;
-    });
-    
-    rows.forEach(row => tbody.appendChild(row));
+
+        // If it's already a string but didn't parse to an array, try again
+        if (typeof value !== 'string') break;
+    }
+
+    console.error('❌ Could not extract an array from allProductsData. Raw value:', value);
+    return [];
 }
 
-let currentProductCode = null;
-let currentProductType = null;
+const ALL_PRODUCTS = parseAllProducts();
+let filteredProducts = [...ALL_PRODUCTS];
+let currentPage = 1;
+let perPage = 25;
+let sortState = { column: 'name', direction: 'asc' };
 
-// Copy to clipboard function
+const tbody = document.getElementById('productTbody');
+const searchInput = document.getElementById('searchInput');
+const categoryFilter = document.getElementById('categoryFilter');
+const filterStatus = document.getElementById('filterStatus');
+const filterStatusText = document.getElementById('filterStatusText');
+const visibleCountEl = document.getElementById('visibleCount');
+const filteredTotalCountEl = document.getElementById('filteredTotalCount');
+const paginationText = document.getElementById('paginationText');
+const paginationControls = document.getElementById('paginationControls');
+const perPageSelect = document.getElementById('perPageSelect');
+const headerTotalCount = document.getElementById('headerTotalCount');
+
+// Keep header count in sync
+if (headerTotalCount) {
+    headerTotalCount.textContent = ALL_PRODUCTS.length;
+}
+
+const userRole = "{{ user.role }}";
+const canManage = (
+    userRole === 'company_admin' ||
+    userRole === 'company_manager' ||
+    userRole === 'super_admin' ||
+    userRole === 'stock_controller'
+);
+
+// ============================================================
+// ESCAPE HTML
+// ============================================================
+function esc(s) {
+    if (s === null || s === undefined) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// ============================================================
+// FORMAT CURRENCY
+// ============================================================
+function fmtKsh(n) {
+    const num = parseFloat(n) || 0;
+    return 'KSh ' + Math.round(num).toLocaleString();
+}
+
+// ============================================================
+// RENDER A SINGLE ROW
+// ============================================================
+function renderRow(p, index) {
+    // Category badge
+    let catBadge = '';
+    if (p.type === 'Smartphone') {
+        catBadge = '<span class="category-badge category-smartphone">📱 Smartphone</span>';
+    } else if (p.type === 'Feature Phone') {
+        catBadge = '<span class="category-badge category-feature-phone">📞 Feature Phone</span>';
+    } else if (p.type === 'Electronic') {
+        catBadge = '<span class="category-badge category-electronic">💻 Electronic</span>';
+    } else if (p.type === 'Accessory') {
+        catBadge = '<span class="category-badge category-accessory">🎧 Accessory</span>';
+    } else {
+        catBadge = '<span class="category-badge">' + esc(p.type || '-') + '</span>';
+    }
+
+    // Stock badge
+    let stockBadge = '';
+    const stock = parseInt(p.stock) || 0;
+    if (stock > 10) {
+        stockBadge = '<span class="stock-badge stock-in-stock">In Stock</span>';
+    } else if (stock > 0) {
+        stockBadge = '<span class="stock-badge stock-low-stock">Low Stock</span>';
+    } else {
+        stockBadge = '<span class="stock-badge stock-out-of-stock">Out of Stock</span>';
+    }
+
+    // Actions column
+    let actionsCell;
+    if (canManage) {
+        actionsCell = '<td class="text-center">' +
+            '<button class="btn-action-menu" ' +
+            'onclick="openActionModal(\'' + esc(p.product_code) + '\', \'' + esc(p.name) + '\', \'' + esc(p.type) + '\')" ' +
+            'title="Actions">⋮</button></td>';
+    } else {
+        actionsCell = '<td class="text-center" style="color:#000;">N/A</td>';
+    }
+
+    return '<tr data-id="' + index + '" ' +
+        'data-sku="' + esc(p.product_code) + '" ' +
+        'data-name="' + esc(p.name) + '" ' +
+        'data-category="' + esc(p.type) + '" ' +
+        'data-brand="' + esc(p.brand) + '" ' +
+        'data-model="' + esc(p.model) + '" ' +
+        'data-specs="' + esc(p.specs) + '" ' +
+        'data-stock="' + stock + '" ' +
+        'data-buying="' + (parseFloat(p.purchase_price) || 0) + '" ' +
+        'data-selling="' + (parseFloat(p.selling_price) || 0) + '" ' +
+        'data-best="' + (parseFloat(p.best_price) || 0) + '">' +
+        '<td><span class="product-id">#' + (p.display_id || '') + '</span></td>' +
+        '<td><span class="product-code" onclick="copyToClipboard(\'' + esc(p.product_code) + '\')" title="Click to copy">' + esc(p.product_code) + '</span></td>' +
+        '<td><div class="product-name-cell"><span class="product-name">' + esc(p.name) + '</span></div></td>' +
+        '<td>' + catBadge + '</td>' +
+        '<td>' + esc(p.brand) + '</td>' +
+        '<td>' + esc(p.model) + '</td>' +
+        '<td>' + esc(p.specs) + '</td>' +
+        '<td><div class="stock-cell"><span class="stock-quantity">' + stock + '</span>' + stockBadge + '</div></td>' +
+        '<td class="price-cell">' + fmtKsh(p.selling_price) + '</td>' +
+        '<td class="price-cell">' + fmtKsh(p.best_price) + '</td>' +
+        actionsCell +
+        '</tr>';
+}
+
+// ============================================================
+// RENDER THE WHOLE TABLE (only current page)
+// ============================================================
+function renderTable() {
+    // Sort
+    filteredProducts.sort((a, b) => {
+        const col = sortState.column;
+        let va, vb;
+
+        if (col === 'id') { va = parseInt(a.id) || 0; vb = parseInt(b.id) || 0; }
+        else if (col === 'sku') { va = a.product_code || ''; vb = b.product_code || ''; }
+        else if (col === 'name') { va = a.name || ''; vb = b.name || ''; }
+        else if (col === 'category') { va = a.type || ''; vb = b.type || ''; }
+        else if (col === 'brand') { va = a.brand || ''; vb = b.brand || ''; }
+        else if (col === 'model') { va = a.model || ''; vb = b.model || ''; }
+        else if (col === 'specs') { va = a.specs || ''; vb = b.specs || ''; }
+        else if (col === 'stock') { va = parseInt(a.stock) || 0; vb = parseInt(b.stock) || 0; }
+        else if (col === 'buying') { va = parseFloat(a.purchase_price) || 0; vb = parseFloat(b.purchase_price) || 0; }
+        else if (col === 'selling') { va = parseFloat(a.selling_price) || 0; vb = parseFloat(b.selling_price) || 0; }
+        else if (col === 'best') { va = parseFloat(a.best_price) || 0; vb = parseFloat(b.best_price) || 0; }
+
+        let cmp = 0;
+        if (typeof va === 'number' && typeof vb === 'number') {
+            cmp = va - vb;
+        } else {
+            cmp = String(va).localeCompare(String(vb), undefined, { sensitivity: 'base' });
+        }
+        return sortState.direction === 'asc' ? cmp : -cmp;
+    });
+
+    // Paginate
+    const totalFiltered = filteredProducts.length;
+    let startIdx, endIdx;
+    if (perPage === 'all') {
+        startIdx = 0;
+        endIdx = totalFiltered;
+    } else {
+        startIdx = (currentPage - 1) * perPage;
+        endIdx = Math.min(startIdx + perPage, totalFiltered);
+    }
+    const pageSlice = filteredProducts.slice(startIdx, endIdx);
+
+    // Build HTML
+    let html = '';
+    if (pageSlice.length === 0) {
+        html =
+            '<tr><td colspan="11" class="text-center py-4">' +
+            '<div class="empty-state">' +
+            '<span class="empty-icon">🔍</span>' +
+            '<h3>No matching products</h3>' +
+            '<p>Try a different search term or clear the filters.</p>' +
+            '</div></td></tr>';
+    } else {
+        pageSlice.forEach((p, i) => {
+            html += renderRow(p, startIdx + i + 1);
+        });
+    }
+    tbody.innerHTML = html;
+
+    // Update counts
+    visibleCountEl.textContent = pageSlice.length;
+    filteredTotalCountEl.textContent = totalFiltered;
+
+    // Page info text
+    const totalPages = perPage === 'all' ? 1 : Math.ceil(totalFiltered / perPage);
+    if (totalPages > 1) {
+        paginationText.textContent = '(page ' + currentPage + ' of ' + totalPages + ')';
+    } else {
+        paginationText.textContent = '';
+    }
+
+    // Render pagination controls
+    renderPagination(totalPages);
+}
+
+// ============================================================
+// PAGINATION CONTROLS
+// ============================================================
+function renderPagination(totalPages) {
+    let html = '';
+
+    // First + Prev
+    if (currentPage > 1) {
+        html += '<li class="page-item"><a class="page-link" onclick="goToPage(1)"><i class="fas fa-angle-double-left"></i></a></li>';
+        html += '<li class="page-item"><a class="page-link" onclick="goToPage(' + (currentPage - 1) + ')"><i class="fas fa-angle-left"></i></a></li>';
+    } else {
+        html += '<li class="page-item disabled"><span class="page-link"><i class="fas fa-angle-double-left"></i></span></li>';
+        html += '<li class="page-item disabled"><span class="page-link"><i class="fas fa-angle-left"></i></span></li>';
+    }
+
+    // Numbered
+    const startPage = Math.max(1, currentPage - 2);
+    const endPage = Math.min(totalPages, currentPage + 2);
+    for (let n = startPage; n <= endPage; n++) {
+        if (n === currentPage) {
+            html += '<li class="page-item active"><span class="page-link">' + n + '</span></li>';
+        } else {
+            html += '<li class="page-item"><a class="page-link" onclick="goToPage(' + n + ')">' + n + '</a></li>';
+        }
+    }
+
+    // Next + Last
+    if (currentPage < totalPages) {
+        html += '<li class="page-item"><a class="page-link" onclick="goToPage(' + (currentPage + 1) + ')"><i class="fas fa-angle-right"></i></a></li>';
+        html += '<li class="page-item"><a class="page-link" onclick="goToPage(' + totalPages + ')"><i class="fas fa-angle-double-right"></i></a></li>';
+    } else {
+        html += '<li class="page-item disabled"><span class="page-link"><i class="fas fa-angle-right"></i></span></li>';
+        html += '<li class="page-item disabled"><span class="page-link"><i class="fas fa-angle-double-right"></i></span></li>';
+    }
+
+    paginationControls.innerHTML = html;
+}
+
+function goToPage(n) {
+    const totalPages = perPage === 'all' ? 1 : Math.ceil(filteredProducts.length / perPage);
+    if (n < 1 || n > totalPages) return;
+    currentPage = n;
+    renderTable();
+    document.querySelector('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ============================================================
+// FILTERING
+// ============================================================
+function applyFilters() {
+    const term = (searchInput.value || '').trim().toLowerCase();
+    const category = (categoryFilter.value || '').trim();
+
+    filteredProducts = ALL_PRODUCTS.filter(function (p) {
+        const haystack = [
+            p.product_code || '',
+            p.name || '',
+            p.type || '',
+            p.brand || '',
+            p.model || '',
+            p.specs || '',
+        ].join(' ').toLowerCase();
+
+        const matchesSearch = !term || haystack.includes(term);
+        const matchesCategory = !category || (p.type || '') === category;
+
+        return matchesSearch && matchesCategory;
+    });
+
+    currentPage = 1;
+    renderTable();
+
+    const active = [];
+    if (term) active.push('search: "' + term + '"');
+    if (category) active.push('category: ' + category);
+    if (active.length > 0) {
+        filterStatusText.textContent = active.join(' · ');
+        filterStatus.classList.add('show');
+    } else {
+        filterStatus.classList.remove('show');
+    }
+}
+
+function clearFilters() {
+    searchInput.value = '';
+    categoryFilter.value = '';
+    applyFilters();
+    searchInput.focus();
+}
+
+// ============================================================
+// SORTING
+// ============================================================
+function sortTable(column) {
+    if (sortState.column === column) {
+        sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortState.column = column;
+        sortState.direction = 'asc';
+    }
+
+    document.querySelectorAll('.sortable-header').forEach(h => {
+        h.classList.remove('active', 'asc', 'desc');
+        const icon = h.querySelector('.sort-icon');
+        if (icon) icon.textContent = '';
+        if (h.dataset.sort === column) {
+            h.classList.add('active', sortState.direction);
+        }
+    });
+
+    renderTable();
+}
+
+// ============================================================
+// COPY TO CLIPBOARD
+// ============================================================
 function copyToClipboard(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(() => {
             showCopyTooltip('Copied: ' + text);
-        }).catch(() => {
-            fallbackCopy(text);
-        });
+        }).catch(() => fallbackCopy(text));
     } else {
         fallbackCopy(text);
     }
 }
 
 function fallbackCopy(text) {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    document.body.appendChild(textarea);
-    textarea.select();
-    try {
-        document.execCommand('copy');
-        showCopyTooltip('Copied: ' + text);
-    } catch (err) {
-        showCopyTooltip('Failed to copy');
-    }
-    document.body.removeChild(textarea);
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showCopyTooltip('Copied: ' + text); }
+    catch (e) { showCopyTooltip('Failed to copy'); }
+    document.body.removeChild(ta);
 }
 
 function showCopyTooltip(message) {
@@ -1039,145 +1196,76 @@ function showCopyTooltip(message) {
     tooltip.style.left = '50%';
     tooltip.style.top = '50%';
     tooltip.style.transform = 'translate(-50%, -50%)';
-    
     clearTimeout(tooltip._timeout);
-    tooltip._timeout = setTimeout(() => {
-        tooltip.classList.remove('show');
-    }, 2000);
+    tooltip._timeout = setTimeout(() => tooltip.classList.remove('show'), 2000);
 }
 
+// ============================================================
+// ACTION MODAL
+// ============================================================
 function openActionModal(productCode, productName, productType) {
-    currentProductCode = productCode;
-    currentProductType = productType;
-    
     document.getElementById('actionProductName').textContent = productName || 'Unknown Product';
     document.getElementById('actionProductType').textContent = productType || 'Category';
-    
-    // Set proper category badge class
-    const typeClass = (productType || '').toLowerCase().replace(' ', '-');
+
+    const typeClass = (productType || '').toLowerCase().replace(/\s+/g, '-');
     document.getElementById('actionProductType').className = 'category-badge category-' + typeClass;
     document.getElementById('actionProductCode').textContent = 'Code: ' + (productCode || 'N/A');
-    
+
     document.getElementById('viewLink').href = '/epa_shop/products/' + productCode + '/';
     document.getElementById('editLink').href = '/epa_shop/products/' + productCode + '/edit/';
     document.getElementById('restockLink').href = '/epa_shop/products/' + productCode + '/restock/';
     document.getElementById('deleteLink').href = '/epa_shop/products/' + productCode + '/delete/';
-    
+
     document.getElementById('actionModal').style.display = 'flex';
 }
 
 function closeActionModal() {
     document.getElementById('actionModal').style.display = 'none';
-    currentProductCode = null;
-    currentProductType = null;
 }
 
-document.getElementById('actionModal').addEventListener('click', function(e) {
-    if (e.target === this) {
-        closeActionModal();
-    }
+document.getElementById('actionModal').addEventListener('click', function (e) {
+    if (e.target === this) closeActionModal();
 });
 
-function changePerPage(value) {
-    const currentUrl = new URL(window.location.href);
-    currentUrl.searchParams.set('per_page', value);
-    currentUrl.searchParams.set('page', 1);
-    window.location.href = currentUrl.toString();
-}
-
-
-// Search and Filter functionality
-document.addEventListener('DOMContentLoaded', function() {
-    const searchInput = document.getElementById('searchInput');
-    const categoryFilter = document.getElementById('categoryFilter');
-    let searchTimeout;
-
-    // ============================================
-    // RESTORE FOCUS AFTER PAGE RELOAD
-    // ============================================
-    const focusField = sessionStorage.getItem('focusField');
-    if (focusField === 'searchInput' && searchInput && searchInput.value) {
-        searchInput.focus();
-        const len = searchInput.value.length;
-        searchInput.setSelectionRange(len, len);
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', function () {
+    // Default sort indicator
+    const nameHeader = document.querySelector('[data-sort="name"]');
+    if (nameHeader) {
+        nameHeader.classList.add('active', 'asc');
+        const icon = nameHeader.querySelector('.sort-icon');
+        if (icon) icon.textContent = '▲';
     }
-    sessionStorage.removeItem('focusField');
 
-    // ============================================
-    // APPLY FILTERS (server-side, via URL params)
-    // ============================================
-    function applyFilters() {
-        // Remember which field had focus before navigating
-        if (document.activeElement === searchInput) {
-            sessionStorage.setItem('focusField', 'searchInput');
+    // Wire up filters
+    searchInput.addEventListener('input', applyFilters);
+    searchInput.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { searchInput.value = ''; applyFilters(); }
+    });
+    categoryFilter.addEventListener('change', applyFilters);
+
+    // Per-page selector
+    perPageSelect.addEventListener('change', function () {
+        const v = this.value;
+        perPage = v === 'all' ? 'all' : parseInt(v);
+        currentPage = 1;
+        renderTable();
+    });
+
+    // Initial render (this replaces the loading row)
+    applyFilters();
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function (e) {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            searchInput.focus();
+            searchInput.select();
         }
-
-        const search = searchInput.value;
-        const category = categoryFilter.value;
-        const currentUrl = new URL(window.location.href);
-
-        if (search) {
-            currentUrl.searchParams.set('search', search);
-        } else {
-            currentUrl.searchParams.delete('search');
-        }
-
-        if (category) {
-            currentUrl.searchParams.set('category', category);
-        } else {
-            currentUrl.searchParams.delete('category');
-        }
-
-        // Always reset to page 1 when filters change
-        currentUrl.searchParams.set('page', 1);
-        window.location.href = currentUrl.toString();
-    }
-
-    // Debounced search input
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(applyFilters, 600);
-        });
-
-        // Immediate search on Enter key
-        searchInput.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                clearTimeout(searchTimeout);
-                applyFilters();
-            }
-        });
-    }
-
-    // Category filter — apply immediately
-    if (categoryFilter) {
-        categoryFilter.addEventListener('change', applyFilters);
-    }
-
-    // ============================================
-    // INITIALIZE SORTING
-    // ============================================
-    const table = document.getElementById('productTable');
-    if (table) {
-        sortState.column = 'name';
-        sortState.direction = 'asc';
-        const nameHeader = table.querySelector('[data-sort="name"]');
-        if (nameHeader) {
-            nameHeader.classList.add('active', 'asc');
-            const icon = nameHeader.querySelector('.sort-icon');
-            if (icon) icon.textContent = '▲';
-        }
-        sortTable('name');
-    }
-});
-
-
-
-// Keyboard shortcut: Escape to close modal
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        closeActionModal();
-    }
+        if (e.key === 'Escape') closeActionModal();
+    });
 });
 </script>
 {% endblock %}
