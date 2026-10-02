@@ -45,6 +45,7 @@ class Plan(models.Model):
     has_bulk_import = models.BooleanField(default=False)
     has_custom_domain = models.BooleanField(default=False)
     has_mpesa_intergration = models.BooleanField(default=False)
+    has_treasury = models.BooleanField(default=False)    
 
     # Business type access
     allowed_business_types = models.ManyToManyField(
@@ -94,6 +95,8 @@ class Plan(models.Model):
             features.append("Custom Domain")
         if self.has_mpesa_intergration:
             features.append("M-Pesa Integration")
+        if self.has_treasury:
+            features.append("Treasury Management")
 
         return features
 
