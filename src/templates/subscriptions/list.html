@@ -168,6 +168,105 @@
     .filter-row .btn-filter.btn-secondary:hover { background: #87CEEB; }
 
     /* ============================================ */
+    /* ENTRIES SELECTOR (top of table)               */
+    /* ============================================ */
+    .entries-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        padding: 8px 12px;
+        border-bottom: 1px solid #e0e0e0;
+        background: #f8f9fa;
+        font-size: 12px;
+    }
+    .entries-row .entries-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #000000;
+        font-weight: 600;
+    }
+    .entries-row select.entries-select {
+        padding: 4px 8px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: #ffffff;
+        color: #000000;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .entries-row select.entries-select:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+
+    /* ============================================ */
+    /* PAGINATION                                    */
+    /* ============================================ */
+    .pagination-wrap {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .pagination-info {
+        font-size: 12px;
+        color: #000000;
+        font-weight: 600;
+    }
+    .pagination {
+        display: flex;
+        gap: 4px;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        flex-wrap: wrap;
+    }
+    .pagination li a,
+    .pagination li span {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 32px;
+        height: 32px;
+        padding: 0 8px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: #ffffff;
+        color: #000000;
+        font-weight: 600;
+        font-size: 12px;
+        text-decoration: none;
+        transition: background 0.15s;
+    }
+    .pagination li a:hover {
+        background: #87CEEB;
+        color: #000000;
+    }
+    .pagination li.active span {
+        background: #87CEEB;
+        color: #000000;
+        cursor: default;
+    }
+    .pagination li.disabled span {
+        background: #f8f9fa;
+        color: #999999;
+        cursor: not-allowed;
+        opacity: 0.7;
+    }
+    .pagination li.ellipsis span {
+        border: none;
+        background: transparent;
+        color: #000000;
+        cursor: default;
+    }
+
+    /* ============================================ */
     /* BUTTONS                                       */
     /* ============================================ */
     .btn-primary {
@@ -232,6 +331,17 @@
         .btn-sm { font-size: 10px; padding: 2px 6px; }
         .stat-card .stat-number { font-size: 16px; }
         .stat-card { padding: 10px; }
+
+        .entries-row { flex-direction: column; align-items: stretch; }
+        .pagination-wrap { flex-direction: column; align-items: stretch; }
+        .pagination { justify-content: center; }
+        .pagination li a,
+        .pagination li span {
+            min-width: 28px;
+            height: 28px;
+            font-size: 11px;
+            padding: 0 6px;
+        }
     }
 </style>
 {% endblock %}
@@ -317,6 +427,9 @@
                         {% endfor %}
                     </select>
 
+                    {# Preserve per_page when filtering #}
+                    <input type="hidden" name="per_page" value="{{ per_page }}">
+
                     <button type="submit" class="btn-filter btn-primary">
                         <i class="fas fa-search"></i> Filter
                     </button>
@@ -330,7 +443,28 @@
         {# ---------- TABLE ---------- #}
         <div class="card">
             <div class="card-body p-0">
-                <div class="table-responsive" style="border: 2px solid #000000;">
+
+                {# ---------- ENTRIES SELECTOR ---------- #}
+                <div class="entries-row">
+                    <div class="entries-left">
+                        <span>Show</span>
+                        <select class="entries-select" id="entriesSelect">
+                            <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                            <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
+                            <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                            <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                        </select>
+                        <span>entries</span>
+                    </div>
+                    <div class="text-muted small">
+                        {% if subscriptions %}
+                            Showing {{ subscriptions.start_index }}–{{ subscriptions.end_index }}
+                            of {{ subscriptions.paginator.count }}
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="table-responsive" style="border: 2px solid #000000; border-top: none;">
                     <table class="table-excel mb-0" id="subscriptionsTable">
                         <thead>
                             <tr>
@@ -459,28 +593,114 @@
                 </div>
             </div>
 
+            {# ---------- FOOTER: INFO + PAGINATION ---------- #}
             <div class="card-footer">
-                <small>Showing {{ subscriptions|length }} subscription{{ subscriptions|length|pluralize }}</small>
-                {% if search_query or status_filter or plan_filter %}
-                    <span class="float-end">
-                        <a href="{% url 'plans:subscription-list' %}" class="btn btn-sm btn-outline-secondary">
-                            <i class="fas fa-times"></i> Clear Filters
-                        </a>
-                    </span>
-                {% endif %}
+                <div class="pagination-wrap">
+
+                    {# LEFT: info #}
+                    <div class="pagination-info">
+                        {% if subscriptions %}
+                            Showing {{ subscriptions.start_index }}–{{ subscriptions.end_index }}
+                            of {{ subscriptions.paginator.count }}
+                            subscription{{ subscriptions.paginator.count|pluralize }}
+                        {% else %}
+                            Showing 0 subscriptions
+                        {% endif %}
+                    </div>
+
+                    {# RIGHT: page links #}
+                    {% if subscriptions.paginator.num_pages > 1 %}
+                    <ul class="pagination">
+                        {# First #}
+                        {% if subscriptions.has_previous %}
+                            <li>
+                                <a href="?page=1&per_page={{ per_page }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if plan_filter %}&plan={{ plan_filter }}{% endif %}"
+                                   title="First">
+                                    <i class="fas fa-angle-double-left"></i>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="?page={{ subscriptions.previous_page_number }}&per_page={{ per_page }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if plan_filter %}&plan={{ plan_filter }}{% endif %}"
+                                   title="Previous">
+                                    <i class="fas fa-angle-left"></i>
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="disabled"><span><i class="fas fa-angle-double-left"></i></span></li>
+                            <li class="disabled"><span><i class="fas fa-angle-left"></i></span></li>
+                        {% endif %}
+
+                        {# Page numbers with windowing #}
+                        {% for num in subscriptions.paginator.page_range %}
+                            {% if num == subscriptions.number %}
+                                <li class="active"><span>{{ num }}</span></li>
+                            {% elif num > subscriptions.number|add:"-3" and num < subscriptions.number|add:"3" %}
+                                <li>
+                                    <a href="?page={{ num }}&per_page={{ per_page }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if plan_filter %}&plan={{ plan_filter }}{% endif %}">
+                                        {{ num }}
+                                    </a>
+                                </li>
+                            {% elif num == 1 or num == subscriptions.paginator.num_pages %}
+                                <li>
+                                    <a href="?page={{ num }}&per_page={{ per_page }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if plan_filter %}&plan={{ plan_filter }}{% endif %}">
+                                        {{ num }}
+                                    </a>
+                                </li>
+                            {% elif num == subscriptions.number|add:"-3" or num == subscriptions.number|add:"3" %}
+                                <li class="ellipsis"><span>…</span></li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {# Next / Last #}
+                        {% if subscriptions.has_next %}
+                            <li>
+                                <a href="?page={{ subscriptions.next_page_number }}&per_page={{ per_page }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if plan_filter %}&plan={{ plan_filter }}{% endif %}"
+                                   title="Next">
+                                    <i class="fas fa-angle-right"></i>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="?page={{ subscriptions.paginator.num_pages }}&per_page={{ per_page }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if plan_filter %}&plan={{ plan_filter }}{% endif %}"
+                                   title="Last">
+                                    <i class="fas fa-angle-double-right"></i>
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="disabled"><span><i class="fas fa-angle-right"></i></span></li>
+                            <li class="disabled"><span><i class="fas fa-angle-double-right"></i></span></li>
+                        {% endif %}
+                    </ul>
+                    {% endif %}
+
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    // Auto-submit on filter change (optional — remove if you prefer the Filter button)
+    // ============================================
+    // Filter selects — auto-submit on change
+    // ============================================
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.filter-select').forEach(sel => {
             sel.addEventListener('change', function () {
                 this.closest('form').submit();
             });
         });
+
+        // ============================================
+        // Entries-per-page selector — reset to page 1
+        // ============================================
+        const entriesSelect = document.getElementById('entriesSelect');
+        if (entriesSelect) {
+            entriesSelect.addEventListener('change', function () {
+                const url = new URL(window.location.href);
+                url.searchParams.set('per_page', this.value);
+                url.searchParams.set('page', '1');
+                window.location.href = url.toString();
+            });
+        }
     });
 </script>
 {% endblock %}

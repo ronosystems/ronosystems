@@ -8,7 +8,7 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-
+from django.core.paginator import Paginator
 from .models import Plan, Subscription
 from apps.companies.models import Company, BusinessType
 
@@ -304,9 +304,28 @@ def subscription_list(request):
             Q(company__email__icontains=search_query)
         )
 
+    # ============================================
+    # PER-PAGE (10 / 25 / 50 / 100)
+    # ============================================
+    try:
+        per_page = int(request.GET.get('per_page', 10))
+    except (TypeError, ValueError):
+        per_page = 10
+    if per_page not in (10, 25, 50, 100):
+        per_page = 10
+
+    # ============================================
+    # PAGINATION
+    # ============================================
+    paginator = Paginator(subscriptions, per_page)
+    page_number = request.GET.get('page', 1)
+    subscriptions_page = paginator.get_page(page_number)
+
     context = {
-        'subscriptions': subscriptions,
-        'total_count': subscriptions.count(),
+        'subscriptions': subscriptions_page,                 # Page object (was queryset)
+        'per_page': per_page,                                # for entries dropdown
+        'total_count': base_qs.count(),                      # total across ALL (unfiltered)
+        'filtered_count': subscriptions.count(),             # total matching current filters
         'active_count': Subscription.objects.filter(status='active').count(),
         'pending_count': Subscription.objects.filter(status='pending').count(),
         'expired_count': Subscription.objects.filter(status='expired').count(),
@@ -318,7 +337,7 @@ def subscription_list(request):
         'page_subtitle': 'Manage company subscriptions',
     }
     return render(request, 'subscriptions/list.html', context)
-
+    
 
 # ============================================
 # SUBSCRIPTION DETAIL
