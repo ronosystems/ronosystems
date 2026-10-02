@@ -10,10 +10,15 @@ class Plan(models.Model):
 
     PLAN_TYPES = (
         ('free', 'FREE'),
+        ('free_trial', 'FREE TRIAL'),
         ('basic', 'BASIC'),
+        ('basic_pro', 'BASIC PRO'),
         ('premium', 'PREMIUM'),
+        ('premium_pro', 'PREMIUM PRO'),
         ('standard', 'STANDARD'),
+        ('standard_pro', 'STANDARD PRO'),
         ('enterprise', 'ENTERPRISE'),
+        ('enterprise_pro', 'ENTERPRISE PRO'),
     )
 
     BILLING_CYCLES = (
@@ -96,7 +101,7 @@ class Plan(models.Model):
         if self.has_mpesa_intergration:
             features.append("M-Pesa Integration")
         if self.has_treasury:
-            features.append("Treasury Management")
+            features.append("MpesaShop Management")
 
         return features
 
