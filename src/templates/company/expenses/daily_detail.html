@@ -349,6 +349,14 @@
         border-radius: 4px;
         background: white;
     }
+    /* PDF preview frame — fills the modal body */
+    .attachment-modal-body iframe {
+        width: 100%;
+        height: 70vh;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+    }
     .attachment-modal-footer {
         border-top: 2px solid #000000;
         background: #f8f9fa;
@@ -428,7 +436,6 @@
             <i class="fas fa-print"></i> Print
         </button>
 
-        {# ---- FIXED: dropdown instead of old single URL ---- #}
         <div class="dropdown d-inline-block">
             <button class="btn btn-danger btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
                 <i class="fas fa-plus"></i> Add Expense
@@ -621,25 +628,24 @@
 
                             <td data-label="Actions" class="text-center">
                                 <div class="d-flex justify-content-center gap-1">
-                                    {% if expense.attachment %}
-                                        {% if expense.is_pdf %}
-                                            <a href="{{ expense.attachment.url }}" target="_blank" class="btn btn-attachment btn-sm" title="View PDF">
+                                    {# ---- Unified attachment preview: modal handles both images and PDFs ---- #}
+                                    {% if expense.attachment_url %}
+                                        <button type="button" class="btn btn-attachment btn-sm"
+                                                title="{% if expense.is_pdf %}View PDF{% else %}Preview image{% endif %}"
+                                                onclick="openAttachmentModal('{{ expense.attachment_url }}', '{{ expense.description|escapejs }}', {% if expense.is_pdf %}true{% else %}false{% endif %})">
+                                            {% if expense.is_pdf %}
                                                 <i class="fas fa-file-pdf"></i>
-                                            </a>
-                                        {% else %}
-                                            <button type="button" class="btn btn-attachment btn-sm"
-                                                    title="Preview attachment"
-                                                    onclick="openAttachmentModal('{{ expense.attachment.url }}', '{{ expense.description|escapejs }}')">
+                                            {% else %}
                                                 <i class="fas fa-image"></i>
-                                            </button>
-                                        {% endif %}
+                                            {% endif %}
+                                        </button>
                                     {% else %}
                                         <button type="button" class="btn btn-outline-secondary btn-sm" disabled title="No attachment">
                                             <i class="fas fa-paperclip"></i>
                                         </button>
                                     {% endif %}
 
-                                    {# ---- FIXED: category-specific edit URLs ---- #}
+                                    {# ---- Category-specific edit URLs ---- #}
                                     {% if expense.expense_type == 'salary' %}
                                         <a href="{% url 'company-salaries-edit' expense.id %}" class="btn btn-warning btn-sm" title="Edit"><i class="fas fa-edit"></i></a>
                                     {% elif expense.expense_type == 'rent' %}
@@ -689,7 +695,6 @@
             <h5 class="mt-3">No Expenses Recorded</h5>
             <p class="text-muted">No expenses recorded on {{ report_date|date:"F d, Y" }}</p>
 
-            {# ---- FIXED: dropdown in empty state ---- #}
             <div class="dropdown d-inline-block">
                 <button class="btn btn-danger dropdown-toggle" type="button" data-bs-toggle="dropdown">
                     <i class="fas fa-plus"></i> Add Expense
@@ -716,20 +721,24 @@
 
 <!-- ============================================
      ATTACHMENT PREVIEW MODAL
+     Handles BOTH images (via <img>) and PDFs (via <iframe>)
 ============================================ -->
 <div class="attachment-modal" id="attachmentModal" onclick="if(event.target===this) closeAttachmentModal()">
     <div class="attachment-modal-content">
         <div class="attachment-modal-header">
-            <h6><i class="fas fa-image"></i> Attachment Preview</h6>
+            <h6 id="attachmentModalTitle"><i class="fas fa-image"></i> Attachment Preview</h6>
             <button type="button" class="close-btn" onclick="closeAttachmentModal()">&times;</button>
         </div>
         <div class="attachment-modal-body">
-            <img id="attachmentModalImg" src="" alt="Attachment preview">
+            {# Image preview (default) #}
+            <img id="attachmentModalImg" src="" alt="Attachment preview" style="display:none;">
+            {# PDF preview (toggled on when is_pdf=true) #}
+            <iframe id="attachmentModalFrame" src="" style="display:none;" title="PDF preview"></iframe>
             <p id="attachmentModalCaption" class="text-muted mt-3 mb-0"></p>
         </div>
         <div class="attachment-modal-footer">
-            <a id="attachmentModalDownload" href="" target="_blank" class="btn btn-attachment btn-sm">
-                <i class="fas fa-external-link-alt"></i> Open in New Tab
+            <a id="attachmentModalDownload" href="" rel="noopener" class="btn btn-attachment btn-sm">
+                <i class="fas fa-external-link-alt"></i> full view / download
             </a>
             <button type="button" class="btn btn-secondary btn-sm" onclick="closeAttachmentModal()">
                 <i class="fas fa-times"></i> Close
@@ -820,17 +829,53 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
-function openAttachmentModal(url, description) {
-    document.getElementById('attachmentModalImg').src = url;
-    document.getElementById('attachmentModalCaption').textContent = description ? 'Expense: ' + description : '';
-    document.getElementById('attachmentModalDownload').href = url;
+/**
+ * Open the attachment modal.
+ *
+ * @param {string} url         Signed Cloudinary URL from `attachment_url`
+ * @param {string} description Expense description (for the caption)
+ * @param {boolean} isPdf      True when the attachment is a PDF
+ */
+function openAttachmentModal(url, description, isPdf) {
+    const img       = document.getElementById('attachmentModalImg');
+    const frame     = document.getElementById('attachmentModalFrame');
+    const title     = document.getElementById('attachmentModalTitle');
+    const caption   = document.getElementById('attachmentModalCaption');
+    const download  = document.getElementById('attachmentModalDownload');
+
+    if (isPdf) {
+        // PDF → use iframe, hide the image element
+        img.style.display = 'none';
+        img.src = '';
+        frame.style.display = 'block';
+        frame.src = url;
+        title.innerHTML = '<i class="fas fa-file-pdf text-danger"></i> PDF Preview';
+    } else {
+        // Image → use <img>, hide the iframe
+        frame.style.display = 'none';
+        frame.src = '';
+        img.style.display = 'block';
+        img.src = url;
+        title.innerHTML = '<i class="fas fa-image text-info"></i> Image Preview';
+    }
+
+    caption.textContent = description ? 'Expense: ' + description : '';
+    download.href = url;
+
     document.getElementById('attachmentModal').classList.add('open');
     document.body.style.overflow = 'hidden';
 }
 
 function closeAttachmentModal() {
-    document.getElementById('attachmentModal').classList.remove('open');
+    const modal = document.getElementById('attachmentModal');
+    modal.classList.remove('open');
+
+    // Clear both preview elements so nothing lingers
     document.getElementById('attachmentModalImg').src = '';
+    document.getElementById('attachmentModalImg').style.display = 'none';
+    document.getElementById('attachmentModalFrame').src = '';
+    document.getElementById('attachmentModalFrame').style.display = 'none';
+
     document.body.style.overflow = '';
 }
 </script>

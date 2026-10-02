@@ -507,6 +507,9 @@ def _expense_type_create(request, expense_type, redirect_name):
                     messages.error(request, '❌ Attachment upload failed. Please try again.')
                     return redirect(request.path)
                 data['attachment'] = uploaded['public_id']
+                # Save Cloudinary's reported format so `is_pdf` works
+                # even when the public_id has no `.pdf` extension.
+                data['attachment_format'] = (uploaded.get('format') or '').lower()
 
             Expense.objects.create(**data)
             messages.success(request, f'✅ {expense_type.title()} expense recorded successfully!')
@@ -563,11 +566,13 @@ def _expense_type_edit(request, pk, expense_type, redirect_name):
                 if old_public_id:
                     delete_attachment(old_public_id)
                 data['attachment'] = uploaded['public_id']
+                data['attachment_format'] = (uploaded.get('format') or '').lower()
 
             elif remove_attachment and old_public_id:
                 # Remove without replacing
                 delete_attachment(old_public_id)
                 data['attachment'] = None
+                data['attachment_format'] = ''
 
             # else: no change — don't touch expense.attachment at all
 

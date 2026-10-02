@@ -2,6 +2,7 @@ from django.db import models
 from django.utils import timezone
 from django.conf import settings as django_settings
 
+
 # NOTE:
 # `Branch` used to live in `epa_shop`, which is loaded after `companies`,
 # so importing `Company` directly worked fine there.
@@ -261,6 +262,19 @@ class Expense(models.Model):
         help_text="Cloudinary public_id for the receipt/invoice (JPG, PNG, GIF, or PDF)",
     )
 
+    # Cloudinary's reported format for the attachment.
+    # Cloudinary strips the file extension from the public_id when the
+    # uploader doesn't supply one, so `attachment.name` alone can't tell us
+    # whether the file is a PDF. The upload response includes a `format`
+    # field ("pdf", "jpg", "png", ...) — we save it here at upload time and
+    # consult it in `is_pdf` / `attachment_url`.
+    attachment_format = models.CharField(
+        max_length=10,
+        blank=True,
+        default='',
+        help_text="Cloudinary format (pdf, jpg, png, ...). Set at upload time.",
+    )
+
     # ============================================
     # ADDITIONAL INFO
     # ============================================
@@ -342,11 +356,23 @@ class Expense(models.Model):
 
     @property
     def is_pdf(self):
+        """
+        True when the attachment is a PDF.
+
+        Prefers the Cloudinary-reported format (`attachment_format`), which
+        is reliable even when Cloudinary strips the extension from the
+        public_id. Falls back to checking the public_id itself for older
+        records that pre-date the `attachment_format` field.
+        """
         if not self.attachment:
             return False
+
+        fmt = (self.attachment_format or '').strip().lower()
+        if fmt:
+            return fmt == 'pdf'
+
         return self.attachment.name.lower().endswith('.pdf')
 
-    # ── NEW: Cloudinary-ready URL ──
     @property
     def attachment_url(self):
         """
@@ -356,7 +382,9 @@ class Expense(models.Model):
         and stores the returned public_id in `self.attachment`. This property
         builds the delivery URL that templates can use directly.
 
-        Mirrors `_build_cloudinary_url()` in apps/epa_shop/models.py.
+        PDFs are stored by Cloudinary under `/image/upload/` when uploaded
+        with `resource_type='image'` (the default in our uploader), so the
+        URL path stays `/image/upload/` regardless of file type.
         """
         if not self.attachment:
             return None
