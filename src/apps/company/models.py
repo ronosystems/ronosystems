@@ -299,6 +299,22 @@ class Expense(models.Model):
     )
     approved_at = models.DateTimeField(null=True, blank=True)
 
+    # Whoever last edited this expense via the edit form.
+    # Set in `_expense_type_edit` just before `expense.save()`.
+    updated_by = models.ForeignKey(
+        django_settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='expenses_updated',
+    )
+
+    # Whoever marked this expense as paid.
+    # Set in `mark_paid()` below whenever a user is passed in.
+    paid_by = models.ForeignKey(
+        django_settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='expenses_paid',
+    )
+
     # ============================================
     # TIMESTAMPS
     # ============================================
@@ -446,9 +462,19 @@ class Expense(models.Model):
         self.save()
 
     def mark_paid(self, user=None):
+        """
+        Mark as paid.
+
+        Records `paid_by` (when a user is supplied) in addition to
+        `paid_at`. If the expense had not been approved yet, the payer is
+        also recorded as the approver so the audit trail doesn't have a
+        gap.
+        """
         self.status = self.STATUS_PAID
         self.paid_at = timezone.now()
-        if user and not self.approved_by:
-            self.approved_by = user
-            self.approved_at = timezone.now()
+        if user:
+            self.paid_by = user
+            if not self.approved_by:
+                self.approved_by = user
+                self.approved_at = timezone.now()
         self.save()

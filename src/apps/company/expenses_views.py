@@ -580,6 +580,9 @@ def _expense_type_edit(request, pk, expense_type, redirect_name):
                 if key != 'company':
                     setattr(expense, key, value)
 
+            # Stamp the editor for the audit trail.
+            expense.updated_by = request.user
+
             expense.save()
             messages.success(request, '✅ Expense updated successfully!')
             return redirect(redirect_name)

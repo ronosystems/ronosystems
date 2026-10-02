@@ -16,7 +16,7 @@
         color: #6c757d;
     }
 
-    /* Excel-style detail table */
+    /* Excel-style detail table (used by the info cards) */
     .table-detail {
         width: 100%;
         border-collapse: collapse;
@@ -32,12 +32,76 @@
         background-color: #f0f2f5;
         font-weight: 700;
         color: #000000;
-        width: 30%;
+        width: 40%;
     }
     .table-detail td {
         background-color: #ffffff;
         color: #000000;
         word-break: break-word;
+    }
+
+    /* ============================================
+       AUDIT TRAIL TABLE
+       Uses a fixed layout so the 4 columns share
+       space predictably and never fight each other.
+       ============================================ */
+    .table-audit {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-size: 0.9rem;
+    }
+    .table-audit th,
+    .table-audit td {
+        border: 1px solid #000000;
+        padding: 10px 14px;
+        vertical-align: middle;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+    }
+    .table-audit th {
+        background-color: #f0f2f5;
+        font-weight: 700;
+        color: #000000;
+        width: 15%;
+    }
+    .table-audit td {
+        background-color: #ffffff;
+        color: #000000;
+        width: 35%;
+    }
+    .table-audit tbody tr:not(:last-child) th,
+    .table-audit tbody tr:not(:last-child) td {
+        border-bottom: 2px solid #000000;
+    }
+
+    /* On narrow screens, stack each audit row into blocks */
+    @media (max-width: 768px) {
+        .table-audit,
+        .table-audit tbody,
+        .table-audit tr,
+        .table-audit th,
+        .table-audit td {
+            display: block;
+            width: 100%;
+        }
+        .table-audit tr {
+            border: 1px solid #000000;
+            margin-bottom: 8px;
+        }
+        .table-audit th,
+        .table-audit td {
+            border: none;
+            border-bottom: 1px solid #000000;
+            padding: 8px 12px;
+        }
+        .table-audit tr > *:last-child {
+            border-bottom: none;
+        }
+        .table-audit th {
+            background-color: #f0f2f5;
+            width: auto;
+        }
     }
 
     .status-badge {
@@ -99,6 +163,59 @@
         padding-bottom: 6px;
         border-bottom: 2px solid #000000;
     }
+
+    /* 3-column grid for info cards */
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 4px;
+    }
+    .info-card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: #ffffff;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+    .info-card-header {
+        background: #87CEEB;
+        border-bottom: 2px solid #000000;
+        padding: 8px 14px;
+        font-weight: 700;
+        font-size: 0.82rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #000000;
+    }
+    .info-card-body {
+        padding: 0;
+        flex-grow: 1;
+    }
+    .info-card-body .table-detail th,
+    .info-card-body .table-detail td {
+        padding: 8px 12px;
+        font-size: 0.85rem;
+    }
+    .info-card-body .table-detail tr:last-child th,
+    .info-card-body .table-detail tr:last-child td {
+        border-bottom: none;
+    }
+    .info-card-body .table-detail th {
+        width: 45%;
+    }
+
+    /* Stack to 2 cols on medium screens */
+    @media (max-width: 1199.98px) {
+        .info-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    /* Stack to 1 col on small screens */
+    @media (max-width: 767.98px) {
+        .info-grid { grid-template-columns: 1fr; }
+        .table-detail th { width: 40%; }
+    }
 </style>
 {% endblock %}
 
@@ -124,182 +241,317 @@
             </div>
         </div>
 
-        <!-- Core info -->
-        <div class="card mb-4" style="border: 2px solid #000;">
-            <div class="card-body p-0">
-                <table class="table-detail">
-                    <tbody>
-                        <tr>
-                            <th>Expense Type</th>
-                            <td>
-                                <strong>{{ expense.get_expense_type_display }}</strong>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th>Date</th>
-                            <td>{{ expense.expense_date|date:"l, d M Y" }}</td>
-                        </tr>
-                        <tr>
-                            <th>Description</th>
-                            <td>{{ expense.description|default:"—" }}</td>
-                        </tr>
-                        <tr>
-                            <th>Amount</th>
-                            <td>
-                                <strong style="font-size:1.1rem; color:#dc3545;">
-                                    KSh {{ expense.amount|floatformat:2 }}
-                                </strong>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th>Branch</th>
-                            <td>
-                                {% if expense.branch %}
-                                    <i class="fas fa-store" style="color:#1fb4d2;"></i>
-                                    {{ expense.branch.name }}
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        <tr>
-                            <th>Status</th>
-                            <td>
-                                <span class="status-badge status-{{ expense.status }}">
-                                    {{ expense.status_display }}
-                                </span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th>Payment Method</th>
-                            <td>{{ expense.payment_method_display|default:"—" }}</td>
-                        </tr>
-                        <tr>
-                            <th>Reference</th>
-                            <td>{{ expense.reference|default:"—" }}</td>
-                        </tr>
+        <!-- ============================================ -->
+        <!-- 3-COLUMN INFO GRID                            -->
+        <!-- ============================================ -->
+        <div class="info-grid">
 
-                        {# ── Type-specific rows ── #}
-                        {% if expense.expense_type == 'salary' %}
+            <!-- ─── COLUMN 1 — Basic Info ─── -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <i class="fas fa-info-circle"></i> Basic Information
+                </div>
+                <div class="info-card-body">
+                    <table class="table-detail">
+                        <tbody>
                             <tr>
-                                <th>Employee Name</th>
-                                <td><strong>{{ expense.employee_name|default:"—" }}</strong></td>
-                            </tr>
-                            {% if expense.employee_id %}
-                            <tr>
-                                <th>Employee ID</th>
-                                <td>{{ expense.employee_id }}</td>
-                            </tr>
-                            {% endif %}
-                            {% if expense.employee_phone %}
-                            <tr>
-                                <th>Employee Phone</th>
-                                <td>{{ expense.employee_phone }}</td>
-                            </tr>
-                            {% endif %}
-                            <tr>
-                                <th>Salary Month</th>
-                                <td>{{ expense.salary_month_display|default:"—" }}</td>
-                            </tr>
-                        {% elif expense.expense_type == 'rent' %}
-                            <tr>
-                                <th>Rent Month</th>
-                                <td>{{ expense.rent_month_display|default:"—" }}</td>
-                            </tr>
-                            {% if expense.landlord_name %}
-                            <tr>
-                                <th>Landlord Name</th>
-                                <td>{{ expense.landlord_name }}</td>
-                            </tr>
-                            {% endif %}
-                            {% if expense.landlord_phone %}
-                            <tr>
-                                <th>Landlord Phone</th>
-                                <td>{{ expense.landlord_phone }}</td>
-                            </tr>
-                            {% endif %}
-                            {% if expense.receipt_number %}
-                            <tr>
-                                <th>Receipt Number</th>
-                                <td>{{ expense.receipt_number }}</td>
-                            </tr>
-                            {% endif %}
-                        {% elif expense.expense_type == 'bill' %}
-                            <tr>
-                                <th>Bill Type</th>
-                                <td>{{ expense.bill_type_display|default:"—" }}</td>
+                                <th>Expense Type</th>
+                                <td><strong>{{ expense.get_expense_type_display }}</strong></td>
                             </tr>
                             <tr>
-                                <th>Bill Name</th>
-                                <td><strong>{{ expense.bill_name|default:"—" }}</strong></td>
+                                <th>Date</th>
+                                <td>{{ expense.expense_date|date:"d M Y" }}</td>
                             </tr>
                             <tr>
-                                <th>Bill Period</th>
-                                <td>{{ expense.bill_period_display|default:"—" }}</td>
+                                <th>Description</th>
+                                <td>{{ expense.description|default:"—" }}</td>
                             </tr>
-                            {% if expense.receipt_number %}
                             <tr>
-                                <th>Receipt Number</th>
-                                <td>{{ expense.receipt_number }}</td>
-                            </tr>
-                            {% endif %}
-                        {% elif expense.expense_type == 'general' %}
-                            <tr>
-                                <th>Category</th>
+                                <th>Amount</th>
                                 <td>
-                                    <span class="badge" style="background:#e8eaf6; color:#283593; border:1px solid #000;">
-                                        {{ expense.category_display }}
+                                    <strong style="font-size:1rem; color:#dc3545;">
+                                        KSh {{ expense.amount|floatformat:2 }}
+                                    </strong>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Branch</th>
+                                <td>
+                                    {% if expense.branch %}
+                                        <i class="fas fa-store" style="color:#1fb4d2;"></i>
+                                        {{ expense.branch.name }}
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Status</th>
+                                <td>
+                                    <span class="status-badge status-{{ expense.status }}">
+                                        {{ expense.status_display }}
                                     </span>
                                 </td>
                             </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
 
-        <!-- Audit trail -->
+            <!-- ─── COLUMN 2 — Payment Details ─── -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <i class="fas fa-credit-card"></i> Payment Details
+                </div>
+                <div class="info-card-body">
+                    <table class="table-detail">
+                        <tbody>
+                            <tr>
+                                <th>Payment Method</th>
+                                <td>{{ expense.payment_method_display|default:"—" }}</td>
+                            </tr>
+                            <tr>
+                                <th>Reference</th>
+                                <td>{{ expense.reference|default:"—" }}</td>
+                            </tr>
+                            {% if expense.receipt_number %}
+                            <tr>
+                                <th>Receipt Number</th>
+                                <td>{{ expense.receipt_number }}</td>
+                            </tr>
+                            {% endif %}
+
+                            {# ── Type-specific payment-adjacent rows ── #}
+                            {% if expense.expense_type == 'salary' %}
+                                <tr>
+                                    <th>Salary Month</th>
+                                    <td>{{ expense.salary_month_display|default:"—" }}</td>
+                                </tr>
+                            {% elif expense.expense_type == 'rent' %}
+                                <tr>
+                                    <th>Rent Month</th>
+                                    <td>{{ expense.rent_month_display|default:"—" }}</td>
+                                </tr>
+                            {% elif expense.expense_type == 'bill' %}
+                                <tr>
+                                    <th>Bill Period</th>
+                                    <td>{{ expense.bill_period_display|default:"—" }}</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ─── COLUMN 3 — Type-Specific Details ─── -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    {% if expense.expense_type == 'salary' %}
+                        <i class="fas fa-user-tie"></i> Employee Details
+                    {% elif expense.expense_type == 'rent' %}
+                        <i class="fas fa-home"></i> Landlord Details
+                    {% elif expense.expense_type == 'bill' %}
+                        <i class="fas fa-file-invoice-dollar"></i> Bill Details
+                    {% else %}
+                        <i class="fas fa-tag"></i> Category
+                    {% endif %}
+                </div>
+                <div class="info-card-body">
+                    <table class="table-detail">
+                        <tbody>
+                            {% if expense.expense_type == 'salary' %}
+                                <tr>
+                                    <th>Employee Name</th>
+                                    <td><strong>{{ expense.employee_name|default:"—" }}</strong></td>
+                                </tr>
+                                {% if expense.employee_id %}
+                                <tr>
+                                    <th>Employee ID</th>
+                                    <td>{{ expense.employee_id }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if expense.employee_phone %}
+                                <tr>
+                                    <th>Employee Phone</th>
+                                    <td>{{ expense.employee_phone }}</td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <th>Salary Month</th>
+                                    <td>{{ expense.salary_month_display|default:"—" }}</td>
+                                </tr>
+
+                            {% elif expense.expense_type == 'rent' %}
+                                <tr>
+                                    <th>Rent Month</th>
+                                    <td>{{ expense.rent_month_display|default:"—" }}</td>
+                                </tr>
+                                {% if expense.landlord_name %}
+                                <tr>
+                                    <th>Landlord Name</th>
+                                    <td>{{ expense.landlord_name }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if expense.landlord_phone %}
+                                <tr>
+                                    <th>Landlord Phone</th>
+                                    <td>{{ expense.landlord_phone }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if not expense.landlord_name and not expense.landlord_phone %}
+                                <tr>
+                                    <td colspan="2" class="text-muted text-center">—</td>
+                                </tr>
+                                {% endif %}
+
+                            {% elif expense.expense_type == 'bill' %}
+                                <tr>
+                                    <th>Bill Type</th>
+                                    <td>{{ expense.bill_type_display|default:"—" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Bill Name</th>
+                                    <td><strong>{{ expense.bill_name|default:"—" }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <th>Bill Period</th>
+                                    <td>{{ expense.bill_period_display|default:"—" }}</td>
+                                </tr>
+                                {% if expense.receipt_number %}
+                                <tr>
+                                    <th>Receipt Number</th>
+                                    <td>{{ expense.receipt_number }}</td>
+                                </tr>
+                                {% endif %}
+
+                            {% else %}
+                                <tr>
+                                    <th>Category</th>
+                                    <td>
+                                        <span class="badge" style="background:#e8eaf6; color:#283593; border:1px solid #000;">
+                                            {{ expense.category_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+        <!-- /.info-grid -->
+
+        <!-- ============================================ -->
+        <!-- AUDIT TRAIL — Requested / Approved / Updated / Paid -->
+        <!-- ============================================ -->
         <div class="section-title">Audit Trail</div>
         <div class="card mb-4" style="border: 2px solid #000;">
             <div class="card-body p-0">
-                <table class="table-detail">
+                <table class="table-audit">
                     <tbody>
+
+                        {# ── Row 1: Requested / Requested At ── #}
                         <tr>
-                            <th>Recorded By</th>
+                            <th>Requested By</th>
                             <td>
                                 {% if expense.created_by %}
-                                    {{ expense.created_by.get_full_name|default:expense.created_by.username }}
-                                    <span class="text-muted small">({{ expense.created_by.email }})</span>
+                                    <strong>{{ expense.created_by.get_full_name|default:expense.created_by.username }}</strong>
+                                    {% if expense.created_by.email %}
+                                        <br><small class="text-muted">{{ expense.created_by.email }}</small>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <th>Requested At</th>
+                            <td>
+                                {% if expense.created_at %}
+                                    {{ expense.created_at|date:"d M Y, H:i" }}
                                 {% else %}
                                     <span class="text-muted">—</span>
                                 {% endif %}
                             </td>
                         </tr>
-                        <tr>
-                            <th>Recorded At</th>
-                            <td>{{ expense.created_at|date:"d M Y, H:i" }}</td>
-                        </tr>
-                        {% if expense.approved_by %}
+
+                        {# ── Row 2: Approved / Approved At ── #}
                         <tr>
                             <th>Approved By</th>
                             <td>
-                                {{ expense.approved_by.get_full_name|default:expense.approved_by.username }}
+                                {% if expense.approved_by %}
+                                    <strong>{{ expense.approved_by.get_full_name|default:expense.approved_by.username }}</strong>
+                                    {% if expense.approved_by.email %}
+                                        <br><small class="text-muted">{{ expense.approved_by.email }}</small>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <th>Approved At</th>
+                            <td>
                                 {% if expense.approved_at %}
-                                    <br><span class="text-muted small">on {{ expense.approved_at|date:"d M Y, H:i" }}</span>
+                                    {{ expense.approved_at|date:"d M Y, H:i" }}
+                                {% else %}
+                                    <span class="text-muted">—</span>
                                 {% endif %}
                             </td>
                         </tr>
-                        {% endif %}
-                        {% if expense.paid_at %}
+
+                        {# ── Row 3: Updated / Updated At ── #}
                         <tr>
+                            <th>Updated By</th>
+                            <td>
+                                {% if expense.updated_by %}
+                                    <strong>{{ expense.updated_by.get_full_name|default:expense.updated_by.username }}</strong>
+                                    {% if expense.updated_by.email %}
+                                        <br><small class="text-muted">{{ expense.updated_by.email }}</small>
+                                    {% endif %}
+                                {% elif expense.approved_by %}
+                                    <strong>{{ expense.approved_by.get_full_name|default:expense.approved_by.username }}</strong>
+                                    <br><small class="text-muted">(approved by)</small>
+                                {% elif expense.created_by %}
+                                    <strong>{{ expense.created_by.get_full_name|default:expense.created_by.username }}</strong>
+                                    <br><small class="text-muted">(original record)</small>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <th>Updated At</th>
+                            <td>
+                                {% if expense.updated_at %}
+                                    {{ expense.updated_at|date:"d M Y, H:i" }}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+
+                        {# ── Row 4: Paid / Paid At ── #}
+                        <tr>
+                            <th>Paid By</th>
+                            <td>
+                                {% if expense.paid_by %}
+                                    <strong>{{ expense.paid_by.get_full_name|default:expense.paid_by.username }}</strong>
+                                    {% if expense.paid_by.email %}
+                                        <br><small class="text-muted">{{ expense.paid_by.email }}</small>
+                                    {% endif %}
+                                {% elif expense.approved_by and expense.paid_at %}
+                                    <strong>{{ expense.approved_by.get_full_name|default:expense.approved_by.username }}</strong>
+                                    <br><small class="text-muted">(marked as paid)</small>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
                             <th>Paid At</th>
-                            <td>{{ expense.paid_at|date:"d M Y, H:i" }}</td>
+                            <td>
+                                {% if expense.paid_at %}
+                                    {{ expense.paid_at|date:"d M Y, H:i" }}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
                         </tr>
-                        {% endif %}
-                        <tr>
-                            <th>Last Updated</th>
-                            <td>{{ expense.updated_at|date:"d M Y, H:i" }}</td>
-                        </tr>
+
                     </tbody>
                 </table>
             </div>
@@ -320,11 +572,11 @@
         <div class="attachment-box">
             {% if expense.attachment_url %}
                 {% if expense.is_pdf %}
-                    {# PDF — no inline preview, just a link #}
+                    {# PDF — no inline preview, just links #}
                     <i class="fas fa-file-pdf" style="font-size:3rem; color:#dc3545;"></i>
                     <p class="mb-2 mt-2">PDF attachment</p>
                     <div class="attachment-actions">
-                        <a href="{{ expense.attachment_url }}" target="_blank" rel="noopener"
+                        <a href="{{ expense.attachment_url }}" rel="noopener"
                            class="btn btn-danger btn-sm" style="border:2px solid #000;">
                             <i class="fas fa-external-link-alt"></i> Open PDF
                         </a>
@@ -335,13 +587,13 @@
                     </div>
                 {% else %}
                     {# Image — inline preview #}
-                    <a href="{{ expense.attachment_url }}" target="_blank" rel="noopener">
+                    <a href="{{ expense.attachment_url }}" rel="noopener">
                         <img src="{{ expense.attachment_url }}"
                              alt="Attachment for Expense #{{ expense.id }}"
                              onerror="this.parentElement.innerHTML='<div class=&quot;no-attachment&quot;><i class=&quot;fas fa-exclamation-triangle&quot;></i><p>Attachment file is missing or unreachable.</p></div>';">
                     </a>
                     <div class="attachment-actions">
-                        <a href="{{ expense.attachment_url }}" target="_blank" rel="noopener"
+                        <a href="{{ expense.attachment_url }}" rel="noopener"
                            class="btn btn-primary btn-sm" style="border:2px solid #000;">
                             <i class="fas fa-expand"></i> View Full Size
                         </a>
