@@ -101,7 +101,7 @@ class Plan(models.Model):
         if self.has_mpesa_intergration:
             features.append("M-Pesa Integration")
         if self.has_treasury:
-            features.append("MpesaShop Management")
+            features.append("MpesaShop")
 
         return features
 
