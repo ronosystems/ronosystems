@@ -948,3 +948,221 @@ class SupportSession(models.Model):
         self.is_active = False
         self.ended_at = timezone.now()
         self.save(update_fields=['is_active', 'ended_at'])
+
+
+
+
+# ============================================
+# TENANT FEEDBACK
+# ============================================
+
+class TenantFeedback(models.Model):
+    """
+    Feedback submitted by a tenant's user — bugs, feature requests, or
+    general comments. Visible to the hub owner (super admin) in a single
+    inbox.
+    """
+
+    TYPE_BUG     = 'bug'
+    TYPE_FEATURE = 'feature'
+    TYPE_IMPROVE = 'improvement'
+    TYPE_OTHER   = 'other'
+
+    FEEDBACK_TYPES = (
+        (TYPE_BUG,     'Bug / Error'),
+        (TYPE_FEATURE, 'Feature Request'),
+        (TYPE_IMPROVE, 'Improvement'),
+        (TYPE_OTHER,   'Other'),
+    )
+
+    SEVERITY_LOW    = 'low'
+    SEVERITY_NORMAL = 'normal'
+    SEVERITY_HIGH   = 'high'
+    SEVERITY_CRIT  = 'critical'
+
+    SEVERITY_CHOICES = (
+        (SEVERITY_LOW,    'Low — minor annoyance'),
+        (SEVERITY_NORMAL, 'Normal — should fix soon'),
+        (SEVERITY_HIGH,   'High — blocking my work'),
+        (SEVERITY_CRIT,   'Critical — losing data / money'),
+    )
+
+    STATUS_NEW        = 'new'
+    STATUS_REVIEWING  = 'reviewing'
+    STATUS_PLANNED    = 'planned'
+    STATUS_IN_PROGRESS= 'in_progress'
+    STATUS_DONE       = 'done'
+    STATUS_WONT_FIX   = 'wont_fix'
+
+    STATUS_CHOICES = (
+        (STATUS_NEW,         'New'),
+        (STATUS_REVIEWING,   'Reviewing'),
+        (STATUS_PLANNED,     'Planned'),
+        (STATUS_IN_PROGRESS, 'In Progress'),
+        (STATUS_DONE,        'Done'),
+        (STATUS_WONT_FIX,    "Won't Fix"),
+    )
+
+    # ---------- Who ----------
+    company = models.ForeignKey(
+        'companies.Company',
+        on_delete=models.CASCADE,
+        related_name='feedback_items',
+    )
+    submitted_by = models.ForeignKey(
+        django_settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='feedback_submitted',
+    )
+    branch = models.ForeignKey(
+        'company.Branch',
+        on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='feedback_items',
+        help_text="Branch the user was on when submitting (if any).",
+    )
+
+    # ---------- What ----------
+    feedback_type = models.CharField(
+        max_length=20, choices=FEEDBACK_TYPES, default=TYPE_OTHER,
+        db_index=True,
+    )
+    severity = models.CharField(
+        max_length=20, choices=SEVERITY_CHOICES, default=SEVERITY_NORMAL,
+    )
+    title = models.CharField(
+        max_length=200,
+        help_text="Short summary — e.g. 'Cannot upload PDF receipts'",
+    )
+    message = models.TextField(
+        help_text="Full description of the issue or request",
+    )
+
+    # ---------- Auto-captured context ----------
+    page_url = models.CharField(
+        max_length=500, blank=True,
+        help_text="Where the user was when the feedback was submitted",
+    )
+    user_agent = models.TextField(blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+
+    # ---------- Screenshot / attachment ----------
+    screenshot = models.FileField(
+        upload_to='tenant_feedback/%Y/%m/',
+        blank=True, null=True,
+        max_length=500,
+        help_text="Cloudinary public_id for the screenshot (optional)",
+    )
+    screenshot_format = models.CharField(
+        max_length=10, blank=True, default='',
+        help_text="Cloudinary format (jpg, png, pdf, ...).",
+    )
+
+    # ---------- Hub-owner triage ----------
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default=STATUS_NEW,
+        db_index=True,
+    )
+    admin_notes = models.TextField(
+        blank=True,
+        help_text="Internal notes — not shown to the tenant.",
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(
+        django_settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='feedback_resolved',
+    )
+
+    # ---------- Timestamps ----------
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'rono_tenant_feedback'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['company', 'status']),
+            models.Index(fields=['status', '-created_at']),
+            models.Index(fields=['feedback_type', 'status']),
+        ]
+
+    def __str__(self):
+        return f"[{self.get_feedback_type_display()}] {self.title} — {self.company.name}"
+
+    # ============================================
+    # DISPLAY HELPERS
+    # ============================================
+    @property
+    def severity_display(self):
+        for k, v in self.SEVERITY_CHOICES:
+            if k == self.severity:
+                return v.split(' — ')[0]
+        return self.severity
+
+    @property
+    def status_display_short(self):
+        return self.get_status_display()
+
+    @property
+    def is_open(self):
+        return self.status not in (self.STATUS_DONE, self.STATUS_WONT_FIX)
+
+    @property
+    def is_critical(self):
+        return self.severity == self.SEVERITY_CRIT and self.is_open
+
+    @property
+    def screenshot_url(self):
+        """Cloudinary-signed URL for the screenshot, or None."""
+        if not self.screenshot:
+            return None
+
+        key = getattr(self.screenshot, 'name', None) or str(self.screenshot)
+        key = key.strip().lstrip('/')
+        if not key:
+            return None
+
+        if key.startswith(('http://', 'https://')):
+            return key
+        if key.startswith('media/'):
+            key = key[len('media/'):]
+
+        cfg = getattr(django_settings, 'CLOUDINARY_STORAGE', {})
+        cloud_name = cfg.get('CLOUD_NAME', '')
+        if cloud_name:
+            return f"https://res.cloudinary.com/{cloud_name}/image/upload/{key}"
+
+        media_url = getattr(django_settings, 'MEDIA_URL', '/media/')
+        if not media_url.endswith('/'):
+            media_url += '/'
+        return f"{media_url}{key}"
+
+    @property
+    def is_screenshot_image(self):
+        fmt = (self.screenshot_format or '').lower()
+        if fmt:
+            return fmt in ('jpg', 'jpeg', 'png', 'gif', 'webp')
+        key = (self.screenshot.name or '').lower()
+        return key.endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp'))
+
+    @property
+    def is_screenshot_pdf(self):
+        fmt = (self.screenshot_format or '').lower()
+        if fmt:
+            return fmt == 'pdf'
+        return (self.screenshot.name or '').lower().endswith('.pdf')
+
+    # ============================================
+    # STATE ACTIONS
+    # ============================================
+    def set_status(self, new_status, by_user=None, note=None):
+        self.status = new_status
+        if note:
+            self.admin_notes = (self.admin_notes + '\n\n' + note).strip()
+        if new_status in (self.STATUS_DONE, self.STATUS_WONT_FIX):
+            self.resolved_at = timezone.now()
+            self.resolved_by = by_user
+        else:
+            self.resolved_at = None
+            self.resolved_by = None
+        self.save()

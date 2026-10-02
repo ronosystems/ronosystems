@@ -499,6 +499,110 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
 
+        /* ============================================
+           TENANT FEEDBACK WIDGET
+        ============================================ */
+        .fb-fab {
+            position: fixed;
+            right: 22px;
+            bottom: 22px;
+            z-index: 1055;
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            border: 2px solid #000;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .fb-fab:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+        }
+        .fb-fab i { font-size: 22px; color: #000; }
+
+        .fb-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 1060;
+            background: rgba(0, 0, 0, 0.55);
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .fb-modal.open { display: flex; }
+
+        .fb-modal-inner {
+            background: #fff;
+            border: 3px solid #000;
+            border-radius: 6px;
+            width: 100%;
+            max-width: 560px;
+            max-height: 92vh;
+            overflow: auto;
+        }
+        .fb-modal-header {
+            background: var(--primary-color);
+            border-bottom: 2px solid #000;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .fb-modal-header strong {
+            font-size: 1rem;
+            color: #000;
+        }
+        .fb-modal-close {
+            background: #dc3545;
+            color: #fff;
+            border: 2px solid #000;
+            border-radius: 4px;
+            padding: 2px 10px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+        .fb-modal-body { padding: 16px; }
+        .fb-form-label {
+            font-weight: 700;
+            font-size: 0.8rem;
+            color: #000;
+            margin-bottom: 4px;
+            display: block;
+        }
+        .fb-form-control {
+            width: 100%;
+            border: 2px solid #000;
+            border-radius: 4px;
+            padding: 6px 10px;
+            font-size: 0.88rem;
+        }
+        .fb-form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 30%, transparent);
+        }
+        .fb-modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 16px;
+        }
+        .fb-toast {
+            padding: 8px 12px;
+            border: 1px solid #000;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-size: 0.88rem;
+        }
+        .fb-toast.ok  { background: #d4edda; color: #155724; }
+        .fb-toast.err { background: #f8d7da; color: #721c24; }
+
         /* Responsive */
         @media (max-width: 992px) {
             .sidebar {
@@ -550,6 +654,9 @@
             .top-navbar .user-profile .user-name { display: none; }
             .top-navbar .user-profile .user-role { display: none; }
             .content-area { padding: 10px; }
+
+            .fb-fab { width: 48px; height: 48px; right: 16px; bottom: 16px; }
+            .fb-fab i { font-size: 18px; }
         }
     </style>
     {% block extra_css %}{% endblock %}
@@ -833,10 +940,10 @@
                     {% endif %}
 
                     {# ============================================================ #}
-                    {# SUPER ADMIN — outside support mode only                      #}
+                    {# SUPER ADMIN — Hub administration links                      #}
                     {# ============================================================ #}
-                    {% if user.is_authenticated and role == 'super_admin' and not is_support_mode %}
-                    <li class="nav-label">SUPER ADMIN</li>
+                    {% if user.is_authenticated and user.role == 'super_admin' and not is_support_mode %}
+                    <li class="nav-label">ADMINISTRATION</li>
 
                     <li class="nav-item">
                         <a class="nav-link {% if '/support/' in request.path %}active{% endif %}"
@@ -846,50 +953,9 @@
                     </li>
 
                     <li class="nav-item">
-                        <a class="nav-link" href="/admin/">
-                            <i class="fas fa-user-shield"></i> <span>Admin Panel</span>
-                        </a>
-                    </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/business_types/' in request.path %}active{% endif %}"
-                           href="/business-types/">
-                            <i class="fas fa-tags"></i> <span>Business Types</span>
-                        </a>
-                    </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/plans/' in request.path %}active{% endif %}"
-                           href="/plans/">
-                            <i class="fas fa-dollar-sign"></i> <span>Plans</span>
-                        </a>
-                    </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/companies/' in request.path %}active{% endif %}"
-                           href="/companies/">
-                            <i class="fas fa-building"></i> <span>Companies</span>
-                        </a>
-                    </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/employees/' in request.path %}active{% endif %}"
-                           href="/employees/">
-                            <i class="fas fa-users"></i> <span>All Users</span>
-                        </a>
-                    </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/reports/' in request.path and '/kuku_biz/' not in request.path %}active{% endif %}"
-                           href="/reports/">
-                            <i class="fas fa-file-alt"></i> <span>Platform Reports</span>
-                        </a>
-                    </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/settings/' in request.path and '/company/settings/' not in request.path %}active{% endif %}"
-                           href="/settings/">
-                            <i class="fas fa-cog"></i> <span>System Settings</span>
+                        <a class="nav-link {% if '/hub/feedback/' in request.path %}active{% endif %}"
+                           href="{% url 'companies:hub-feedback-list' %}">
+                            <i class="fas fa-inbox"></i> <span>Tenant Feedback</span>
                         </a>
                     </li>
                     {% endif %}
@@ -1020,6 +1086,82 @@
             </div>
         </footer>
     </div>
+
+    {# ============================================ #}
+    {# TENANT FEEDBACK FLOATING WIDGET              #}
+    {# Only shown to authenticated users, and not   #}
+    {# while a super-admin is in support mode.      #}
+    {# ============================================ #}
+    {% if user.is_authenticated and not is_support_mode and user.role != 'super_admin' %}
+    <div class="fb-fab" id="fbFab" title="Send feedback to RonoSystems">
+        <i class="fas fa-comment-dots"></i>
+    </div>
+
+    <div class="fb-modal" id="fbModal">
+        <div class="fb-modal-inner">
+            <div class="fb-modal-header">
+                <strong><i class="fas fa-comment-dots"></i> Send Feedback</strong>
+                <button type="button" class="fb-modal-close" onclick="closeFb()">&times;</button>
+            </div>
+
+            <form id="fbForm" enctype="multipart/form-data" class="fb-modal-body">
+                {% csrf_token %}
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="fb-form-label">Type</label>
+                        <select name="feedback_type" class="fb-form-control" required>
+                            <option value="bug">🐞 Bug / Error</option>
+                            <option value="feature">✨ Feature Request</option>
+                            <option value="improvement">⚡ Improvement</option>
+                            <option value="other" selected>💬 Other</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="fb-form-label">Severity</label>
+                        <select name="severity" class="fb-form-control" required>
+                            <option value="low">Low</option>
+                            <option value="normal" selected>Normal</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="fb-form-label">Title</label>
+                        <input type="text" name="title" class="fb-form-control"
+                               maxlength="200" required
+                               placeholder="Short summary — e.g. 'Cannot upload PDF receipts'">
+                    </div>
+                    <div class="col-12">
+                        <label class="fb-form-label">Describe</label>
+                        <textarea name="message" class="fb-form-control" rows="5"
+                                  required placeholder="What happened? What did you expect? What would help?"></textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="fb-form-label">Screenshot (optional)</label>
+                        <input type="file" name="screenshot" class="fb-form-control"
+                               accept="image/*,.pdf">
+                        <small class="text-muted">JPG, PNG, GIF, WEBP, or PDF · max 5 MB</small>
+                    </div>
+                </div>
+
+                <input type="hidden" name="page_url" id="fbPageUrl">
+
+                <div class="fb-modal-footer">
+                    <button type="button" onclick="closeFb()"
+                            class="btn btn-secondary btn-sm" style="border:2px solid #000;">
+                        Cancel
+                    </button>
+                    <button type="submit" id="fbSubmit"
+                            class="btn btn-primary btn-sm" style="border:2px solid #000;">
+                        <i class="fas fa-paper-plane"></i> Send
+                    </button>
+                </div>
+                <div id="fbMsg"></div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
 
     <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
     <script>
@@ -1159,6 +1301,79 @@
             setInterval(updateTimer, 1000);
         })();
         {% endif %}
+
+        // ============================================================
+        // TENANT FEEDBACK WIDGET
+        // ============================================================
+        (function () {
+            const fab    = document.getElementById('fbFab');
+            const modal  = document.getElementById('fbModal');
+            const form   = document.getElementById('fbForm');
+            const btn    = document.getElementById('fbSubmit');
+            const msgBox = document.getElementById('fbMsg');
+            const urlInput = document.getElementById('fbPageUrl');
+
+            if (!fab || !modal) return;   // widget not rendered for this user
+
+            window.openFb = function () {
+                urlInput.value = window.location.href;
+                modal.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            };
+            window.closeFb = function () {
+                modal.classList.remove('open');
+                document.body.style.overflow = '';
+                msgBox.innerHTML = '';
+            };
+
+            fab.addEventListener('click', window.openFb);
+            modal.addEventListener('click', function (e) {
+                if (e.target === modal) window.closeFb();
+            });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && modal.classList.contains('open')) {
+                    window.closeFb();
+                }
+            });
+
+            form.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+                msgBox.innerHTML = '';
+
+                try {
+                    const fd = new FormData(form);
+                    const res = await fetch('{% url "companies:tenant-feedback-submit" %}', {
+                        method: 'POST',
+                        body: fd,
+                        headers: {'X-Requested-With': 'XMLHttpRequest'},
+                    });
+                    const data = await res.json();
+
+                    if (data.ok) {
+                        msgBox.innerHTML =
+                            '<div class="fb-toast ok">' +
+                            '<i class="fas fa-check"></i> Thank you! Your feedback has been sent.' +
+                            '</div>';
+                        form.reset();
+                        setTimeout(window.closeFb, 1500);
+                    } else {
+                        msgBox.innerHTML =
+                            '<div class="fb-toast err">' +
+                            '<i class="fas fa-exclamation-triangle"></i> ' +
+                            (data.error || 'Something went wrong.') + '</div>';
+                    }
+                } catch (err) {
+                    msgBox.innerHTML =
+                        '<div class="fb-toast err">' +
+                        'Network error. Please try again.</div>';
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send';
+                }
+            });
+        })();
     </script>
 
     {# ============================================ #}

@@ -28,6 +28,14 @@ from .models import Company, BusinessType, CompanyJoinRequest
 from .kcb_client import KCBClient
 
 
+import cloudinary
+import cloudinary.uploader
+from django.conf import settings as django_settings
+from .models import TenantFeedback
+from apps.companies.support_utils import get_active_company
+from django.core.paginator import Paginator
+
+
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
@@ -1400,3 +1408,293 @@ def company_employee_list(request, company_id):
         'page_subtitle': 'Company employees',
     }
     return render(request, 'companies/employees.html', context)
+
+
+
+
+# ============================================
+# TENANT FEEDBACK — FLOATING WIDGET SUBMIT
+# ============================================
+
+# Allowed screenshot formats
+FEEDBACK_SCREENSHOT_EXTS = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf')
+FEEDBACK_SCREENSHOT_MAX_SIZE = 5 * 1024 * 1024  # 5 MB
+
+
+def _feedback_cloudinary_config():
+    cfg = getattr(django_settings, 'CLOUDINARY_STORAGE', {})
+    cloudinary.config(
+        cloud_name=cfg.get('CLOUD_NAME', ''),
+        api_key=cfg.get('API_KEY', ''),
+        api_secret=cfg.get('API_SECRET', ''),
+        secure=True,
+    )
+
+
+def _upload_feedback_screenshot(file_obj, company_id, feedback_type):
+    """
+    Upload a feedback screenshot to Cloudinary under:
+        tenant_feedback/<company_id>/<type>_<timestamp>
+    Returns the Cloudinary response dict (contains public_id + format).
+    """
+    import time as _time
+    _feedback_cloudinary_config()
+
+    public_id = f"tenant_feedback/{company_id}/{feedback_type}_{int(_time.time())}"
+
+    # PDFs go under `raw`, everything else stays as `image`
+    name = (file_obj.name or '').lower()
+    resource_type = 'raw' if name.endswith('.pdf') else 'image'
+
+    return cloudinary.uploader.upload(
+        file_obj,
+        public_id=public_id,
+        overwrite=False,
+        resource_type=resource_type,
+    )
+
+
+@login_required
+def tenant_feedback_submit(request):
+    """
+    Accepts POST from the floating feedback widget. Returns JSON so the
+    JS can show a toast without a full page reload.
+
+    Fields:
+        feedback_type — bug | feature | improvement | other
+        severity      — low | normal | high | critical
+        title         — short summary
+        message       — full description
+        page_url      — URL the user was on
+        screenshot    — optional file (image or PDF)
+    """
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+
+    company, _ = get_active_company(request)
+    if not company:
+        return JsonResponse({'ok': False, 'error': 'No active company.'}, status=403)
+
+    feedback_type = (request.POST.get('feedback_type') or 'other').strip()
+    valid_types = dict(TenantFeedback.FEEDBACK_TYPES)
+    if feedback_type not in valid_types:
+        feedback_type = TenantFeedback.TYPE_OTHER
+
+    severity = (request.POST.get('severity') or 'normal').strip()
+    valid_sev = dict(TenantFeedback.SEVERITY_CHOICES)
+    if severity not in valid_sev:
+        severity = TenantFeedback.SEVERITY_NORMAL
+
+    title = (request.POST.get('title') or '').strip()
+    message = (request.POST.get('message') or '').strip()
+    page_url = (request.POST.get('page_url') or '')[:500]
+
+    if not title or not message:
+        return JsonResponse(
+            {'ok': False, 'error': 'Title and message are required.'},
+            status=400,
+        )
+
+    # ── Screenshot (optional) ──
+    screenshot = request.FILES.get('screenshot')
+    attachment_public_id = ''
+    attachment_format = ''
+
+    if screenshot:
+        if screenshot.size > FEEDBACK_SCREENSHOT_MAX_SIZE:
+            return JsonResponse(
+                {'ok': False, 'error': 'Screenshot too large (max 5 MB).'},
+                status=400,
+            )
+        name = (screenshot.name or '').lower()
+        if not name.endswith(FEEDBACK_SCREENSHOT_EXTS):
+            allowed = ', '.join(FEEDBACK_SCREENSHOT_EXTS)
+            return JsonResponse(
+                {'ok': False, 'error': f'Invalid file type. Allowed: {allowed}'},
+                status=400,
+            )
+        try:
+            result = _upload_feedback_screenshot(
+                screenshot, company.id, feedback_type,
+            )
+            attachment_public_id = result.get('public_id') or ''
+            attachment_format = (result.get('format') or '').lower()
+        except Exception as exc:
+            return JsonResponse(
+                {'ok': False, 'error': f'Upload failed: {exc}'},
+                status=500,
+            )
+
+    # ── Branch (best effort) ──
+    user_branch = None
+    if hasattr(request.user, 'branch') and request.user.branch:
+        user_branch = request.user.branch
+
+    # ── IP ──
+    xff = request.META.get('HTTP_X_FORWARDED_FOR', '')
+    ip = xff.split(',')[0].strip() if xff else request.META.get('REMOTE_ADDR')
+
+    fb = TenantFeedback.objects.create(
+        company=company,
+        submitted_by=request.user,
+        branch=user_branch,
+        feedback_type=feedback_type,
+        severity=severity,
+        title=title,
+        message=message,
+        page_url=page_url,
+        user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+        ip_address=ip or None,
+        screenshot=attachment_public_id or None,
+        screenshot_format=attachment_format,
+        status=TenantFeedback.STATUS_NEW,
+    )
+
+    return JsonResponse({'ok': True, 'id': fb.id})
+
+
+
+
+# ============================================
+# HUB OWNER FEEDBACK LIST + DETAIL
+# ============================================
+
+# NOTE: This module registers its URLs under `app_name = 'companies'`
+# in apps/companies/urls.py, so every reverse() / redirect() here must
+# use the `companies:` namespace prefix — e.g.
+#     reverse('companies:hub-feedback-detail', kwargs={'pk': fb.id})
+# Templates follow the same rule:  {% url 'companies:hub-feedback-detail' fb.id %}
+
+
+def _is_hub_owner(user):
+    return user.is_authenticated and (
+        user.is_superuser or getattr(user, 'role', '') == 'super_admin'
+    )
+
+
+@login_required
+def hub_feedback_list(request):
+    """
+    Hub-owner inbox — one page listing feedback across ALL tenants.
+    Only accessible to super-admins.
+    """
+    if not _is_hub_owner(request.user):
+        messages.error(request, 'Access denied.')
+        return redirect('/dashboard/')
+
+    qs = TenantFeedback.objects.select_related(
+        'company', 'submitted_by', 'branch', 'resolved_by',
+    )
+
+    # ── Filters ──
+    status      = request.GET.get('status')
+    ftype       = request.GET.get('type')
+    severity    = request.GET.get('severity')
+    company_id  = request.GET.get('company')
+    search      = request.GET.get('q')
+    only_open   = request.GET.get('open') == '1'
+
+    if status:
+        qs = qs.filter(status=status)
+    if ftype:
+        qs = qs.filter(feedback_type=ftype)
+    if severity:
+        qs = qs.filter(severity=severity)
+
+    if company_id:
+        try:
+            qs = qs.filter(company_id=int(company_id))
+        except (TypeError, ValueError):
+            pass  # ignore malformed company filter
+
+    if only_open:
+        qs = qs.exclude(status__in=[
+            TenantFeedback.STATUS_DONE,
+            TenantFeedback.STATUS_WONT_FIX,
+        ])
+
+    if search:
+        qs = qs.filter(
+            Q(title__icontains=search)
+            | Q(message__icontains=search)
+            | Q(company__name__icontains=search)
+        )
+
+    # ── Counts (for the stat cards) ──
+    all_qs = TenantFeedback.objects.all()
+    counts = {
+        'total':    all_qs.count(),
+        'new':      all_qs.filter(status=TenantFeedback.STATUS_NEW).count(),
+        'open':     all_qs.exclude(status__in=[
+            TenantFeedback.STATUS_DONE,
+            TenantFeedback.STATUS_WONT_FIX,
+        ]).count(),
+        'critical': all_qs.filter(
+            severity=TenantFeedback.SEVERITY_CRIT,
+        ).exclude(status__in=[
+            TenantFeedback.STATUS_DONE,
+            TenantFeedback.STATUS_WONT_FIX,
+        ]).count(),
+        'bugs':     all_qs.filter(feedback_type=TenantFeedback.TYPE_BUG).count(),
+        'features': all_qs.filter(feedback_type=TenantFeedback.TYPE_FEATURE).count(),
+    }
+
+    # ── Pagination ──
+    paginator = Paginator(qs, 25)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    # ── Tenant list for filter (uses `Company` imported at module top) ──
+    companies = Company.objects.filter(is_active=True).order_by('name')
+
+    context = {
+        'page_obj':         page_obj,
+        'counts':           counts,
+        'companies':        companies,
+        'feedback_types':   TenantFeedback.FEEDBACK_TYPES,
+        'statuses':         TenantFeedback.STATUS_CHOICES,
+        'severities':       TenantFeedback.SEVERITY_CHOICES,
+        'selected_status':  status,
+        'selected_type':    ftype,
+        'selected_severity': severity,
+        'selected_company': company_id,
+        'selected_open':    only_open,
+        'search':           search or '',
+        'is_hub_owner':     True,
+    }
+    return render(request, 'hub/feedback_list.html', context)
+
+
+@login_required
+def hub_feedback_detail(request, pk):
+    """Hub owner opens a single feedback item, can change status / add notes."""
+    if not _is_hub_owner(request.user):
+        messages.error(request, 'Access denied.')
+        return redirect('/dashboard/')
+
+    fb = get_object_or_404(TenantFeedback, id=pk)
+
+    if request.method == 'POST':
+        new_status = request.POST.get('status')
+        note = (request.POST.get('admin_notes') or '').strip()
+
+        if new_status and new_status in dict(TenantFeedback.STATUS_CHOICES):
+            fb.set_status(new_status, by_user=request.user, note=note or None)
+            messages.success(request, f'Status changed to {fb.get_status_display()}.')
+        elif note:
+            fb.admin_notes = (fb.admin_notes + '\n\n' + note).strip()
+            fb.save(update_fields=['admin_notes'])
+            messages.success(request, 'Note added.')
+
+        # Namespaced reverse — the URL is registered under `companies:`.
+        return redirect('companies:hub-feedback-detail', pk=fb.id)
+
+    context = {
+        'fb':           fb,
+        'statuses':     TenantFeedback.STATUS_CHOICES,
+        'is_hub_owner': True,
+    }
+    return render(request, 'hub/feedback_detail.html', context)
+
+
+
+    

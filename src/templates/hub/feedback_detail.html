@@ -1,0 +1,234 @@
+{% extends base_template|default:"base.html" %}
+{% block title %}Feedback #{{ fb.id }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .fb-card { border: 2px solid #000; border-radius: 4px; margin-bottom: 16px; background: #fff; }
+    .fb-card-header {
+        background: #0f172a; color: #fff; padding: 10px 16px;
+        font-weight: 700; border-bottom: 2px solid #000;
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    .fb-card-body { padding: 16px; }
+
+    .kv { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    .kv th, .kv td { border: 1px solid #000; padding: 8px 12px; }
+    .kv th { background: #f0f2f5; width: 30%; }
+
+    .badge-type, .badge-sev, .badge-status {
+        padding: 3px 10px; border-radius: 4px; font-size: 11px;
+        font-weight: 700; border: 1px solid #000;
+        text-transform: uppercase; letter-spacing: 0.4px;
+    }
+    .badge-type.bug         { background: #fecaca; color: #7f1d1d; }
+    .badge-type.feature     { background: #bbf7d0; color: #14532d; }
+    .badge-type.improvement { background: #bae6fd; color: #0c4a6e; }
+    .badge-type.other       { background: #e2e8f0; color: #1e293b; }
+    .badge-sev.low          { background: #f1f5f9; color: #475569; }
+    .badge-sev.normal       { background: #e0f2fe; color: #075985; }
+    .badge-sev.high         { background: #fed7aa; color: #7c2d12; }
+    .badge-sev.critical     { background: #dc3545; color: #fff; }
+    .badge-status.new       { background: #fef3c7; color: #92400e; }
+    .badge-status.reviewing { background: #dbeafe; color: #1e40af; }
+    .badge-status.planned   { background: #e0e7ff; color: #3730a3; }
+    .badge-status.in_progress { background: #fde68a; color: #78350f; }
+    .badge-status.done      { background: #d1fae5; color: #065f46; }
+    .badge-status.wont_fix  { background: #e5e7eb; color: #4b5563; }
+
+    .message-box {
+        background: #f8f9fa; border: 2px solid #000; border-radius: 4px;
+        padding: 14px; white-space: pre-wrap; font-size: 0.92rem; line-height: 1.5;
+    }
+    .notes-box {
+        background: #fffbeb; border: 2px solid #000; border-radius: 4px;
+        padding: 14px; white-space: pre-wrap; font-size: 0.88rem;
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    }
+
+    .screenshot-preview {
+        border: 2px solid #000; border-radius: 4px; max-width: 100%;
+        max-height: 500px; background: #fff;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <h4 class="mb-0">
+                <i class="fas fa-comment-dots"></i> Feedback #{{ fb.id }}
+                <span class="badge-status {{ fb.status }} ms-2">{{ fb.get_status_display }}</span>
+            </h4>
+            <small class="text-muted">Submitted {{ fb.created_at|date:"d M Y, H:i" }}</small>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'companies:hub-feedback-list' %}" class="btn btn-secondary btn-sm" style="border:2px solid #000;">
+                <i class="fas fa-arrow-left"></i> Back to Inbox
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+
+            <!-- Original submission -->
+            <div class="fb-card">
+                <div class="fb-card-header">
+                    <span><i class="fas fa-flag"></i> Submission</span>
+                    <span>
+                        <span class="badge-type {{ fb.feedback_type }}">{{ fb.get_feedback_type_display }}</span>
+                        <span class="badge-sev {{ fb.severity }} ms-1">{{ fb.severity_display }}</span>
+                    </span>
+                </div>
+                <div class="fb-card-body">
+                    <h5 style="margin-bottom:10px;">{{ fb.title }}</h5>
+                    <div class="message-box">{{ fb.message }}</div>
+
+                    {% if fb.screenshot %}
+                    <div style="margin-top:16px;">
+                        <div class="text-muted small mb-2"><strong>Attachment:</strong></div>
+                        {% if fb.is_screenshot_image %}
+                            <a href="{{ fb.screenshot_url }}"  rel="noopener">
+                                <img src="{{ fb.screenshot_url }}" class="screenshot-preview"
+                                     alt="Attachment">
+                            </a>
+                        {% elif fb.is_screenshot_pdf %}
+                            <a href="{{ fb.screenshot_url }}" rel="noopener"
+                               class="btn btn-danger btn-sm" style="border:2px solid #000;">
+                                <i class="fas fa-file-pdf"></i> Open PDF Attachment
+                            </a>
+                        {% else %}
+                            <a href="{{ fb.screenshot_url }}" rel="noopener"
+                               class="btn btn-secondary btn-sm" style="border:2px solid #000;">
+                                <i class="fas fa-paperclip"></i> Open Attachment
+                            </a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Triage form -->
+            <div class="fb-card">
+                <div class="fb-card-header">
+                    <span><i class="fas fa-tasks"></i> Triage</span>
+                </div>
+                <div class="fb-card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Change Status</label>
+                                <select name="status" class="form-select form-select-sm">
+                                    {% for k, v in statuses %}
+                                        <option value="{{ k }}" {% if fb.status == k %}selected{% endif %}>{{ v }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small fw-bold">Add Internal Note</label>
+                                <textarea name="admin_notes" class="form-control form-control-sm" rows="3"
+                                          placeholder="Notes visible only to you (appended to the notes box below)"></textarea>
+                            </div>
+                            <div class="col-12 text-end">
+                                <button type="submit" class="btn btn-primary btn-sm"
+                                        style="border:2px solid #000;">
+                                    <i class="fas fa-save"></i> Save Changes
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Internal notes history -->
+            {% if fb.admin_notes %}
+            <div class="fb-card">
+                <div class="fb-card-header">
+                    <span><i class="fas fa-lock"></i> Internal Notes (not shown to tenant)</span>
+                </div>
+                <div class="fb-card-body">
+                    <div class="notes-box">{{ fb.admin_notes }}</div>
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+
+        <!-- Sidebar — meta -->
+        <div class="col-lg-4">
+            <div class="fb-card">
+                <div class="fb-card-header">
+                    <span><i class="fas fa-info-circle"></i> Details</span>
+                </div>
+                <div class="fb-card-body p-0">
+                    <table class="kv">
+                        <tr>
+                            <th>Company</th>
+                            <td><strong>{{ fb.company.name }}</strong></td>
+                        </tr>
+                        {% if fb.branch %}
+                        <tr>
+                            <th>Branch</th>
+                            <td>{{ fb.branch.name }}</td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <th>Submitted By</th>
+                            <td>
+                                {% if fb.submitted_by %}
+                                    {{ fb.submitted_by.get_full_name|default:fb.submitted_by.username }}
+                                    <br><small class="text-muted">{{ fb.submitted_by.email }}</small>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Page</th>
+                            <td>
+                                {% if fb.page_url %}
+                                    <small style="word-break:break-all;">{{ fb.page_url }}</small>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>IP Address</th>
+                            <td>{{ fb.ip_address|default:"—" }}</td>
+                        </tr>
+                        <tr>
+                            <th>Submitted</th>
+                            <td>{{ fb.created_at|date:"d M Y, H:i" }}</td>
+                        </tr>
+                        {% if fb.resolved_at %}
+                        <tr>
+                            <th>Resolved</th>
+                            <td>
+                                {{ fb.resolved_at|date:"d M Y, H:i" }}
+                                {% if fb.resolved_by %}
+                                    <br><small class="text-muted">by {{ fb.resolved_by.get_full_name|default:fb.resolved_by.username }}</small>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+
+            <div class="fb-card">
+                <div class="fb-card-header">
+                    <span><i class="fas fa-desktop"></i> User Agent</span>
+                </div>
+                <div class="fb-card-body">
+                    <small style="word-break:break-all;">{{ fb.user_agent|default:"—" }}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

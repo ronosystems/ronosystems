@@ -99,4 +99,23 @@ urlpatterns = [
         web_views.company_verify_domain,
         name='company-verify-domain',
     ),
+
+    # Tenant-side submit (from floating widget)
+    path(
+        'feedback/submit/',
+        web_views.tenant_feedback_submit,
+        name='tenant-feedback-submit',
+    ),
+
+    # Hub-owner inbox
+    path(
+        'hub/feedback/',
+        web_views.hub_feedback_list,
+        name='hub-feedback-list',
+    ),
+    path(
+        'hub/feedback/<int:pk>/',
+        web_views.hub_feedback_detail,
+        name='hub-feedback-detail',
+    ),
 ]
