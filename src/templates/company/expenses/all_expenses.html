@@ -1,0 +1,396 @@
+{% extends base_template|default:"base.html" %}
+
+{% block title %}All Expenses{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       TABLE
+       ============================================ */
+    .table-all {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+    }
+    .table-all th,
+    .table-all td {
+        border: 1px solid #000000;
+        padding: 8px 10px;
+        vertical-align: middle;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+    }
+    .table-all thead th {
+        background-color: #87CEEB;
+        color: #000000;
+        font-weight: 700;
+        border-bottom: 2px solid #000000;
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        white-space: nowrap;
+    }
+    .table-all tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    .table-all tbody tr:hover td { background-color: #f5f7fa; }
+    .table-all tbody tr:nth-child(even) td { background-color: #fafbfc; }
+    .table-all tbody tr:nth-child(even):hover td { background-color: #f0f2f5; }
+
+    .table-all tfoot td {
+        background-color: #f8f9fa !important;
+        border-top: 2px solid #000000;
+        font-weight: 700;
+        padding: 10px 12px;
+    }
+
+    .table-all .col-id      { width: 60px;  text-align: center; }
+    .table-all .col-type    { width: 90px; }
+    .table-all .col-date    { width: 105px; }
+    .table-all .col-amount  { width: 120px; text-align: right; }
+    .table-all .col-branch  { width: 130px; }
+    .table-all .col-status  { width: 100px; text-align: center; }
+    .table-all .col-actions { width: 130px; text-align: center; }
+
+    /* ============================================
+       BADGES
+       ============================================ */
+    .type-badge {
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 700;
+        display: inline-block;
+        border: 1px solid #000000;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+    }
+    .type-badge.salary  { background: #d1fae5; color: #065f46; }
+    .type-badge.rent    { background: #dbeafe; color: #1e40af; }
+    .type-badge.bill    { background: #fce4ec; color: #c62828; }
+    .type-badge.general { background: #e8eaf6; color: #283593; }
+
+    .status-badge {
+        padding: 3px 10px;
+        border-radius: 50px;
+        font-size: 10px;
+        font-weight: 700;
+        display: inline-block;
+        border: 1px solid #000000;
+        white-space: nowrap;
+    }
+    .status-badge.pending  { background: #fef3c7; color: #92400e; }
+    .status-badge.approved { background: #dbeafe; color: #1e40af; }
+    .status-badge.paid     { background: #d4edda; color: #155724; }
+    .status-badge.rejected { background: #f8d7da; color: #721c24; }
+
+    /* ============================================
+       SUMMARY CARDS
+       ============================================ */
+    .all-summary {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        margin-bottom: 16px;
+    }
+    .all-card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: #ffffff;
+        padding: 14px 16px;
+        text-align: center;
+        border-left: 6px solid #dc3545;
+    }
+    .all-card .value {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #000000;
+    }
+    .all-card .label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #000000;
+        font-weight: 600;
+        margin-top: 4px;
+    }
+
+    /* ============================================
+       FILTER BAR
+       ============================================ */
+    .filter-bar {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+        gap: 10px;
+        align-items: end;
+        padding: 12px 14px;
+        background: #f8f9fa;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        margin-bottom: 14px;
+    }
+    .filter-bar .filter-actions {
+        display: flex;
+        gap: 6px;
+    }
+
+    /* ============================================
+       BUTTONS
+       ============================================ */
+    .btn-xs {
+        padding: 4px 8px;
+        font-size: 11px;
+        border-radius: 4px;
+        border: 2px solid #000000;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .btn-view   { background: #e0f7fa; color: #00695c; }
+    .btn-view:hover { background: #b2ebf2; color: #00695c; }
+    .btn-edit   { background: #ffc107; color: #000000; }
+    .btn-edit:hover { background: #e0a800; color: #000000; }
+    .btn-del    { background: #dc3545; color: #ffffff; }
+    .btn-del:hover { background: #c82333; color: #ffffff; }
+
+    /* ============================================
+       RESPONSIVE
+       ============================================ */
+    @media (max-width: 1199.98px) {
+        .filter-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .filter-bar .filter-actions { grid-column: span 2; justify-content: flex-end; }
+        .all-summary { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 767.98px) {
+        .filter-bar { grid-template-columns: 1fr; }
+        .filter-bar .filter-actions { grid-column: auto; justify-content: stretch; }
+        .filter-bar .filter-actions .btn { flex: 1; }
+        .all-summary { grid-template-columns: 1fr; }
+        .table-all { font-size: 0.8rem; }
+        .table-all .col-branch,
+        .table-all .col-date { display: none; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <h4 class="mb-0"><i class="fas fa-list"></i> All Expenses</h4>
+            <small class="text-muted">
+                Every expense across salaries, rents, bills, and general.
+            </small>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'company-expenses-dashboard' %}" class="btn btn-secondary btn-sm" style="border:2px solid #000;">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary cards -->
+    <div class="all-summary">
+        <div class="all-card">
+            <div class="value">{{ summary.total_expenses|default:"0" }}</div>
+            <div class="label">Total Records</div>
+        </div>
+        <div class="all-card">
+            <div class="value">KSh {{ summary.total_amount|floatformat:2|default:"0.00" }}</div>
+            <div class="label">Total Amount</div>
+        </div>
+        <div class="all-card">
+            <div class="value">
+                KSh
+                {% if summary.total_expenses %}
+                    {{ summary.total_amount|floatformat:2 }}
+                {% else %}
+                    0.00
+                {% endif %}
+            </div>
+            <div class="label">Sum of Filtered</div>
+        </div>
+        <div class="all-card">
+            <div class="value">{{ expenses|length }}</div>
+            <div class="label">Items Shown</div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <form method="get" class="filter-bar">
+        <div>
+            <label class="form-label small mb-1">Branch</label>
+            <select name="branch" class="form-select form-select-sm">
+                <option value="">All branches</option>
+                {% for b in branches %}
+                    <option value="{{ b.id }}" {% if selected_branch == b.id|stringformat:"s" %}selected{% endif %}>
+                        {{ b.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label small mb-1">Type</label>
+            <select name="type" class="form-select form-select-sm">
+                <option value="">All types</option>
+                {% for k, v in expense_types %}
+                    <option value="{{ k }}" {% if selected_type == k %}selected{% endif %}>{{ v }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label small mb-1">Status</label>
+            <select name="status" class="form-select form-select-sm">
+                <option value="">All statuses</option>
+                {% for k, v in statuses %}
+                    <option value="{{ k }}" {% if selected_status == k %}selected{% endif %}>{{ v }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label small mb-1">Search</label>
+            <input type="text" name="q" value="{{ search }}" class="form-control form-control-sm"
+                   placeholder="Description, name, ref...">
+        </div>
+        <div class="filter-actions">
+            <button type="submit" class="btn btn-primary btn-sm" style="border:2px solid #000;">
+                <i class="fas fa-filter"></i> Filter
+            </button>
+            <a href="{% url 'company-expenses-all' %}" class="btn btn-secondary btn-sm" style="border:2px solid #000;">
+                Reset
+            </a>
+        </div>
+    </form>
+
+    {% if expenses %}
+    <div class="card shadow-sm" style="border: 2px solid #000;">
+        <div class="table-responsive">
+            <table class="table-all mb-0">
+                <thead>
+                    <tr>
+                        <th class="col-id">#</th>
+                        <th class="col-type">Type</th>
+                        <th>Details</th>
+                        <th>Description</th>
+                        <th class="col-branch">Branch</th>
+                        <th class="col-date">Date</th>
+                        <th class="col-amount">Amount</th>
+                        <th class="col-status">Status</th>
+                        <th class="col-actions">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in expenses %}
+                    <tr>
+                        <td class="col-id">#{{ e.id }}</td>
+                        <td class="col-type">
+                            <span class="type-badge {{ e.expense_type }}">
+                                {{ e.get_expense_type_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <strong>{{ e.description|default:"—" }}</strong>
+                            <br>
+                            <small class="text-muted">
+                                {% if e.expense_type == 'salary' %}
+                                    {{ e.employee_name|default:"—" }}
+                                    {% if e.salary_month %} · {{ e.salary_month_display }}{% endif %}
+                                {% elif e.expense_type == 'rent' %}
+                                    {{ e.landlord_name|default:e.branch.name|default:"—" }}
+                                    {% if e.rent_month %} · {{ e.rent_month_display }}{% endif %}
+                                {% elif e.expense_type == 'bill' %}
+                                    {{ e.bill_type_display }}
+                                    {% if e.bill_period %} · {{ e.bill_period_display }}{% endif %}
+                                {% else %}
+                                    {{ e.category_display }}
+                                {% endif %}
+                            </small>
+                        </td>
+                        <td>{{ e.description|default:"—" }}</td>
+                        <td class="col-branch">
+                            {% if e.branch %}
+                                <i class="fas fa-store" style="color:#1fb4d2;"></i>
+                                {{ e.branch.name }}
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="col-date">{{ e.expense_date|date:"d M Y" }}</td>
+                        <td class="col-amount fw-bold" style="color:#dc3545;">
+                            KSh {{ e.amount|floatformat:2 }}
+                        </td>
+                        <td class="col-status">
+                            <span class="status-badge {{ e.status }}">
+                                {{ e.status_display }}
+                            </span>
+                        </td>
+                        <td class="col-actions">
+                            <div class="d-flex justify-content-center gap-1">
+                                {# View #}
+                                <a href="{% url 'company-expenses-detail' e.id %}"
+                                   class="btn-xs btn-view" title="View">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                {# Edit — route by type #}
+                                {% if e.expense_type == 'salary' %}
+                                    <a href="{% url 'company-salaries-edit' e.id %}" class="btn-xs btn-edit" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                {% elif e.expense_type == 'rent' %}
+                                    <a href="{% url 'company-rents-edit' e.id %}" class="btn-xs btn-edit" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                {% elif e.expense_type == 'bill' %}
+                                    <a href="{% url 'company-bills-edit' e.id %}" class="btn-xs btn-edit" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                {% else %}
+                                    <a href="{% url 'company-general-edit' e.id %}" class="btn-xs btn-edit" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                {% endif %}
+                                {# Delete #}
+                                <a href="{% url 'company-expenses-delete' e.id %}"
+                                   class="btn-xs btn-del" title="Delete"
+                                   onclick="return confirm('Delete this expense?\n\n{{ e.description|escapejs }}\nAmount: KSh {{ e.amount|floatformat:2 }}\n\nThis cannot be undone.');">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="6" class="text-end">TOTAL:</td>
+                        <td class="col-amount" style="color:#dc3545;">
+                            KSh {{ summary.total_amount|floatformat:2|default:"0.00" }}
+                        </td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- Empty state -->
+    <div class="card" style="border: 2px solid #000;">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-inbox fa-3x text-muted d-block mb-3" style="opacity:.4;"></i>
+            <h5 class="mt-3">No Expenses Found</h5>
+            <p class="text-muted mb-0">
+                No expenses match your current filters.
+            </p>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

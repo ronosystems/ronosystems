@@ -934,3 +934,185 @@ def get_category_breakdown(expenses_qs):
             breakdown[key]['amount'] = data['total'] or Decimal('0.00')
 
     return breakdown
+
+
+
+@login_required
+def expenses_pay_all(request):
+    """
+    Central payment page — shows ALL unpaid expenses (any type) in one table.
+
+    GET  → render the table with checkboxes.
+    POST → mark every selected expense as paid, stamping paid_by + paid_at.
+    """
+    company, is_viewing_company = get_active_company(request)
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+
+    user_branch = get_user_branch(request.user)
+    is_admin = is_viewing_company or request.user.role in ['super_admin', 'company_admin']
+
+    # ── POST: pay the selected rows ──
+    if request.method == 'POST':
+        ids = request.POST.getlist('expense_ids')
+        if not ids:
+            messages.warning(request, 'No expenses selected.')
+            return redirect('company-expenses-pay-all')
+
+        qs = Expense.objects.filter(
+            id__in=ids,
+            company=company,
+        ).exclude(status=Expense.STATUS_PAID)
+
+        # Non-admins can only pay expenses in their branch
+        if not is_admin and not is_viewing_company and user_branch:
+            qs = qs.filter(branch=user_branch)
+
+        paid_count = 0
+        for exp in qs:
+            exp.mark_paid(request.user)
+            paid_count += 1
+
+        if paid_count:
+            messages.success(request, f'✅ Marked {paid_count} expense(s) as Paid.')
+        else:
+            messages.warning(request, 'No eligible expenses were paid.')
+        return redirect('company-expenses-pay-all')
+
+    # ── GET: build the unpaid list ──
+    qs = Expense.objects.filter(company=company).exclude(status=Expense.STATUS_PAID)
+
+    if not is_admin and not is_viewing_company and user_branch:
+        qs = qs.filter(branch=user_branch)
+
+    # Optional filters
+    branch_id = request.GET.get('branch')
+    expense_type = request.GET.get('type')
+    search = request.GET.get('q')
+
+    if branch_id:
+        qs = qs.filter(branch_id=branch_id)
+    if expense_type:
+        qs = qs.filter(expense_type=expense_type)
+    if search:
+        qs = qs.filter(
+            Q(description__icontains=search)
+            | Q(bill_name__icontains=search)
+            | Q(employee_name__icontains=search)
+            | Q(landlord_name__icontains=search)
+            | Q(reference__icontains=search)
+        )
+
+    qs = qs.select_related('branch', 'created_by').order_by('-expense_date', '-id')
+
+    summary = get_expenses_summary(qs)
+
+    branches = Branch.objects.filter(company=company, is_active=True)
+    if not is_admin and not is_viewing_company and user_branch:
+        branches = branches.filter(id=user_branch.id)
+
+    context = {
+        'company': company,
+        'expenses': qs,
+        'summary': summary,
+        'branches': branches,
+        'expense_types': Expense.EXPENSE_TYPES,
+        'selected_branch': branch_id,
+        'selected_type': expense_type,
+        'search': search or '',
+        'is_expenses': True,
+        'is_admin': is_admin,
+        'is_viewing_company': is_viewing_company,
+        'user_branch': user_branch,
+    }
+    return render(request, 'company/expenses/pay_all.html', context)
+
+
+@login_required
+def expenses_all(request):
+    """
+    Flat list of ALL expenses across every category.
+
+    Supports filters: branch, type, status, category, date range, search.
+    Non-admins see only their own branch's expenses.
+    """
+    company, is_viewing_company = get_active_company(request)
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+
+    user_branch = get_user_branch(request.user)
+    is_admin = is_viewing_company or request.user.role in ['super_admin', 'company_admin']
+
+    qs = Expense.objects.filter(company=company)
+    if not is_admin and not is_viewing_company and user_branch:
+        qs = qs.filter(branch=user_branch)
+
+    # ── Filters ──
+    branch_id    = request.GET.get('branch')
+    expense_type = request.GET.get('type')
+    status       = request.GET.get('status')
+    category     = request.GET.get('category')
+    date_from    = request.GET.get('date_from')
+    date_to      = request.GET.get('date_to')
+    search       = request.GET.get('q')
+
+    if branch_id:
+        qs = qs.filter(branch_id=branch_id)
+    if expense_type:
+        qs = qs.filter(expense_type=expense_type)
+    if status:
+        qs = qs.filter(status=status)
+    if category:
+        qs = qs.filter(category=category)
+    if date_from:
+        qs = qs.filter(expense_date__gte=date_from)
+    if date_to:
+        qs = qs.filter(expense_date__lte=date_to)
+    if search:
+        qs = qs.filter(
+            Q(description__icontains=search)
+            | Q(bill_name__icontains=search)
+            | Q(employee_name__icontains=search)
+            | Q(landlord_name__icontains=search)
+            | Q(reference__icontains=search)
+            | Q(receipt_number__icontains=search)
+        )
+
+    qs = qs.select_related('branch', 'created_by').order_by('-expense_date', '-id')
+
+    summary = get_expenses_summary(qs)
+
+    branches = Branch.objects.filter(company=company, is_active=True)
+    if not is_admin and not is_viewing_company and user_branch:
+        branches = branches.filter(id=user_branch.id)
+
+    context = {
+        'company': company,
+        'expenses': qs,
+        'summary': summary,
+        'branches': branches,
+        'expense_types': Expense.EXPENSE_TYPES,
+        'statuses': Expense.EXPENSE_STATUS,
+        'categories': Expense.GENERAL_CATEGORIES,
+        'selected_branch': branch_id,
+        'selected_type': expense_type,
+        'selected_status': status,
+        'selected_category': category,
+        'date_from': date_from,
+        'date_to': date_to,
+        'search': search or '',
+        'is_expenses': True,
+        'is_admin': is_admin,
+        'is_viewing_company': is_viewing_company,
+        'user_branch': user_branch,
+    }
+    return render(request, 'company/expenses/all_expenses.html', context)
+
+
+    

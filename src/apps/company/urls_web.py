@@ -74,6 +74,8 @@ urlpatterns = [
     path('expenses/<int:pk>/approve/', expenses_views.expense_approve, name='company-expenses-approve'),
     path('expenses/<int:pk>/reject/', expenses_views.expense_reject, name='company-expenses-reject'),
     path('expenses/<int:pk>/paid/', expenses_views.expense_mark_paid, name='company-expenses-paid'),
+    path('expenses/pay-all/', expenses_views.expenses_pay_all, name='company-expenses-pay-all'),
+    path('expenses/all/', expenses_views.expenses_all, name='company-expenses-all'),
 
     # ============================================
     # SETTINGS

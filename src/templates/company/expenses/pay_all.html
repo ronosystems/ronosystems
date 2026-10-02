@@ -1,0 +1,408 @@
+{% extends base_template|default:"base.html" %}
+
+{% block title %}Pay Expenses{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE TABLE
+       ============================================ */
+    .table-pay {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-size: 0.88rem;
+    }
+    .table-pay th,
+    .table-pay td {
+        border: 1px solid #000000;
+        padding: 8px 10px;
+        vertical-align: middle;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+    }
+    .table-pay thead th {
+        background-color: #87CEEB;
+        color: #000000;
+        font-weight: 700;
+        border-bottom: 2px solid #000000;
+        position: sticky;
+        top: 0;
+        z-index: 5;
+    }
+    .table-pay tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    .table-pay tbody tr:hover td { background-color: #f5f7fa; }
+    .table-pay tbody tr:nth-child(even) td { background-color: #fafbfc; }
+    .table-pay tbody tr:nth-child(even):hover td { background-color: #f0f2f5; }
+
+    .table-pay .col-check   { width: 40px; text-align: center; }
+    .table-pay .col-id      { width: 60px; }
+    .table-pay .col-type    { width: 90px; }
+    .table-pay .col-date    { width: 110px; }
+    .table-pay .col-amount  { width: 120px; text-align: right; }
+    .table-pay .col-status  { width: 100px; }
+    .table-pay .col-branch  { width: 120px; }
+
+    .check-big {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        border: 2px solid #000000;
+        border-radius: 3px;
+    }
+    .check-big:checked {
+        background-color: #28a745;
+        border-color: #000000;
+    }
+
+    /* ============================================
+       SUMMARY CARDS
+       ============================================ */
+    .pay-summary {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        margin-bottom: 16px;
+    }
+    .pay-card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: #ffffff;
+        padding: 16px 18px;
+        text-align: center;
+        border-left: 6px solid #dc3545;
+    }
+    .pay-card .value {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: #000000;
+    }
+    .pay-card .label {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #000000;
+        font-weight: 600;
+        margin-top: 4px;
+    }
+
+    /* ============================================
+       TYPE BADGES
+       ============================================ */
+    .type-badge {
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 700;
+        display: inline-block;
+        border: 1px solid #000000;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+    }
+    .type-badge.salary  { background: #d1fae5; color: #065f46; }
+    .type-badge.rent    { background: #dbeafe; color: #1e40af; }
+    .type-badge.bill    { background: #fce4ec; color: #c62828; }
+    .type-badge.general { background: #e8eaf6; color: #283593; }
+
+    .status-badge {
+        padding: 3px 10px;
+        border-radius: 50px;
+        font-size: 10px;
+        font-weight: 700;
+        display: inline-block;
+        border: 1px solid #000000;
+    }
+    .status-badge.pending  { background: #fef3c7; color: #92400e; }
+    .status-badge.approved { background: #dbeafe; color: #1e40af; }
+
+    /* ============================================
+       TOOLBAR
+       ============================================ */
+    .pay-toolbar {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+        padding: 12px 14px;
+        background: #f8f9fa;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        margin-bottom: 12px;
+    }
+    .pay-toolbar .spacer { flex-grow: 1; }
+    .pay-toolbar .selection-info {
+        font-weight: 600;
+        color: #000000;
+    }
+
+    .btn-pay {
+        background: #28a745;
+        border: 2px solid #000000;
+        color: #ffffff;
+        font-weight: 700;
+        border-radius: 4px;
+        padding: 6px 16px;
+    }
+    .btn-pay:hover { background: #218838; color: #ffffff; }
+    .btn-pay:disabled {
+        background: #c3e6cb;
+        color: #6c757d;
+        cursor: not-allowed;
+    }
+
+    @media (max-width: 768px) {
+        .pay-summary { grid-template-columns: 1fr; }
+        .table-pay { font-size: 0.8rem; }
+        .table-pay .col-branch,
+        .table-pay .col-date { display: none; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <h4 class="mb-0">
+                <i class="fas fa-hand-holding-usd"></i> Pay Expenses
+            </h4>
+            <small class="text-muted">
+                Select the expenses you want to settle, then click <strong>Pay Selected</strong>.
+            </small>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'company-expenses-dashboard' %}" class="btn btn-secondary btn-sm" style="border:2px solid #000;">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary cards -->
+    <div class="pay-summary">
+        <div class="pay-card">
+            <div class="value">{{ summary.total_expenses|default:"0" }}</div>
+            <div class="label">Unpaid Expenses</div>
+        </div>
+        <div class="pay-card">
+            <div class="value">KSh {{ summary.total_amount|floatformat:2|default:"0.00" }}</div>
+            <div class="label">Total Outstanding</div>
+        </div>
+        <div class="pay-card">
+            <div class="value" id="selectedCount">0</div>
+            <div class="label">Selected</div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <form method="get" class="pay-toolbar">
+        <div style="min-width: 150px;">
+            <label class="form-label small mb-1">Branch</label>
+            <select name="branch" class="form-select form-select-sm">
+                <option value="">All branches</option>
+                {% for b in branches %}
+                    <option value="{{ b.id }}" {% if selected_branch == b.id|stringformat:"s" %}selected{% endif %}>
+                        {{ b.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div style="min-width: 150px;">
+            <label class="form-label small mb-1">Type</label>
+            <select name="type" class="form-select form-select-sm">
+                <option value="">All types</option>
+                {% for k, v in expense_types %}
+                    <option value="{{ k }}" {% if selected_type == k %}selected{% endif %}>{{ v }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div style="min-width: 220px;">
+            <label class="form-label small mb-1">Search</label>
+            <input type="text" name="q" value="{{ search }}" class="form-control form-control-sm"
+                   placeholder="Description, name, reference...">
+        </div>
+        <div class="spacer"></div>
+        <div class="align-self-end d-flex gap-2">
+            <button type="submit" class="btn btn-primary btn-sm" style="border:2px solid #000;">
+                <i class="fas fa-filter"></i> Filter
+            </button>
+            <a href="{% url 'company-expenses-pay-all' %}" class="btn btn-secondary btn-sm" style="border:2px solid #000;">
+                Reset
+            </a>
+        </div>
+    </form>
+
+    {% if expenses %}
+    <form method="post" id="payForm">
+        {% csrf_token %}
+
+        <!-- Action bar -->
+        <div class="pay-toolbar">
+            <div class="form-check mb-0">
+                <input class="form-check-input check-big" type="checkbox" id="selectAll">
+                <label class="form-check-label fw-bold ms-1" for="selectAll">
+                    Select All
+                </label>
+            </div>
+            <span class="selection-info ms-3">
+                <span id="selectedCount2">0</span> of {{ expenses|length }} selected
+            </span>
+            <div class="spacer"></div>
+            <button type="submit" class="btn-pay" id="payBtn" disabled
+                    onclick="return confirm('Mark the selected expenses as PAID?\n\nThis cannot be undone.')">
+                <i class="fas fa-check-double"></i> Pay Selected
+            </button>
+        </div>
+
+        <!-- Table -->
+        <div class="card shadow-sm" style="border: 2px solid #000;">
+            <div class="table-responsive">
+                <table class="table-pay mb-0">
+                    <thead>
+                        <tr>
+                            <th class="col-check">
+                                <i class="fas fa-check-square"></i>
+                            </th>
+                            <th class="col-id">#</th>
+                            <th class="col-type">Type</th>
+                            <th class="col-date">Date</th>
+                            <th>Details</th>
+                            <th class="col-branch">Branch</th>
+                            <th class="col-amount">Amount</th>
+                            <th class="col-status">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for e in expenses %}
+                        <tr>
+                            <td class="col-check">
+                                <input type="checkbox"
+                                       class="form-check-input check-big expense-checkbox"
+                                       name="expense_ids"
+                                       value="{{ e.id }}"
+                                       data-amount="{{ e.amount }}">
+                            </td>
+                            <td class="col-id">#{{ e.id }}</td>
+                            <td class="col-type">
+                                <span class="type-badge {{ e.expense_type }}">
+                                    {{ e.get_expense_type_display }}
+                                </span>
+                            </td>
+                            <td class="col-date">{{ e.expense_date|date:"d M Y" }}</td>
+                            <td>
+                                {# Description on top, type-specific second line #}
+                                <strong>{{ e.description|default:"—" }}</strong>
+                                <br>
+                                <small class="text-muted">
+                                    {% if e.expense_type == 'salary' %}
+                                        {{ e.employee_name|default:"—" }}
+                                        {% if e.salary_month %} · {{ e.salary_month_display }}{% endif %}
+                                    {% elif e.expense_type == 'rent' %}
+                                        {{ e.landlord_name|default:e.branch.name|default:"—" }}
+                                        {% if e.rent_month %} · {{ e.rent_month_display }}{% endif %}
+                                    {% elif e.expense_type == 'bill' %}
+                                        {{ e.bill_type_display }}
+                                        {% if e.bill_period %} · {{ e.bill_period_display }}{% endif %}
+                                    {% else %}
+                                        {{ e.category_display }}
+                                    {% endif %}
+                                </small>
+                            </td>
+                            <td class="col-branch">
+                                {% if e.branch %}
+                                    <i class="fas fa-store" style="color:#1fb4d2;"></i>
+                                    {{ e.branch.name }}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="col-amount fw-bold" style="color:#dc3545;">
+                                KSh {{ e.amount|floatformat:2 }}
+                            </td>
+                            <td class="col-status">
+                                {% if e.status == 'approved' %}
+                                    <span class="status-badge approved">Approved</span>
+                                {% else %}
+                                    <span class="status-badge pending">Pending</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </form>
+
+    {% else %}
+    <!-- Empty state -->
+    <div class="card" style="border: 2px solid #000;">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-check-circle fa-3x text-success d-block mb-3"></i>
+            <h5 class="mt-3">All Caught Up</h5>
+            <p class="text-muted mb-0">
+                No unpaid expenses match your filters. Everything has been settled.
+            </p>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+<script>
+(function () {
+    const selectAll  = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.expense-checkbox');
+    const payBtn     = document.getElementById('payBtn');
+    const count1     = document.getElementById('selectedCount');
+    const count2     = document.getElementById('selectedCount2');
+
+    if (!payBtn) return;   // empty state — nothing to wire up
+
+    function updateState() {
+        const selected = document.querySelectorAll('.expense-checkbox:checked');
+        const total    = checkboxes.length;
+        const n        = selected.length;
+
+        // Counters
+        if (count1) count1.textContent = n;
+        if (count2) count2.textContent = n;
+
+        // Pay button
+        payBtn.disabled = n === 0;
+
+        // Select-all checkbox state
+        if (selectAll) {
+            selectAll.checked       = n === total && total > 0;
+            selectAll.indeterminate = n > 0 && n < total;
+        }
+    }
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function () {
+            checkboxes.forEach(cb => { cb.checked = selectAll.checked; });
+            updateState();
+        });
+    }
+
+    checkboxes.forEach(cb => cb.addEventListener('change', updateState));
+
+    // Ctrl/Cmd + click on a checkbox to select all
+    checkboxes.forEach(cb => {
+        cb.addEventListener('click', function (evt) {
+            if (evt.ctrlKey || evt.metaKey) {
+                checkboxes.forEach(other => { other.checked = true; });
+                updateState();
+            }
+        });
+    });
+
+    updateState();
+})();
+</script>
+{% endblock %}
