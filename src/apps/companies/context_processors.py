@@ -7,7 +7,7 @@ is anonymous, or a field is empty, they return safe defaults instead of
 raising — templates should never crash because of a missing tenant.
 """
 
-from apps.companies.models import Company, CompanyJoinRequest
+from apps.companies.models import Company, CompanyJoinRequest, TenantFeedback
 
 
 # ============================================
@@ -86,6 +86,7 @@ def pending_join_requests(request):
     except Exception:
         count = 0
     return {'pending_join_requests_count': count}
+
 
 
 # ============================================
@@ -195,9 +196,6 @@ def company_branding_context(request):
     return ctx
 
 
-
-
-
 # ============================================
 # RECEIPT SETTINGS
 # ============================================
@@ -253,6 +251,36 @@ def receipt_settings_context(request):
     return {'receipt_settings': settings_dict}
 
 
+# ============================================
+# PENDING FEEDBACK COUNT (for super-admins only)
+# ============================================
 
+def pending_feedback_count(request):
+    """
+    Inject the number of *new* feedback items into every template context
+    for super-admins only.
+
+    Returns 0 for everyone else so the template can safely render the
+    count without extra conditionals.
+    """
+    user = getattr(request, 'user', None)
+    if not user or not user.is_authenticated:
+        return {'pending_feedback_count': 0}
+
+    is_hub_owner = user.is_superuser or getattr(user, 'role', '') == 'super_admin'
+    if not is_hub_owner:
+        return {'pending_feedback_count': 0}
+
+    # Hide the count while the super-admin is impersonating a tenant —
+    # the hub link isn't even shown in that mode.
+    from apps.companies.support_utils import is_support_mode
+    if is_support_mode(request):
+        return {'pending_feedback_count': 0}
+
+    count = TenantFeedback.objects.filter(
+        status=TenantFeedback.STATUS_NEW,
+    ).count()
+
+    return {'pending_feedback_count': count}
 
     
