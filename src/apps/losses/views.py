@@ -259,6 +259,40 @@ def loss_create(request, company_id=None, branch_id=None):
 
 
 # ============================================
+# DETAIL
+# ============================================
+
+@login_required
+def loss_detail(request, company_id=None, branch_id=None, pk=None):
+    """Read-only detail view for a single loss/return record."""
+    company, _ = get_active_company(request)
+    if not company:
+        messages.warning(request, 'No company assigned.')
+        return redirect('/dashboard/')
+
+    branch = _resolve_branch(request, company, branch_id)
+    if not branch:
+        messages.error(request, 'No branch available or you do not have access.')
+        return redirect('/dashboard/')
+
+    record = get_object_or_404(
+        LossReturn.objects.select_related('recorded_by', 'verified_by'),
+        id=pk,
+        company=company,
+        branch=branch,
+    )
+
+    context = {
+        'company': company,
+        'branch': branch,
+        'record': record,
+        'is_admin': is_admin_or_manager(request.user),
+        'can_verify': can_verify(request.user),
+    }
+    return render(request, 'losses/loss_detail.html', context)
+
+
+# ============================================
 # EDIT
 # ============================================
 

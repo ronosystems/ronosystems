@@ -1,0 +1,455 @@
+{% extends base_template|default:"base.html" %}
+{% load static %}
+
+{% block title %}{{ record.reference }} - Losses & Returns{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       LAYOUT
+    ============================================ */
+    .detail-card {
+        border: 2px solid #000;
+        border-radius: 6px;
+        background: #fff;
+        overflow: hidden;
+    }
+    .detail-card .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000;
+        padding: 14px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .detail-card .card-header h4 {
+        margin: 0;
+        color: #000;
+        font-weight: 800;
+        font-size: 1.05rem;
+    }
+    .detail-card .card-header h4 i {
+        margin-right: 6px;
+    }
+
+    .detail-body {
+        padding: 20px;
+    }
+
+    /* ============================================
+       STATUS STRIP
+    ============================================ */
+    .status-strip {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 16px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        border: 2px solid #000;
+    }
+    .status-strip.pending  { background: #fff3cd; color: #856404; }
+    .status-strip.verified { background: #d4edda; color: #155724; }
+    .status-strip i { font-size: 1.2rem; }
+    .status-strip .status-label {
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-size: 0.85rem;
+    }
+    .status-strip .status-meta {
+        margin-left: auto;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-align: right;
+    }
+
+    /* ============================================
+       DETAIL ROWS
+    ============================================ */
+    .section-title {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 800;
+        color: #6c757d;
+        padding-bottom: 4px;
+        border-bottom: 1px dashed #ccc;
+        margin: 20px 0 10px 0;
+    }
+    .section-title:first-of-type { margin-top: 0; }
+
+    .detail-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px 24px;
+    }
+    @media (max-width: 640px) {
+        .detail-grid { grid-template-columns: 1fr; }
+    }
+
+    .detail-row {
+        display: flex;
+        flex-direction: column;
+        padding: 8px 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    .detail-row .label {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #888;
+        font-weight: 700;
+        margin-bottom: 3px;
+    }
+    .detail-row .value {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #000;
+        word-break: break-word;
+    }
+    .detail-row .value.empty {
+        color: #adb5bd;
+        font-weight: 400;
+        font-style: italic;
+    }
+
+    /* ============================================
+       AMOUNT HIGHLIGHT
+    ============================================ */
+    .amount-highlight {
+        border: 2px solid #000;
+        border-radius: 6px;
+        padding: 16px 20px;
+        margin: 16px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .amount-highlight.loss {
+        background: #fff5f5;
+        border-left: 6px solid #721c24;
+    }
+    .amount-highlight.return {
+        background: #f0f7ff;
+        border-left: 6px solid #004085;
+    }
+    .amount-highlight .amount-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 800;
+        color: #555;
+    }
+    .amount-highlight .amount-value {
+        font-size: 1.6rem;
+        font-weight: 800;
+    }
+    .amount-highlight.loss .amount-value   { color: #721c24; }
+    .amount-highlight.return .amount-value { color: #004085; }
+
+    /* ============================================
+       BADGES
+    ============================================ */
+    .badge {
+        padding: 5px 12px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 700;
+        border: 1px solid #000;
+        display: inline-block;
+    }
+    .badge-refund     { background: #cce5ff; color: #004085; }
+    .badge-return     { background: #d4edda; color: #155724; }
+    .badge-discount   { background: #fff3cd; color: #856404; }
+    .badge-writeoff   { background: #e2e3e5; color: #383d41; }
+    .badge-damage     { background: #f8d7da; color: #721c24; }
+    .badge-shrinkage  { background: #f5c6cb; color: #721c24; }
+    .badge-pending    { background: #fff3cd; color: #856404; }
+    .badge-verified   { background: #d4edda; color: #155724; }
+
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary { background-color: #87CEEB; border: 2px solid #000; color: #000; font-weight: 600; }
+    .btn-primary:hover { background-color: #7bb8d8; color: #000; }
+    .btn-success { background-color: #28a745; border: 2px solid #000; color: #fff; font-weight: 600; }
+    .btn-success:hover { background-color: #218838; color: #fff; }
+    .btn-warning { background-color: #ffc107; border: 2px solid #000; color: #000; font-weight: 600; }
+    .btn-warning:hover { background-color: #e0a800; color: #000; }
+    .btn-danger { background-color: #dc3545; border: 2px solid #000; color: #fff; font-weight: 600; }
+    .btn-danger:hover { background-color: #bb2d3b; color: #fff; }
+    .btn-secondary {
+        background-color: #f8f9fa; border: 2px solid #000;
+        color: #000; font-weight: 600;
+    }
+    .btn-secondary:hover { background-color: #e2e6ea; color: #000; }
+
+    /* ============================================
+       NOTES BOX
+    ============================================ */
+    .notes-box {
+        background: #f9f9f9;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 12px 14px;
+        font-size: 0.88rem;
+        color: #333;
+        line-height: 1.5;
+        white-space: pre-wrap;
+    }
+    .notes-box.empty {
+        color: #adb5bd;
+        font-style: italic;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb mb-0" style="background: transparent; padding: 0;">
+            <li class="breadcrumb-item">
+                <a href="{% url 'losses:loss_list' company.id branch.id %}" style="color: #000; font-weight: 600;">
+                    Losses & Returns
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                {{ record.reference }}
+            </li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+
+            <div class="detail-card">
+
+                <!-- Header -->
+                <div class="card-header">
+                    <h4>
+                        <i class="fas fa-file-alt"></i> {{ record.reference }}
+                    </h4>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a href="{% url 'losses:loss_list' company.id branch.id %}"
+                           class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </a>
+
+                        {% if not record.is_verified and is_admin %}
+                        <a href="{% url 'losses:loss_edit' company.id branch.id record.id %}"
+                           class="btn btn-primary btn-sm">
+                            <i class="fas fa-edit"></i> Edit
+                        </a>
+                        <a href="{% url 'losses:loss_delete' company.id branch.id record.id %}"
+                           class="btn btn-danger btn-sm">
+                            <i class="fas fa-trash"></i> Delete
+                        </a>
+                        {% endif %}
+
+                        {% if not record.is_verified and can_verify %}
+                        <a href="{% url 'losses:loss_verify' company.id branch.id record.id %}"
+                           class="btn btn-success btn-sm">
+                            <i class="fas fa-lock"></i> Verify
+                        </a>
+                        {% endif %}
+
+                        {% if record.is_verified and can_verify %}
+                        <a href="{% url 'losses:loss_unverify' company.id branch.id record.id %}"
+                           class="btn btn-warning btn-sm">
+                            <i class="fas fa-unlock"></i> Unlock
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Body -->
+                <div class="detail-body">
+
+                    <!-- Status Strip -->
+                    {% if record.is_verified %}
+                    <div class="status-strip verified">
+                        <i class="fas fa-lock"></i>
+                        <span class="status-label">Verified & Locked</span>
+                        <div class="status-meta">
+                            by
+                            <strong>{{ record.verified_by.get_full_name|default:record.verified_by.username|default:"—" }}</strong>
+                            <br>
+                            {{ record.verified_at|date:"M d, Y H:i" }}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="status-strip pending">
+                        <i class="fas fa-clock"></i>
+                        <span class="status-label">Pending Verification</span>
+                        <div class="status-meta">
+                            Recorded {{ record.created_at|date:"M d, Y H:i" }}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Category + Type -->
+                    <div class="section-title">Category</div>
+                    <div class="detail-grid">
+                        <div class="detail-row">
+                            <span class="label">Type</span>
+                            <span class="value">
+                                <span class="badge badge-{{ record.category }}">
+                                    {{ record.get_category_display }}
+                                </span>
+                            </span>
+                        </div>
+                        {% if record.refund_type %}
+                        <div class="detail-row">
+                            <span class="label">Refund Method</span>
+                            <span class="value">{{ record.get_refund_type_display }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Amount Highlight -->
+                    {% if record.is_loss_style %}
+                        <div class="amount-highlight loss">
+                            <span class="amount-label">Cost Lost (per unit × qty)</span>
+                            <span class="amount-value">- KES {{ record.effective_amount|floatformat:2 }}</span>
+                        </div>
+                    {% else %}
+                        <div class="amount-highlight return">
+                            <span class="amount-label">Selling Amount (per unit × qty)</span>
+                            <span class="amount-value">KES {{ record.effective_amount|floatformat:2 }}</span>
+                        </div>
+                    {% endif %}
+
+                    <!-- Product -->
+                    <div class="section-title">Product</div>
+                    <div class="detail-grid">
+                        <div class="detail-row">
+                            <span class="label">Product Name</span>
+                            <span class="value {% if not record.product_name %}empty{% endif %}">
+                                {{ record.product_name|default:"Not specified" }}
+                            </span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="label">Product Model</span>
+                            <span class="value {% if not record.product_model %}empty{% endif %}">
+                                {{ record.product_model|default:"Not specified" }}
+                            </span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="label">Quantity</span>
+                            <span class="value">{{ record.quantity }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="label">Unit Amount</span>
+                            <span class="value">
+                                {% if record.is_loss_style %}
+                                    KES {{ record.cost_amount|floatformat:2 }} (cost)
+                                {% else %}
+                                    KES {{ record.amount|floatformat:2 }} (selling)
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Customer -->
+                    <div class="section-title">Customer</div>
+                    <div class="detail-grid">
+                        <div class="detail-row">
+                            <span class="label">Customer Name</span>
+                            <span class="value {% if not record.customer_name %}empty{% endif %}">
+                                {{ record.customer_name|default:"Not specified" }}
+                            </span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="label">Customer Phone</span>
+                            <span class="value {% if not record.customer_phone %}empty{% endif %}">
+                                {{ record.customer_phone|default:"Not specified" }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Description -->
+                    <div class="section-title">Description</div>
+                    <div class="notes-box {% if not record.description %}empty{% endif %}">
+                        {{ record.description|default:"No description provided." }}
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="section-title">Notes</div>
+                    <div class="notes-box {% if not record.notes %}empty{% endif %}">
+                        {{ record.notes|default:"No additional notes." }}
+                    </div>
+
+                    <!-- Verification Info -->
+                    {% if record.is_verified %}
+                    <div class="section-title">Verification Details</div>
+                    <div class="detail-grid">
+                        <div class="detail-row">
+                            <span class="label">Verified By</span>
+                            <span class="value">
+                                {{ record.verified_by.get_full_name|default:record.verified_by.username }}
+                                {% if record.verified_by.role %}
+                                <br><small class="text-muted" style="font-weight: 400;">
+                                    {{ record.verified_by.get_role_display }}
+                                </small>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="label">Verified At</span>
+                            <span class="value">{{ record.verified_at|date:"M d, Y H:i" }}</span>
+                        </div>
+                    </div>
+                    {% if record.verification_notes %}
+                    <div class="notes-box" style="background: #d4edda; border-color: #28a745; margin-top: 10px;">
+                        {{ record.verification_notes }}
+                    </div>
+                    {% endif %}
+                    {% endif %}
+
+                    <!-- Audit Trail -->
+                    <div class="section-title">Audit Trail</div>
+                    <div class="detail-grid">
+                        <div class="detail-row">
+                            <span class="label">Recorded By</span>
+                            <span class="value">
+                                {% if record.recorded_by %}
+                                    {{ record.recorded_by.get_full_name|default:record.recorded_by.username }}
+                                    {% if record.recorded_by.role %}
+                                    <br><small class="text-muted" style="font-weight: 400;">
+                                        {{ record.recorded_by.get_role_display }}
+                                    </small>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="empty">Unknown</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="label">Recorded At</span>
+                            <span class="value">{{ record.created_at|date:"M d, Y H:i" }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="label">Last Updated</span>
+                            <span class="value">{{ record.updated_at|date:"M d, Y H:i" }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="label">Branch</span>
+                            <span class="value">{{ record.branch.name }}</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}
