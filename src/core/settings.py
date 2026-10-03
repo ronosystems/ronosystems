@@ -184,6 +184,8 @@ TEMPLATES = [
                 'apps.companies.context_processors.receipt_settings_context', 
                 'apps.plans.context_processors.treasury_access',
                 'apps.companies.context_processors.pending_feedback_count',
+                'apps.losses.context_processors.pending_losses_count',
+                'apps.treasury.context_processors.company_context',
             ],
         },
     },
