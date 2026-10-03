@@ -1,0 +1,307 @@
+{% extends base_template|default:"base.html" %}
+{% load static %}
+
+{% block title %}
+{% if is_edit %}Edit{% else %}Record{% endif %} Loss / Return - {{ company.name }}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-card { border: 2px solid #000; border-radius: 4px; background: #fff; }
+    .form-card .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000;
+        padding: 14px 20px;
+        border-radius: 0 !important;
+    }
+    .form-card .card-header h4 { margin: 0; color: #000; font-weight: 700; }
+    .form-label { font-weight: 600; color: #000; font-size: 0.9rem; margin-bottom: 4px; }
+    .form-control, .form-select {
+        border: 2px solid #000;
+        border-radius: 4px;
+        color: #000;
+        font-weight: 500;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 0.2rem rgba(135, 206, 235, 0.35);
+    }
+    .form-control[readonly] { background: #f1f5f9; cursor: not-allowed; }
+    .help-text { font-size: 0.78rem; color: #555; margin-top: 2px; }
+
+    .section-title {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 800;
+        color: #6c757d;
+        margin: 18px 0 8px 0;
+        padding-bottom: 4px;
+        border-bottom: 1px dashed #ccc;
+    }
+    .section-title:first-of-type { margin-top: 0; }
+
+    .btn-save {
+        background-color: #28a745; border: 2px solid #000; color: #fff;
+        font-weight: 700; padding: 10px 24px; border-radius: 4px;
+    }
+    .btn-save:hover { background-color: #218838; color: #fff; }
+    .btn-cancel {
+        background-color: #f8f9fa; border: 2px solid #000; color: #000;
+        font-weight: 600; padding: 10px 24px; border-radius: 4px;
+    }
+    .btn-cancel:hover { background-color: #e2e6ea; color: #000; }
+    .alert { border: 2px solid #000; border-radius: 4px; }
+
+    .info-panel {
+        background: #f9f9f9; border: 2px solid #000; border-radius: 4px;
+        padding: 15px;
+    }
+    .info-panel h6 {
+        font-weight: 700; color: #000; margin-bottom: 10px;
+        text-transform: uppercase; font-size: 0.8rem; letter-spacing: 1px;
+    }
+    .hide-when-loss { display: block; }
+    .hide-when-return { display: none; }
+    .category-refund .hide-when-loss,
+    .category-return .hide-when-loss { display: block; }
+    .category-refund .hide-when-return,
+    .category-return .hide-when-return { display: block; }
+    .category-damage .hide-when-loss,
+    .category-shrinkage .hide-when-loss { display: none; }
+    .category-damage .hide-when-return,
+    .category-shrinkage .hide-when-return { display: block; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb mb-0" style="background: transparent; padding: 0;">
+            <li class="breadcrumb-item">
+                <a href="{% url 'losses:loss_list' company.id branch.id %}" style="color: #000;">
+                    Losses & Returns
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                {% if is_edit %}Edit{% else %}Record{% endif %}
+            </li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-lg-8 mb-4">
+            <div class="card form-card">
+                <div class="card-header">
+                    <h4>
+                        <i class="fas fa-exclamation-triangle"></i>
+                        {% if is_edit %}Edit{% else %}Record{% endif %} Loss / Return
+                    </h4>
+                </div>
+                <div class="card-body">
+
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <form method="POST" novalidate>
+                        {% csrf_token %}
+
+                        <div class="section-title">Category</div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="id_category">
+                                <i class="fas fa-tag"></i> Type of Loss / Return
+                                <span style="color: red;">*</span>
+                            </label>
+                            {{ form.category }}
+                        </div>
+
+                        <div class="mb-3" id="refundTypeWrap">
+                            <label class="form-label" for="id_refund_type">
+                                <i class="fas fa-exchange-alt"></i> Refund Method
+                                <span style="color: red;">*</span>
+                            </label>
+                            {{ form.refund_type }}
+                            <div class="help-text">
+                                Only applies to <strong>Refunds</strong> and <strong>Returns</strong>.
+                            </div>
+                        </div>
+
+                        <div class="section-title">Product</div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="id_product_name">Product Name</label>
+                                {{ form.product_name }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="id_product_model">Product Model</label>
+                                {{ form.product_model }}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="id_description">Description</label>
+                            {{ form.description }}
+                        </div>
+
+                        <div class="section-title">Amounts</div>
+
+                        <div class="row">
+                            <!-- Selling-side amount (returns/refunds/discounts/writeoffs) -->
+                            <div class="col-md-6 mb-3" id="amountWrap">
+                                <label class="form-label" for="id_amount">
+                                    <i class="fas fa-money-bill-wave"></i> Amount Sold At (KES)
+                                </label>
+                                {{ form.amount }}
+                                <div class="help-text">
+                                    What the customer paid / was owed.
+                                </div>
+                            </div>
+
+                            <!-- Cost-side amount (damages/shrinkage) -->
+                            <div class="col-md-6 mb-3" id="costWrap">
+                                <label class="form-label" for="id_cost_amount">
+                                    <i class="fas fa-coins"></i> Cost Price (KES)
+                                </label>
+                                {{ form.cost_amount }}
+                                <div class="help-text">
+                                    Auto-filled from product. Editable if needed.
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="id_quantity">Quantity</label>
+                                {{ form.quantity }}
+                            </div>
+                        </div>
+
+                        <div class="section-title">Customer (optional)</div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="id_customer_name">Customer Name</label>
+                                {{ form.customer_name }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="id_customer_phone">Customer Phone</label>
+                                {{ form.customer_phone }}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="id_notes">Notes</label>
+                            {{ form.notes }}
+                        </div>
+
+                        <div class="d-flex gap-2 mt-4">
+                            <button type="submit" class="btn btn-save flex-fill">
+                                <i class="fas fa-save"></i>
+                                {% if is_edit %}Update{% else %}Save{% endif %} Record
+                            </button>
+                            <a href="{% url 'losses:loss_list' company.id branch.id %}"
+                               class="btn btn-cancel flex-fill text-center">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4 mb-4">
+            <div class="info-panel mb-3">
+                <h6><i class="fas fa-info-circle"></i> Categories</h6>
+                <ul style="font-size: 0.83rem; padding-left: 18px; margin: 0; color: #333;">
+                    <li><strong>Refund</strong> — cash returned to customer</li>
+                    <li><strong>Return</strong> — product returned</li>
+                    <li><strong>Discount</strong> — allowance given</li>
+                    <li><strong>Write-off</strong> — bad debt</li>
+                    <li><strong>Damage</strong> — spoiled item</li>
+                    <li><strong>Shrinkage</strong> — theft or loss</li>
+                </ul>
+            </div>
+
+            <div class="info-panel">
+                <h6><i class="fas fa-lightbulb"></i> Tip</h6>
+                <p style="font-size: 0.83rem; color: #333; margin: 0;">
+                    For <strong>Damage</strong> and <strong>Shrinkage</strong>, the cost
+                    field auto-fills when you type a product name that matches existing inventory.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const categoryEl = document.getElementById('id_category');
+        const refundWrap = document.getElementById('refundTypeWrap');
+        const amountWrap = document.getElementById('amountWrap');
+        const costWrap = document.getElementById('costWrap');
+        const costInput = document.getElementById('id_cost_amount');
+        const productNameInput = document.getElementById('id_product_name');
+        const productModelInput = document.getElementById('id_product_model');
+
+        const RETURN_STYLE = {{ return_style_categories|safe }};
+        const LOSS_STYLE = {{ loss_style_categories|safe }};
+
+        function applyCategory() {
+            const cat = categoryEl.value;
+
+            // Show / hide refund type
+            if (cat === 'refund' || cat === 'return') {
+                refundWrap.style.display = '';
+            } else {
+                refundWrap.style.display = 'none';
+            }
+
+            // Show / hide amount vs cost
+            if (LOSS_STYLE.includes(cat)) {
+                amountWrap.style.display = 'none';
+                costWrap.style.display = '';
+                costInput.removeAttribute('readonly');   // allow manual override
+            } else {
+                amountWrap.style.display = '';
+                costWrap.style.display = 'none';
+            }
+        }
+
+        categoryEl.addEventListener('change', applyCategory);
+        applyCategory();
+
+        // Auto-fill cost from product name (for damage/shrinkage)
+        let lookupTimer = null;
+        productNameInput.addEventListener('input', function () {
+            const cat = categoryEl.value;
+            if (!LOSS_STYLE.includes(cat)) return;
+
+            clearTimeout(lookupTimer);
+            lookupTimer = setTimeout(() => {
+                const name = productNameInput.value.trim();
+                if (!name) return;
+
+                fetch(`{% url 'losses:api_product_lookup' %}?name=${encodeURIComponent(name)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.found) {
+                            costInput.value = data.purchase_price.toFixed(2);
+                            if (!productModelInput.value && data.model) {
+                                productModelInput.value = data.model;
+                            }
+                        }
+                    })
+                    .catch(() => { /* silent */ });
+            }, 400);
+        });
+    })();
+</script>
+{% endblock %}

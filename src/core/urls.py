@@ -43,9 +43,8 @@ urlpatterns = [
     path('payments/kcb/callback/', company_views.company_payments_callback, name='kcb-callback'),
     path('companies/', include('apps.companies.web_urls')),
     path('employees/', include('apps.employees.web_urls')),
-
+    path('losses/', include('apps.losses.urls', namespace='losses')),
     path('treasury/', include('apps.treasury.urls')),
-
     path('plans/', include('apps.plans.urls')),
     path('reports/', include('apps.reports.urls')),
     path('settings/', include('apps.settings.urls')),

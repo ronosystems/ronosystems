@@ -1,0 +1,152 @@
+{% extends base_template|default:"base.html" %}
+{% load static %}
+
+{% block title %}
+{% if action == 'verify' %}Verify{% else %}Un-verify{% endif %} Record - {{ company.name }}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .confirm-card {
+        border: 3px solid {% if action == 'verify' %}#28a745{% else %}#ffc107{% endif %};
+        border-radius: 6px;
+        background: #fff;
+        max-width: 640px;
+        margin: 0 auto;
+    }
+    .confirm-card .card-header {
+        background: {% if action == 'verify' %}#28a745{% else %}#ffc107{% endif %} !important;
+        color: {% if action == 'verify' %}#fff{% else %}#000{% endif %} !important;
+        border-bottom: 3px solid #000;
+        padding: 16px 22px;
+    }
+    .confirm-card .card-header h4 {
+        margin: 0;
+        font-weight: 700;
+        color: inherit;
+    }
+    .detail-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px solid #eee;
+        font-size: 0.95rem;
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-row .label {
+        font-weight: 700;
+        color: #555;
+        text-transform: uppercase;
+        font-size: 0.78rem;
+        letter-spacing: 0.5px;
+    }
+    .detail-row .value {
+        color: #000;
+        font-weight: 600;
+        text-align: right;
+    }
+    .btn-action {
+        background: {% if action == 'verify' %}#28a745{% else %}#ffc107{% endif %};
+        border: 2px solid #000;
+        color: {% if action == 'verify' %}#fff{% else %}#000{% endif %};
+        font-weight: 700;
+        padding: 10px 24px;
+        border-radius: 4px;
+    }
+    .btn-action:hover { filter: brightness(0.92); }
+    .btn-cancel {
+        background: #f8f9fa;
+        border: 2px solid #000;
+        color: #000;
+        font-weight: 600;
+        padding: 10px 24px;
+        border-radius: 4px;
+    }
+    .btn-cancel:hover { background: #e2e6ea; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="confirm-card">
+        <div class="card-header">
+            <h4>
+                <i class="fas fa-{% if action == 'verify' %}lock{% else %}unlock{% endif %}"></i>
+                {% if action == 'verify' %}Verify & Lock Record{% else %}Un-verify Record{% endif %}
+            </h4>
+        </div>
+        <div class="card-body p-4">
+
+            {% if action == 'verify' %}
+                <p style="font-size: 1rem; color: #333;">
+                    Verifying this record will <strong>lock it</strong> from further edits or deletions.
+                    Only you (or another admin / stock controller) can un-verify it later.
+                </p>
+            {% else %}
+                <p style="font-size: 1rem; color: #333;">
+                    Un-verifying this record will <strong>unlock it</strong> so it can be edited or deleted again.
+                </p>
+            {% endif %}
+
+            <div class="my-3 p-3" style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px;">
+                <div class="detail-row">
+                    <span class="label">Reference</span>
+                    <span class="value">{{ record.reference }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Category</span>
+                    <span class="value">{{ record.get_category_display }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Amount</span>
+                    <span class="value">KES {{ record.effective_amount|floatformat:2 }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Recorded At</span>
+                    <span class="value">{{ record.created_at|date:"M d, Y H:i" }}</span>
+                </div>
+                {% if record.verified_by %}
+                <div class="detail-row">
+                    <span class="label">Currently Verified By</span>
+                    <span class="value">
+                        {{ record.verified_by.get_full_name|default:record.verified_by.username }}
+                        <br><small class="text-muted">{{ record.verified_at|date:"M d, Y H:i" }}</small>
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+
+            <form method="POST">
+                {% csrf_token %}
+
+                {% if action == 'verify' %}
+                <div class="mb-3">
+                    <label class="form-label" style="font-weight: 600;">
+                        Verification Notes <span class="text-muted">(optional)</span>
+                    </label>
+                    <textarea name="verification_notes"
+                              class="form-control"
+                              rows="3"
+                              style="border: 2px solid #000;"
+                              placeholder="Any notes about this verification…"></textarea>
+                </div>
+                {% endif %}
+
+                <div class="d-flex gap-2 mt-4">
+                    <button type="submit" class="btn btn-action flex-fill">
+                        <i class="fas fa-{% if action == 'verify' %}lock{% else %}unlock{% endif %}"></i>
+                        {% if action == 'verify' %}Yes, Verify & Lock{% else %}Yes, Un-verify{% endif %}
+                    </button>
+                    <a href="{% url 'losses:loss_list' company.id branch.id %}"
+                       class="btn btn-cancel flex-fill text-center">
+                        <i class="fas fa-times"></i> Cancel
+                    </a>
+                </div>
+            </form>
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}

@@ -123,6 +123,7 @@ INSTALLED_APPS = [
     'apps.plans',
     'apps.reports',
     'apps.settings',
+    'apps.losses',
 
     # Business Type Apps
     'apps.epa_shop',

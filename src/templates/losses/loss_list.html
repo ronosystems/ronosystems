@@ -1,0 +1,517 @@
+{% extends base_template|default:"base.html" %}
+{% load static %}
+
+{% block title %}Losses & Returns - {{ company.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       BASE
+    ============================================ */
+    .table-excel { border-collapse: collapse; width: 100%; }
+    .table-excel th, .table-excel td {
+        border: 1px solid #000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    .table-excel thead th {
+        background-color: #87CEEB !important;
+        color: #000 !important;
+        font-weight: 700;
+        border-bottom: 2px solid #000 !important;
+    }
+    .table-excel tbody tr:nth-child(even) td { background-color: #f9f9f9; }
+    .table-excel tbody tr:hover td { background-color: #f0f0f0; }
+
+    .card { border: 2px solid #000; border-radius: 4px; }
+    .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000;
+        padding: 12px 20px;
+        color: #000 !important;
+    }
+    .card-header h5 { color: #000 !important; font-weight: 700; margin: 0; }
+
+    /* ============================================
+       STAT CARDS (multi-line with amounts + counts)
+    ============================================ */
+    .stat-box {
+        border: 2px solid #000;
+        border-radius: 6px;
+        padding: 14px 16px;
+        background: #fff;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    .stat-overall  { border-left: 5px solid #6c757d; }
+    .stat-pending  { border-left: 5px solid #ffc107; }
+    .stat-verified { border-left: 5px solid #28a745; }
+
+    .stat-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding-bottom: 8px;
+        border-bottom: 1px dashed #ccc;
+        margin-bottom: 10px;
+    }
+    .stat-header i {
+        font-size: 1rem;
+        color: #000;
+    }
+    .stat-overall  .stat-header i { color: #6c757d; }
+    .stat-pending  .stat-header i { color: #ffc107; }
+    .stat-verified .stat-header i { color: #28a745; }
+
+    .stat-title {
+        font-size: 0.78rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: #000;
+    }
+
+    .stat-rows {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        flex: 1;
+    }
+    .stat-line {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.82rem;
+    }
+    .stat-key {
+        color: #555;
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+    .stat-num {
+        font-weight: 800;
+        font-size: 0.9rem;
+        white-space: nowrap;
+    }
+    .stat-num.blue  { color: #004085; }
+    .stat-num.red   { color: #721c24; }
+    .stat-num.warn  { color: #856404; }
+    .stat-num.green { color: #155724; }
+    .stat-num.dark  { color: #000; }
+
+    .stat-line-total {
+        padding-top: 6px;
+        margin-top: 2px;
+        border-top: 1px solid #e9ecef;
+    }
+    .stat-line-count {
+        padding-top: 4px;
+        margin-top: 2px;
+        border-top: 1px dashed #e9ecef;
+    }
+    .stat-count {
+        display: inline-block;
+        min-width: 32px;
+        text-align: center;
+        font-weight: 800;
+        font-size: 0.85rem;
+        padding: 3px 10px;
+        border-radius: 50px;
+        border: 1px solid #000;
+    }
+    .stat-count.dark     { background: #2d3436; color: #fff; }
+    .stat-count.warn-bg  { background: #fff3cd; color: #856404; }
+    .stat-count.green-bg { background: #d4edda; color: #155724; }
+
+    /* ============================================
+       BADGES
+    ============================================ */
+    .badge {
+        padding: 4px 10px; border-radius: 50px; font-size: 11px;
+        font-weight: 600; border: 1px solid #000;
+        display: inline-block;
+    }
+    /* Category badges */
+    .badge-refund     { background: #cce5ff; color: #004085; }
+    .badge-return     { background: #d4edda; color: #155724; }
+    .badge-discount   { background: #fff3cd; color: #856404; }
+    .badge-writeoff   { background: #e2e3e5; color: #383d41; }
+    .badge-damage     { background: #f8d7da; color: #721c24; }
+    .badge-shrinkage  { background: #f5c6cb; color: #721c24; }
+    /* Status badges */
+    .badge-pending  { background: #fff3cd; color: #856404; }
+    .badge-verified { background: #d4edda; color: #155724; }
+
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+    .btn-primary { background-color: #87CEEB; border: 2px solid #000; color: #000; font-weight: 600; }
+    .btn-primary:hover { background-color: #7bb8d8; color: #000; }
+    .btn-success { background-color: #28a745; border: 2px solid #000; color: #fff; font-weight: 600; }
+    .btn-success:hover { background-color: #218838; color: #fff; }
+    .btn-danger { background-color: #dc3545; border: 2px solid #000; color: #fff; font-weight: 600; }
+    .btn-danger:hover { background-color: #bb2d3b; color: #fff; }
+    .btn-warning { background-color: #ffc107; border: 2px solid #000; color: #000; font-weight: 600; }
+    .btn-warning:hover { background-color: #e0a800; color: #000; }
+
+    .action-group { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
+    .locked-hint {
+        font-size: 0.68rem;
+        color: #6c757d;
+        margin-top: 2px;
+    }
+
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 5px 6px;
+            font-size: 11px;
+        }
+        .btn-sm { font-size: 10px; padding: 2px 6px; }
+        .stat-num { font-size: 0.8rem; }
+        .stat-key { font-size: 0.68rem; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- ============================================
+         HEADER
+    ============================================ -->
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+            <h4 style="margin: 0; font-weight: 800;">
+                <i class="fas fa-exclamation-triangle"></i> Losses & Returns
+            </h4>
+            <small class="text-muted">{{ branch.name }} — {{ company.name }}</small>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            {% if is_admin %}
+            <a href="{% url 'losses:loss_create' company.id branch.id %}" class="btn btn-success">
+                <i class="fas fa-plus"></i> Record New
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ============================================
+         STATS ROW
+    ============================================ -->
+    <div class="row mb-3">
+
+        <!-- Column 1: Overall Totals -->
+        <div class="col-lg-4 col-md-6 mb-2">
+            <div class="stat-box stat-overall">
+                <div class="stat-header">
+                    <i class="fas fa-chart-pie"></i>
+                    <span class="stat-title">Overall Totals</span>
+                </div>
+                <div class="stat-rows">
+                    <div class="stat-line">
+                        <span class="stat-key">Selling (Refunded)</span>
+                        <span class="stat-num blue">KES {{ total_amount|floatformat:2 }}</span>
+                    </div>
+                    <div class="stat-line">
+                        <span class="stat-key">Cost Lost</span>
+                        <span class="stat-num red">KES {{ total_cost|floatformat:2 }}</span>
+                    </div>
+                    <div class="stat-line stat-line-total">
+                        <span class="stat-key">Combined Value</span>
+                        <span class="stat-num dark">KES {{ total_value|floatformat:2 }}</span>
+                    </div>
+                    <div class="stat-line stat-line-count">
+                        <span class="stat-key">Records</span>
+                        <span class="stat-count dark">{{ record_count }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Column 2: Pending (Unverified) -->
+        <div class="col-lg-4 col-md-6 mb-2">
+            <div class="stat-box stat-pending">
+                <div class="stat-header">
+                    <i class="fas fa-clock"></i>
+                    <span class="stat-title">Pending Verification</span>
+                </div>
+                <div class="stat-rows">
+                    <div class="stat-line">
+                        <span class="stat-key">Selling (Refunded)</span>
+                        <span class="stat-num blue">KES {{ pending_selling|floatformat:2 }}</span>
+                    </div>
+                    <div class="stat-line">
+                        <span class="stat-key">Cost Lost</span>
+                        <span class="stat-num red">KES {{ pending_cost|floatformat:2 }}</span>
+                    </div>
+                    <div class="stat-line stat-line-total">
+                        <span class="stat-key">Pending Total</span>
+                        <span class="stat-num warn">KES {{ pending_value|floatformat:2 }}</span>
+                    </div>
+                    <div class="stat-line stat-line-count">
+                        <span class="stat-key">Records</span>
+                        <span class="stat-count warn-bg">{{ pending_count }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Column 3: Verified (Locked) -->
+        <div class="col-lg-4 col-md-6 mb-2">
+            <div class="stat-box stat-verified">
+                <div class="stat-header">
+                    <i class="fas fa-lock"></i>
+                    <span class="stat-title">Verified / Locked</span>
+                </div>
+                <div class="stat-rows">
+                    <div class="stat-line">
+                        <span class="stat-key">Selling (Refunded)</span>
+                        <span class="stat-num blue">KES {{ verified_selling|floatformat:2 }}</span>
+                    </div>
+                    <div class="stat-line">
+                        <span class="stat-key">Cost Lost</span>
+                        <span class="stat-num red">KES {{ verified_cost|floatformat:2 }}</span>
+                    </div>
+                    <div class="stat-line stat-line-total">
+                        <span class="stat-key">Verified Total</span>
+                        <span class="stat-num green">KES {{ verified_value|floatformat:2 }}</span>
+                    </div>
+                    <div class="stat-line stat-line-count">
+                        <span class="stat-key">Records</span>
+                        <span class="stat-count green-bg">{{ verified_count }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============================================
+         FILTERS
+    ============================================ -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <form method="GET" class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label" style="font-weight: 600; font-size: 0.85rem;">Category</label>
+                    <select name="category" class="form-select" style="border: 2px solid #000;">
+                        <option value="">All Categories</option>
+                        {% for key, label in category_choices %}
+                            <option value="{{ key }}" {% if selected_category == key %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" style="font-weight: 600; font-size: 0.85rem;">Status</label>
+                    <select name="status" class="form-select" style="border: 2px solid #000;">
+                        <option value="">All</option>
+                        <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Pending</option>
+                        <option value="verified" {% if selected_status == 'verified' %}selected{% endif %}>Verified</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" style="font-weight: 600; font-size: 0.85rem;">From</label>
+                    <input type="date" name="date_from" class="form-control" value="{{ date_from|default:'' }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" style="font-weight: 600; font-size: 0.85rem;">To</label>
+                    <input type="date" name="date_to" class="form-control" value="{{ date_to|default:'' }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" style="font-weight: 600; font-size: 0.85rem;">Search</label>
+                    <input type="text" name="search" class="form-control"
+                           placeholder="Reference, product…"
+                           value="{{ search|default:'' }}">
+                </div>
+                <div class="col-md-1">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============================================
+         TABLE
+    ============================================ -->
+    <div class="card">
+        <div class="card-header">
+            <h5><i class="fas fa-list"></i> Records</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="border: 2px solid #000;">
+                <table class="table-excel mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 11%;">Date</th>
+                            <th style="width: 11%;">Reference</th>
+                            <th style="width: 12%;">Category</th>
+                            <th style="width: 18%;">Product</th>
+                            <th style="width: 14%;">Customer</th>
+                            <th style="width: 11%;" class="text-end">Amount</th>
+                            <th style="width: 9%;" class="text-center">Status</th>
+                            <th style="width: 14%;" class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in records %}
+                        <tr>
+                            <td>
+                                <div style="font-weight:700; font-size:0.82rem;">{{ r.created_at|date:"M d, Y" }}</div>
+                                <div style="font-size:0.7rem; color:#6c757d;">{{ r.created_at|date:"H:i" }}</div>
+                            </td>
+                            <td>
+                                <span style="font-family: 'Courier New', monospace; font-size:0.78rem;">
+                                    {{ r.reference }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge badge-{{ r.category }}">
+                                    {{ r.get_category_display|truncatechars:20 }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if r.product_name %}
+                                    <strong>{{ r.product_name }}</strong>
+                                    {% if r.product_model %}
+                                        <br><small class="text-muted">{{ r.product_model }}</small>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if r.customer_name %}
+                                    {{ r.customer_name }}
+                                    {% if r.customer_phone %}
+                                        <br><small class="text-muted">{{ r.customer_phone }}</small>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                {% if r.is_loss_style %}
+                                    <span style="color:#721c24; font-weight:700;">
+                                        - KES {{ r.effective_amount|floatformat:2 }}
+                                    </span>
+                                    <br><small class="text-muted">cost</small>
+                                {% else %}
+                                    <span style="color:#004085; font-weight:700;">
+                                        KES {{ r.effective_amount|floatformat:2 }}
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if r.is_verified %}
+                                    <span class="badge badge-verified"
+                                          title="Verified by {{ r.verified_by.get_full_name|default:r.verified_by.username }} on {{ r.verified_at|date:'M d, Y H:i' }}">
+                                        <i class="fas fa-lock"></i> Verified
+                                    </span>
+                                {% else %}
+                                    <span class="badge badge-pending">
+                                        <i class="fas fa-clock"></i> Pending
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div class="action-group">
+
+                                    {% if not r.is_verified %}
+                                        {# ── Record is editable ── #}
+                                        {% if is_admin %}
+                                        <a href="{% url 'losses:loss_edit' company.id branch.id r.id %}"
+                                           class="btn btn-sm btn-primary" title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a href="{% url 'losses:loss_delete' company.id branch.id r.id %}"
+                                           class="btn btn-sm btn-danger" title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                        {% endif %}
+
+                                        {# ── Verify & lock ── #}
+                                        {% if can_verify %}
+                                        <a href="{% url 'losses:loss_verify' company.id branch.id r.id %}"
+                                           class="btn btn-sm btn-success" title="Verify & Lock">
+                                            <i class="fas fa-lock"></i> Verify
+                                        </a>
+                                        {% endif %}
+                                    {% else %}
+                                        {# ── Record is locked ── #}
+                                        {% if can_verify %}
+                                        <a href="{% url 'losses:loss_unverify' company.id branch.id r.id %}"
+                                           class="btn btn-sm btn-warning" title="Un-verify">
+                                            <i class="fas fa-unlock"></i> Unlock
+                                        </a>
+                                        {% else %}
+                                        <span class="locked-hint">
+                                            <i class="fas fa-lock"></i> Locked
+                                        </span>
+                                        {% endif %}
+                                    {% endif %}
+
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-4">
+                                <i class="fas fa-inbox"></i> No records yet.
+                                {% if is_admin %}
+                                    <a href="{% url 'losses:loss_create' company.id branch.id %}">Record one now</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ============================================
+             PAGINATION
+        ============================================ -->
+        {% if records.has_other_pages %}
+        <div class="card-footer" style="border-top: 2px solid #000;">
+            <nav>
+                <ul class="pagination mb-0 justify-content-center">
+                    {% if records.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ records.previous_page_number }}{% if querystring %}&{{ querystring }}{% endif %}">
+                                &laquo; Prev
+                            </a>
+                        </li>
+                    {% endif %}
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Page {{ records.number }} of {{ records.paginator.num_pages }}
+                        </span>
+                    </li>
+                    {% if records.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ records.next_page_number }}{% if querystring %}&{{ querystring }}{% endif %}">
+                                Next &raquo;
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
