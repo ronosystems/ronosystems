@@ -8,6 +8,24 @@
     /* ============================================
        LAYOUT
     ============================================ */
+    .detail-wrap {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 20px;
+        align-items: start;
+    }
+    @media (max-width: 992px) {
+        .detail-wrap {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .detail-col {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
     .detail-card {
         border: 2px solid #000;
         border-radius: 6px;
@@ -33,7 +51,6 @@
     .detail-card .card-header h4 i {
         margin-right: 6px;
     }
-
     .detail-body {
         padding: 20px;
     }
@@ -49,6 +66,7 @@
         border-radius: 4px;
         margin-bottom: 20px;
         border: 2px solid #000;
+        flex-wrap: wrap;
     }
     .status-strip.pending  { background: #fff3cd; color: #856404; }
     .status-strip.verified { background: #d4edda; color: #155724; }
@@ -67,7 +85,7 @@
     }
 
     /* ============================================
-       DETAIL ROWS
+       SECTION TITLES
     ============================================ */
     .section-title {
         font-size: 0.72rem;
@@ -81,10 +99,16 @@
     }
     .section-title:first-of-type { margin-top: 0; }
 
+    /* ============================================
+       DETAIL ROWS
+    ============================================ */
     .detail-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 12px 24px;
+    }
+    .detail-grid.single {
+        grid-template-columns: 1fr;
     }
     @media (max-width: 640px) {
         .detail-grid { grid-template-columns: 1fr; }
@@ -206,6 +230,56 @@
         color: #adb5bd;
         font-style: italic;
     }
+
+    /* ============================================
+       ACTION STACK (sidebar)
+    ============================================ */
+    .action-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .action-stack .btn {
+        width: 100%;
+        text-align: left;
+        padding: 9px 14px;
+        font-size: 0.88rem;
+    }
+    .action-stack .btn i {
+        width: 18px;
+        margin-right: 6px;
+    }
+
+    /* ============================================
+       QUICK FACTS (sidebar)
+    ============================================ */
+    .quick-facts {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .quick-fact {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 8px 0;
+        border-bottom: 1px dashed #eee;
+        font-size: 0.85rem;
+    }
+    .quick-fact:last-child { border-bottom: none; }
+    .quick-fact .key {
+        color: #777;
+        font-weight: 600;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+    .quick-fact .val {
+        font-weight: 700;
+        color: #000;
+        text-align: right;
+        word-break: break-word;
+    }
 </style>
 {% endblock %}
 
@@ -226,8 +300,17 @@
         </ol>
     </nav>
 
-    <div class="row">
-        <div class="col-lg-10 mx-auto">
+    <!-- ============================================
+         TWO-COLUMN LAYOUT
+         LEFT  → Primary info (record details)
+         RIGHT → Actions, quick facts, verification, audit
+    ============================================ -->
+    <div class="detail-wrap">
+
+        <!-- ============================================
+             LEFT COLUMN — PRIMARY INFO
+        ============================================ -->
+        <div class="detail-col">
 
             <div class="detail-card">
 
@@ -236,37 +319,9 @@
                     <h4>
                         <i class="fas fa-file-alt"></i> {{ record.reference }}
                     </h4>
-                    <div class="d-flex gap-2 flex-wrap">
-                        <a href="{% url 'losses:loss_list' company.id branch.id %}"
-                           class="btn btn-secondary btn-sm">
-                            <i class="fas fa-arrow-left"></i> Back
-                        </a>
-
-                        {% if not record.is_verified and is_admin %}
-                        <a href="{% url 'losses:loss_edit' company.id branch.id record.id %}"
-                           class="btn btn-primary btn-sm">
-                            <i class="fas fa-edit"></i> Edit
-                        </a>
-                        <a href="{% url 'losses:loss_delete' company.id branch.id record.id %}"
-                           class="btn btn-danger btn-sm">
-                            <i class="fas fa-trash"></i> Delete
-                        </a>
-                        {% endif %}
-
-                        {% if not record.is_verified and can_verify %}
-                        <a href="{% url 'losses:loss_verify' company.id branch.id record.id %}"
-                           class="btn btn-success btn-sm">
-                            <i class="fas fa-lock"></i> Verify
-                        </a>
-                        {% endif %}
-
-                        {% if record.is_verified and can_verify %}
-                        <a href="{% url 'losses:loss_unverify' company.id branch.id record.id %}"
-                           class="btn btn-warning btn-sm">
-                            <i class="fas fa-unlock"></i> Unlock
-                        </a>
-                        {% endif %}
-                    </div>
+                    <span class="badge badge-{{ record.category }}">
+                        {{ record.get_category_display }}
+                    </span>
                 </div>
 
                 <!-- Body -->
@@ -294,8 +349,21 @@
                     </div>
                     {% endif %}
 
-                    <!-- Category + Type -->
-                    <div class="section-title">Category</div>
+                    <!-- Amount Highlight -->
+                    {% if record.is_loss_style %}
+                        <div class="amount-highlight loss">
+                            <span class="amount-label">Cost Lost (per unit × qty)</span>
+                            <span class="amount-value">- KES {{ record.effective_amount|floatformat:2 }}</span>
+                        </div>
+                    {% else %}
+                        <div class="amount-highlight return">
+                            <span class="amount-label">Selling Amount (per unit × qty)</span>
+                            <span class="amount-value">KES {{ record.effective_amount|floatformat:2 }}</span>
+                        </div>
+                    {% endif %}
+
+                    <!-- Category -->
+                    <div class="section-title">Category Details</div>
                     <div class="detail-grid">
                         <div class="detail-row">
                             <span class="label">Type</span>
@@ -312,19 +380,6 @@
                         </div>
                         {% endif %}
                     </div>
-
-                    <!-- Amount Highlight -->
-                    {% if record.is_loss_style %}
-                        <div class="amount-highlight loss">
-                            <span class="amount-label">Cost Lost (per unit × qty)</span>
-                            <span class="amount-value">- KES {{ record.effective_amount|floatformat:2 }}</span>
-                        </div>
-                    {% else %}
-                        <div class="amount-highlight return">
-                            <span class="amount-label">Selling Amount (per unit × qty)</span>
-                            <span class="amount-value">KES {{ record.effective_amount|floatformat:2 }}</span>
-                        </div>
-                    {% endif %}
 
                     <!-- Product -->
                     <div class="section-title">Product</div>
@@ -349,9 +404,9 @@
                             <span class="label">Unit Amount</span>
                             <span class="value">
                                 {% if record.is_loss_style %}
-                                    KES {{ record.cost_amount|floatformat:2 }} (cost)
+                                    KES {{ record.cost_amount|floatformat:2 }} <small style="color:#777;">(cost)</small>
                                 {% else %}
-                                    KES {{ record.amount|floatformat:2 }} (selling)
+                                    KES {{ record.amount|floatformat:2 }} <small style="color:#777;">(selling)</small>
                                 {% endif %}
                             </span>
                         </div>
@@ -361,13 +416,13 @@
                     <div class="section-title">Customer</div>
                     <div class="detail-grid">
                         <div class="detail-row">
-                            <span class="label">Customer Name</span>
+                            <span class="label">Name</span>
                             <span class="value {% if not record.customer_name %}empty{% endif %}">
                                 {{ record.customer_name|default:"Not specified" }}
                             </span>
                         </div>
                         <div class="detail-row">
-                            <span class="label">Customer Phone</span>
+                            <span class="label">Phone</span>
                             <span class="value {% if not record.customer_phone %}empty{% endif %}">
                                 {{ record.customer_phone|default:"Not specified" }}
                             </span>
@@ -381,19 +436,150 @@
                     </div>
 
                     <!-- Notes -->
-                    <div class="section-title">Notes</div>
+                    <div class="section-title">Additional Notes</div>
                     <div class="notes-box {% if not record.notes %}empty{% endif %}">
                         {{ record.notes|default:"No additional notes." }}
                     </div>
 
-                    <!-- Verification Info -->
-                    {% if record.is_verified %}
-                    <div class="section-title">Verification Details</div>
-                    <div class="detail-grid">
-                        <div class="detail-row">
-                            <span class="label">Verified By</span>
-                            <span class="value">
-                                {{ record.verified_by.get_full_name|default:record.verified_by.username }}
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================
+             RIGHT COLUMN — ACTIONS / QUICK FACTS / AUDIT
+        ============================================ -->
+        <div class="detail-col">
+
+            <!-- ── ACTIONS ── -->
+            <div class="detail-card">
+                <div class="card-header">
+                    <h4><i class="fas fa-bolt"></i> Actions</h4>
+                </div>
+                <div class="detail-body">
+                    <div class="action-stack">
+
+                        <a href="{% url 'losses:loss_list' company.id branch.id %}"
+                           class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Back to List
+                        </a>
+
+                        {% if not record.is_verified and is_admin %}
+                        <a href="{% url 'losses:loss_edit' company.id branch.id record.id %}"
+                           class="btn btn-primary">
+                            <i class="fas fa-edit"></i> Edit Record
+                        </a>
+                        {% endif %}
+
+                        {% if not record.is_verified and can_verify %}
+                        <a href="{% url 'losses:loss_verify' company.id branch.id record.id %}"
+                           class="btn btn-success">
+                            <i class="fas fa-lock"></i> Verify & Lock
+                        </a>
+                        {% endif %}
+
+                        {% if record.is_verified and can_verify %}
+                        <a href="{% url 'losses:loss_unverify' company.id branch.id record.id %}"
+                           class="btn btn-warning">
+                            <i class="fas fa-unlock"></i> Un-verify
+                        </a>
+                        {% endif %}
+
+                        {% if not record.is_verified and is_admin %}
+                        <a href="{% url 'losses:loss_delete' company.id branch.id record.id %}"
+                           class="btn btn-danger"
+                           onclick="return confirm('Delete this record permanently?');">
+                            <i class="fas fa-trash"></i> Delete Record
+                        </a>
+                        {% endif %}
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── QUICK FACTS ── -->
+            <div class="detail-card">
+                <div class="card-header">
+                    <h4><i class="fas fa-info-circle"></i> Quick Facts</h4>
+                </div>
+                <div class="detail-body">
+                    <div class="quick-facts">
+
+                        <div class="quick-fact">
+                            <span class="key">Reference</span>
+                            <span class="val" style="font-family: 'Courier New', monospace; font-size: 0.8rem;">
+                                {{ record.reference }}
+                            </span>
+                        </div>
+
+                        <div class="quick-fact">
+                            <span class="key">Category</span>
+                            <span class="val">{{ record.get_category_display }}</span>
+                        </div>
+
+                        {% if record.refund_type %}
+                        <div class="quick-fact">
+                            <span class="key">Refund Method</span>
+                            <span class="val">{{ record.get_refund_type_display }}</span>
+                        </div>
+                        {% endif %}
+
+                        <div class="quick-fact">
+                            <span class="key">Quantity</span>
+                            <span class="val">{{ record.quantity }}</span>
+                        </div>
+
+                        <div class="quick-fact">
+                            <span class="key">Amount</span>
+                            <span class="val">
+                                {% if record.is_loss_style %}
+                                    <span style="color: #721c24;">
+                                        - KES {{ record.effective_amount|floatformat:2 }}
+                                    </span>
+                                {% else %}
+                                    <span style="color: #004085;">
+                                        KES {{ record.effective_amount|floatformat:2 }}
+                                    </span>
+                                {% endif %}
+                            </span>
+                        </div>
+
+                        <div class="quick-fact">
+                            <span class="key">Status</span>
+                            <span class="val">
+                                {% if record.is_verified %}
+                                    <span class="badge badge-verified" style="font-size: 10px;">
+                                        <i class="fas fa-lock"></i> Verified
+                                    </span>
+                                {% else %}
+                                    <span class="badge badge-pending" style="font-size: 10px;">
+                                        <i class="fas fa-clock"></i> Pending
+                                    </span>
+                                {% endif %}
+                            </span>
+                        </div>
+
+                        <div class="quick-fact">
+                            <span class="key">Branch</span>
+                            <span class="val">{{ record.branch.name }}</span>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── VERIFICATION DETAILS (only if verified) ── -->
+            {% if record.is_verified %}
+            <div class="detail-card">
+                <div class="card-header">
+                    <h4><i class="fas fa-check-circle"></i> Verification</h4>
+                </div>
+                <div class="detail-body">
+
+                    <div class="quick-facts">
+                        <div class="quick-fact">
+                            <span class="key">Verified By</span>
+                            <span class="val">
+                                {{ record.verified_by.get_full_name|default:record.verified_by.username|default:"—" }}
                                 {% if record.verified_by.role %}
                                 <br><small class="text-muted" style="font-weight: 400;">
                                     {{ record.verified_by.get_role_display }}
@@ -401,24 +587,34 @@
                                 {% endif %}
                             </span>
                         </div>
-                        <div class="detail-row">
-                            <span class="label">Verified At</span>
-                            <span class="value">{{ record.verified_at|date:"M d, Y H:i" }}</span>
+                        <div class="quick-fact">
+                            <span class="key">Verified At</span>
+                            <span class="val">{{ record.verified_at|date:"M d, Y H:i" }}</span>
                         </div>
                     </div>
+
                     {% if record.verification_notes %}
-                    <div class="notes-box" style="background: #d4edda; border-color: #28a745; margin-top: 10px;">
+                    <div class="section-title">Verification Notes</div>
+                    <div class="notes-box" style="background: #d4edda; border-color: #28a745;">
                         {{ record.verification_notes }}
                     </div>
                     {% endif %}
-                    {% endif %}
 
-                    <!-- Audit Trail -->
-                    <div class="section-title">Audit Trail</div>
-                    <div class="detail-grid">
-                        <div class="detail-row">
-                            <span class="label">Recorded By</span>
-                            <span class="value">
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- ── AUDIT TRAIL ── -->
+            <div class="detail-card">
+                <div class="card-header">
+                    <h4><i class="fas fa-history"></i> Audit Trail</h4>
+                </div>
+                <div class="detail-body">
+                    <div class="quick-facts">
+
+                        <div class="quick-fact">
+                            <span class="key">Recorded By</span>
+                            <span class="val">
                                 {% if record.recorded_by %}
                                     {{ record.recorded_by.get_full_name|default:record.recorded_by.username }}
                                     {% if record.recorded_by.role %}
@@ -431,25 +627,26 @@
                                 {% endif %}
                             </span>
                         </div>
-                        <div class="detail-row">
-                            <span class="label">Recorded At</span>
-                            <span class="value">{{ record.created_at|date:"M d, Y H:i" }}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="label">Last Updated</span>
-                            <span class="value">{{ record.updated_at|date:"M d, Y H:i" }}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="label">Branch</span>
-                            <span class="value">{{ record.branch.name }}</span>
-                        </div>
-                    </div>
 
+                        <div class="quick-fact">
+                            <span class="key">Recorded At</span>
+                            <span class="val">{{ record.created_at|date:"M d, Y H:i" }}</span>
+                        </div>
+
+                        <div class="quick-fact">
+                            <span class="key">Last Updated</span>
+                            <span class="val">{{ record.updated_at|date:"M d, Y H:i" }}</span>
+                        </div>
+
+                    </div>
                 </div>
             </div>
 
         </div>
+        <!-- END RIGHT COLUMN -->
+
     </div>
+    <!-- END TWO-COLUMN LAYOUT -->
 
 </div>
 {% endblock %}
