@@ -20,7 +20,7 @@ from .forms import LossReturnForm
 
 def is_admin_or_manager(user):
     """Full edit rights on unverified records."""
-    return user.role in ['super_admin', 'company_admin', 'company_manager']
+    return user.role in ['super_admin', 'company_admin', 'company_manager', 'company_cashier', 'stock_controller']
 
 
 def can_verify(user):
@@ -36,7 +36,7 @@ def can_edit_loss(user, record):
     Returns (allowed: bool, reason: str)
     """
     if not is_admin_or_manager(user):
-        return False, 'Only admins and managers can edit losses.'
+        return False, 'Only authorized users can edit losses.'
     if record.is_verified:
         return False, (
             f'This record ({record.reference}) is verified and locked. '
