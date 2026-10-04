@@ -25,7 +25,7 @@ def is_admin_or_manager(user):
 
 def can_verify(user):
     """Only company admins, super admins, and stock controllers can verify/un-verify."""
-    return user.role in ['company_admin', 'super_admin', 'stock_controller']
+    return user.role in ['company_admin', 'super_admin']
 
 
 def can_edit_loss(user, record):
