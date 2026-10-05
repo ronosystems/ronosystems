@@ -85,38 +85,52 @@ def _delete_cloudinary_asset(public_id):
 # COGS CALCULATION HELPERS
 # ============================================
 
-def get_cogs_from_sale(sale):
-    """Calculate COGS for a single sale"""
-    total_cogs = Decimal('0.00')
+def get_cogs_from_sale(sale, use_cache=True):
+    """
+    Calculate COGS for a single sale.
+    Caches the result on the Sale instance so repeated calls are free.
+    """
+    if use_cache and hasattr(sale, '_cached_cogs'):
+        return sale._cached_cogs
 
+    total_cogs = Decimal('0.00')
     for item in sale.items.all():
-        if item.content_type:
+        if item.content_type_id:
             try:
                 product = item.content_type.get_object_for_this_type(id=item.object_id)
                 if hasattr(product, 'purchase_price') and product.purchase_price:
                     total_cogs += product.purchase_price * item.quantity
                 else:
                     total_cogs += item.unit_price * Decimal('0.7') * item.quantity
-            except:
+            except Exception:
                 total_cogs += item.unit_price * Decimal('0.7') * item.quantity
         else:
             total_cogs += item.unit_price * Decimal('0.7') * item.quantity
 
+    sale._cached_cogs = total_cogs
     return total_cogs
 
 
 def calculate_total_cogs_from_sales(company, branch=None):
-    """Calculate total COGS from ALL sales"""
-    sales = Sale.objects.filter(company=company, payment_status='paid')
+    """Calculate total COGS from ALL sales — with prefetched items"""
+    from django.contrib.contenttypes.models import ContentType
+
+    sales = (
+        Sale.objects
+        .filter(company=company, payment_status='paid')
+        .prefetch_related('items')     # ← kills the per-sale item query
+    )
     if branch:
         sales = sales.filter(branch=branch)
+
+    # Preload content types in one query
+    ct_map = {ct.id: ct for ct in ContentType.objects.all()}
 
     total_cogs = Decimal('0.00')
     for sale in sales:
         total_cogs += get_cogs_from_sale(sale)
-
     return total_cogs
-
+  
 
 def get_total_revenue(company, branch=None):
     """Get total revenue from sales"""
@@ -549,7 +563,7 @@ def debug_cogs_balance(request):
 
 @login_required
 def finance_dashboard(request):
-    """Main finance dashboard with COGS balance, Profit balance, and recent transactions"""
+    """Main finance dashboard — single-pass COGS calculation"""
     company, is_viewing_company = get_active_company(request)
 
     if not company:
@@ -562,93 +576,94 @@ def finance_dashboard(request):
     branches = Branch.objects.filter(company=company, is_active=True)
     today = timezone.now().date()
 
-    # ── Balances ──
-    current_balance = get_effective_cogs_balance(company, branch_id)
-    current_profit_balance = get_effective_profit_balance(company, branch_id)
-    total_commissions = get_total_commissions(company, branch_id)
-    total_revenue = get_total_revenue(company, branch_id)
-    total_expenses = get_total_expenses(company, branch_id)
-
-    # ── Today's COGS ──
-    today_sales = Sale.objects.filter(
-        company=company,
-        payment_status='paid',
-        sale_date__date=today
-    )
-    if branch_id:
-        today_sales = today_sales.filter(branch_id=branch_id)
-
-    today_cogs = Decimal('0.00')
-    for sale in today_sales:
-        today_cogs += get_cogs_from_sale(sale)
-
-    # ── Today's purchases ──
-    today_purchases = PurchaseRecord.objects.filter(
-        company=company,
-        status='completed',
-        purchase_date=today
-    )
-    if branch_id:
-        today_purchases = today_purchases.filter(branch_id=branch_id)
-
-    today_purchases_value = today_purchases.aggregate(
-        total=Sum('total_amount')
-    )['total'] or Decimal('0.00')
-
-    # ── Week / month boundaries ──
+    # ── Compute all date boundaries ONCE ──
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
-
-    def get_cogs_for_period(start_date, end_date):
-        sales = Sale.objects.filter(
-            company=company,
-            payment_status='paid',
-            sale_date__date__gte=start_date,
-            sale_date__date__lte=end_date
-        )
-        if branch_id:
-            sales = sales.filter(branch_id=branch_id)
-
-        total = Decimal('0.00')
-        for sale in sales:
-            total += get_cogs_from_sale(sale)
-        return total
-
-    week_cogs = get_cogs_for_period(week_start, week_end)
-    month_cogs = get_cogs_for_period(today.replace(day=1), today)
-
+    month_start = today.replace(day=1)
     yesterday = today - timedelta(days=1)
-    yesterday_cogs = get_cogs_for_period(yesterday, yesterday)
 
     last_week_start = week_start - timedelta(days=7)
     last_week_end = last_week_start + timedelta(days=6)
-    last_week_cogs = get_cogs_for_period(last_week_start, last_week_end)
 
     if today.month == 1:
         last_month_start = today.replace(year=today.year - 1, month=12, day=1)
         last_month_end = today.replace(year=today.year - 1, month=12, day=31)
     else:
         last_month_start = today.replace(month=today.month - 1, day=1)
-        last_month_end = today.replace(month=today.month, day=1) - timedelta(days=1)
+        last_month_end = month_start - timedelta(days=1)
 
-    last_month_cogs = get_cogs_for_period(last_month_start, last_month_end)
+    # ── SINGLE PASS over all paid sales ──
+    all_sales = (
+        Sale.objects
+        .filter(company=company, payment_status='paid')
+        .only('id', 'sale_date', 'net_amount', 'branch_id')
+        .prefetch_related('items')
+    )
+    if branch_id:
+        all_sales = all_sales.filter(branch_id=branch_id)
 
-    # ── Recent transactions (last 5 across all sources) ──
+    total_cogs_all = Decimal('0.00')
+    today_cogs = Decimal('0.00')
+    yesterday_cogs = Decimal('0.00')
+    week_cogs = Decimal('0.00')
+    last_week_cogs = Decimal('0.00')
+    month_cogs = Decimal('0.00')
+    last_month_cogs = Decimal('0.00')
+    total_revenue = Decimal('0.00')
+
+    for sale in all_sales:
+        sale_cogs = get_cogs_from_sale(sale)
+        total_cogs_all += sale_cogs
+        total_revenue += sale.net_amount
+
+        sale_date = sale.sale_date.date() if hasattr(sale.sale_date, 'date') else sale.sale_date
+
+        if sale_date == today:
+            today_cogs += sale_cogs
+        if sale_date == yesterday:
+            yesterday_cogs += sale_cogs
+        if week_start <= sale_date <= week_end:
+            week_cogs += sale_cogs
+        if last_week_start <= sale_date <= last_week_end:
+            last_week_cogs += sale_cogs
+        if month_start <= sale_date <= today:
+            month_cogs += sale_cogs
+        if last_month_start <= sale_date <= last_month_end:
+            last_month_cogs += sale_cogs
+
+    # ── Now compute the balances using the already-computed total_cogs_all ──
+    total_purchases = get_total_purchases(company, branch_id)   # 1 query
+    total_commissions = get_total_commissions(company, branch_id)  # 1 query
+    total_expenses = get_total_expenses(company, branch_id)     # 1 query
+
+    current_balance = total_cogs_all - total_purchases
+
+    total_income = total_revenue + total_commissions
+    gross_profit = total_income - total_cogs_all
+    current_profit_balance = gross_profit - total_expenses
+
+    # ── Today's purchases ──
+    today_purchases = PurchaseRecord.objects.filter(
+        company=company, status='completed', purchase_date=today
+    )
+    if branch_id:
+        today_purchases = today_purchases.filter(branch_id=branch_id)
+    today_purchases_value = today_purchases.aggregate(
+        total=Sum('total_amount')
+    )['total'] or Decimal('0.00')
+
+    # ── Recent transactions ──
     recent_transactions = get_recent_transactions(company, branch_id, limit=5)
 
     context = {
         'company': company,
         'branches': branches,
         'selected_branch': branch_id,
-
-        # Balances
         'current_balance': current_balance,
         'current_profit_balance': current_profit_balance,
         'total_commissions': total_commissions,
         'total_revenue': total_revenue,
         'total_expenses': total_expenses,
-
-        # COGS period stats
         'today_cogs': today_cogs,
         'yesterday_cogs': yesterday_cogs,
         'week_cogs': week_cogs,
@@ -656,16 +671,11 @@ def finance_dashboard(request):
         'month_cogs': month_cogs,
         'last_month_cogs': last_month_cogs,
         'today_purchases': today_purchases_value,
-
-        # Recent activity
         'recent_transactions': recent_transactions,
-
-        # Flags
         'is_finance': True,
         'is_viewing_company': is_viewing_company,
     }
     return render(request, 'company/finance/dashboard.html', context)
-
 
 
 @login_required

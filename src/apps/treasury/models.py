@@ -354,6 +354,9 @@ class DailyRecord(models.Model):
     @property
     def total_bank_balance(self):
         """Sum of all bank account balances for this day"""
+        # Use prefetched cache if available
+        if hasattr(self, '_prefetched_objects_cache') and 'bank_balances' in self._prefetched_objects_cache:
+            return sum(b.closing_balance for b in self._prefetched_objects_cache['bank_balances'])
         return self.bank_balances.aggregate(
             total=models.Sum('closing_balance')
         )['total'] or 0
@@ -361,6 +364,8 @@ class DailyRecord(models.Model):
     @property
     def total_mpesa_balance(self):
         """Sum of all M-Pesa account balances for this day"""
+        if hasattr(self, '_prefetched_objects_cache') and 'mpesa_balances' in self._prefetched_objects_cache:
+            return sum(m.closing_balance for m in self._prefetched_objects_cache['mpesa_balances'])
         return self.mpesa_balances.aggregate(
             total=models.Sum('closing_balance')
         )['total'] or 0

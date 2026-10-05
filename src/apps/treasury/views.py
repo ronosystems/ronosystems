@@ -263,6 +263,8 @@ def treasury_dashboard(request, company_id=None):
 @branch_access_required
 def branch_treasury(request, company_id=None, branch_id=None):
     """View treasury details for a specific branch"""
+    from django.db.models import Prefetch  # add at top of file ideally
+
     company = get_user_company(request, company_id)
     if not company:
         return redirect('dashboard')
@@ -270,15 +272,54 @@ def branch_treasury(request, company_id=None, branch_id=None):
     branch = get_object_or_404(Branch, id=branch_id, company=company)
     treasury = get_treasury(company, branch)
     
-    # Get daily records (paginated)
-    daily_records = DailyRecord.objects.filter(
-        company=company,
-        branch=branch
-    ).order_by('-date')
+    # Get daily records (paginated) — WITH prefetch to kill N+1 queries
+    daily_records = (
+        DailyRecord.objects
+        .filter(company=company, branch=branch)
+        .prefetch_related(
+            Prefetch(
+                'bank_balances',
+                queryset=DailyBankBalance.objects.select_related('bank_account')
+            ),
+            Prefetch(
+                'mpesa_balances',
+                queryset=DailyMpesaBalance.objects.select_related('mpesa_account')
+            ),
+        )
+        .select_related('created_by', 'approved_by')
+        .order_by('-date')
+    )
     
     paginator = Paginator(daily_records, 30)
     page = request.GET.get('page', 1)
     daily_records_page = paginator.get_page(page)
+    
+    # ============================================
+    # BULK PREFETCH PREVIOUS-DAY RECORDS
+    # (needed if template uses day_chain_status / grand_total)
+    # ============================================
+    page_records = list(daily_records_page.object_list)
+    if page_records:
+        from datetime import timedelta
+        prev_dates = {r.date - timedelta(days=1) for r in page_records}
+        prev_records = (
+            DailyRecord.objects
+            .filter(company=company, branch=branch, date__in=prev_dates)
+            .prefetch_related(
+                Prefetch(
+                    'bank_balances',
+                    queryset=DailyBankBalance.objects.select_related('bank_account')
+                ),
+                Prefetch(
+                    'mpesa_balances',
+                    queryset=DailyMpesaBalance.objects.select_related('mpesa_account')
+                ),
+            )
+        )
+        prev_by_date = {r.date: r for r in prev_records}
+        for r in page_records:
+            r._cached_prev = prev_by_date.get(r.date - timedelta(days=1))
+        daily_records_page.object_list = page_records
     
     # Get movements (paginated)
     movements = Movement.objects.filter(
@@ -309,6 +350,9 @@ def branch_treasury(request, company_id=None, branch_id=None):
         company=company,
         branch=branch,
         date=timezone.now().date()
+    ).prefetch_related(
+        'bank_balances',
+        'mpesa_balances'
     ).first()
     
     # Get today's bank balances
@@ -340,7 +384,6 @@ def branch_treasury(request, company_id=None, branch_id=None):
         'is_agent': is_agent(request.user),
     }
     return render(request, 'treasury/branch_treasury.html', context)
-
 
 
 # ============================================
@@ -2180,10 +2223,6 @@ def export_movements_csv(request, company_id=None, branch_id=None):
     return response
 
 
-
-
-
-
 # ============================================
 # MPESA COMMISSIONS
 # ============================================
@@ -2432,7 +2471,6 @@ def commissions_list(request, company_id=None, branch_id=None):
         'user_branch': user_branch,
     }
     return render(request, 'treasury/commissions_list.html', context)
-
 
 
 # ============================================
