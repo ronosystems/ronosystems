@@ -502,19 +502,40 @@ if not DEBUG and ON_RENDER:
 # ============================================
 # EMAIL
 # ============================================
-if ON_RENDER:
+# Force SMTP even in dev (for testing real email delivery).
+# Set USE_REAL_EMAIL=True in .env to activate.
+USE_REAL_EMAIL = env_bool('USE_REAL_EMAIL', default=False)
+
+if ON_RENDER or USE_REAL_EMAIL:
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
-    EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
-    EMAIL_USE_TLS = env_bool('EMAIL_USE_TLS', default=True)
+    EMAIL_PORT = int(os.getenv('EMAIL_PORT', 465))
+
+    # Auto-select TLS vs SSL based on port.
+    # Port 465 → implicit SSL.   Port 587 → STARTTLS.
+    # Django forbids both being True at once.
+    if EMAIL_PORT == 465:
+        EMAIL_USE_SSL = True
+        EMAIL_USE_TLS = False
+    else:
+        EMAIL_USE_SSL = False
+        EMAIL_USE_TLS = True
+
     EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
     EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
     DEFAULT_FROM_EMAIL = os.getenv(
-        'DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'noreply@ronosystems.com'
+        'DEFAULT_FROM_EMAIL',
+        EMAIL_HOST_USER or 'noreply@ronosystems.com'
     )
+    SERVER_EMAIL = os.getenv('SERVER_EMAIL', DEFAULT_FROM_EMAIL)
+    SUPPORT_EMAIL = os.getenv('SUPPORT_EMAIL', DEFAULT_FROM_EMAIL)
 else:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
     DEFAULT_FROM_EMAIL = 'noreply@ronosystems.com'
+    SERVER_EMAIL = DEFAULT_FROM_EMAIL
+    SUPPORT_EMAIL = os.getenv('SUPPORT_EMAIL', DEFAULT_FROM_EMAIL)
+
+
 
 SYSTEM_NAME = os.getenv('SYSTEM_NAME', 'RonoSystems')
 
