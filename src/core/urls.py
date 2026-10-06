@@ -5,6 +5,7 @@ from django.conf.urls.static import static
 from apps.companies import web_views as company_views
 from apps.accounts.admin_site import restricted_admin_site
 from apps.accounts import views_guest
+from core.views import qz_sign
 from . import views
 
 
@@ -58,6 +59,8 @@ urlpatterns = [
     path('api/', include('apps.companies.urls')),
     path('api/epa/', include('apps.epa_shop.urls')),
     path('api/supermarket/', include('apps.supermarket.urls')),
+
+    path('qz/sign/', qz_sign, name='qz-sign'),
 ]
 
 

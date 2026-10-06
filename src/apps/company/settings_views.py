@@ -370,27 +370,48 @@ def settings_receipt(request):
                 'receipt_header': request.POST.get('receipt_header', ''),
                 'receipt_footer': request.POST.get('receipt_footer', ''),
                 'receipt_format': request.POST.get('receipt_format', 'standard'),
-                'show_logo': request.POST.get('show_logo') == 'on',
-                'show_company_details': request.POST.get('show_company_details') == 'on',
-                'show_customer_details': request.POST.get('show_customer_details') == 'on',
-                'show_items': request.POST.get('show_items') == 'on',
-                'show_totals': request.POST.get('show_totals') == 'on',
-                'show_payment': request.POST.get('show_payment') == 'on',
-                'show_signature': request.POST.get('show_signature') == 'on',
-                'receipt_title': request.POST.get('receipt_title', 'RECEIPT'),
-                'thank_you_message': request.POST.get('thank_you_message', 'Thank you for your business!'),
-                'include_barcode': request.POST.get('include_barcode') == 'on',
-                'print_copies': int(request.POST.get('print_copies', 1)),
-                'auto_print': request.POST.get('auto_print') == 'on',
-                'receipt_font_size': request.POST.get('receipt_font_size', '14'),
-                'receipt_width': request.POST.get('receipt_width', '80'),
-                'custom_css': request.POST.get('custom_css', ''),
-                'receipt_company_name': request.POST.get('receipt_company_name', ''),
-                'receipt_address':      request.POST.get('receipt_address', ''),
-                'receipt_phone':        request.POST.get('receipt_phone', ''),
-                'receipt_email':        request.POST.get('receipt_email', ''),
-            }
 
+                # ---- Master sections ----
+                'show_logo':             request.POST.get('show_logo') == 'on',
+                'show_company_details':  request.POST.get('show_company_details') == 'on',
+                'show_customer_details': request.POST.get('show_customer_details') == 'on',
+                'show_items':            request.POST.get('show_items') == 'on',
+                'show_totals':           request.POST.get('show_totals') == 'on',
+                'show_payment':          request.POST.get('show_payment') == 'on',
+                'show_signature':        request.POST.get('show_signature') == 'on',
+
+                # ---- Granular toggles ----
+                'show_company_name':     request.POST.get('show_company_name') == 'on',
+                'show_branch':           request.POST.get('show_branch') == 'on',
+                'show_company_email':    request.POST.get('show_company_email') == 'on',
+                'show_company_phone':    request.POST.get('show_company_phone') == 'on',
+                'show_company_pin':      request.POST.get('show_company_pin') == 'on',
+                'show_receipt_title':    request.POST.get('show_receipt_title') == 'on',
+                'show_receipt_header':   request.POST.get('show_receipt_header') == 'on',
+                'show_receipt_footer':   request.POST.get('show_receipt_footer') == 'on',
+                'show_thank_you':        request.POST.get('show_thank_you') == 'on',
+                'show_receipt_info':     request.POST.get('show_receipt_info') == 'on',
+                'show_next_of_kin':      request.POST.get('show_next_of_kin') == 'on',
+                'show_subtotal':         request.POST.get('show_subtotal') == 'on',
+                'show_vat':              request.POST.get('show_vat') == 'on',
+                'show_payment_method':   request.POST.get('show_payment_method') == 'on',
+                'show_payment_status':   request.POST.get('show_payment_status') == 'on',
+                'show_customer_phone':   request.POST.get('show_customer_phone') == 'on',
+                'show_customer_id':      request.POST.get('show_customer_id') == 'on',
+                'show_next_of_kin_phone': request.POST.get('show_next_of_kin_phone') == 'on',
+                'receipt_title':         request.POST.get('receipt_title', 'RECEIPT'),
+                'thank_you_message':     request.POST.get('thank_you_message', 'Thank you for your business!'),
+                'include_barcode':       request.POST.get('include_barcode') == 'on',
+                'print_copies':          int(request.POST.get('print_copies', 1)),
+                'auto_print':            request.POST.get('auto_print') == 'on',
+                'receipt_font_size':     request.POST.get('receipt_font_size', '14'),
+                'receipt_width':         request.POST.get('receipt_width', '80'),
+                'custom_css':            request.POST.get('custom_css', ''),
+                'receipt_company_name':  request.POST.get('receipt_company_name', ''),
+                'receipt_address':       request.POST.get('receipt_address', ''),
+                'receipt_phone':         request.POST.get('receipt_phone', ''),
+                'receipt_email':         request.POST.get('receipt_email', ''),
+            }
             save_company_settings(company, receipt_settings, 'receipt')
             messages.success(request, 'Receipt settings updated successfully!')
             return redirect('company-settings-receipt')
@@ -451,11 +472,24 @@ def settings_preview_receipt(request):
         'cashier': 'Admin',
     }
 
+    # Build the effective email/phone/address to display in the preview,
+    # preferring the receipt override, then the company value, then a dash.
+    preview_email   = settings_data['receipt'].get('receipt_email')   or company.email   or '—'
+    preview_phone   = settings_data['receipt'].get('receipt_phone')   or company.phone   or '—'
+    preview_address = settings_data['receipt'].get('receipt_address') or company.address or '—'
+    preview_name    = settings_data['receipt'].get('receipt_company_name') or company.name
+
     context = {
         'company': company,
         'settings': settings_data,
         'receipt': receipt_data,
         'is_viewing_company': is_viewing_company,
+        # ---- Explicit preview values so the template never
+        #      falls back to the logged-in user's email/phone/address ----
+        'preview_email':   preview_email,
+        'preview_phone':   preview_phone,
+        'preview_address': preview_address,
+        'preview_name':    preview_name,
     }
     return render(request, 'company/settings/receipt_preview.html', context)
 
@@ -531,6 +565,26 @@ def get_company_settings(company):
             'show_totals': True,
             'show_payment': True,
             'show_signature': True,
+            'show_customer_phone':    True,
+            'show_customer_id':       True,
+            'show_next_of_kin_phone': True,
+            # ---- New granular toggles ----
+            'show_company_name': True,
+            'show_branch': True,
+            'show_company_email': True,
+            'show_company_phone': True,
+            'show_company_pin': True,
+            'show_receipt_title': True,
+            'show_receipt_header': True,
+            'show_receipt_footer': True,
+            'show_thank_you': True,
+            'show_receipt_info': True,
+            'show_next_of_kin': True,
+            'show_subtotal': True,
+            'show_vat': True,
+            'show_payment_method': True,
+            'show_payment_status': True,
+
             'receipt_title': 'RECEIPT',
             'thank_you_message': 'Thank you for your business!',
             'include_barcode': False,

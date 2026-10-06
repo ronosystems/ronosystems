@@ -870,6 +870,14 @@
                     <span>Subtotal</span>
                     <span id="subtotal">KSh 0.00</span>
                 </div>
+
+                {% if enable_tax and tax_rate > 0 %}
+                <div class="total-row" id="taxRow">
+                    <span>VAT ({{ tax_rate }}%) — included</span>
+                    <span id="tax">KSh 0.00</span>
+                </div>
+                {% endif %}
+
                 <div class="total-row grand">
                     <span>Total</span>
                     <span id="total">KSh 0.00</span>
@@ -1007,6 +1015,40 @@ const CATEGORY_EMOJI = {
     'Electronics': '💻',
     'Accessories': '🎧'
 };
+
+// ============================================
+// CART LINE MATCHER
+// ============================================
+/**
+ * Two cart lines are the SAME line ONLY when:
+ *   - product_code matches
+ *   - price matches exactly (to 2 decimals)
+ *   - unit matches (both null, or both the same identifier)
+ *
+ * This lets the SAME SKU appear as multiple lines when sold at
+ * different prices, or as separate units (unique IMEI / serial).
+ */
+function isSameCartLine(item, candidate) {
+    if (item.product_code !== candidate.product_code) return false;
+
+    const p1 = Number(item.price || 0).toFixed(2);
+    const p2 = Number(candidate.price || 0).toFixed(2);
+    if (p1 !== p2) return false;
+
+    const u1 = item.unit || null;
+    const u2 = candidate.unit || null;
+    if (u1 !== u2) return false;
+
+    return true;
+}
+
+
+
+// ============================================
+// TAX CONFIG (server-rendered)
+// ============================================
+const POS_ENABLE_TAX = {{ enable_tax|yesno:"true,false" }};
+const POS_TAX_RATE   = {{ tax_rate|default:0 }};
 
 // Barcode detection
 const BARCODE_MIN_LEN = 6;
@@ -1276,11 +1318,14 @@ function autoAddBarcodeMatch(match) {
     const isAccessory = match.category === 'Accessories';
     const unitIdentifier = match.unit_type === 'SKU' ? null : match.identifier;
 
-    // Duplicate check
-    const existing = cart.find(item => {
-        if (isAccessory) return item.product_code === match.product_code;
-        return item.unit === unitIdentifier;
-    });
+    // Duplicate check — only merge into an existing line when
+    // SKU + price + unit all match. Otherwise create a new line.
+    const candidate = {
+        product_code: match.product_code,
+        price: match.price,
+        unit: unitIdentifier,
+    };
+    const existing = cart.find(item => isSameCartLine(item, candidate));
 
     if (existing) {
         existing.quantity += 1;
@@ -1502,10 +1547,14 @@ function addToCartFromModal() {
             return;
         }
 
-        const existing = cart.find(i => i.product_code === currentProduct.product_code);
+        const candidate = {
+            product_code: currentProduct.product_code,
+            price: price,
+            unit: null,
+        };
+        const existing = cart.find(i => isSameCartLine(i, candidate));
         if (existing) {
             existing.quantity += qty;
-            existing.price = price;
         } else {
             cart.push({
                 product_code: currentProduct.product_code,
@@ -1530,7 +1579,12 @@ function addToCartFromModal() {
             return;
         }
 
-        const existing = cart.find(i => i.unit === selectedUnit.identifier);
+        const candidate = {
+            product_code: currentProduct.product_code,
+            price: price,
+            unit: selectedUnit.identifier,
+        };
+        const existing = cart.find(i => isSameCartLine(i, candidate));
         if (existing) {
             existing.quantity += 1;
         } else {
@@ -1570,12 +1624,14 @@ function renderCart() {
     const container = document.getElementById('cartItems');
     const countEl = document.getElementById('cartCount');
     const subtotalEl = document.getElementById('subtotal');
+    const taxEl = document.getElementById('tax');           // may be null if tax disabled
     const totalEl = document.getElementById('total');
     const checkoutBtn = document.getElementById('checkoutBtn');
 
     countEl.textContent = cart.reduce((sum, i) => sum + i.quantity, 0);
     checkoutBtn.disabled = cart.length === 0;
 
+    // ---------- Empty cart ----------
     if (cart.length === 0) {
         container.innerHTML = `
             <div class="cart-empty">
@@ -1585,12 +1641,14 @@ function renderCart() {
             </div>
         `;
         subtotalEl.textContent = 'KSh 0.00';
+        if (taxEl) taxEl.textContent = 'KSh 0.00';
         totalEl.textContent = 'KSh 0.00';
         currentTotal = 0;
         updateCheckoutButton();
         return;
     }
 
+    // ---------- Build items + subtotal ----------
     let subtotal = 0;
     container.innerHTML = cart.map((item, index) => {
         const lineTotal = item.price * item.quantity;
@@ -1615,8 +1673,26 @@ function renderCart() {
         `;
     }).join('');
 
-    currentTotal = subtotal;
+    // ---------- Tax (INCLUSIVE — extracted, not added) ----------
+    let tax = 0;
+    if (typeof POS_ENABLE_TAX !== 'undefined'
+        && POS_ENABLE_TAX
+        && typeof POS_TAX_RATE !== 'undefined'
+        && POS_TAX_RATE > 0) {
+        // VAT = subtotal × rate / (100 + rate)
+        tax = (subtotal * POS_TAX_RATE) / (100 + POS_TAX_RATE);
+        tax = Math.round(tax * 100) / 100;
+    }
+
+    // ---------- Write to DOM ----------
     subtotalEl.textContent = `KSh ${subtotal.toLocaleString()}`;
+
+    if (taxEl) {
+        taxEl.textContent = `KSh ${tax.toLocaleString()}`;
+    }
+
+    // Customer pays exactly the subtotal (shelf price).
+    currentTotal = subtotal;
     totalEl.textContent = `KSh ${currentTotal.toLocaleString()}`;
     updateCheckoutButton();
 }

@@ -12,7 +12,9 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from .utils import record_stock_movement
 from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from apps.company.settings_views import get_company_settings
 from apps.companies.support_utils import (
     get_active_company,
     is_support_mode,
@@ -35,6 +37,44 @@ def get_user_branch(user):
     """Get the user's branch"""
     return user.branch if user else None
 
+def calculate_tax(company, subtotal):
+    """
+    Return (tax_amount, net_amount) based on the company's Payment Settings.
+
+    TAX-INCLUSIVE model (Kenyan retail):
+        The subtotal IS the price the customer pays.
+        Tax is extracted from it, not added on top.
+
+        VAT = subtotal × rate / (100 + rate)
+        net = subtotal   (unchanged — customer pays exactly the shelf price)
+
+    If tax is disabled or rate is 0, returns (Decimal('0'), subtotal).
+    """
+    from apps.company.settings_views import get_company_settings
+
+    try:
+        company_settings = get_company_settings(company)
+        payment = company_settings.get('payment', {})
+    except Exception:
+        return Decimal('0'), Decimal(str(subtotal))
+
+    enable_tax = payment.get('enable_tax', False)
+    try:
+        rate = Decimal(str(payment.get('default_tax_rate', 0) or 0))
+    except Exception:
+        rate = Decimal('0')
+
+    subtotal = Decimal(str(subtotal))
+
+    if not enable_tax or rate <= 0:
+        return Decimal('0'), subtotal
+
+    # Tax-INCLUSIVE extraction:  tax = subtotal × rate / (100 + rate)
+    tax = (subtotal * rate / (Decimal('100') + rate)).quantize(
+        Decimal('0.01'), rounding=ROUND_HALF_UP
+    )
+    net = subtotal   # ← customer pays exactly what's on the shelf
+    return tax, net
 
 # ============================================
 # PROCESS SALE
@@ -214,8 +254,13 @@ def process_sale(request):
                     'total_price': price * quantity,
                     'unit_identifier': unit_identifier
                 })
+
+            # ------------------------------------------------------------
+            # Calculate tax from Payment Settings
+            # ------------------------------------------------------------
+            tax_amount, net_amount = calculate_tax(company, subtotal)
+
             
-            # Create sale
             sale = Sale.objects.create(
                 company=company,
                 branch=branch,
@@ -223,10 +268,10 @@ def process_sale(request):
                 customer_name=customer_name,
                 customer_phone=customer_phone,
                 customer_email=customer_email,
-                total_amount=subtotal,
+                total_amount=subtotal,        # subtotal (before tax)
                 discount=0,
-                tax=0,
-                net_amount=subtotal,
+                tax=tax_amount,               # ✅ calculated
+                net_amount=net_amount,        # ✅ subtotal + tax
                 payment_status='paid',
                 payment_method=data.get('payment_method', 'cash'),
                 sold_by=request.user,
@@ -278,7 +323,7 @@ def process_sale(request):
             
             # Update customer stats
             if customer:
-                customer.total_purchases += subtotal
+                customer.total_purchases += net_amount    # ✅ includes tax
                 customer.visit_count += 1
                 customer.last_visit = timezone.now()
                 customer.save()
@@ -288,7 +333,9 @@ def process_sale(request):
                 'message': 'Sale completed successfully!',
                 'sale_id': sale.id,
                 'sale_number': sale.company_sale_id,
-                'total': float(subtotal),
+                'subtotal': float(subtotal),
+                'tax': float(tax_amount),        # ✅ new
+                'total': float(net_amount),      # ✅ now includes tax
                 'items_count': len(sale_items_data),
                 'customer': customer_name
             })
@@ -440,6 +487,7 @@ def sale_search_units(request):
     return JsonResponse({'results': results})
 
 
+
 # ============================================
 # SINGLE ITEM SALE - Process
 # ============================================
@@ -449,13 +497,13 @@ def sale_search_units(request):
 def sale_process_single(request):
     """Process a single item sale"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         return JsonResponse({'error': 'No company assigned'}, status=400)
-    
+
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
-    
+
     try:
         unit_id = request.POST.get('unit_id')
         customer_name = request.POST.get('customer_name', '').strip()
@@ -464,38 +512,38 @@ def sale_process_single(request):
         customer_email = request.POST.get('customer_email', '').strip()
         next_of_keen_name = request.POST.get('next_of_keen_name', '').strip()
         next_of_keen_phone = request.POST.get('next_of_keen_phone', '').strip()
-        
+
         sale_price = request.POST.get('sale_price', '0')
         sale_type = request.POST.get('sale_type', 'cash')
         branch_id = request.POST.get('branch_id')
-        
+
         if not unit_id:
             return JsonResponse({'error': 'Please scan or enter a unit identifier'}, status=400)
-        
+
         if not customer_name:
             return JsonResponse({'error': 'Customer name is required'}, status=400)
-        
+
         if not customer_phone:
             return JsonResponse({'error': 'Customer phone number is required'}, status=400)
-        
+
         if not customer_id_number:
             return JsonResponse({'error': 'Customer ID number is required'}, status=400)
-        
+
         if not sale_type:
             return JsonResponse({'error': 'Please select a sale type'}, status=400)
-        
+
         try:
             sale_price = Decimal(str(sale_price))
             if sale_price <= 0:
                 return JsonResponse({'error': 'Sale price must be greater than 0'}, status=400)
         except:
             return JsonResponse({'error': 'Invalid sale price'}, status=400)
-        
+
         unit = get_object_or_404(Unit, id=unit_id)
-        
+
         if unit.status != 'available':
             return JsonResponse({'error': f'Unit "{unit.identifier}" is not available'}, status=400)
-        
+
         product = None
         if unit.phone:
             product = unit.phone
@@ -503,20 +551,27 @@ def sale_process_single(request):
             product = unit.electronic
         else:
             return JsonResponse({'error': 'Invalid product'}, status=400)
-        
+
         # Verify product belongs to active company
         if product.company != company:
             return JsonResponse({'error': 'Product does not belong to this company'}, status=403)
-        
+
         branch = None
         if branch_id:
             branch = Branch.objects.filter(id=branch_id, company=company).first()
         if not branch:
             branch = product.branch
-        
+
         if not branch:
             return JsonResponse({'error': 'No branch assigned to this product'}, status=400)
-        
+
+        # ------------------------------------------------------------
+        # Calculate tax based on company payment settings.
+        # Returns (tax_amount, net_amount) where net = subtotal + tax.
+        # If tax is disabled, tax_amount = 0 and net = subtotal.
+        # ------------------------------------------------------------
+        tax_amount, net_amount = calculate_tax(company, sale_price)
+
         # Create or get customer
         customer = Customer.objects.filter(phone=customer_phone, company=company).first()
         if not customer:
@@ -545,7 +600,7 @@ def sale_process_single(request):
                 customer.next_of_keen_phone = next_of_keen_phone
             customer.address = f"ID: {customer_id_number} | Next of Keen: {next_of_keen_name} | NOK Phone: {next_of_keen_phone}"
             customer.save()
-        
+
         # Create owner (if not exists)
         owner = Owner.objects.filter(phone=customer_phone, company=company).first()
         if not owner:
@@ -559,8 +614,8 @@ def sale_process_single(request):
                 address=f"ID: {customer_id_number} | Next of Keen: {next_of_keen_name} | NOK Phone: {next_of_keen_phone}",
                 is_active=True
             )
-        
-        # Create sale
+
+        # Create sale — use the calculated tax and net_amount
         sale = Sale.objects.create(
             company=company,
             branch=branch,
@@ -568,16 +623,16 @@ def sale_process_single(request):
             customer_name=customer_name,
             customer_phone=customer_phone,
             customer_email=customer_email,
-            total_amount=sale_price,
+            total_amount=sale_price,          # subtotal (before tax)
             discount=Decimal('0'),
-            tax=Decimal('0'),
-            net_amount=sale_price,
+            tax=tax_amount,                   # ✅ calculated tax
+            net_amount=net_amount,            # ✅ subtotal + tax
             payment_status='paid' if sale_type in ['cash', 'm-pesa', 'bank_transfer'] else 'pending',
             payment_method=sale_type,
             sold_by=request.user,
             sale_date=timezone.now()
         )
-        
+
         # Create sale item
         content_type = ContentType.objects.get_for_model(product)
         sale_item = SaleItem.objects.create(
@@ -592,7 +647,7 @@ def sale_process_single(request):
             total_price=sale_price,
             unit=unit
         )
-        
+
         # Update unit status
         unit.status = 'sold'
         unit.owner = owner
@@ -600,25 +655,25 @@ def sale_process_single(request):
         unit.owner_phone = customer_phone
         unit.sold_date = timezone.now()
         unit.save()
-        
+
         # Update product stock
         previous_quantity = product.quantity_in_stock
         if product.quantity_in_stock > 0:
             product.quantity_in_stock -= 1
             product.save()
-        
-        # Update customer stats
-        customer.total_purchases += sale_price
+
+        # Update customer stats — use net_amount so totals reflect what they paid
+        customer.total_purchases += net_amount
         customer.visit_count += 1
         customer.last_visit = timezone.now()
         customer.save()
-        
-        # Update owner stats
-        owner.total_purchases += sale_price
+
+        # Update owner stats — same
+        owner.total_purchases += net_amount
         owner.purchase_count += 1
         owner.last_purchase_date = timezone.now()
         owner.save()
-        
+
         # Record stock movement
         record_stock_movement(
             product=product,
@@ -633,31 +688,33 @@ def sale_process_single(request):
             notes=f"Sale #{sale.id} - {customer_name} ({customer_phone})",
             performed_by=request.user
         )
-        
+
         return JsonResponse({
             'success': True,
             'sale_id': sale.id,
             'message': f'Sale completed successfully! Receipt #{sale.company_sale_id}',
             'redirect_url': f'/epa_shop/sale/receipt/{sale.id}/'
         })
-        
+
     except Exception as e:
         import traceback
         traceback.print_exc()
         return JsonResponse({'error': str(e)}, status=500)
 
 
+
+
 @login_required
 def sale_receipt(request, pk):
     """Generate and return sale receipt HTML page"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     try:
         if isinstance(pk, str) and not pk.isdigit():
             sale = get_object_or_404(Sale, company_sale_id=pk, company=company)
@@ -665,21 +722,30 @@ def sale_receipt(request, pk):
             sale = get_object_or_404(Sale, pk=int(pk), company=company)
     except (ValueError, TypeError):
         sale = get_object_or_404(Sale, company_sale_id=str(pk), company=company)
-    
+
     # Check branch access (skip in support mode)
     if not is_viewing_company and not is_admin_or_manager(request.user):
         user_branch = get_user_branch(request.user)
         if user_branch and sale.branch and sale.branch.id != user_branch.id:
             messages.error(request, 'You do not have permission to view receipts from other branches.')
             return redirect('/epa_shop/sales/')
-    
+
     items = sale.items.all()
-    
+
+    # ------------------------------------------------------------
+    # Load receipt settings (merged with defaults) so the template
+    # can honour every toggle from the Receipt Settings page.
+    # ------------------------------------------------------------
+    from apps.company.settings_views import get_company_settings
+    company_settings = get_company_settings(company)
+    receipt_settings = company_settings.get('receipt', {})
+
     context = {
-        'company': company,                                # ✅ ADD THIS
+        'company': company,
         'sale': sale,
         'items': items,
-        'is_viewing_company': is_viewing_company,          # ✅ ADD THIS
+        'is_viewing_company': is_viewing_company,
+        'receipt_settings': receipt_settings,   # ✅ NEW
         'page_title': f'Receipt #{sale.company_sale_id}',
         'page_subtitle': 'Sale receipt',
         'is_receipt': True,
@@ -695,35 +761,43 @@ def sale_receipt(request, pk):
 def sale_receipt_by_id(request, company_sale_id):
     """Generate and return sale receipt data using company_sale_id"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     sale = get_object_or_404(Sale, company_sale_id=company_sale_id, company=company)
-    
+
     # Check branch access (skip in support mode)
     if not is_viewing_company and not is_admin_or_manager(request.user):
         user_branch = get_user_branch(request.user)
         if user_branch and sale.branch and sale.branch.id != user_branch.id:
             messages.error(request, 'You do not have permission to view receipts from other branches.')
             return redirect('/epa_shop/sales/')
-    
+
     items = sale.items.all()
-    
+
+    # ------------------------------------------------------------
+    # Load receipt settings (merged with defaults) so the template
+    # can honour every toggle from the Receipt Settings page.
+    # ------------------------------------------------------------
+    from apps.company.settings_views import get_company_settings
+    company_settings = get_company_settings(company)
+    receipt_settings = company_settings.get('receipt', {})
+
     context = {
-        'company': company,                                # ✅ ADD THIS
+        'company': company,
         'sale': sale,
         'items': items,
-        'is_viewing_company': is_viewing_company,          # ✅ ADD THIS
+        'is_viewing_company': is_viewing_company,
+        'receipt_settings': receipt_settings,   # ✅ NEW
         'page_title': f'Receipt #{sale.company_sale_id}',
         'page_subtitle': 'Sale receipt',
         'is_receipt': True,
     }
     return render(request, 'epa/sale_receipt.html', context)
-
 
 # ============================================
 # GET BRANCHES FOR POS
