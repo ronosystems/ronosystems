@@ -186,6 +186,7 @@ TEMPLATES = [
                 'apps.companies.context_processors.pending_feedback_count',
                 'apps.losses.context_processors.pending_losses_count',
                 'apps.treasury.context_processors.company_context',
+                'apps.settings.context_processors.pending_payments_count',
             ],
         },
     },

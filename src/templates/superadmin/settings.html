@@ -151,6 +151,127 @@
     }
 
     /* ============================================
+       PAYMENT GROUPS (collapsible)
+    ============================================ */
+    .pay-group {
+        border: 2px solid #000;
+        border-radius: 4px;
+        background: #fff;
+        margin-bottom: 12px;
+        overflow: hidden;
+        transition: box-shadow 0.15s;
+    }
+    .pay-group:hover {
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    }
+    .pay-group.is-enabled {
+        border-color: #28a745;
+    }
+    .pay-group-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 14px;
+        background: #f8fafc;
+        cursor: pointer;
+        user-select: none;
+        transition: background 0.15s;
+    }
+    .pay-group.is-enabled .pay-group-header {
+        background: #d4edda;
+    }
+    .pay-group-header:hover {
+        background: #eef4f8;
+    }
+    .pay-group.is-enabled .pay-group-header:hover {
+        background: #c8e6c9;
+    }
+    .pay-group-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 700;
+        color: #000;
+        font-size: 0.95rem;
+        flex: 1;
+        min-width: 0;
+    }
+    .pay-group-title i.group-icon {
+        font-size: 20px;
+        width: 24px;
+        text-align: center;
+        color: #036a77;
+        flex-shrink: 0;
+    }
+    .pay-group.is-enabled .pay-group-title i.group-icon {
+        color: #155724;
+    }
+    .pay-group-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-shrink: 0;
+    }
+    .pay-group-chevron {
+        font-size: 14px;
+        color: #666;
+        transition: transform 0.2s;
+    }
+    .pay-group.is-open .pay-group-chevron {
+        transform: rotate(90deg);
+    }
+
+    /* Toggle switch inside the header */
+    .pay-group-toggle {
+        width: 40px;
+        height: 22px;
+        cursor: pointer;
+        border: 2px solid #000 !important;
+        background: #ccc;
+        border-radius: 22px;
+        appearance: none;
+        -webkit-appearance: none;
+        position: relative;
+        transition: background 0.15s;
+        flex-shrink: 0;
+    }
+    .pay-group-toggle:checked {
+        background-color: #28a745;
+    }
+    .pay-group-toggle::after {
+        content: '';
+        position: absolute;
+        top: 1px;
+        left: 1px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #fff;
+        border: 1px solid #000;
+        transition: transform 0.15s;
+    }
+    .pay-group-toggle:checked::after {
+        transform: translateX(18px);
+    }
+
+    /* Collapsible body */
+    .pay-group-body {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease;
+        border-top: 0 solid #000;
+    }
+    .pay-group.is-open .pay-group-body {
+        max-height: 1000px;
+        border-top: 2px dashed #ccc;
+    }
+    .pay-group-body-inner {
+        padding: 14px 16px 16px 52px;
+        background: #fff;
+    }
+
+    /* ============================================
        UPLOAD GRID
     ============================================ */
     .upload-grid {
@@ -535,6 +656,7 @@
         .form-group label {
             font-size: 13px;
         }
+        .pay-group-body-inner { padding-left: 16px; }
     }
 
     @media (max-width: 480px) {
@@ -572,6 +694,8 @@
         .toast {
             font-size: 12px;
         }
+        .pay-group-title { font-size: 0.85rem; }
+        .pay-group-body-inner { padding: 12px 12px 14px 12px; }
     }
 </style>
 {% endblock %}
@@ -586,12 +710,6 @@
                     <h4 class="mb-0 settings-header-title">
                         <i class="fas fa-cogs" style="color: #000000;"></i>
                         <span>System Settings</span>
-                        {% if pending_payments_count %}
-                            <span class="notif-badge"
-                                  title="{{ pending_payments_count }} pending payment{{ pending_payments_count|pluralize }} to verify">
-                                {{ pending_payments_count }}
-                            </span>
-                        {% endif %}
                     </h4>
                     <p class="text-muted small mb-0" style="color: #000000 !important;">
                         Configure your system preferences
@@ -599,14 +717,6 @@
                 </div>
 
                 <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <a href="{% url 'companies:pending-payments' %}"
-                       class="verify-payments-btn">
-                        <i class="fas fa-receipt"></i>
-                        <span>Verify Payments</span>
-                        {% if pending_payments_count %}
-                            <span class="notif-badge">{{ pending_payments_count }}</span>
-                        {% endif %}
-                    </a>
                     <button type="button"
                             class="btn btn-outline-secondary btn-sm"
                             onclick="window.location.reload()">
@@ -673,9 +783,275 @@
                             </div>
                             <div class="card-body">
 
-                                {# --- Special layout for branding: colors on top, media in grid --- #}
-                                {% if cat_key == 'branding' %}
-                                    {# Colors #}
+                                {# ============================================ #}
+                                {# PAYMENT CATEGORY — special layout           #}
+                                {# ============================================ #}
+                                {% if cat_key == 'payment' %}
+
+                                    {# --- Core payment settings (currency, tax, discount) --- #}
+                                    {% for field in items %}
+                                        {% if field.key == 'CURRENCY' or field.key == 'CURRENCY_SYMBOL' or field.key == 'TAX_RATE' or field.key == 'ENABLE_DISCOUNT' or field.key == 'ENABLE_TAX' %}
+                                        <div class="form-group">
+                                            <label for="{{ field.key }}">
+                                                {{ field.label }}
+                                                {% if field.required %}<span class="required">*</span>{% endif %}
+                                            </label>
+
+                                            {% if field.type == 'boolean' %}
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox"
+                                                           id="{{ field.key }}" name="{{ field.key }}"
+                                                           {% if field.value == 'true' %}checked{% endif %}>
+                                                    <label class="form-check-label" for="{{ field.key }}">
+                                                        {{ field.label }}
+                                                    </label>
+                                                </div>
+                                            {% elif field.type == 'select' %}
+                                                <select class="form-select" id="{{ field.key }}" name="{{ field.key }}">
+                                                    {% for opt in field.options %}
+                                                        <option value="{{ opt.value }}"
+                                                            {% if field.value == opt.value %}selected{% endif %}>
+                                                            {{ opt.label }}
+                                                        </option>
+                                                    {% endfor %}
+                                                </select>
+                                            {% elif field.type == 'integer' or field.type == 'float' %}
+                                                <input type="number" class="form-control"
+                                                       id="{{ field.key }}" name="{{ field.key }}"
+                                                       value="{{ field.value }}"
+                                                       {% if field.type == 'float' %}step="0.01"{% endif %}>
+                                            {% else %}
+                                                <input type="{{ field.type|default:'text' }}" class="form-control"
+                                                       id="{{ field.key }}" name="{{ field.key }}"
+                                                       value="{{ field.value|default:'' }}">
+                                            {% endif %}
+
+                                            {% if field.help_text %}
+                                                <small class="help-text">{{ field.help_text }}</small>
+                                            {% endif %}
+                                        </div>
+                                        {% endif %}
+                                    {% endfor %}
+
+                                    <hr style="border-top: 2px dashed #ccc; margin: 20px 0;">
+
+                                    <h6 style="font-weight:700; color:#000; margin-bottom:14px;">
+                                        <i class="fas fa-sliders-h"></i> Payment Methods
+                                    </h6>
+
+                                    {# --- M-Pesa STK Push group --- #}
+                                    {% for field in items %}
+                                        {% if field.key == 'PAYMENT_MPESA_STK_ENABLED' %}
+                                        <div class="pay-group {% if field.value == 'true' %}is-enabled{% endif %}"
+                                             data-pay-group="stk">
+                                            <div class="pay-group-header" data-pay-toggle="stk">
+                                                <div class="pay-group-title">
+                                                    <i class="fas fa-bolt group-icon"></i>
+                                                    <span>{{ field.label }}</span>
+                                                </div>
+                                                <div class="pay-group-actions">
+                                                    <input type="checkbox"
+                                                           class="pay-group-toggle"
+                                                           id="{{ field.key }}"
+                                                           name="{{ field.key }}"
+                                                           {% if field.value == 'true' %}checked{% endif %}>
+                                                    <i class="fas fa-chevron-right pay-group-chevron"></i>
+                                                </div>
+                                            </div>
+                                            <div class="pay-group-body">
+                                                <div class="pay-group-body-inner">
+                                                    {% if field.help_text %}
+                                                        <small class="help-text" style="display:block; margin-bottom:10px;">
+                                                            {{ field.help_text }}
+                                                        </small>
+                                                    {% endif %}
+                                                    <p class="text-muted small mb-0">
+                                                        <i class="fas fa-info-circle"></i>
+                                                        Customers will get a prompt on their phone to enter their M-Pesa PIN.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    {% endfor %}
+
+                                    {# --- Buy Goods group --- #}
+                                    {% for field in items %}
+                                        {% if field.key == 'PAYMENT_BUY_GOODS_ENABLED' %}
+                                        <div class="pay-group {% if field.value == 'true' %}is-enabled{% endif %}"
+                                             data-pay-group="buy_goods">
+                                            <div class="pay-group-header" data-pay-toggle="buy_goods">
+                                                <div class="pay-group-title">
+                                                    <i class="fas fa-store group-icon"></i>
+                                                    <span>{{ field.label }}</span>
+                                                </div>
+                                                <div class="pay-group-actions">
+                                                    <input type="checkbox"
+                                                           class="pay-group-toggle"
+                                                           id="{{ field.key }}"
+                                                           name="{{ field.key }}"
+                                                           {% if field.value == 'true' %}checked{% endif %}>
+                                                    <i class="fas fa-chevron-right pay-group-chevron"></i>
+                                                </div>
+                                            </div>
+                                            <div class="pay-group-body">
+                                                <div class="pay-group-body-inner">
+                                                    {% for f in items %}
+                                                        {% if f.key == 'PAYMENT_BUY_GOODS_TILL' or f.key == 'PAYMENT_BUY_GOODS_NAME' %}
+                                                        <div class="form-group">
+                                                            <label for="{{ f.key }}">{{ f.label }}</label>
+                                                            <input type="text" class="form-control"
+                                                                   id="{{ f.key }}" name="{{ f.key }}"
+                                                                   value="{{ f.value|default:'' }}">
+                                                            {% if f.help_text %}
+                                                                <small class="help-text">{{ f.help_text }}</small>
+                                                            {% endif %}
+                                                        </div>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    {% endfor %}
+
+                                    {# --- Paybill group --- #}
+                                    {% for field in items %}
+                                        {% if field.key == 'PAYMENT_PAYBILL_ENABLED' %}
+                                        <div class="pay-group {% if field.value == 'true' %}is-enabled{% endif %}"
+                                             data-pay-group="paybill">
+                                            <div class="pay-group-header" data-pay-toggle="paybill">
+                                                <div class="pay-group-title">
+                                                    <i class="fas fa-file-invoice group-icon"></i>
+                                                    <span>{{ field.label }}</span>
+                                                </div>
+                                                <div class="pay-group-actions">
+                                                    <input type="checkbox"
+                                                           class="pay-group-toggle"
+                                                           id="{{ field.key }}"
+                                                           name="{{ field.key }}"
+                                                           {% if field.value == 'true' %}checked{% endif %}>
+                                                    <i class="fas fa-chevron-right pay-group-chevron"></i>
+                                                </div>
+                                            </div>
+                                            <div class="pay-group-body">
+                                                <div class="pay-group-body-inner">
+                                                    {% for f in items %}
+                                                        {% if f.key == 'PAYMENT_PAYBILL_NUMBER' or f.key == 'PAYMENT_PAYBILL_ACCOUNT' or f.key == 'PAYMENT_PAYBILL_NAME' %}
+                                                        <div class="form-group">
+                                                            <label for="{{ f.key }}">{{ f.label }}</label>
+                                                            <input type="text" class="form-control"
+                                                                   id="{{ f.key }}" name="{{ f.key }}"
+                                                                   value="{{ f.value|default:'' }}">
+                                                            {% if f.help_text %}
+                                                                <small class="help-text">{{ f.help_text }}</small>
+                                                            {% endif %}
+                                                        </div>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    {% endfor %}
+
+                                    {# --- Send Money group --- #}
+                                    {% for field in items %}
+                                        {% if field.key == 'PAYMENT_SEND_MONEY_ENABLED' %}
+                                        <div class="pay-group {% if field.value == 'true' %}is-enabled{% endif %}"
+                                             data-pay-group="send_money">
+                                            <div class="pay-group-header" data-pay-toggle="send_money">
+                                                <div class="pay-group-title">
+                                                    <i class="fas fa-mobile-alt group-icon"></i>
+                                                    <span>{{ field.label }}</span>
+                                                </div>
+                                                <div class="pay-group-actions">
+                                                    <input type="checkbox"
+                                                           class="pay-group-toggle"
+                                                           id="{{ field.key }}"
+                                                           name="{{ field.key }}"
+                                                           {% if field.value == 'true' %}checked{% endif %}>
+                                                    <i class="fas fa-chevron-right pay-group-chevron"></i>
+                                                </div>
+                                            </div>
+                                            <div class="pay-group-body">
+                                                <div class="pay-group-body-inner">
+                                                    {% for f in items %}
+                                                        {% if f.key == 'PAYMENT_SEND_MONEY_PHONE' or f.key == 'PAYMENT_SEND_MONEY_NAME' %}
+                                                        <div class="form-group">
+                                                            <label for="{{ f.key }}">{{ f.label }}</label>
+                                                            <input type="text" class="form-control"
+                                                                   id="{{ f.key }}" name="{{ f.key }}"
+                                                                   value="{{ f.value|default:'' }}">
+                                                            {% if f.help_text %}
+                                                                <small class="help-text">{{ f.help_text }}</small>
+                                                            {% endif %}
+                                                        </div>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    {% endfor %}
+
+                                    {# --- Bank Transfer group --- #}
+                                    {% for field in items %}
+                                        {% if field.key == 'PAYMENT_BANK_ENABLED' %}
+                                        <div class="pay-group {% if field.value == 'true' %}is-enabled{% endif %}"
+                                             data-pay-group="bank">
+                                            <div class="pay-group-header" data-pay-toggle="bank">
+                                                <div class="pay-group-title">
+                                                    <i class="fas fa-university group-icon"></i>
+                                                    <span>{{ field.label }}</span>
+                                                </div>
+                                                <div class="pay-group-actions">
+                                                    <input type="checkbox"
+                                                           class="pay-group-toggle"
+                                                           id="{{ field.key }}"
+                                                           name="{{ field.key }}"
+                                                           {% if field.value == 'true' %}checked{% endif %}>
+                                                    <i class="fas fa-chevron-right pay-group-chevron"></i>
+                                                </div>
+                                            </div>
+                                            <div class="pay-group-body">
+                                                <div class="pay-group-body-inner">
+                                                    {% for f in items %}
+                                                        {% if f.key == 'PAYMENT_BANK_NAME' or f.key == 'PAYMENT_BANK_ACCOUNT_NAME' or f.key == 'PAYMENT_BANK_ACCOUNT_NUMBER' or f.key == 'PAYMENT_BANK_BRANCH' or f.key == 'PAYMENT_BANK_SWIFT' %}
+                                                        <div class="form-group">
+                                                            <label for="{{ f.key }}">{{ f.label }}</label>
+                                                            <input type="text" class="form-control"
+                                                                   id="{{ f.key }}" name="{{ f.key }}"
+                                                                   value="{{ f.value|default:'' }}">
+                                                            {% if f.help_text %}
+                                                                <small class="help-text">{{ f.help_text }}</small>
+                                                            {% endif %}
+                                                        </div>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    {% endfor %}
+
+                                    {# --- Manual instructions (bottom) --- #}
+                                    {% for field in items %}
+                                        {% if field.key == 'PAYMENT_MANUAL_INSTRUCTIONS' %}
+                                        <div class="form-group" style="margin-top:16px;">
+                                            <label for="{{ field.key }}">{{ field.label }}</label>
+                                            <textarea class="form-control"
+                                                      id="{{ field.key }}" name="{{ field.key }}"
+                                                      rows="3">{{ field.value|default:'' }}</textarea>
+                                            {% if field.help_text %}
+                                                <small class="help-text">{{ field.help_text }}</small>
+                                            {% endif %}
+                                        </div>
+                                        {% endif %}
+                                    {% endfor %}
+
+                                {% elif cat_key == 'branding' %}
+                                    {# --- Special layout for branding: colors on top, media in grid --- #}
                                     <div class="form-row mb-3">
                                         {% for field in items %}
                                             {% if field.type == 'color' %}
@@ -693,7 +1069,6 @@
                                         {% endfor %}
                                     </div>
 
-                                    {# Uploads — images AND videos #}
                                     <div class="upload-grid">
                                         {% for field in items %}
                                             {% if field.type == 'image' or field.type == 'video' %}
@@ -738,6 +1113,7 @@
                                             {% endif %}
                                         {% endfor %}
                                     </div>
+
                                 {% else %}
                                     {# --- Generic layout for other categories --- #}
                                     {% for field in items %}
@@ -848,8 +1224,6 @@
      {% comment %}
        ============================================================
        Remove mini-forms — live OUTSIDE the main settings form.
-       The "Remove" buttons above reference these by id using the
-       HTML5 `form="..."` attribute. No nesting = no interference.
        ============================================================
     {% endcomment %}
 
@@ -912,14 +1286,17 @@ function showToast(type, message) {
     bsToast.show();
 }
 
-// Color sync + live preview (works for both images and videos)
 document.addEventListener('DOMContentLoaded', function () {
-    // Clear stale file selections from the browser's back/forward cache
+    // ============================================
+    // Clear stale file selections from browser cache
+    // ============================================
     document.querySelectorAll('input[type="file"]').forEach(function (el) {
         el.value = '';
     });
 
-    // Sync color pickers with their text counterparts
+    // ============================================
+    // Color sync
+    // ============================================
     document.querySelectorAll('input[type="color"]').forEach(function (el) {
         el.addEventListener('input', function () {
             const textInput = document.getElementById(this.id + '_text');
@@ -927,7 +1304,9 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Live preview for every media input on the page
+    // ============================================
+    // Live preview for media inputs
+    // ============================================
     document.querySelectorAll('.upload-item').forEach(function (item) {
         const key = item.dataset.fieldKey;
         const type = item.dataset.fieldType;
@@ -959,6 +1338,39 @@ document.addEventListener('DOMContentLoaded', function () {
                 img.src = url;
                 img.alt = key;
                 previewDiv.appendChild(img);
+            }
+        });
+    });
+
+    // ============================================
+    // Payment groups: expand/collapse + toggle sync
+    // ============================================
+    document.querySelectorAll('.pay-group').forEach(function (group) {
+        const header  = group.querySelector('.pay-group-header');
+        const toggle  = group.querySelector('.pay-group-toggle');
+
+        if (!header || !toggle) return;
+
+        // ---- Auto-open on load if enabled ----
+        if (toggle.checked) {
+            group.classList.add('is-open');
+        }
+
+        // ---- Click on the header (but NOT the toggle itself) → expand/collapse ----
+        header.addEventListener('click', function (e) {
+            // If the click landed on the toggle, let the checkbox handle it
+            if (e.target === toggle) return;
+            group.classList.toggle('is-open');
+        });
+
+        // ---- Toggle change → auto-open when turning on; keep open state when off ----
+        toggle.addEventListener('change', function () {
+            if (toggle.checked) {
+                group.classList.add('is-enabled');
+                group.classList.add('is-open');
+            } else {
+                group.classList.remove('is-enabled');
+                // Leave the panel open so the user can still see/edit the fields
             }
         });
     });

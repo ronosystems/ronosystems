@@ -1,5 +1,36 @@
 from .models import SystemSetting
+from django.db import OperationalError, ProgrammingError
 
+
+def pending_payments_count(request):
+    """
+    Expose the number of pending manual payments to every template.
+
+    Only computes for authenticated staff/superadmin users, so tenants
+    never trigger the query.
+    """
+    if not getattr(request, 'user', None) or not request.user.is_authenticated:
+        return {'pending_payments_count': 0}
+
+    # Only staff / superusers see the badge
+    if not (request.user.is_staff or request.user.is_superuser):
+        return {'pending_payments_count': 0}
+
+    try:
+        from apps.plans.models import Subscription
+        count = (
+            Subscription.objects
+            .filter(status='pending')
+            .exclude(payment_method__in=['', 'mpesa', 'stk'])
+            .count()
+        )
+    except (OperationalError, ProgrammingError):
+        # Happens during initial migrations
+        count = 0
+    except Exception:
+        count = 0
+
+    return {'pending_payments_count': count}
 
 def system_settings(request):
     """
