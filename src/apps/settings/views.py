@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.conf import settings as django_settings
 from django.views.decorators.http import require_http_methods
-from apps.plans.models import Subscription 
+from apps.plans.models import Subscription
 from .models import SystemSetting
 
 
@@ -80,7 +80,7 @@ SETTINGS_SCHEMA = [
     {'key': 'EMAIL_TLS', 'type': 'boolean', 'category': 'email',
      'label': 'Enable TLS', 'default': True, 'order': 6},
 
-    # --- Payment ---
+    # --- Payment: core ---
     {'key': 'CURRENCY', 'type': 'select', 'category': 'payment',
      'label': 'Default Currency', 'default': 'KES', 'order': 1,
      'options': [
@@ -98,6 +98,61 @@ SETTINGS_SCHEMA = [
     {'key': 'ENABLE_TAX', 'type': 'boolean', 'category': 'payment',
      'label': 'Enable Tax', 'default': False, 'order': 5},
 
+    # --- Payment: M-Pesa STK ---
+    {'key': 'PAYMENT_MPESA_STK_ENABLED', 'type': 'boolean', 'category': 'payment',
+     'label': 'Enable M-Pesa STK Push', 'default': True, 'order': 10,
+     'help_text': 'Automatic STK push. Disable if KCB/STK is not live yet.'},
+
+    # --- Payment: Buy Goods (Till) ---
+    {'key': 'PAYMENT_BUY_GOODS_ENABLED', 'type': 'boolean', 'category': 'payment',
+     'label': 'Enable Buy Goods (Till)', 'default': False, 'order': 11},
+    {'key': 'PAYMENT_BUY_GOODS_TILL', 'type': 'text', 'category': 'payment',
+     'label': 'Buy Goods Till Number', 'default': '', 'order': 12,
+     'help_text': 'e.g. 123456'},
+    {'key': 'PAYMENT_BUY_GOODS_NAME', 'type': 'text', 'category': 'payment',
+     'label': 'Buy Goods Business Name', 'default': '', 'order': 13,
+     'help_text': 'Shown to the customer so they know who they are paying.'},
+
+    # --- Payment: Paybill ---
+    {'key': 'PAYMENT_PAYBILL_ENABLED', 'type': 'boolean', 'category': 'payment',
+     'label': 'Enable Paybill', 'default': False, 'order': 14},
+    {'key': 'PAYMENT_PAYBILL_NUMBER', 'type': 'text', 'category': 'payment',
+     'label': 'Paybill Number', 'default': '', 'order': 15,
+     'help_text': 'e.g. 522522'},
+    {'key': 'PAYMENT_PAYBILL_ACCOUNT', 'type': 'text', 'category': 'payment',
+     'label': 'Paybill Account Number', 'default': '', 'order': 16,
+     'help_text': 'Usually the company ID / invoice number. Use {company_id} to auto-fill.'},
+    {'key': 'PAYMENT_PAYBILL_NAME', 'type': 'text', 'category': 'payment',
+     'label': 'Paybill Business Name', 'default': '', 'order': 17},
+
+    # --- Payment: Send Money ---
+    {'key': 'PAYMENT_SEND_MONEY_ENABLED', 'type': 'boolean', 'category': 'payment',
+     'label': 'Enable Send Money (Phone)', 'default': False, 'order': 18},
+    {'key': 'PAYMENT_SEND_MONEY_PHONE', 'type': 'text', 'category': 'payment',
+     'label': 'Send Money Phone Number', 'default': '', 'order': 19,
+     'help_text': 'e.g. 0712345678'},
+    {'key': 'PAYMENT_SEND_MONEY_NAME', 'type': 'text', 'category': 'payment',
+     'label': 'Send Money Recipient Name', 'default': '', 'order': 20},
+
+    # --- Payment: Bank Transfer ---
+    {'key': 'PAYMENT_BANK_ENABLED', 'type': 'boolean', 'category': 'payment',
+     'label': 'Enable Bank Transfer', 'default': False, 'order': 21},
+    {'key': 'PAYMENT_BANK_NAME', 'type': 'text', 'category': 'payment',
+     'label': 'Bank Name', 'default': '', 'order': 22},
+    {'key': 'PAYMENT_BANK_ACCOUNT_NAME', 'type': 'text', 'category': 'payment',
+     'label': 'Bank Account Name', 'default': '', 'order': 23},
+    {'key': 'PAYMENT_BANK_ACCOUNT_NUMBER', 'type': 'text', 'category': 'payment',
+     'label': 'Bank Account Number', 'default': '', 'order': 24},
+    {'key': 'PAYMENT_BANK_BRANCH', 'type': 'text', 'category': 'payment',
+     'label': 'Bank Branch', 'default': '', 'order': 25},
+    {'key': 'PAYMENT_BANK_SWIFT', 'type': 'text', 'category': 'payment',
+     'label': 'SWIFT / Bank Code', 'default': '', 'order': 26},
+
+    # --- Payment: instructions ---
+    {'key': 'PAYMENT_MANUAL_INSTRUCTIONS', 'type': 'textarea', 'category': 'payment',
+     'label': 'Manual Payment Instructions', 'default': '', 'order': 27,
+     'help_text': 'Shown below the manual payment options.'},
+
     # --- Preferences ---
     {'key': 'NOTIFICATIONS', 'type': 'boolean', 'category': 'preferences',
      'label': 'Notifications', 'default': True, 'order': 1},
@@ -105,56 +160,6 @@ SETTINGS_SCHEMA = [
      'label': 'Email Notifications', 'default': True, 'order': 2},
     {'key': 'PUSH_NOTIFICATIONS', 'type': 'boolean', 'category': 'preferences',
      'label': 'Push Notifications', 'default': False, 'order': 3},
-
-    # --- Payment (manual / offline methods) ---
-    {'key': 'PAYMENT_MPESA_STK_ENABLED', 'type': 'boolean', 'category': 'payment',
-    'label': 'Enable M-Pesa STK Push', 'default': True, 'order': 10,
-    'help_text': 'Automatic STK push. Disable if KCB/STK is not live yet.'},
-
-    {'key': 'PAYMENT_BUY_GOODS_ENABLED', 'type': 'boolean', 'category': 'payment',
-    'label': 'Enable Buy Goods (Till)', 'default': False, 'order': 11},
-    {'key': 'PAYMENT_BUY_GOODS_TILL', 'type': 'text', 'category': 'payment',
-    'label': 'Buy Goods Till Number', 'default': '', 'order': 12,
-    'help_text': 'e.g. 123456'},
-    {'key': 'PAYMENT_BUY_GOODS_NAME', 'type': 'text', 'category': 'payment',
-    'label': 'Buy Goods Business Name', 'default': '', 'order': 13,
-    'help_text': 'Shown to the customer so they know who they are paying.'},
-
-    {'key': 'PAYMENT_PAYBILL_ENABLED', 'type': 'boolean', 'category': 'payment',
-    'label': 'Enable Paybill', 'default': False, 'order': 14},
-    {'key': 'PAYMENT_PAYBILL_NUMBER', 'type': 'text', 'category': 'payment',
-    'label': 'Paybill Number', 'default': '', 'order': 15,
-    'help_text': 'e.g. 522522'},
-    {'key': 'PAYMENT_PAYBILL_ACCOUNT', 'type': 'text', 'category': 'payment',
-    'label': 'Paybill Account Number', 'default': '', 'order': 16,
-    'help_text': 'Usually the company ID / invoice number. Use {company_id} to auto-fill.'},
-    {'key': 'PAYMENT_PAYBILL_NAME', 'type': 'text', 'category': 'payment',
-    'label': 'Paybill Business Name', 'default': '', 'order': 17},
-
-    {'key': 'PAYMENT_SEND_MONEY_ENABLED', 'type': 'boolean', 'category': 'payment',
-    'label': 'Enable Send Money (Phone)', 'default': False, 'order': 18},
-    {'key': 'PAYMENT_SEND_MONEY_PHONE', 'type': 'text', 'category': 'payment',
-    'label': 'Send Money Phone Number', 'default': '', 'order': 19,
-    'help_text': 'e.g. 0712345678'},
-    {'key': 'PAYMENT_SEND_MONEY_NAME', 'type': 'text', 'category': 'payment',
-    'label': 'Send Money Recipient Name', 'default': '', 'order': 20},
-
-    {'key': 'PAYMENT_BANK_ENABLED', 'type': 'boolean', 'category': 'payment',
-    'label': 'Enable Bank Transfer', 'default': False, 'order': 21},
-    {'key': 'PAYMENT_BANK_NAME', 'type': 'text', 'category': 'payment',
-    'label': 'Bank Name', 'default': '', 'order': 22},
-    {'key': 'PAYMENT_BANK_ACCOUNT_NAME', 'type': 'text', 'category': 'payment',
-    'label': 'Bank Account Name', 'default': '', 'order': 23},
-    {'key': 'PAYMENT_BANK_ACCOUNT_NUMBER', 'type': 'text', 'category': 'payment',
-    'label': 'Bank Account Number', 'default': '', 'order': 24},
-    {'key': 'PAYMENT_BANK_BRANCH', 'type': 'text', 'category': 'payment',
-    'label': 'Bank Branch', 'default': '', 'order': 25},
-    {'key': 'PAYMENT_BANK_SWIFT', 'type': 'text', 'category': 'payment',
-    'label': 'SWIFT / Bank Code', 'default': '', 'order': 26},
-
-    {'key': 'PAYMENT_MANUAL_INSTRUCTIONS', 'type': 'textarea', 'category': 'payment',
-    'label': 'Manual Payment Instructions', 'default': '', 'order': 27,
-    'help_text': 'Shown below the manual payment options. e.g. "After paying, send the confirmation SMS to 07XX..."'},
 ]
 
 
@@ -166,6 +171,7 @@ def _is_admin(user):
 
 
 def _stringify(value, t):
+    """Convert a Python value into the string form we store in `SystemSetting.value`."""
     if t == 'boolean':
         return 'true' if value else 'false'
     if value is None:
@@ -174,6 +180,7 @@ def _stringify(value, t):
 
 
 def _ensure_schema_rows():
+    """Make sure every key in SETTINGS_SCHEMA exists as a SystemSetting row."""
     for spec in SETTINGS_SCHEMA:
         obj, created = SystemSetting.objects.get_or_create(
             key=spec['key'],
@@ -188,8 +195,7 @@ def _ensure_schema_rows():
                 'options': spec.get('options', []),
             },
         )
-        
-        # If the row already existed, make sure the schema metadata is up to date
+
         if not created:
             changed = False
             if obj.options != spec.get('options', []):
@@ -204,9 +210,9 @@ def _ensure_schema_rows():
             if obj.setting_type != spec['type']:
                 obj.setting_type = spec['type']
                 changed = True
-                
             if changed:
                 obj.save()
+
 
 def _cloudinary():
     cfg = getattr(django_settings, 'CLOUDINARY_STORAGE', {})
@@ -220,16 +226,9 @@ def _cloudinary():
 
 def _upload_media(file_obj, setting_key, resource_type='image'):
     """
-    Upload to Cloudinary with a UNIQUE public_id per upload:
+    Upload to Cloudinary with a unique public_id per upload:
         settings/<key>_<timestamp>
-
-    Why unique: Cloudinary's CDN caches by public_id. With a fixed
-    public_id + overwrite=True, replacing an image/video serves the
-    OLD cached version even though the new file is uploaded. A unique
-    public_id makes every upload a brand-new asset → CDN never serves
-    stale content.
-
-    Returns the public_id Cloudinary used (e.g. 'settings/site_logo_1789754321').
+    Returns the public_id Cloudinary used.
     """
     _cloudinary()
     key_lower = setting_key.lower()
@@ -254,16 +253,9 @@ def _delete_media(public_id, resource_type='image'):
     except Exception:
         pass
 
-def _pending_manual_payments_count():
-    """
-    Number of manual payments awaiting verification.
 
-    A "manual pending" row is one where:
-      - status == 'pending'
-      - payment_method is set
-      - payment_method is NOT one of the auto-verified methods
-        ('mpesa', 'stk', or empty)
-    """
+def _pending_manual_payments_count():
+    """Number of manual payments awaiting verification."""
     try:
         return (
             Subscription.objects
@@ -275,9 +267,9 @@ def _pending_manual_payments_count():
         return 0
 
 
-
-
-
+# ======================================================================
+# Views
+# ======================================================================
 @login_required
 @user_passes_test(_is_admin)
 def settings_dashboard(request):
@@ -320,6 +312,16 @@ def settings_dashboard(request):
 @user_passes_test(_is_admin)
 @require_http_methods(['POST'])
 def settings_update(request):
+    """
+    Save changes to SystemSetting rows.
+
+    Important nuance:
+    - A ticked HTML checkbox posts `name=on`.
+    - An UNticked checkbox posts NOTHING.
+
+    So boolean keys must be handled by iterating over the SCHEMA — not over
+    `request.POST` — otherwise unticking a box is a silent no-op.
+    """
     _ensure_schema_rows()
 
     updated = 0
@@ -349,7 +351,6 @@ def settings_update(request):
         uploaded_keys.add(key)
         updated += 1
 
-        # Delete the previous asset if it was a different one
         if old_value and old_value != new_value:
             _delete_media(old_value, resource_type=resource_type)
 
@@ -378,44 +379,77 @@ def settings_update(request):
             _delete_media(old, resource_type=resource_type)
         updated += 1
 
-    # ---------- 3) Plain values ----------
-    for key, raw in request.POST.items():
-        if key == 'csrfmiddlewaretoken' or key.startswith('remove_'):
+    # ---------- 3) Booleans: iterate over SCHEMA, not over POST ----------
+    # This is the key fix: an unticked checkbox is missing from request.POST,
+    # so we must ask the schema which boolean keys to check and write 'false'
+    # for any that are not present as 'on' in the request.
+    for spec in SETTINGS_SCHEMA:
+        if spec['type'] != 'boolean':
             continue
+
+        key = spec['key']
+
+        # Skip if this key had a file upload this round (unlikely for booleans
+        # but harmless to guard)
+        if key in uploaded_keys or key in request.FILES:
+            continue
+
         try:
             obj = SystemSetting.objects.get(key=key)
         except SystemSetting.DoesNotExist:
             continue
-        if obj.setting_type in ('image', 'video'):
+
+        # The browser sends `key=on` when ticked, nothing when unticked.
+        new_val = 'true' if request.POST.get(key) == 'on' else 'false'
+
+        if obj.value != new_val:
+            obj.value = new_val
+            obj.save(update_fields=['value'])
+            updated += 1
+
+    # ---------- 4) Non-boolean plain values: iterate over POST ----------
+    for key, raw in request.POST.items():
+        if key == 'csrfmiddlewaretoken' or key.startswith('remove_'):
+            continue
+
+        try:
+            obj = SystemSetting.objects.get(key=key)
+        except SystemSetting.DoesNotExist:
+            continue
+
+        # Skip uploads and booleans (handled above)
+        if obj.setting_type in ('image', 'video', 'boolean'):
             continue
 
         val = raw.strip() if isinstance(raw, str) else raw
 
-        if obj.setting_type == 'boolean':
-            new_val = 'true' if raw == 'on' else 'false'
-        elif obj.setting_type == 'integer':
+        if obj.setting_type == 'integer':
             try:
                 new_val = str(int(val or 0))
-            except ValueError:
+            except (TypeError, ValueError):
                 new_val = '0'
         elif obj.setting_type == 'float':
             try:
                 new_val = str(float(val or 0))
-            except ValueError:
+            except (TypeError, ValueError):
                 new_val = '0'
         else:
             new_val = val
 
         if obj.value != new_val:
             obj.value = new_val
-            obj.save()
+            obj.save(update_fields=['value'])
             updated += 1
 
+    # ---------- 5) User feedback ----------
     if errors:
         for e in errors:
             messages.error(request, f'Upload failed — {e}')
     if updated:
-        messages.success(request, f'Saved ({updated} change{"s" if updated != 1 else ""}).')
+        messages.success(
+            request,
+            f'Saved ({updated} change{"s" if updated != 1 else ""}).'
+        )
     elif not errors:
         messages.info(request, 'No changes.')
 
@@ -426,6 +460,7 @@ def settings_update(request):
 @user_passes_test(_is_admin)
 @require_http_methods(['POST'])
 def settings_reset_category(request):
+    """Reset every setting in a given category to its schema default."""
     category = request.POST.get('category')
     if not category:
         messages.error(request, 'No category specified.')
@@ -445,7 +480,7 @@ def settings_reset_category(request):
             _delete_media(obj.value, resource_type=resource_type)
 
         obj.value = _stringify(spec['default'], spec['type'])
-        obj.save()
+        obj.save(update_fields=['value'])
         count += 1
 
     messages.success(request, f'Reset {count} setting(s) in "{category}".')
