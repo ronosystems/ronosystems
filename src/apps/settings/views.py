@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.conf import settings as django_settings
 from django.views.decorators.http import require_http_methods
-
+from apps.plans.models import Subscription 
 from .models import SystemSetting
 
 
@@ -105,6 +105,56 @@ SETTINGS_SCHEMA = [
      'label': 'Email Notifications', 'default': True, 'order': 2},
     {'key': 'PUSH_NOTIFICATIONS', 'type': 'boolean', 'category': 'preferences',
      'label': 'Push Notifications', 'default': False, 'order': 3},
+
+    # --- Payment (manual / offline methods) ---
+    {'key': 'PAYMENT_MPESA_STK_ENABLED', 'type': 'boolean', 'category': 'payment',
+    'label': 'Enable M-Pesa STK Push', 'default': True, 'order': 10,
+    'help_text': 'Automatic STK push. Disable if KCB/STK is not live yet.'},
+
+    {'key': 'PAYMENT_BUY_GOODS_ENABLED', 'type': 'boolean', 'category': 'payment',
+    'label': 'Enable Buy Goods (Till)', 'default': False, 'order': 11},
+    {'key': 'PAYMENT_BUY_GOODS_TILL', 'type': 'text', 'category': 'payment',
+    'label': 'Buy Goods Till Number', 'default': '', 'order': 12,
+    'help_text': 'e.g. 123456'},
+    {'key': 'PAYMENT_BUY_GOODS_NAME', 'type': 'text', 'category': 'payment',
+    'label': 'Buy Goods Business Name', 'default': '', 'order': 13,
+    'help_text': 'Shown to the customer so they know who they are paying.'},
+
+    {'key': 'PAYMENT_PAYBILL_ENABLED', 'type': 'boolean', 'category': 'payment',
+    'label': 'Enable Paybill', 'default': False, 'order': 14},
+    {'key': 'PAYMENT_PAYBILL_NUMBER', 'type': 'text', 'category': 'payment',
+    'label': 'Paybill Number', 'default': '', 'order': 15,
+    'help_text': 'e.g. 522522'},
+    {'key': 'PAYMENT_PAYBILL_ACCOUNT', 'type': 'text', 'category': 'payment',
+    'label': 'Paybill Account Number', 'default': '', 'order': 16,
+    'help_text': 'Usually the company ID / invoice number. Use {company_id} to auto-fill.'},
+    {'key': 'PAYMENT_PAYBILL_NAME', 'type': 'text', 'category': 'payment',
+    'label': 'Paybill Business Name', 'default': '', 'order': 17},
+
+    {'key': 'PAYMENT_SEND_MONEY_ENABLED', 'type': 'boolean', 'category': 'payment',
+    'label': 'Enable Send Money (Phone)', 'default': False, 'order': 18},
+    {'key': 'PAYMENT_SEND_MONEY_PHONE', 'type': 'text', 'category': 'payment',
+    'label': 'Send Money Phone Number', 'default': '', 'order': 19,
+    'help_text': 'e.g. 0712345678'},
+    {'key': 'PAYMENT_SEND_MONEY_NAME', 'type': 'text', 'category': 'payment',
+    'label': 'Send Money Recipient Name', 'default': '', 'order': 20},
+
+    {'key': 'PAYMENT_BANK_ENABLED', 'type': 'boolean', 'category': 'payment',
+    'label': 'Enable Bank Transfer', 'default': False, 'order': 21},
+    {'key': 'PAYMENT_BANK_NAME', 'type': 'text', 'category': 'payment',
+    'label': 'Bank Name', 'default': '', 'order': 22},
+    {'key': 'PAYMENT_BANK_ACCOUNT_NAME', 'type': 'text', 'category': 'payment',
+    'label': 'Bank Account Name', 'default': '', 'order': 23},
+    {'key': 'PAYMENT_BANK_ACCOUNT_NUMBER', 'type': 'text', 'category': 'payment',
+    'label': 'Bank Account Number', 'default': '', 'order': 24},
+    {'key': 'PAYMENT_BANK_BRANCH', 'type': 'text', 'category': 'payment',
+    'label': 'Bank Branch', 'default': '', 'order': 25},
+    {'key': 'PAYMENT_BANK_SWIFT', 'type': 'text', 'category': 'payment',
+    'label': 'SWIFT / Bank Code', 'default': '', 'order': 26},
+
+    {'key': 'PAYMENT_MANUAL_INSTRUCTIONS', 'type': 'textarea', 'category': 'payment',
+    'label': 'Manual Payment Instructions', 'default': '', 'order': 27,
+    'help_text': 'Shown below the manual payment options. e.g. "After paying, send the confirmation SMS to 07XX..."'},
 ]
 
 
@@ -204,37 +254,65 @@ def _delete_media(public_id, resource_type='image'):
     except Exception:
         pass
 
+def _pending_manual_payments_count():
+    """
+    Number of manual payments awaiting verification.
 
-# ======================================================================
-# Views
-# ======================================================================
+    A "manual pending" row is one where:
+      - status == 'pending'
+      - payment_method is set
+      - payment_method is NOT one of the auto-verified methods
+        ('mpesa', 'stk', or empty)
+    """
+    try:
+        return (
+            Subscription.objects
+            .filter(status='pending')
+            .exclude(payment_method__in=['', 'mpesa', 'stk'])
+            .count()
+        )
+    except Exception:
+        return 0
+
+
+
+
+
 @login_required
 @user_passes_test(_is_admin)
 def settings_dashboard(request):
+    """Render the System Settings dashboard with all categories and pending payment count."""
     _ensure_schema_rows()
 
+    # ---------- Build the categories dict from the schema ----------
     categories = {}
     for spec in SETTINGS_SCHEMA:
         cat = spec['category']
         categories.setdefault(cat, [])
+
         try:
             obj = SystemSetting.objects.get(key=spec['key'])
         except SystemSetting.DoesNotExist:
             continue
+
         categories[cat].append({
-            'key': obj.key,
-            'label': obj.label or obj.key,
-            'type': obj.setting_type,
-            'value': obj.value,
-            'url': obj.get_url(),
+            'key':       obj.key,
+            'label':     obj.label or obj.key,
+            'type':      obj.setting_type,
+            'value':     obj.value,
+            'url':       obj.get_url(),
             'help_text': obj.help_text,
-            'required': obj.is_required,
-            'options': obj.options or [],
+            'required':  obj.is_required,
+            'options':   obj.options or [],
         })
 
+    # ---------- Pending manual payments (for the notification badge) ----------
+    pending_payments_count = _pending_manual_payments_count()
+
     return render(request, 'superadmin/settings.html', {
-        'categories': categories,
-        'category_labels': dict(SystemSetting.CATEGORIES),
+        'categories':             categories,
+        'category_labels':        dict(SystemSetting.CATEGORIES),
+        'pending_payments_count': pending_payments_count,
     })
 
 

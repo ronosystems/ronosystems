@@ -20,7 +20,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
-
+from apps.settings.models import SystemSetting
 from apps.company.models import Branch
 from apps.plans.models import Plan, Subscription
 
@@ -38,6 +38,55 @@ from django.core.paginator import Paginator
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+
+
+
+# ============================================
+# RECEIPT UPLOAD HELPER
+# ============================================
+
+def _receipt_cloudinary_config():
+    """Point the Cloudinary SDK at the credentials from Django settings."""
+    cfg = getattr(django_settings, 'CLOUDINARY_STORAGE', {})
+    cloudinary.config(
+        cloud_name=cfg.get('CLOUD_NAME', ''),
+        api_key=cfg.get('API_KEY', ''),
+        api_secret=cfg.get('API_SECRET', ''),
+        secure=True,
+    )
+
+
+def _upload_receipt(file_obj, company_id, subscription_id):
+    """
+    Upload a payment receipt to Cloudinary and return its public_id.
+
+    Layout: payment_receipts/<company_id>/<subscription_id>_<timestamp>
+
+    - Images → resource_type='image'
+    - PDFs   → resource_type='raw'
+    """
+    import time as _time
+
+    _receipt_cloudinary_config()
+
+    public_id = (
+        f"payment_receipts/{company_id}/"
+        f"{subscription_id}_{int(_time.time())}"
+    )
+
+    name = (file_obj.name or '').lower()
+    resource_type = 'raw' if name.endswith('.pdf') else 'image'
+
+    result = cloudinary.uploader.upload(
+        file_obj,
+        public_id=public_id,
+        overwrite=False,
+        resource_type=resource_type,
+    )
+    return result.get('public_id') or public_id
+
+
 
 
 # ============================================
@@ -59,6 +108,12 @@ ASSIGNABLE_ROLES = [
     ('stock_controller', 'Stock Controller'),
     ('mpesa_agent',      'M-Pesa Agent'),
 ]
+
+# ============================================
+# RECEIPT UPLOAD LIMITS
+# ============================================
+RECEIPT_ALLOWED_EXTS = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf')
+RECEIPT_MAX_SIZE = 5 * 1024 * 1024  # 5 MB
 
 # Domain regex: matches "example.com", "sub.example.co.ke", etc.
 DOMAIN_RE = re.compile(
@@ -909,14 +964,301 @@ def company_payments(request, pk):
 
     plans = Plan.objects.filter(is_active=True, is_featured=True).order_by('order', 'price')
 
+    # ---------- Manual / offline payment methods (from Settings) ----------
+    def s(key, default=''):
+        try:
+            return SystemSetting.get_setting(key, default)
+        except Exception:
+            return default
+
+    manual_methods = []
+
+    if s('PAYMENT_BUY_GOODS_ENABLED', False):
+        manual_methods.append({
+            'id': 'buy_goods',
+            'title': 'Buy Goods (Till)',
+            'icon': 'fa-store',
+            'lines': [
+                ('Till Number',   s('PAYMENT_BUY_GOODS_TILL')),
+                ('Business Name', s('PAYMENT_BUY_GOODS_NAME')),
+            ],
+        })
+
+    if s('PAYMENT_PAYBILL_ENABLED', False):
+        account = s('PAYMENT_PAYBILL_ACCOUNT').replace('{company_id}', str(company.id))
+        manual_methods.append({
+            'id': 'paybill',
+            'title': 'Paybill',
+            'icon': 'fa-file-invoice',
+            'lines': [
+                ('Paybill Number', s('PAYMENT_PAYBILL_NUMBER')),
+                ('Account Number', account),
+                ('Business Name',  s('PAYMENT_PAYBILL_NAME')),
+            ],
+        })
+
+    if s('PAYMENT_SEND_MONEY_ENABLED', False):
+        manual_methods.append({
+            'id': 'send_money',
+            'title': 'Send Money',
+            'icon': 'fa-mobile-alt',
+            'lines': [
+                ('Phone Number', s('PAYMENT_SEND_MONEY_PHONE')),
+                ('Recipient',    s('PAYMENT_SEND_MONEY_NAME')),
+            ],
+        })
+
+    if s('PAYMENT_BANK_ENABLED', False):
+        manual_methods.append({
+            'id': 'bank',
+            'title': 'Bank Transfer',
+            'icon': 'fa-university',
+            'lines': [
+                ('Bank',           s('PAYMENT_BANK_NAME')),
+                ('Account Name',   s('PAYMENT_BANK_ACCOUNT_NAME')),
+                ('Account Number', s('PAYMENT_BANK_ACCOUNT_NUMBER')),
+                ('Branch',         s('PAYMENT_BANK_BRANCH')),
+                ('SWIFT',          s('PAYMENT_BANK_SWIFT')),
+            ],
+        })
+
     context = {
         'company': company,
         'plans': plans,
         'current_subscription': company.latest_subscription,
         'page_title': 'Renew Subscription',
         'page_subtitle': company.name,
+
+        # Manual / offline payment
+        'manual_methods':      manual_methods,
+        'stk_enabled':         s('PAYMENT_MPESA_STK_ENABLED', True),
+        'manual_instructions': s('PAYMENT_MANUAL_INSTRUCTIONS', ''),
     }
     return render(request, 'companies/payments.html', context)
+
+
+# ============================================
+# MANUAL / OFFLINE PAYMENT — RECORD
+# ============================================
+
+
+@login_required
+@require_POST
+def company_payments_manual(request, pk):
+    """
+    Record a manual (offline) payment claim, with an optional receipt.
+    Accepts multipart/form-data (file upload) OR JSON (no file).
+    Creates a pending Subscription row for admin review.
+    """
+    try:
+        company = get_object_or_404(Company, pk=pk)
+
+        if not _is_super_admin(request.user):
+            if getattr(request.user, 'company_id', None) != company.id:
+                return JsonResponse(
+                    {'success': False, 'error': 'Access denied.'}, status=403
+                )
+
+        # ---- Parse payload: form-data (with file) or JSON ----
+        if request.content_type and request.content_type.startswith('multipart/'):
+            plan_id       = request.POST.get('plan_id')
+            reference     = (request.POST.get('reference') or '').strip()
+            method        = (request.POST.get('method') or 'manual').strip()
+            payment_msg   = (request.POST.get('payment_message') or '').strip()
+            receipt_file  = request.FILES.get('receipt')
+        else:
+            try:
+                payload = json.loads(request.body.decode() or '{}')
+            except json.JSONDecodeError:
+                return JsonResponse(
+                    {'success': False, 'error': 'Invalid JSON.'}, status=400
+                )
+            plan_id       = payload.get('plan_id')
+            reference     = (payload.get('reference') or '').strip()
+            method        = (payload.get('method') or 'manual').strip()
+            payment_msg   = (payload.get('payment_message') or '').strip()
+            receipt_file  = None
+
+        if not plan_id or not reference:
+            return JsonResponse(
+                {'success': False, 'error': 'Missing plan or reference.'}, status=400
+            )
+
+        plan = get_object_or_404(Plan, pk=plan_id)
+
+        start_dt = timezone.now()
+        end_dt   = _compute_end_date(plan, start_dt)
+
+        # ---- Create the Subscription row FIRST (so we have an ID) ----
+        sub = Subscription.objects.create(
+            company=company,
+            plan=plan,
+            start_date=start_dt,
+            end_date=end_dt,
+            status='pending',
+            payment_method=method or 'manual',
+            payment_reference=reference,
+            payment_message=payment_msg,
+        )
+
+        # ---- Upload receipt (if any) ----
+        if receipt_file:
+            if receipt_file.size > RECEIPT_MAX_SIZE:
+                sub.delete()
+                return JsonResponse(
+                    {'success': False, 'error': 'Receipt too large (max 5 MB).'},
+                    status=400,
+                )
+            fname = (receipt_file.name or '').lower()
+            if not fname.endswith(RECEIPT_ALLOWED_EXTS):
+                sub.delete()
+                allowed = ', '.join(RECEIPT_ALLOWED_EXTS)
+                return JsonResponse(
+                    {'success': False, 'error': f'Invalid file type. Allowed: {allowed}'},
+                    status=400,
+                )
+            try:
+                sub.payment_receipt = _upload_receipt(
+                    receipt_file, company.id, sub.id
+                )
+                sub.save(update_fields=['payment_receipt'])
+            except Exception as exc:
+                sub.delete()
+                logger.exception("Receipt upload failed")
+                return JsonResponse(
+                    {'success': False, 'error': f'Upload failed: {exc}'},
+                    status=500,
+                )
+
+        logger.info(
+            "Manual payment recorded: company=%s sub=%s ref=%s receipt=%s",
+            company.id, sub.id, reference, bool(sub.payment_receipt),
+        )
+
+        return JsonResponse({
+            'success': True,
+            'reference': reference,
+            'subscription_id': sub.id,
+        })
+
+    except Exception as e:
+        logger.exception("Manual payment recording failed")
+        return JsonResponse(
+            {'success': False, 'error': f'Server error: {e}'}, status=500
+        )
+        
+
+# ============================================
+# PAYMENT VERIFICATION (super-admin only)
+# ============================================
+
+@login_required
+@staff_member_required
+def pending_payments(request):
+    """List of pending manual payments awaiting verification."""
+    if not _is_super_admin(request.user) and not request.user.is_staff:
+        messages.error(request, "You don't have access to this page.")
+        return redirect('/dashboard/')
+
+    pending = (
+        Subscription.objects
+        .filter(status='pending', payment_method__isnull=False)
+        .exclude(payment_method='mpesa')      # skip unverified STK rows
+        .exclude(payment_method='')
+        .select_related('company', 'plan', 'reviewed_by')
+        .order_by('-created_at')
+    )
+
+    # Show only those with a receipt or a message
+    pending = pending.exclude(payment_reference='')
+
+    context = {
+        'pending': pending,
+        'pending_count': pending.count(),
+        'page_title': 'Verify Payments',
+        'page_subtitle': 'Pending manual payments',
+    }
+    return render(request, 'superadmin/pending_payments.html', context)
+
+
+@login_required
+@staff_member_required
+@require_POST
+def approve_payment(request, sub_id):
+    """Approve a pending manual payment → activate subscription."""
+    if not _is_super_admin(request.user) and not request.user.is_staff:
+        return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
+
+    sub = get_object_or_404(
+        Subscription.objects.select_related('company', 'plan'),
+        pk=sub_id,
+    )
+
+    if sub.status != 'pending':
+        return JsonResponse({'success': False, 'error': 'Already reviewed.'}, status=400)
+
+    company = sub.company
+
+    # Expire other active subs
+    company.subscriptions.filter(status='active').exclude(pk=sub.pk).update(status='expired')
+
+    sub.status       = 'active'
+    sub.reviewed_by  = request.user
+    sub.reviewed_at  = timezone.now()
+    sub.save(update_fields=['status', 'reviewed_by', 'reviewed_at'])
+
+    # Sync Company row
+    company.plan               = sub.plan
+    company.subscription_start = sub.start_date
+    company.subscription_end   = sub.end_date
+    company.status             = 'active'
+    company.is_active          = True
+    company.save(update_fields=[
+        'plan', 'subscription_start', 'subscription_end', 'status', 'is_active'
+    ])
+
+    messages.success(
+        request,
+        f'Approved: {company.name} → {sub.plan.display_name}.'
+    )
+    return redirect('companies:pending-payments')
+
+
+@login_required
+@staff_member_required
+@require_POST
+def reject_payment(request, sub_id):
+    """Reject a pending manual payment."""
+    if not _is_super_admin(request.user) and not request.user.is_staff:
+        return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
+
+    sub = get_object_or_404(Subscription, pk=sub_id)
+    if sub.status != 'pending':
+        return JsonResponse({'success': False, 'error': 'Already reviewed.'}, status=400)
+
+    sub.status      = 'cancelled'
+    sub.reviewed_by = request.user
+    sub.reviewed_at = timezone.now()
+    sub.save(update_fields=['status', 'reviewed_by', 'reviewed_at'])
+
+    messages.warning(
+        request,
+        f'Rejected: {sub.company.name} — {sub.plan.display_name}.'
+    )
+    return redirect('companies:pending-payments')
+
+
+def _pending_payments_count():
+    """Used by the settings view to render the notification badge."""
+    try:
+        return (
+            Subscription.objects
+            .filter(status='pending')
+            .exclude(payment_method__in=['', 'mpesa'])
+            .count()
+        )
+    except Exception:
+        return 0
 
 
 # ============================================

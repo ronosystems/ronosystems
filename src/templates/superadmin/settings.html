@@ -33,6 +33,9 @@
         font-weight: 600;
         font-size: 0.9rem;
         border: 2px solid transparent;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
     }
     .settings-sidebar .nav-pills .nav-link i {
         width: 18px;
@@ -117,8 +120,15 @@
         background: white;
         color: #000000;
     }
+    .form-group textarea.form-control {
+        height: auto;
+        min-height: 70px;
+        resize: vertical;
+        line-height: 1.4;
+    }
     .form-group .form-control:focus,
-    .form-group .form-select:focus {
+    .form-group .form-select:focus,
+    .form-group textarea.form-control:focus {
         border-color: #87CEEB;
         box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
     }
@@ -190,7 +200,6 @@
         object-fit: contain;
         padding: 4px;
     }
-    /* Video preview (NEW) */
     .upload-item .preview video {
         width: 100%;
         height: 100%;
@@ -429,6 +438,50 @@
     }
 
     /* ============================================
+       PAYMENT VERIFICATION BADGE + BUTTON
+    ============================================ */
+    .notif-badge {
+        background: #dc3545;
+        color: #ffffff;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 6px;
+        border-radius: 10px;
+        margin-left: 6px;
+        border: 1px solid #000000;
+        display: inline-block;
+        min-width: 18px;
+        text-align: center;
+        line-height: 1.2;
+    }
+    .settings-header-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 0;
+    }
+    .verify-payments-btn {
+        background: #fff3cd;
+        border: 2px solid #856404;
+        color: #856404;
+        font-weight: 700;
+        padding: 6px 14px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 13px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: background 0.15s;
+    }
+    .verify-payments-btn:hover {
+        background: #ffe9a3;
+        color: #6a4e02;
+        text-decoration: none;
+    }
+
+    /* ============================================
        RESPONSIVE
     ============================================ */
     @media (max-width: 992px) {
@@ -528,14 +581,38 @@
     <div class="row">
         <!-- Header -->
         <div class="col-12 mb-3">
-            <div class="d-flex justify-content-between align-items-center flex-wrap">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div>
-                    <h4 class="mb-0"><i class="fas fa-cogs" style="color: #000000;"></i> System Settings</h4>
-                    <p class="text-muted small mb-0" style="color: #000000 !important;">Configure your system preferences</p>
+                    <h4 class="mb-0 settings-header-title">
+                        <i class="fas fa-cogs" style="color: #000000;"></i>
+                        <span>System Settings</span>
+                        {% if pending_payments_count %}
+                            <span class="notif-badge"
+                                  title="{{ pending_payments_count }} pending payment{{ pending_payments_count|pluralize }} to verify">
+                                {{ pending_payments_count }}
+                            </span>
+                        {% endif %}
+                    </h4>
+                    <p class="text-muted small mb-0" style="color: #000000 !important;">
+                        Configure your system preferences
+                    </p>
                 </div>
-                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.location.reload()">
-                    <i class="fas fa-sync-alt"></i> Refresh
-                </button>
+
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <a href="{% url 'companies:pending-payments' %}"
+                       class="verify-payments-btn">
+                        <i class="fas fa-receipt"></i>
+                        <span>Verify Payments</span>
+                        {% if pending_payments_count %}
+                            <span class="notif-badge">{{ pending_payments_count }}</span>
+                        {% endif %}
+                    </a>
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm"
+                            onclick="window.location.reload()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -553,8 +630,13 @@
                                 {% for cat_key, items in categories.items %}
                                 <a class="nav-link {% if forloop.first %}active{% endif %}"
                                    href="#{{ cat_key }}" data-bs-toggle="pill">
-                                    <i class="fas fa-{% if cat_key == 'branding' %}paint-brush{% elif cat_key == 'general' %}cog{% elif cat_key == 'email' %}envelope{% elif cat_key == 'payment' %}credit-card{% elif cat_key == 'preferences' %}sliders-h{% else %}folder{% endif %}"></i>
-                                    {{ category_labels|get_item:cat_key }}
+                                    <span>
+                                        <i class="fas fa-{% if cat_key == 'branding' %}paint-brush{% elif cat_key == 'general' %}cog{% elif cat_key == 'email' %}envelope{% elif cat_key == 'payment' %}credit-card{% elif cat_key == 'preferences' %}sliders-h{% else %}folder{% endif %}"></i>
+                                        {{ category_labels|get_item:cat_key }}
+                                    </span>
+                                    {% if cat_key == 'payment' and pending_payments_count %}
+                                        <span class="notif-badge">{{ pending_payments_count }}</span>
+                                    {% endif %}
                                 </a>
                                 {% endfor %}
                             </nav>
@@ -570,11 +652,24 @@
                     {% for cat_key, items in categories.items %}
                     <div class="tab-pane fade {% if forloop.first %}show active{% endif %}" id="{{ cat_key }}">
                         <div class="card settings-card">
-                            <div class="card-header">
-                                <h6>
+                            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <h6 class="mb-0">
                                     <i class="fas fa-{% if cat_key == 'branding' %}paint-brush{% elif cat_key == 'general' %}cog{% elif cat_key == 'email' %}envelope{% elif cat_key == 'payment' %}credit-card{% elif cat_key == 'preferences' %}sliders-h{% else %}folder{% endif %}"></i>
                                     {{ category_labels|get_item:cat_key }} Settings
+                                    {% if cat_key == 'payment' and pending_payments_count %}
+                                        <span class="notif-badge">{{ pending_payments_count }}</span>
+                                    {% endif %}
                                 </h6>
+                                {% if cat_key == 'payment' %}
+                                <a href="{% url 'companies:pending-payments' %}"
+                                   class="verify-payments-btn">
+                                    <i class="fas fa-receipt"></i>
+                                    <span>Verify Payments</span>
+                                    {% if pending_payments_count %}
+                                        <span class="notif-badge">{{ pending_payments_count }}</span>
+                                    {% endif %}
+                                </a>
+                                {% endif %}
                             </div>
                             <div class="card-body">
 
@@ -683,6 +778,11 @@
                                                 </button>
                                             </div>
 
+                                        {% elif field.type == 'textarea' %}
+                                            <textarea class="form-control"
+                                                      id="{{ field.key }}" name="{{ field.key }}"
+                                                      rows="3">{{ field.value|default:'' }}</textarea>
+
                                         {% elif field.type == 'integer' or field.type == 'float' %}
                                             <input type="number" class="form-control"
                                                    id="{{ field.key }}" name="{{ field.key }}"
@@ -752,7 +852,7 @@
        HTML5 `form="..."` attribute. No nesting = no interference.
        ============================================================
     {% endcomment %}
-    
+
     {% for cat_key, items in categories.items %}
         {% for field in items %}
             {% if field.url %}

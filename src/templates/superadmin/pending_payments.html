@@ -1,0 +1,393 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Verify Payments - RonoSystems{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       PAGE WRAPPER
+    ============================================ */
+    .vp-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+    .vp-header h4 {
+        margin: 0;
+        font-weight: 700;
+        color: #000;
+    }
+    .vp-header .vp-sub {
+        color: #6c757d;
+        font-size: 0.9rem;
+        margin: 2px 0 0;
+    }
+
+    /* ============================================
+       PAYMENT CARD
+    ============================================ */
+    .vp-card {
+        border: 2px solid #000;
+        border-radius: 4px;
+        background: #fff;
+        padding: 16px;
+        margin-bottom: 16px;
+    }
+    .vp-card h6 {
+        margin: 0 0 8px;
+        font-weight: 700;
+        color: #000;
+        font-size: 1rem;
+    }
+
+    /* Metadata grid */
+    .vp-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 22px;
+        font-size: 13px;
+        color: #333;
+        margin-bottom: 12px;
+    }
+    .vp-meta .vp-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .vp-meta .vp-item strong {
+        color: #000;
+        font-weight: 700;
+    }
+    .vp-meta .vp-item code {
+        background: #f0f0f0;
+        padding: 1px 6px;
+        border-radius: 3px;
+        border: 1px solid #ccc;
+        font-size: 12px;
+    }
+
+    /* Receipt block */
+    .vp-receipt {
+        border: 2px dashed #999;
+        border-radius: 4px;
+        padding: 10px;
+        background: #f8f9fa;
+        margin-bottom: 12px;
+    }
+    .vp-receipt-title {
+        font-size: 12px;
+        font-weight: 700;
+        color: #333;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+    }
+    .vp-receipt-thumb {
+        display: inline-block;
+        max-width: 240px;
+        border: 2px solid #000;
+        border-radius: 4px;
+        overflow: hidden;
+        background: #fff;
+        cursor: pointer;
+        transition: transform 0.15s;
+    }
+    .vp-receipt-thumb:hover {
+        transform: scale(1.02);
+    }
+    .vp-receipt-thumb img {
+        display: block;
+        max-width: 100%;
+        max-height: 240px;
+    }
+    .vp-receipt-pdf {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border: 2px solid #000;
+        border-radius: 4px;
+        background: #fff;
+        color: #dc3545;
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 13px;
+    }
+    .vp-receipt-pdf:hover {
+        background: #fff5f5;
+        color: #b71c1c;
+        text-decoration: none;
+    }
+    .vp-receipt-pdf i { font-size: 22px; }
+    .vp-receipt-missing {
+        color: #6c757d;
+        font-style: italic;
+        font-size: 13px;
+    }
+
+    /* M-Pesa message block */
+    .vp-message {
+        background: #f8f9fa;
+        border-left: 3px solid #036a77;
+        padding: 8px 10px;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        color: #333;
+        white-space: pre-wrap;
+        word-break: break-word;
+        margin-bottom: 12px;
+        border-radius: 0 4px 4px 0;
+    }
+
+    /* Action buttons */
+    .vp-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        padding-top: 10px;
+        border-top: 1px solid #e9ecef;
+    }
+    .vp-actions form {
+        margin: 0;
+    }
+    .vp-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 20px;
+        border: 2px solid #000;
+        border-radius: 4px;
+        font-weight: 700;
+        font-size: 13px;
+        cursor: pointer;
+        transition: transform 0.1s, background 0.15s;
+    }
+    .vp-btn:hover { transform: translateY(-1px); }
+    .vp-btn-approve {
+        background: #28a745;
+        color: #fff;
+    }
+    .vp-btn-approve:hover { background: #218838; color: #fff; }
+    .vp-btn-reject {
+        background: #dc3545;
+        color: #fff;
+    }
+    .vp-btn-reject:hover { background: #c82333; color: #fff; }
+
+    /* Empty state */
+    .vp-empty {
+        text-align: center;
+        padding: 60px 20px;
+        border: 2px dashed #999;
+        border-radius: 4px;
+        background: #f8f9fa;
+        color: #333;
+    }
+    .vp-empty i {
+        font-size: 3rem;
+        color: #28a745;
+        display: block;
+        margin-bottom: 12px;
+    }
+
+    /* Lightbox for full-size image */
+    .vp-lightbox {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: rgba(0,0,0,0.85);
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+    .vp-lightbox.open { display: flex; }
+    .vp-lightbox img {
+        max-width: 95vw;
+        max-height: 92vh;
+        border: 3px solid #fff;
+        border-radius: 4px;
+    }
+    .vp-lightbox-close {
+        position: absolute;
+        top: 16px;
+        right: 20px;
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 4px;
+        font-size: 22px;
+        font-weight: 700;
+        width: 40px;
+        height: 40px;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
+
+{% block page_title %}Verify Payments{% endblock %}
+{% block page_subtitle %}{{ pending_count }} pending payment{{ pending_count|pluralize }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+
+    <!-- Header -->
+    <div class="vp-header">
+        <div>
+            <h4><i class="fas fa-receipt"></i> Verify Payments</h4>
+            <p class="vp-sub">
+                {{ pending_count }} pending payment{{ pending_count|pluralize }} awaiting your review
+            </p>
+        </div>
+        <a href="{% url 'settings:dashboard' %}"
+           class="btn btn-outline-secondary btn-sm"
+           style="border:2px solid #000; font-weight:600;">
+            <i class="fas fa-arrow-left"></i> Back to Settings
+        </a>
+    </div>
+
+    {% for sub in pending %}
+    <div class="vp-card">
+
+        <!-- Title -->
+        <h6>
+            {{ sub.company.name }} — {{ sub.plan.display_name }}
+        </h6>
+
+        <!-- Metadata -->
+        <div class="vp-meta">
+            <span class="vp-item">
+                <strong>Amount:</strong>
+                {{ sub.plan.currency }} {{ sub.plan.price }}
+            </span>
+            <span class="vp-item">
+                <strong>Method:</strong>
+                {{ sub.get_payment_method_display|default:sub.payment_method }}
+            </span>
+            <span class="vp-item">
+                <strong>Ref:</strong>
+                <code>{{ sub.payment_reference }}</code>
+            </span>
+            <span class="vp-item">
+                <strong>Submitted:</strong>
+                {{ sub.created_at|date:"M j, Y H:i" }}
+            </span>
+        </div>
+
+        <!-- Receipt -->
+        <div class="vp-receipt">
+            <div class="vp-receipt-title">
+                <i class="fas fa-paperclip"></i> Receipt
+            </div>
+
+            {% if sub.has_receipt %}
+                {% if sub.payment_receipt|lower|slice:"-4:" == ".pdf" %}
+                    {# PDF — show a link, not an inline image #}
+                    <a href="{{ sub.get_receipt_url }}"
+                       rel="noopener"
+                       class="vp-receipt-pdf">
+                        <i class="fas fa-file-pdf"></i>
+                        Open PDF receipt
+                    </a>
+                {% else %}
+                    {# Image — thumbnail + click to enlarge #}
+                    <a href="{{ sub.get_receipt_url }}"
+                       target="_blank"
+                       rel="noopener"
+                       class="vp-receipt-thumb"
+                       data-receipt-src="{{ sub.get_receipt_url }}">
+                        <img src="{{ sub.get_receipt_url }}"
+                             alt="Payment receipt for {{ sub.payment_reference }}"
+                             loading="lazy"
+                             onerror="this.parentElement.outerHTML='&lt;div class=&quot;vp-receipt-missing&quot;&gt;&lt;i class=&quot;fas fa-exclamation-triangle&quot;&gt;&lt;/i&gt; Receipt could not be loaded. &lt;a href=&quot;{{ sub.get_receipt_url }}&quot; target=&quot;_blank&quot;&gt;Open in new tab&lt;/a&gt;.&lt;/div&gt;';">
+                    </a>
+                {% endif %}
+            {% else %}
+                <div class="vp-receipt-missing">
+                    <i class="fas fa-info-circle"></i>
+                    No receipt file uploaded.
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Pasted M-Pesa / bank message -->
+        {% if sub.payment_message %}
+        <div class="vp-message">{{ sub.payment_message }}</div>
+        {% endif %}
+
+        <!-- Review actions -->
+        <div class="vp-actions">
+            <form method="post"
+                  action="{% url 'companies:approve-payment' sub.id %}"
+                  onsubmit="return confirm('Approve this payment and activate the subscription for {{ sub.company.name|escapejs }}?');">
+                {% csrf_token %}
+                <button type="submit" class="vp-btn vp-btn-approve">
+                    <i class="fas fa-check"></i> Approve
+                </button>
+            </form>
+
+            <form method="post"
+                  action="{% url 'companies:reject-payment' sub.id %}"
+                  onsubmit="return confirm('Reject this payment? The customer will be notified.');">
+                {% csrf_token %}
+                <button type="submit" class="vp-btn vp-btn-reject">
+                    <i class="fas fa-times"></i> Reject
+                </button>
+            </form>
+        </div>
+    </div>
+    {% empty %}
+    <div class="vp-empty">
+        <i class="fas fa-check-circle"></i>
+        <h5>All caught up!</h5>
+        <p class="mb-0">No pending payments to verify right now.</p>
+    </div>
+    {% endfor %}
+
+</div>
+
+<!-- Image lightbox -->
+<div class="vp-lightbox" id="vpLightbox">
+    <button type="button" class="vp-lightbox-close" onclick="closeLightbox()">&times;</button>
+    <img id="vpLightboxImg" src="" alt="Receipt">
+</div>
+
+<script>
+(function () {
+    const lightbox = document.getElementById('vpLightbox');
+    const lightboxImg = document.getElementById('vpLightboxImg');
+
+    document.querySelectorAll('.vp-receipt-thumb').forEach(function (thumb) {
+        thumb.addEventListener('click', function (e) {
+            // Ctrl/Cmd-click → let the browser open in a new tab
+            if (e.ctrlKey || e.metaKey) return;
+            e.preventDefault();
+            const src = thumb.dataset.receiptSrc;
+            if (!src) return;
+            lightboxImg.src = src;
+            lightbox.classList.add('open');
+            document.body.style.overflow = 'hidden';
+        });
+    });
+
+    window.closeLightbox = function () {
+        lightbox.classList.remove('open');
+        lightboxImg.src = '';
+        document.body.style.overflow = '';
+    };
+
+    lightbox.addEventListener('click', function (e) {
+        if (e.target === lightbox) window.closeLightbox();
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && lightbox.classList.contains('open')) {
+            window.closeLightbox();
+        }
+    });
+})();
+</script>
+{% endblock %}

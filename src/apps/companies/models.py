@@ -581,7 +581,7 @@ class Company(models.Model):
             'has_priority_support': plan.has_priority_support,
             'has_bulk_import': plan.has_bulk_import,
             'has_custom_domain': plan.has_custom_domain,
-            'has_mpesa_integration': plan.has_mpesa_intergration,  # model spelling
+            'has_mpesa_integration': plan.has_mpesa_integration,  # model spelling
         }
 
     def has_feature(self, feature_name):

@@ -122,7 +122,7 @@ def plan_create(request):
                 has_priority_support=request.POST.get('has_priority_support') == 'on',
                 has_bulk_import=request.POST.get('has_bulk_import') == 'on',
                 has_custom_domain=request.POST.get('has_custom_domain') == 'on',
-                has_mpesa_intergration=request.POST.get('has_mpesa_intergration') == 'on',
+                has_mpesa_integration=request.POST.get('has_mpesa_integration') == 'on',
                 has_treasury=request.POST.get('has_treasury') == 'on',
                 is_active=request.POST.get('is_active') == 'on',
                 is_featured=request.POST.get('is_featured') == 'on',
@@ -206,7 +206,7 @@ def plan_edit(request, pk):
             plan.has_priority_support = request.POST.get('has_priority_support') == 'on'
             plan.has_bulk_import = request.POST.get('has_bulk_import') == 'on'
             plan.has_custom_domain = request.POST.get('has_custom_domain') == 'on'
-            plan.has_mpesa_intergration = request.POST.get('has_mpesa_intergration') == 'on'
+            plan.has_mpesa_integration = request.POST.get('has_mpesa_integration') == 'on'
             plan.has_treasury = request.POST.get('has_treasury') == 'on'
             plan.is_active = request.POST.get('is_active') == 'on'
             plan.is_featured = request.POST.get('is_featured') == 'on'
@@ -586,7 +586,7 @@ def get_plan_detail_api(request, pk):
         'has_priority_support': plan.has_priority_support,
         'has_bulk_import': plan.has_bulk_import,
         'has_custom_domain': plan.has_custom_domain,
-        'has_mpesa_integration': plan.has_mpesa_intergration,
+        'has_mpesa_integration': plan.has_mpesa_integration,
         'has_treasury': plan.has_treasury,
     })
 
@@ -614,7 +614,7 @@ def get_company_subscription_api(request, company_id):
                 'days_until_expiry': sub.days_until_expiry,
                 'is_active': sub.is_active_subscription(),
                 'has_treasury': sub.plan.has_treasury,
-                'has_mpesa_integration': sub.plan.has_mpesa_intergration,
+                'has_mpesa_integration': sub.plan.has_mpesa_integration,
                 'has_api_access': sub.plan.has_api_access,
                 'has_advanced_reports': sub.plan.has_advanced_reports,
                 'has_custom_branding': sub.plan.has_custom_branding,

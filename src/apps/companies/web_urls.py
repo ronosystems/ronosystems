@@ -91,6 +91,19 @@ urlpatterns = [
         name='company-payments',
     ),
 
+    path('<int:pk>/payments/manual/',
+        web_views.company_payments_manual,
+        name='company-payments-manual'),
+
+
+    path('payments/pending/',
+        web_views.pending_payments, name='pending-payments'),
+    path('payments/<int:sub_id>/approve/',
+        web_views.approve_payment, name='approve-payment'),
+    path('payments/<int:sub_id>/reject/',
+        web_views.reject_payment, name='reject-payment'),
+
+
     # ============================================
     # MISC
     # ============================================

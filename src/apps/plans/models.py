@@ -3,6 +3,7 @@
 from django.db import models
 from django.utils import timezone
 from apps.companies.models import Company
+from django.conf import settings as django_settings
 
 
 class Plan(models.Model):
@@ -49,8 +50,8 @@ class Plan(models.Model):
     has_priority_support = models.BooleanField(default=False)
     has_bulk_import = models.BooleanField(default=False)
     has_custom_domain = models.BooleanField(default=False)
-    has_mpesa_intergration = models.BooleanField(default=False)
-    has_treasury = models.BooleanField(default=False)    
+    has_mpesa_integration = models.BooleanField(default=False)
+    has_treasury = models.BooleanField(default=False)
 
     # Business type access
     allowed_business_types = models.ManyToManyField(
@@ -74,12 +75,6 @@ class Plan(models.Model):
     def __str__(self):
         return f"{self.display_name} ({self.billing_cycle})"
 
-    # ---------- Correctly-spelled alias ----------
-    @property
-    def has_mpesa_integration(self):
-        """Read-only alias for the misspelled field."""
-        return self.has_mpesa_intergration
-
     # ---------- Feature list ----------
     def get_feature_list(self):
         features = []
@@ -98,7 +93,7 @@ class Plan(models.Model):
             features.append("Bulk Import")
         if self.has_custom_domain:
             features.append("Custom Domain")
-        if self.has_mpesa_intergration:
+        if self.has_mpesa_integration:
             features.append("M-Pesa Integration")
         if self.has_treasury:
             features.append("MpesaShop")
@@ -133,9 +128,34 @@ class Subscription(models.Model):
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
 
-    # Payment info
+    # ============================================
+    # PAYMENT INFO
+    # ============================================
     payment_method = models.CharField(max_length=50, blank=True)
     payment_reference = models.CharField(max_length=200, blank=True)
+
+    # Manual / offline payment receipt
+    payment_receipt = models.CharField(
+        max_length=500, blank=True, default='',
+        help_text='Cloudinary public_id of the uploaded receipt.',
+    )
+    payment_message = models.TextField(
+        blank=True, default='',
+        help_text='M-Pesa / bank confirmation message pasted by the customer.',
+    )
+
+    # Review tracking (who verified this payment, and when)
+    reviewed_by = models.ForeignKey(
+        django_settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='reviewed_payments',
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_note = models.TextField(
+        blank=True, default='',
+        help_text='Optional note from the reviewer (reason for rejection, etc.).',
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -143,6 +163,9 @@ class Subscription(models.Model):
     class Meta:
         db_table = 'subscriptions'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', 'payment_method']),
+        ]
 
     def __str__(self):
         return f"{self.company.name} - {self.plan.display_name}"
@@ -210,7 +233,6 @@ class Subscription(models.Model):
         'lifetime' | 'expired' | 'pending' | 'cancelled' | 'inactive'
         | 'active' | 'expiring'
         """
-        # Status-based states take priority
         if self.status == 'pending':
             return 'pending'
         if self.status == 'cancelled':
@@ -218,20 +240,62 @@ class Subscription(models.Model):
         if self.status == 'inactive':
             return 'inactive'
 
-        # Expired by status OR by date
         if self.status == 'expired' or self.is_expired_now:
             return 'expired'
 
-        # No end date = lifetime
         if self.end_date is None:
             return 'lifetime'
 
-        # Active but expiring within 7 days → warn
         days = self.days_until_expiry
         if days is not None and days <= 7:
             return 'expiring'
 
         return 'active'
+
+    # ============================================
+    # RECEIPT HELPERS
+    # ============================================
+
+    @property
+    def has_receipt(self):
+        """True if a receipt file has been uploaded."""
+        return bool(self.payment_receipt and self.payment_receipt.strip())
+
+    @property
+    def is_manual_pending(self):
+        """True if this is a manual payment still awaiting verification."""
+        if self.status != 'pending':
+            return False
+        if not self.payment_method:
+            return False
+        if self.payment_method in ('mpesa', 'stk'):
+            return False
+        return True
+
+    def get_receipt_url(self):
+        """
+        Return a fully-formed URL for the uploaded receipt.
+
+        - Images → /image/upload/...
+        - PDFs   → /raw/upload/...
+        Falls back to MEDIA_URL for local dev.
+        """
+        if not self.has_receipt:
+            return None
+
+        key = self.payment_receipt.strip().lstrip('/')
+
+        cfg = getattr(django_settings, 'CLOUDINARY_STORAGE', {})
+        cloud_name = cfg.get('CLOUD_NAME', '')
+
+        if cloud_name:
+            resource = 'raw' if key.lower().endswith('.pdf') else 'image'
+            return f"https://res.cloudinary.com/{cloud_name}/{resource}/upload/{key}"
+
+        media_url = getattr(django_settings, 'MEDIA_URL', '/media/')
+        if not media_url.endswith('/'):
+            media_url += '/'
+        return f"{media_url}{key}"
 
     # ============================================
     # AUTO-EXPIRE
@@ -248,6 +312,65 @@ class Subscription(models.Model):
                 self.save(update_fields=['status', 'updated_at'])
             return True
         return False
+
+    # ============================================
+    # REVIEW ACTIONS
+    # ============================================
+
+    def approve(self, by_user, note='', save=True):
+        """
+        Approve this pending payment → status becomes 'active'.
+        Also expires any other active subscriptions for the same company.
+        Returns True if the row changed.
+        """
+        if self.status != 'pending':
+            return False
+
+        # Expire other active subscriptions for this company
+        (self.company.subscriptions
+            .filter(status='active')
+            .exclude(pk=self.pk)
+            .update(status='expired'))
+
+        self.status = 'active'
+        self.reviewed_by = by_user
+        self.reviewed_at = timezone.now()
+        self.review_note = (note or '').strip()
+
+        if save:
+            self.save(update_fields=[
+                'status', 'reviewed_by', 'reviewed_at', 'review_note', 'updated_at',
+            ])
+
+            # Sync Company row
+            company = self.company
+            company.plan = self.plan
+            company.subscription_start = self.start_date
+            company.subscription_end = self.end_date
+            company.status = 'active'
+            company.is_active = True
+            company.save(update_fields=[
+                'plan', 'subscription_start', 'subscription_end',
+                'status', 'is_active',
+            ])
+
+        return True
+
+    def reject(self, by_user, note='', save=True):
+        """Reject this pending payment → status becomes 'cancelled'."""
+        if self.status != 'pending':
+            return False
+
+        self.status = 'cancelled'
+        self.reviewed_by = by_user
+        self.reviewed_at = timezone.now()
+        self.review_note = (note or '').strip()
+
+        if save:
+            self.save(update_fields=[
+                'status', 'reviewed_by', 'reviewed_at', 'review_note', 'updated_at',
+            ])
+        return True
 
 
 class PlanFeature(models.Model):

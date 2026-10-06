@@ -151,6 +151,7 @@
         display: flex;
         justify-content: flex-end;
         gap: 10px;
+        flex-wrap: wrap;
     }
 
     .phone-input {
@@ -257,6 +258,170 @@
         white-space: pre-wrap;
         word-break: break-all;
     }
+
+    /* ============================================ */
+    /* METHOD CHOOSER BUTTONS                        */
+    /* ============================================ */
+    .method-btn {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        text-align: left;
+        padding: 12px 14px;
+        margin-bottom: 8px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: #ffffff;
+        cursor: pointer;
+        transition: background 0.15s, transform 0.1s;
+    }
+    .method-btn:hover {
+        background: #f0f8ff;
+        transform: translateX(2px);
+    }
+    .method-btn i {
+        font-size: 22px;
+        color: #036a77;
+        width: 26px;
+        text-align: center;
+        flex-shrink: 0;
+    }
+    .method-btn strong {
+        display: block;
+        font-size: 14px;
+        color: #000;
+    }
+    .method-btn .small {
+        color: #6c757d;
+        font-size: 12px;
+    }
+    .method-btn[data-method="stk"] i { color: #28a745; }
+
+    /* ============================================ */
+    /* MANUAL PAYMENT DETAILS                        */
+    /* ============================================ */
+    .manual-detail-list {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 12px 14px;
+        background: #f8fafc;
+    }
+    .manual-detail-list .row-line {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 0;
+        border-bottom: 1px dashed #cccccc;
+        font-size: 14px;
+        gap: 10px;
+    }
+    .manual-detail-list .row-line:last-child {
+        border-bottom: none;
+    }
+    .manual-detail-list .row-line .lbl {
+        color: #666666;
+        flex-shrink: 0;
+    }
+    .manual-detail-list .row-line .val {
+        font-weight: 700;
+        font-family: monospace;
+        font-size: 14px;
+        text-align: right;
+        word-break: break-all;
+    }
+    .copy-btn {
+        background: none;
+        border: none;
+        color: #036a77;
+        cursor: pointer;
+        font-size: 12px;
+        margin-left: 6px;
+        padding: 2px 4px;
+    }
+    .copy-btn:hover { color: #0056b3; }
+
+    .manual-summary {
+        background: #fff3cd;
+        border: 2px dashed #856404;
+        border-radius: 4px;
+        padding: 10px 12px;
+        font-size: 13px;
+        color: #856404;
+        margin-top: 12px;
+        line-height: 1.5;
+    }
+    .manual-summary strong { color: #6a4e02; }
+    .manual-summary .ref-code {
+        font-family: monospace;
+        background: #ffffff;
+        padding: 1px 6px;
+        border-radius: 3px;
+        border: 1px solid #856404;
+    }
+
+    /* ============================================ */
+    /* RECEIPT UPLOAD                                */
+    /* ============================================ */
+    .receipt-upload-box {
+        margin-top: 12px;
+        border: 2px dashed #000;
+        border-radius: 4px;
+        padding: 12px;
+        background: #f8fafc;
+    }
+    .receipt-upload-box label {
+        font-weight: 600;
+        font-size: 13px;
+        display: block;
+        margin-bottom: 6px;
+        color: #000;
+    }
+    .receipt-upload-box input[type="file"],
+    .receipt-upload-box textarea {
+        width: 100%;
+        font-size: 13px;
+        border: 2px solid #000;
+        border-radius: 4px;
+        padding: 6px 8px;
+        background: #fff;
+        color: #000;
+        box-sizing: border-box;
+    }
+    .receipt-upload-box textarea {
+        resize: vertical;
+        min-height: 60px;
+        font-family: inherit;
+    }
+    .receipt-upload-box input[type="file"]:focus,
+    .receipt-upload-box textarea:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.35);
+    }
+    .receipt-preview {
+        margin-top: 10px;
+        display: none;
+        border: 2px solid #000;
+        border-radius: 4px;
+        overflow: hidden;
+        background: #fff;
+    }
+    .receipt-preview img {
+        max-width: 100%;
+        max-height: 220px;
+        display: block;
+        margin: 0 auto;
+        padding: 4px;
+    }
+    .receipt-preview .filename {
+        font-size: 11px;
+        padding: 4px 8px;
+        background: #f0f0f0;
+        border-top: 1px solid #ccc;
+        color: #333;
+        word-break: break-all;
+    }
 </style>
 {% endblock %}
 
@@ -298,15 +463,22 @@
                             Active until {{ sub.end_date|date:"M j, Y" }}
                             ({{ sub.days_until_expiry }} day{{ sub.days_until_expiry|pluralize }} left)
                         {% elif state == 'pending' %}
-                            Payment pending — activate by completing M-Pesa
+                            {% if sub.payment_receipt %}
+                                Receipt submitted — awaiting verification by site owner
+                            {% else %}
+                                Payment pending — choose a method below to complete
+                            {% endif %}
                         {% elif state == 'cancelled' %}
                             Cancelled — renew to restore access
+                            {% if sub.review_note %}
+                                <br><small class="text-muted">Reason: {{ sub.review_note }}</small>
+                            {% endif %}
                         {% else %}
                             {{ sub.get_status_display }}
                         {% endif %}
                     </div>
                 </div>
-                {% if state == 'expired' or state == 'expiring' or state == 'cancelled' %}
+                {% if state == 'expired' or state == 'expiring' or state == 'cancelled' or state == 'pending' %}
                 <a href="#plansSection" class="csb-action">
                     <i class="fas fa-arrow-down"></i> Renew below
                 </a>
@@ -317,7 +489,7 @@
         {% endwith %}
 
         <h4>Choose a Plan</h4>
-        <p class="text-muted">Select a plan to renew your subscription. You'll pay via M-Pesa.</p>
+        <p class="text-muted">Select a plan to renew your subscription.</p>
 
         <div class="row mt-4" id="plansSection">
             {% for plan in plans %}
@@ -347,8 +519,9 @@
                                 data-plan-id="{{ plan.id }}"
                                 data-plan-name="{{ plan.display_name }}"
                                 data-plan-price="{{ plan.currency }} {{ plan.price }}"
+                                data-plan-amount="{{ plan.price }}"
                                 data-company-id="{{ company.id }}">
-                            <i class="fas fa-mobile-alt"></i>
+                            <i class="fas fa-shopping-cart"></i>
                             Pay {{ plan.currency }} {{ plan.price }}
                         </button>
                     </div>
@@ -367,31 +540,63 @@
 
 
 {# ============================================ #}
-{# M-PESA PAYMENT MODAL (Bootstrap-free)         #}
+{# PAYMENT MODAL (Bootstrap-free)                #}
 {# ============================================ #}
 <div id="payModal" class="pay-modal-overlay">
     <div class="pay-modal">
 
         {# ---------- Header ---------- #}
         <div class="pay-modal-header">
-            <h5><i class="fas fa-mobile-alt"></i> M-Pesa Payment</h5>
+            <h5><i class="fas fa-money-bill-wave"></i> Complete Payment</h5>
             <button type="button" class="pay-modal-close" id="closeModalBtn" aria-label="Close">&times;</button>
         </div>
 
         {# ---------- Body ---------- #}
         <div class="pay-modal-body">
 
-            {# STEP 1: Enter phone #}
-            <div id="stepPhone">
-                <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-                    <span><strong>Plan:</strong></span>
-                    <span id="modalPlanName">—</span>
-                </div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:18px;">
-                    <span><strong>Amount:</strong></span>
-                    <span id="modalPlanPrice">—</span>
-                </div>
+            {# Plan / Amount summary — always visible #}
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                <span><strong>Plan:</strong></span>
+                <span id="modalPlanName">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:18px;">
+                <span><strong>Amount:</strong></span>
+                <span id="modalPlanPrice">—</span>
+            </div>
 
+            {# STEP 0: Choose payment method #}
+            <div id="stepMethod">
+                <p style="font-weight:600;margin-bottom:10px;">Choose how to pay:</p>
+
+                {% if stk_enabled %}
+                <button type="button" class="method-btn" data-method="stk">
+                    <i class="fas fa-bolt"></i>
+                    <div>
+                        <strong>M-Pesa STK Push</strong>
+                        <div class="small">Automatic prompt on your phone</div>
+                    </div>
+                </button>
+                {% endif %}
+
+                {% for m in manual_methods %}
+                <button type="button" class="method-btn" data-method="{{ m.id }}">
+                    <i class="fas {{ m.icon }}"></i>
+                    <div>
+                        <strong>{{ m.title }}</strong>
+                        <div class="small">Pay manually, then upload receipt</div>
+                    </div>
+                </button>
+                {% endfor %}
+
+                {% if not stk_enabled and not manual_methods %}
+                    <div class="alert alert-warning mb-0">
+                        No payment methods configured. Please contact support.
+                    </div>
+                {% endif %}
+            </div>
+
+            {# STEP 1: Enter phone (STK only) #}
+            <div id="stepPhone" style="display:none;">
                 <label for="phoneInput" style="font-weight:600;display:block;margin-bottom:6px;">
                     Enter your M-Pesa phone number
                 </label>
@@ -408,7 +613,7 @@
                      style="color:#dc3545;font-size:13px;margin-top:8px;display:none;"></div>
             </div>
 
-            {# STEP 2: Waiting for PIN #}
+            {# STEP 2: Waiting for PIN (STK only) #}
             <div id="stepWaiting" style="display:none;">
                 <div class="pay-status-box">
                     <div class="pay-spinner"></div>
@@ -440,7 +645,63 @@
                 </div>
             </div>
 
-            {# STEP 3: Result #}
+            {# STEP 3: Manual payment instructions + receipt upload #}
+            <div id="stepManual" style="display:none;">
+                <div style="text-align:center;margin-bottom:14px;">
+                    <i class="fas fa-info-circle" style="font-size:2.2rem;color:#87CEEB;"></i>
+                    <h5 style="margin-top:8px;" id="manualTitle">Pay Manually</h5>
+                </div>
+
+                <div class="manual-detail-list" id="manualDetails"></div>
+
+                <div class="manual-summary">
+                    <div><strong>Amount:</strong> <span id="manualAmount">—</span></div>
+                    <div style="margin-top:4px;">
+                        <strong>Reference:</strong>
+                        <span class="ref-code" id="manualReference">—</span>
+                    </div>
+                    <div style="margin-top:8px;" id="manualInstructions"></div>
+                </div>
+
+                {# --- Receipt upload --- #}
+                <div class="receipt-upload-box">
+                    <label for="receiptInput">
+                        <i class="fas fa-receipt"></i>
+                        Upload payment receipt <span style="color:#dc3545;">*</span>
+                    </label>
+                    <input type="file"
+                           id="receiptInput"
+                           accept="image/*,.pdf">
+                    <div style="font-size:11px;color:#666;margin-top:4px;">
+                        Screenshot of the M-Pesa confirmation SMS, or the bank slip.
+                        JPG, PNG, or PDF — max 5 MB.
+                    </div>
+
+                    <div class="receipt-preview" id="receiptPreview">
+                        <img id="receiptPreviewImg" alt="Receipt preview">
+                        <div class="filename" id="receiptFilename"></div>
+                    </div>
+                </div>
+
+                <div class="receipt-upload-box">
+                    <label for="receiptMessage">
+                        <i class="fas fa-comment-alt"></i>
+                        Paste the M-Pesa / bank confirmation message (optional)
+                    </label>
+                    <textarea id="receiptMessage"
+                              rows="3"
+                              placeholder="e.g. QK12ABC3DE Confirmed. Ksh1,000.00 sent to RONOSYSTEMS on 6/10/26 at 2:15 PM."></textarea>
+                </div>
+
+                <div id="receiptError"
+                     style="color:#dc3545;font-size:13px;margin-top:8px;display:none;"></div>
+
+                <p style="font-size:12px;color:#666;margin-top:12px;">
+                    Your payment will be activated after the site owner verifies your receipt.
+                </p>
+            </div>
+
+            {# STEP 4: Result #}
             <div id="stepResult" style="display:none;">
                 <div id="resultBox"></div>
             </div>
@@ -451,12 +712,24 @@
             <button type="button" class="btn btn-secondary" id="cancelModalBtn">
                 Cancel
             </button>
-            <button type="button" class="pay-submit-btn" id="submitPayBtn">
+
+            {# STK submit button (shown only for STK method) #}
+            <button type="button" class="pay-submit-btn" id="submitPayBtn"
+                    style="display:none;">
                 <i class="fas fa-paper-plane"></i> Send STK Push
+            </button>
+
+            {# Manual "I have paid" button (shown only for manual methods) #}
+            <button type="button" class="pay-submit-btn" id="manualDoneBtn"
+                    style="display:none;background:#036a77;">
+                <i class="fas fa-check"></i> Submit for Verification
             </button>
         </div>
     </div>
 </div>
+
+{# Manual methods JSON payload for JS #}
+{{ manual_methods|json_script:"manualData" }}
 
 
 <script>
@@ -473,14 +746,24 @@
     const CSRF = getCookie('csrftoken');
 
     // ============================================
+    // Server-supplied data
+    // ============================================
+    const MANUAL_METHODS = JSON.parse(
+        document.getElementById('manualData').textContent || '[]'
+    );
+    const MANUAL_INSTRUCTIONS = "{{ manual_instructions|escapejs }}";
+
+    // ============================================
     // Elements
     // ============================================
     const modalEl     = document.getElementById('payModal');
     const closeBtn    = document.getElementById('closeModalBtn');
     const cancelBtn   = document.getElementById('cancelModalBtn');
 
+    const stepMethod  = document.getElementById('stepMethod');
     const stepPhone   = document.getElementById('stepPhone');
     const stepWaiting = document.getElementById('stepWaiting');
+    const stepManual  = document.getElementById('stepManual');
     const stepResult  = document.getElementById('stepResult');
 
     const phoneInput   = document.getElementById('phoneInput');
@@ -492,6 +775,22 @@
     const modalPlanName  = document.getElementById('modalPlanName');
     const modalPlanPrice = document.getElementById('modalPlanPrice');
     const submitPayBtn   = document.getElementById('submitPayBtn');
+    const manualDoneBtn  = document.getElementById('manualDoneBtn');
+
+    // Manual panel refs
+    const manualTitle        = document.getElementById('manualTitle');
+    const manualDetails      = document.getElementById('manualDetails');
+    const manualAmount       = document.getElementById('manualAmount');
+    const manualReference    = document.getElementById('manualReference');
+    const manualInstructions = document.getElementById('manualInstructions');
+
+    // Receipt refs
+    const receiptInput      = document.getElementById('receiptInput');
+    const receiptMessage    = document.getElementById('receiptMessage');
+    const receiptPreview    = document.getElementById('receiptPreview');
+    const receiptPreviewImg = document.getElementById('receiptPreviewImg');
+    const receiptFilename   = document.getElementById('receiptFilename');
+    const receiptError      = document.getElementById('receiptError');
 
     const devConfirmBtn  = document.getElementById('devConfirmBtn'); // may be null
 
@@ -500,6 +799,7 @@
         planId: null,
         reference: null,
         pollTimer: null,
+        method: null,
     };
 
     // ============================================
@@ -528,6 +828,48 @@
     });
 
     // ============================================
+    // Reset modal to Step 0
+    // ============================================
+    function resetModal() {
+        stepMethod.style.display  = 'block';
+        stepPhone.style.display   = 'none';
+        stepWaiting.style.display = 'none';
+        stepManual.style.display  = 'none';
+        stepResult.style.display  = 'none';
+
+        submitPayBtn.style.display   = 'none';
+        submitPayBtn.disabled        = false;
+        submitPayBtn.innerHTML       = '<i class="fas fa-paper-plane"></i> Send STK Push';
+
+        manualDoneBtn.style.display  = 'none';
+        manualDoneBtn.disabled       = false;
+        manualDoneBtn.innerHTML      = '<i class="fas fa-check"></i> Submit for Verification';
+
+        phoneError.style.display = 'none';
+        phoneError.textContent   = '';
+        phoneInput.value         = '';
+        pollingStatus.textContent= '';
+        manualDetails.innerHTML  = '';
+        manualInstructions.innerHTML = '';
+
+        // Reset receipt inputs
+        if (receiptInput) receiptInput.value = '';
+        if (receiptMessage) receiptMessage.value = '';
+        if (receiptPreview) receiptPreview.style.display = 'none';
+        if (receiptPreviewImg) receiptPreviewImg.removeAttribute('src');
+        if (receiptFilename) receiptFilename.textContent = '';
+        if (receiptError) {
+            receiptError.style.display = 'none';
+            receiptError.textContent = '';
+        }
+
+        if (devConfirmBtn) {
+            devConfirmBtn.disabled = false;
+            devConfirmBtn.innerHTML = '<i class="fas fa-flask"></i> Dev: Mark as Paid';
+        }
+    }
+
+    // ============================================
     // Open modal when a plan Pay button is clicked
     // ============================================
     document.querySelectorAll('.pay-plan-btn').forEach(btn => {
@@ -535,32 +877,115 @@
             current.companyId = btn.dataset.companyId;
             current.planId    = btn.dataset.planId;
             current.reference = null;
+            current.method    = null;
 
             modalPlanName.textContent  = btn.dataset.planName;
             modalPlanPrice.textContent = btn.dataset.planPrice;
 
-            // Reset state
-            stepPhone.style.display   = 'block';
-            stepWaiting.style.display = 'none';
-            stepResult.style.display  = 'none';
-            submitPayBtn.style.display = 'inline-block';
-            submitPayBtn.disabled = false;
-            submitPayBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send STK Push';
-
-            phoneError.style.display = 'none';
-            phoneError.textContent = '';
-            phoneInput.value = '';
-            pollingStatus.textContent = '';
-
-            if (devConfirmBtn) {
-                devConfirmBtn.disabled = false;
-                devConfirmBtn.innerHTML = '<i class="fas fa-flask"></i> Dev: Mark as Paid';
-            }
-
+            resetModal();
             openModal();
-            setTimeout(() => phoneInput.focus(), 200);
         });
     });
+
+    // ============================================
+    // Step 0 → pick a method
+    // ============================================
+    document.querySelectorAll('.method-btn').forEach(mb => {
+        mb.addEventListener('click', () => {
+            const method = mb.dataset.method;
+            current.method = method;
+            stepMethod.style.display = 'none';
+
+            if (method === 'stk') {
+                stepPhone.style.display      = 'block';
+                submitPayBtn.style.display   = 'inline-block';
+                manualDoneBtn.style.display  = 'none';
+                setTimeout(() => phoneInput.focus(), 150);
+                return;
+            }
+
+            // Manual method
+            const cfg = MANUAL_METHODS.find(m => m.id === method);
+            if (!cfg) {
+                stepMethod.style.display = 'block';
+                return;
+            }
+
+            manualTitle.textContent  = cfg.title;
+            manualAmount.textContent = modalPlanPrice.textContent;
+
+            // Unique reference: C<company>-P<plan>-<timestamp>
+            const ref = `C${current.companyId}-P${current.planId}-${Date.now().toString().slice(-6)}`;
+            current.reference = ref;
+            manualReference.textContent = ref;
+
+            manualDetails.innerHTML = cfg.lines
+                .filter(([, v]) => v)
+                .map(([label, val]) => `
+                    <div class="row-line">
+                        <span class="lbl">${escapeHtml(label)}</span>
+                        <span class="val">
+                            ${escapeHtml(val)}
+                            <button type="button" class="copy-btn"
+                                    data-copy="${escapeHtml(val)}"
+                                    title="Copy">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </span>
+                    </div>
+                `).join('');
+
+            manualInstructions.innerHTML = MANUAL_INSTRUCTIONS
+                ? escapeHtml(MANUAL_INSTRUCTIONS)
+                : '';
+
+            // Wire copy buttons
+            manualDetails.querySelectorAll('.copy-btn').forEach(cb => {
+                cb.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    navigator.clipboard.writeText(cb.dataset.copy).then(() => {
+                        cb.innerHTML = '<i class="fas fa-check"></i>';
+                        setTimeout(() => cb.innerHTML = '<i class="fas fa-copy"></i>', 1500);
+                    });
+                });
+            });
+
+            stepManual.style.display    = 'block';
+            submitPayBtn.style.display  = 'none';
+            manualDoneBtn.style.display = 'inline-block';
+        });
+    });
+
+    // ============================================
+    // Receipt file preview
+    // ============================================
+    if (receiptInput) {
+        receiptInput.addEventListener('change', () => {
+            if (receiptError) receiptError.style.display = 'none';
+
+            const file = receiptInput.files[0];
+            if (!file) {
+                receiptPreview.style.display = 'none';
+                return;
+            }
+
+            receiptFilename.textContent =
+                file.name + ' · ' + (file.size / 1024).toFixed(0) + ' KB';
+
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    receiptPreviewImg.src = e.target.result;
+                    receiptPreviewImg.style.display = 'block';
+                    receiptPreview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                receiptPreviewImg.style.display = 'none';
+                receiptPreview.style.display = 'block';
+            }
+        });
+    }
 
     // ============================================
     // Phone normalization
@@ -569,7 +994,7 @@
         let p = (raw || '').replace(/[\s\-\(\)\+]/g, '');
         if (p.startsWith('254')) return p;
         if (p.startsWith('0'))   return '254' + p.slice(1);
-        if (/^[17]\d{8}$/.test(p)) return '254' + p;   // 7XXXXXXXX
+        if (/^[17]\d{8}$/.test(p)) return '254' + p;
         return null;
     }
 
@@ -657,7 +1082,6 @@
 
             current.reference = data.reference;
 
-            // Switch to waiting step
             stepPhone.style.display   = 'none';
             stepWaiting.style.display = 'block';
             submitPayBtn.style.display = 'none';
@@ -685,11 +1109,95 @@
     });
 
     // ============================================
-    // Poll payment status every 3s
+    // Manual → "Submit for Verification"
+    // ============================================
+    if (manualDoneBtn) {
+        manualDoneBtn.addEventListener('click', async () => {
+            if (!current.companyId || !current.reference) {
+                alert('No reference to record.');
+                return;
+            }
+
+            // Receipt is required
+            const file = receiptInput && receiptInput.files[0];
+            if (!file) {
+                receiptError.textContent = 'Please upload a payment receipt.';
+                receiptError.style.display = 'block';
+                stepManual.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+
+            manualDoneBtn.disabled = true;
+            manualDoneBtn.innerHTML =
+                '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+
+            const fd = new FormData();
+            fd.append('plan_id',         current.planId);
+            fd.append('reference',       current.reference);
+            fd.append('method',          current.method || 'manual');
+            fd.append('payment_message', (receiptMessage && receiptMessage.value) || '');
+            fd.append('receipt',         file);
+
+            try {
+                const resp = await fetch(
+                    `/companies/${current.companyId}/payments/manual/`,
+                    {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'X-CSRFToken': CSRF,
+                            'Accept': 'application/json',
+                            // Don't set Content-Type — browser sets boundary
+                        },
+                        body: fd,
+                    }
+                );
+
+                const raw = await resp.text();
+                let data = null;
+                try { data = raw ? JSON.parse(raw) : null; } catch (e) {}
+
+                if (!resp.ok || !data || !data.success) {
+                    throw new Error(
+                        (data && data.error) ||
+                        `Submission failed (HTTP ${resp.status}).`
+                    );
+                }
+
+                stepManual.style.display    = 'none';
+                stepResult.style.display    = 'block';
+                submitPayBtn.style.display  = 'none';
+                manualDoneBtn.style.display = 'none';
+
+                resultBox.innerHTML = `
+                    <div style="text-align:center;">
+                        <i class="fas fa-clock" style="font-size:3rem;color:#856404;"></i>
+                        <h5 style="margin-top:12px;">Awaiting Verification</h5>
+                        <p>Receipt submitted. Reference
+                           <strong>${escapeHtml(current.reference)}</strong>.</p>
+                        <p style="font-size:12px;color:#666;">
+                            The site owner will verify your payment shortly.
+                        </p>
+                        <a href="/epa_shop/dashboard/" class="btn btn-primary" style="margin-top:8px;">
+                            Continue to Dashboard
+                        </a>
+                    </div>`;
+            } catch (err) {
+                receiptError.textContent = err.message;
+                receiptError.style.display = 'block';
+                manualDoneBtn.disabled = false;
+                manualDoneBtn.innerHTML =
+                    '<i class="fas fa-check"></i> Submit for Verification';
+            }
+        });
+    }
+
+    // ============================================
+    // Poll payment status every 3s (STK only)
     // ============================================
     function startPolling() {
         let attempts = 0;
-        const MAX = 40;    // ~2 minutes
+        const MAX = 40;
         pollingStatus.textContent = 'Checking payment status...';
 
         current.pollTimer = setInterval(async () => {
@@ -760,7 +1268,6 @@
                     return;
                 }
 
-                // Success — the next poll will pick it up.
                 pollingStatus.textContent = 'Marked as paid — confirming…';
             } catch (err) {
                 alert('Dev confirm error: ' + err.message);
