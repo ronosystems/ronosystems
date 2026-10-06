@@ -125,7 +125,7 @@ def _stringify(value, t):
 
 def _ensure_schema_rows():
     for spec in SETTINGS_SCHEMA:
-        SystemSetting.objects.get_or_create(
+        obj, created = SystemSetting.objects.get_or_create(
             key=spec['key'],
             defaults={
                 'value': _stringify(spec['default'], spec['type']),
@@ -138,7 +138,25 @@ def _ensure_schema_rows():
                 'options': spec.get('options', []),
             },
         )
-
+        
+        # If the row already existed, make sure the schema metadata is up to date
+        if not created:
+            changed = False
+            if obj.options != spec.get('options', []):
+                obj.options = spec.get('options', [])
+                changed = True
+            if obj.label != spec.get('label', spec['key']):
+                obj.label = spec.get('label', spec['key'])
+                changed = True
+            if obj.help_text != spec.get('help_text', ''):
+                obj.help_text = spec.get('help_text', '')
+                changed = True
+            if obj.setting_type != spec['type']:
+                obj.setting_type = spec['type']
+                changed = True
+                
+            if changed:
+                obj.save()
 
 def _cloudinary():
     cfg = getattr(django_settings, 'CLOUDINARY_STORAGE', {})
