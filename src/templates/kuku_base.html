@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}{{ system_name|default:"RonoSystems" }} · Kuku Biz{% endblock %}</title>
+    <title>{% block title %}{{ system_name|default:"RonoSystems" }}{% endblock %}</title>
 
     {% if site_favicon_url %}
         <link rel="icon" type="image/png" href="{{ site_favicon_url }}">
@@ -671,60 +671,34 @@
     <!-- ============================================================ -->
     <aside class="sidebar" id="sidebar">
 
-        <!-- Brand — three explicit cases:
-             1. Support mode → impersonated company
-             2. Custom domain → the tenant that owns the hostname
-             3. Else (mother site) → platform branding from system_settings
-        -->
+        <!-- Brand — uses `current_company` (support-mode, custom-domain, or
+             user's own company, in that precedence). Falls back to platform
+             defaults for super-admin / logged-out pages. -->
         <div class="sidebar-brand">
-            {% if is_support_mode and support_company %}
-                {# ── SUPPORT MODE ── #}
-                {% if support_company.logo_url %}
-                    <img src="{{ support_company.logo_url }}"
-                         alt="{{ support_company.display_name }}" class="logo-img">
+            {% if current_company %}
+                {% if current_company.logo %}
+                    <img src="{{ current_company.logo_url }}" alt="{{ current_company.display_name }}" class="logo-img">
                 {% elif site_logo_url %}
-                    <img src="{{ site_logo_url }}"
-                         alt="{{ system_name }}" class="logo-img">
+                    <img src="{{ site_logo_url }}" alt="{{ current_company.display_name }}" class="logo-img">
                 {% else %}
-                    <div class="logo-icon"><i class="fas fa-drumstick-bite"></i></div>
-                {% endif %}
-                <span class="company-name">
-                    <h5>{{ support_company.display_name }}</h5>
-                </span>
-
-            {% elif is_custom_domain and current_company %}
-                {# ── CUSTOM DOMAIN ── #}
-                {% if current_company.logo_url %}
-                    <img src="{{ current_company.logo_url }}"
-                         alt="{{ current_company.display_name }}" class="logo-img">
-                {% elif site_logo_url %}
-                    <img src="{{ site_logo_url }}"
-                         alt="{{ system_name }}" class="logo-img">
-                {% else %}
-                    <div class="logo-icon"><i class="fas fa-drumstick-bite"></i></div>
+                    <div class="logo-icon">
+                        <i class="fas fa-rocket"></i>
+                    </div>
                 {% endif %}
                 <span class="company-name">
                     <h5>{{ current_company.display_name }}</h5>
                 </span>
-
             {% else %}
-                {# ── MOTHER SITE / PLATFORM ── #}
                 {% if site_logo_url %}
-                    <img src="{{ site_logo_url }}"
-                         alt="{{ system_name|default:'Kuku Biz' }}" class="logo-img">
+                    <img src="{{ site_logo_url }}" alt="{{ system_name }}" class="logo-img">
                 {% else %}
-                    <div class="logo-icon"><i class="fas fa-drumstick-bite"></i></div>
+                    <div class="logo-icon">
+                        <i class="fas fa-rocket"></i>
+                    </div>
                 {% endif %}
                 <span class="company-name">
-                    <h5>{{ system_name|default:"Kuku Biz" }}</h5>
+                    <h5>{{ system_name|default:"Enterprise Platform" }}</h5>
                 </span>
-            {% endif %}
-
-            {# Show which branch this user belongs to #}
-            {% if user.is_authenticated and user.branch %}
-                <div class="user-branch-chip">
-                    <i class="fas fa-code-branch"></i> {{ user.branch.name }}
-                </div>
             {% endif %}
         </div>
 
