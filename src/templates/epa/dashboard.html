@@ -97,6 +97,66 @@
     .welcome-banner.cashier-banner { background: linear-gradient(135deg, #1a237e 0%, #0d1442 100%); }
     .welcome-banner.mpesa-banner   { background: linear-gradient(135deg, #4a148c 0%, #1a237e 100%); }
 
+    /* ============================================
+       CASHIER FULL BANNER (company name + branch)
+    ============================================ */
+    .cashier-full-banner {
+        text-align: center;
+        padding: 40px 25px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .cashier-full-banner .cashier-company-name {
+        font-size: 3.5rem;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 4px;
+        color: #ffffff;
+        line-height: 1.1;
+        margin: 0;
+        text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.25);
+        word-break: break-word;
+    }
+
+    .cashier-full-banner .cashier-branch-name {
+        font-size: 1.6rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 3px;
+        color: #87CEEB;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px dashed rgba(135, 206, 235, 0.45);
+        display: inline-block;
+        word-break: break-word;
+    }
+
+    @media (max-width: 768px) {
+        .cashier-full-banner {
+            padding: 30px 15px;
+        }
+        .cashier-full-banner .cashier-company-name {
+            font-size: 2.2rem;
+            letter-spacing: 2px;
+        }
+        .cashier-full-banner .cashier-branch-name {
+            font-size: 1.1rem;
+            letter-spacing: 2px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .cashier-full-banner .cashier-company-name {
+            font-size: 1.6rem;
+            letter-spacing: 1px;
+        }
+        .cashier-full-banner .cashier-branch-name {
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+        }
+    }
+
     /* Stats row inside banner */
     .welcome-banner .banner-stats {
         display: flex;
@@ -553,97 +613,115 @@
             {% elif user.role == 'company_cashier' %}cashier-banner
             {% elif user.role == 'mpesa_agent' %}mpesa-banner{% endif %}">
 
-            <!-- Top: icon + greeting -->
-            <div class="welcome-top">
-                <div class="welcome-icon">
-                    <i class="fas fa-hand-wave"></i>
+            {% if user.role == 'company_cashier' %}
+                {# ============================================ #}
+                {# CASHIER: Full banner with company + branch   #}
+                {# ============================================ #}
+                <div class="cashier-full-banner">
+                    <h1 class="cashier-company-name">
+                        {{ user.company.name|default:"Company" }}
+                    </h1>
+                    {% if user.branch %}
+                    <div class="cashier-branch-name">
+                        <i class="fas fa-store"></i> {{ user.branch.name }}
+                    </div>
+                    {% endif %}
                 </div>
+            {% else %}
+                {# ============================================ #}
+                {# ALL OTHER ROLES: Normal welcome banner       #}
+                {# ============================================ #}
 
-                <div class="welcome-text">
-                    <h2>
-                        {# Time-based greeting #}
-                        {% now "H:i" as current_time %}
-                        {% with hour=current_time|slice:":2"|add:"0" %}
-                            {% if hour >= 4 and hour <= 11 %}
-                                Good Morning,
-                            {% elif hour >= 12 and hour <= 16 %}
-                                Good Afternoon,
-                            {% elif hour >= 17 and hour <= 22 %}
-                                Good Evening,
+                <!-- Top: icon + greeting -->
+                <div class="welcome-top">
+                    <div class="welcome-icon">
+                        <i class="fas fa-hand-wave"></i>
+                    </div>
+
+                    <div class="welcome-text">
+                        <h2>
+                            {# Time-based greeting #}
+                            {% now "H:i" as current_time %}
+                            {% with hour=current_time|slice:":2"|add:"0" %}
+                                {% if hour >= 4 and hour <= 11 %}
+                                    Good Morning,
+                                {% elif hour >= 12 and hour <= 16 %}
+                                    Good Afternoon,
+                                {% elif hour >= 17 and hour <= 22 %}
+                                    Good Evening,
+                                {% else %}
+                                    Good Night,
+                                {% endif %}
+                            {% endwith %}
+                            {{ user.first_name|default:user.username }}!
+                            <span class="welcome-badge">{{ user.role|title|cut:"_" }}</span>
+                        </h2>
+
+                        <p class="welcome-subtitle">
+                            {% if user.role == 'company_admin' or user.role == 'super_admin' %}
+                                Manage your company's operations, track sales, and monitor performance from one central dashboard.
+                            {% elif user.role == 'company_manager' %}
+                                Oversee daily operations, manage inventory, and track team performance.
+                            {% elif user.role == 'company_agent' %}
+                                Manage your sales, track your units, and view your commission reports.
+                            {% elif user.role == 'mpesa_agent' %}
+                                Monitor your M-Pesa transactions, track balances, and manage daily records.
+                            {% elif user.role == 'company_staff' %}
+                                View company updates and access your work resources.
                             {% else %}
-                                Good Night,
+                                Welcome to your dashboard. Here's what's happening today.
                             {% endif %}
-                        {% endwith %}
-                        {{ user.first_name|default:user.username }}!
-                        <span class="welcome-badge">{{ user.role|title|cut:"_" }}</span>
-                    </h2>
+                        </p>
 
-                    <p class="welcome-subtitle">
-                        {% if user.role == 'company_admin' or user.role == 'super_admin' %}
-                            Manage your company's operations, track sales, and monitor performance from one central dashboard.
-                        {% elif user.role == 'company_manager' %}
-                            Oversee daily operations, manage inventory, and track team performance.
-                        {% elif user.role == 'company_agent' %}
-                            Manage your sales, track your units, and view your commission reports.
-                        {% elif user.role == 'company_cashier' %}
-                            Process sales efficiently and track your daily transactions.
-                        {% elif user.role == 'mpesa_agent' %}
-                            Monitor your M-Pesa transactions, track balances, and manage daily records.
-                        {% elif user.role == 'company_staff' %}
-                            View company updates and access your work resources.
-                        {% else %}
-                            Welcome to your dashboard. Here's what's happening today.
-                        {% endif %}
-                    </p>
-
-                    <div class="welcome-date">
-                        <i class="fas fa-calendar-day"></i> {{ today|date:"l, F d, Y" }}
-                        <i class="fas fa-clock ms-3"></i> {{ today|time:"H:i" }}
+                        <div class="welcome-date">
+                            <i class="fas fa-calendar-day"></i> {{ today|date:"l, F d, Y" }}
+                            <i class="fas fa-clock ms-3"></i> {{ today|time:"H:i" }}
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Middle: stats row -->
-            <div class="banner-stats">
-                {% if user.branch %}
-                <div class="quick-stat">
-                    <span class="label"><i class="fas fa-store"></i> Branch</span>
-                    <span class="value">{{ user.branch.name }}</span>
-                </div>
-                {% endif %}
-
-                {% if user.company %}
-                <div class="quick-stat">
-                    <span class="label"><i class="fas fa-building"></i> Company</span>
-                    <span class="value">{{ user.company.name }}</span>
-                </div>
-                {% endif %}
-
-                <div class="quick-stat">
-                    <span class="label"><i class="fas fa-clock"></i> Last Login</span>
-                    <span class="value">{{ user.last_login|date:"M d, Y H:i"|default:"First login" }}</span>
-                </div>
-            </div>
-
-            <!-- Bottom: Company ID preview -->
-            {% if user.company and user.company.company_id %}
-            <div class="company-id-row">
-                <div class="company-id-preview"
-                     id="companyIdPreview"
-                     data-company-id="{{ user.company.company_id }}"
-                     title="Click to copy Company ID"
-                     role="button"
-                     tabindex="0">
-                    <i class="fas fa-hashtag preview-icon"></i>
-                    <div class="preview-body">
-                        <span class="preview-label">Company ID</span>
-                        <span class="preview-value">{{ user.company.company_id }}</span>
+                <!-- Middle: stats row -->
+                <div class="banner-stats">
+                    {% if user.branch %}
+                    <div class="quick-stat">
+                        <span class="label"><i class="fas fa-store"></i> Branch</span>
+                        <span class="value">{{ user.branch.name }}</span>
                     </div>
-                    <span class="preview-copy" id="companyIdCopyHint">
-                        <i class="fas fa-copy"></i> Copy
-                    </span>
+                    {% endif %}
+
+                    {% if user.company %}
+                    <div class="quick-stat">
+                        <span class="label"><i class="fas fa-building"></i> Company</span>
+                        <span class="value">{{ user.company.name }}</span>
+                    </div>
+                    {% endif %}
+
+                    <div class="quick-stat">
+                        <span class="label"><i class="fas fa-clock"></i> Last Login</span>
+                        <span class="value">{{ user.last_login|date:"M d, Y H:i"|default:"First login" }}</span>
+                    </div>
                 </div>
-            </div>
+
+                <!-- Bottom: Company ID preview -->
+                {% if user.company and user.company.company_id %}
+                <div class="company-id-row">
+                    <div class="company-id-preview"
+                         id="companyIdPreview"
+                         data-company-id="{{ user.company.company_id }}"
+                         title="Click to copy Company ID"
+                         role="button"
+                         tabindex="0">
+                        <i class="fas fa-hashtag preview-icon"></i>
+                        <div class="preview-body">
+                            <span class="preview-label">Company ID</span>
+                            <span class="preview-value">{{ user.company.company_id }}</span>
+                        </div>
+                        <span class="preview-copy" id="companyIdCopyHint">
+                            <i class="fas fa-copy"></i> Copy
+                        </span>
+                    </div>
+                </div>
+                {% endif %}
             {% endif %}
 
         </div>
