@@ -284,7 +284,7 @@ def settings_company(request):
         'active_tab': 'company',
         'is_viewing_company': is_viewing_company,
     }
-    return render(request, 'company/settings/company.html', context)
+    return render(request, 'company/settings/dashboard.html', context)
 
 
 # ============================================
@@ -379,7 +379,7 @@ def settings_payment(request):
             ('credit', 'Credit'),
         ],
     }
-    return render(request, 'company/settings/payment.html', context)
+    return render(request, 'company/settings/dashboard.html', context)
 
 
 # ============================================
@@ -466,7 +466,7 @@ def settings_receipt(request):
             ('invoice', 'Invoice Style'),
         ],
     }
-    return render(request, 'company/settings/receipt.html', context)
+    return render(request, 'company/settings/dashboard.html', context)
 
 
 # ============================================
@@ -523,7 +523,7 @@ def settings_preview_receipt(request):
         'preview_address': preview_address,
         'preview_name':    preview_name,
     }
-    return render(request, 'company/settings/receipt_preview.html', context)
+    return render(request, 'company/settings/dashboard.html', context)
 
 
 # ============================================
