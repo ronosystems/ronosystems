@@ -292,7 +292,7 @@ def settings_company(request):
 # ============================================
 @login_required
 def settings_payment(request):
-    """Payment settings"""
+    """Payment settings — supports granular M-Pesa STK / Buy Goods / Paybill / Bank"""
     company, is_viewing_company = get_active_company(request)
 
     if not company:
@@ -304,24 +304,56 @@ def settings_payment(request):
     if request.method == 'POST':
         try:
             payment_settings = {
+                # ---------- Currency & Tax ----------
                 'currency': request.POST.get('currency', 'KES'),
                 'currency_symbol': request.POST.get('currency_symbol', 'KSh'),
                 'decimal_places': int(request.POST.get('decimal_places', 2)),
                 'payment_methods': request.POST.getlist('payment_methods'),
+
                 'enable_discount': request.POST.get('enable_discount') == 'on',
                 'enable_tax': request.POST.get('enable_tax') == 'on',
                 'default_tax_rate': float(request.POST.get('default_tax_rate', 0)),
+
+                # ---------- Credit & Terms ----------
                 'enable_partial_payment': request.POST.get('enable_partial_payment') == 'on',
                 'enable_credit': request.POST.get('enable_credit') == 'on',
                 'credit_limit': float(request.POST.get('credit_limit', 0)),
                 'payment_terms': int(request.POST.get('payment_terms', 30)),
-                'enable_mpesa': request.POST.get('enable_mpesa') == 'on',
-                'mpesa_paybill': request.POST.get('mpesa_paybill', ''),
-                'mpesa_till': request.POST.get('mpesa_till', ''),
+
+                # ---------- M-Pesa STK Push ----------
+                'enable_mpesa_stk': request.POST.get('enable_mpesa_stk') == 'on',
+                'mpesa_stk_shortcode': request.POST.get('mpesa_stk_shortcode', ''),
+                'mpesa_stk_passkey': request.POST.get('mpesa_stk_passkey', ''),
+
+                # ---------- M-Pesa Buy Goods (Till) ----------
+                'enable_buy_goods': request.POST.get('enable_buy_goods') == 'on',
+                'buy_goods_till': request.POST.get('buy_goods_till', ''),
+                'buy_goods_name': request.POST.get('buy_goods_name', ''),
+
+                # ---------- M-Pesa Paybill ----------
+                'enable_paybill': request.POST.get('enable_paybill') == 'on',
+                'paybill_number': request.POST.get('paybill_number', ''),
+                'paybill_account': request.POST.get('paybill_account', ''),
+                'paybill_name': request.POST.get('paybill_name', ''),
+
+                # ---------- Bank Transfer ----------
                 'enable_bank': request.POST.get('enable_bank') == 'on',
                 'bank_name': request.POST.get('bank_name', ''),
+                'bank_account_name': request.POST.get('bank_account_name', ''),
                 'bank_account': request.POST.get('bank_account', ''),
                 'bank_branch': request.POST.get('bank_branch', ''),
+                'bank_swift': request.POST.get('bank_swift', ''),
+
+                # ---------- Legacy aliases (keep old code paths working) ----------
+                # `enable_mpesa` is True if ANY M-Pesa variant is on
+                'enable_mpesa': (
+                    request.POST.get('enable_mpesa_stk') == 'on'
+                    or request.POST.get('enable_buy_goods') == 'on'
+                    or request.POST.get('enable_paybill') == 'on'
+                ),
+                # `mpesa_till` / `mpesa_paybill` mirror the new fields
+                'mpesa_till': request.POST.get('buy_goods_till', ''),
+                'mpesa_paybill': request.POST.get('paybill_number', ''),
             }
 
             save_company_settings(company, payment_settings, 'payment')
@@ -535,6 +567,7 @@ def get_company_settings(company):
             'decimal_places': 2,
         },
         'payment': {
+            # ---------- Currency & Tax ----------
             'currency': 'KES',
             'currency_symbol': 'KSh',
             'decimal_places': 2,
@@ -542,17 +575,41 @@ def get_company_settings(company):
             'enable_discount': True,
             'enable_tax': False,
             'default_tax_rate': 0,
+
+            # ---------- Credit & Terms ----------
             'enable_partial_payment': False,
             'enable_credit': False,
             'credit_limit': 0,
             'payment_terms': 30,
-            'enable_mpesa': True,
-            'mpesa_paybill': '',
-            'mpesa_till': '',
+
+            # ---------- M-Pesa STK Push ----------
+            'enable_mpesa_stk': False,
+            'mpesa_stk_shortcode': '',
+            'mpesa_stk_passkey': '',
+
+            # ---------- M-Pesa Buy Goods (Till) ----------
+            'enable_buy_goods': False,
+            'buy_goods_till': '',
+            'buy_goods_name': '',
+
+            # ---------- M-Pesa Paybill ----------
+            'enable_paybill': False,
+            'paybill_number': '',
+            'paybill_account': '',
+            'paybill_name': '',
+
+            # ---------- Bank Transfer ----------
             'enable_bank': False,
             'bank_name': '',
+            'bank_account_name': '',
             'bank_account': '',
             'bank_branch': '',
+            'bank_swift': '',
+
+            # ---------- Legacy aliases ----------
+            'enable_mpesa': False,
+            'mpesa_paybill': '',
+            'mpesa_till': '',
         },
         'receipt': {
             'receipt_header': '',
