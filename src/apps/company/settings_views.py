@@ -239,6 +239,7 @@ def settings_company(request):
             company_email = request.POST.get('company_email')
             company_phone = request.POST.get('company_phone')
             company_address = request.POST.get('company_address')
+            company_pin     = request.POST.get('company_pin')
 
             text_changed = False
             if company_name and company.name != company_name:
@@ -253,7 +254,9 @@ def settings_company(request):
             if company_address and company.address != company_address:
                 company.address = company_address
                 text_changed = True
-
+            if company_pin is not None and company.company_pin != company_pin:
+                company.company_pin = company_pin
+                text_changed = True
             if text_changed:
                 company.save()
 

@@ -484,6 +484,72 @@
 {% block content %}
 <div class="row">
     <div class="col-12">
+
+
+
+        {# ============================================ #}
+        {# REVENUE STATS                                #}
+        {# ============================================ #}
+        {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' or user.role == 'stock_controller' %}  
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card bg-success text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h2 class="mb-0">KSh {{ stats.total_revenue|floatformat:0 }}</h2>
+                                <small>Total Revenue</small>
+                            </div>
+                            <div class="stat-icon"><i class="fas fa-money-bill-wave"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card bg-primary text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h2 class="mb-0">KSh {{ stats.today_revenue|floatformat:0 }}</h2>
+                                <small>Today's Revenue</small>
+                            </div>
+                            <div class="stat-icon"><i class="fas fa-calendar-day"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card bg-secondary text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h2 class="mb-0">KSh {{ stats.week_revenue|floatformat:0 }}</h2>
+                                <small>This Week</small>
+                            </div>
+                            <div class="stat-icon"><i class="fas fa-calendar-week"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card bg-warning text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h2 class="mb-0">KSh {{ stats.month_revenue|floatformat:0 }}</h2>
+                                <small>This Month</small>
+                            </div>
+                            <div class="stat-icon"><i class="fas fa-calendar-week"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         
         <!-- Top Bar with Entries, Search, and Buttons -->
         <div class="top-bar">
@@ -502,6 +568,19 @@
                 </span>
             </div>
             <div class="right-section">
+                <!-- Branch filter -->
+                {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' or user.role == 'stock_controller' %}
+                <span class="entries-label">Filter by Branch:</span>
+                <select class="entries-selector" id="branchFilter" onchange="filterByBranch()">
+                    <option value="">All Branches</option>
+                    {% for b in branches %}
+                        <option value="{{ b.id }}" {% if branch_id == b.id|stringformat:"s" %}selected{% endif %}>
+                            {{ b.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+                <!-- Search Box -->
                 <input type="text" class="search-box" id="searchSales" placeholder="Search by customer, sale ID, or company ID..." 
                        value="{{ search_query }}" oninput="filterSales()">
                 <a href="/epa_shop/sales/single/" class="btn btn-primary">
@@ -748,6 +827,19 @@ function changeEntries() {
     const perPage = document.getElementById('entriesSelect').value;
     const currentUrl = new URL(window.location.href);
     currentUrl.searchParams.set('per_page', perPage);
+    currentUrl.searchParams.set('page', 1);
+    window.location.href = currentUrl.toString();
+}
+
+function filterByBranch() {
+    const branch = document.getElementById('branchFilter').value;
+    const currentUrl = new URL(window.location.href);
+
+    if (branch) {
+        currentUrl.searchParams.set('branch', branch);
+    } else {
+        currentUrl.searchParams.delete('branch');
+    }
     currentUrl.searchParams.set('page', 1);
     window.location.href = currentUrl.toString();
 }

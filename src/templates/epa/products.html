@@ -645,6 +645,71 @@
 {% block content %}
 <div class="row">
     <div class="col-12">
+
+        {# ============================================ #}
+        {# STATS CARDS                                  #}
+        {# ============================================ #}
+        {% if is_admin or user_role == 'company_manager' or user_role == 'company_admin' %}
+        <div class="row mb-4">
+            <div class="col-md-3 col-6 mb-3">
+                <div class="card stat-card bg-primary">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h2 class="mb-0">{{ stats.total_products }}</h2>
+                                <small>Product Models</small>
+                            </div>
+                            <div class="stat-icon"><i class="fas fa-box"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3 col-6 mb-3">
+                <div class="card stat-card bg-info">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h2 class="mb-0">{{ stats.total_unit_items }}</h2>
+                                <small>Units (IMEI/Serial)</small>
+                            </div>
+                            <div class="stat-icon"><i class="fas fa-qrcode"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3 col-6 mb-3">
+                <div class="card stat-card bg-secondary">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h2 class="mb-0">{{ stats.total_stock_items }}</h2>
+                                <small>Total Stock Items</small>
+                            </div>
+                            <div class="stat-icon"><i class="fas fa-warehouse"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3 col-6 mb-3">
+                <div class="card stat-card bg-success">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h2 class="mb-0">{{ stats.total_products_value|floatformat:0 }}</h2>
+                                <small>Total Products Value</small>
+                            </div>
+                            <div class="stat-icon"><i class="fas fa-money-bill-wave"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+
         <!-- Header -->
         {% if user.role == 'company_admin' or user.role == 'super_admin' or user.role == 'stock_controller'%}  
         <div class="products-header">
@@ -678,6 +743,19 @@
                 <option value="Electronic">💻 Electronics</option>
                 <option value="Accessory">🎧 Accessories</option>
             </select>
+
+            <!-- Branch filter -->
+            {% if user.role == 'company_admin' or user.role == 'super_admin' or user.role == 'stock_controller'%}  
+            <select class="filter-select" id="branchFilter" onchange="filterByBranch()">
+                <option value="">All Branches</option>
+                {% for b in branches %}
+                    <option value="{{ b.id }}" {% if branch_id == b.id|stringformat:"s" %}selected{% endif %}>
+                        {{ b.name }}
+                    </option>
+                {% endfor %}
+            </select>
+            {% endif %}
+            
             <span class="filter-status" id="filterStatus">
                 <span id="filterStatusText"></span>
                 <button type="button" onclick="clearFilters()" title="Clear filters">✕</button>
@@ -1136,9 +1214,33 @@ function applyFilters() {
     }
 }
 
+
+function filterByBranch() {
+    const branch = document.getElementById('branchFilter').value;
+    const currentUrl = new URL(window.location.href);
+
+    if (branch) {
+        currentUrl.searchParams.set('branch', branch);
+    } else {
+        currentUrl.searchParams.delete('branch');
+    }
+    window.location.href = currentUrl.toString();
+}
+
+
 function clearFilters() {
     searchInput.value = '';
     categoryFilter.value = '';
+
+    const branchFilter = document.getElementById('branchFilter');
+    if (branchFilter && branchFilter.value) {
+        // Reload without the branch param so the server refetches everything
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.delete('branch');
+        window.location.href = currentUrl.toString();
+        return;
+    }
+
     applyFilters();
     searchInput.focus();
 }

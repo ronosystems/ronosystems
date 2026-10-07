@@ -170,7 +170,12 @@ class Company(models.Model):
     email = models.EmailField()
     phone = models.CharField(max_length=20)
     website = models.URLField(blank=True)
-
+    company_pin = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        help_text="KRA PIN / Tax identification number shown on receipts.",
+    )
     # ---------- Branding ----------
     # We do NOT use Django's ImageField here — file uploads go to Cloudinary
     # explicitly via `apps.companies.media.upload_company_media()`, and the

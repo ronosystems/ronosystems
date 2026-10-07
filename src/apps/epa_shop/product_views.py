@@ -784,25 +784,37 @@ def unit_delete(request, product_code, identifier):
 # ============================================
 # PRODUCT LIST WITH PAGINATION
 # ============================================
-
 @login_required
 def product_list(request):
     """List all products with proper data from database."""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
+    # ---------- Role flags ----------
+    is_admin = is_admin_or_manager(request.user) or is_viewing_company
+
+    # ---------- Branch filter ----------
+    branch_id = request.GET.get('branch', '').strip()
+    selected_branch = None
+    if branch_id and branch_id.isdigit():
+        selected_branch = Branch.objects.filter(
+            id=int(branch_id), company=company
+        ).first()
+
     all_products = []
-    
-    # ---- Electronics ----
+
+    # ---------- Electronics ----------
     electronics = Electronic.objects.filter(company=company)
+    if selected_branch:
+        electronics = electronics.filter(branch=selected_branch)
     if not is_viewing_company:
         electronics = filter_by_user_access(electronics, request.user, 'product')
-    
+
     for item in electronics:
         all_products.append({
             'id': item.id,
@@ -820,12 +832,14 @@ def product_list(request):
             'is_active': item.is_active,
             'created_at': item.created_at.isoformat() if item.created_at else None,
         })
-    
-    # ---- Phones ----
+
+    # ---------- Phones ----------
     phones = Phone.objects.filter(company=company)
+    if selected_branch:
+        phones = phones.filter(branch=selected_branch)
     if not is_viewing_company:
         phones = filter_by_user_access(phones, request.user, 'product')
-    
+
     for item in phones:
         phone_type = 'Smartphone'
         if hasattr(item, 'phone_type'):
@@ -834,7 +848,7 @@ def product_list(request):
             ram_empty = not item.ram or item.ram in ('N/A', '')
             rom_empty = not item.storage_capacity or item.storage_capacity in ('N/A', '')
             phone_type = 'Feature Phone' if (ram_empty and rom_empty) else 'Smartphone'
-        
+
         all_products.append({
             'id': item.id,
             'product_code': item.product_code or '-',
@@ -851,12 +865,14 @@ def product_list(request):
             'is_active': item.is_active,
             'created_at': item.created_at.isoformat() if item.created_at else None,
         })
-    
-    # ---- Accessories ----
+
+    # ---------- Accessories ----------
     accessories = Accessory.objects.filter(company=company)
+    if selected_branch:
+        accessories = accessories.filter(branch=selected_branch)
     if not is_viewing_company:
         accessories = filter_by_user_access(accessories, request.user, 'product')
-    
+
     for item in accessories:
         all_products.append({
             'id': item.id,
@@ -874,22 +890,63 @@ def product_list(request):
             'is_active': item.is_active,
             'created_at': item.created_at.isoformat() if item.created_at else None,
         })
-    
+
     # Sort by created_at descending (newest first)
     all_products.sort(key=lambda x: x['created_at'] or '', reverse=True)
-    
-    # Serialize to JSON for the template
-    all_products_json = all_products
-    
+
+    # ============================================================
+    # STATS — computed from `all_products` so they respect
+    # both the branch filter and the user's role/branch access.
+    # ============================================================
+    total_products = len(all_products)
+
+    phone_ids = [
+        p['id'] for p in all_products
+        if p['type'] in ('Smartphone', 'Feature Phone')
+    ]
+    electronic_ids = [
+        p['id'] for p in all_products
+        if p['type'] == 'Electronic'
+    ]
+
+    total_unit_items = 0
+    if phone_ids:
+        total_unit_items += Unit.objects.filter(phone_id__in=phone_ids).count()
+    if electronic_ids:
+        total_unit_items += Unit.objects.filter(electronic_id__in=electronic_ids).count()
+
+    total_stock_items = sum(int(p.get('stock') or 0) for p in all_products)
+    total_products_value = sum(
+        (float(p.get('selling_price') or 0) * int(p.get('stock') or 0))
+        for p in all_products
+    )
+
+    stats = {
+        'total_products':       total_products,
+        'total_unit_items':     total_unit_items,
+        'total_stock_items':    total_stock_items,
+        'total_products_value': total_products_value,
+    }
+
+    # ---------- Branch dropdown options ----------
+    branches = Branch.objects.filter(
+        company=company, is_active=True
+    ).order_by('name')
+
     context = {
-        'all_products_json': all_products_json,
-        'total_count': len(all_products),
+        'all_products_json':  all_products,
+        'total_count':        len(all_products),
+        'stats':              stats,
+        'is_admin':           is_admin,
+        'user_role':          request.user.role,
         'is_viewing_company': is_viewing_company,
-        'page_title': 'Products',
-        'page_subtitle': 'Manage your products',
+        'branches':           branches,
+        'selected_branch':    selected_branch,
+        'branch_id':          branch_id,
+        'page_title':         'Products',
+        'page_subtitle':      'Manage your products',
     }
     return render(request, 'epa/products.html', context)
-
 
 # ============================================
 # PRODUCT DETAIL

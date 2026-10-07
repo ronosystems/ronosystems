@@ -22,6 +22,9 @@ from apps.companies.support_utils import (
     get_effective_branch,
 )
 import json
+from datetime import timedelta
+from django.db.models import Sum, Q
+
 
 
 # ============================================
@@ -857,11 +860,9 @@ def sale_history(request):
 # SALE LIST
 # ============================================
 
-from django.utils import timezone
-
 @login_required
 def sale_list(request):
-    """List all sales with pagination"""
+    """List all sales with pagination + branch filter + live stats"""
     company, is_viewing_company = get_active_company(request)
 
     if not company:
@@ -870,7 +871,7 @@ def sale_list(request):
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
 
-    # Roles that can see ALL sales
+    # ---------- Role flags ----------
     can_view_all = (
         is_viewing_company or
         request.user.is_super_admin or
@@ -879,7 +880,6 @@ def sale_list(request):
         request.user.is_staff
     )
 
-    # Roles that can see all branches (but may still be date-limited)
     is_admin = (
         is_viewing_company or
         request.user.is_company_admin or
@@ -889,36 +889,69 @@ def sale_list(request):
         request.user.is_staff
     )
 
+    # ---------- Base queryset ----------
     sales_queryset = Sale.objects.filter(company=company)
 
-    # Filter by branch for non-admins (skip in support mode)
+    # Non-admins default to their own branch
     if not is_admin and request.user.branch:
         sales_queryset = sales_queryset.filter(branch=request.user.branch)
 
-    # ---------------------------------------------------------
-    # NEW: Non super_admin / company_admin see only TODAY's sales
-    # ---------------------------------------------------------
+    # Non-privileged users see only TODAY
     if not can_view_all:
-        today = timezone.localdate()          # uses active timezone
-        sales_queryset = sales_queryset.filter(
-            sale_date__date=today
-        )
-    # ---------------------------------------------------------
+        today = timezone.localdate()
+        sales_queryset = sales_queryset.filter(sale_date__date=today)
 
-    sales_queryset = sales_queryset.order_by('-sale_date')
+    # ---------- Branch filter (from querystring) ----------
+    branch_id = request.GET.get('branch', '').strip()
+    selected_branch = None
+    if branch_id and branch_id.isdigit():
+        selected_branch = Branch.objects.filter(id=int(branch_id), company=company).first()
+        if selected_branch:
+            sales_queryset = sales_queryset.filter(branch=selected_branch)
 
-    # Count AFTER date filter so "Total" reflects what the user can see
-    total_count = sales_queryset.count()
+    # ---------- Date-range filter (optional) ----------
+    date_from = request.GET.get('from', '').strip()
+    date_to   = request.GET.get('to', '').strip()
+    if date_from:
+        sales_queryset = sales_queryset.filter(sale_date__date__gte=date_from)
+    if date_to:
+        sales_queryset = sales_queryset.filter(sale_date__date__lte=date_to)
 
+    # ---------- Search ----------
     search_query = request.GET.get('search', '').strip()
     if search_query:
         sales_queryset = sales_queryset.filter(
-            models.Q(customer_name__icontains=search_query) |
-            models.Q(company_sale_id__icontains=search_query) |
-            models.Q(payment_method__icontains=search_query) |
-            models.Q(payment_status__icontains=search_query)
+            Q(customer_name__icontains=search_query) |
+            Q(company_sale_id__icontains=search_query) |
+            Q(payment_method__icontains=search_query) |
+            Q(payment_status__icontains=search_query)
         )
 
+    # ---------- Stats (computed on filtered queryset) ----------
+    now = timezone.now()
+    today = now.date()
+    week_start = today - timedelta(days=today.weekday())          # Monday
+    month_start = today.replace(day=1)
+
+    stats = {
+        'total_revenue': sales_queryset.aggregate(s=Sum('net_amount'))['s'] or 0,
+        'today_revenue': sales_queryset.filter(
+            sale_date__date=today
+        ).aggregate(s=Sum('net_amount'))['s'] or 0,
+        'week_revenue': sales_queryset.filter(
+            sale_date__date__gte=week_start
+        ).aggregate(s=Sum('net_amount'))['s'] or 0,
+        'month_revenue': sales_queryset.filter(
+            sale_date__date__gte=month_start
+        ).aggregate(s=Sum('net_amount'))['s'] or 0,
+        'total_sales_count': sales_queryset.count(),
+    }
+
+    # ---------- Order & count ----------
+    sales_queryset = sales_queryset.order_by('-sale_date')
+    total_count = sales_queryset.count()
+
+    # ---------- Pagination ----------
     per_page = request.GET.get('per_page', '10')
     if per_page == 'all':
         per_page = total_count or 10
@@ -930,13 +963,20 @@ def sale_list(request):
 
     paginator = Paginator(sales_queryset, per_page)
     page = request.GET.get('page', 1)
-
     try:
         sales = paginator.page(page)
     except PageNotAnInteger:
         sales = paginator.page(1)
     except EmptyPage:
         sales = paginator.page(paginator.num_pages)
+
+    # ---------- Branch dropdown options ----------
+    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+
+    # ---------- Preserve query params for pagination links ----------
+    qs = request.GET.copy()
+    qs.pop('page', None)
+    querystring = qs.urlencode()
 
     context = {
         'sales': sales,
@@ -946,12 +986,18 @@ def sale_list(request):
         'search_query': search_query,
         'is_admin_or_manager': is_admin,
         'is_viewing_company': is_viewing_company,
-        'can_view_all_sales': can_view_all,    
+        'can_view_all_sales': can_view_all,
+        'stats': stats,                        # ✅ NEW
+        'branches': branches,                  # ✅ NEW
+        'selected_branch': selected_branch,    # ✅ NEW
+        'branch_id': branch_id,                # ✅ NEW
+        'date_from': date_from,                # ✅ NEW
+        'date_to': date_to,                    # ✅ NEW
+        'querystring': querystring,            # ✅ NEW
         'page_title': 'Sales',
         'page_subtitle': 'Sales history',
     }
     return render(request, 'epa/sales.html', context)
-
 
 # ============================================
 # SALE DETAIL
