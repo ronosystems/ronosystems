@@ -7,6 +7,10 @@ from .models import (
     Electronic, Phone, Accessory, Category, 
     Sale, SaleItem, Customer, StockMovement, Supplier
 )
+from .models import (
+    Electronic, Phone, Accessory, Category,
+    Sale, SaleItem, Customer, StockMovement, Supplier, Unit,   # ← add Unit
+)
 from apps.companies.support_utils import (
     get_active_company,
     is_support_mode,
@@ -45,6 +49,25 @@ def inventory_list(request):
     phones_count = phones.count()
     accessories_count = accessories.count()
     
+    # ============================================
+    # UNIT COUNTS (IMEI / Serial)
+    # ============================================
+    # For phones & electronics, units live in the Unit model.
+    # Accessories don't have units — their quantity_in_stock is the count.
+
+    electronics_unit_count = Unit.objects.filter(
+        electronic__company=company,
+        electronic__is_active=True,
+    ).count()
+
+    phones_unit_count = Unit.objects.filter(
+        phone__company=company,
+        phone__is_active=True,
+    ).count()
+
+    # Accessories: sum of quantity_in_stock (no per-unit IMEI tracking)
+    accessories_unit_count = accessories_stock
+
     total_products = electronics_count + phones_count + accessories_count
     total_stock = electronics_stock + phones_stock + accessories_stock
     
@@ -195,7 +218,9 @@ def inventory_list(request):
         'low_stock_count': len(low_stock_items),
         'low_stock_items': low_stock_items[:10],
         'is_viewing_company': is_viewing_company,
-        
+        'electronics_unit_count': electronics_unit_count,
+        'phones_unit_count': phones_unit_count,
+        'accessories_unit_count': accessories_unit_count,
         # Financial stats
         'total_purchase_value': total_purchase_value,
         'total_selling_value': total_selling_value,
