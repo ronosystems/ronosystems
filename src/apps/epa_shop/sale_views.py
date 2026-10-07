@@ -490,7 +490,6 @@ def sale_search_units(request):
     return JsonResponse({'results': results})
 
 
-
 # ============================================
 # SINGLE ITEM SALE - Process
 # ============================================
@@ -703,8 +702,6 @@ def sale_process_single(request):
         import traceback
         traceback.print_exc()
         return JsonResponse({'error': str(e)}, status=500)
-
-
 
 
 @login_required
@@ -928,8 +925,11 @@ def sale_list(request):
         )
 
     # ---------- Stats (computed on filtered queryset) ----------
-    now = timezone.now()
-    today = now.date()
+    # ---------- Stats (computed on filtered queryset) ----------
+    # IMPORTANT: use timezone.localdate() so "today" matches the
+    # company's local calendar day — timezone.now().date() returns
+    # the UTC date which is one day behind in EAT (UTC+3).
+    today = timezone.localdate()
     week_start = today - timedelta(days=today.weekday())          # Monday
     month_start = today.replace(day=1)
 
