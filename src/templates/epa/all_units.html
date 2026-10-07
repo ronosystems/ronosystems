@@ -416,12 +416,13 @@
                                 <thead>
                                     <tr>
                                         <th style="width:4%;">#</th>
-                                        <th style="width:14%;">{% if product_type == 'Phone' %}IMEI{% else %}Serial{% endif %}</th>
+                                        <th style="width:12%;">{% if product_type == 'Phone' %}IMEI{% else %}Serial{% endif %}</th>
+                                        <th style="width:6%;">Model</th>
                                         <th style="width:12%;">Branch</th>
-                                        <th style="width:10%;">Status</th>
-                                        <th style="width:16%;">Owner</th>
-                                        <th style="width:10%;">Added</th>
-                                        <th style="width:10%;">Days</th>
+                                        <th style="width:8%;">Status</th>
+                                        <th style="width:16%;">Current Owner</th>
+                                        <th style="width:10%;">Last Updated</th>
+                                        <th style="width:8%;">Since Update</th>
                                         <th style="width:24%;" class="text-center">Actions</th>
                                     </tr>
                                 </thead>
@@ -472,16 +473,17 @@
                                 <thead>
                                     <tr>
                                         <th style="width:4%;">#</th>
-                                        <th style="width:14%;">{% if product_type == 'Phone' %}IMEI{% else %}Serial{% endif %}</th>
+                                        <th style="width:12%;">{% if product_type == 'Phone' %}IMEI{% else %}Serial{% endif %}</th>
+                                        <th style="width:6%;">Model</th>
                                         <th style="width:12%;">Branch</th>
-                                        <th style="width:10%;">Status</th>
-                                        <th style="width:16%;">Owner</th>
-                                        <th style="width:10%;">Added</th>
-                                        <th style="width:10%;">Days</th>
+                                        <th style="width:8%;">Status</th>
+                                        <th style="width:16%;">Current Owner</th>
+                                        <th style="width:10%;">Last Updated</th>
+                                        <th style="width:8%;">Since Update</th>
                                         <th style="width:24%;" class="text-center">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody id="soldTbody"></tbody>
+                                <tbody id="soldTbody"></tbody> 
                             </table>
                         </div>
                     </div>
@@ -509,6 +511,7 @@
     <template class="unit-row-template" data-status="{{ unit.status }}">
         <tr data-unit-id="{{ unit.id }}"
             data-identifier="{{ unit.identifier }}"
+            data-model="{{ unit.model|default:'' }}"
             data-owner="{{ unit.owner_name|default:'' }}"
             data-days="{{ unit.days_since_update|default:0 }}"
             data-status="{{ unit.status }}"
@@ -522,6 +525,15 @@
                       style="cursor:pointer;" title="Click to copy">
                     {{ unit.identifier }}
                 </span>
+            </td>
+            <td>
+                {% if unit.phone %}
+                    {{ unit.phone.model|default:"-" }}
+                {% elif unit.electronic %}
+                    {{ unit.electronic.model_number|default:"-" }}
+                {% else %}
+                    -
+                {% endif %}
             </td>
             <td>
                 {% if unit.phone %}{{ unit.phone.branch.name|default:"-" }}
@@ -541,11 +553,11 @@
                             <div class="owner-phone"><i class="fas fa-phone"></i> {{ unit.owner_phone }}</div>
                         {% endif %}
                     {% else %}
-                        <span class="text-muted">Not assigned</span>
+                        <span class="text-muted">This Device Still Under Shop</span>
                     {% endif %}
                 </div>
             </td>
-            <td>{{ unit.created_at|date:"Y-m-d" }}</td>
+            <td>{{ unit.updated_at|default:unit.created_at|date:"Y-m-d" }}</td>
             <td>
                 {% if unit.days_since_update %}
                     <span class="days-badge

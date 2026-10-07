@@ -1,0 +1,988 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================ */
+    /* LAYOUT — two columns                          */
+    /* ============================================ */
+    .bt-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+        gap: 20px;
+        align-items: start;
+    }
+    @media (max-width: 1100px) {
+        .bt-layout { grid-template-columns: 1fr; }
+    }
+
+    .bt-column { min-width: 0; }
+
+    .bt-card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: #ffffff;
+        margin-bottom: 20px;
+    }
+    .bt-card-header {
+        background: #87CEEB;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .bt-card-header h5 {
+        margin: 0;
+        font-weight: 700;
+        color: #000000;
+        font-size: 1rem;
+    }
+    .bt-card-header i { margin-right: 8px; }
+    .bt-card-body { padding: 20px; }
+
+    .bt-label {
+        font-weight: 600;
+        color: #000000;
+        margin-bottom: 4px;
+        display: block;
+        font-size: 0.9rem;
+    }
+    .bt-label.required::after { content: " *"; color: #dc3545; }
+
+    .bt-input,
+    .bt-select {
+        width: 100%;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 8px 12px;
+        font-size: 0.9rem;
+        background: #ffffff;
+        color: #000000;
+        font-family: inherit;
+    }
+    .bt-select { height: 42px; }
+    textarea.bt-input {
+        min-height: 260px;
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+        line-height: 1.5;
+        resize: vertical;
+    }
+    .bt-input:focus,
+    .bt-select:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .bt-select:disabled {
+        background: #f0f0f0;
+        color: #888;
+        cursor: not-allowed;
+        border-color: #888;
+    }
+
+    .bt-hint {
+        display: block;
+        font-size: 11px;
+        color: #666;
+        margin-top: 4px;
+    }
+
+    /* ============================================ */
+    /* Transfer-type radios                          */
+    /* ============================================ */
+    .bt-type-row {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+    }
+    .bt-type-option {
+        flex: 1;
+        min-width: 180px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 14px 16px;
+        cursor: pointer;
+        background: #f8f9fa;
+        transition: all 0.15s;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .bt-type-option:hover { background: #e9ecef; }
+    .bt-type-option input[type="radio"] {
+        width: 18px;
+        height: 18px;
+        accent-color: #87CEEB;
+        cursor: pointer;
+    }
+    .bt-type-option.is-selected {
+        background: #dbeafe;
+        border-color: #0d6efd;
+    }
+    .bt-type-option .bt-type-label {
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: #000000;
+    }
+    .bt-type-option .bt-type-desc {
+        font-size: 0.75rem;
+        color: #555;
+        display: block;
+        margin-top: 2px;
+    }
+
+    /* ============================================ */
+    /* Panels                                        */
+    /* ============================================ */
+    .bt-panel { display: none; }
+    .bt-panel.is-visible { display: block; }
+
+    .bt-row {
+        display: grid;
+        grid-template-columns: 1fr 40px 1fr;
+        gap: 12px;
+        align-items: end;
+    }
+    .bt-arrow {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        color: #000000;
+        padding-bottom: 8px;
+    }
+
+    /* ============================================ */
+    /* From-source mode toggle                       */
+    /* ============================================ */
+    .bt-mode-row {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 14px;
+        padding: 10px 14px;
+        border: 2px dashed #000000;
+        border-radius: 4px;
+        background: #fbfdff;
+        flex-wrap: wrap;
+    }
+    .bt-mode-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #000000;
+        margin: 0;
+    }
+    .bt-mode-option input[type="radio"] {
+        width: 16px;
+        height: 16px;
+        accent-color: #87CEEB;
+        cursor: pointer;
+    }
+    .bt-mode-option:hover { color: #036a77; }
+
+    /* ============================================ */
+    /* Submit bar                                    */
+    /* ============================================ */
+    .bt-submit-bar {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 16px 20px;
+        border-top: 2px solid #000000;
+        background: #f8f9fa;
+        border-radius: 0 0 4px 4px;
+    }
+    .btn-bt-primary {
+        background: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        font-weight: 700;
+        padding: 10px 26px;
+        border-radius: 4px;
+        font-size: 0.9rem;
+    }
+    .btn-bt-primary:hover { background: #7bb8d8; color: #000000; }
+    .btn-bt-secondary {
+        background: #ffffff;
+        border: 2px solid #000000;
+        color: #000000;
+        font-weight: 700;
+        padding: 10px 26px;
+        border-radius: 4px;
+        font-size: 0.9rem;
+    }
+    .btn-bt-secondary:hover { background: #e9ecef; color: #000000; }
+
+    /* ============================================ */
+    /* LIVE PREVIEW (right column)                   */
+    /* ============================================ */
+    .pv-counter {
+        font-size: 12px;
+        font-weight: 700;
+        color: #000000;
+        background: #ffffff;
+        border: 2px solid #000000;
+        padding: 3px 10px;
+        border-radius: 50px;
+    }
+
+    .pv-summary {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        padding: 10px 16px;
+        border-bottom: 2px solid #000000;
+        background: #f8f9fa;
+        font-size: 12px;
+    }
+    .pv-summary .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 10px;
+        border-radius: 50px;
+        border: 2px solid #000000;
+        font-weight: 700;
+        background: #ffffff;
+    }
+    .pv-summary .chip.found           { background: #d4edda; }
+    .pv-summary .chip.duplicate       { background: #fff3cd; }
+    .pv-summary .chip.another_company { background: #e2e3e5; }
+    .pv-summary .chip.not_found       { background: #f8d7da; }
+    .pv-summary .chip.sold            { background: #cce5ff; }
+    .pv-summary .chip .num { font-weight: 800; }
+
+    .pv-table-wrap {
+        max-height: 520px;
+        overflow-y: auto;
+    }
+    .pv-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+    .pv-table th,
+    .pv-table td {
+        border-bottom: 1px solid #dee2e6;
+        padding: 8px 12px;
+        text-align: left;
+        vertical-align: middle;
+    }
+    .pv-table th {
+        background: #87CEEB;
+        color: #000000;
+        font-weight: 700;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        border-bottom: 2px solid #000000;
+    }
+    .pv-table tbody tr:hover { background: #f5f5f5; }
+
+    .pv-table .col-ident  { font-family: 'Courier New', monospace; font-weight: 700; }
+    .pv-table .col-status { width: 130px; }
+    .pv-table .col-action { width: 44px; text-align: center; }
+
+    .pv-badge {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 50px;
+        border: 2px solid #000000;
+        white-space: nowrap;
+    }
+    .pv-badge.found           { background: #d4edda; color: #155724; }
+    .pv-badge.duplicate       { background: #fff3cd; color: #856404; }
+    .pv-badge.another_company { background: #e2e3e5; color: #383d41; }
+    .pv-badge.not_found       { background: #f8d7da; color: #721c24; }
+    .pv-badge.sold            { background: #cce5ff; color: #004085; }
+
+    .pv-remove {
+        background: #ffffff;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        width: 26px;
+        height: 26px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-weight: 800;
+        color: #dc3545;
+        font-size: 12px;
+        line-height: 1;
+        padding: 0;
+    }
+    .pv-remove:hover { background: #dc3545; color: #ffffff; }
+
+    .pv-empty {
+        padding: 40px 20px;
+        text-align: center;
+        color: #666;
+        font-size: 13px;
+    }
+    .pv-empty i { font-size: 32px; display: block; margin-bottom: 8px; opacity: 0.4; }
+
+    .pv-checking {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border: 2px solid #dee2e6;
+        border-top-color: #87CEEB;
+        border-radius: 50%;
+        animation: pv-spin 0.7s linear infinite;
+        vertical-align: middle;
+    }
+    @keyframes pv-spin { to { transform: rotate(360deg); } }
+
+    /* ============================================ */
+    /* Server results (left column, after POST)      */
+    /* ============================================ */
+    .bt-result-title {
+        font-weight: 700;
+        font-size: 0.95rem;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        margin-bottom: 8px;
+    }
+    .bt-result-block {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 12px 16px;
+        margin-bottom: 12px;
+        background: #ffffff;
+    }
+    .bt-result-block.success { background: #d4edda; border-color: #155724; }
+    .bt-result-block.warn    { background: #fff3cd; border-color: #856404; }
+    .bt-result-block.danger  { background: #f8d7da; border-color: #721c24; }
+    .bt-result-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8px;
+        font-size: 13px;
+    }
+    .bt-result-table th,
+    .bt-result-table td {
+        border: 1px solid #000000;
+        padding: 6px 10px;
+        text-align: left;
+    }
+    .bt-result-table th { background: #87CEEB; font-weight: 600; }
+    .bt-result-table .ident { font-family: 'Courier New', monospace; font-weight: 700; }
+
+    @media (max-width: 768px) {
+        .bt-row { grid-template-columns: 1fr; }
+        .bt-arrow { padding: 0; transform: rotate(90deg); }
+        .bt-submit-bar { flex-direction: column; }
+        .bt-submit-bar .btn-bt-primary,
+        .bt-submit-bar .btn-bt-secondary { width: 100%; }
+        .pv-table-wrap { max-height: 320px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 1400px; margin: 0 auto;">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center flex-wrap mb-3">
+        <div>
+            <h4 class="mb-0"><i class="fas fa-exchange-alt"></i> Bulk Unit Transfer</h4>
+            <p class="text-muted mb-0" style="font-size: 13px;">
+                Move many IMEI / Serial units between branches or users.
+            </p>
+        </div>
+        <a href="/epa_shop/inventory/" class="btn btn-sm btn-outline-secondary"
+           style="border: 2px solid #000000; font-weight: 600;">
+            <i class="fas fa-arrow-left"></i> Back to Inventory
+        </a>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- TWO-COLUMN LAYOUT                             -->
+    <!-- ============================================ -->
+    <div class="bt-layout">
+
+        <!-- ============================================ -->
+        <!-- LEFT — the form                              -->
+        <!-- ============================================ -->
+        <div class="bt-column">
+            <form method="post" id="bulkTransferForm">
+                {% csrf_token %}
+                <input type="hidden" name="from_mode" id="fromModeInput" value="anywhere">
+
+                <!-- ---------------------------------------- -->
+                <!-- 1. Transfer type                          -->
+                <!-- ---------------------------------------- -->
+                <div class="bt-card">
+                    <div class="bt-card-header">
+                        <h5><i class="fas fa-random"></i> 1. Choose Transfer Type</h5>
+                    </div>
+                    <div class="bt-card-body">
+
+                        <div class="bt-type-row">
+                            <label class="bt-type-option is-selected" data-type="branch">
+                                <input type="radio" name="transfer_type" value="branch" checked>
+                                <div>
+                                    <span class="bt-type-label">
+                                        <i class="fas fa-building"></i> Branch Transfer
+                                    </span>
+                                    <span class="bt-type-desc">Move from Branch A → Branch B</span>
+                                </div>
+                            </label>
+                            <label class="bt-type-option" data-type="user">
+                                <input type="radio" name="transfer_type" value="user">
+                                <div>
+                                    <span class="bt-type-label">
+                                        <i class="fas fa-user"></i> User Transfer
+                                    </span>
+                                    <span class="bt-type-desc">Move from User X → User Y</span>
+                                </div>
+                            </label>
+                        </div>
+
+                        <!-- ========================= -->
+                        <!-- BRANCH PANEL              -->
+                        <!-- ========================= -->
+                        <div class="bt-panel is-visible" id="panel-branch">
+
+                            <div class="bt-mode-row">
+                                <label class="bt-mode-option">
+                                    <input type="radio" name="from_mode_branch" value="anywhere" checked>
+                                    <span>From anywhere</span>
+                                </label>
+                                <label class="bt-mode-option">
+                                    <input type="radio" name="from_mode_branch" value="specific">
+                                    <span>From a specific branch</span>
+                                </label>
+                            </div>
+
+                            <div class="bt-row">
+                                <div>
+                                    <label class="bt-label" id="lbl-from-branch">From Branch</label>
+                                    <select class="bt-select" name="from_branch" id="sel-from-branch" disabled>
+                                        <option value="">— Select source —</option>
+                                        {% for b in branches %}
+                                        <option value="{{ b.id }}">{{ b.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="bt-arrow"><i class="fas fa-arrow-right"></i></div>
+                                <div>
+                                    <label class="bt-label required">To Branch</label>
+                                    <select class="bt-select" name="to_branch">
+                                        <option value="">— Select destination —</option>
+                                        {% for b in branches %}
+                                        <option value="{{ b.id }}">{{ b.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <span class="bt-hint" id="hint-from-branch">
+                                Units from any branch will be moved. Units already in the destination will be updated in place.
+                            </span>
+                        </div>
+
+                        <!-- ========================= -->
+                        <!-- USER PANEL                -->
+                        <!-- ========================= -->
+                        <div class="bt-panel" id="panel-user">
+
+                            <div class="bt-mode-row">
+                                <label class="bt-mode-option">
+                                    <input type="radio" name="from_mode_user" value="anywhere" checked>
+                                    <span>From anywhere</span>
+                                </label>
+                                <label class="bt-mode-option">
+                                    <input type="radio" name="from_mode_user" value="specific">
+                                    <span>From a specific user</span>
+                                </label>
+                            </div>
+
+                            <div class="bt-row">
+                                <div>
+                                    <label class="bt-label" id="lbl-from-user">From User</label>
+                                    <select class="bt-select" name="from_user" id="sel-from-user" disabled>
+                                        <option value="">— Select source user —</option>
+                                        {% for u in users %}
+                                        <option value="{{ u.id }}">
+                                            {{ u.get_full_name|default:u.username }}
+                                            {% if u.branch %} — {{ u.branch.name }}{% endif %}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="bt-arrow"><i class="fas fa-arrow-right"></i></div>
+                                <div>
+                                    <label class="bt-label required">To User</label>
+                                    <select class="bt-select" name="to_user">
+                                        <option value="">— Select destination user —</option>
+                                        {% for u in users %}
+                                        <option value="{{ u.id }}">
+                                            {{ u.get_full_name|default:u.username }}
+                                            {% if u.branch %} — {{ u.branch.name }}{% endif %}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <span class="bt-hint" id="hint-from-user">
+                                Units from any user — including unassigned stock — will be reassigned to the destination.
+                            </span>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- ---------------------------------------- -->
+                <!-- 2. Identifiers                            -->
+                <!-- ---------------------------------------- -->
+                <div class="bt-card">
+                    <div class="bt-card-header">
+                        <h5><i class="fas fa-list-ol"></i> 2. Paste IMEI / Serial Numbers</h5>
+                    </div>
+                    <div class="bt-card-body">
+                        <label class="bt-label required">Identifiers (one per line)</label>
+                        <textarea class="bt-input" name="identifiers" id="identifiersInput"
+                                  placeholder="356938035643809&#10;356938035643810&#10;SN-ABC-12345&#10;..."
+                                  spellcheck="false">{{ request.POST.identifiers|default:'' }}</textarea>
+                        <span class="bt-hint">
+                            One IMEI or Serial per line. Commas also work. Duplicates are removed automatically.
+                            <strong>Sold units cannot be transferred.</strong>
+                        </span>
+                    </div>
+
+                    <div class="bt-submit-bar">
+                        <a href="/epa_shop/inventory/" class="btn-bt-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn-bt-primary">
+                            <i class="fas fa-exchange-alt"></i> Transfer Units
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <!-- ---------------------------------------- -->
+            <!-- Server-side results (after POST)         -->
+            <!-- ---------------------------------------- -->
+            {% if summary %}
+            <div class="bt-card">
+                <div class="bt-card-header">
+                    <h5><i class="fas fa-clipboard-check"></i> Transfer Result</h5>
+                </div>
+                <div class="bt-card-body">
+                    <p style="font-size: 14px; margin-bottom: 16px;">
+                        <strong>{{ summary.total }}</strong> identifier{{ summary.total|pluralize }} submitted ·
+                        {% if summary.transfer_type == 'branch' %}
+                            Branch: <strong>{{ summary.from_label }}</strong> → <strong>{{ summary.to_label }}</strong>
+                        {% else %}
+                            User: <strong>{{ summary.from_label }}</strong> → <strong>{{ summary.to_label }}</strong>
+                        {% endif %}
+                    </p>
+
+                    {% if summary.moved %}
+                    <div class="bt-result-block success">
+                        <div class="bt-result-title">
+                            <i class="fas fa-check-circle"></i> Moved ({{ summary.moved|length }})
+                        </div>
+                        <table class="bt-result-table">
+                            <thead><tr><th>Identifier</th><th>From</th><th>To</th></tr></thead>
+                            <tbody>
+                                {% for m in summary.moved %}
+                                <tr>
+                                    <td class="ident">{{ m.identifier }}</td>
+                                    <td>{{ m.from }}</td>
+                                    <td>{{ m.to }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+
+                    {% if summary.skipped %}
+                    <div class="bt-result-block warn">
+                        <div class="bt-result-title">
+                            <i class="fas fa-exclamation-triangle"></i> Skipped ({{ summary.skipped|length }})
+                        </div>
+                        <table class="bt-result-table">
+                            <thead><tr><th>Identifier</th><th>Reason</th></tr></thead>
+                            <tbody>
+                                {% for ident, reason in summary.skipped %}
+                                <tr>
+                                    <td class="ident">{{ ident }}</td>
+                                    <td>{{ reason }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+
+                    {% if summary.not_found %}
+                    <div class="bt-result-block danger">
+                        <div class="bt-result-title">
+                            <i class="fas fa-times-circle"></i> Not Found ({{ summary.not_found|length }})
+                        </div>
+                        <table class="bt-result-table">
+                            <thead><tr><th>Identifier</th></tr></thead>
+                            <tbody>
+                                {% for ident in summary.not_found %}
+                                <tr><td class="ident">{{ ident }}</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+
+                    {% if not summary.moved and not summary.skipped and not summary.not_found %}
+                    <div class="bt-result-block">
+                        <p class="mb-0">No identifiers were submitted.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- ============================================ -->
+        <!-- RIGHT — live stock checker                   -->
+        <!-- ============================================ -->
+        <div class="bt-column">
+            <div class="bt-card">
+                <div class="bt-card-header">
+                    <h5><i class="fas fa-clipboard-list"></i> Stock Checker</h5>
+                    <span class="pv-counter" id="pvCounter">0 lines</span>
+                </div>
+
+                <!-- Summary chips -->
+                <div class="pv-summary" id="pvSummary">
+                    <span class="chip found">
+                        <i class="fas fa-check-circle"></i>
+                        Found <span class="num" id="cnt-found">0</span>
+                    </span>
+                    <span class="chip duplicate">
+                        <i class="fas fa-copy"></i>
+                        Duplicate <span class="num" id="cnt-duplicate">0</span>
+                    </span>
+                    <span class="chip sold">
+                        <i class="fas fa-shopping-bag"></i>
+                        Sold <span class="num" id="cnt-sold">0</span>
+                    </span>
+                    <span class="chip another_company">
+                        <i class="fas fa-globe"></i>
+                        Another Company <span class="num" id="cnt-another_company">0</span>
+                    </span>
+                    <span class="chip not_found">
+                        <i class="fas fa-times-circle"></i>
+                        Not Found <span class="num" id="cnt-not_found">0</span>
+                    </span>
+                </div>
+
+                <!-- Table -->
+                <div class="pv-table-wrap">
+                    <table class="pv-table" id="pvTable">
+                        <thead>
+                            <tr>
+                                <th class="col-ident">Identifier</th>
+                                <th class="col-status">Status</th>
+                                <th class="col-action"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="pvBody">
+                            <tr>
+                                <td colspan="3">
+                                    <div class="pv-empty">
+                                        <i class="fas fa-clipboard"></i>
+                                        Paste IMEI / Serial numbers on the left to see a live check here.
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    // ============================================================
+    // Transfer type toggle (branch vs user)
+    // ============================================================
+    const form = document.getElementById('bulkTransferForm');
+    const hiddenFromMode = document.getElementById('fromModeInput');
+
+    if (form) {
+        const radios = form.querySelectorAll('input[name="transfer_type"]');
+        const options = form.querySelectorAll('.bt-type-option');
+        const panelBranch = document.getElementById('panel-branch');
+        const panelUser   = document.getElementById('panel-user');
+
+        function applyType(type) {
+            panelBranch.classList.toggle('is-visible', type === 'branch');
+            panelUser.classList.toggle('is-visible',   type === 'user');
+            options.forEach(opt => {
+                opt.classList.toggle('is-selected', opt.dataset.type === type);
+            });
+            syncFromModeHidden();
+        }
+
+        radios.forEach(r => r.addEventListener('change', () => applyType(r.value)));
+        const checked = form.querySelector('input[name="transfer_type"]:checked');
+        if (checked) applyType(checked.value);
+    }
+
+    // ============================================================
+    // From-source mode toggle (specific vs anywhere)
+    // ============================================================
+    const branchModeRadios = document.querySelectorAll('input[name="from_mode_branch"]');
+    const selFromBranch    = document.getElementById('sel-from-branch');
+    const lblFromBranch    = document.getElementById('lbl-from-branch');
+    const hintFromBranch   = document.getElementById('hint-from-branch');
+
+    branchModeRadios.forEach(r => r.addEventListener('change', () => {
+        const specific = document.querySelector('input[name="from_mode_branch"]:checked').value === 'specific';
+        selFromBranch.disabled = !specific;
+        selFromBranch.required = specific;
+        lblFromBranch.classList.toggle('required', specific);
+        hintFromBranch.textContent = specific
+            ? 'Only units currently in this branch will be moved. Others will be skipped.'
+            : 'Units from any branch will be moved. Units already in the destination will be updated in place.';
+        syncFromModeHidden();
+    }));
+
+    const userModeRadios = document.querySelectorAll('input[name="from_mode_user"]');
+    const selFromUser    = document.getElementById('sel-from-user');
+    const lblFromUser    = document.getElementById('lbl-from-user');
+    const hintFromUser   = document.getElementById('hint-from-user');
+
+    userModeRadios.forEach(r => r.addEventListener('change', () => {
+        const specific = document.querySelector('input[name="from_mode_user"]:checked').value === 'specific';
+        selFromUser.disabled = !specific;
+        selFromUser.required = specific;
+        lblFromUser.classList.toggle('required', specific);
+        hintFromUser.textContent = specific
+            ? 'Only units currently assigned to this user will be moved. Others will be skipped.'
+            : 'Units from any user — including unassigned stock — will be reassigned to the destination.';
+        syncFromModeHidden();
+    }));
+
+    // Push the active panel's mode into the hidden POST field
+    function syncFromModeHidden() {
+        if (!hiddenFromMode) return;
+        const activeType = document.querySelector('input[name="transfer_type"]:checked')?.value || 'branch';
+
+        if (activeType === 'branch') {
+            const v = document.querySelector('input[name="from_mode_branch"]:checked')?.value || 'anywhere';
+            hiddenFromMode.value = v;
+        } else {
+            const v = document.querySelector('input[name="from_mode_user"]:checked')?.value || 'anywhere';
+            hiddenFromMode.value = v;
+        }
+    }
+
+    // Initialize disabled state on load
+    if (selFromBranch) selFromBranch.disabled = true;
+    if (selFromUser)   selFromUser.disabled = true;
+    syncFromModeHidden();
+
+    // ============================================================
+    // LIVE PREVIEW — check identifiers as they're typed/pasted
+    // ============================================================
+    const textarea  = document.getElementById('identifiersInput');
+    const pvBody    = document.getElementById('pvBody');
+    const pvCounter = document.getElementById('pvCounter');
+    const cntEls = {
+        found:           document.getElementById('cnt-found'),
+        duplicate:       document.getElementById('cnt-duplicate'),
+        sold:            document.getElementById('cnt-sold'),
+        another_company: document.getElementById('cnt-another_company'),
+        not_found:       document.getElementById('cnt-not_found'),
+    };
+
+    const CHECK_URL = '/epa_shop/inventory/bulk-transfer/check/';
+
+    let debounceTimer = null;
+    let lastCheckedList = [];
+
+    function parseIdentifiers() {
+        const raw = (textarea.value || '');
+        const lines = raw.replace(/,/g, '\n').split(/\r?\n/);
+        return lines.map(l => l.trim()).filter(l => l.length > 0);
+    }
+
+    function renderEmpty() {
+        pvBody.innerHTML =
+            '<tr><td colspan="3">' +
+            '<div class="pv-empty">' +
+            '<i class="fas fa-clipboard"></i>' +
+            'Paste IMEI / Serial numbers on the left to see a live check here.' +
+            '</div></td></tr>';
+    }
+
+    function renderLoading(list) {
+        const rows = list.map(ident =>
+            '<tr data-ident="' + escapeHtml(ident) + '">' +
+            '<td class="col-ident">' + escapeHtml(ident) + '</td>' +
+            '<td class="col-status"><span class="pv-checking"></span></td>' +
+            '<td class="col-action"></td>' +
+            '</tr>'
+        ).join('');
+        pvBody.innerHTML = rows;
+    }
+
+    function renderResults(results) {
+        if (!results.length) { renderEmpty(); return; }
+
+        const counts = { found: 0, duplicate: 0, sold: 0, another_company: 0, not_found: 0 };
+
+        const rows = results.map((r, idx) => {
+            counts[r.status] = (counts[r.status] || 0) + 1;
+            return '<tr data-ident="' + escapeHtml(r.identifier) + '" data-index="' + idx + '">' +
+                '<td class="col-ident">' + escapeHtml(r.identifier) + '</td>' +
+                '<td class="col-status">' +
+                    '<span class="pv-badge ' + r.status + '">' + statusLabel(r.status) + '</span>' +
+                '</td>' +
+                '<td class="col-action">' +
+                    '<button type="button" class="pv-remove" ' +
+                        'data-ident="' + escapeHtml(r.identifier) + '" ' +
+                        'title="Remove this line">✕</button>' +
+                '</td>' +
+                '</tr>';
+        }).join('');
+
+        pvBody.innerHTML = rows;
+
+        cntEls.found.textContent           = counts.found;
+        cntEls.duplicate.textContent       = counts.duplicate;
+        cntEls.sold.textContent            = counts.sold;
+        cntEls.another_company.textContent = counts.another_company;
+        cntEls.not_found.textContent       = counts.not_found;
+    }
+
+    function statusLabel(s) {
+        switch (s) {
+            case 'found':           return '✓ Found';
+            case 'duplicate':       return '⚠ Duplicate';
+            case 'sold':            return '🛑 Sold';
+            case 'another_company': return '🌐 Another Company';
+            case 'not_found':       return '✕ Not Found';
+            default:                return s;
+        }
+    }
+
+    function escapeHtml(s) {
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function updateCounter() {
+        const n = parseIdentifiers().length;
+        pvCounter.textContent = n + ' line' + (n === 1 ? '' : 's');
+    }
+
+    function getCsrfToken() {
+        const el = document.querySelector('input[name="csrfmiddlewaretoken"]');
+        return el ? el.value : '';
+    }
+
+    function checkIdentifiers() {
+        const list = parseIdentifiers();
+        updateCounter();
+
+        if (!list.length) {
+            renderEmpty();
+            cntEls.found.textContent = cntEls.duplicate.textContent =
+                cntEls.sold.textContent = cntEls.another_company.textContent =
+                cntEls.not_found.textContent = 0;
+            lastCheckedList = [];
+            return;
+        }
+
+        // Skip if list unchanged
+        if (list.length === lastCheckedList.length &&
+            list.every((x, i) => x === lastCheckedList[i])) {
+            return;
+        }
+        lastCheckedList = list;
+
+        renderLoading(list);
+
+        fetch(CHECK_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
+            },
+            body: JSON.stringify({ identifiers: list }),
+        })
+        .then(r => r.ok ? r.json() : Promise.reject(r))
+        .then(data => {
+            renderResults(data.results || []);
+        })
+        .catch(err => {
+            console.error('Check failed:', err);
+            renderEmpty();
+        });
+    }
+
+    // Remove first occurrence of a given identifier from the textarea
+    function removeOneLine(identifier) {
+        const lines = (textarea.value || '').replace(/,/g, '\n').split(/\r?\n/);
+        let removed = false;
+        const newLines = [];
+        for (let i = 0; i < lines.length; i++) {
+            const l = lines[i].trim();
+            if (!removed && l === identifier) {
+                removed = true;
+                continue;
+            }
+            newLines.push(lines[i]);
+        }
+        textarea.value = newLines.join('\n');
+        lastCheckedList = [];   // force re-check
+        checkIdentifiers();
+    }
+
+    if (textarea) {
+        textarea.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(checkIdentifiers, 350);
+        });
+
+        pvBody.addEventListener('click', (e) => {
+            const btn = e.target.closest('.pv-remove');
+            if (!btn) return;
+            removeOneLine(btn.dataset.ident);
+        });
+
+        if ((textarea.value || '').trim()) {
+            checkIdentifiers();
+        } else {
+            renderEmpty();
+            updateCounter();
+        }
+    }
+});
+</script>
+{% endblock %}

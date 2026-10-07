@@ -19,6 +19,8 @@ urlpatterns = [
     path('inventory/', inventory_views.inventory_list, name='epa-inventory'),
     path('inventory/low-stock/', inventory_views.low_stock, name='epa-low-stock'),
     path('inventory/movement/', inventory_views.stock_movement, name='epa-stock-movement'),
+    path('inventory/bulk-transfer/', inventory_views.bulk_transfer, name='bulk-transfer'),
+    path('inventory/bulk-transfer/check/', inventory_views.bulk_transfer_check, name='bulk-transfer-check'),
     
     # ============================================
     # PRODUCTS - Full CRUD (Using Product Code)

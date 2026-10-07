@@ -871,23 +871,42 @@
                 <ul class="nav flex-column">
 
                     {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'company_cashier' or user.role == 'company_agent' or user.role == 'mpesa_agent' or user.role == 'stock_controller' %}
-                    <li class="nav-label">DASHBOARD</li>
+                    <li class="nav-label">HOME DASHBOARD</li>
 
                     <li class="nav-item">
                         {% if is_support_mode and support_company %}
                         <a class="nav-link {% if '/epa_shop/dashboard/' in request.path %}active{% endif %}" href="/epa_shop/dashboard/">
-                            <i class="fas fa-chart-pie"></i> <span>Home</span>
+                            <i class="fas fa-chart-pie"></i> <span>Home Page</span>
                         </a>
                         {% else %}
                         <a class="nav-link {% if request.path == '/dashboard/' or '/epa_shop/dashboard/' in request.path %}active{% endif %}" href="/dashboard/">
-                            <i class="fas fa-chart-pie"></i> <span>Home</span>
+                            <i class="fas fa-chart-pie"></i> <span>Home Page</span>
                         </a>
                         {% endif %}
                     </li>
                     {% endif %}
 
+                    {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' or user.role == 'mpesa_agent' %}
+                    {% if company and company_has_treasury %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/treasury/' in request.path %}active{% endif %}"
+                            href="{% url 'treasury:dashboard' company.id %}">
+                                <i class="fas fa-money-bill"></i> <span>Mpesa Shop</span>
+                                {% if user.role == 'company_admin' or user.role == 'super_admin' %}
+                                {% if unverified_daily_records_count and unverified_daily_records_count > 0 %}
+                                    <span class="badge bg-danger"
+                                        title="{{ unverified_daily_records_count }} unverified daily record{{ unverified_daily_records_count|pluralize }}">
+                                        {{ unverified_daily_records_count }}
+                                    </span>
+                                {% endif %}
+                                {% endif %}
+                            </a>
+                        </li>
+                    {% endif %}
+                    {% endif %}
+
                     {% if is_support_mode and support_company %}
-                        <li class="nav-label">MANAGEMENt</li>
+                        <li class="nav-label">SITE MANAGEMENT</li>
 
                         <li class="nav-item">
                             <a class="nav-link {% if '/epa_shop/pos/' in request.path %}active{% endif %}" href="/epa_shop/pos/">
@@ -990,7 +1009,7 @@
                             {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'company_cashier' or user.role == 'company_agent' or user.role == 'mpesa_agent' or user.role == 'stock_controller' %}
                                 {% if user.company and user.company.business_type %}
                                     {% if 'epa' in user.company.business_type.name.lower or 'electronics' in user.company.business_type.name.lower %}
-                                    <li class="nav-label">SHOP</li>
+                                    <li class="nav-label">SHOP MANAGEMENT</li>
 
                                     {% if user.role == 'company_cashier' %}
                                     <li class="nav-item">
@@ -998,25 +1017,6 @@
                                             <i class="fas fa-shopping-cart"></i> <span>POS</span>
                                         </a>
                                     </li>
-                                    {% endif %}
-
-                                    {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' or user.role == 'mpesa_agent' %}
-                                    {% if company and company_has_treasury %}
-                                        <li class="nav-item">
-                                            <a class="nav-link {% if '/treasury/' in request.path %}active{% endif %}"
-                                            href="{% url 'treasury:dashboard' company.id %}">
-                                                <i class="fas fa-money-bill"></i> <span>Mpesa</span>
-                                                {% if user.role == 'company_admin' or user.role == 'super_admin' %}
-                                                {% if unverified_daily_records_count and unverified_daily_records_count > 0 %}
-                                                    <span class="badge bg-danger"
-                                                        title="{{ unverified_daily_records_count }} unverified daily record{{ unverified_daily_records_count|pluralize }}">
-                                                        {{ unverified_daily_records_count }}
-                                                    </span>
-                                                {% endif %}
-                                                {% endif %}
-                                            </a>
-                                        </li>
-                                    {% endif %}
                                     {% endif %}
 
                                     {% if user.role == 'company_agent' %}
@@ -1069,15 +1069,57 @@
                                     {% endif %}
 
                                     {% if user.role == 'company_admin' or user.role == 'super_admin' or user.role == 'stock_controller' %}
+                                    <li class="nav-label">STORE MANAGEMENT</li>
+                                    <!-- Inventory -->
                                     <li class="nav-item">
-                                        <a class="nav-link {% if '/epa_shop/inventory/' in request.path %}active{% endif %}" href="/epa_shop/inventory/">
+                                        <a class="nav-link {% if request.path == '/epa_shop/inventory/' %}active{% endif %}"
+                                        href="/epa_shop/inventory/">
                                             <i class="fas fa-warehouse"></i> <span>Inventory</span>
                                         </a>
                                     </li>
+
+                                    <!-- Low Stock -->
+                                    <li class="nav-item">
+                                        <a class="nav-link {% if '/epa_shop/inventory/low-stock/' in request.path %}active{% endif %}"
+                                        href="/epa_shop/inventory/low-stock/">
+                                            <i class="fas fa-exclamation-triangle"></i> <span>Low Stock</span>
+                                            {% if low_stock_count > 0 %}
+                                                <span class="badge bg-danger"
+                                                    title="{{ low_stock_count }} item{{ low_stock_count|pluralize }} below minimum stock">
+                                                    {{ low_stock_count }}
+                                                </span>
+                                            {% endif %}
+                                        </a>
+                                    </li>
+
+                                    <!-- Movements -->
+                                    <li class="nav-item">
+                                        <a class="nav-link {% if '/epa_shop/inventory/movement/' in request.path %}active{% endif %}"
+                                        href="/epa_shop/inventory/movement/">
+                                            <i class="fas fa-history"></i> <span>Movements</span>
+                                        </a>
+                                    </li>
+
+                                    <!-- Bulk Transfer -->
+                                    <li class="nav-item">
+                                        <a class="nav-link {% if '/epa_shop/inventory/bulk-transfer/' in request.path %}active{% endif %}"
+                                        href="/epa_shop/inventory/bulk-transfer/">
+                                            <i class="fas fa-exchange-alt"></i> <span>Bulk Transfer</span>
+                                        </a>
+                                    </li>
+
+                                    <!-- Categories -->
+                                    <li class="nav-item">
+                                        <a class="nav-link {% if '/epa_shop/categories/' in request.path %}active{% endif %}"
+                                        href="/epa_shop/categories/">
+                                            <i class="fas fa-tags"></i> <span>Categories</span>
+                                        </a>
+                                    </li>
+
                                     {% endif %}
 
                                     {% if user.role == 'company_admin' or user.role == 'super_admin' %}
-                                    <li class="nav-label">USERS</li>
+                                    <li class="nav-label">USERS MANAGEMENT</li>
                                     <li class="nav-item">
                                         <a class="nav-link {% if '/company/employees/' in request.path %}active{% endif %}" href="/company/employees/">
                                             <i class="fas fa-users"></i> <span>Employees</span>
@@ -1096,7 +1138,7 @@
                                     </li>
                                     {% endif %}
 
-                                    <li class="nav-label">SETTINGS</li>
+                                    <li class="nav-label">COMPANY SETTINGS</li>
                                     <li class="nav-item">
                                         <a class="nav-link {% if '/company/branches/' in request.path %}active{% endif %}" href="/company/branches/">
                                             <i class="fas fa-building"></i> <span>Branches</span>
@@ -1137,7 +1179,7 @@
                         </a>
                     </li>
 
-                    <li class="nav-label">Management</li>
+                    <li class="nav-label">Site Management</li>
                     <li class="nav-item">
                         <a class="nav-link {% if '/business_types/' in request.path %}active{% endif %}" href="/business-types/">
                             <i class="fas fa-tags"></i> <span>Business</span>
@@ -1164,7 +1206,7 @@
                         </a>
                     </li>
 
-                    <li class="nav-label">Administration</li>
+                    <li class="nav-label">Site Administration</li>
                     <li class="nav-item">
                         <a class="nav-link" href="/admin/">
                             <i class="fas fa-tag"></i> <span>Admin Panel</span>

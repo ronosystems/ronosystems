@@ -18,7 +18,19 @@ from apps.companies.support_utils import (
     get_effective_branch,
 )
 
+from apps.company.models import Branch
+from django.contrib.auth import get_user_model
+from .product_views import get_or_create_owner_from_user
+from django.db import transaction
 
+
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from collections import Counter
+import json
+
+
+User = get_user_model()
 
 
 @login_required
@@ -233,8 +245,6 @@ def inventory_list(request):
         'page_subtitle': 'Manage your stock',
     }
     return render(request, 'epa/inventory.html', context)
-
-
 
 
 @login_required
@@ -471,3 +481,419 @@ def customer_create(request):
     # Placeholder
     messages.info(request, 'Customer creation coming soon.')
     return redirect('/epa/customers/')
+
+
+
+# ============================================
+# BULK UNIT TRANSFER
+# ============================================
+
+@login_required
+def bulk_transfer(request):
+    """
+    Bulk-transfer units (IMEI / Serial) between:
+      - Branch A  →  Branch B
+      - User X    →  User Y
+
+    The user pastes one identifier per line (IMEI or Serial).
+    Each identifier is matched against the Unit model; only units
+    belonging to the active company are affected.
+    """
+    from apps.epa_shop.product_views import get_or_create_owner_from_user
+
+    company, is_viewing_company = get_active_company(request)
+
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+
+    # ---------- Permission gate ----------
+    is_authorized = (
+        is_viewing_company or
+        request.user.role in ('super_admin', 'company_admin', 'company_manager', 'stock_controller')
+    )
+    if not is_authorized:
+        messages.error(request, 'You do not have permission to perform bulk transfers.')
+        return redirect('/epa_shop/inventory/')
+
+    # ---------- Dropdown data ----------
+    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+
+    users = (
+        User.objects
+        .filter(company=company, is_active=True)
+        .exclude(role='super_admin')
+        .order_by('first_name', 'last_name', 'username')
+    )
+
+    # ---------- Result summary (populated on POST) ----------
+    summary = None
+
+    if request.method == 'POST':
+        transfer_type = request.POST.get('transfer_type', 'branch')
+
+        # from_mode: 'specific' (use the dropdown) | 'anywhere' (no source filter)
+        from_mode = request.POST.get('from_mode', 'specific')
+
+        # ----- Branch transfer inputs -----
+        from_branch_id = request.POST.get('from_branch', '').strip()
+        to_branch_id   = request.POST.get('to_branch', '').strip()
+
+        # ----- User transfer inputs -----
+        from_user_id = request.POST.get('from_user', '').strip()
+        to_user_id   = request.POST.get('to_user', '').strip()
+
+        # ----- Identifiers ----------
+        raw = request.POST.get('identifiers', '')
+        identifiers = [
+            line.strip()
+            for line in raw.replace(',', '\n').splitlines()
+            if line.strip()
+        ]
+        seen = set()
+        identifiers = [x for x in identifiers if not (x in seen or seen.add(x))]
+
+        # ---------- Validate ----------
+        errors = []
+        if not identifiers:
+            errors.append('Please enter at least one IMEI / Serial number.')
+
+        if transfer_type == 'branch':
+            if not to_branch_id:
+                errors.append('"To Branch" is required.')
+            if from_mode == 'specific' and not from_branch_id:
+                errors.append('"From Branch" is required when using a specific source.')
+            if from_mode == 'specific' and from_branch_id == to_branch_id:
+                errors.append('Source and destination branches must be different.')
+        elif transfer_type == 'user':
+            if not to_user_id:
+                errors.append('"To User" is required.')
+            if from_mode == 'specific' and not from_user_id:
+                errors.append('"From User" is required when using a specific source.')
+            if from_mode == 'specific' and from_user_id == to_user_id:
+                errors.append('Source and destination users must be different.')
+        else:
+            errors.append('Invalid transfer type.')
+
+        if errors:
+            for e in errors:
+                messages.error(request, e)
+        else:
+            # ---------- Resolve targets ----------
+            from_branch = to_branch = None
+            from_user   = to_user   = None
+            to_owner                = None
+
+            if transfer_type == 'branch':
+                to_branch = Branch.objects.filter(id=to_branch_id, company=company).first()
+                if not to_branch:
+                    messages.error(request, 'Invalid destination branch.')
+                    return redirect('bulk-transfer')
+
+                if from_mode == 'specific':
+                    from_branch = Branch.objects.filter(id=from_branch_id, company=company).first()
+                    if not from_branch:
+                        messages.error(request, 'Invalid source branch.')
+                        return redirect('bulk-transfer')
+            else:
+                to_user = User.objects.filter(id=to_user_id, company=company).first()
+                if not to_user:
+                    messages.error(request, 'Invalid destination user.')
+                    return redirect('bulk-transfer')
+
+                if from_mode == 'specific':
+                    from_user = User.objects.filter(id=from_user_id, company=company).first()
+                    if not from_user:
+                        messages.error(request, 'Invalid source user.')
+                        return redirect('bulk-transfer')
+
+                to_owner = get_or_create_owner_from_user(to_user, company=company)
+
+            # ---------- Process ----------
+            moved     = []
+            skipped   = []
+            not_found = []
+
+            with transaction.atomic():
+                for ident in identifiers:
+                    unit = (
+                        Unit.objects
+                        .filter(identifier=ident)
+                        .select_related(
+                            'phone', 'phone__branch',
+                            'electronic', 'electronic__branch',
+                            'owner',
+                        )
+                        .first()
+                    )
+
+                    if not unit:
+                        not_found.append(ident)
+                        continue
+
+                    product = unit.phone or unit.electronic
+                    if not product or product.company_id != company.id:
+                        skipped.append((ident, 'Belongs to a different company'))
+                        continue
+
+                    # ============================================
+                    # SOLD GUARD — sold units are not transferable
+                    # ============================================
+                    if unit.status == 'sold':
+                        skipped.append((
+                            ident,
+                            'Unit is Already SOLD and cannot be transferred'
+                        ))
+                        continue
+
+                    # ============ BRANCH TRANSFER ============
+                    if transfer_type == 'branch':
+                        current_branch = product.branch
+
+                        if from_mode == 'specific' and current_branch:
+                            if current_branch.id != from_branch.id:
+                                skipped.append((
+                                    ident,
+                                    f'Currently in "{current_branch.name}", not "{from_branch.name}"'
+                                ))
+                                continue
+
+                        # Move the parent product to the destination branch
+                        product.branch = to_branch
+                        product.save(update_fields=['branch'])
+
+                        # ✅ Touch the unit so its updated_at advances,
+                        #    making the "Last Updated / Days" columns reflect
+                        #    this transfer on the units page.
+                        unit.save(update_fields=['updated_at'])
+
+                        moved.append({
+                            'identifier': ident,
+                            'from': current_branch.name if current_branch else '-',
+                            'to':   to_branch.name,
+                        })
+
+                    # ============ USER TRANSFER ============
+                    else:
+                        current_owner_name = ''
+                        current_phone = ''
+                        if unit.owner:
+                            current_owner_name = unit.owner.name
+                            current_phone = (unit.owner.phone or '').strip()
+                        elif unit.owner_name:
+                            current_owner_name = unit.owner_name
+                            current_phone = (unit.owner_phone or '').strip()
+
+                        if from_mode == 'specific' and from_user:
+                            expected_phone = (from_user.phone or '').strip()
+
+                            # Case A: source user has a phone — match by phone
+                            if expected_phone:
+                                if current_phone != expected_phone:
+                                    skipped.append((
+                                        ident,
+                                        f'Assigned to "{current_owner_name or "nobody"}", '
+                                        f'not "{from_user.get_full_name() or from_user.username}"'
+                                    ))
+                                    continue
+                            # Case B: source user has no phone — match by name
+                            else:
+                                expected_name = (
+                                    from_user.get_full_name() or from_user.username
+                                ).strip().lower()
+                                actual_name = (current_owner_name or '').strip().lower()
+                                if actual_name != expected_name:
+                                    skipped.append((
+                                        ident,
+                                        f'Assigned to "{current_owner_name or "nobody"}", '
+                                        f'not "{from_user.get_full_name() or from_user.username}"'
+                                    ))
+                                    continue
+
+                        # Apply — reassign owner.
+                        # ✅ Include 'updated_at' in update_fields so auto_now
+                        #    actually fires. Without it Django skips the
+                        #    auto-update and the "Last Updated" column stays stale.
+                        unit.owner = to_owner
+                        unit.owner_name = to_owner.name if to_owner else ''
+                        unit.owner_phone = to_owner.phone if to_owner else ''
+                        unit.save(update_fields=[
+                            'owner', 'owner_name', 'owner_phone', 'updated_at',
+                        ])
+
+                        moved.append({
+                            'identifier': ident,
+                            'from': current_owner_name or 'unassigned',
+                            'to':   to_owner.name if to_owner else '-',
+                        })
+
+            summary = {
+                'transfer_type': transfer_type,
+                'from_mode': from_mode,
+                'from_label': (
+                    (from_branch.name if from_branch else 'Anywhere')
+                    if transfer_type == 'branch'
+                    else (from_user.get_full_name() or from_user.username
+                          if from_user else 'Anywhere')
+                ),
+                'to_label': (
+                    to_branch.name if transfer_type == 'branch'
+                    else (to_user.get_full_name() or to_user.username)
+                ),
+                'moved':     moved,
+                'skipped':   skipped,
+                'not_found': not_found,
+                'total':     len(identifiers),
+            }
+
+            if moved:
+                messages.success(
+                    request,
+                    f'Successfully transferred {len(moved)} of {len(identifiers)} unit(s).'
+                )
+            if skipped or not_found:
+                messages.warning(
+                    request,
+                    f'{len(skipped)} skipped, {len(not_found)} not found.'
+                )
+
+    context = {
+        'company': company,
+        'branches': branches,
+        'users': users,
+        'summary': summary,
+        'is_viewing_company': is_viewing_company,
+        'page_title': 'Bulk Unit Transfer',
+        'page_subtitle': 'Move many IMEI / Serial units at once',
+    }
+    return render(request, 'epa/bulk_transfer.html', context)
+
+# ============================================
+# BULK TRANSFER — STOCK CHECK (AJAX)
+# ============================================
+
+@login_required
+@require_POST
+def bulk_transfer_check(request):
+    """
+    JSON endpoint: given a list of identifiers, return the status of each.
+
+    Status values:
+      found           – exists in this company, ready to transfer
+      duplicate       – appears more than once in the submitted list
+      another_company – exists but belongs to a different company
+      not_found       – doesn't exist anywhere anywhere in the DB
+    """
+    company, is_viewing_company = get_active_company(request)
+    if not company:
+        return JsonResponse({'error': 'No company'}, status=400)
+
+    try:
+        payload = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    identifiers = payload.get('identifiers', []) or []
+
+    # Count occurrences to detect duplicates within this submission
+    counts = Counter(identifiers)
+
+    # Track which identifiers we've already emitted a non-duplicate row for
+    seen_in_results = set()
+
+    results = []
+    for ident in identifiers:
+        # Flag 2nd+ occurrence as duplicate
+        if counts[ident] > 1 and ident in seen_in_results:
+            results.append({
+                'identifier': ident,
+                'status': 'duplicate',
+                'product_code': '',
+                'product_name': '',
+                'branch': '',
+                'owner': '',
+            })
+            continue
+
+        unit = (
+            Unit.objects
+            .filter(identifier=ident)
+            .select_related(
+                'phone', 'phone__branch', 'phone__company',
+                'electronic', 'electronic__branch', 'electronic__company',
+                'owner',
+            )
+            .first()
+        )
+
+        if not unit:
+            results.append({
+                'identifier': ident,
+                'status': 'not_found',
+                'product_code': '',
+                'product_name': '',
+                'branch': '',
+                'owner': '',
+            })
+            seen_in_results.add(ident)
+            continue
+
+        product = unit.phone or unit.electronic
+        if not product:
+            results.append({
+                'identifier': ident,
+                'status': 'not_found',
+                'product_code': '',
+                'product_name': '',
+                'branch': '',
+                'owner': '',
+            })
+            seen_in_results.add(ident)
+            continue
+
+        if product.company_id != company.id:
+            results.append({
+                'identifier': ident,
+                'status': 'another_company',
+                'product_code': product.product_code or '',
+                'product_name': getattr(product, 'name', '') or '',
+                'branch': product.branch.name if product.branch else '',
+                'owner': '',
+            })
+            seen_in_results.add(ident)
+            continue
+
+        # Sold units — flag them in the preview as "sold" rather than "found"
+        if unit.status == 'sold':
+            results.append({
+                'identifier': ident,
+                'status': 'sold',
+                'product_code': product.product_code or '',
+                'product_name': getattr(product, 'name', '') or '',
+                'branch': product.branch.name if product.branch else '',
+                'owner': unit.owner.name if unit.owner else (unit.owner_name or ''),
+            })
+            seen_in_results.add(ident)
+            continue
+
+        owner_label = ''
+        if unit.owner:
+            owner_label = unit.owner.name
+        elif unit.owner_name:
+            owner_label = unit.owner_name
+
+        results.append({
+            'identifier': ident,
+            'status': 'found',
+            'product_code': product.product_code or '',
+            'product_name': getattr(product, 'name', '') or '',
+            'branch': product.branch.name if product.branch else '',
+            'owner': owner_label,
+        })
+        seen_in_results.add(ident)
+
+    return JsonResponse({'results': results})
+    
+    
