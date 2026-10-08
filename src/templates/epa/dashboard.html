@@ -94,8 +94,8 @@
     .welcome-banner.admin-banner   { background: linear-gradient(135deg, #1a237e 0%, #0d1442 100%); }
     .welcome-banner.manager-banner { background: linear-gradient(135deg, #004d40 0%, #00251a 100%); }
     .welcome-banner.agent-banner   { background: linear-gradient(135deg, #e65100 0%, #bf360c 100%); }
-    .welcome-banner.cashier-banner { background: linear-gradient(135deg, #1a237e 0%, #0d1442 100%); }
-    .welcome-banner.mpesa-banner   { background: linear-gradient(135deg, #4a148c 0%, #1a237e 100%); }
+    .welcome-banner.cashier-banner { background: linear-gradient(135deg, #00e1ff 0%, #00ffff 100%); }
+    .welcome-banner.mpesa-banner   { background: linear-gradient(135deg, #000000 0%, #000000 100%); }
 
     /* ============================================
        CASHIER FULL BANNER — company name fills space
@@ -119,33 +119,94 @@
     }
 
     .cashier-full-banner .cashier-company-name {
-        font-size: clamp(5rem, 10vw, 8rem);
-        font-weight: 2000;
-        text-transform: uppercase;
-        letter-spacing: 6px;
-        color: #ffffff;
-        line-height: 2.05;
-        margin: 0;
-        text-shadow: 3px 3px 0 rgb(0, 0, 0);
-        word-break: break-word;
+            font-size: clamp(5rem, 10vw, 8rem);
+            font-weight: 1000;
+            text-transform: uppercase;
+            letter-spacing: 6px;
+            color: #ffffff;
+            line-height: 2.05;
+            margin: 0;
+            text-shadow: 5px 5px 0 rgb(0, 0, 0);
+            word-break: break-word;
+            width: 100%;
+        }
+
+
+    /* ============================================
+    CASHIER BRANCH NAME — Scrolling Marquee
+    ============================================ */
+    .cashier-full-banner .cashier-branch-wrapper {
         width: 100%;
+        overflow: hidden;
+        margin-top: 18px;
+        padding-top: 18px;
+        border-top: 2px dashed rgb(0, 0, 0);
+        position: relative;
+        /* Optional: fade edges for a smoother look */
+        -webkit-mask-image: linear-gradient(
+            to right,
+            transparent 0%,
+            #000 8%,
+            #000 92%,
+            transparent 100%
+        );
+        mask-image: linear-gradient(
+            to right,
+            transparent 0%,
+            #000 8%,
+            #000 92%,
+            transparent 100%
+        );
     }
 
     .cashier-full-banner .cashier-branch-name {
         font-size: clamp(2rem, 3vw, 3rem);
         font-weight: 1000;
         text-transform: uppercase;
+        text-shadow: 2px 2px 0 rgb(0, 0, 0);
         letter-spacing: 4px;
-        color: #87CEEB;
-        margin-top: 18px;
-        padding-top: 18px;
-        border-top: 2px dashed rgba(135, 206, 235, 0.5);
+        color: #fc5c00;
         display: inline-block;
-        word-break: break-word;
+        white-space: nowrap;
+        word-break: keep-all;
+        padding-left: 100%; /* Start off-screen on the right */
+        animation: branchMarquee 15s linear infinite;
+        will-change: transform;
     }
 
     .cashier-full-banner .cashier-branch-name i {
         margin-right: 8px;
+    }
+
+    /* Pause the marquee on hover so users can read it */
+    .cashier-full-banner .cashier-branch-wrapper:hover .cashier-branch-name {
+        animation-play-state: paused;
+    }
+
+    /* Right-to-left scroll */
+    @keyframes branchMarquee {
+        0% {
+            transform: translateX(0);
+        }
+        100% {
+            transform: translateX(-100%);
+        }
+    }
+
+    @media (max-width: 768px) {
+        .cashier-full-banner .cashier-branch-name {
+            font-size: clamp(1.5rem, 5vw, 2.2rem);
+            letter-spacing: 2px;
+            animation-duration: 12s;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .cashier-full-banner .cashier-branch-name {
+            font-size: 1.4rem;
+            letter-spacing: 1px;
+            animation-duration: 10s;
+        }
     }
 
     @media (max-width: 768px) {
@@ -640,8 +701,10 @@
                         {{ user.company.name|default:"Company" }}
                     </h1>
                     {% if user.branch %}
-                    <div class="cashier-branch-name">
-                        <i class="fas fa-store"></i> {{ user.branch.name }}
+                    <div class="cashier-branch-wrapper">
+                        <div class="cashier-branch-name">
+                            <i class="fas fa-store"></i> WELCOME TO {{ user.branch.name }} BRANCH
+                        </div>
                     </div>
                     {% endif %}
                 </div>
