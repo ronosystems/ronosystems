@@ -1,0 +1,1716 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoicing — {{ system_name|default:"RonoSystems" }}</title>
+
+    {# ---------- Favicon from Settings ---------- #}
+    {% if site_favicon_url %}
+        <link rel="icon" type="image/png" href="{{ site_favicon_url }}">
+        <link rel="shortcut icon" href="{{ site_favicon_url }}">
+        <link rel="apple-touch-icon" href="{{ site_favicon_url }}">
+    {% endif %}
+
+    <link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* ============================================
+           FOREX FACTORY STYLE VARIABLES
+        ============================================ */
+        :root {
+            --nav-bg-top: #2d5f7c;
+            --nav-bg-bottom: #1e4e6d;
+            --nav-border-green: #66cc33;
+            --nav-active-bg: #7bc043;
+            --nav-active-text: #1e4e6d;
+            --nav-text: #ffffff;
+            --nav-divider: rgba(255,255,255,0.2);
+
+            --ff-bg: #f0f4f7;
+            --ff-border: #dcdcdc;
+            --ff-text: #333;
+            --ff-link: #2a6496;
+            --sidebar-width: 220px;
+
+            --mobile-header-bg: #2d5f7c;
+            --mobile-nav-bg: #1e4e6d;
+        }
+
+        body {
+            font-family: 'Open Sans', Arial, sans-serif;
+            font-size: 13px;
+            background-color: var(--ff-bg);
+            color: var(--ff-text);
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+        }
+
+        /* ============================================
+           DESKTOP HEADER
+        ============================================ */
+        .desktop-header {
+            background: linear-gradient(to bottom, var(--nav-bg-top), var(--nav-bg-bottom));
+            height: 52px;
+            display: flex;
+            align-items: center;
+            border-bottom: 4px solid var(--nav-border-green);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+            overflow: visible;
+        }
+
+        .ff-logo-section {
+            background: #3b7ea1;
+            width: 170px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            height: calc(100% + 8px);
+            margin-top: -4px;
+            margin-bottom: -4px;
+            clip-path: polygon(0 0, 100% 0, 85% 100%, 0 100%);
+            border-bottom: none;
+            z-index: 10;
+        }
+
+        .ff-logo-content {
+            display: flex;
+            align-items: center;
+            color: white;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 14px;
+            line-height: 1.1;
+            text-transform: uppercase;
+            padding-left: 10px;
+            padding-right: 20px;
+        }
+        .ff-logo-content i {
+            font-size: 24px;
+            margin-right: 8px;
+            color: #fff;
+        }
+        .ff-logo-text span {
+            display: block;
+            font-size: 16px;
+            letter-spacing: 0.5px;
+        }
+
+        .ff-nav-container {
+            display: flex;
+            flex-grow: 1;
+            align-items: center;
+        }
+
+        .brand-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+        .brand-icon img {
+            max-height: 32px;
+            max-width: 40px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            display: block;
+        }
+        .brand-icon i {
+            font-size: 24px;
+            color: #fff;
+        }
+
+        .ff-nav-item {
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            color: var(--nav-text);
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 13px;
+            text-transform: capitalize;
+            border-right: 1px solid var(--nav-divider);
+            position: relative;
+            transition: background 0.2s;
+            transform: skewX(-10deg);
+            margin-right: -5px;
+            height: 100%;
+        }
+        .ff-nav-item-inner {
+            transform: skewX(10deg);
+            display: flex;
+            align-items: center;
+        }
+        .ff-nav-item:hover {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            text-decoration: none;
+        }
+        .ff-nav-item.active {
+            background: var(--nav-active-bg);
+            color: var(--nav-active-text);
+            border-right: none;
+        }
+        .ff-nav-item i {
+            margin-right: 8px;
+            font-size: 14px;
+        }
+
+        .ff-tools {
+            display: flex;
+            align-items: center;
+            padding-right: 0;
+            color: white;
+            font-size: 12px;
+            height: 100%;
+        }
+        .ff-tool-item {
+            display: flex;
+            align-items: center;
+            color: white;
+            text-decoration: none;
+            padding: 0 15px;
+            height: 100%;
+            transform: skewX(-10deg);
+            border-left: 1px solid var(--nav-divider);
+            transition: background 0.2s;
+            position: relative;
+        }
+        .ff-tool-item-inner {
+            transform: skewX(10deg);
+            display: flex;
+            align-items: center;
+        }
+        .ff-tool-item:hover {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            text-decoration: none;
+        }
+        .ff-tool-item i {
+            margin-right: 6px;
+            font-size: 14px;
+        }
+
+        /* ============================================
+           MOBILE HEADER
+        ============================================ */
+        .mobile-header {
+            display: none;
+            background: var(--mobile-header-bg);
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+            flex-direction: column;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .mobile-header-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 48px;
+            padding: 0 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .mobile-header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .mobile-hamburger {
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 5px;
+            display: flex;
+            align-items: center;
+        }
+        .mobile-logo {
+            color: white;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            font-weight: 700;
+            font-size: 16px;
+            text-transform: uppercase;
+        }
+        .mobile-logo i {
+            font-size: 20px;
+            margin-right: 8px;
+        }
+        .mobile-header-right {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            color: #cbe6f5;
+        }
+        .mobile-header-right a {
+            color: #cbe6f5;
+            font-size: 16px;
+            text-decoration: none;
+        }
+
+        .mobile-nav-tabs {
+            display: flex;
+            background: var(--mobile-nav-bg);
+            overflow-x: auto;
+            white-space: nowrap;
+            height: 40px;
+            align-items: center;
+            scrollbar-width: none;
+            border-bottom: 3px solid var(--nav-border-green);
+        }
+        .mobile-nav-tabs::-webkit-scrollbar { display: none; }
+        .mobile-nav-tab {
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 13px;
+            height: 100%;
+            border-right: 1px solid rgba(255,255,255,0.1);
+            transform: skewX(-15deg);
+            margin-right: -5px;
+        }
+        .mobile-nav-tab-inner {
+            transform: skewX(15deg);
+            display: flex;
+            align-items: center;
+        }
+        .mobile-nav-tab.active {
+            background: var(--nav-active-bg);
+            color: var(--nav-active-text);
+            border-right: none;
+        }
+        .mobile-nav-tab i {
+            margin-right: 6px;
+            font-size: 14px;
+        }
+
+        /* ============================================
+           MOBILE SIDEBAR
+        ============================================ */
+        .mobile-sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+        }
+        .mobile-sidebar {
+            position: fixed;
+            top: 0;
+            left: -280px;
+            width: 280px;
+            height: 100%;
+            background: #fff;
+            z-index: 2001;
+            transition: left 0.3s ease;
+            overflow-y: auto;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+        }
+        .mobile-sidebar.open { left: 0; }
+        .mobile-sidebar-header {
+            background: var(--mobile-header-bg);
+            color: white;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid var(--nav-border-green);
+        }
+        .mobile-sidebar-header h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .mobile-sidebar-close {
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 5px;
+        }
+        .mobile-sidebar-content {
+            padding: 15px 0;
+            flex-grow: 1;
+        }
+
+        /* ============================================
+           LAYOUT CONTAINER
+        ============================================ */
+        .main-wrapper {
+            display: flex;
+            margin-top: 56px;
+            min-height: calc(100vh - 56px);
+        }
+
+        /* ============================================
+           SIDEBAR (Desktop)
+        ============================================ */
+        .ff-sidebar {
+            width: var(--sidebar-width);
+            background: #fff;
+            border-right: 1px solid var(--ff-border);
+            flex-shrink: 0;
+            padding: 15px 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-header {
+            font-size: 11px;
+            font-weight: 700;
+            color: #333;
+            padding: 8px 15px;
+            border-bottom: 1px solid #ddd;
+            border-top: 1px solid #ddd;
+            margin-bottom: 10px;
+            background: #e6e6e6;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .sidebar-link {
+            display: block;
+            padding: 6px 15px;
+            color: var(--ff-link);
+            text-decoration: none;
+            font-size: 13px;
+            border-left: 3px solid transparent;
+            transition: all 0.2s;
+        }
+        .sidebar-link:hover {
+            background: #f0f7fa;
+            border-left-color: var(--nav-bg-top);
+            text-decoration: none;
+            color: var(--nav-bg-bottom);
+        }
+
+        .sidebar-promo {
+            margin: 20px 15px;
+            padding: 15px;
+            background: #2d5f7c;
+            color: white;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .sidebar-promo h5 {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #7bc043;
+        }
+        .sidebar-promo p {
+            font-size: 11px;
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+        .sidebar-promo .btn {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            background: #7bc043;
+            color: #1e4e6d;
+            border: none;
+            width: 100%;
+            padding: 8px;
+        }
+        .sidebar-promo .btn:hover { background: #6aa838; }
+
+        /* ============================================
+           CONTENT AREA
+        ============================================ */
+        .ff-content {
+            flex-grow: 1;
+            padding: 20px;
+            background: #fff;
+            overflow-x: hidden;
+        }
+
+        .content-header {
+            background: #f9f9f9;
+            border: 1px solid var(--ff-border);
+            padding: 10px 15px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 2px;
+        }
+        .content-header h1 {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 0;
+            color: var(--nav-bg-bottom);
+        }
+        .breadcrumb-custom {
+            font-size: 11px;
+            color: #666;
+        }
+        .breadcrumb-custom a {
+            color: var(--ff-link);
+            text-decoration: none;
+        }
+
+        .dashboard-panel {
+            background: #fff;
+            border: 1px solid var(--ff-border);
+            margin-bottom: 25px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .panel-header {
+            background: #e6e6e6;
+            padding: 8px 15px;
+            border-bottom: 1px solid var(--ff-border);
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #333;
+        }
+        .panel-body {
+            padding: 20px;
+        }
+
+        .hero-title {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--nav-bg-bottom);
+            margin-bottom: 15px;
+            line-height: 1.2;
+        }
+        .hero-title .highlight {
+            color: var(--nav-bg-top);
+            text-decoration: underline;
+            text-decoration-color: #7bc043;
+            text-decoration-thickness: 3px;
+        }
+        .hero-subtitle {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        /* ============================================
+           INVOICING PAGE — TABS LAYOUT
+        ============================================ */
+        .inv-lead {
+            font-size: 15px;
+            color: #333;
+            line-height: 1.7;
+            margin-bottom: 20px;
+        }
+
+        .inv-layout {
+            display: grid;
+            grid-template-columns: 240px 1fr;
+            gap: 25px;
+            align-items: start;
+        }
+
+        /* ---- Left TOC (tabs) ---- */
+        .inv-toc {
+            position: sticky;
+            top: 75px;
+            align-self: start;
+            background: #f9f9f9;
+            border: 1px solid var(--ff-border);
+            border-radius: 4px;
+            padding: 10px;
+            max-height: calc(100vh - 95px);
+            overflow-y: auto;
+        }
+        .inv-toc-title {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #333;
+            letter-spacing: 0.5px;
+            padding: 6px 8px 10px;
+            margin-bottom: 6px;
+            border-bottom: 1px solid #ddd;
+        }
+        .inv-toc-tab {
+            display: flex;
+            align-items: center;
+            padding: 9px 10px;
+            color: #333;
+            text-decoration: none;
+            font-size: 12.5px;
+            font-weight: 600;
+            border-radius: 3px;
+            border-left: 3px solid transparent;
+            margin-bottom: 2px;
+            cursor: pointer;
+            transition: all 0.15s;
+            background: transparent;
+            border-top: none;
+            border-right: none;
+            border-bottom: none;
+            width: 100%;
+            text-align: left;
+        }
+        .inv-toc-tab:hover {
+            background: #eef4f8;
+            color: var(--nav-bg-bottom);
+            border-left-color: var(--nav-bg-top);
+        }
+        .inv-toc-tab.active {
+            background: var(--nav-active-bg);
+            color: var(--nav-active-text);
+            border-left-color: var(--nav-active-text);
+        }
+        .inv-toc-tab i {
+            width: 18px;
+            margin-right: 8px;
+            font-size: 13px;
+            color: var(--nav-bg-top);
+        }
+        .inv-toc-tab.active i {
+            color: var(--nav-active-text);
+        }
+
+        /* ---- Right panels ---- */
+        .inv-articles {
+            min-width: 0;
+        }
+
+        .inv-panel {
+            display: none;
+            animation: invFadeIn 0.2s ease-out;
+        }
+        .inv-panel.active {
+            display: block;
+        }
+        @keyframes invFadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .inv-panel h3 {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--nav-bg-bottom);
+            margin: 0 0 14px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--ff-border);
+        }
+        .inv-panel h3 i {
+            color: var(--nav-bg-top);
+            margin-right: 8px;
+        }
+        .inv-panel p {
+            font-size: 13px;
+            line-height: 1.7;
+            color: #333;
+            margin-bottom: 12px;
+        }
+        .inv-panel ul,
+        .inv-panel ol {
+            font-size: 13px;
+            line-height: 1.75;
+            padding-left: 22px;
+            margin-bottom: 14px;
+            color: #333;
+        }
+        .inv-panel li { margin-bottom: 5px; }
+        .inv-panel code {
+            background: #f4f4f4;
+            color: #c7254e;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+
+        .inv-callout {
+            background: #d9edf7;
+            border-left: 4px solid var(--nav-bg-top);
+            padding: 12px 15px;
+            border-radius: 3px;
+            font-size: 12.5px;
+            color: #31708f;
+            margin: 14px 0;
+        }
+        .inv-callout strong { color: #1e4e6d; }
+        .inv-callout.warn {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+            color: #856404;
+        }
+        .inv-callout.warn strong { color: #6a4e02; }
+
+        /* ---- Tables (invoice list, templates) ---- */
+        .inv-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12.5px;
+            margin-top: 10px;
+        }
+        .inv-table th {
+            background: var(--nav-bg-bottom);
+            color: #fff;
+            text-align: left;
+            padding: 9px 12px;
+            font-weight: 600;
+            font-size: 11.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .inv-table th:first-child { border-top-left-radius: 3px; }
+        .inv-table th:last-child  { border-top-right-radius: 3px; }
+        .inv-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--ff-border);
+            vertical-align: middle;
+        }
+        .inv-table tr:nth-child(even) td { background: #f9f9f9; }
+        .inv-table tr:hover td { background: #f0f7fa; }
+
+        .inv-badge {
+            display: inline-block;
+            padding: 2px 9px;
+            font-size: 10.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            border-radius: 10px;
+        }
+        .inv-badge.paid    { background: #d4edda; color: #155724; }
+        .inv-badge.pending { background: #fff3cd; color: #856404; }
+        .inv-badge.overdue { background: #f8d7da; color: #721c24; }
+        .inv-badge.draft   { background: #e2e3e5; color: #41464b; }
+
+        /* ---- Feature card grid ---- */
+        .inv-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+        }
+        .inv-card {
+            background: #f9f9f9;
+            border: 1px solid var(--ff-border);
+            border-radius: 4px;
+            padding: 16px;
+            transition: all 0.2s;
+        }
+        .inv-card:hover {
+            background: #f0f7fa;
+            border-color: var(--nav-bg-top);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        .inv-card-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--nav-bg-top);
+            color: #fff;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 17px;
+            margin-bottom: 10px;
+        }
+        .inv-card-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--nav-bg-bottom);
+            margin-bottom: 4px;
+        }
+        .inv-card-desc {
+            font-size: 11.5px;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        /* ---- Invoice mock preview ---- */
+        .invoice-preview {
+            background: #fff;
+            border: 1px solid var(--ff-border);
+            border-radius: 4px;
+            padding: 22px;
+            max-width: 620px;
+            margin-top: 10px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+        }
+        .invoice-preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding-bottom: 14px;
+            border-bottom: 2px solid var(--ff-border);
+            margin-bottom: 14px;
+        }
+        .invoice-preview-header h4 {
+            margin: 0 0 4px 0;
+            font-size: 18px;
+            color: var(--nav-bg-bottom);
+            font-weight: 800;
+        }
+        .invoice-preview-header .inv-meta {
+            font-size: 11.5px;
+            color: #666;
+            line-height: 1.5;
+            text-align: right;
+        }
+        .invoice-preview-header .inv-meta strong {
+            color: var(--nav-bg-bottom);
+        }
+        .invoice-preview table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin-bottom: 14px;
+        }
+        .invoice-preview table th {
+            text-align: left;
+            padding: 8px 6px;
+            border-bottom: 1px solid #ddd;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #666;
+        }
+        .invoice-preview table td {
+            padding: 8px 6px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .invoice-preview table td.num { text-align: right; }
+        .invoice-preview .inv-totals {
+            text-align: right;
+            font-size: 12.5px;
+        }
+        .invoice-preview .inv-totals .row {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            padding: 3px 0;
+        }
+        .invoice-preview .inv-totals .row.grand {
+            border-top: 2px solid var(--nav-bg-bottom);
+            padding-top: 8px;
+            margin-top: 6px;
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--nav-bg-bottom);
+        }
+
+        .inv-cta {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 18px;
+        }
+        .inv-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--nav-bg-bottom);
+            color: #fff;
+            border: none;
+            padding: 9px 18px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            border-radius: 3px;
+            text-decoration: none;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .inv-btn:hover {
+            background: var(--nav-bg-top);
+            color: #fff;
+            text-decoration: none;
+        }
+        .inv-btn.ghost {
+            background: transparent;
+            color: var(--nav-bg-bottom);
+            border: 2px solid var(--nav-bg-bottom);
+        }
+        .inv-btn.ghost:hover {
+            background: var(--nav-bg-bottom);
+            color: #fff;
+        }
+
+        /* ============================================
+           FOOTER
+        ============================================ */
+        .ff-footer {
+            background: #2c3e50;
+            color: #bdc3c7;
+            padding: 40px 0 20px;
+            font-size: 12px;
+            border-top: 4px solid var(--nav-bg-bottom);
+        }
+        .ff-footer h5 {
+            color: white;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #34495e;
+            padding-bottom: 8px;
+        }
+        .ff-footer a {
+            color: #bdc3c7;
+            text-decoration: none;
+            display: block;
+            margin-bottom: 8px;
+            transition: color 0.2s;
+        }
+        .ff-footer a:hover { color: #7bc043; }
+        .ff-footer .copyright {
+            border-top: 1px solid #34495e;
+            padding-top: 20px;
+            margin-top: 20px;
+            text-align: center;
+            color: #7f8c8d;
+        }
+
+        /* ============================================
+        SOCIAL ICONS (footer)
+        ============================================ */
+        .ff-social {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 6px;
+        }
+
+        .ff-social-link {
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            color: #ffffff !important;
+            text-decoration: none !important;
+            font-size: 16px;
+            margin-bottom: 0 !important;
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+
+        /* Brand colors at rest */
+        .ff-social-link.facebook  { background: #1877f2; }
+        .ff-social-link.whatsapp  { background: #25d366; }
+        .ff-social-link.x         { background: #000000; }
+        .ff-social-link.telegram  { background: #229ed9; }
+        .ff-social-link.instagram {
+            background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+        }
+        .ff-social-link.linkedin  { background: #0a66c2; }
+
+        /* Hover: lift + glow */
+        .ff-social-link:hover {
+            color: #ffffff !important;
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+            filter: brightness(1.1);
+            text-decoration: none !important;
+        }
+
+        /* Mobile: keep icons compact */
+        @media (max-width: 576px) {
+            .ff-social-link {
+                width: 34px;
+                height: 34px;
+                font-size: 14px;
+            }
+        }
+
+        /* ============================================
+           RESPONSIVE
+        ============================================ */
+        @media (max-width: 992px) {
+            .desktop-header { display: none; }
+            .mobile-header { display: flex; }
+            .main-wrapper { margin-top: 92px; }
+            .ff-sidebar { display: none; }
+            .ff-content { padding: 15px; }
+            .hero-title { font-size: 1.6rem; }
+            .mobile-sidebar-overlay.active { display: block; }
+
+            .inv-layout { grid-template-columns: 1fr; gap: 15px; }
+            .inv-toc {
+                position: relative;
+                top: 0;
+                max-height: none;
+                display: flex;
+                overflow-x: auto;
+                white-space: nowrap;
+                padding: 6px;
+                scrollbar-width: none;
+            }
+            .inv-toc::-webkit-scrollbar { display: none; }
+            .inv-toc-title { display: none; }
+            .inv-toc-tab {
+                width: auto;
+                flex-shrink: 0;
+                border-left: none;
+                border-bottom: 3px solid transparent;
+                margin-bottom: 0;
+                margin-right: 4px;
+                border-radius: 3px;
+            }
+            .inv-toc-tab.active {
+                border-left: none;
+                border-bottom-color: var(--nav-active-text);
+            }
+        }
+        @media (max-width: 576px) {
+            .hero-title { font-size: 1.4rem; }
+            .content-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .inv-panel h3 { font-size: 15px; }
+            .invoice-preview { padding: 14px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ============================================
+    DESKTOP HEADER
+    ============================================ -->
+    <header class="desktop-header">
+
+        <div class="ff-logo-section">
+            <a href="/" class="ff-logo-content">
+                <span class="brand-icon">
+                    {% if site_logo_url %}
+                        <img src="{{ site_logo_url }}" alt="{{ system_name|default:'RonoSystems' }}">
+                    {% else %}
+                        <i class="fas fa-cube"></i>
+                    {% endif %}
+                </span>
+                <div class="ff-logo-text">
+                    {{ system_name|default:"RONO" }}<span>SYSTEMS</span>
+                </div>
+            </a>
+        </div>
+
+        <nav class="ff-nav-container">
+            <a href="/" class="ff-nav-item">
+                <div class="ff-nav-item-inner">
+                    <i class="fas fa-home"></i> <span>Home</span>
+                </div>
+            </a>
+            <a href="/features/" class="ff-nav-item">
+                <div class="ff-nav-item-inner">
+                    <i class="fas fa-cogs"></i> <span>Features</span>
+                </div>
+            </a>
+            <a href="/contact/" class="ff-nav-item">
+                <div class="ff-nav-item-inner">
+                    <i class="fas fa-envelope"></i> <span>Contact</span>
+                </div>
+            </a>
+            <a href="/about/" class="ff-nav-item">
+                <div class="ff-nav-item-inner">
+                    <i class="fas fa-info-circle"></i> <span>About</span>
+                </div>
+            </a>
+            <a href="#" class="ff-nav-item" data-ai-open>
+                <div class="ff-nav-item-inner">
+                    <i class="fas fa-robot"></i> <span>AI Assistant</span>
+                </div>
+            </a>
+        </nav>
+
+        <div class="ff-tools">
+            <a href="#" class="ff-tool-item" title="Notifications">
+                <div class="ff-tool-item-inner"><i class="fas fa-bell"></i></div>
+            </a>
+            <a href="#" class="ff-tool-item">
+                <div class="ff-tool-item-inner">
+                    <i class="far fa-clock"></i> <span id="desktop-clock">--:--</span>
+                </div>
+            </a>
+            <a href="/pricing/" class="ff-tool-item">
+                <div class="ff-tool-item-inner"><i class="fas fa-dollar"></i> <span>Pricing</span></div>
+            </a>
+            <a href="/documentation/" class="ff-tool-item">
+                <div class="ff-tool-item-inner"><i class="fas fa-book"></i> <span>Documentation</span></div>
+            </a>
+            <a href="/invoicing/" class="ff-nav-item active">
+                <div class="ff-tool-item-inner"><i class="fas fa-receipt"></i> <span>Invoicing</span></div>
+            </a>
+            {% if user.is_authenticated %}
+            <a href="/dashboard/" class="ff-tool-item">
+                <div class="ff-tool-item-inner"><i class="fas fa-tachometer-alt"></i> <span>Dashboard</span></div>
+            </a>
+            {% else %}
+            <a href="/auth/login/" class="ff-tool-item">
+                <div class="ff-tool-item-inner"><i class="fas fa-sign-in-alt"></i> <span>Login</span></div>
+            </a>
+            {% endif %}
+        </div>
+    </header>
+
+    <!-- ============================================
+    MOBILE HEADER
+    ============================================ -->
+    <header class="mobile-header">
+        <div class="mobile-header-top">
+            <div class="mobile-header-left">
+                <div class="mobile-hamburger" id="mobile-menu-toggle">
+                    <i class="fas fa-bars"></i>
+                </div>
+                <a href="/" class="mobile-logo">
+                    <span class="brand-icon">
+                        {% if site_logo_url %}
+                            <img src="{{ site_logo_url }}" alt="{{ system_name|default:'RonoSystems' }}">
+                        {% else %}
+                            <i class="fas fa-cube"></i>
+                        {% endif %}
+                    </span>
+                    {{ system_name|default:"RONO" }}
+                </a>
+            </div>
+            <div class="mobile-header-right">
+                {% if user.is_authenticated %}
+                    <a href="/dashboard/"><i class="fas fa-tachometer-alt"></i></a>
+                {% else %}
+                    <a href="/auth/login/"><i class="fas fa-user"></i></a>
+                {% endif %}
+            </div>
+        </div>
+
+        <nav class="mobile-nav-tabs">
+            <a href="/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-home"></i> Home</div></a>
+            <a href="/features/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-cogs"></i> Features</div></a>
+            <a href="/contact/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-envelope"></i> Contact</div></a>
+            <a href="/about/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-info-circle"></i> About</div></a>
+            <a href="/documentation/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-book"></i> Docs</div></a>
+            <a href="/invoicing/" class="mobile-nav-tab active"><div class="mobile-nav-tab-inner"><i class="fas fa-receipt"></i> Invoicing</div></a>
+        </nav>
+    </header>
+
+    <!-- ============================================
+    MOBILE SIDEBAR
+    ============================================ -->
+    <div class="mobile-sidebar-overlay" id="mobile-sidebar-overlay"></div>
+
+    <aside class="mobile-sidebar" id="mobile-sidebar">
+        <div class="mobile-sidebar-header">
+            <h3>Menu</h3>
+            <button class="mobile-sidebar-close" id="mobile-sidebar-close">&times;</button>
+        </div>
+        <div class="mobile-sidebar-content">
+            <div class="sidebar-header">Platform</div>
+            <a href="/" class="sidebar-link">Dashboard</a>
+            <a href="/features/" class="sidebar-link">Features</a>
+            <a href="/pricing/" class="sidebar-link">Pricing</a>
+            <a href="/documentation/" class="sidebar-link">Documentation</a>
+            <a href="/invoicing/" class="sidebar-link">Invoicing</a>
+            <a href="/contact/" class="sidebar-link">Contact</a>
+            <a href="/about/" class="sidebar-link">About</a>
+            <a href="/auth/register/" class="sidebar-link">Start Free Trial</a>
+
+            <div class="sidebar-header">Legal</div>
+            <a href="/privacy/" class="sidebar-link">Privacy Policy</a>
+            <a href="/terms/" class="sidebar-link">Terms of Service</a>
+
+            <div class="sidebar-promo">
+                <h5>Ready to transform?</h5>
+                <p>Join thousands of companies using {{ system_name|default:"RonoSystems" }}.</p>
+                <a href="/auth/register/" class="btn">Get Started</a>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ============================================
+    MAIN WRAPPER
+    ============================================ -->
+    <div class="main-wrapper">
+
+        <aside class="ff-sidebar">
+            <div class="sidebar-header">Platform</div>
+            <a href="/" class="sidebar-link">Dashboard</a>
+            <a href="/features/" class="sidebar-link">Features</a>
+            <a href="/pricing/" class="sidebar-link">Pricing</a>
+            <a href="/documentation/" class="sidebar-link">Documentation</a>
+            <a href="/invoicing/" class="sidebar-link">Invoicing</a>
+            <a href="/contact/" class="sidebar-link">Contact</a>
+            <a href="/about/" class="sidebar-link">About</a>
+            <a href="/auth/register/" class="sidebar-link">Start Free Trial</a>
+
+            <div class="sidebar-header">Legal</div>
+            <a href="/privacy/" class="sidebar-link">Privacy Policy</a>
+            <a href="/terms/" class="sidebar-link">Terms of Service</a>
+
+            <div class="sidebar-promo">
+                <h5>Ready to transform?</h5>
+                <p>Join thousands of companies using {{ system_name|default:"RonoSystems" }}.</p>
+                <a href="/auth/register/" class="btn">Get Started</a>
+            </div>
+        </aside>
+
+        <main class="ff-content">
+
+            <div class="content-header">
+                <h1>Invoicing</h1>
+                <div class="breadcrumb-custom">
+                    <a href="/">Home</a> &raquo; <span>Invoicing</span>
+                </div>
+            </div>
+
+            <!-- ============================================
+                 INVOICING PANEL
+                 ============================================ -->
+            <div class="dashboard-panel" id="invoicing">
+                <div class="panel-header">
+                    <i class="fas fa-receipt me-1"></i> Create, Send &amp; Track Invoices
+                </div>
+                <div class="panel-body">
+
+                    <h2 class="hero-title">
+                        Professional Invoices, <span class="highlight">Effortlessly</span>
+                    </h2>
+
+                    <p class="inv-lead">
+                        Create branded invoices, send them by email or WhatsApp, track payments,
+                        and reconcile everything with your books. Pick a topic below to explore
+                        what's possible.
+                    </p>
+
+                    <div class="inv-layout">
+
+                        <!-- LEFT: Tab list -->
+                        <nav class="inv-toc" id="invToc">
+                            <div class="inv-toc-title"><i class="fas fa-list"></i> Topics</div>
+
+                            <button type="button" class="inv-toc-tab active" data-inv-target="overview">
+                                <i class="fas fa-th-large"></i> Overview
+                            </button>
+                            <button type="button" class="inv-toc-tab" data-inv-target="create">
+                                <i class="fas fa-plus-circle"></i> Create an Invoice
+                            </button>
+                            <button type="button" class="inv-toc-tab" data-inv-target="templates">
+                                <i class="fas fa-file-invoice"></i> Templates
+                            </button>
+                            <button type="button" class="inv-toc-tab" data-inv-target="send">
+                                <i class="fas fa-paper-plane"></i> Send &amp; Share
+                            </button>
+                            <button type="button" class="inv-toc-tab" data-inv-target="track">
+                                <i class="fas fa-chart-bar"></i> Track Payments
+                            </button>
+                            <button type="button" class="inv-toc-tab" data-inv-target="recurring">
+                                <i class="fas fa-sync-alt"></i> Recurring Invoices
+                            </button>
+                            <button type="button" class="inv-toc-tab" data-inv-target="tax">
+                                <i class="fas fa-percent"></i> Tax &amp; eTIMS
+                            </button>
+                            <button type="button" class="inv-toc-tab" data-inv-target="example">
+                                <i class="fas fa-eye"></i> Example Invoice
+                            </button>
+                            <button type="button" class="inv-toc-tab" data-inv-target="support">
+                                <i class="fas fa-life-ring"></i> Help &amp; Support
+                            </button>
+                        </nav>
+
+                        <!-- RIGHT: Panels -->
+                        <div class="inv-articles" id="invArticles">
+
+                            <!-- Overview -->
+                            <section class="inv-panel active" data-inv-panel="overview">
+                                <h3><i class="fas fa-th-large"></i> Overview</h3>
+                                <p>
+                                    The Invoicing module in {{ system_name|default:"RonoSystems" }} lets you
+                                    issue and manage invoices end-to-end — from a first quote to a
+                                    paid receipt.
+                                </p>
+                                <div class="inv-grid">
+                                    <div class="inv-card">
+                                        <div class="inv-card-icon"><i class="fas fa-bolt"></i></div>
+                                        <div class="inv-card-title">Fast Creation</div>
+                                        <div class="inv-card-desc">Build a complete invoice in under 30 seconds.</div>
+                                    </div>
+                                    <div class="inv-card">
+                                        <div class="inv-card-icon"><i class="fas fa-paper-plane"></i></div>
+                                        <div class="inv-card-title">Multi-channel Sending</div>
+                                        <div class="inv-card-desc">Email, WhatsApp, SMS, or a shareable link.</div>
+                                    </div>
+                                    <div class="inv-card">
+                                        <div class="inv-card-icon"><i class="fas fa-check-circle"></i></div>
+                                        <div class="inv-card-title">Payment Tracking</div>
+                                        <div class="inv-card-desc">See paid, pending, and overdue at a glance.</div>
+                                    </div>
+                                    <div class="inv-card">
+                                        <div class="inv-card-icon"><i class="fas fa-file-invoice"></i></div>
+                                        <div class="inv-card-title">Custom Templates</div>
+                                        <div class="inv-card-desc">Match your brand with logo, colors, and layout.</div>
+                                    </div>
+                                </div>
+                                <div class="inv-callout">
+                                    <strong>Tip:</strong> Invoices are numbered automatically per company
+                                    (<code>INV-2026-0001</code>) — no manual tracking required.
+                                </div>
+                            </section>
+
+                            <!-- Create -->
+                            <section class="inv-panel" data-inv-panel="create">
+                                <h3><i class="fas fa-plus-circle"></i> Create an Invoice</h3>
+                                <p>Creating an invoice is a four-step flow:</p>
+                                <ol>
+                                    <li><strong>Pick a customer</strong> — choose an existing one or add a new one on the fly.</li>
+                                    <li><strong>Add line items</strong> — products, services, quantities, prices, discounts.</li>
+                                    <li><strong>Set terms</strong> — due date, payment methods, notes, and currency.</li>
+                                    <li><strong>Preview &amp; save</strong> — send immediately or save as draft.</li>
+                                </ol>
+                                <p>You can also create invoices directly from:</p>
+                                <ul>
+                                    <li>A completed sale in the <strong>POS</strong></li>
+                                    <li>A customer's profile (repeat business)</li>
+                                    <li>A <strong>recurring</strong> template</li>
+                                    <li>An <strong>API</strong> call</li>
+                                </ul>
+                                <div class="inv-cta">
+                                    <a href="/auth/login/" class="inv-btn"><i class="fas fa-plus"></i> Create Invoice</a>
+                                    <a href="/documentation/#doc-quickstart" class="inv-btn ghost"><i class="fas fa-book"></i> Read Docs</a>
+                                </div>
+                            </section>
+
+                            <!-- Templates -->
+                            <section class="inv-panel" data-inv-panel="templates">
+                                <h3><i class="fas fa-file-invoice"></i> Templates</h3>
+                                <p>Choose from several invoice templates — or design your own:</p>
+                                <table class="inv-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Template</th>
+                                            <th>Style</th>
+                                            <th>Best For</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>Classic</strong></td>
+                                            <td>Clean, single-column</td>
+                                            <td>General use</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Modern</strong></td>
+                                            <td>Bold header, subtle colors</td>
+                                            <td>Tech &amp; services</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Compact</strong></td>
+                                            <td>Dense, fits A5</td>
+                                            <td>Retail &amp; receipts</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Formal</strong></td>
+                                            <td>Serif, corporate</td>
+                                            <td>Legal &amp; finance</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Custom</strong></td>
+                                            <td>Your logo + colors</td>
+                                            <td>Brand consistency</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <div class="inv-callout">
+                                    <strong>Custom brand:</strong> upload your logo in Settings → Branding,
+                                    and set your primary color to match your invoices.
+                                </div>
+                            </section>
+
+                            <!-- Send -->
+                            <section class="inv-panel" data-inv-panel="send">
+                                <h3><i class="fas fa-paper-plane"></i> Send &amp; Share</h3>
+                                <p>Deliver your invoice through any channel your customers prefer:</p>
+                                <ul>
+                                    <li><strong>Email</strong> — with a PDF attachment and a pay-online link.</li>
+                                    <li><strong>WhatsApp</strong> — send a message with the invoice link.</li>
+                                    <li><strong>SMS</strong> — short message with a checkout URL.</li>
+                                    <li><strong>Shareable link</strong> — a public URL your customer can open.</li>
+                                    <li><strong>Download PDF</strong> — for printing or archiving.</li>
+                                </ul>
+                                <div class="inv-callout warn">
+                                    <strong>Reminders:</strong> Automatic reminders can be sent 3, 7, and 14
+                                    days after the due date — configurable in Settings → Preferences.
+                                </div>
+                            </section>
+
+                            <!-- Track -->
+                            <section class="inv-panel" data-inv-panel="track">
+                                <h3><i class="fas fa-chart-bar"></i> Track Payments</h3>
+                                <p>Every invoice has a live status you can act on:</p>
+                                <table class="inv-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Invoice</th>
+                                            <th>Customer</th>
+                                            <th>Amount</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>INV-2026-0042</strong></td>
+                                            <td>Acme Ltd</td>
+                                            <td>KSh 45,000</td>
+                                            <td><span class="inv-badge paid">Paid</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>INV-2026-0041</strong></td>
+                                            <td>Beta Traders</td>
+                                            <td>KSh 12,500</td>
+                                            <td><span class="inv-badge pending">Pending</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>INV-2026-0040</strong></td>
+                                            <td>Gamma Services</td>
+                                            <td>KSh 8,900</td>
+                                            <td><span class="inv-badge overdue">Overdue</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>INV-2026-0039</strong></td>
+                                            <td>Delta Co</td>
+                                            <td>KSh 21,000</td>
+                                            <td><span class="inv-badge draft">Draft</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <p style="margin-top: 12px;">
+                                    Reconciliation is automatic when a payment is received via
+                                    M-Pesa STK, Paybill, Buy Goods, or bank transfer.
+                                </p>
+                            </section>
+
+                            <!-- Recurring -->
+                            <section class="inv-panel" data-inv-panel="recurring">
+                                <h3><i class="fas fa-sync-alt"></i> Recurring Invoices</h3>
+                                <p>For subscription-based or repeat business, set up recurring invoices:</p>
+                                <ul>
+                                    <li>Choose a schedule: weekly, monthly, quarterly, or yearly.</li>
+                                    <li>Set start and (optional) end dates.</li>
+                                    <li>Choose to auto-send or hold as draft for review.</li>
+                                    <li>Auto-charge with saved payment methods where supported.</li>
+                                </ul>
+                                <div class="inv-callout">
+                                    <strong>Pro tip:</strong> recurring invoices share one template — update the
+                                    template once, and future invoices pick up the changes.
+                                </div>
+                            </section>
+
+                            <!-- Tax -->
+                            <section class="inv-panel" data-inv-panel="tax">
+                                <h3><i class="fas fa-percent"></i> Tax &amp; eTIMS</h3>
+                                <p>
+                                    {{ system_name|default:"RonoSystems" }} supports both simple VAT and full
+                                    tax-compliant invoicing.
+                                </p>
+                                <ul>
+                                    <li>Configure tax rate and inclusive/exclusive mode in Settings → Payment.</li>
+                                    <li>Per-line tax or per-invoice tax — your choice.</li>
+                                    <li>eTIMS-ready invoice format (Kenya Revenue Authority).</li>
+                                    <li>Automatic tax summaries in Reports → Tax.</li>
+                                </ul>
+                                <div class="inv-callout warn">
+                                    <strong>Compliance note:</strong> enabling eTIMS requires your company
+                                    KRA PIN and device credentials — see Settings → Payment.
+                                </div>
+                            </section>
+
+                            <!-- Example -->
+                            <section class="inv-panel" data-inv-panel="example">
+                                <h3><i class="fas fa-eye"></i> Example Invoice</h3>
+                                <p>Here's what a typical invoice looks like:</p>
+
+                                <div class="invoice-preview">
+                                    <div class="invoice-preview-header">
+                                        <div>
+                                            <h4>{{ system_name|default:"RonoSystems" }}</h4>
+                                            <div style="font-size: 12px; color: #666;">
+                                                Nairobi, Kenya · support@ronosystems.com
+                                            </div>
+                                        </div>
+                                        <div class="inv-meta">
+                                            <div><strong>Invoice:</strong> INV-2026-0042</div>
+                                            <div><strong>Issued:</strong> 08 Oct 2026</div>
+                                            <div><strong>Due:</strong> 22 Oct 2026</div>
+                                            <div style="margin-top: 4px;">
+                                                <span class="inv-badge pending">Pending</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div style="font-size: 12px; margin-bottom: 10px;">
+                                        <strong>Bill To:</strong><br>
+                                        Acme Ltd<br>
+                                        accounts@acme.example
+                                    </div>
+
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Item</th>
+                                                <th>Qty</th>
+                                                <th class="num">Price</th>
+                                                <th class="num">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>POS Terminal License — Annual</td>
+                                                <td>1</td>
+                                                <td class="num">KSh 30,000</td>
+                                                <td class="num">KSh 30,000</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Extra User Seats</td>
+                                                <td>3</td>
+                                                <td class="num">KSh 3,000</td>
+                                                <td class="num">KSh 9,000</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Priority Support (3 months)</td>
+                                                <td>1</td>
+                                                <td class="num">KSh 6,000</td>
+                                                <td class="num">KSh 6,000</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+
+                                    <div class="inv-totals">
+                                        <div class="row"><span>Subtotal:</span> <span>KSh 45,000</span></div>
+                                        <div class="row"><span>VAT (16%):</span> <span>KSh 7,200</span></div>
+                                        <div class="row grand"><span>Total Due:</span> <span>KSh 52,200</span></div>
+                                    </div>
+                                </div>
+
+                                <div class="inv-cta">
+                                    <a href="/auth/login/" class="inv-btn"><i class="fas fa-plus"></i> Create Your Own</a>
+                                    <a href="/documentation/" class="inv-btn ghost"><i class="fas fa-book"></i> View Docs</a>
+                                </div>
+                            </section>
+
+                            <!-- Support -->
+                            <section class="inv-panel" data-inv-panel="support">
+                                <h3><i class="fas fa-life-ring"></i> Help &amp; Support</h3>
+                                <p>Need a hand with invoicing? We're here:</p>
+                                <ul>
+                                    <li><strong>Documentation:</strong> <a href="/documentation/">/documentation/</a></li>
+                                    <li><strong>Email:</strong> <a href="mailto:support.ronosystems@gmail.com">support.ronosystems@gmail.com</a></li>
+                                    <li><strong>Contact page:</strong> <a href="/contact/">/contact/</a></li>
+                                    <li><strong>Live chat:</strong> available in-app, Mon–Fri 9am–6pm EAT</li>
+                                </ul>
+                                <div class="inv-callout">
+                                    <strong>Priority support</strong> is available on Standard, Premium, and
+                                    Enterprise plans — with a 4-hour response SLA.
+                                </div>
+                            </section>
+
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <footer class="ff-footer">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <h5><i class="fas fa-cube me-2"></i> {{ system_name|default:"RonoSystems" }}</h5>
+                    <p style="line-height: 1.6; margin-bottom: 15px;">
+                        {{ site_tagline|default:"Enterprise Management Platform helping businesses streamline operations, manage teams, and drive growth with AI-powered insights." }}
+                    </p>
+
+                    <!-- ============================================
+                        SOCIAL ICONS
+                        ============================================ -->
+                    <div class="ff-social">
+                        <a href="https://facebook.com/" rel="noopener" title="Facebook" class="ff-social-link facebook">
+                            <i class="fab fa-facebook-f"></i>
+                        </a>
+                        <a href="https://wa.me/254722527955" rel="noopener" title="WhatsApp" class="ff-social-link whatsapp">
+                            <i class="fab fa-whatsapp"></i>
+                        </a>
+                        <a href="https://x.com/" rel="noopener" title="X (Twitter)" class="ff-social-link x">
+                            <i class="fab fa-x-twitter"></i>
+                        </a>
+                        <a href="https://t.me/" rel="noopener" title="Telegram" class="ff-social-link telegram">
+                            <i class="fab fa-telegram-plane"></i>
+                        </a>
+                        <a href="https://instagram.com/" rel="noopener" title="Instagram" class="ff-social-link instagram">
+                            <i class="fab fa-instagram"></i>
+                        </a>
+                        <a href="https://linkedin.com/" rel="noopener" title="LinkedIn" class="ff-social-link linkedin">
+                            <i class="fab fa-linkedin-in"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="col-lg-2 col-md-3 col-6 mb-4">
+                    <h5>About</h5>
+                    <a href="/about/">Our Company</a>
+                    <a href="/about/">Team</a>
+                    <a href="/about/">Mission & Vision</a>
+                    <a href="/about/">Our Story</a>
+                </div>
+
+                <div class="col-lg-2 col-md-3 col-6 mb-4">
+                    <h5>Features</h5>
+                    <a href="/features/">POS System</a>
+                    <a href="/features/">Analytics</a>
+                    <a href="/features/">AI Assistant</a>
+                    <a href="/features/">Team Management</a>
+                </div>
+
+                <div class="col-lg-2 col-md-3 col-6 mb-4">
+                    <h5>Pricing</h5>
+                    <a href="/pricing/">Free</a>
+                    <a href="/pricing/">Basic</a>
+                    <a href="/pricing/">Standard</a>
+                    <a href="/pricing/">Premium</a>
+                    <a href="/pricing/">Enterprise</a>
+                </div>
+
+                <div class="col-lg-2 col-md-3 col-6 mb-4">
+                    <h5>Contact</h5>
+                    <a href="/contact/">Email Us</a>
+                    <a href="/contact/">Call Us</a>
+                    <a href="/contact/">Live Chat</a>
+                    <a href="/contact/">Help Center</a>
+                </div>
+            </div>
+
+            <div class="copyright">
+                &copy; {% now "Y" %} {{ system_name|default:"RonoSystems" }}. All rights reserved.
+                <span class="float-end">
+                    <a href="/privacy/" style="display:inline; margin-left:10px;">Privacy</a>
+                    <a href="/terms/" style="display:inline; margin-left:10px;">Terms</a>
+                </span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
+    <script>
+        // ============================================
+        // LIVE CLOCK
+        // ============================================
+        function updateClock() {
+            const now = new Date();
+            let hours = now.getHours();
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const ampm = hours >= 12 ? 'pm' : 'am';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            const timeString = hours + ':' + minutes + ampm;
+            const desktopClock = document.getElementById('desktop-clock');
+            if (desktopClock) desktopClock.textContent = timeString;
+        }
+        updateClock();
+        setInterval(updateClock, 1000);
+
+
+
+        // ============================================
+        // MOBILE SIDEBAR TOGGLE
+        // ============================================
+        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+        const mobileSidebar = document.getElementById('mobile-sidebar');
+        const mobileSidebarOverlay = document.getElementById('mobile-sidebar-overlay');
+        const mobileSidebarClose = document.getElementById('mobile-sidebar-close');
+
+        function openMobileSidebar() {
+            mobileSidebar.classList.add('open');
+            mobileSidebarOverlay.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeMobileSidebar() {
+            mobileSidebar.classList.remove('open');
+            mobileSidebarOverlay.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+        if (mobileMenuToggle) mobileMenuToggle.addEventListener('click', openMobileSidebar);
+        if (mobileSidebarClose) mobileSidebarClose.addEventListener('click', closeMobileSidebar);
+        if (mobileSidebarOverlay) mobileSidebarOverlay.addEventListener('click', closeMobileSidebar);
+
+        document.querySelectorAll('.mobile-sidebar .sidebar-link, .mobile-sidebar .btn').forEach(link => {
+            link.addEventListener('click', closeMobileSidebar);
+        });
+
+        // ============================================
+        // INVOICING TAB SWITCHER
+        // ============================================
+        function activateInvTab(targetId) {
+            document.querySelectorAll('.inv-toc-tab').forEach(function (btn) {
+                btn.classList.toggle('active', btn.dataset.invTarget === targetId);
+            });
+            document.querySelectorAll('.inv-panel').forEach(function (panel) {
+                panel.classList.toggle('active', panel.dataset.invPanel === targetId);
+            });
+        }
+
+        document.querySelectorAll('.inv-toc-tab').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                activateInvTab(this.dataset.invTarget);
+                if (history.replaceState) {
+                    history.replaceState(null, '', '#inv-' + this.dataset.invTarget);
+                }
+            });
+        });
+
+        // Deep-link: /invoicing/#inv-example
+        (function initFromHash() {
+            const hash = window.location.hash || '';
+            if (hash.startsWith('#inv-')) {
+                const target = hash.replace('#inv-', '');
+                const exists = document.querySelector('.inv-panel[data-inv-panel="' + target + '"]');
+                if (exists) activateInvTab(target);
+            }
+        })();
+
+        // ============================================
+        // SMOOTH SCROLL (only for non-inv anchors)
+        // ============================================
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                const targetId = this.getAttribute('href');
+                if (targetId === '#' || targetId.startsWith('#inv-') || targetId.startsWith('#doc-')) return;
+                const target = document.querySelector(targetId);
+                if (target) {
+                    e.preventDefault();
+                    const isMobile = window.innerWidth <= 992;
+                    const headerOffset = isMobile ? 100 : 60;
+                    const elementPosition = target.getBoundingClientRect().top;
+                    const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                    window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+                }
+            });
+        });
+    </script>
+    {% include 'partials/ai_assistant.html' %}
+</body>
+</html>

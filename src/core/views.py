@@ -76,3 +76,67 @@ def api_root(request):
             'employees': '/company/employees/'
         }
     })
+
+
+# core/views.py  (or wherever your qz_sign lives)
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.core.mail import send_mail
+from django.conf import settings as django_settings
+
+
+def contact(request):
+    """
+    Handle GET (show form) and POST (send message).
+    """
+    if request.method == 'POST':
+        name    = (request.POST.get('name') or '').strip()
+        email   = (request.POST.get('email') or '').strip()
+        subject = (request.POST.get('subject') or '').strip()
+        message = (request.POST.get('message') or '').strip()
+
+        # Basic validation
+        if not name or not email or not message:
+            messages.error(request, 'Please fill in all required fields.')
+            return render(request, 'contact.html')
+
+        # Compose the email
+        full_subject = f"[Contact] {subject or 'New message'} — from {name}"
+        body = (
+            f"New contact form submission\n"
+            f"----------------------------------------\n"
+            f"Name:    {name}\n"
+            f"Email:   {email}\n"
+            f"Subject: {subject or '(none)'}\n"
+            f"----------------------------------------\n\n"
+            f"{message}\n"
+        )
+
+        # Send to the address in settings, fallback to a default
+        recipient = getattr(django_settings, 'CONTACT_EMAIL', None)
+        if not recipient:
+            # try the SystemSetting "EMAIL_FROM" address
+            try:
+                from apps.settings.models import SystemSetting
+                recipient = SystemSetting.get_setting('EMAIL_FROM', 'support@ronosystems.com')
+            except Exception:
+                recipient = 'support@ronosystems.com'
+
+        from_email = getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'noreply@ronosystems.com')
+
+        try:
+            send_mail(
+                subject=full_subject,
+                message=body,
+                from_email=from_email,
+                recipient_list=[recipient],
+                fail_silently=False,
+            )
+            messages.success(request, 'Thanks! Your message has been sent — we will reply shortly.')
+        except Exception as e:
+            messages.error(request, f'Sorry, we could not send your message right now. ({e})')
+
+        return redirect('contact')
+
+    # GET
+    return render(request, 'contact.html')

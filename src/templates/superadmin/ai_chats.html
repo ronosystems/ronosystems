@@ -1,0 +1,566 @@
+{% extends 'base.html' %}
+{% block title %}AI Chats {% endblock %}
+
+{% block content %}
+
+<style>
+    /* ============================================
+       PAGE HEADER
+       ============================================ */
+    .aichat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+    .aichat-header h2 {
+        font-size: 1.35rem;
+        font-weight: 800;
+        color: #000;
+        margin: 0 0 4px;
+        letter-spacing: -0.3px;
+    }
+    .aichat-header p {
+        font-size: 0.85rem;
+        color: #666;
+        margin: 0;
+    }
+
+    /* ============================================
+       BUTTONS
+       ============================================ */
+    .aichat-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border: 2px solid #000;
+        border-radius: 4px;
+        background: #fff;
+        color: #000;
+        font-size: 0.85rem;
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s ease;
+    }
+    .aichat-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+        color: #000;
+        text-decoration: none;
+    }
+    .aichat-btn.primary  { background: #87CEEB; }
+    .aichat-btn.primary:hover { background: #6ab8e0; }
+    .aichat-btn.danger   { background: #fff; color: #dc3545 !important; border-color: #dc3545; }
+    .aichat-btn.danger:hover { background: #dc3545; color: #fff !important; border-color: #dc3545; }
+    .aichat-btn.ghost    { background: #f9f9f9; }
+    .aichat-btn.ghost:hover { background: #87CEEB; }
+
+    /* ============================================
+       STATS CARDS
+       ============================================ */
+    .aichat-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+    .aichat-stat {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 6px;
+        padding: 16px 18px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+    .aichat-stat .icon {
+        width: 46px;
+        height: 46px;
+        border-radius: 8px;
+        background: #87CEEB;
+        border: 2px solid #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        color: #000;
+        flex-shrink: 0;
+    }
+    .aichat-stat .icon.green { background: #7bc043; }
+    .aichat-stat .icon.teal  { background: #036a77; color: #fff; }
+    .aichat-stat .meta .n {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #000;
+        line-height: 1;
+        display: block;
+        margin-bottom: 2px;
+    }
+    .aichat-stat .meta .l {
+        font-size: 11px;
+        text-transform: uppercase;
+        color: #666;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+
+    /* ============================================
+       FILTER BAR
+       ============================================ */
+    .aichat-filters {
+        background: #f9f9f9;
+        border: 2px solid #000;
+        border-radius: 6px;
+        padding: 12px 14px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    .aichat-filters input,
+    .aichat-filters select {
+        border: 2px solid #000;
+        border-radius: 4px;
+        padding: 8px 12px;
+        font-size: 0.85rem;
+        background: #fff;
+        color: #000;
+        font-family: inherit;
+    }
+    .aichat-filters input:focus,
+    .aichat-filters select:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,.3);
+    }
+    .aichat-filters input[type="search"] {
+        flex: 1;
+        min-width: 220px;
+    }
+
+    /* ============================================
+       CONVERSATION CARD
+       ============================================ */
+    .aichat-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 6px;
+        margin-bottom: 14px;
+        overflow: hidden;
+        transition: box-shadow 0.15s;
+    }
+    .aichat-card:hover {
+        box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+    }
+    .aichat-card-head {
+        background: #e6e6e6;
+        padding: 10px 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        border-bottom: 2px dashed #b8b8b8;
+    }
+    .aichat-card-head .info {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        font-size: 12px;
+        color: #333;
+        font-weight: 600;
+    }
+    .aichat-card-head .info span {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .aichat-card-head .info i { color: #036a77; font-size: 11px; }
+    .aichat-card-head .provider {
+        background: #036a77;
+        color: #fff;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .aichat-card-body {
+        padding: 14px 16px;
+    }
+    .aichat-msg {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 12px;
+        font-size: 13px;
+        line-height: 1.55;
+    }
+    .aichat-msg:last-child { margin-bottom: 0; }
+    .aichat-msg .role {
+        flex-shrink: 0;
+        width: 70px;
+        padding-top: 2px;
+    }
+    .aichat-msg .role .pill {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 2px 9px;
+        border-radius: 12px;
+        border: 1.5px solid #000;
+    }
+    .aichat-msg.user .role .pill { background: #87CEEB; color: #000; }
+    .aichat-msg.bot  .role .pill { background: #7bc043; color: #000; }
+    .aichat-msg .bubble {
+        flex: 1;
+        background: #f9f9f9;
+        border: 1.5px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 10px 14px;
+        word-wrap: break-word;
+        white-space: pre-wrap;
+        color: #1a1a1a;
+    }
+    .aichat-msg.user .bubble { background: #eef7fc; border-color: #cbe4f0; }
+    .aichat-msg.bot  .bubble { background: #f4faf0; border-color: #d5e9c8; }
+
+    /* ============================================
+       EMPTY STATE
+       ============================================ */
+    .aichat-empty {
+        text-align: center;
+        padding: 60px 20px;
+        background: #f9f9f9;
+        border: 2px dashed #ccc;
+        border-radius: 8px;
+    }
+    .aichat-empty i {
+        font-size: 48px;
+        color: #ccc;
+        display: block;
+        margin-bottom: 16px;
+    }
+    .aichat-empty h4 {
+        font-size: 1rem;
+        font-weight: 800;
+        color: #333;
+        margin: 0 0 6px;
+    }
+    .aichat-empty p {
+        font-size: 0.85rem;
+        color: #888;
+        margin: 0;
+    }
+
+    /* ============================================
+       PAGINATION
+       ============================================ */
+    .aichat-pager {
+        display: flex;
+        gap: 6px;
+        justify-content: center;
+        margin-top: 24px;
+        flex-wrap: wrap;
+    }
+    .aichat-pager a,
+    .aichat-pager span {
+        padding: 7px 13px;
+        border: 2px solid #000;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 700;
+        text-decoration: none;
+        color: #000;
+        background: #fff;
+        transition: all 0.15s;
+    }
+    .aichat-pager a:hover { background: #f0f7fa; }
+    .aichat-pager .current { background: #87CEEB; cursor: default; }
+    .aichat-pager .dots { border: none; background: transparent; cursor: default; }
+
+    /* ============================================
+       CONFIRM MODAL
+       ============================================ */
+    .aichat-modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.55);
+        z-index: 1060;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+    .aichat-modal.open { display: flex; }
+    .aichat-modal-box {
+        background: #fff;
+        border: 3px solid #000;
+        border-radius: 8px;
+        max-width: 460px;
+        width: 100%;
+        overflow: hidden;
+    }
+    .aichat-modal-head {
+        background: #dc3545;
+        color: #fff;
+        padding: 14px 18px;
+        font-weight: 800;
+        font-size: 1rem;
+        border-bottom: 2px solid #000;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .aichat-modal-body {
+        padding: 20px 18px;
+        font-size: 0.9rem;
+        color: #333;
+        line-height: 1.6;
+    }
+    .aichat-modal-body .warn {
+        background: #fff3cd;
+        border: 2px solid #ffc107;
+        border-radius: 4px;
+        padding: 10px 12px;
+        margin-top: 12px;
+        font-size: 0.82rem;
+        color: #856404;
+    }
+    .aichat-modal-foot {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        padding: 14px 18px;
+        border-top: 2px solid #e0e0e0;
+        background: #f9f9f9;
+    }
+
+    /* Mobile */
+    @media (max-width: 576px) {
+        .aichat-header h2 { font-size: 1.1rem; }
+        .aichat-msg .role { width: 55px; }
+        .aichat-msg .role .pill { font-size: 9px; padding: 2px 6px; }
+        .aichat-filters input[type="search"] { min-width: 100%; }
+    }
+</style>
+
+<!-- ============================================
+     PAGE HEADER
+     ============================================ -->
+<div class="aichat-header">
+    <div>
+        <h2><i class="fas fa-robot" style="color:#036a77;"></i> AI Assistant Conversations</h2>
+        <p>Every message exchanged between visitors and your AI assistant — logged and searchable.</p>
+    </div>
+
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <a href="{% url 'settings:ai-chats' %}" class="aichat-btn ghost">
+            <i class="fas fa-sync-alt"></i> Refresh
+        </a>
+
+        {% if total > 0 %}
+        <button type="button" class="aichat-btn danger" id="openClearModal">
+            <i class="fas fa-trash-alt"></i> Clear Logs
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- ============================================
+     STATS
+     ============================================ -->
+<div class="aichat-stats">
+    <div class="aichat-stat">
+        <div class="icon teal"><i class="fas fa-comments"></i></div>
+        <div class="meta">
+            <span class="n">{{ total }}</span>
+            <span class="l">Total chats</span>
+        </div>
+    </div>
+    <div class="aichat-stat">
+        <div class="icon green"><i class="fas fa-clock"></i></div>
+        <div class="meta">
+            <span class="n">{{ today }}</span>
+            <span class="l">Last 24 hours</span>
+        </div>
+    </div>
+    <div class="aichat-stat">
+        <div class="icon"><i class="fas fa-filter"></i></div>
+        <div class="meta">
+            <span class="n">{{ filtered }}</span>
+            <span class="l">Matching filter</span>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================
+     FILTERS
+     ============================================ -->
+<form method="get" class="aichat-filters">
+    <input type="search" name="q" value="{{ q }}"
+           placeholder="Search user messages, AI replies, or session ID…">
+
+    <select name="days">
+        <option value="1"  {% if days == 1  %}selected{% endif %}>Last 24 hours</option>
+        <option value="7"  {% if days == 7  %}selected{% endif %}>Last 7 days</option>
+        <option value="30" {% if days == 30 %}selected{% endif %}>Last 30 days</option>
+        <option value="90" {% if days == 90 %}selected{% endif %}>Last 90 days</option>
+    </select>
+
+    <select name="per_page">
+        <option value="25"  {% if per_page == 25  %}selected{% endif %}>25 / page</option>
+        <option value="50"  {% if per_page == 50  %}selected{% endif %}>50 / page</option>
+        <option value="100" {% if per_page == 100 %}selected{% endif %}>100 / page</option>
+    </select>
+
+    <button type="submit" class="aichat-btn primary">
+        <i class="fas fa-search"></i> Apply
+    </button>
+    {% if q or days != 7 or per_page != 25 %}
+    <a href="{% url 'settings:ai-chats' %}" class="aichat-btn">
+        <i class="fas fa-times"></i> Reset
+    </a>
+    {% endif %}
+</form>
+
+<!-- ============================================
+     CONVERSATION LIST
+     ============================================ -->
+{% for log in page_obj %}
+<div class="aichat-card">
+    <div class="aichat-card-head">
+        <div class="info">
+            <span><i class="fas fa-calendar-alt"></i> {{ log.created_at|date:"M d, Y · H:i" }}</span>
+            <span><i class="fas fa-fingerprint"></i> {{ log.session_key|slice:":12" }}…</span>
+        </div>
+        {% if log.provider %}
+        <span class="provider">{{ log.provider }}</span>
+        {% endif %}
+    </div>
+
+    <div class="aichat-card-body">
+        <div class="aichat-msg user">
+            <div class="role"><span class="pill">Visitor</span></div>
+            <div class="bubble">{{ log.user_message }}</div>
+        </div>
+        <div class="aichat-msg bot">
+            <div class="role"><span class="pill">ARIA</span></div>
+            <div class="bubble">{{ log.bot_reply }}</div>
+        </div>
+    </div>
+</div>
+{% empty %}
+<div class="aichat-empty">
+    <i class="fas fa-robot"></i>
+    <h4>No AI chats found</h4>
+    <p>
+        {% if q %}
+            No conversations match "<strong>{{ q }}</strong>". Try a different search term.
+        {% else %}
+            Once visitors start chatting with ARIA, their conversations will appear here.
+        {% endif %}
+    </p>
+</div>
+{% endfor %}
+
+<!-- ============================================
+     PAGINATION
+     ============================================ -->
+{% if page_obj.paginator.num_pages > 1 %}
+<div class="aichat-pager">
+    {% if page_obj.has_previous %}
+        <a href="?page=1&q={{ q }}&days={{ days }}&per_page={{ per_page }}">
+            <i class="fas fa-angle-double-left"></i>
+        </a>
+        <a href="?page={{ page_obj.previous_page_number }}&q={{ q }}&days={{ days }}&per_page={{ per_page }}">
+            <i class="fas fa-chevron-left"></i> Prev
+        </a>
+    {% endif %}
+
+    {% for num in page_obj.paginator.page_range %}
+        {% if num == page_obj.number %}
+            <span class="current">{{ num }}</span>
+        {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+            <a href="?page={{ num }}&q={{ q }}&days={{ days }}&per_page={{ per_page }}">{{ num }}</a>
+        {% endif %}
+    {% endfor %}
+
+    {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}&q={{ q }}&days={{ days }}&per_page={{ per_page }}">
+            Next <i class="fas fa-chevron-right"></i>
+        </a>
+        <a href="?page={{ page_obj.paginator.num_pages }}&q={{ q }}&days={{ days }}&per_page={{ per_page }}">
+            <i class="fas fa-angle-double-right"></i>
+        </a>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- ============================================
+     CLEAR LOGS CONFIRMATION MODAL
+     ============================================ -->
+{% if total > 0 %}
+<div class="aichat-modal" id="clearModal">
+    <div class="aichat-modal-box">
+        <div class="aichat-modal-head">
+            <i class="fas fa-exclamation-triangle"></i> Clear all AI chat logs?
+        </div>
+
+        <form method="post" action="{% url 'settings:ai-chats-clear' %}">
+            {% csrf_token %}
+            <div class="aichat-modal-body">
+                <p>
+                    This will permanently delete <strong>{{ total }}</strong> conversation log{{ total|pluralize }}
+                    from the database. The AI assistant itself will not be affected — only the historical records.
+                </p>
+                <div class="warn">
+                    <i class="fas fa-info-circle"></i>
+                    This action cannot be undone. Consider exporting first if you need to keep a record.
+                </div>
+            </div>
+            <div class="aichat-modal-foot">
+                <button type="button" class="aichat-btn ghost" id="closeClearModal">Cancel</button>
+                <button type="submit" class="aichat-btn danger">
+                    <i class="fas fa-trash-alt"></i> Yes, delete all
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const modal  = document.getElementById('clearModal');
+        const openBtn = document.getElementById('openClearModal');
+        const closeBtn = document.getElementById('closeClearModal');
+
+        if (!modal) return;
+
+        function open()  { modal.classList.add('open');  document.body.style.overflow = 'hidden'; }
+        function close() { modal.classList.remove('open'); document.body.style.overflow = ''; }
+
+        openBtn  && openBtn.addEventListener('click', open);
+        closeBtn && closeBtn.addEventListener('click', close);
+
+        modal.addEventListener('click', function (e) {
+            if (e.target === modal) close();
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && modal.classList.contains('open')) close();
+        });
+    })();
+</script>
+{% endif %}
+
+{% endblock %}
