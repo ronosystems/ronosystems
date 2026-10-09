@@ -58,4 +58,17 @@ urlpatterns = [
     path('repairs/', views.RepairListCreateView.as_view(), name='repair_list'),
     path('repairs/<int:pk>/', views.RepairDetailView.as_view(), name='repair_detail'),
     path('repairs/<int:pk>/complete/', views.RepairCompleteView.as_view(), name='repair_complete'),
+
+
+
+    path('barcode/<str:kind>/<int:pk>.png',
+         views.barcode_png,        name='barcode_png'),
+
+    path('label/<str:kind>/<int:pk>.pdf',
+         views.label_single_pdf,   name='label_single_pdf'),
+
+    path('labels/<str:kind>.pdf',
+         views.labels_bulk_pdf,    name='labels_bulk_pdf'),
+     
+    path('labels/<str:kind>/print/', views.label_print_html, name='label_print_html'),
 ]

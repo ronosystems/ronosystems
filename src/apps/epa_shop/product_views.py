@@ -25,6 +25,27 @@ import os
 User = get_user_model()
 
 
+
+# ============================================
+# BARCODE / LABEL IMPORT
+# ============================================
+
+from django.http import FileResponse, Http404
+from .barcode_utils import (
+    build_label_pdf,
+    build_label_sheet_pdf,
+    generate_barcode_image,
+)
+
+
+PRODUCT_KIND_MODELS = {
+    'phone':      Phone,
+    'electronic': Electronic,
+    'accessory':  Accessory,
+}
+
+
+
 # ============================================
 # HELPER FUNCTION - Get product by code
 # ============================================
@@ -853,6 +874,8 @@ def scanner_lookup(request):
                 },
                 'product': {
                     'id': product.id,
+                    'pk': product.id,                        # 👈 ADD
+                    'kind': 'phone' if unit.phone else 'electronic',   # 👈 ADD
                     'product_code': product.product_code,
                     'name': product.name,
                     'brand': getattr(product, 'brand', ''),
@@ -922,6 +945,8 @@ def scanner_lookup(request):
             'match_type': 'product',
             'product': {
                 'id': product.id,
+                'pk': product.id,                        # 👈 ADD
+                'kind': product_type.lower(),            # 👈 ADD ('phone' / 'electronic' / 'accessory')
                 'product_code': product.product_code,
                 'name': product.name,
                 'brand': getattr(product, 'brand', ''),
@@ -984,6 +1009,8 @@ def product_list(request):
     for item in electronics:
         all_products.append({
             'id': item.id,
+            'pk': item.id,                       # 👈 ADD
+            'kind': 'electronic',                # 👈 ADD
             'product_code': item.product_code or '-',
             'display_id': item.product_code or f"E{item.id}",
             'name': item.name,
@@ -1017,6 +1044,8 @@ def product_list(request):
 
         all_products.append({
             'id': item.id,
+            'pk': item.id,                       # 👈 ADD
+            'kind': 'phone',                     # 👈 ADD
             'product_code': item.product_code or '-',
             'display_id': item.product_code or f"P{item.id}",
             'name': item.name,
@@ -1042,6 +1071,8 @@ def product_list(request):
     for item in accessories:
         all_products.append({
             'id': item.id,
+            'pk': item.id,                       # 👈 ADD
+            'kind': 'accessory',                 # 👈 ADD
             'product_code': item.product_code or '-',
             'display_id': item.product_code or f"A{item.id}",
             'name': item.name,
@@ -2542,3 +2573,91 @@ def accessory_list(request):
         'page_subtitle': 'Manage your accessories',
     }
     return render(request, 'epa/accessory_list.html', context)
+
+
+
+
+# ============================================
+# BARCODE / LABEL VIEWS
+# ============================================
+
+@login_required
+def barcode_png(request, kind, pk):
+    """
+    Return a Code128 barcode PNG for the product's product_code.
+    Used as: <img src="/epa_shop/barcode/accessory/5.png">
+    """
+    company, _ = get_active_company(request)
+    if not company:
+        raise Http404("No active company")
+
+    model = PRODUCT_KIND_MODELS.get(kind)
+    if not model:
+        raise Http404(f"Unknown product kind: {kind}")
+
+    product = get_object_or_404(model, pk=pk, company=company)
+
+    if not product.product_code:
+        raise Http404("Product has no product_code")
+
+    buffer = generate_barcode_image(product.product_code)
+    return FileResponse(
+        buffer,
+        content_type='image/png',
+        filename=f"{product.product_code}.png",
+    )
+
+
+@login_required
+def label_single_pdf(request, kind, pk, size='medium'):
+    """Single-label PDF (one page, one label) for roll printers."""
+    company, _ = get_active_company(request)
+    if not company:
+        raise Http404("No active company")
+
+    model = PRODUCT_KIND_MODELS.get(kind)
+    if not model:
+        raise Http404(f"Unknown product kind: {kind}")
+
+    product = get_object_or_404(model, pk=pk, company=company)
+
+    pdf = build_label_pdf([product], size=size)
+    return FileResponse(
+        pdf,
+        content_type='application/pdf',
+        filename=f"label-{product.product_code}.pdf",
+    )
+
+
+@login_required
+def labels_bulk_pdf(request, kind):
+    """
+    Bulk label PDF.
+    Query params: ids=1,2,3   size=medium   sheet=1
+    """
+    company, _ = get_active_company(request)
+    if not company:
+        raise Http404("No active company")
+
+    model = PRODUCT_KIND_MODELS.get(kind)
+    if not model:
+        raise Http404(f"Unknown product kind: {kind}")
+
+    ids_param = request.GET.get('ids', '')
+    ids = [int(i) for i in ids_param.split(',') if i.strip().isdigit()]
+    if not ids:
+        raise Http404("No product ids supplied")
+
+    products = list(model.objects.filter(pk__in=ids, company=company))
+
+    size = request.GET.get('size', 'medium')
+    use_sheet = request.GET.get('sheet', '0') == '1'
+
+    if use_sheet:
+        pdf = build_label_sheet_pdf(products, size=size)
+        filename = f"labels-{kind}-sheet.pdf"
+    else:
+        pdf = build_label_pdf(products, size=size)
+        filename = f"labels-{kind}.pdf"
+
+    return FileResponse(pdf, content_type='application/pdf', filename=filename)

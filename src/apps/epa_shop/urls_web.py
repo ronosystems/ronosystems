@@ -26,6 +26,9 @@ urlpatterns = [
     # PRODUCTS - Full CRUD (Using Product Code)
     # ============================================
     path('scanner-lookup/', product_views.scanner_lookup, name='scanner_lookup'),
+    path('barcode/<str:kind>/<int:pk>.png', product_views.barcode_png,      name='barcode_png'),
+    path('label/<str:kind>/<int:pk>.pdf', product_views.label_single_pdf, name='label_single_pdf'),
+    path('labels/<str:kind>.pdf', product_views.labels_bulk_pdf,  name='labels_bulk_pdf'),  
     path('products/', product_views.product_list, name='epa-products'),
     path('products/add/', product_views.product_create, name='epa-product-create'),
     path('products/<str:product_code>/', product_views.product_detail, name='epa-product-detail'),
@@ -138,4 +141,5 @@ urlpatterns = [
     path('finance/cogs-daily/<str:date_str>/', finance_views.cogs_daily_detail, name='finance-cogs-daily-detail'),
     path('finance/cogs-weekly/<int:year>/<int:week>/', finance_views.cogs_weekly_detail, name='finance-cogs-weekly-detail'),
     path('finance/cogs-monthly/<int:year>/<int:month>/', finance_views.cogs_monthly_detail, name='finance-cogs-monthly-detail'),
+    
 ]

@@ -729,3 +729,109 @@ class EPADashboardView(CompanyScopedMixin, APIView):
             'expiring_warranties': expiring_warranties,
             'timestamp': timezone.now()
         })
+
+
+
+
+from django.http import FileResponse, Http404
+from django.shortcuts import get_object_or_404, render
+from django.contrib.auth.decorators import login_required
+
+from .models import Phone, Electronic, Accessory
+from .barcode_utils import (
+    build_label_pdf,
+    build_label_sheet_pdf,
+    generate_barcode_image,
+)
+
+
+PRODUCT_MODELS = {
+    'phone':      Phone,
+    'electronic': Electronic,
+    'accessory':  Accessory,
+}
+
+
+def _get_product(kind, pk):
+    model = PRODUCT_MODELS.get(kind)
+    if not model:
+        raise Http404("Unknown product type")
+    return get_object_or_404(model, pk=pk)
+
+
+@login_required
+def barcode_png(request, kind, pk):
+    """Raw PNG of the product's barcode — useful for <img src> previews."""
+    product = _get_product(kind, pk)
+
+    if not product.product_code:
+        raise Http404("Product has no product code yet")
+
+    buffer = generate_barcode_image(product.product_code)
+    return FileResponse(
+        buffer,
+        content_type='image/png',
+        filename=f"{product.product_code}.png",
+    )
+
+
+@login_required
+def label_single_pdf(request, kind, pk, size='medium'):
+    """Download a single-label PDF (one page, one label)."""
+    product = _get_product(kind, pk)
+    pdf = build_label_pdf([product], size=size)
+    return FileResponse(
+        pdf,
+        content_type='application/pdf',
+        filename=f"label-{product.product_code}.pdf",
+    )
+
+
+@login_required
+def labels_bulk_pdf(request, kind):
+    """
+    Bulk label PDF.
+    Query params:
+        ids=1,2,3,4          -> product PKs
+        size=small|medium|large|square
+        sheet=1              -> A4 grid sheet instead of roll
+    """
+    ids_param = request.GET.get('ids', '')
+    ids = [int(i) for i in ids_param.split(',') if i.strip().isdigit()]
+    if not ids:
+        raise Http404("No product ids supplied")
+
+    model = PRODUCT_MODELS.get(kind)
+    if not model:
+        raise Http404("Unknown product type")
+
+    products = list(model.objects.filter(pk__in=ids))
+    size = request.GET.get('size', 'medium')
+    use_sheet = request.GET.get('sheet', '0') == '1'
+
+    if use_sheet:
+        pdf = build_label_sheet_pdf(products, size=size)
+        filename = f"labels-{kind}-sheet.pdf"
+    else:
+        pdf = build_label_pdf(products, size=size)
+        filename = f"labels-{kind}.pdf"
+
+    return FileResponse(pdf, content_type='application/pdf', filename=filename)
+
+
+
+@login_required
+def label_print_html(request, kind):
+    ids = [int(i) for i in request.GET.get('ids', '').split(',') if i.strip().isdigit()]
+    model = PRODUCT_MODELS.get(kind)
+    products = model.objects.filter(pk__in=ids) if model else []
+
+    return render(request, 'epa_shop/label_print.html', {
+        'products': products,
+        'kind': kind,
+    })   
+
+
+
+
+    
