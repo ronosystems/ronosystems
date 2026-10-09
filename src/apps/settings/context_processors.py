@@ -1,5 +1,7 @@
 from .models import SystemSetting
 from django.db import OperationalError, ProgrammingError
+from datetime import timedelta
+from django.utils import timezone
 
 
 def pending_payments_count(request):
@@ -46,6 +48,8 @@ def system_settings(request):
       - login_background_url        : str or None
       - landing_video_url           : str or None   (NEW)
       - landing_video_poster_url    : str or None   (NEW)
+      - hero_video_url              : str or None   (NEW)
+      - hero_video_poster_url       : str or None   (NEW)
       - system_settings             : dict (all keys → typed values)
     """
 
@@ -73,7 +77,38 @@ def system_settings(request):
         # --- Landing video (NEW) ---
         'landing_video_url': video('LANDING_VIDEO'),
         'landing_video_poster_url': img('LANDING_VIDEO_POSTER'),
+        'hero_video_url': video('HERO_VIDEO'),
+        'hero_video_poster_url': img('HERO_VIDEO_POSTER'),
 
         # --- Full settings dict for advanced template use ---
         'system_settings': SystemSetting.as_dict(),
+        
+        'plans': _get_active_plans(),
     }
+
+def _get_active_plans():
+    """Lazy import to avoid AppRegistryNotReady at startup."""
+    try:
+        from apps.plans.models import Plan
+        return Plan.objects.filter(is_active=True).order_by('order', 'price')
+    except Exception:
+        return []
+
+def pending_ai_chats_count(request):
+    """
+    Injects `pending_ai_chats_count` — the number of AI chats today
+    for super-admins. Returns 0 for everyone else.
+    """
+    user = getattr(request, 'user', None)
+    if not user or not user.is_authenticated:
+        return {'pending_ai_chats_count': 0}
+    if getattr(user, 'role', None) != 'super_admin':
+        return {'pending_ai_chats_count': 0}
+
+    try:
+        from .models import AIChatLog
+        since = timezone.now() - timedelta(hours=24)
+        count = AIChatLog.objects.filter(created_at__gte=since).count()
+        return {'pending_ai_chats_count': count}
+    except Exception:
+        return {'pending_ai_chats_count': 0}

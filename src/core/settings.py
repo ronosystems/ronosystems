@@ -187,6 +187,7 @@ TEMPLATES = [
                 'apps.losses.context_processors.pending_losses_count',
                 'apps.treasury.context_processors.company_context',
                 'apps.settings.context_processors.pending_payments_count',
+                'apps.settings.context_processors.pending_ai_chats_count',
             ],
         },
     },
@@ -526,19 +527,46 @@ if ON_RENDER or USE_REAL_EMAIL:
     EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
     DEFAULT_FROM_EMAIL = os.getenv(
         'DEFAULT_FROM_EMAIL',
-        EMAIL_HOST_USER or 'noreply@ronosystems.com'
+        EMAIL_HOST_USER or 'support.ronosystems@gmail.com'
     )
     SERVER_EMAIL = os.getenv('SERVER_EMAIL', DEFAULT_FROM_EMAIL)
     SUPPORT_EMAIL = os.getenv('SUPPORT_EMAIL', DEFAULT_FROM_EMAIL)
 else:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-    DEFAULT_FROM_EMAIL = 'noreply@ronosystems.com'
+    DEFAULT_FROM_EMAIL = 'support.ronosystems@gmail.com'
     SERVER_EMAIL = DEFAULT_FROM_EMAIL
     SUPPORT_EMAIL = os.getenv('SUPPORT_EMAIL', DEFAULT_FROM_EMAIL)
 
 
 
 SYSTEM_NAME = os.getenv('SYSTEM_NAME', 'RonoSystems')
+
+
+# ============================================
+# AI ASSISTANT
+# ============================================
+# Primary provider
+AI_PROVIDER = os.getenv('AI_PROVIDER', 'groq')     # 'groq' | 'openai' | 'gemini'
+
+# Groq
+GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
+GROQ_MODEL = os.getenv('GROQ_MODEL', 'llama-3.3-70b-versatile')
+
+# OpenAI (kept as fallback)
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
+
+# Gemini (optional)
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+
+# Enable if ANY provider has a key
+AI_ASSISTANT_ENABLED = bool(GROQ_API_KEY or OPENAI_API_KEY or GEMINI_API_KEY)
+
+
+# ============================================
+# CONTACT FORM
+# ============================================
+CONTACT_EMAIL = os.getenv('CONTACT_EMAIL', 'support.ronosystems@gmail.com')
 
 
 # ============================================

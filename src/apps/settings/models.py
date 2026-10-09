@@ -170,3 +170,15 @@ class SystemSetting(models.Model):
     def save(self, *args, **kwargs):
         # We do NOT touch `value` here — the view writes the storage key.
         super().save(*args, **kwargs)
+
+
+class AIChatLog(models.Model):
+    session_key = models.CharField(max_length=64, db_index=True)
+    user_message = models.TextField()
+    bot_reply = models.TextField()
+    provider = models.CharField(max_length=20, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'ai_chat_logs'
+        ordering = ['-created_at']

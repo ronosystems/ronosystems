@@ -8,6 +8,10 @@ from django.conf import settings as django_settings
 from django.views.decorators.http import require_http_methods
 from apps.plans.models import Subscription
 from .models import SystemSetting
+from django.core.paginator import Paginator
+from django.utils import timezone
+from datetime import timedelta
+from django.db.models import Q
 
 
 # ======================================================================
@@ -65,6 +69,12 @@ SETTINGS_SCHEMA = [
     {'key': 'LANDING_VIDEO_POSTER', 'type': 'image', 'category': 'branding',
      'label': 'Video Thumbnail', 'default': '', 'order': 7,
      'help_text': 'Optional. Shown before the video plays. 1280×720px.'},
+    {'key': 'HERO_VIDEO', 'type': 'video', 'category': 'branding',
+     'label': 'Hero Video', 'default': '', 'order': 8,
+     'help_text': 'MP4 or WebM, up to 50MB. Shown in the hero section next to the landing video.'},
+    {'key': 'HERO_VIDEO_POSTER', 'type': 'image', 'category': 'branding',
+     'label': 'Hero Video Thumbnail', 'default': '', 'order': 9,
+     'help_text': 'Optional. Shown before the hero video plays. 1280×720px.'},
 
     # --- Email ---
     {'key': 'EMAIL_HOST', 'type': 'text', 'category': 'email',
@@ -76,7 +86,7 @@ SETTINGS_SCHEMA = [
     {'key': 'EMAIL_PASSWORD', 'type': 'password', 'category': 'email',
      'label': 'SMTP Password', 'default': '', 'order': 4},
     {'key': 'EMAIL_FROM', 'type': 'email', 'category': 'email',
-     'label': 'From Email', 'default': 'noreply@example.com', 'order': 5},
+     'label': 'From Email', 'default': 'support.ronosystems@gmail.com', 'order': 5},
     {'key': 'EMAIL_TLS', 'type': 'boolean', 'category': 'email',
      'label': 'Enable TLS', 'default': True, 'order': 6},
 
@@ -270,6 +280,78 @@ def _pending_manual_payments_count():
 # ======================================================================
 # Views
 # ======================================================================
+
+
+@login_required
+@user_passes_test(_is_admin)
+def ai_chat_list(request):
+    """
+    Browse AI Assistant conversations.
+    Filters: ?q=<search>  ?days=<1|7|30|90>  ?page=<n>
+    """
+    from .models import AIChatLog
+
+    qs = AIChatLog.objects.all().order_by('-created_at')
+
+    # Time filter
+    try:
+        days = int(request.GET.get('days', 7))
+    except (TypeError, ValueError):
+        days = 7
+    if days not in (1, 7, 30, 90):
+        days = 7
+    since = timezone.now() - timedelta(days=days)
+    qs = qs.filter(created_at__gte=since)
+
+    # Search
+    q = (request.GET.get('q') or '').strip()
+    if q:
+        qs = qs.filter(
+            Q(user_message__icontains=q) |
+            Q(bot_reply__icontains=q) |
+            Q(session_key__icontains=q)
+        )
+
+    # Stats
+    total = AIChatLog.objects.count()
+    today = AIChatLog.objects.filter(
+        created_at__gte=timezone.now() - timedelta(hours=24)
+    ).count()
+
+    # Paginate
+    try:
+        per_page = int(request.GET.get('per_page', 25))
+    except (TypeError, ValueError):
+        per_page = 25
+    if per_page not in (25, 50, 100):
+        per_page = 25
+
+    paginator = Paginator(qs, per_page)
+    page = paginator.get_page(request.GET.get('page', 1))
+
+    return render(request, 'superadmin/ai_chats.html', {
+        'page_obj': page,
+        'q': q,
+        'days': days,
+        'per_page': per_page,
+        'total': total,
+        'today': today,
+        'filtered': qs.count(),
+    })
+
+
+@login_required
+@user_passes_test(_is_admin)
+@require_http_methods(['POST'])
+def ai_chats_clear(request):
+    """Delete all AIChatLog rows. Super-admin only."""
+    from .models import AIChatLog
+    count = AIChatLog.objects.count()
+    AIChatLog.objects.all().delete()
+    messages.success(request, f'Deleted {count} AI chat log{"s" if count != 1 else ""}.')
+    return redirect('settings:ai-chats')
+
+
 @login_required
 @user_passes_test(_is_admin)
 def settings_dashboard(request):
@@ -301,10 +383,16 @@ def settings_dashboard(request):
     # ---------- Pending manual payments (for the notification badge) ----------
     pending_payments_count = _pending_manual_payments_count()
 
+    # ---------- Hero video and poster URLs ----------
+    hero_video_url = SystemSetting.get_video_url('HERO_VIDEO')
+    hero_video_poster_url = SystemSetting.get_image_url('HERO_VIDEO_POSTER')
+
     return render(request, 'superadmin/settings.html', {
         'categories':             categories,
         'category_labels':        dict(SystemSetting.CATEGORIES),
         'pending_payments_count': pending_payments_count,
+        'hero_video_url':         hero_video_url,    
+        'hero_video_poster_url':  hero_video_poster_url,
     })
 
 

@@ -740,6 +740,79 @@
         .fb-toast.ok  { background: #d4edda; color: #155724; }
         .fb-toast.err { background: #f8d7da; color: #721c24; }
 
+
+
+        /* ============================================
+        AI CHATS — navbar button with corner badge
+        ============================================ */
+        .ai-chats-btn {
+            position: relative;              /* 👈 REQUIRED for badge to anchor */
+            display: inline-flex !important;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 14px;
+            border: 2px solid #000 !important;
+            border-radius: 4px;
+            background: #fff;
+            color: #000 !important;
+            text-decoration: none !important;
+            font-weight: 700;
+            font-size: 0.85rem;
+            line-height: 1;
+            transition: all 0.2s ease;
+        }
+
+        .ai-chats-btn i {
+            font-size: 1rem;
+            color: #036a77;
+            transition: color 0.2s;
+        }
+
+        .ai-chats-btn:hover {
+            background: #036a77;
+            color: #fff !important;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+        .ai-chats-btn:hover i { color: #fff; }
+
+        .ai-chats-btn.active {
+            background: #87CEEB;
+            color: #000 !important;
+        }
+        .ai-chats-btn.active i { color: #000; }
+
+        /* ---- Corner badge ---- */
+        .ai-chats-badge {
+            position: absolute;              /* 👈 anchors to .ai-chats-btn */
+            top: -8px;
+            right: -8px;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            background: #dc3545;
+            color: #fff !important;
+            font-size: 10px;
+            font-weight: 800;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #000;
+            line-height: 1;
+            animation: badgePulse 1.5s infinite;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+            z-index: 2;
+        }
+
+        @media (max-width: 576px) {
+            .ai-chats-label { display: none; }
+            .ai-chats-btn  { position: relative; }
+            .ai-chats-badge { position: absolute; top: -8px; right: -8px; }
+        }
+
+
+
         /* ============================================
            RESPONSIVE
         ============================================ */
@@ -1297,6 +1370,19 @@
             </div>
 
             <div class="navbar-actions">
+
+                {% if user.is_authenticated and user.role == 'super_admin' %}
+                <a href="{% url 'settings:ai-chats' %}"
+                class="ai-chats-btn {% if '/settings/ai-chats/' in request.path %}active{% endif %}"
+                title="View AI Assistant conversations">
+                    <i class="fas fa-robot"></i>
+                    <span class="ai-chats-label">AI Chats</span>
+                    {% if pending_ai_chats_count and pending_ai_chats_count > 0 %}
+                        <span class="ai-chats-badge">{{ pending_ai_chats_count }}</span>
+                    {% endif %}
+                </a>
+                {% endif %}
+
                 <a href="#" class="user-profile" data-bs-toggle="dropdown">
                     <div class="avatar-sm">
                         {% if user.is_authenticated and user.profile_picture %}
