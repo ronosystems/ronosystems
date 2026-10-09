@@ -73,6 +73,7 @@ urlpatterns = [
     path('features/', TemplateView.as_view(template_name='features.html'), name='features'),
     path('faq/', TemplateView.as_view(template_name='faq.html'), name='faq'),
     path('documentation/', TemplateView.as_view(template_name='documentation.html'), name='documentation'),
+    path('ai-assistant/', TemplateView.as_view(template_name='ai_assistant.html'), name='ai-assistant-page'),
     path('invoicing/', TemplateView.as_view(template_name='invoicing.html'), name='invoicing'),
     path('pricing/', TemplateView.as_view(template_name='pricing.html'), name='pricing'),
 
