@@ -549,6 +549,51 @@
         letter-spacing: 3px;
         font-size: 12px;
     }
+    /* NEW: sale barcode block in preview */
+    .pv-sale-barcode {
+        margin-top: 12px;
+        text-align: center;
+    }
+    .pv-sale-barcode .pv-sb-label {
+        font-size: 9px;
+        letter-spacing: 1px;
+        margin-bottom: 4px;
+        color: #000000;
+    }
+    .pv-sale-barcode .pv-sb-box {
+        display: inline-block;
+        padding: 6px 12px;
+        border: 2px solid #000000;
+        background: #ffffff;
+    }
+    .pv-sale-barcode .pv-sb-num {
+        font-family: 'Courier New', monospace;
+        letter-spacing: 2px;
+        font-size: 11px;
+        margin-bottom: 4px;
+        color: #000000;
+    }
+    .pv-sale-barcode .pv-sb-bars {
+        display: flex;
+        gap: 1px;
+        height: 32px;
+        align-items: flex-end;
+        justify-content: center;
+    }
+    .pv-sale-barcode .pv-sb-bars span {
+        display: inline-block;
+        background: #000000;
+    }
+    .pv-sale-barcode .pv-sb-bars span.white {
+        background: #ffffff;
+    }
+    .pv-sale-barcode .pv-sb-code {
+        font-family: 'Courier New', monospace;
+        font-size: 10px;
+        margin-top: 4px;
+        letter-spacing: 1px;
+        color: #000000;
+    }
     .pv-logo-wrap { text-align: center; margin-bottom: 8px; }
     .pv-logo-wrap img {
         max-width: 70px;
@@ -1469,7 +1514,10 @@
                                 <div class="card settings-card">
                                     <div class="card-header"><h6><i class="fas fa-eye"></i> Display Options</h6></div>
                                     <div class="card-body">
-                                        <p class="override-hint" style="margin-bottom:12px;">Toggle which sections appear on the printed receipt.</p>
+                                        <p class="override-hint" style="margin-bottom:12px;">
+                                            Toggle which sections appear on the printed receipt.
+                                            <strong>Barcode (for Sale Lookup)</strong> prints the sale barcode — scan it later to pull up the same sale.
+                                        </p>
                                         <div class="row">
 
                                             <div class="col-md-4 mb-2"><div class="form-check">
@@ -1597,6 +1645,12 @@
                                                 <label class="form-check-label" for="include_barcode">Include Barcode</label>
                                             </div></div>
 
+                                            <!-- NEW: Barcode for Sale Lookup -->
+                                            <div class="col-md-4 mb-2"><div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="show_sale_barcode" id="show_sale_barcode" {% if settings.receipt.show_sale_barcode %}checked{% endif %}>
+                                                <label class="form-check-label" for="show_sale_barcode">Barcode (for Sale Lookup)</label>
+                                            </div></div>
+
                                             <div class="col-md-4 mb-2"><div class="form-check">
                                                 <input class="form-check-input" type="checkbox" name="auto_print" id="auto_print" {% if settings.receipt.auto_print %}checked{% endif %}>
                                                 <label class="form-check-label" for="auto_print">Auto Print</label>
@@ -1720,6 +1774,37 @@
                                             <div class="pv-barcode" data-preview="include_barcode">
                                                 <span>*RCP-2026-0001*</span>
                                             </div>
+
+                                            <!-- NEW: Sale barcode preview -->
+                                            <div class="pv-sale-barcode" data-preview="show_sale_barcode">
+                                                <div class="pv-sb-label">SCAN TO LOOK UP THIS SALE</div>
+                                                <div class="pv-sb-box">
+                                                    <div class="pv-sb-num">BAR-20261009-000001</div>
+                                                    <div class="pv-sb-bars">
+                                                        <span style="width:2px;height:100%;"></span>
+                                                        <span class="white" style="width:1px;height:100%;"></span>
+                                                        <span style="width:3px;height:100%;"></span>
+                                                        <span class="white" style="width:1px;height:100%;"></span>
+                                                        <span style="width:2px;height:100%;"></span>
+                                                        <span class="white" style="width:1px;height:100%;"></span>
+                                                        <span style="width:2px;height:100%;"></span>
+                                                        <span style="width:3px;height:100%;"></span>
+                                                        <span class="white" style="width:1px;height:100%;"></span>
+                                                        <span style="width:2px;height:100%;"></span>
+                                                        <span class="white" style="width:1px;height:100%;"></span>
+                                                        <span style="width:3px;height:100%;"></span>
+                                                        <span class="white" style="width:1px;height:100%;"></span>
+                                                        <span style="width:2px;height:100%;"></span>
+                                                        <span style="width:2px;height:100%;"></span>
+                                                        <span class="white" style="width:1px;height:100%;"></span>
+                                                        <span style="width:3px;height:100%;"></span>
+                                                        <span class="white" style="width:1px;height:100%;"></span>
+                                                        <span style="width:2px;height:100%;"></span>
+                                                    </div>
+                                                    <div class="pv-sb-code">BAR-20261009-000001</div>
+                                                </div>
+                                            </div>
+
                                         </div>
                                     </div>
                                 </div>
@@ -1824,7 +1909,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var form = document.getElementById('receiptSettingsForm');
     var preview = document.getElementById('receiptPreview');
     if (form && preview) {
-        // Checkbox toggles
+        // Checkbox toggles — also covers `show_sale_barcode` (name starts with "show_")
         form.querySelectorAll('input[type="checkbox"][name^="show_"], input[type="checkbox"][name="include_barcode"]').forEach(function (cb) {
             var targets = preview.querySelectorAll('[data-preview="' + cb.name + '"]');
             if (!targets.length) return;

@@ -446,6 +446,7 @@ def settings_receipt(request):
                 'receipt_address':       request.POST.get('receipt_address', ''),
                 'receipt_phone':         request.POST.get('receipt_phone', ''),
                 'receipt_email':         request.POST.get('receipt_email', ''),
+                'show_sale_barcode':     request.POST.get('show_sale_barcode') == 'on',
             }
             save_company_settings(company, receipt_settings, 'receipt')
             messages.success(request, 'Receipt settings updated successfully!')
@@ -657,6 +658,7 @@ def get_company_settings(company):
             'receipt_address': '',
             'receipt_phone': '',
             'receipt_email': '',
+            'show_sale_barcode': False
         },
     }
 
