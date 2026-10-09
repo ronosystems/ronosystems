@@ -854,6 +854,7 @@
             color: #fff;
         }
 
+
         /* ============================================
            FOOTER
         ============================================ */
@@ -863,7 +864,25 @@
             padding: 40px 0 20px;
             font-size: 12px;
             border-top: 4px solid var(--nav-bg-bottom);
+            width: 100%;
         }
+        
+        .ff-footer-inner {
+            width: 100%;
+            padding: 0 20px;
+            overflow: hidden; /* Prevents Bootstrap negative margins from breaking layout */
+        }
+
+        /* Fix Bootstrap grid inside footer without a container */
+        .ff-footer .row {
+            margin-left: -10px;
+            margin-right: -10px;
+        }
+        .ff-footer [class*="col-"] {
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+
         .ff-footer h5 {
             color: white;
             font-size: 13px;
@@ -873,24 +892,40 @@
             border-bottom: 1px solid #34495e;
             padding-bottom: 8px;
         }
+        
+        /* Base link styles: Stack vertically */
         .ff-footer a {
             color: #bdc3c7;
             text-decoration: none;
-            display: block;
+            display: block; /* Forces vertical stacking */
             margin-bottom: 8px;
             transition: color 0.2s;
         }
-        .ff-footer a:hover { color: #7bc043; }
+        .ff-footer a:hover {
+            color: #7bc043;
+        }
+        
+        /* Copyright Section: Split left and right on desktop */
         .ff-footer .copyright {
             border-top: 1px solid #34495e;
             padding-top: 20px;
             margin-top: 20px;
-            text-align: center;
             color: #7f8c8d;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .ff-footer .copyright-links a {
+            display: inline-block;
+            margin-bottom: 0;
+            margin-left: 15px;
         }
 
         /* ============================================
-        SOCIAL ICONS (footer)
+           SOCIAL ICONS
         ============================================ */
         .ff-social {
             display: flex;
@@ -900,12 +935,12 @@
         }
 
         .ff-social-link {
-            display: flex !important;
+            display: inline-flex !important; /* Prevents stretching */
             align-items: center;
             justify-content: center;
-            width: 38px;
-            height: 38px;
-            border-radius: 50%;
+            width: 38px !important;
+            height: 38px !important;
+            border-radius: 50% !important;
             color: #ffffff !important;
             text-decoration: none !important;
             font-size: 16px;
@@ -915,7 +950,7 @@
             box-shadow: 0 2px 6px rgba(0,0,0,0.15);
         }
 
-        /* Brand colors at rest */
+        /* Brand colors */
         .ff-social-link.facebook  { background: #1877f2; }
         .ff-social-link.whatsapp  { background: #25d366; }
         .ff-social-link.x         { background: #000000; }
@@ -925,7 +960,6 @@
         }
         .ff-social-link.linkedin  { background: #0a66c2; }
 
-        /* Hover: lift + glow */
         .ff-social-link:hover {
             color: #ffffff !important;
             transform: translateY(-3px) scale(1.05);
@@ -934,14 +968,90 @@
             text-decoration: none !important;
         }
 
-        /* Mobile: keep icons compact */
-        @media (max-width: 576px) {
-            .ff-social-link {
-                width: 34px;
-                height: 34px;
-                font-size: 14px;
+        /* ============================================
+           FOOTER RESPONSIVE ADJUSTMENTS
+        ============================================ */
+        
+        @media (max-width: 992px) {
+            .ff-footer {
+                border-top: 4px solid var(--nav-border-green); 
             }
         }
+
+        /* Small Mobile (<= 576px) */
+        @media (max-width: 576px) {
+            /* Center text for all footer columns */
+            .ff-footer .col-lg-4,
+            .ff-footer .col-lg-2, 
+            .ff-footer .col-md-3, 
+            .ff-footer .col-6 {
+                text-align: center; 
+                margin-bottom: 25px;
+            }
+            
+            .ff-footer h5 {
+                text-align: center; 
+                margin-bottom: 10px;
+            }
+            
+            /* Keep links stacked vertically and centered */
+            .ff-footer a {
+                margin-bottom: 8px;
+                display: block; 
+                width: 100%; 
+            }
+
+            /* Center social icons */
+            .ff-social {
+                gap: 10px; 
+                justify-content: center; 
+            }
+
+            /* Stack copyright, keep links inline */
+            .ff-footer .copyright {
+                flex-direction: column;
+                text-align: center;
+                gap: 10px;
+                padding-top: 15px;
+            }
+
+            .ff-footer .copyright-links {
+                display: flex;
+                justify-content: center;
+                gap: 20px;
+            }
+
+            .ff-footer .copyright-links a {
+                margin: 0;
+                width: auto; /* Reset width so they sit inline */
+                display: inline-block;
+            }
+            
+            .ff-footer-inner {
+                padding: 0 15px;
+            }
+        }
+
+
+        /* Fix logo alignment inside footer h5 */
+        .ff-footer h5 {
+            display: flex;
+            align-items: center;
+            /* If you want the logo centered on mobile, the media query below will handle it */
+        }
+        
+        .ff-footer h5 .brand-icon img {
+            max-height: 22px; /* Keep it small enough for the header text */
+            max-width: 28px;
+            object-fit: contain;
+            display: block;
+        }
+        @media (max-width: 576px) {
+            .ff-footer h5 {
+                justify-content: center; /* Centers the logo + text together */
+            }
+        }
+
 
         /* ============================================
            RESPONSIVE
@@ -1092,22 +1202,27 @@
             </div>
             <div class="mobile-header-right">
                 {% if user.is_authenticated %}
-                    <a href="/dashboard/"><i class="fas fa-tachometer-alt"></i></a>
+                    <a href="/dashboard/"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
                 {% else %}
-                    <a href="/auth/login/"><i class="fas fa-user"></i></a>
+                    <a href="/auth/login/"><i class="fas fa-user"></i> Login</a>
                 {% endif %}
             </div>
         </div>
 
         <nav class="mobile-nav-tabs">
-            <a href="/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-home"></i> Home</div></a> 
+            <a href="/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-home"></i> Home</div></a>                             
             <a href="/features/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-cogs"></i> Features</div></a>
-            <a href="/documentation/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-book"></i> Docs</div></a>
+            <a href="/documentation/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-book"></i> Documentation</div></a>
             <a href="/invoicing/" class="mobile-nav-tab active"><div class="mobile-nav-tab-inner"><i class="fas fa-receipt"></i> Invoicing</div></a>
             <a href="/pricing/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-tags"></i> Pricing</div></a>
             <a href="/contact/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-envelope"></i> Contact</div></a>
             <a href="/about/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-info-circle"></i> About</div></a>
             <a href="/help/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-question-circle"></i> Help</div></a>
+            <a href="/privacy/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-shield-alt"></i> Privacy Policy</div></a>
+            <a href="/terms/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-gavel"></i> Terms of Service</div></a>
+            <a href="#" class="ff-nav-item" data-ai-open>
+                <div class="mobile-nav-tab-inner"><i class="fas fa-robot"></i> AI Assistant</div>
+            </a>
             <a href="/auth/register/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-rocket"></i> Sign Up</div></a>
         </nav>
     </header>
@@ -1539,18 +1654,26 @@
         </main>
     </div>
 
+
+
     <footer class="ff-footer">
-        <div class="container">
+        <div class="ff-footer-inner">
             <div class="row">
                 <div class="col-lg-4 col-md-6 mb-4">
-                    <h5><i class="fas fa-cube me-2"></i> {{ system_name|default:"RonoSystems" }}</h5>
+                    <h5>
+                        <span class="brand-icon">
+                            {% if site_logo_url %}
+                                <img src="{{ site_logo_url }}" alt="{{ system_name|default:'RonoSystems' }}">
+                            {% else %}
+                                <i class="fas fa-cube me-2"></i>
+                            {% endif %}
+                        </span>
+                        {{ system_name|default:"RonoSystems" }}
+                    </h5>
                     <p style="line-height: 1.6; margin-bottom: 15px;">
                         {{ site_tagline|default:"Enterprise Management Platform helping businesses streamline operations, manage teams, and drive growth with AI-powered insights." }}
                     </p>
 
-                    <!-- ============================================
-                        SOCIAL ICONS
-                        ============================================ -->
                     <div class="ff-social">
                         <a href="https://facebook.com/" rel="noopener" title="Facebook" class="ff-social-link facebook">
                             <i class="fab fa-facebook-f"></i>
@@ -1591,7 +1714,6 @@
 
                 <div class="col-lg-2 col-md-3 col-6 mb-4">
                     <h5>Pricing</h5>
-                    <a href="/pricing/">Free</a>
                     <a href="/pricing/">Basic</a>
                     <a href="/pricing/">Standard</a>
                     <a href="/pricing/">Premium</a>
@@ -1608,14 +1730,19 @@
             </div>
 
             <div class="copyright">
-                &copy; {% now "Y" %} {{ system_name|default:"RonoSystems" }}. All rights reserved.
-                <span class="float-end">
-                    <a href="/privacy/" style="display:inline; margin-left:10px;">Privacy</a>
-                    <a href="/terms/" style="display:inline; margin-left:10px;">Terms</a>
+                <span class="copyright-text">
+                    &copy; {% now "Y" %} {{ system_name|default:"RonoSystems" }}. All rights reserved.
+                </span>
+                <span class="copyright-links">
+                    <a href="/privacy/">Privacy Policy</a>
+                    <a href="/terms/">Terms of Service</a>
                 </span>
             </div>
         </div>
     </footer>
+
+
+
 
     <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
     <script>
@@ -1714,6 +1841,5 @@
             });
         });
     </script>
-    {% include 'partials/ai_assistant.html' %}
 </body>
 </html>
