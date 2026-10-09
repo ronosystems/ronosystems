@@ -169,6 +169,13 @@ class BaseProduct(models.Model):
         blank=True,
         help_text="Unique product code within the company (auto-generated)"
     )
+    barcode = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        db_index=True,
+        help_text="Barcode/UPC/EAN for scanner lookup"
+    )
 
     class Meta:
         abstract = True
@@ -352,6 +359,7 @@ class Phone(BaseProduct):
             models.Index(fields=['imei']),
             models.Index(fields=['owner']),
             models.Index(fields=['product_code']),
+            models.Index(fields=['company', 'barcode']),
         ]
 
     def __str__(self):
@@ -454,6 +462,7 @@ class Electronic(BaseProduct):
             models.Index(fields=['serial_number']),
             models.Index(fields=['owner']),
             models.Index(fields=['product_code']),
+            models.Index(fields=['company', 'barcode']),
         ]
 
     def __str__(self):
@@ -542,6 +551,7 @@ class Accessory(BaseProduct):
             models.Index(fields=['branch', 'is_active']),
             models.Index(fields=['owner']),
             models.Index(fields=['product_code']),
+            models.Index(fields=['company', 'barcode']),
         ]
 
     def __str__(self):
@@ -669,6 +679,17 @@ class Sale(models.Model):
     sale_number = models.PositiveIntegerField(default=1, editable=False, help_text="Sequential number per company")
     company_sale_id = models.CharField(max_length=50, unique=True, blank=True, editable=False, help_text="Company prefix + sale number")
 
+    # ── NEW: scannable barcode for the sale ──
+    barcode_number = models.CharField(
+        max_length=50,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        editable=False,
+        help_text="Auto-generated scannable barcode (BAR-YYYYMMDD-XXXXXX)"
+    )
+
     # Denormalized customer info (snapshot at time of sale)
     customer_name = models.CharField(max_length=200)
     customer_phone = models.CharField(max_length=20)
@@ -697,6 +718,7 @@ class Sale(models.Model):
             models.Index(fields=['payment_status']),
             models.Index(fields=['company', 'sale_number']),
             models.Index(fields=['company_sale_id']),
+            models.Index(fields=['barcode_number']),   # 👈 NEW
         ]
         unique_together = [['company', 'sale_number']]
 
@@ -707,7 +729,49 @@ class Sale(models.Model):
     def item_count(self):
         return self.items.count()
 
+    # ── NEW: barcode generation helper ──
+    def generate_barcode_number(self):
+        """
+        Return a unique barcode of the form BAR-YYYYMMDD-XXXXXX.
+
+        The sequence X is per-company, per-day, so:
+          - Day 1: BAR-20261009-000001, BAR-20261009-000002, ...
+          - Day 2: BAR-20261010-000001, ...  (sequence restarts each day)
+        """
+        from datetime import datetime
+
+        date_str = datetime.now().strftime('%Y%m%d')
+        prefix = f"BAR-{date_str}-"
+
+        # Find the highest existing sequence for this company today
+        last = (
+            Sale.objects
+            .filter(company=self.company, barcode_number__startswith=prefix)
+            .order_by('-barcode_number')
+            .values_list('barcode_number', flat=True)
+            .first()
+        )
+
+        if last:
+            try:
+                last_num = int(last.split('-')[-1])
+                next_num = last_num + 1
+            except (ValueError, IndexError):
+                next_num = 1
+        else:
+            next_num = 1
+
+        candidate = f"{prefix}{str(next_num).zfill(6)}"
+
+        # Safety: if a collision somehow exists, keep incrementing
+        while Sale.objects.filter(barcode_number=candidate).exists():
+            next_num += 1
+            candidate = f"{prefix}{str(next_num).zfill(6)}"
+
+        return candidate
+
     def save(self, *args, **kwargs):
+        # 1) Company sale ID (existing behaviour)
         if not self.company_sale_id:
             last_sale = Sale.objects.filter(company=self.company).order_by('-sale_number').first()
 
@@ -719,8 +783,13 @@ class Sale(models.Model):
             company_prefix = self.company.name[:3].upper() if self.company and self.company.name else "COM"
             self.company_sale_id = f"{company_prefix}-{str(self.sale_number).zfill(6)}"
 
+        # 2) Barcode (new)
+        if not self.barcode_number and self.company:
+            self.barcode_number = self.generate_barcode_number()
+
         super().save(*args, **kwargs)
 
+        
 
 class SaleItem(models.Model):
     """Individual items in a sale using GenericForeignKey"""

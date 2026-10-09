@@ -781,6 +781,172 @@ def unit_delete(request, product_code, identifier):
     return render(request, 'epa/unit_delete_confirm.html', context)
 
 
+
+
+# ============================================
+# SCANNER LOOKUP - Find product by IMEI/Serial/Barcode
+# ============================================
+
+@login_required
+def scanner_lookup(request):
+    """
+    AJAX endpoint for barcode scanner.
+    Accepts: ?q=<scanned_value>
+    Returns JSON with product info if found.
+    
+    Search priority:
+      1. Exact match on Unit.identifier (IMEI/Serial)
+      2. Exact match on product barcode
+      3. Exact match on product_code
+      4. Fallback: name/brand/model contains
+    """
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        return JsonResponse({
+            'success': False,
+            'error': 'No active company selected.'
+        }, status=400)
+    
+    query = (request.GET.get('q') or '').strip()
+    if not query:
+        return JsonResponse({
+            'success': False,
+            'error': 'No search value provided.'
+        }, status=400)
+    
+    # ---------- 1. Look up as a Unit (IMEI/Serial) ----------
+    unit = Unit.objects.filter(identifier__iexact=query).select_related(
+        'phone', 'electronic', 'owner'
+    ).first()
+    
+    if unit:
+        product = unit.phone or unit.electronic
+        if product and product.company_id == company.id:
+            # Permission check (skip in support mode)
+            if not is_viewing_company:
+                if is_agent(request.user):
+                    owner = Owner.objects.filter(
+                        company=company, phone=request.user.phone
+                    ).first()
+                    if not owner or unit.owner != owner:
+                        return JsonResponse({
+                            'success': False,
+                            'error': 'You do not have permission to view this unit.'
+                        }, status=403)
+            
+            product_type = 'Phone' if unit.phone else 'Electronic'
+            
+            # Find any sale this unit belongs to
+            sale_item = SaleItem.objects.filter(unit=unit).select_related('sale').first()
+            
+            return JsonResponse({
+                'success': True,
+                'match_type': 'unit',
+                'unit': {
+                    'id': unit.id,
+                    'identifier': unit.identifier,
+                    'unit_type': unit.unit_type,
+                    'status': unit.status,
+                    'owner_name': unit.owner_name or (unit.owner.name if unit.owner else ''),
+                    'owner_phone': unit.owner_phone or (unit.owner.phone if unit.owner else ''),
+                },
+                'product': {
+                    'id': product.id,
+                    'product_code': product.product_code,
+                    'name': product.name,
+                    'brand': getattr(product, 'brand', ''),
+                    'model': getattr(product, 'model', None) or getattr(product, 'model_number', ''),
+                    'type': product_type,
+                    'stock': product.quantity_in_stock,
+                    'selling_price': float(product.selling_price),
+                    'best_price': float(product.best_price) if product.best_price else 0,
+                    'purchase_price': float(product.purchase_price),
+                    'detail_url': f'/epa_shop/products/{product.product_code}/',
+                    'units_url': f'/epa_shop/products/{product.product_code}/units/',
+                },
+                'sale': {
+                    'id': sale_item.sale.id,
+                    'company_sale_id': sale_item.sale.company_sale_id,
+                    'sale_date': sale_item.sale.sale_date.isoformat(),
+                } if sale_item else None,
+            })
+    
+    # ---------- 2. Look up as a product barcode / product_code ----------
+    product = None
+    product_type = None
+    
+    # Try barcode first (if field exists)
+    for model_cls, type_label in [
+        (Phone, 'Phone'),
+        (Electronic, 'Electronic'),
+        (Accessory, 'Accessory'),
+    ]:
+        # Check barcode field exists before querying
+        if hasattr(model_cls, 'barcode'):
+            obj = model_cls.objects.filter(
+                company=company, barcode__iexact=query
+            ).first()
+            if obj:
+                product = obj
+                product_type = type_label
+                break
+    
+    # Fall back to product_code
+    if not product:
+        product, product_type = get_product_by_code(company, query)
+    
+    if product:
+        # Permission check
+        if not is_viewing_company:
+            if is_agent(request.user):
+                owner = Owner.objects.filter(
+                    company=company, phone=request.user.phone
+                ).first()
+                if not owner or getattr(product, 'owner', None) != owner:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'You do not have permission to view this product.'
+                    }, status=403)
+            elif not is_admin_or_manager(request.user):
+                user_branch = get_user_branch(request.user)
+                product_branch = getattr(product, 'branch', None)
+                if user_branch and product_branch and product_branch.id != user_branch.id:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Product belongs to a different branch.'
+                    }, status=403)
+        
+        return JsonResponse({
+            'success': True,
+            'match_type': 'product',
+            'product': {
+                'id': product.id,
+                'product_code': product.product_code,
+                'name': product.name,
+                'brand': getattr(product, 'brand', ''),
+                'model': getattr(product, 'model', None) or getattr(product, 'model_number', ''),
+                'type': product_type,
+                'stock': product.quantity_in_stock,
+                'selling_price': float(product.selling_price),
+                'best_price': float(product.best_price) if product.best_price else 0,
+                'purchase_price': float(product.purchase_price),
+                'detail_url': f'/epa_shop/products/{product.product_code}/',
+                'units_url': f'/epa_shop/products/{product.product_code}/units/',
+            },
+            'unit': None,
+            'sale': None,
+        })
+    
+    # ---------- 3. Not found ----------
+    return JsonResponse({
+        'success': False,
+        'error': f'No product or unit found for "{query}".',
+        'query': query,
+    }, status=404)
+
+
+
 # ============================================
 # PRODUCT LIST WITH PAGINATION
 # ============================================
@@ -1103,7 +1269,6 @@ def product_detail(request, product_code):
     }
     return render(request, 'epa/product_detail.html', context)
 
-
 # ============================================
 # PRODUCT CREATE
 # ============================================
@@ -1112,30 +1277,30 @@ def product_detail(request, product_code):
 def product_create(request):
     """Create a new product - checks for duplicates first"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     # Only super admin, company admin, and stock controllers can create products
     if not is_admin_or_manager(request.user) and not is_viewing_company:
         messages.error(request, 'You do not have permission to create products. Only administrators and stock controllers can manage products.')
         return redirect('/epa_shop/products/')
-    
+
     # Filter branches
     branches = Branch.objects.filter(company=company, is_active=True)
     if not is_viewing_company and not request.user.is_super_admin and not request.user.is_company_admin:
         user_branch = get_user_branch(request.user)
         if user_branch:
             branches = branches.filter(id=user_branch.id)
-    
+
     form_data = {}
     category_value = ''
     units_json = '[]'
     units = []
-    
+
     if request.method == 'POST':
         try:
             category_type = request.POST.get('category', '').strip()
@@ -1143,55 +1308,55 @@ def product_create(request):
             name = request.POST.get('name', '').strip()
             brand = request.POST.get('brand', '').strip()
             model = request.POST.get('model', '').strip()
-            
+
             ram_list = request.POST.getlist('ram')
             ram = ''
             for val in ram_list:
                 if val and val.strip():
                     ram = val.strip()
                     break
-            
+
             rom_list = request.POST.getlist('rom')
             rom = ''
             for val in rom_list:
                 if val and val.strip():
                     rom = val.strip()
                     break
-            
+
             storage_list = request.POST.getlist('storage')
             storage = ''
             for val in storage_list:
                 if val and val.strip():
                     storage = val.strip()
                     break
-            
+
             if category_type == 'electronics' and not storage:
                 for val in rom_list:
                     if val and val.strip():
                         storage = val.strip()
                         break
-            
+
             screen_size_list = request.POST.getlist('screen_size')
             screen_size = ''
             for val in screen_size_list:
                 if val and val.strip():
                     screen_size = val.strip()
                     break
-            
+
             color_list = request.POST.getlist('color')
             color = ''
             for val in color_list:
                 if val and val.strip():
                     color = val.strip()
                     break
-            
+
             battery_capacity_list = request.POST.getlist('battery_capacity')
             battery_capacity = ''
             for val in battery_capacity_list:
                 if val and val.strip():
                     battery_capacity = val.strip()
                     break
-            
+
             condition = request.POST.get('condition', 'new')
             network_type = request.POST.get('network_type', '').strip()
             memory_card = request.POST.get('memory_card', 'no')
@@ -1200,32 +1365,37 @@ def product_create(request):
             processor = request.POST.get('processor', '').strip()
             specs = request.POST.get('specs', '').strip()
             accessory_type = request.POST.get('accessory_type', 'other')
-            barcode = request.POST.get('barcode', '').strip()
+
+            # Barcode — read from form (used for all three product types)
+            barcode = request.POST.get('barcode', '').strip() or None
+
             size = request.POST.get('size', '').strip()
-            
+
             image = request.FILES.get('product_image')
-            
+
             try:
                 purchase_price = Decimal(str(request.POST.get('purchase_price', 0) or 0))
             except:
                 purchase_price = Decimal('0')
-                
+
             try:
                 selling_price = Decimal(str(request.POST.get('selling_price', 0) or 0))
             except:
                 selling_price = Decimal('0')
-            
+
             try:
                 best_price = Decimal(str(request.POST.get('best_price', 0) or 0))
             except:
                 best_price = Decimal('0')
-            
+
             try:
                 quantity = int(request.POST.get('quantity', 0) or 0)
             except:
                 quantity = 0
-            
+
+            # ------------------------------------------------------------
             # VALIDATIONS
+            # ------------------------------------------------------------
             if not category_type:
                 messages.error(request, 'Please select a category.')
                 return render(request, 'epa/product_form.html', {
@@ -1234,7 +1404,7 @@ def product_create(request):
                     'units_json': '[]', 'is_edit': False,
                     'page_title': 'Add Product', 'page_subtitle': 'Create a new product',
                 })
-            
+
             if not brand:
                 messages.error(request, 'Brand is required.')
                 return render(request, 'epa/product_form.html', {
@@ -1243,7 +1413,7 @@ def product_create(request):
                     'units_json': '[]', 'is_edit': False,
                     'page_title': 'Add Product', 'page_subtitle': 'Create a new product',
                 })
-            
+
             if not model:
                 messages.error(request, 'Model is required.')
                 return render(request, 'epa/product_form.html', {
@@ -1252,7 +1422,7 @@ def product_create(request):
                     'units_json': '[]', 'is_edit': False,
                     'page_title': 'Add Product', 'page_subtitle': 'Create a new product',
                 })
-            
+
             if not branch_id:
                 messages.error(request, 'Please select a branch.')
                 return render(request, 'epa/product_form.html', {
@@ -1261,7 +1431,7 @@ def product_create(request):
                     'units_json': '[]', 'is_edit': False,
                     'page_title': 'Add Product', 'page_subtitle': 'Create a new product',
                 })
-            
+
             try:
                 branch = Branch.objects.get(id=branch_id, company=company, is_active=True)
             except Branch.DoesNotExist:
@@ -1272,7 +1442,7 @@ def product_create(request):
                     'units_json': '[]', 'is_edit': False,
                     'page_title': 'Add Product', 'page_subtitle': 'Create a new product',
                 })
-            
+
             if purchase_price <= 0:
                 messages.error(request, 'Buying price must be greater than 0.')
                 return render(request, 'epa/product_form.html', {
@@ -1281,7 +1451,7 @@ def product_create(request):
                     'units_json': '[]', 'is_edit': False,
                     'page_title': 'Add Product', 'page_subtitle': 'Create a new product',
                 })
-            
+
             if selling_price <= 0:
                 messages.error(request, 'Selling price must be greater than 0.')
                 return render(request, 'epa/product_form.html', {
@@ -1290,7 +1460,7 @@ def product_create(request):
                     'units_json': '[]', 'is_edit': False,
                     'page_title': 'Add Product', 'page_subtitle': 'Create a new product',
                 })
-            
+
             # Category-specific validations
             if category_type == 'smartphone':
                 if not ram:
@@ -1309,7 +1479,7 @@ def product_create(request):
                         'units_json': '[]', 'is_edit': False,
                         'page_title': 'Add Product', 'page_subtitle': 'Create a new product',
                     })
-            
+
             elif category_type == 'electronics':
                 if not ram:
                     messages.error(request, 'RAM is required for electronics.')
@@ -1335,7 +1505,7 @@ def product_create(request):
                         'units_json': '[]', 'is_edit': False,
                         'page_title': 'Add Product', 'page_subtitle': 'Create a new product',
                     })
-            
+
             elif category_type == 'accessory':
                 if not accessory_type or accessory_type == '':
                     messages.error(request, 'Accessory type is required.')
@@ -1353,17 +1523,19 @@ def product_create(request):
                         'units_json': '[]', 'is_edit': False,
                         'page_title': 'Add Product', 'page_subtitle': 'Create a new product',
                     })
-            
+
             units_data = request.POST.get('units', '[]')
             try:
                 units = json.loads(units_data)
             except:
                 units = []
-            
-            # Check for existing product
+
+            # ------------------------------------------------------------
+            # Check for existing product (duplicate detection)
+            # ------------------------------------------------------------
             existing_product = None
             existing_product_type = None
-            
+
             if category_type in ['smartphone', 'feature_phone']:
                 existing_phones = Phone.objects.filter(
                     company=company, brand__iexact=brand, model__iexact=model,
@@ -1372,7 +1544,7 @@ def product_create(request):
                 if existing_phones.exists():
                     existing_product = existing_phones.first()
                     existing_product_type = 'Phone'
-            
+
             elif category_type == 'electronics':
                 existing_electronics = Electronic.objects.filter(
                     company=company, brand__iexact=brand, model_number__iexact=model,
@@ -1381,7 +1553,7 @@ def product_create(request):
                 if existing_electronics.exists():
                     existing_product = existing_electronics.first()
                     existing_product_type = 'Electronic'
-            
+
             elif category_type == 'accessory':
                 existing_accessories = Accessory.objects.filter(
                     company=company, brand__iexact=brand, model__iexact=model,
@@ -1390,13 +1562,13 @@ def product_create(request):
                 if existing_accessories.exists():
                     existing_product = existing_accessories.first()
                     existing_product_type = 'Accessory'
-            
+
             # If existing, add units only
             if existing_product and existing_product_type:
                 owner = get_or_create_owner_from_user(request.user, company=company)
                 added_count = 0
                 skipped_count = 0
-                
+
                 if existing_product_type in ['Phone', 'Electronic']:
                     for unit_data in units:
                         identifier = unit_data.get('identifier', '').strip()
@@ -1411,19 +1583,22 @@ def product_create(request):
                         else:
                             Unit.objects.create(electronic=existing_product, identifier=identifier, unit_type='serial', status=status, owner=owner)
                         added_count += 1
-                    
+
                     if existing_product_type == 'Phone':
                         total_units = Unit.objects.filter(phone=existing_product).count()
                     else:
                         total_units = Unit.objects.filter(electronic=existing_product).count()
                     existing_product.quantity_in_stock = total_units
                     existing_product.save()
-                    
+
                 elif existing_product_type == 'Accessory':
                     existing_product.quantity_in_stock += quantity
+                    # Also update barcode if a new one was provided
+                    if barcode:
+                        existing_product.barcode = barcode
                     existing_product.save()
                     added_count = quantity
-                
+
                 if added_count > 0:
                     msg = f'✅ Product "{existing_product.name}" already exists (Code: {existing_product.product_code}). '
                     msg += f'Added {added_count} new unit(s) to stock.'
@@ -1435,9 +1610,9 @@ def product_create(request):
                         messages.warning(request, f'All {skipped_count} identifier(s) already exist. No new units added.')
                     else:
                         messages.info(request, 'No new units to add. The product already exists.')
-                
+
                 return redirect('/epa_shop/products/')
-            
+
             # Auto-generate name
             if not name or name.strip() == '':
                 if category_type == 'smartphone':
@@ -1452,7 +1627,7 @@ def product_create(request):
                     name = f"{brand} {model} {accessory_type}".strip()
                 else:
                     name = f"{brand} {model}".strip()
-            
+
             # Get or create category
             category_map = {
                 'smartphone': 'phones',
@@ -1461,7 +1636,7 @@ def product_create(request):
                 'accessory': 'accessories'
             }
             category_type_db = category_map.get(category_type, 'other')
-            
+
             category = Category.objects.filter(company=company, category_type=category_type_db).first()
             if not category:
                 category = Category.objects.create(
@@ -1470,10 +1645,12 @@ def product_create(request):
                     category_type=category_type_db,
                     is_active=True
                 )
-            
+
             owner = get_or_create_owner_from_user(request.user, company=company)
-            
+
+            # ------------------------------------------------------------
             # Create new product
+            # ------------------------------------------------------------
             if category_type in ['smartphone', 'feature_phone']:
                 if category_type == 'feature_phone':
                     ram_value = ram or 'N/A'
@@ -1489,10 +1666,11 @@ def product_create(request):
                     network_type_value = None
                     memory_card_value = 'no'
                     features_value = None
-                
+
                 product = Phone.objects.create(
                     company=company, branch=branch, category=category,
                     name=name, brand=brand, model=model, imei=None,
+                    barcode=barcode,
                     color=color or '', storage_capacity=rom_value, ram=ram_value,
                     screen_size=screen_size or '', battery_capacity=battery_capacity or '',
                     condition=condition, purchase_price=purchase_price,
@@ -1501,28 +1679,29 @@ def product_create(request):
                     phone_type=phone_type_value, network_type=network_type_value,
                     memory_card=memory_card_value, features=features_value
                 )
-                
+
                 for unit_data in units:
                     Unit.objects.create(
                         phone=product, identifier=unit_data['identifier'],
                         unit_type='imei', status=unit_data.get('status', 'available'),
                         owner=owner
                     )
-                
+
                 product_type_label = "Feature Phone" if category_type == 'feature_phone' else "Smartphone"
                 messages.success(request, f'✅ New {product_type_label} "{product.name}" created! Code: {product.product_code}')
-                
+
             elif category_type == 'electronics':
                 product = Electronic.objects.create(
                     company=company, branch=branch, category=category,
                     name=name, brand=brand, model_number=model, serial_number=None,
+                    barcode=barcode,
                     device_type=device_type, processor=processor, ram=ram, storage=storage,
                     screen_size=screen_size or '', color=color or '',
                     purchase_price=purchase_price, selling_price=selling_price,
                     best_price=best_price, quantity_in_stock=len(units),
                     image=image, owner=owner
                 )
-                
+
                 for unit_data in units:
                     Unit.objects.create(
                         electronic=product, identifier=unit_data['identifier'],
@@ -1530,18 +1709,20 @@ def product_create(request):
                         owner=owner
                     )
                 messages.success(request, f'✅ New Electronics "{product.name}" created! Code: {product.product_code}')
-                
+
             elif category_type == 'accessory':
                 product = Accessory.objects.create(
                     company=company, branch=branch, category=category,
                     name=name, brand=brand, accessory_type=accessory_type,
-                    model=model or '', compatible_phone_models=barcode or '',
+                    model=model or '',
+                    compatible_phone_models='',   # left for its original purpose (compatibility list)
+                    barcode=barcode,              # barcode goes here now
                     purchase_price=purchase_price, selling_price=selling_price,
                     best_price=best_price, quantity_in_stock=quantity,
                     image=image, owner=owner
                 )
                 messages.success(request, f'✅ New Accessory "{product.name}" created! Code: {product.product_code}')
-            
+
             else:
                 messages.error(request, f'Unknown category: {category_type}')
                 return render(request, 'epa/product_form.html', {
@@ -1550,14 +1731,14 @@ def product_create(request):
                     'units_json': '[]', 'is_edit': False,
                     'page_title': 'Add Product', 'page_subtitle': 'Create a new product',
                 })
-            
+
             return redirect('/epa_shop/products/')
-            
+
         except Exception as e:
             messages.error(request, f'Error creating product: {str(e)}')
             import traceback
             traceback.print_exc()
-            
+
             form_data = request.POST
             category_value = request.POST.get('category', '')
             units_data = request.POST.get('units', '[]')
@@ -1566,14 +1747,14 @@ def product_create(request):
             except:
                 units = []
             units_json = json.dumps(units)
-            
+
             return render(request, 'epa/product_form.html', {
                 'branches': branches, 'form_data': form_data,
                 'category_value': category_value, 'units': units,
                 'units_json': units_json, 'is_edit': False,
                 'page_title': 'Add Product', 'page_subtitle': 'Create a new product',
             })
-    
+
     context = {
         'branches': branches,
         'form_data': {},
@@ -1595,46 +1776,46 @@ def product_create(request):
 def product_edit(request, product_code):
     """Edit product details using product code"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     if not is_admin_or_manager(request.user) and not is_viewing_company:
         messages.error(request, 'You do not have permission to edit products. Only administrators and stock controllers can manage products.')
         return redirect('/epa_shop/products/')
-    
+
     product, product_type = get_product_by_code(company, product_code)
-    
+
     if not product:
         messages.error(request, f'Product with code "{product_code}" not found.')
         return redirect('/epa_shop/products/')
-    
+
     if not is_admin_or_manager(request.user) and not is_viewing_company:
         user_branch = get_user_branch(request.user)
         product_branch = product.branch if product else None
         if user_branch and product_branch and product_branch.id != user_branch.id:
             messages.error(request, 'You do not have permission to edit products from other branches.')
             return redirect('/epa_shop/products/')
-    
+
     units = []
     units_json = '[]'
-    
+
     if product_type == 'Phone':
         units = Unit.objects.filter(phone=product).order_by('-created_at')
         units_json = json.dumps([{'identifier': u.identifier, 'status': u.status} for u in units])
     elif product_type == 'Electronic':
         units = Unit.objects.filter(electronic=product).order_by('-created_at')
         units_json = json.dumps([{'identifier': u.identifier, 'status': u.status} for u in units])
-    
+
     branches = Branch.objects.filter(company=company, is_active=True)
     if not is_viewing_company and not request.user.is_super_admin and not request.user.is_company_admin:
         user_branch = get_user_branch(request.user)
         if user_branch:
             branches = branches.filter(id=user_branch.id)
-    
+
     if product_type == 'Phone':
         if hasattr(product, 'phone_type') and product.phone_type == 'feature':
             category_value = 'feature_phone'
@@ -1651,7 +1832,7 @@ def product_edit(request, product_code):
         category_value = 'accessory'
     else:
         category_value = ''
-    
+
     if request.method == 'POST':
         try:
             category_type = request.POST.get('category', '').strip()
@@ -1659,7 +1840,7 @@ def product_edit(request, product_code):
             name = request.POST.get('name', '').strip()
             brand = request.POST.get('brand', '').strip()
             model = request.POST.get('model', '').strip()
-            
+
             ram = request.POST.get('ram', '').strip()
             rom = request.POST.get('rom', '').strip()
             screen_size = request.POST.get('screen_size', '').strip()
@@ -1673,36 +1854,42 @@ def product_edit(request, product_code):
             processor = request.POST.get('processor', '').strip()
             storage = request.POST.get('storage', '').strip()
             accessory_type = request.POST.get('accessory_type', 'other')
-            barcode = request.POST.get('barcode', '').strip()
+
+            # Barcode — used for all three product types
+            barcode = request.POST.get('barcode', '').strip() or None
+
             size = request.POST.get('size', '').strip()
-            
+
             image = request.FILES.get('product_image')
-            
+
             try:
                 purchase_price = Decimal(str(request.POST.get('purchase_price', 0) or 0))
             except:
                 purchase_price = Decimal('0')
-                
+
             try:
                 selling_price = Decimal(str(request.POST.get('selling_price', 0) or 0))
             except:
                 selling_price = Decimal('0')
-            
+
             try:
                 best_price = Decimal(str(request.POST.get('best_price', 0) or 0))
             except:
                 best_price = Decimal('0')
-            
+
             try:
                 quantity = int(request.POST.get('quantity', 0) or 0)
             except:
                 quantity = 0
-                
+
             try:
                 min_stock = int(request.POST.get('min_stock', 5) or 5)
             except:
                 min_stock = 5
-            
+
+            # ------------------------------------------------------------
+            # VALIDATIONS
+            # ------------------------------------------------------------
             if not branch_id:
                 messages.error(request, 'Please select a branch.')
                 return render(request, 'epa/product_form.html', {
@@ -1711,7 +1898,7 @@ def product_edit(request, product_code):
                     'is_edit': True, 'page_title': f'Edit {product.name}',
                     'page_subtitle': f'Code: {product.product_code}',
                 })
-            
+
             if not brand:
                 messages.error(request, 'Brand is required.')
                 return render(request, 'epa/product_form.html', {
@@ -1720,7 +1907,7 @@ def product_edit(request, product_code):
                     'is_edit': True, 'page_title': f'Edit {product.name}',
                     'page_subtitle': f'Code: {product.product_code}',
                 })
-            
+
             if not model:
                 messages.error(request, 'Model is required.')
                 return render(request, 'epa/product_form.html', {
@@ -1729,7 +1916,7 @@ def product_edit(request, product_code):
                     'is_edit': True, 'page_title': f'Edit {product.name}',
                     'page_subtitle': f'Code: {product.product_code}',
                 })
-            
+
             if purchase_price <= 0:
                 messages.error(request, 'Buying price must be greater than 0.')
                 return render(request, 'epa/product_form.html', {
@@ -1738,7 +1925,7 @@ def product_edit(request, product_code):
                     'is_edit': True, 'page_title': f'Edit {product.name}',
                     'page_subtitle': f'Code: {product.product_code}',
                 })
-            
+
             if selling_price <= 0:
                 messages.error(request, 'Selling price must be greater than 0.')
                 return render(request, 'epa/product_form.html', {
@@ -1747,7 +1934,7 @@ def product_edit(request, product_code):
                     'is_edit': True, 'page_title': f'Edit {product.name}',
                     'page_subtitle': f'Code: {product.product_code}',
                 })
-            
+
             if not name:
                 if product_type == 'Phone':
                     name = f"{brand} {model} {rom} {ram}".strip()
@@ -1755,20 +1942,25 @@ def product_edit(request, product_code):
                     name = f"{brand} {model} {ram} {storage}".strip()
                 else:
                     name = f"{brand} {model} {accessory_type}".strip()
-            
+
             owner = get_or_create_owner_from_user(request.user, company=company)
-            
+
+            # Common fields
             product.name = name
             product.brand = brand
             product.purchase_price = purchase_price
             product.selling_price = selling_price
-            
+
             if hasattr(product, 'best_price'):
                 product.best_price = best_price
-            
+
+            # Barcode (all three models have this field)
+            if hasattr(product, 'barcode'):
+                product.barcode = barcode
+
             if branch_id:
                 product.branch_id = branch_id
-            
+
             if image:
                 if product.image:
                     try:
@@ -1777,7 +1969,7 @@ def product_edit(request, product_code):
                     except:
                         pass
                 product.image = image
-            
+
             if product_type == 'Phone':
                 product.model = model
                 product.ram = ram or ''
@@ -1786,7 +1978,7 @@ def product_edit(request, product_code):
                 product.color = color or ''
                 product.battery_capacity = battery_capacity or ''
                 product.condition = condition
-                
+
                 if category_type == 'feature_phone':
                     product.phone_type = 'feature'
                     product.network_type = network_type if network_type else None
@@ -1797,48 +1989,48 @@ def product_edit(request, product_code):
                     product.network_type = None
                     product.memory_card = 'no'
                     product.features = None
-                
+
                 product.save()
-                
+
                 units_data = request.POST.get('units', '[]')
                 try:
                     new_units = json.loads(units_data)
                 except:
                     new_units = []
-                
+
                 existing_units = Unit.objects.filter(phone=product)
                 existing_identifiers = set(existing_units.values_list('identifier', flat=True))
                 new_identifiers = set()
-                
+
                 for unit_data in new_units:
                     if 'identifier' in unit_data:
                         new_identifiers.add(unit_data['identifier'])
-                
+
                 units_to_delete = existing_identifiers - new_identifiers
                 if units_to_delete:
                     Unit.objects.filter(phone=product, identifier__in=units_to_delete).delete()
-                
+
                 for unit_data in new_units:
                     identifier = unit_data.get('identifier')
                     status = unit_data.get('status', 'available')
-                    
+
                     if not identifier:
                         continue
-                    
+
                     existing_unit = Unit.objects.filter(phone=product, identifier=identifier).first()
                     if existing_unit:
                         existing_unit.status = status
                         existing_unit.save()
                     else:
                         Unit.objects.create(phone=product, identifier=identifier, unit_type='imei', status=status, owner=owner)
-                
+
                 total_units = Unit.objects.filter(phone=product).count()
                 product.quantity_in_stock = total_units
                 product.save()
-                
+
                 phone_type_label = "Feature Phone" if category_type == 'feature_phone' else "Smartphone"
                 messages.success(request, f'{phone_type_label} "{product.name}" updated! Code: {product.product_code}')
-                
+
             elif product_type == 'Electronic':
                 product.model_number = model
                 product.device_type = device_type
@@ -1848,57 +2040,57 @@ def product_edit(request, product_code):
                 product.screen_size = screen_size or ''
                 product.color = color or ''
                 product.save()
-                
+
                 units_data = request.POST.get('units', '[]')
                 try:
                     new_units = json.loads(units_data)
                 except:
                     new_units = []
-                
+
                 existing_units = Unit.objects.filter(electronic=product)
                 existing_identifiers = set(existing_units.values_list('identifier', flat=True))
                 new_identifiers = set()
-                
+
                 for unit_data in new_units:
                     if 'identifier' in unit_data:
                         new_identifiers.add(unit_data['identifier'])
-                
+
                 units_to_delete = existing_identifiers - new_identifiers
                 if units_to_delete:
                     Unit.objects.filter(electronic=product, identifier__in=units_to_delete).delete()
-                
+
                 for unit_data in new_units:
                     identifier = unit_data.get('identifier')
                     status = unit_data.get('status', 'available')
-                    
+
                     if not identifier:
                         continue
-                    
+
                     existing_unit = Unit.objects.filter(electronic=product, identifier=identifier).first()
                     if existing_unit:
                         existing_unit.status = status
                         existing_unit.save()
                     else:
                         Unit.objects.create(electronic=product, identifier=identifier, unit_type='serial', status=status, owner=owner)
-                
+
                 total_units = Unit.objects.filter(electronic=product).count()
                 product.quantity_in_stock = total_units
                 product.save()
-                
+
                 messages.success(request, f'Electronics "{product.name}" updated! Code: {product.product_code}')
-                
+
             elif product_type == 'Accessory':
                 product.model = model or ''
                 product.accessory_type = accessory_type
-                product.compatible_phone_models = barcode or ''
+                # Do NOT touch compatible_phone_models here — it's a separate field.
                 product.quantity_in_stock = quantity
                 product.minimum_stock_level = min_stock
                 product.save()
-                
+
                 messages.success(request, f'Accessory "{product.name}" updated! Code: {product.product_code}')
-            
+
             return redirect('/epa_shop/products/')
-            
+
         except Exception as e:
             messages.error(request, f'Error updating product: {str(e)}')
             import traceback
@@ -1910,7 +2102,7 @@ def product_edit(request, product_code):
                 'page_title': f'Edit {product.name}',
                 'page_subtitle': f'Code: {product.product_code}',
             })
-    
+
     context = {
         'branches': branches,
         'product': product,
@@ -1931,6 +2123,7 @@ def product_edit(request, product_code):
     return render(request, 'epa/product_form.html', context)
 
 
+    
 # ============================================
 # PRODUCT DELETE
 # ============================================

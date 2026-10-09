@@ -152,6 +152,7 @@
     }
     .barcode-result-item .badge.imei { background: #d4edda; }
     .barcode-result-item .badge.serial { background: #cce5ff; }
+    .barcode-result-item .badge.barcode { background: #e2d9f3; }
     .barcode-result-item .badge.sku { background: #fff3cd; }
     .barcode-result-item .product-name {
         font-size: 12px;
@@ -691,6 +692,9 @@
         animation: slideInRight 0.3s ease;
         display: none;
     }
+    .stock-update-indicator.error {
+        background: #dc3545;
+    }
 
     /* Unit search (inside product modal) */
     .unit-search-container { position: relative; }
@@ -1019,15 +1023,6 @@ const CATEGORY_EMOJI = {
 // ============================================
 // CART LINE MATCHER
 // ============================================
-/**
- * Two cart lines are the SAME line ONLY when:
- *   - product_code matches
- *   - price matches exactly (to 2 decimals)
- *   - unit matches (both null, or both the same identifier)
- *
- * This lets the SAME SKU appear as multiple lines when sold at
- * different prices, or as separate units (unique IMEI / serial).
- */
 function isSameCartLine(item, candidate) {
     if (item.product_code !== candidate.product_code) return false;
 
@@ -1042,8 +1037,6 @@ function isSameCartLine(item, candidate) {
     return true;
 }
 
-
-
 // ============================================
 // TAX CONFIG (server-rendered)
 // ============================================
@@ -1052,7 +1045,6 @@ const POS_TAX_RATE   = {{ tax_rate|default:0 }};
 
 // Barcode detection
 const BARCODE_MIN_LEN = 6;
-const ID_PATTERN = /^[0-9A-Za-z\-_]+$/;
 
 // DOM references
 const searchInput = document.getElementById('searchProducts');
@@ -1195,14 +1187,19 @@ async function refreshProductsAfterSale() {
 // ============================================
 // BARCODE / IMEI / SERIAL SEARCH
 // ============================================
+/**
+ * Determine if the input looks like a scanned code.
+ * In a POS context, anything >= 6 chars that isn't purely
+ * alphabet is treated as a potential scan.
+ */
 function looksLikeIdentifier(value) {
     const v = value.trim();
     if (v.length < BARCODE_MIN_LEN) return false;
-    if (!ID_PATTERN.test(v)) return false;
-    const digitCount = (v.match(/\d/g) || []).length;
-    return (digitCount / v.length) >= 0.5 || v.includes('-');
+    // If it contains at least one digit, treat as a code.
+    return /\d/.test(v);
 }
 
+// Fire on every input change
 searchInput.addEventListener('input', function () {
     const q = this.value.trim();
 
@@ -1218,6 +1215,7 @@ searchInput.addEventListener('input', function () {
     applyFilters();
 });
 
+// Enter key: exact match → auto-add, otherwise fall back
 searchInput.addEventListener('keydown', async function (e) {
     if (e.key !== 'Enter') return;
     e.preventDefault();
@@ -1232,7 +1230,9 @@ searchInput.addEventListener('keydown', async function (e) {
             autoAddBarcodeMatch(result.match);
             return;
         }
-        // fall through if no barcode match
+        // 👇 Give feedback when nothing matched
+        showIndicator(`❌ No match for "${q}"`, /* error */ true);
+        return;
     }
 
     // Normal Enter → open first visible in-stock product
@@ -1276,6 +1276,7 @@ function renderBarcodeResults(units) {
     barcodeResults.innerHTML = units.map((u, i) => {
         const badgeClass = u.unit_type === 'IMEI' ? 'imei'
                           : u.unit_type === 'Serial' ? 'serial'
+                          : u.unit_type === 'Barcode' ? 'barcode'
                           : 'sku';
         const emoji = CATEGORY_EMOJI[u.category] || '';
         return `
@@ -1295,7 +1296,6 @@ function renderBarcodeResults(units) {
         `;
     }).join('');
 
-    // Attach handlers with real JS objects (avoids JSON-in-attribute issues)
     barcodeResults.querySelectorAll('.barcode-result-item').forEach((el, idx) => {
         el.addEventListener('click', () => autoAddBarcodeMatch(units[idx]));
     });
@@ -1310,16 +1310,21 @@ function hideBarcodeResults() {
 
 /**
  * Auto-add a barcode/IMEI/serial match to cart.
- * Handles accessories (SKU) vs unit-tracked products differently.
+ * - IMEI/Serial → unit-tracked line
+ * - Barcode (product-level) → for Accessories with qty 1, or for Phone/Electronic
+ *   w/o units → treated as 1-unit line
+ * - SKU → accessory line, mergeable
  */
 function autoAddBarcodeMatch(match) {
     if (!match) return;
 
-    const isAccessory = match.category === 'Accessories';
-    const unitIdentifier = match.unit_type === 'SKU' ? null : match.identifier;
+    // Decide what "unit" to attach to the cart line
+    let unitIdentifier = null;
+    if (match.unit_type === 'IMEI' || match.unit_type === 'Serial') {
+        unitIdentifier = match.identifier;  // unique per unit
+    }
+    // Barcode & SKU → no unit identifier (mergeable by product+price)
 
-    // Duplicate check — only merge into an existing line when
-    // SKU + price + unit all match. Otherwise create a new line.
     const candidate = {
         product_code: match.product_code,
         price: match.price,
@@ -1350,7 +1355,7 @@ function autoAddBarcodeMatch(match) {
     hideBarcodeResults();
     searchInput.focus();
 
-    showIndicator(`✅ Added: ${match.name} (${match.identifier})`);
+    showIndicator(`✅ Added: ${match.name}`);
 }
 
 // ============================================
@@ -1624,14 +1629,13 @@ function renderCart() {
     const container = document.getElementById('cartItems');
     const countEl = document.getElementById('cartCount');
     const subtotalEl = document.getElementById('subtotal');
-    const taxEl = document.getElementById('tax');           // may be null if tax disabled
+    const taxEl = document.getElementById('tax');
     const totalEl = document.getElementById('total');
     const checkoutBtn = document.getElementById('checkoutBtn');
 
     countEl.textContent = cart.reduce((sum, i) => sum + i.quantity, 0);
     checkoutBtn.disabled = cart.length === 0;
 
-    // ---------- Empty cart ----------
     if (cart.length === 0) {
         container.innerHTML = `
             <div class="cart-empty">
@@ -1648,7 +1652,6 @@ function renderCart() {
         return;
     }
 
-    // ---------- Build items + subtotal ----------
     let subtotal = 0;
     container.innerHTML = cart.map((item, index) => {
         const lineTotal = item.price * item.quantity;
@@ -1673,25 +1676,21 @@ function renderCart() {
         `;
     }).join('');
 
-    // ---------- Tax (INCLUSIVE — extracted, not added) ----------
+    // Tax (INCLUSIVE)
     let tax = 0;
     if (typeof POS_ENABLE_TAX !== 'undefined'
         && POS_ENABLE_TAX
         && typeof POS_TAX_RATE !== 'undefined'
         && POS_TAX_RATE > 0) {
-        // VAT = subtotal × rate / (100 + rate)
         tax = (subtotal * POS_TAX_RATE) / (100 + POS_TAX_RATE);
         tax = Math.round(tax * 100) / 100;
     }
 
-    // ---------- Write to DOM ----------
     subtotalEl.textContent = `KSh ${subtotal.toLocaleString()}`;
-
     if (taxEl) {
         taxEl.textContent = `KSh ${tax.toLocaleString()}`;
     }
 
-    // Customer pays exactly the subtotal (shelf price).
     currentTotal = subtotal;
     totalEl.textContent = `KSh ${currentTotal.toLocaleString()}`;
     updateCheckoutButton();
@@ -2116,9 +2115,14 @@ function showSuccessToast(message) {
     setTimeout(() => { toast.style.display = 'none'; }, 4000);
 }
 
-function showIndicator(message) {
+function showIndicator(message, isError = false) {
     const indicator = document.getElementById('stockUpdateIndicator');
     indicator.textContent = message;
+    if (isError) {
+        indicator.classList.add('error');
+    } else {
+        indicator.classList.remove('error');
+    }
     indicator.style.display = 'block';
     indicator.style.opacity = '1';
 

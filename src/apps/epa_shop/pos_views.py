@@ -253,29 +253,31 @@ def pos_search_products(request):
 @login_required
 def pos_search_barcode(request):
     """
-    Unified barcode / IMEI / serial lookup for the POS search bar.
+    Unified barcode / IMEI / serial / product_code lookup for POS.
+
+    Search order (per product type):
+      1. Exact match on Unit.identifier (IMEI / Serial) — for Phone/Electronic
+      2. Exact match on product.barcode
+      3. Partial match on product_code (fallback for typing)
 
     Query params:
-        q        — the scanned/typed code (required, min length 3)
-        add      — '1' to only return the first exact/partial match
-                   (used by the auto-add-on-Enter flow)
-
+        q — the scanned/typed code
     Returns:
-        {
-          "match": { ...product payload... } | null,
-          "units": [ ...all matching units... ]
-        }
+        {"match": {...}|null, "units": [{...}, ...]}
     """
     try:
         company, is_viewing_company = get_active_company(request)
         if not company:
-            return JsonResponse({'error': 'No company assigned', 'match': None, 'units': []}, status=400)
+            return JsonResponse(
+                {'error': 'No company assigned', 'match': None, 'units': []},
+                status=400,
+            )
 
         q = request.GET.get('q', '').strip()
         if len(q) < 3:
             return JsonResponse({'match': None, 'units': []})
 
-        # Branch scoping (same rule as pos_search_products)
+        # Branch scoping (cashiers only see their branch)
         if is_viewing_company:
             user_branch = None
         elif request.user.role == 'company_cashier':
@@ -285,21 +287,31 @@ def pos_search_barcode(request):
 
         units_payload = []
 
-        # ---------- Phone units ----------
+        # ============================================================
+        # 1. PHONES
+        #    Match: Unit.identifier EXACT, OR barcode EXACT, OR code partial
+        # ============================================================
+        phones_qs = Phone.objects.filter(company=company, is_active=True)
+        if user_branch:
+            phones_qs = phones_qs.filter(branch=user_branch)
+
+        # (a) Exact match on Unit.identifier
         phone_units = (
             Unit.objects
             .filter(
                 phone__company=company,
-                identifier__icontains=q,
                 status='available',
+                identifier__iexact=q,   # ← exact, not icontains
             )
             .select_related('phone', 'phone__branch')
         )
         if user_branch:
             phone_units = phone_units.filter(phone__branch=user_branch)
 
+        seen_phone_codes = set()
         for u in phone_units:
             p = u.phone
+            seen_phone_codes.add(p.product_code)
             units_payload.append({
                 'identifier': u.identifier,
                 'unit_type': 'IMEI',
@@ -322,21 +334,58 @@ def pos_search_barcode(request):
                 'image': p.image.url if p.image else None,
             })
 
-        # ---------- Electronic units ----------
+        # (b) Match on Phone.barcode (exact)
+        phone_barcode_matches = phones_qs.filter(barcode__iexact=q)
+        for p in phone_barcode_matches:
+            if p.product_code in seen_phone_codes:
+                continue
+            seen_phone_codes.add(p.product_code)
+            units_payload.append({
+                'identifier': p.barcode,
+                'unit_type': 'Barcode',
+                'category': 'Phone',
+                'product_code': p.product_code,
+                'name': p.name,
+                'brand': p.brand,
+                'model': p.model,
+                'price': float(p.selling_price),
+                'stock': Unit.objects.filter(phone=p, status='available').count(),
+                'branch_id': p.branch_id,
+                'specs': {
+                    'ram': p.ram or '',
+                    'storage_capacity': p.storage_capacity or '',
+                    'screen_size': p.screen_size or '',
+                    'color': p.color or '',
+                    'condition': p.condition or 'new',
+                    'battery_capacity': p.battery_capacity or '',
+                },
+                'image': p.image.url if p.image else None,
+            })
+
+        # ============================================================
+        # 2. ELECTRONICS
+        # ============================================================
+        electronics_qs = Electronic.objects.filter(company=company, is_active=True)
+        if user_branch:
+            electronics_qs = electronics_qs.filter(branch=user_branch)
+
+        # (a) Exact match on Unit.identifier
         electronic_units = (
             Unit.objects
             .filter(
                 electronic__company=company,
-                identifier__icontains=q,
                 status='available',
+                identifier__iexact=q,
             )
             .select_related('electronic', 'electronic__branch')
         )
         if user_branch:
             electronic_units = electronic_units.filter(electronic__branch=user_branch)
 
+        seen_elec_codes = set()
         for u in electronic_units:
             p = u.electronic
+            seen_elec_codes.add(p.product_code)
             units_payload.append({
                 'identifier': u.identifier,
                 'unit_type': 'Serial',
@@ -359,20 +408,70 @@ def pos_search_barcode(request):
                 'image': p.image.url if p.image else None,
             })
 
-        # ---------- Accessories (no Unit table — use product_code) ----------
-        # Optional: barcode scanners on accessories usually scan the product_code.
-        accessories = Accessory.objects.filter(
-            company=company,
-            is_active=True,
-            product_code__icontains=q,
-        )
-        if user_branch:
-            accessories = accessories.filter(branch=user_branch)
-
-        for a in accessories:
+        # (b) Match on Electronic.barcode (exact)
+        elec_barcode_matches = electronics_qs.filter(barcode__iexact=q)
+        for p in elec_barcode_matches:
+            if p.product_code in seen_elec_codes:
+                continue
+            seen_elec_codes.add(p.product_code)
             units_payload.append({
-                'identifier': a.product_code,
-                'unit_type': 'SKU',
+                'identifier': p.barcode,
+                'unit_type': 'Barcode',
+                'category': 'Electronics',
+                'product_code': p.product_code,
+                'name': p.name,
+                'brand': p.brand,
+                'model': p.model_number,
+                'price': float(p.selling_price),
+                'stock': Unit.objects.filter(electronic=p, status='available').count(),
+                'branch_id': p.branch_id,
+                'specs': {
+                    'ram': p.ram or '',
+                    'storage': p.storage or '',
+                    'processor': p.processor or '',
+                    'device_type': p.device_type or 'other',
+                    'screen_size': p.screen_size or '',
+                    'color': p.color or '',
+                },
+                'image': p.image.url if p.image else None,
+            })
+
+        # ============================================================
+        # 3. ACCESSORIES
+        #    Match: barcode EXACT, OR product_code EXACT/partial
+        # ============================================================
+        accessories_qs = Accessory.objects.filter(company=company, is_active=True)
+        if user_branch:
+            accessories_qs = accessories_qs.filter(branch=user_branch)
+
+        # (a) Exact barcode
+        acc_barcode_matches = accessories_qs.filter(barcode__iexact=q)
+        # (b) Exact product_code
+        acc_code_matches = accessories_qs.filter(product_code__iexact=q)
+        # (c) Partial product_code (for typing, not scanning)
+        acc_partial_matches = accessories_qs.filter(product_code__icontains=q)
+
+        # Merge, dedupe, exact matches first
+        acc_seen = set()
+        acc_combined = []
+        for a in list(acc_barcode_matches) + list(acc_code_matches) + list(acc_partial_matches):
+            if a.id in acc_seen:
+                continue
+            acc_seen.add(a.id)
+            acc_combined.append(a)
+
+        for a in acc_combined:
+            # Pick the best identifier label
+            if a.barcode and a.barcode.lower() == q.lower():
+                identifier = a.barcode
+                unit_type_label = 'Barcode'
+            else:
+                identifier = a.product_code
+                unit_type_label = 'SKU'
+
+            units_payload.append({
+                'identifier': identifier,
+                'unit_type': unit_type_label,
                 'category': 'Accessories',
                 'product_code': a.product_code,
                 'name': a.name,
@@ -388,7 +487,7 @@ def pos_search_barcode(request):
                 'image': a.image.url if a.image else None,
             })
 
-        # Prefer exact matches first
+        # Sort: exact identifier matches first, then alphabetical
         units_payload.sort(key=lambda x: (x['identifier'] != q, x['identifier']))
 
         match = units_payload[0] if units_payload else None
@@ -406,6 +505,7 @@ def pos_search_barcode(request):
             status=500,
         )
 
+        
 
 @login_required
 def pos_search_imei(request):

@@ -25,6 +25,7 @@ urlpatterns = [
     # ============================================
     # PRODUCTS - Full CRUD (Using Product Code)
     # ============================================
+    path('scanner-lookup/', product_views.scanner_lookup, name='scanner_lookup'),
     path('products/', product_views.product_list, name='epa-products'),
     path('products/add/', product_views.product_create, name='epa-product-create'),
     path('products/<str:product_code>/', product_views.product_detail, name='epa-product-detail'),
@@ -52,6 +53,7 @@ urlpatterns = [
     # ============================================
     path('sale/<int:sale_id>/reverse/', product_views.unit_reverse_sale, name='epa-sale-reverse'),
     path('sale/<int:sale_id>/complete/', sale_views.sale_complete, name='epa-sale-complete'),
+    path('sale/lookup/', sale_views.sale_lookup_by_barcode, name='epa-sale-lookup'),
     
     # ============================================
     # POINT OF SALE (POS)

@@ -342,6 +342,35 @@
         background: #87CEEB;
         border-color: #000000;
     }
+
+    /* Scanner button */
+    .btn-scan {
+        padding: 8px 16px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: #87CEEB;
+        cursor: pointer;
+        transition: all 0.3s;
+        font-weight: 700;
+        color: #000000;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .btn-scan:hover {
+        background: #7bb8d8;
+        border-color: #000000;
+        transform: translateY(-1px);
+    }
+    .btn-scan.scanning {
+        background: #28a745;
+        color: white;
+        animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+        50% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+    }
     
     /* ============================================
        CARD STYLING
@@ -573,6 +602,60 @@
     @keyframes spin {
         to { transform: rotate(360deg); }
     }
+
+    /* ============================================
+       SCANNER RESULT DETAILS
+    ============================================ */
+    .scan-section {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 16px;
+        margin-bottom: 16px;
+    }
+    .scan-section.unit-section {
+        border-color: #0d6efd;
+        background: #e7f1ff;
+    }
+    .scan-section.sale-section {
+        border-color: #ffc107;
+        background: #fff8e7;
+    }
+    .scan-section-title {
+        font-size: 16px;
+        font-weight: 700;
+        margin-bottom: 10px;
+        color: #000000;
+    }
+    .scan-details-table {
+        width: 100%;
+        font-size: 13px;
+    }
+    .scan-details-table td {
+        padding: 4px 8px;
+        vertical-align: top;
+    }
+    .scan-details-table td:first-child {
+        font-weight: 600;
+        width: 40%;
+        color: #555;
+    }
+    .scan-error {
+        text-align: center;
+        padding: 30px;
+    }
+    .scan-error-icon {
+        font-size: 48px;
+        display: block;
+        margin-bottom: 10px;
+    }
+    .scan-error h3 {
+        color: #dc3545;
+        margin-bottom: 8px;
+    }
+    .scan-error p {
+        color: #666;
+        margin-bottom: 6px;
+    }
     
     /* ============================================
        RESPONSIVE
@@ -601,6 +684,7 @@
         .products-filters .search-input { width: 100%; min-width: auto; }
         .products-filters .filter-select { width: 100%; }
         .products-filters .btn-refresh { width: 100%; }
+        .products-filters .btn-scan { width: 100%; justify-content: center; }
         .products-header { flex-direction: column; align-items: flex-start; gap: 10px; }
         .header-right { width: 100%; }
         .header-right .btn { width: 100%; text-align: center; }
@@ -736,6 +820,11 @@
         <!-- Search and Filters -->
         <div class="products-filters">
             <input type="text" class="search-input" placeholder="Search ALL products by name, brand, model, SKU, or code..." id="searchInput" autocomplete="off">
+            
+            <button type="button" class="btn-scan" id="scanBtn" title="Click to focus scanner input — USB scanners type automatically">
+                <i class="fas fa-barcode"></i> Scan
+            </button>
+
             <select class="filter-select" id="categoryFilter">
                 <option value="">All Categories</option>
                 <option value="Smartphone">📱 Smartphones</option>
@@ -888,6 +977,29 @@
     </div>
 </div>
 
+<!-- ============================================================ -->
+<!-- SCANNER RESULT MODAL                                          -->
+<!-- ============================================================ -->
+<div class="action-modal-overlay" id="scanResultModal">
+    <div class="action-modal" style="max-width: 620px;">
+        <div class="action-modal-header">
+            <h3>🔍 Scan Result</h3>
+            <button class="action-modal-close" onclick="closeScanModal()">✕</button>
+        </div>
+        <div class="action-modal-body" id="scanResultBody">
+            <!-- Filled dynamically -->
+        </div>
+        <div class="action-modal-footer">
+            <button class="action-modal-cancel" onclick="closeScanModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden scanner input — kept focused so USB scanners type into it -->
+<input type="text" id="scannerInput" 
+       style="position:fixed;left:-9999px;top:-9999px;opacity:0;" 
+       autocomplete="off" tabindex="-1">
+
 <!-- Copy Tooltip -->
 <div class="copy-tooltip" id="copyTooltip">Copied!</div>
 
@@ -909,8 +1021,6 @@ function parseAllProducts() {
 
     let value = el.textContent;
 
-    // Try up to 3 rounds of JSON.parse — handles the case where the
-    // view passed a json.dumps() string that json_script then re-encoded.
     for (let attempt = 0; attempt < 3; attempt++) {
         try {
             value = JSON.parse(value);
@@ -924,14 +1034,11 @@ function parseAllProducts() {
             return value;
         }
 
-        // If we got an object with a products/items key, unwrap it
         if (value && typeof value === 'object' && !Array.isArray(value)) {
             if (Array.isArray(value.products)) return value.products;
             if (Array.isArray(value.items)) return value.items;
-            // Otherwise keep drilling (it's a JSON string that needs another parse)
         }
 
-        // If it's already a string but didn't parse to an array, try again
         if (typeof value !== 'string') break;
     }
 
@@ -957,7 +1064,6 @@ const paginationControls = document.getElementById('paginationControls');
 const perPageSelect = document.getElementById('perPageSelect');
 const headerTotalCount = document.getElementById('headerTotalCount');
 
-// Keep header count in sync
 if (headerTotalCount) {
     headerTotalCount.textContent = ALL_PRODUCTS.length;
 }
@@ -969,6 +1075,22 @@ const canManage = (
     userRole === 'super_admin' ||
     userRole === 'stock_controller'
 );
+
+
+// NEW — who can see the buying (purchase) price
+const canSeeBuyingPrice = (
+    userRole === 'company_admin' ||
+    userRole === 'super_admin' ||
+    userRole === 'stock_controller'
+);
+
+
+const canSeeScanActions = (
+    userRole === 'company_admin' ||
+    userRole === 'super_admin' ||
+    userRole === 'stock_controller'
+);
+
 
 // ============================================================
 // ESCAPE HTML
@@ -995,7 +1117,6 @@ function fmtKsh(n) {
 // RENDER A SINGLE ROW
 // ============================================================
 function renderRow(p, index) {
-    // Category badge
     let catBadge = '';
     if (p.type === 'Smartphone') {
         catBadge = '<span class="category-badge category-smartphone">📱 Smartphone</span>';
@@ -1009,7 +1130,6 @@ function renderRow(p, index) {
         catBadge = '<span class="category-badge">' + esc(p.type || '-') + '</span>';
     }
 
-    // Stock badge
     let stockBadge = '';
     const stock = parseInt(p.stock) || 0;
     if (stock > 10) {
@@ -1020,7 +1140,6 @@ function renderRow(p, index) {
         stockBadge = '<span class="stock-badge stock-out-of-stock">Out of Stock</span>';
     }
 
-    // Actions column
     let actionsCell;
     if (canManage) {
         actionsCell = '<td class="text-center">' +
@@ -1060,7 +1179,6 @@ function renderRow(p, index) {
 // RENDER THE WHOLE TABLE (only current page)
 // ============================================================
 function renderTable() {
-    // Sort
     filteredProducts.sort((a, b) => {
         const col = sortState.column;
         let va, vb;
@@ -1086,7 +1204,6 @@ function renderTable() {
         return sortState.direction === 'asc' ? cmp : -cmp;
     });
 
-    // Paginate
     const totalFiltered = filteredProducts.length;
     let startIdx, endIdx;
     if (perPage === 'all') {
@@ -1098,7 +1215,6 @@ function renderTable() {
     }
     const pageSlice = filteredProducts.slice(startIdx, endIdx);
 
-    // Build HTML
     let html = '';
     if (pageSlice.length === 0) {
         html =
@@ -1115,11 +1231,9 @@ function renderTable() {
     }
     tbody.innerHTML = html;
 
-    // Update counts
     visibleCountEl.textContent = pageSlice.length;
     filteredTotalCountEl.textContent = totalFiltered;
 
-    // Page info text
     const totalPages = perPage === 'all' ? 1 : Math.ceil(totalFiltered / perPage);
     if (totalPages > 1) {
         paginationText.textContent = '(page ' + currentPage + ' of ' + totalPages + ')';
@@ -1127,7 +1241,6 @@ function renderTable() {
         paginationText.textContent = '';
     }
 
-    // Render pagination controls
     renderPagination(totalPages);
 }
 
@@ -1137,7 +1250,6 @@ function renderTable() {
 function renderPagination(totalPages) {
     let html = '';
 
-    // First + Prev
     if (currentPage > 1) {
         html += '<li class="page-item"><a class="page-link" onclick="goToPage(1)"><i class="fas fa-angle-double-left"></i></a></li>';
         html += '<li class="page-item"><a class="page-link" onclick="goToPage(' + (currentPage - 1) + ')"><i class="fas fa-angle-left"></i></a></li>';
@@ -1146,7 +1258,6 @@ function renderPagination(totalPages) {
         html += '<li class="page-item disabled"><span class="page-link"><i class="fas fa-angle-left"></i></span></li>';
     }
 
-    // Numbered
     const startPage = Math.max(1, currentPage - 2);
     const endPage = Math.min(totalPages, currentPage + 2);
     for (let n = startPage; n <= endPage; n++) {
@@ -1157,7 +1268,6 @@ function renderPagination(totalPages) {
         }
     }
 
-    // Next + Last
     if (currentPage < totalPages) {
         html += '<li class="page-item"><a class="page-link" onclick="goToPage(' + (currentPage + 1) + ')"><i class="fas fa-angle-right"></i></a></li>';
         html += '<li class="page-item"><a class="page-link" onclick="goToPage(' + totalPages + ')"><i class="fas fa-angle-double-right"></i></a></li>';
@@ -1234,7 +1344,6 @@ function clearFilters() {
 
     const branchFilter = document.getElementById('branchFilter');
     if (branchFilter && branchFilter.value) {
-        // Reload without the branch param so the server refetches everything
         const currentUrl = new URL(window.location.href);
         currentUrl.searchParams.delete('branch');
         window.location.href = currentUrl.toString();
@@ -1330,6 +1439,211 @@ document.getElementById('actionModal').addEventListener('click', function (e) {
 });
 
 // ============================================================
+// SCANNER LOOKUP
+// ============================================================
+function handleScanInput(value) {
+    if (!value || !value.trim()) return;
+
+    const query = value.trim();
+
+    // Visual feedback
+    const scanBtn = document.getElementById('scanBtn');
+    scanBtn.classList.add('scanning');
+    scanBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Searching…';
+
+    fetch('/epa_shop/scanner-lookup/?q=' + encodeURIComponent(query))
+        .then(r => r.json())
+        .then(data => {
+            showScanResult(data, query);
+        })
+        .catch(err => {
+            showScanResult({
+                success: false,
+                error: 'Network error: ' + err,
+            }, query);
+        })
+        .finally(() => {
+            scanBtn.classList.remove('scanning');
+            scanBtn.innerHTML = '<i class="fas fa-barcode"></i> Scan';
+        });
+}
+
+function showScanResult(data, query) {
+    const body = document.getElementById('scanResultBody');
+
+    if (!data.success) {
+        body.innerHTML =
+            '<div class="scan-error">' +
+            '<span class="scan-error-icon">❌</span>' +
+            '<h3>Not Found</h3>' +
+            '<p>No product or unit matches <strong>' + esc(query) + '</strong></p>' +
+            '<p style="font-size:12px;color:#999;">' + esc(data.error || '') + '</p>' +
+            '</div>';
+        document.getElementById('scanResultModal').style.display = 'flex';
+        return;
+    }
+
+    const p = data.product;
+    const u = data.unit;
+    const s = data.sale;
+
+    let html = '';
+
+    // ---------- Product block ----------
+    html += '<div class="scan-section">';
+    html += '<div class="scan-section-title">' + esc(p.name) + '</div>';
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">';
+    html += '<span class="product-code" style="font-size:12px;">' + esc(p.product_code) + '</span>';
+    html += '<span class="category-badge category-' + esc((p.type || '').toLowerCase().replace(/\s+/g, '-')) + '">' + esc(p.type) + '</span>';
+    html += '</div>';
+    html += '<table class="scan-details-table">';
+    html += '<tr><td>Brand</td><td>' + esc(p.brand) + '</td></tr>';
+    html += '<tr><td>Model</td><td>' + esc(p.model) + '</td></tr>';
+    html += '<tr><td>Stock</td><td><strong>' + p.stock + '</strong> units</td></tr>';
+    html += '<tr><td>Selling Price</td><td>' + fmtKsh(p.selling_price) + '</td></tr>';
+    html += '<tr><td>Best Price</td><td>' + fmtKsh(p.best_price) + '</td></tr>';
+    if (canSeeBuyingPrice) {
+        html += '<tr><td>Buying Price</td><td>' + fmtKsh(p.purchase_price) + '</td></tr>';
+    }
+    html += '</table>';
+    html += '</div>';
+
+
+    
+    // ---------- Unit block (if IMEI/serial matched) ----------
+    if (u) {
+        html += '<div class="scan-section unit-section">';
+        html += '<div class="scan-section-title">📱 Unit: ' + esc(u.identifier) + '</div>';
+        html += '<table class="scan-details-table">';
+        html += '<tr><td>Type</td><td>' + esc(u.unit_type || 'N/A') + '</td></tr>';
+        html += '<tr><td>Status</td><td><strong>' + esc(u.status) + '</strong></td></tr>';
+        // Owner visible to admins & stock controllers only
+        if (canSeeScanActions && u.owner_name) {
+            html += '<tr><td>Owner</td><td>' + esc(u.owner_name) + ' (' + esc(u.owner_phone) + ')</td></tr>';
+        }
+        html += '</table>';
+        html += '</div>';
+    }
+
+    // ---------- Sale block ----------
+    if (s) {
+        html += '<div class="scan-section sale-section">';
+        html += '<div class="scan-section-title">🧾 Sold — Sale #' + esc(s.company_sale_id) + '</div>';
+        html += '<table class="scan-details-table">';
+        html += '<tr><td>Sale Date</td><td>' + new Date(s.sale_date).toLocaleString() + '</td></tr>';
+        html += '</table>';
+        html += '</div>';
+    }
+
+    // ---------- Action buttons (admins & stock controllers only) ----------
+    if (canManage) {
+        // Build restock URL from product code — same target as the ⋮ Action Modal
+        var restockUrl = '/epa_shop/products/' + encodeURIComponent(p.product_code) + '/restock/';
+
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;">';
+        html += '<a href="' + esc(p.detail_url) + '" class="action-btn action-btn-view">';
+        html += '<span class="action-btn-icon">👁️</span>';
+        html += '<span class="action-btn-label">View Product</span>';
+        html += '<span class="action-btn-desc">Full details</span>';
+        html += '</a>';
+
+        if (p.type !== 'Accessory') {
+            // Phone / Electronic → View Units
+            html += '<a href="' + esc(p.units_url) + '" class="action-btn action-btn-edit">';
+            html += '<span class="action-btn-icon">📦</span>';
+            html += '<span class="action-btn-label">View Units</span>';
+            html += '<span class="action-btn-desc">All IMEI/Serial</span>';
+            html += '</a>';
+        }
+
+        // Always show Restock (works for Phone, Electronic, and Accessory)
+        html += '<a href="' + esc(restockUrl) + '" class="action-btn action-btn-restock">';
+        html += '<span class="action-btn-icon">➕</span>';
+        html += '<span class="action-btn-label">Restock</span>';
+        html += '<span class="action-btn-desc">Add stock or units</span>';
+        html += '</a>';
+
+        html += '</div>';
+    }
+    
+
+    body.innerHTML = html;
+    document.getElementById('scanResultModal').style.display = 'flex';
+}
+
+
+function closeScanModal() {
+    document.getElementById('scanResultModal').style.display = 'none';
+    focusScannerInput();
+}
+
+document.getElementById('scanResultModal').addEventListener('click', function (e) {
+    if (e.target === this) closeScanModal();
+});
+
+// ============================================================
+// SCANNER FOCUS MANAGEMENT
+// ============================================================
+function focusScannerInput() {
+    const si = document.getElementById('scannerInput');
+    if (si) {
+        si.value = '';
+        si.focus({ preventScroll: true });
+    }
+}
+
+function initScannerInput() {
+    const si = document.getElementById('scannerInput');
+    if (!si) return;
+
+    let lastScanTime = 0;
+
+    si.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const value = si.value.trim();
+            si.value = '';
+
+            if (value && value.length >= 3) {
+                // Debounce: ignore if identical scan within 1s
+                const now = Date.now();
+                if (now - lastScanTime < 1000) return;
+                lastScanTime = now;
+                handleScanInput(value);
+            }
+        }
+    });
+
+    // Keep the hidden input focused whenever user isn't typing elsewhere
+    setInterval(() => {
+        const active = document.activeElement;
+        if (!active) return;
+        const tag = (active.tagName || '').toLowerCase();
+        const isEditable = (
+            tag === 'input' ||
+            tag === 'textarea' ||
+            tag === 'select' ||
+            active.isContentEditable
+        );
+        // Only re-focus if the user isn't actively typing somewhere meaningful
+        if (!isEditable || active === si) {
+            si.focus({ preventScroll: true });
+        }
+    }, 2000);
+}
+
+// Manual button opens a prompt as fallback
+document.getElementById('scanBtn').addEventListener('click', function () {
+    focusScannerInput();
+    // If no scanner is attached, allow manual entry via prompt
+    // (useful for testing on desktop without a scanner)
+    const value = prompt('Scan or type barcode / IMEI / serial number:');
+    if (value && value.trim()) {
+        handleScanInput(value.trim());
+    }
+});
+
+// ============================================================
 // INIT
 // ============================================================
 document.addEventListener('DOMContentLoaded', function () {
@@ -1356,8 +1670,12 @@ document.addEventListener('DOMContentLoaded', function () {
         renderTable();
     });
 
-    // Initial render (this replaces the loading row)
+    // Initial render
     applyFilters();
+
+    // Init scanner
+    initScannerInput();
+    focusScannerInput();
 
     // Keyboard shortcuts
     document.addEventListener('keydown', function (e) {
@@ -1366,7 +1684,10 @@ document.addEventListener('DOMContentLoaded', function () {
             searchInput.focus();
             searchInput.select();
         }
-        if (e.key === 'Escape') closeActionModal();
+        if (e.key === 'Escape') {
+            closeActionModal();
+            closeScanModal();
+        }
     });
 });
 </script>
