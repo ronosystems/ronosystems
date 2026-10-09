@@ -189,8 +189,6 @@
 
     /* ============================================ */
     /* PRODUCT INFO — 6-column grid                  */
-    /* # (5%) | Description (36%) | Qty (5%) |       */
-    /* Unit Price (25%) | Total (25%) | Gap (4%)     */
     /* ============================================ */
     .etr-receipt .etr-items {
         border-bottom: 2px dashed #000000;
@@ -257,7 +255,7 @@
     }
 
     /* ============================================ */
-    /* TOTALS — flexbox (label left, value right)    */
+    /* TOTALS                                        */
     /* ============================================ */
     .etr-receipt .etr-totals {
         border-top: 2px solid #000000;
@@ -278,7 +276,6 @@
     .etr-receipt .etr-total-row .label { color: #000000; font-weight: 500; text-align: left; }
     .etr-receipt .etr-total-row .value { font-weight: 600; color: #000000; text-align: right; }
 
-    /* Informational VAT row — smaller, muted look */
     .etr-receipt .etr-total-row.vat-included {
         font-size: 11px;
         color: #555;
@@ -319,6 +316,36 @@
         border-top: 1px solid #000000;
         height: 18px;
         margin-bottom: 2px;
+    }
+
+    /* ============================================ */
+    /* SALE BARCODE (for scan-to-lookup)             */
+    /* ============================================ */
+    .etr-receipt .etr-sale-barcode {
+        text-align: center;
+        margin-top: 14px;
+        padding-top: 10px;
+        border-top: 1px dashed #000000;
+    }
+    .etr-receipt .etr-sale-barcode .sale-bc-label {
+        font-size: 9px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+        color: #000000;
+    }
+    .etr-receipt .etr-sale-barcode svg {
+        display: block;
+        margin: 0 auto;
+        max-width: 100%;
+        height: auto;
+    }
+    .etr-receipt .etr-sale-barcode .sale-bc-number {
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+        letter-spacing: 2px;
+        margin-top: 4px;
+        color: #000000;
     }
 
     /* ============================================ */
@@ -444,8 +471,8 @@
         .etr-receipt .etr-footer { border-top-color:    #000000 !important; }
         .etr-receipt .etr-customer-section { border-color: #000000 !important; }
         .etr-receipt .etr-receipt-info { border-color: #000000 !important; }
+        .etr-receipt .etr-sale-barcode { border-top-color: #000000 !important; }
 
-        /* Make the VAT-included row still readable in black & white */
         .etr-receipt .etr-total-row.vat-included,
         .etr-receipt .etr-total-row.vat-included .label,
         .etr-receipt .etr-total-row.vat-included .value {
@@ -684,10 +711,7 @@
             {% endif %}
 
             <!-- ============================================ -->
-            <!-- TOTALS — flexbox                              -->
-            <!-- VAT is INCLUSIVE — extracted from the price,  -->
-            <!-- not added on top. Customer pays exactly the   -->
-            <!-- shelf price.                                  -->
+            <!-- TOTALS — VAT inclusive                        -->
             <!-- ============================================ -->
             {% if receipt_settings.show_subtotal or receipt_settings.show_vat or receipt_settings.show_totals %}
                 <div class="etr-totals">
@@ -705,7 +729,6 @@
                     </div>
                     {% endif %}
 
-                    {# VAT is informational — already included in the price #}
                     {% if receipt_settings.show_vat and sale.tax > 0 %}
                     <div class="etr-total-row vat-included">
                         <span class="label">VAT (incl.)</span>
@@ -760,6 +783,17 @@
             {% endif %}
 
             <!-- ============================================ -->
+            <!-- SALE BARCODE (for scan-to-lookup)             -->
+            <!-- ============================================ -->
+            {% if receipt_settings.show_sale_barcode and sale.barcode_number %}
+            <div class="etr-sale-barcode">
+                <div class="sale-bc-label">Scan to look up this sale</div>
+                <svg id="saleBarcodeSvg"></svg>
+                <div class="sale-bc-number">{{ sale.barcode_number }}</div>
+            </div>
+            {% endif %}
+
+            <!-- ============================================ -->
             <!-- FOOTER                                        -->
             <!-- ============================================ -->
             <div class="etr-footer">
@@ -811,29 +845,41 @@
 </div>
 {% endif %}
 
-<!-- QZ Tray library -->
+<!-- Libraries -->
 <script src="{% static 'vendor/qz-tray/qz-tray.js' %}"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 
 <script>
 // ============================================================
+// SALE BARCODE — render on load
+// ============================================================
+document.addEventListener('DOMContentLoaded', function () {
+    var svg = document.getElementById('saleBarcodeSvg');
+    if (!svg) return;  // toggle is off
+
+    var code = "{{ sale.barcode_number|escapejs }}";
+    if (!code) return;
+
+    try {
+        JsBarcode(svg, code, {
+            format: 'CODE128',
+            width: 1.6,
+            height: 50,
+            displayValue: false,
+            margin: 0,
+            background: '#ffffff',
+            lineColor: '#000000',
+        });
+    } catch (e) {
+        console.warn('Sale barcode render failed:', e);
+    }
+});
+
+// ============================================================
 // QZ TRAY — signed, silent thermal printing
 // ============================================================
-//
-// The signing flow removes the "Untrusted website" prompt:
-//   1. certificate promise → browser fetches our public cert
-//   2. signature promise   → browser asks Django to sign each request
-//   3. QZ Tray verifies the signature against the cert
-//
-// Signing must be configured BEFORE any connect/print call.
-// ============================================================
-
-// Optional: set to a printer name substring (e.g. "EPSON", "Zebra")
-// to target a specific printer. null = use OS default printer.
 var QZ_PRINTER_NAME = null;
 
-// ------------------------------------------------------------
-// 1. CERTIFICATE PROMISE — serve our public cert to QZ Tray
-// ------------------------------------------------------------
 qz.security.setCertificatePromise(function (resolve, reject) {
     fetch('/static/qz_keys/certificate.crt', { cache: 'no-store' })
         .then(function (r) {
@@ -844,9 +890,6 @@ qz.security.setCertificatePromise(function (resolve, reject) {
         .catch(reject);
 });
 
-// ------------------------------------------------------------
-// 2. SIGNATURE PROMISE — ask Django to sign each QZ Tray request
-// ------------------------------------------------------------
 qz.security.setSignatureAlgorithm('SHA512');
 
 qz.security.setSignaturePromise(function (toSign) {
@@ -865,9 +908,6 @@ qz.security.setSignaturePromise(function (toSign) {
     };
 });
 
-// ------------------------------------------------------------
-// 3. Build a standalone HTML document for QZ Tray
-// ------------------------------------------------------------
 function buildReceiptHTML() {
     var el = document.getElementById('receiptContainer');
     if (!el) return '<html><body>Receipt not found</body></html>';
@@ -892,14 +932,10 @@ function buildReceiptHTML() {
          + '</body></html>';
 }
 
-// ------------------------------------------------------------
-// 4. PRINT — sign, connect, print, fall back to browser
-// ------------------------------------------------------------
 function qzPrintReceipt() {
     var btn = document.getElementById('btnPrintEtr');
     var label = document.getElementById('btnPrintLabel');
 
-    // QZ Tray not loaded → browser print fallback
     if (typeof qz === 'undefined') {
         console.warn('QZ Tray library not loaded — using browser print.');
         window.print();
@@ -952,9 +988,6 @@ function qzPrintReceipt() {
         });
 }
 
-// ------------------------------------------------------------
-// 5. Auto-print on load if ?print=1 or company enabled auto_print
-// ------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', function () {
     var autoPrint = {{ receipt_settings.auto_print|yesno:"true,false" }};
     if (window.location.search.includes('print=1') || autoPrint) {

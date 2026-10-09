@@ -999,6 +999,57 @@ def sale_list(request):
     }
     return render(request, 'epa/sales.html', context)
 
+
+@login_required
+def sale_lookup_by_barcode(request):
+    """Look up a sale by its scannable barcode number."""
+    company, is_viewing_company = get_active_company(request)
+
+    if not company:
+        return JsonResponse({'success': False, 'error': 'No active company.'}, status=400)
+
+    code = (request.GET.get('q') or '').strip()
+    if not code:
+        return JsonResponse({'success': False, 'error': 'No code provided.'}, status=400)
+
+    sale = Sale.objects.filter(
+        company=company,
+        barcode_number__iexact=code,
+    ).select_related('branch', 'customer').first()
+
+    if not sale:
+        return JsonResponse({
+            'success': False,
+            'error': f'No sale found for barcode "{code}".',
+        }, status=404)
+
+    # Branch access check
+    if not is_viewing_company and not is_admin_or_manager(request.user):
+        user_branch = get_user_branch(request.user)
+        if user_branch and sale.branch and sale.branch.id != user_branch.id:
+            return JsonResponse({
+                'success': False,
+                'error': 'This sale belongs to a different branch.',
+            }, status=403)
+
+    return JsonResponse({
+        'success': True,
+        'sale': {
+            'id': sale.id,
+            'company_sale_id': sale.company_sale_id,
+            'barcode_number': sale.barcode_number,
+            'customer_name': sale.customer_name,
+            'customer_phone': sale.customer_phone,
+            'net_amount': float(sale.net_amount),
+            'payment_method': sale.payment_method,
+            'payment_status': sale.payment_status,
+            'sale_date': sale.sale_date.isoformat(),
+            'branch_name': sale.branch.name if sale.branch else '',
+            'receipt_url': f'/epa_shop/sale/receipt/{sale.id}/',
+        },
+    })
+
+
 # ============================================
 # SALE DETAIL
 # ============================================

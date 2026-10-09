@@ -353,6 +353,36 @@
         color: #000000;
     }
 
+
+    /* Sale barcode scan input */
+    .scan-box {
+        border: 2px solid #036a77 !important;
+        background: #f0f9fb;
+        min-width: 200px;
+        font-family: 'Courier New', monospace;
+        letter-spacing: 0.5px;
+    }
+    .scan-box:focus {
+        border-color: #28a745 !important;
+        box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.25) !important;
+        background: #ffffff;
+    }
+    .scan-box.scanning {
+        border-color: #28a745 !important;
+        background: #d4edda;
+    }
+    .scan-box.error {
+        border-color: #dc3545 !important;
+        background: #f8d7da;
+        animation: scanShake 0.3s;
+    }
+    @keyframes scanShake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-4px); }
+        75% { transform: translateX(4px); }
+    }
+
+
     /* Responsive */
     @media (max-width: 768px) {
         .table-excel th,
@@ -580,9 +610,17 @@
                     {% endfor %}
                 </select>
                 {% endif %}
+                
                 <!-- Search Box -->
                 <input type="text" class="search-box" id="searchSales" placeholder="Search by customer, sale ID, or company ID..." 
-                       value="{{ search_query }}" oninput="filterSales()">
+                    value="{{ search_query }}" oninput="filterSales()">
+
+                <!-- 👇 NEW: Scan sale barcode -->
+                <input type="text" class="search-box scan-box" id="scanSaleInput" 
+                    placeholder="🔍 Scan sale barcode…" 
+                    autocomplete="off"
+                    onkeydown="handleSaleScan(event)">
+
                 <a href="/epa_shop/sales/single/" class="btn btn-primary">
                     <i class="fas fa-plus"></i> New Sale
                 </a>
@@ -967,5 +1005,98 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     sortTable('date');
 });
+
+// ============================================================
+// SALE BARCODE SCAN
+// ============================================================
+let lastScanTime = 0;
+
+function handleSaleScan(event) {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+
+    const input = document.getElementById('scanSaleInput');
+    const code = input.value.trim();
+    if (!code) return;
+
+    // Debounce: ignore identical scans within 1s
+    const now = Date.now();
+    if (now - lastScanTime < 1000) {
+        input.value = '';
+        return;
+    }
+    lastScanTime = now;
+
+    lookupSaleByBarcode(code);
+}
+
+async function lookupSaleByBarcode(code) {
+    const input = document.getElementById('scanSaleInput');
+    input.classList.remove('error');
+    input.classList.add('scanning');
+
+    try {
+        const res = await fetch(`/epa_shop/sale/lookup/?q=${encodeURIComponent(code)}`);
+        const data = await res.json();
+
+        if (data.success && data.sale) {
+            // Found → jump to receipt
+            input.classList.remove('scanning');
+            input.classList.add('scan-box'); // reset classes
+
+            // Brief visual confirmation before navigating
+            input.style.background = '#d4edda';
+            input.style.borderColor = '#28a745';
+
+            // Navigate to the receipt after a short pause
+            setTimeout(() => {
+                window.location.href = data.sale.receipt_url;
+            }, 150);
+        } else {
+            // Not found
+            input.classList.remove('scanning');
+            input.classList.add('error');
+            input.value = '';
+            input.placeholder = `❌ Not found: ${code}`;
+
+            setTimeout(() => {
+                input.classList.remove('error');
+                input.placeholder = '🔍 Scan sale barcode…';
+            }, 2500);
+        }
+    } catch (err) {
+        console.error('Sale barcode lookup failed:', err);
+        input.classList.remove('scanning');
+        input.classList.add('error');
+        input.value = '';
+        input.placeholder = '⚠️ Lookup error — try again';
+
+        setTimeout(() => {
+            input.classList.remove('error');
+            input.placeholder = '🔍 Scan sale barcode…';
+        }, 2500);
+    }
+}
+
+// Keep scan input focused when user isn't typing elsewhere
+document.addEventListener('DOMContentLoaded', function () {
+    const scanInput = document.getElementById('scanSaleInput');
+    if (!scanInput) return;
+
+    // Auto-refocus every 2 seconds if focus is on body (scanner-friendly)
+    setInterval(function () {
+        const active = document.activeElement;
+        const tag = (active && active.tagName) ? active.tagName.toLowerCase() : '';
+
+        // Only refocus if user isn't typing in another input
+        if (tag === 'body' || active === document.body) {
+            scanInput.focus({ preventScroll: true });
+        }
+    }, 2000);
+
+    // Focus the scan box on page load
+    scanInput.focus({ preventScroll: true });
+});
+
 </script>
 {% endblock %}
