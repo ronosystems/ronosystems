@@ -5,8 +5,11 @@
 
 {% block extra_css %}
 <style>
+    /* ============================================ */
+    /* ON-SCREEN STYLES                              */
+    /* ============================================ */
     .receipt-wrapper {
-        max-width: 80mm;
+        max-width: 450px;
         margin: 0 auto;
         padding: 20px;
     }
@@ -319,7 +322,7 @@
     }
 
     /* ============================================ */
-    /* SALE BARCODE (for scan-to-lookup)             */
+    /* SALE BARCODE                                  */
     /* ============================================ */
     .etr-receipt .etr-sale-barcode {
         text-align: center;
@@ -433,28 +436,32 @@
     .unauthorized-container p { color: #721c24; margin-bottom: 20px; }
 
     /* ============================================ */
-    /* PRINT — ONLY the receipt container prints     */
+    /* PRINT — 80mm THERMAL ROLL, RECEIPT ONLY       */
     /* ============================================ */
     @media print {
+        /* Force 80mm roll, no margins */
         @page {
-            size: auto;
-            margin: 6mm;
+            size: 80mm auto;
+            margin: 0;
         }
 
         html, body {
-            height: auto !important;
-            overflow: visible !important;
+            width: 80mm !important;
+            min-width: 80mm !important;
+            max-width: 80mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
             background: #ffffff !important;
         }
 
-        /* 1. Hide EVERYTHING on the page */
+        /* 1. Hide EVERYTHING (chat widget, navbar, sidebar, footer, etc.) */
         body * {
             visibility: hidden !important;
             box-shadow: none !important;
             background: transparent !important;
         }
 
-        /* 2. Re-show only the receipt wrapper, its container, and their children */
+        /* 2. Re-show only the receipt wrapper + its children */
         html, body,
         .receipt-wrapper,
         .receipt-wrapper *,
@@ -464,27 +471,31 @@
             background: #ffffff !important;
         }
 
-        /* 3. Pin the receipt to the top of the printed page */
+        /* 3. Pin the receipt to the top-left of the 80mm page */
         .receipt-wrapper {
             position: absolute !important;
             top: 0 !important;
             left: 0 !important;
-            right: 0 !important;
-            width: 100% !important;
-            max-width: {{ receipt_settings.receipt_width|default:80 }}mm !important;
+            width: 80mm !important;
+            max-width: 80mm !important;
+            min-width: 80mm !important;
             padding: 0 !important;
-            margin: 0 auto !important;
+            margin: 0 !important;
         }
 
         .receipt-container {
-            border: 2px solid #000000 !important;
+            width: 80mm !important;
+            max-width: 80mm !important;
+            min-width: 80mm !important;
+            border: none !important;
             border-radius: 0 !important;
-            padding: 12px !important;
+            padding: 3mm !important;
             box-shadow: none !important;
             background: #ffffff !important;
+            box-sizing: border-box !important;
         }
 
-        /* 4. Extra safety net — hide common floating widgets by name */
+        /* 4. Hide common floating widgets + app chrome */
         .action-buttons, .btn, .alert, .breadcrumb,
         .navbar, .sidebar, .sidebar-overlay, .sidebar-footer,
         .sidebar-toggle-btn, .top-navbar, .footer,
@@ -500,10 +511,11 @@
             visibility: hidden !important;
         }
 
-        /* 5. Force everything inside the receipt to pure black on white */
+        /* 5. Pure black on white inside the receipt */
         .etr-receipt, .etr-receipt * {
             border-color: #000000 !important;
             color: #000000 !important;
+            background: transparent !important;
         }
         .etr-receipt .etr-header,
         .etr-receipt .etr-items,
@@ -526,6 +538,9 @@
         }
     }
 
+    /* ============================================ */
+    /* SMALL SCREENS                                 */
+    /* ============================================ */
     @media (max-width: 576px) {
         .receipt-wrapper { padding: 10px; }
         .receipt-container { padding: 15px; }
@@ -560,74 +575,51 @@
 {% else %}
 
 <div class="receipt-wrapper">
-
     <div class="receipt-container" id="receiptContainer">
         <div class="etr-receipt">
 
-            <!-- ============================================ -->
-            <!-- HEADER                                        -->
-            <!-- ============================================ -->
+            <!-- HEADER -->
             <div class="etr-header">
-
                 {% if receipt_settings.show_receipt_header and receipt_settings.receipt_header %}
                     <span class="etr-receipt-header-text">{{ receipt_settings.receipt_header }}</span>
                 {% endif %}
 
                 {% if receipt_settings.show_logo %}
                     {% if sale.company.receipt_logo_url %}
-                        <img src="{{ sale.company.receipt_logo_url }}"
-                             alt="{{ sale.company.name }}"
-                             class="etr-logo">
+                        <img src="{{ sale.company.receipt_logo_url }}" alt="{{ sale.company.name }}" class="etr-logo">
                     {% elif sale.company.logo_url %}
-                        <img src="{{ sale.company.logo_url }}"
-                             alt="{{ sale.company.name }}"
-                             class="etr-logo">
+                        <img src="{{ sale.company.logo_url }}" alt="{{ sale.company.name }}" class="etr-logo">
                     {% elif user.company.logo_url %}
-                        <img src="{{ user.company.logo_url }}"
-                             alt="{{ user.company.name }}"
-                             class="etr-logo">
+                        <img src="{{ user.company.logo_url }}" alt="{{ user.company.name }}" class="etr-logo">
                     {% elif site_logo_url %}
-                        <img src="{{ site_logo_url }}"
-                             alt="{{ system_name|default:'RonoSystems' }}"
-                             class="etr-logo">
+                        <img src="{{ site_logo_url }}" alt="{{ system_name|default:'RonoSystems' }}" class="etr-logo">
                     {% else %}
                         <span class="etr-logo-fallback"><i class="fas fa-rocket"></i></span>
                     {% endif %}
                 {% endif %}
 
                 {% if receipt_settings.show_company_name %}
-                    <span class="etr-company">
-                        {{ receipt_settings.receipt_company_name|default:sale.company.name }}
-                    </span>
+                    <span class="etr-company">{{ receipt_settings.receipt_company_name|default:sale.company.name }}</span>
                 {% endif %}
 
-                <!-- Branch / Address -->
                 {% if receipt_settings.show_branch %}
                     <span class="etr-details etr-location">
-                        <span class="etr-address">
-                            {{ receipt_settings.receipt_address|default:sale.company.address|default:"-" }}
-                        </span>
+                        <span class="etr-address">{{ receipt_settings.receipt_address|default:sale.company.address|default:"-" }}</span>
                         <span class="etr-sep">|</span>
                         <span class="etr-branch">Branch: {{ sale.branch.name|default:"Main" }}</span>
                     </span>
                 {% else %}
                     <span class="etr-details etr-location">
-                        <span class="etr-address">
-                            {{ receipt_settings.receipt_address|default:sale.company.address|default:"-" }}
-                        </span>
+                        <span class="etr-address">{{ receipt_settings.receipt_address|default:sale.company.address|default:"-" }}</span>
                     </span>
                 {% endif %}
 
                 {% if receipt_settings.show_company_phone %}
-                    <span class="etr-details">
-                        Tel: {{ receipt_settings.receipt_phone|default:sale.company.phone|default:"-" }}
-                    </span>
+                    <span class="etr-details">Tel: {{ receipt_settings.receipt_phone|default:sale.company.phone|default:"-" }}</span>
                 {% endif %}
 
                 {% if receipt_settings.show_company_email %}
-                    <span class="etr-details etr-email">
-                        Email: {{ receipt_settings.receipt_email|default:sale.company.email|default:"-" }}
-                    </span>
+                    <span class="etr-details etr-email">Email: {{ receipt_settings.receipt_email|default:sale.company.email|default:"-" }}</span>
                 {% endif %}
 
                 {% if receipt_settings.show_company_pin %}
@@ -639,26 +631,21 @@
                 {% endif %}
             </div>
 
-            <!-- ============================================ -->
-            <!-- RECEIPT INFO — 2×2 grid                       -->
-            <!-- ============================================ -->
+            <!-- RECEIPT INFO -->
             {% if receipt_settings.show_receipt_info %}
             <div class="etr-receipt-info">
                 <div class="etr-info-cell etr-align-left">
                     <span class="etr-info-label">RCPT No.</span>
                     <span class="etr-info-value">#{{ sale.company_sale_id }}</span>
                 </div>
-
                 <div class="etr-info-cell etr-align-right">
                     <span class="etr-info-label">Date</span>
                     <span class="etr-info-value">{{ sale.sale_date|date:"Y-m-d" }}</span>
                 </div>
-
                 <div class="etr-info-cell etr-align-left">
                     <span class="etr-info-label">User</span>
                     <span class="etr-info-value">{{ sale.sold_by.username|default:"—" }}</span>
                 </div>
-
                 <div class="etr-info-cell etr-align-right">
                     <span class="etr-info-label">Time</span>
                     <span class="etr-info-value">{{ sale.sale_date|date:"H:i" }}</span>
@@ -666,9 +653,7 @@
             </div>
             {% endif %}
 
-            <!-- ============================================ -->
-            <!-- CUSTOMER DETAILS                              -->
-            <!-- ============================================ -->
+            <!-- CUSTOMER -->
             {% if receipt_settings.show_customer_details %}
                 <div class="etr-customer-section">
                     <div class="etr-customer-title">Customer Details</div>
@@ -691,9 +676,7 @@
                 </div>
             {% endif %}
 
-            <!-- ============================================ -->
-            <!-- NEXT OF KIN                                   -->
-            <!-- ============================================ -->
+            <!-- NEXT OF KIN -->
             {% if receipt_settings.show_next_of_kin %}
                 {% if sale.customer.next_of_keen_name or sale.customer.next_of_keen_phone %}
                     <div class="etr-customer-section">
@@ -712,9 +695,7 @@
                 {% endif %}
             {% endif %}
 
-            <!-- ============================================ -->
-            <!-- ITEMS — 6-column grid                         -->
-            <!-- ============================================ -->
+            <!-- ITEMS -->
             {% if receipt_settings.show_items %}
                 <div class="etr-items">
                     <div class="item-header">
@@ -754,9 +735,7 @@
                 </div>
             {% endif %}
 
-            <!-- ============================================ -->
-            <!-- TOTALS — VAT inclusive                        -->
-            <!-- ============================================ -->
+            <!-- TOTALS -->
             {% if receipt_settings.show_subtotal or receipt_settings.show_vat or receipt_settings.show_totals %}
                 <div class="etr-totals">
                     {% if receipt_settings.show_subtotal %}
@@ -789,9 +768,7 @@
                 </div>
             {% endif %}
 
-            <!-- ============================================ -->
-            <!-- PAYMENT DETAILS                               -->
-            <!-- ============================================ -->
+            <!-- PAYMENT -->
             {% if receipt_settings.show_payment_method or receipt_settings.show_payment_status %}
                 <div class="etr-totals" style="border-top:none; padding-top:0; margin-top:4px;">
                     {% if receipt_settings.show_payment_method %}
@@ -800,7 +777,6 @@
                         <span class="value">{{ sale.payment_method|default:"-" }}</span>
                     </div>
                     {% endif %}
-
                     {% if receipt_settings.show_payment_status and sale.payment_status %}
                     <div class="etr-total-row">
                         <span class="label">Payment Status</span>
@@ -810,9 +786,7 @@
                 </div>
             {% endif %}
 
-            <!-- ============================================ -->
-            <!-- SIGNATURE                                     -->
-            <!-- ============================================ -->
+            <!-- SIGNATURE -->
             {% if receipt_settings.show_signature %}
                 <div class="etr-signature-section">
                     <div class="sig-block">
@@ -826,9 +800,7 @@
                 </div>
             {% endif %}
 
-            <!-- ============================================ -->
-            <!-- SALE BARCODE (for scan-to-lookup)             -->
-            <!-- ============================================ -->
+            <!-- SALE BARCODE -->
             {% if receipt_settings.show_sale_barcode and sale.barcode_number %}
             <div class="etr-sale-barcode">
                 <div class="sale-bc-label">Scan to look up this sale</div>
@@ -837,9 +809,7 @@
             </div>
             {% endif %}
 
-            <!-- ============================================ -->
-            <!-- FOOTER                                        -->
-            <!-- ============================================ -->
+            <!-- FOOTER -->
             <div class="etr-footer">
                 {% if receipt_settings.show_receipt_footer and receipt_settings.receipt_footer %}
                     <div class="etr-footer-note">{{ receipt_settings.receipt_footer }}</div>
@@ -859,9 +829,7 @@
         </div>
     </div>
 
-    <!-- ============================================ -->
-    <!-- ACTION BUTTONS                                -->
-    <!-- ============================================ -->
+    <!-- ACTION BUTTONS -->
     <div class="action-buttons">
         {% if user.role == 'company_agent' %}
         <a href="/epa_shop/sales/single/" class="btn btn-success">
@@ -885,43 +853,33 @@
             <i class="fas fa-print"></i> <span id="btnPrintLabel">Print ETR</span>
         </button>
     </div>
-
 </div>
 {% endif %}
 
-<!-- Barcode library -->
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 
 <script>
-// ============================================================
-// SALE BARCODE — render on load
-// ============================================================
 document.addEventListener('DOMContentLoaded', function () {
     var svg = document.getElementById('saleBarcodeSvg');
-    if (!svg) return;  // toggle is off
-
-    var code = "{{ sale.barcode_number|escapejs }}";
-    if (!code) return;
-
-    try {
-        JsBarcode(svg, code, {
-            format: 'CODE128',
-            width: 1.6,
-            height: 50,
-            displayValue: false,
-            margin: 0,
-            background: '#ffffff',
-            lineColor: '#000000',
-        });
-    } catch (e) {
-        console.warn('Sale barcode render failed:', e);
+    if (svg) {
+        var code = "{{ sale.barcode_number|escapejs }}";
+        if (code) {
+            try {
+                JsBarcode(svg, code, {
+                    format: 'CODE128',
+                    width: 1.6,
+                    height: 50,
+                    displayValue: false,
+                    margin: 0,
+                    background: '#ffffff',
+                    lineColor: '#000000',
+                });
+            } catch (e) {
+                console.warn('Sale barcode render failed:', e);
+            }
+        }
     }
-});
 
-// ============================================================
-// AUTO PRINT (browser print dialog)
-// ============================================================
-document.addEventListener('DOMContentLoaded', function () {
     var autoPrint = {{ receipt_settings.auto_print|yesno:"true,false" }};
     if (window.location.search.includes('print=1') || autoPrint) {
         setTimeout(function () { window.print(); }, 800);
