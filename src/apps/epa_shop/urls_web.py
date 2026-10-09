@@ -28,7 +28,12 @@ urlpatterns = [
     path('scanner-lookup/', product_views.scanner_lookup, name='scanner_lookup'),
     path('barcode/<str:kind>/<int:pk>.png', product_views.barcode_png,      name='barcode_png'),
     path('label/<str:kind>/<int:pk>.pdf', product_views.label_single_pdf, name='label_single_pdf'),
-    path('labels/<str:kind>.pdf', product_views.labels_bulk_pdf,  name='labels_bulk_pdf'),  
+    path('labels-mixed.pdf', product_views.labels_mixed_pdf, name='labels_mixed_pdf'), 
+    path('labels/<str:kind>.pdf', product_views.labels_bulk_pdf,  name='labels_bulk_pdf'),
+    path('labels/print/', product_views.labels_print_page, name='labels-print'),
+
+    
+      
     path('products/', product_views.product_list, name='epa-products'),
     path('products/add/', product_views.product_create, name='epa-product-create'),
     path('products/<str:product_code>/', product_views.product_detail, name='epa-product-detail'),

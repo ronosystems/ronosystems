@@ -2630,6 +2630,80 @@ def label_single_pdf(request, kind, pk, size='medium'):
 
 
 @login_required
+def labels_mixed_pdf(request):
+    """
+    Bulk labels across mixed product kinds in a SINGLE PDF,
+    with per-product quantities.
+
+    URL: /epa_shop/labels-mixed.pdf?items=phone:1:10,accessory:5:3,electronic:3:1
+         &size=medium&sheet=0
+
+    Each item is "kind:pk:qty" (qty optional, defaults to 1).
+    """
+    company, _ = get_active_company(request)
+    if not company:
+        raise Http404("No active company")
+
+    items_param = request.GET.get('items', '').strip()
+    if not items_param:
+        raise Http404("No items supplied")
+
+    products = []  # expanded list — same product repeated qty times
+
+    for chunk in items_param.split(','):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+
+        parts = chunk.split(':')
+        if len(parts) < 2:
+            continue
+
+        kind = parts[0].strip()
+        pk_str = parts[1].strip()
+        qty_str = parts[2].strip() if len(parts) >= 3 else '1'
+
+        if not pk_str.isdigit():
+            continue
+        pk = int(pk_str)
+
+        try:
+            qty = int(qty_str)
+        except (ValueError, TypeError):
+            qty = 1
+
+        # Sanity cap so someone can't request 1 million pages
+        qty = max(1, min(qty, 500))
+
+        model = PRODUCT_KIND_MODELS.get(kind)
+        if not model:
+            continue
+
+        product = model.objects.filter(pk=pk, company=company).first()
+        if not product:
+            continue
+
+        # Repeat this product qty times in the label list
+        for _ in range(qty):
+            products.append(product)
+
+    if not products:
+        raise Http404("No matching products")
+
+    size = request.GET.get('size', 'medium')
+    use_sheet = request.GET.get('sheet', '0') == '1'
+
+    if use_sheet:
+        pdf = build_label_sheet_pdf(products, size=size)
+        filename = "labels-mixed-sheet.pdf"
+    else:
+        pdf = build_label_pdf(products, size=size)
+        filename = "labels-mixed.pdf"
+
+    return FileResponse(pdf, content_type='application/pdf', filename=filename)
+
+
+@login_required
 def labels_bulk_pdf(request, kind):
     """
     Bulk label PDF.
@@ -2661,3 +2735,81 @@ def labels_bulk_pdf(request, kind):
         filename = f"labels-{kind}.pdf"
 
     return FileResponse(pdf, content_type='application/pdf', filename=filename)
+
+
+@login_required
+def labels_print_page(request):
+    """
+    Dedicated page for managing and printing barcode labels.
+    Restricted to company_admin, super_admin, stock_controller.
+    """
+    company, is_viewing_company = get_active_company(request)
+
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+
+    # Role gate
+    allowed_roles = ('company_admin', 'super_admin', 'stock_controller')
+    if not is_viewing_company and request.user.role not in allowed_roles:
+        messages.error(request, 'You do not have permission to print labels.')
+        return redirect('/epa_shop/products/')
+
+    # Build product list (same shape as product_list, minimal fields)
+    all_products = []
+
+    electronics = Electronic.objects.filter(company=company, is_active=True)
+    for item in electronics:
+        all_products.append({
+            'pk': item.id,
+            'kind': 'electronic',
+            'product_code': item.product_code or '-',
+            'name': item.name,
+            'type': 'Electronic',
+            'brand': item.brand or '-',
+            'model': item.model_number or '-',
+        })
+
+    phones = Phone.objects.filter(company=company, is_active=True)
+    for item in phones:
+        phone_type = 'Smartphone'
+        if hasattr(item, 'phone_type'):
+            phone_type = 'Feature Phone' if item.phone_type == 'feature' else 'Smartphone'
+        else:
+            ram_empty = not item.ram or item.ram in ('N/A', '')
+            rom_empty = not item.storage_capacity or item.storage_capacity in ('N/A', '')
+            phone_type = 'Feature Phone' if (ram_empty and rom_empty) else 'Smartphone'
+
+        all_products.append({
+            'pk': item.id,
+            'kind': 'phone',
+            'product_code': item.product_code or '-',
+            'name': item.name,
+            'type': phone_type,
+            'brand': item.brand or '-',
+            'model': item.model or '-',
+        })
+
+    accessories = Accessory.objects.filter(company=company, is_active=True)
+    for item in accessories:
+        all_products.append({
+            'pk': item.id,
+            'kind': 'accessory',
+            'product_code': item.product_code or '-',
+            'name': item.name,
+            'type': 'Accessory',
+            'brand': item.brand or '-',
+            'model': item.model or '-',
+        })
+
+    all_products.sort(key=lambda x: x['product_code'])
+
+    context = {
+        'all_products_json': all_products,
+        'total_count': len(all_products),
+        'page_title': 'Print Labels',
+        'page_subtitle': 'Select products and print barcode labels',
+    }
+    return render(request, 'epa/labels_print.html', context)

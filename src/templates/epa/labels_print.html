@@ -1,0 +1,744 @@
+{% extends 'base.html' %}
+
+{% block title %}Print Labels{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       EXCEL-LIKE TABLE
+       ============================================ */
+    .table-excel {
+        border-collapse: collapse; width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .table-excel th, .table-excel td {
+        border: 1px solid #000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+    .table-excel thead th {
+        background-color: #87CEEB !important;
+        color: #000;
+        font-weight: 600;
+        position: sticky; top: 0; z-index: 10;
+    }
+    .table-excel tbody tr:hover td { background: #f5f5f5; }
+    .table-excel tbody tr:nth-child(even) td { background: #f9f9f9; }
+
+    .product-code {
+        font-family: 'Courier New', monospace;
+        font-weight: 700; font-size: 13px;
+        background: #f0f2f5; padding: 3px 10px;
+        border-radius: 4px; border: 2px solid #000;
+        display: inline-block; white-space: nowrap;
+    }
+
+    .category-badge {
+        padding: 4px 12px; border-radius: 50px;
+        font-size: 11px; font-weight: 600;
+        border: 1px solid #000; display: inline-block; white-space: nowrap;
+    }
+    .category-smartphone   { background: #dbeafe; color: #1e40af; }
+    .category-feature-phone{ background: #e0e7ff; color: #3730a3; }
+    .category-electronic   { background: #d1fae5; color: #065f46; }
+    .category-accessory    { background: #fef3c7; color: #92400e; }
+
+    .label-qty {
+        width: 70px; padding: 6px 8px;
+        border: 2px solid #000; border-radius: 4px;
+        font-size: 14px; font-weight: 700;
+        text-align: center; font-family: 'Courier New', monospace;
+        background: #fff; color: #000;
+    }
+    .label-qty:focus {
+        outline: none;
+        border-color: #6f42c1;
+        box-shadow: 0 0 0 3px rgba(111,66,193,0.25);
+    }
+    .label-qty.active {
+        background: #f3ebff; border-color: #6f42c1;
+    }
+
+    .bulk-btn {
+        padding: 8px 16px; border: 2px solid #000;
+        border-radius: 4px; background: #87CEEB;
+        cursor: pointer; font-weight: 700; color: #000;
+        display: inline-flex; align-items: center; gap: 6px;
+    }
+    .bulk-btn:hover { background: #7bb8d8; }
+    .bulk-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .print-size-bar {
+        display: flex; gap: 12px; align-items: center;
+        flex-wrap: wrap; padding: 12px 16px;
+        background: #f8f9fa; border: 2px solid #000;
+        border-radius: 4px; margin-bottom: 16px;
+    }
+    .print-size-bar label {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 6px 14px; border: 2px solid #000;
+        border-radius: 4px; cursor: pointer;
+        font-weight: 600; background: #fff; font-size: 13px;
+    }
+    .print-size-bar label.selected { background: #87CEEB; }
+    .print-size-bar input[type="radio"] { accent-color: #6f42c1; }
+
+    .summary-box {
+        padding: 12px 16px; background: #f3ebff;
+        border: 2px solid #6f42c1; border-radius: 4px;
+        margin-bottom: 16px; font-weight: 600; color: #4b2c8a;
+    }
+
+    .search-input {
+        padding: 8px 12px; border: 2px solid #000;
+        border-radius: 4px; min-width: 250px;
+        flex: 1; background: white;
+    }
+    .search-input:focus {
+        outline: none; border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+
+    /* ============================================
+       SCANNER BAR
+       ============================================ */
+    .scanner-bar {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        padding: 12px 16px;
+        background: #fff8e7;
+        border: 2px solid #000;
+        border-radius: 4px;
+        margin-bottom: 16px;
+    }
+    .scanner-mode {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .scanner-mode strong { font-size: 13px; }
+    .mode-opt {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border: 2px solid #000;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 13px;
+        background: #fff;
+        transition: all 0.2s;
+    }
+    .mode-opt:hover { background: #f3ebff; }
+    .mode-opt.selected { background: #87CEEB; }
+    .mode-opt input[type="radio"] {
+        accent-color: #6f42c1;
+        margin: 0;
+    }
+
+    .scan-btn {
+        padding: 8px 20px !important;
+        font-size: 14px;
+    }
+    .scan-btn.scanning {
+        background: #28a745 !important;
+        color: #fff !important;
+        animation: scanPulse 1s infinite;
+    }
+    @keyframes scanPulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(40,167,69,0.7); }
+        50%      { box-shadow: 0 0 0 10px rgba(40,167,69,0); }
+    }
+
+    .scan-hint {
+        font-size: 12px;
+        color: #666;
+        font-style: italic;
+    }
+
+    /* Toast */
+    .scan-toast {
+        position: fixed;
+        top: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(-100px);
+        background: #000;
+        color: #fff;
+        padding: 12px 24px;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 700;
+        z-index: 9999;
+        transition: transform 0.3s ease, opacity 0.3s;
+        opacity: 0;
+        pointer-events: none;
+        max-width: 90vw;
+        text-align: center;
+    }
+    .scan-toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+    }
+    .scan-toast.error   { background: #dc3545; }
+    .scan-toast.success { background: #198754; }
+    .scan-toast.info    { background: #0d6efd; }
+
+    /* Row highlight after scan */
+    @keyframes scanHighlight {
+        0%   { background: #fff8e7 !important; }
+        30%  { background: #ffe082 !important; }
+        100% { background: #fff8e7 !important; }
+    }
+    tr.row-highlighted td {
+        animation: scanHighlight 2.2s ease-out;
+        box-shadow: inset 0 0 0 2px #f0ad4e;
+    }
+
+    /* Input flash after auto-increment */
+    @keyframes qtyFlash {
+        0%   { background: #f3ebff; }
+        50%  { background: #b39ddb; color: #fff; }
+        100% { background: #f3ebff; }
+    }
+    .label-qty.flash {
+        animation: qtyFlash 0.6s ease-out;
+    }
+
+    @media (max-width: 600px) {
+        .scanner-bar { flex-direction: column; align-items: stretch; }
+        .scanner-mode { justify-content: center; }
+        .scan-btn { width: 100%; justify-content: center; }
+        .scan-hint { text-align: center; }
+    }
+
+    @media (max-width: 480px) {
+        .table-excel th, .table-excel td { padding: 4px 6px; font-size: 11px; }
+        .label-qty { width: 52px; font-size: 12px; padding: 4px 6px; }
+        .print-size-bar label { font-size: 11px; padding: 4px 10px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+
+        <!-- ============================================
+             HEADER
+             ============================================ -->
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <div>
+                <h3><i class="fas fa-tags"></i> Print Labels</h3>
+                <p class="text-muted mb-0">
+                    Scan products (auto-increments qty) or set qty manually — then generate the PDF.
+                </p>
+            </div>
+            <div>
+                <a href="/epa_shop/products/" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back To Products
+                </a>
+            </div>
+        </div>
+
+        <!-- ============================================
+             SCANNER BAR
+             ============================================ -->
+        <div class="scanner-bar">
+            <div class="scanner-mode">
+                <strong>Scan mode:</strong>
+                <label class="mode-opt selected" data-mode="add">
+                    <input type="radio" name="scanMode" value="add" checked> ➕ Auto-increment qty
+                </label>
+                <label class="mode-opt" data-mode="find">
+                    <input type="radio" name="scanMode" value="find"> 🔍 Find product
+                </label>
+            </div>
+
+            <button type="button" class="bulk-btn scan-btn" id="scanBtn">
+                <i class="fas fa-barcode"></i> Scan
+            </button>
+
+            <span class="scan-hint">
+                Point the USB scanner at a barcode. Scan the same code 10× → qty becomes 10.
+            </span>
+        </div>
+
+        <!-- Hidden input kept focused so USB scanners type into it -->
+        <input type="text" id="scannerInput"
+               style="position:fixed;left:-9999px;top:-9999px;opacity:0;"
+               autocomplete="off" tabindex="-1">
+
+        <!-- Toast notification -->
+        <div class="scan-toast" id="scanToast"></div>
+
+        <!-- ============================================
+             SIZE PICKER + GENERATE
+             ============================================ -->
+        <div class="print-size-bar">
+            <strong style="margin-right:8px;">Label size:</strong>
+            <label data-size="small">
+                <input type="radio" name="lblSize" value="small"> Small 40×20mm
+            </label>
+            <label data-size="medium" class="selected">
+                <input type="radio" name="lblSize" value="medium" checked> Medium 50×25mm
+            </label>
+            <label data-size="large">
+                <input type="radio" name="lblSize" value="large"> Large 60×30mm
+            </label>
+            <label data-size="sheet">
+                <input type="radio" name="lblSize" value="sheet"> A4 Sheet
+            </label>
+
+            <button type="button" id="generateBtn" class="bulk-btn"
+                    onclick="generateLabels()" disabled style="margin-left:auto;">
+                <i class="fas fa-print"></i> Generate PDF (<span id="totalPcs">0</span> pcs)
+            </button>
+        </div>
+
+        <!-- Live summary -->
+        <div class="summary-box" id="summaryBox" style="display:none;">
+            <i class="fas fa-info-circle"></i> <span id="summaryText"></span>
+        </div>
+
+        <!-- Search + Actions -->
+        <div class="mb-3 d-flex gap-2 flex-wrap align-items-center">
+            <input type="text" class="search-input" id="searchInput"
+                   placeholder="Search by code, name, brand or model…" autocomplete="off">
+            <button type="button" class="btn btn-secondary" onclick="clearAll()">
+                <i class="fas fa-times"></i> Clear
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="setAllToQty(1)">
+                <i class="fas fa-check-square"></i> Set All = 1
+            </button>
+        </div>
+
+        <!-- ============================================
+             PRODUCTS TABLE
+             ============================================ -->
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive" style="border:2px solid #000;">
+                    <table class="table-excel mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width:6%;"  class="text-center">Print?</th>
+                                <th style="width:10%;">Product Code</th>
+                                <th style="width:28%;">Product Name</th>
+                                <th style="width:12%;">Category</th>
+                                <th style="width:12%;">Brand</th>
+                                <th style="width:12%;">Model</th>
+                                <th style="width:10%;" class="text-center">Qty (PCS)</th>
+                                <th style="width:10%;" class="text-center">Barcode</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productTbody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer d-flex justify-content-between">
+                <span>Showing <strong id="visibleCount">0</strong> of <strong id="totalCount">0</strong> products</span>
+                <span id="paginationInfo"></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ all_products_json|json_script:"allProductsData" }}
+
+<script>
+/* ================================================================
+   PRINT LABELS PAGE JS
+   ORDER MATTERS — everything is defined before it's used.
+   ================================================================ */
+
+/* ---------- 1. Parse the embedded JSON ---------- */
+function parseData() {
+    const el = document.getElementById('allProductsData');
+    if (!el) return [];
+    let v = el.textContent;
+    for (let i = 0; i < 3; i++) {
+        try { v = JSON.parse(v); } catch (e) { break; }
+        if (Array.isArray(v)) return v;
+        if (v && typeof v === 'object' && Array.isArray(v.products)) return v.products;
+        if (typeof v !== 'string') break;
+    }
+    return [];
+}
+
+const ALL = parseData();
+
+/* key → { kind, pk, code, name, qty } ; qty > 0 means "selected" */
+const qtyByKey = new Map();
+
+/* ---------- 2. Utilities ---------- */
+function esc(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function rowKey(p) { return p.kind + ':' + p.pk; }
+
+function catBadgeClass(t) {
+    if (t === 'Smartphone')    return 'category-smartphone';
+    if (t === 'Feature Phone') return 'category-feature-phone';
+    if (t === 'Electronic')    return 'category-electronic';
+    if (t === 'Accessory')     return 'category-accessory';
+    return '';
+}
+
+/* ---------- 3. Table rendering ---------- */
+function renderTable() {
+    const tbody = document.getElementById('productTbody');
+    const term = (document.getElementById('searchInput').value || '').trim().toLowerCase();
+
+    const list = ALL.filter(p => {
+        if (!term) return true;
+        const hay = (p.product_code + ' ' + p.name + ' ' + p.brand + ' ' + p.model + ' ' + p.type).toLowerCase();
+        return hay.includes(term);
+    });
+
+    let html = '';
+    if (list.length === 0) {
+        html = '<tr><td colspan="8" class="text-center py-4">No products match your search.</td></tr>';
+    } else {
+        list.forEach(p => {
+            const key = rowKey(p);
+            const item = qtyByKey.get(key);
+            const qty = item ? item.qty : 0;
+            const checked = qty > 0;
+
+            html += '<tr data-row-key="' + esc(key) + '">' +
+                '<td class="text-center">' +
+                    '<input type="checkbox" ' + (checked ? 'checked' : '') +
+                    ' onchange="toggleRow(\'' + esc(p.kind) + '\',' + p.pk + ',this.checked)">' +
+                '</td>' +
+                '<td><span class="product-code">' + esc(p.product_code) + '</span></td>' +
+                '<td>' + esc(p.name) + '</td>' +
+                '<td><span class="category-badge ' + catBadgeClass(p.type) + '">' + esc(p.type) + '</span></td>' +
+                '<td>' + esc(p.brand) + '</td>' +
+                '<td>' + esc(p.model) + '</td>' +
+                '<td class="text-center">' +
+                    '<input type="number" class="label-qty ' + (checked ? 'active' : '') + '" ' +
+                    'min="0" max="500" step="1" value="' + qty + '" ' +
+                    'onchange="setQty(\'' + esc(p.kind) + '\',' + p.pk + ',\'' + esc(p.product_code) + '\',\'' + esc(p.name) + '\',this.value)">' +
+                '</td>' +
+                '<td class="text-center">' +
+                    '<a href="/epa_shop/barcode/' + esc(p.kind) + '/' + p.pk + '.png" target="_blank" title="Preview barcode">' +
+                        '<i class="fas fa-barcode"></i>' +
+                    '</a>' +
+                '</td>' +
+            '</tr>';
+        });
+    }
+    tbody.innerHTML = html;
+
+    document.getElementById('visibleCount').textContent = list.length;
+    document.getElementById('totalCount').textContent = ALL.length;
+    document.getElementById('paginationInfo').textContent = '';
+
+    updateSummary();
+}
+
+/* ---------- 4. Selection mutators ---------- */
+function toggleRow(kind, pk, checked) {
+    const key = kind + ':' + pk;
+    if (checked) {
+        if (!qtyByKey.has(key)) {
+            const p = ALL.find(x => x.kind === kind && x.pk === pk);
+            qtyByKey.set(key, {
+                kind, pk,
+                code: p ? p.product_code : '',
+                name: p ? p.name : '',
+                qty: 1
+            });
+        }
+    } else {
+        qtyByKey.delete(key);
+    }
+    renderTable();
+}
+
+function setQty(kind, pk, code, name, value) {
+    let qty = parseInt(value) || 0;
+    if (qty < 0) qty = 0;
+    if (qty > 500) qty = 500;
+    const key = kind + ':' + pk;
+    if (qty === 0) {
+        qtyByKey.delete(key);
+    } else {
+        qtyByKey.set(key, { kind, pk, code, name, qty });
+    }
+    renderTable();
+}
+
+/* ---------- 5. Bulk helpers ---------- */
+function setAllToQty(qty) {
+    qtyByKey.clear();
+    ALL.forEach(p => {
+        qtyByKey.set(rowKey(p), {
+            kind: p.kind, pk: p.pk,
+            code: p.product_code, name: p.name, qty: qty
+        });
+    });
+    renderTable();
+}
+
+function clearAll() {
+    qtyByKey.clear();
+    document.getElementById('searchInput').value = '';
+    renderTable();
+}
+
+/* ---------- 6. Summary + Generate ---------- */
+function getSelectedSize() {
+    const checked = document.querySelector('input[name="lblSize"]:checked');
+    return checked ? checked.value : 'medium';
+}
+
+function updateSummary() {
+    let total = 0;
+    qtyByKey.forEach(x => { total += x.qty; });
+
+    document.getElementById('totalPcs').textContent = total;
+    document.getElementById('generateBtn').disabled = (total === 0);
+
+    const summaryBox = document.getElementById('summaryBox');
+    const summaryText = document.getElementById('summaryText');
+    if (total === 0) {
+        summaryBox.style.display = 'none';
+    } else {
+        summaryBox.style.display = '';
+        const lines = [];
+        qtyByKey.forEach(x => lines.push(x.code + ' × ' + x.qty));
+        summaryText.textContent = total + ' label(s): ' + lines.join(', ');
+    }
+}
+
+function generateLabels() {
+    const items = [];
+    qtyByKey.forEach(x => items.push(x.kind + ':' + x.pk + ':' + x.qty));
+
+    if (items.length === 0) { alert('Nothing selected.'); return; }
+
+    const sizeChoice = getSelectedSize();
+    let size = sizeChoice;
+    let sheet = 0;
+    if (sizeChoice === 'sheet') { size = 'medium'; sheet = 1; }
+
+    const url = '/epa_shop/labels-mixed.pdf' +
+                '?items=' + encodeURIComponent(items.join(',')) +
+                '&size='   + encodeURIComponent(size) +
+                '&sheet='  + sheet;
+    window.open(url, '_blank');
+}
+
+/* ================================================================
+   SCANNER — defined AFTER renderTable/helpers, so all deps exist
+   ================================================================ */
+let scanMode = 'add';
+let lastScanTime = 0;
+
+function showToast(message, kind, duration) {
+    const el = document.getElementById('scanToast');
+    if (!el) return;
+    el.className = 'scan-toast ' + (kind || '');
+    el.textContent = message;
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('show'), duration || 2200);
+}
+
+function focusScanner() {
+    const si = document.getElementById('scannerInput');
+    if (si) { si.value = ''; si.focus({ preventScroll: true }); }
+}
+
+/* Mode toggle */
+document.querySelectorAll('.mode-opt').forEach(lbl => {
+    lbl.addEventListener('click', () => {
+        document.querySelectorAll('.mode-opt').forEach(l => l.classList.remove('selected'));
+        lbl.classList.add('selected');
+        scanMode = lbl.dataset.mode;
+        const r = lbl.querySelector('input[type="radio"]');
+        if (r) r.checked = true;
+        showToast('Mode: ' + (scanMode === 'add' ? '➕ Auto-increment' : '🔍 Find'), 'info', 1200);
+    });
+});
+
+/* Main scan handler */
+function handleScan(value) {
+    const query = (value || '').trim();
+    if (!query || query.length < 3) return;
+
+    const scanBtn = document.getElementById('scanBtn');
+    if (scanBtn) scanBtn.classList.add('scanning');
+
+    fetch('/epa_shop/scanner-lookup/?q=' + encodeURIComponent(query))
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) {
+                showToast('❌ Not found: ' + query, 'error');
+                return;
+            }
+            const p = data.product;
+            if (!p) { showToast('❌ No product info returned', 'error'); return; }
+
+            const kind = (p.kind || '').toLowerCase();
+            const pk   = parseInt(p.pk) || 0;
+            const code = p.product_code || '';
+            const name = p.name || '';
+
+            if (!kind || !pk) { showToast('❌ Product missing kind/pk', 'error'); return; }
+
+            const existing = ALL.find(x => x.kind === kind && x.pk === pk);
+            if (!existing) {
+                showToast('⚠️ ' + code + ' not in this product list', 'error');
+                return;
+            }
+
+            // Clear search so the row is visible
+            const search = document.getElementById('searchInput');
+            if (search.value) { search.value = ''; renderTable(); }
+
+            const key = rowKey(existing);
+            const item = qtyByKey.get(key);
+
+            if (scanMode === 'add') {
+                // 🔑 KEY: increment by 1 every scan. Scan 10× → qty = 10.
+                const newQty = item ? item.qty + 1 : 1;
+                qtyByKey.set(key, {
+                    kind: existing.kind,
+                    pk: existing.pk,
+                    code: existing.product_code,
+                    name: existing.name,
+                    qty: newQty,
+                });
+                renderTable();
+                highlightRow(existing);
+                flashQtyInput(existing);
+                showToast('➕ ' + code + ' → ' + newQty + ' pcs', 'success', 1200);
+            } else {
+                // Find mode — select at qty 1 if not already selected
+                if (!item) {
+                    qtyByKey.set(key, {
+                        kind: existing.kind,
+                        pk: existing.pk,
+                        code: existing.product_code,
+                        name: existing.name,
+                        qty: 1,
+                    });
+                    renderTable();
+                }
+                highlightRow(existing);
+                flashQtyInput(existing);
+                showToast('🔍 ' + code + ' — ' + name, 'info', 1400);
+            }
+        })
+        .catch(err => {
+            showToast('❌ Network error: ' + err, 'error');
+        })
+        .finally(() => {
+            if (scanBtn) scanBtn.classList.remove('scanning');
+            focusScanner();
+        });
+}
+
+/* Highlight + scroll to a row (by kind:pk) */
+function highlightRow(p) {
+    const key = rowKey(p);
+    const row = document.querySelector('tr[data-row-key="' + key + '"]');
+    if (!row) return;
+
+    row.classList.remove('row-highlighted');
+    void row.offsetWidth;             // restart animation
+    row.classList.add('row-highlighted');
+
+    setTimeout(() => {
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 30);
+
+    setTimeout(() => row.classList.remove('row-highlighted'), 2400);
+}
+
+function flashQtyInput(p) {
+    const key = rowKey(p);
+    const row = document.querySelector('tr[data-row-key="' + key + '"]');
+    if (!row) return;
+    const input = row.querySelector('.label-qty');
+    if (!input) return;
+    input.classList.add('flash');
+    setTimeout(() => input.classList.remove('flash'), 700);
+}
+
+/* Hidden input — listens for Enter from USB scanners */
+function initScannerInput() {
+    const si = document.getElementById('scannerInput');
+    if (!si) return;
+
+    si.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+
+        const value = si.value.trim();
+        si.value = '';
+
+        if (!value || value.length < 3) return;
+
+        // Debounce identical rapid scans
+        const now = Date.now();
+        if (now - lastScanTime < 800) return;
+        lastScanTime = now;
+
+        handleScan(value);
+    });
+
+    // Gentle re-focus: only steal focus if user is NOT on an interactive element
+    setInterval(() => {
+        const active = document.activeElement;
+        if (!active || active === si) return;
+
+        const tag = (active.tagName || '').toLowerCase();
+        const isInteractive = (
+            tag === 'input' || tag === 'textarea' || tag === 'select' ||
+            tag === 'button' || tag === 'a' ||
+            active.isContentEditable
+        );
+        if (!isInteractive) {
+            si.focus({ preventScroll: true });
+        }
+    }, 2000);
+}
+
+/* Manual scan button (type code with keyboard) */
+document.getElementById('scanBtn').addEventListener('click', function () {
+    const value = prompt('Scan or type barcode / IMEI / product code:');
+    if (value && value.trim()) handleScan(value.trim());
+});
+
+/* ================================================================
+   EVENT WIRING + INIT
+   ================================================================ */
+
+/* Size picker highlight */
+document.querySelectorAll('.print-size-bar label').forEach(lbl => {
+    lbl.addEventListener('click', () => {
+        document.querySelectorAll('.print-size-bar label').forEach(l => l.classList.remove('selected'));
+        lbl.classList.add('selected');
+    });
+});
+
+/* Search live filter */
+document.getElementById('searchInput').addEventListener('input', renderTable);
+
+/* Init */
+renderTable();          // paints the table
+initScannerInput();     // starts listening for scans
+focusScanner();         // ready for the first scan
+</script>
+{% endblock %}

@@ -810,6 +810,41 @@
         color: #666;
         margin-bottom: 6px;
     }
+
+    /* ============================================
+    LABEL QUANTITY INPUT
+    ============================================ */
+    .label-qty {
+        width: 60px;
+        padding: 4px 6px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 13px;
+        font-weight: 700;
+        text-align: center;
+        background: #ffffff;
+        color: #000000;
+        font-family: 'Courier New', monospace;
+    }
+    .label-qty:focus {
+        outline: none;
+        border-color: #6f42c1;
+        box-shadow: 0 0 0 3px rgba(111, 66, 193, 0.25);
+    }
+    .label-qty:disabled {
+        background: #f0f0f0;
+        color: #999;
+        cursor: not-allowed;
+    }
+    .label-qty.checked {
+        background: #f3ebff;
+        border-color: #6f42c1;
+    }
+
+    @media (max-width: 480px) {
+        .label-qty { width: 44px; font-size: 11px; padding: 2px 4px; }
+    }
+
     
     /* ============================================
        RESPONSIVE
@@ -967,6 +1002,12 @@
                     <i class="fas fa-box"></i> Back To Inventory
                 </a>
                 {% endif %}
+
+                {% if user.role == 'company_admin' or user.role == 'super_admin' or user.role == 'stock_controller' %}
+                <a href="/epa_shop/labels/print/" class="btn btn-secondary">
+                    <i class="fas fa-tags"></i> Print Labels
+                </a>
+                {% endif %}
                 
                 {% if user.role == 'company_admin' or user.role == 'super_admin' or user.role == 'stock_controller'%}  
                 <a href="/epa_shop/products/add/" class="btn btn-primary">
@@ -1021,10 +1062,11 @@
                     <table class="table-excel table-hover mb-0" id="productTable">
                         <thead>
                             <tr>
-                                <!-- Barcode column (moved to first position) -->
+                                {% if user.role == 'company_admin' or user.role == 'super_admin' or user.role == 'stock_controller' %}
                                 <th style="width:6%;" class="text-center" title="Print / view barcode label">
                                     <i class="fas fa-barcode"></i> Barcode
                                 </th>
+                                {% endif %}
                                 <th style="width:10%;" class="sortable-header" data-sort="sku" onclick="sortTable('sku')">
                                     Product SKU <span class="sort-icon"></span>
                                 </th>
@@ -1057,7 +1099,7 @@
                         </thead>
                         <tbody id="productTbody">
                             <tr id="loadingRow">
-                                <td colspan="11">
+                                <td colspan="{% if user.role == 'company_admin' or user.role == 'super_admin' or user.role == 'stock_controller' %}11{% else %}10{% endif %}">
                                     <div id="loadingIndicator">
                                         <span class="spinner"></span> Loading all products…
                                     </div>
@@ -1226,41 +1268,28 @@
      ============================================================ -->
 {{ all_products_json|json_script:"allProductsData" }}
 
+
+
 <script>
 // ============================================================
-// PARSE DATA — DEFENSIVE (handles single, double, or triple encoding)
+// PARSE DATA — DEFENSIVE
 // ============================================================
 function parseAllProducts() {
     const el = document.getElementById('allProductsData');
-    if (!el) {
-        console.error('❌ #allProductsData script tag not found in DOM');
-        return [];
-    }
+    if (!el) { console.error('❌ #allProductsData missing'); return []; }
 
     let value = el.textContent;
-
     for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-            value = JSON.parse(value);
-        } catch (e) {
-            console.error('JSON.parse failed on attempt ' + (attempt + 1) + ':', e);
-            break;
-        }
-
-        if (Array.isArray(value)) {
-            console.log('✓ Parsed all products:', value.length, '(after ' + (attempt + 1) + ' parse round(s))');
-            return value;
-        }
-
+        try { value = JSON.parse(value); }
+        catch (e) { console.error('JSON.parse failed:', e); break; }
+        if (Array.isArray(value)) return value;
         if (value && typeof value === 'object' && !Array.isArray(value)) {
             if (Array.isArray(value.products)) return value.products;
             if (Array.isArray(value.items)) return value.items;
         }
-
         if (typeof value !== 'string') break;
     }
-
-    console.error('❌ Could not extract an array from allProductsData. Raw value:', value);
+    console.error('❌ Could not extract array from allProductsData');
     return [];
 }
 
@@ -1282,11 +1311,13 @@ const paginationControls = document.getElementById('paginationControls');
 const perPageSelect = document.getElementById('perPageSelect');
 const headerTotalCount = document.getElementById('headerTotalCount');
 
-if (headerTotalCount) {
-    headerTotalCount.textContent = ALL_PRODUCTS.length;
-}
+if (headerTotalCount) headerTotalCount.textContent = ALL_PRODUCTS.length;
 
+// ============================================================
+// ROLE FLAGS
+// ============================================================
 const userRole = "{{ user.role }}";
+
 const canManage = (
     userRole === 'company_admin' ||
     userRole === 'company_manager' ||
@@ -1294,14 +1325,11 @@ const canManage = (
     userRole === 'stock_controller'
 );
 
-
-// Who can see the buying (purchase) price
 const canSeeBuyingPrice = (
     userRole === 'company_admin' ||
     userRole === 'super_admin' ||
     userRole === 'stock_controller'
 );
-
 
 const canSeeScanActions = (
     userRole === 'company_admin' ||
@@ -1309,9 +1337,15 @@ const canSeeScanActions = (
     userRole === 'stock_controller'
 );
 
+// 🆕 Barcode label printing is only for admins / stock controllers
+const canPrintLabels = (
+    userRole === 'company_admin' ||
+    userRole === 'super_admin' ||
+    userRole === 'stock_controller'
+);
 
 // ============================================================
-// ESCAPE HTML
+// UTILITIES
 // ============================================================
 function esc(s) {
     if (s === null || s === undefined) return '';
@@ -1323,16 +1357,13 @@ function esc(s) {
         .replace(/'/g, '&#39;');
 }
 
-// ============================================================
-// FORMAT CURRENCY
-// ============================================================
 function fmtKsh(n) {
     const num = parseFloat(n) || 0;
     return 'KSh ' + Math.round(num).toLocaleString();
 }
 
 // ============================================================
-// RENDER A SINGLE ROW
+// RENDER ONE ROW
 // ============================================================
 function renderRow(p, index) {
     let catBadge = '';
@@ -1348,16 +1379,13 @@ function renderRow(p, index) {
         catBadge = '<span class="category-badge">' + esc(p.type || '-') + '</span>';
     }
 
-    let stockBadge = '';
     const stock = parseInt(p.stock) || 0;
-    if (stock > 10) {
-        stockBadge = '<span class="stock-badge stock-in-stock">In Stock</span>';
-    } else if (stock > 0) {
-        stockBadge = '<span class="stock-badge stock-low-stock">Low Stock</span>';
-    } else {
-        stockBadge = '<span class="stock-badge stock-out-of-stock">Out of Stock</span>';
-    }
+    let stockBadge = '';
+    if (stock > 10)       stockBadge = '<span class="stock-badge stock-in-stock">In Stock</span>';
+    else if (stock > 0)   stockBadge = '<span class="stock-badge stock-low-stock">Low Stock</span>';
+    else                  stockBadge = '<span class="stock-badge stock-out-of-stock">Out of Stock</span>';
 
+    // Actions cell
     let actionsCell;
     if (canManage) {
         actionsCell = '<td class="text-center">' +
@@ -1368,15 +1396,16 @@ function renderRow(p, index) {
         actionsCell = '<td class="text-center" style="color:#000;">N/A</td>';
     }
 
-    // Barcode cell — first cell in the row
-    const barcodeCell =
-        '<td class="text-center">' +
-            '<button type="button" class="btn-barcode-view" ' +
-                'onclick="openBarcodeModal(' + (p.pk || 0) + ', \'' + esc(p.kind || '') + '\', \'' + esc(p.product_code) + '\', \'' + esc(p.name) + '\')" ' +
-                'title="View / print barcode label">' +
-                '<i class="fas fa-barcode"></i>' +
-            '</button>' +
-        '</td>';
+    // Barcode button — only shown to label printers
+    const barcodeCell = canPrintLabels
+        ? '<td class="text-center">' +
+              '<button type="button" class="btn-barcode-view" ' +
+                  'onclick="openBarcodeModal(' + (p.pk || 0) + ', \'' + esc(p.kind || '') + '\', \'' + esc(p.product_code) + '\', \'' + esc(p.name) + '\')" ' +
+                  'title="View / print barcode label">' +
+                  '<i class="fas fa-barcode"></i>' +
+              '</button>' +
+          '</td>'
+        : '<td class="text-center" style="color:#000;">-</td>';
 
     return '<tr data-id="' + index + '" ' +
         'data-pk="' + (p.pk || 0) + '" ' +
@@ -1406,58 +1435,47 @@ function renderRow(p, index) {
 }
 
 // ============================================================
-// RENDER THE WHOLE TABLE (only current page)
+// RENDER TABLE
 // ============================================================
 function renderTable() {
     filteredProducts.sort((a, b) => {
         const col = sortState.column;
         let va, vb;
 
-        if (col === 'id') { va = parseInt(a.id) || 0; vb = parseInt(b.id) || 0; }
-        else if (col === 'sku') { va = a.product_code || ''; vb = b.product_code || ''; }
-        else if (col === 'name') { va = a.name || ''; vb = b.name || ''; }
+        if (col === 'id')            { va = parseInt(a.id) || 0; vb = parseInt(b.id) || 0; }
+        else if (col === 'sku')      { va = a.product_code || ''; vb = b.product_code || ''; }
+        else if (col === 'name')     { va = a.name || ''; vb = b.name || ''; }
         else if (col === 'category') { va = a.type || ''; vb = b.type || ''; }
-        else if (col === 'brand') { va = a.brand || ''; vb = b.brand || ''; }
-        else if (col === 'model') { va = a.model || ''; vb = b.model || ''; }
-        else if (col === 'specs') { va = a.specs || ''; vb = b.specs || ''; }
-        else if (col === 'stock') { va = parseInt(a.stock) || 0; vb = parseInt(b.stock) || 0; }
-        else if (col === 'buying') { va = parseFloat(a.purchase_price) || 0; vb = parseFloat(b.purchase_price) || 0; }
-        else if (col === 'selling') { va = parseFloat(a.selling_price) || 0; vb = parseFloat(b.selling_price) || 0; }
-        else if (col === 'best') { va = parseFloat(a.best_price) || 0; vb = parseFloat(b.best_price) || 0; }
+        else if (col === 'brand')    { va = a.brand || ''; vb = b.brand || ''; }
+        else if (col === 'model')    { va = a.model || ''; vb = b.model || ''; }
+        else if (col === 'specs')    { va = a.specs || ''; vb = b.specs || ''; }
+        else if (col === 'stock')    { va = parseInt(a.stock) || 0; vb = parseInt(b.stock) || 0; }
+        else if (col === 'buying')   { va = parseFloat(a.purchase_price) || 0; vb = parseFloat(b.purchase_price) || 0; }
+        else if (col === 'selling')  { va = parseFloat(a.selling_price) || 0; vb = parseFloat(b.selling_price) || 0; }
+        else if (col === 'best')     { va = parseFloat(a.best_price) || 0; vb = parseFloat(b.best_price) || 0; }
 
         let cmp = 0;
-        if (typeof va === 'number' && typeof vb === 'number') {
-            cmp = va - vb;
-        } else {
-            cmp = String(va).localeCompare(String(vb), undefined, { sensitivity: 'base' });
-        }
+        if (typeof va === 'number' && typeof vb === 'number') cmp = va - vb;
+        else cmp = String(va).localeCompare(String(vb), undefined, { sensitivity: 'base' });
         return sortState.direction === 'asc' ? cmp : -cmp;
     });
 
     const totalFiltered = filteredProducts.length;
     let startIdx, endIdx;
-    if (perPage === 'all') {
-        startIdx = 0;
-        endIdx = totalFiltered;
-    } else {
-        startIdx = (currentPage - 1) * perPage;
-        endIdx = Math.min(startIdx + perPage, totalFiltered);
-    }
+    if (perPage === 'all') { startIdx = 0; endIdx = totalFiltered; }
+    else { startIdx = (currentPage - 1) * perPage; endIdx = Math.min(startIdx + perPage, totalFiltered); }
     const pageSlice = filteredProducts.slice(startIdx, endIdx);
 
     let html = '';
     if (pageSlice.length === 0) {
-        html =
-            '<tr><td colspan="11" class="text-center py-4">' +
+        html = '<tr><td colspan="11" class="text-center py-4">' +
             '<div class="empty-state">' +
             '<span class="empty-icon">🔍</span>' +
             '<h3>No matching products</h3>' +
             '<p>Try a different search term or clear the filters.</p>' +
             '</div></td></tr>';
     } else {
-        pageSlice.forEach((p, i) => {
-            html += renderRow(p, startIdx + i + 1);
-        });
+        pageSlice.forEach((p, i) => { html += renderRow(p, startIdx + i + 1); });
     }
     tbody.innerHTML = html;
 
@@ -1465,21 +1483,16 @@ function renderTable() {
     filteredTotalCountEl.textContent = totalFiltered;
 
     const totalPages = perPage === 'all' ? 1 : Math.ceil(totalFiltered / perPage);
-    if (totalPages > 1) {
-        paginationText.textContent = '(page ' + currentPage + ' of ' + totalPages + ')';
-    } else {
-        paginationText.textContent = '';
-    }
+    paginationText.textContent = totalPages > 1 ? '(page ' + currentPage + ' of ' + totalPages + ')' : '';
 
     renderPagination(totalPages);
 }
 
 // ============================================================
-// PAGINATION CONTROLS
+// PAGINATION
 // ============================================================
 function renderPagination(totalPages) {
     let html = '';
-
     if (currentPage > 1) {
         html += '<li class="page-item"><a class="page-link" onclick="goToPage(1)"><i class="fas fa-angle-double-left"></i></a></li>';
         html += '<li class="page-item"><a class="page-link" onclick="goToPage(' + (currentPage - 1) + ')"><i class="fas fa-angle-left"></i></a></li>';
@@ -1487,17 +1500,13 @@ function renderPagination(totalPages) {
         html += '<li class="page-item disabled"><span class="page-link"><i class="fas fa-angle-double-left"></i></span></li>';
         html += '<li class="page-item disabled"><span class="page-link"><i class="fas fa-angle-left"></i></span></li>';
     }
-
     const startPage = Math.max(1, currentPage - 2);
     const endPage = Math.min(totalPages, currentPage + 2);
     for (let n = startPage; n <= endPage; n++) {
-        if (n === currentPage) {
-            html += '<li class="page-item active"><span class="page-link">' + n + '</span></li>';
-        } else {
-            html += '<li class="page-item"><a class="page-link" onclick="goToPage(' + n + ')">' + n + '</a></li>';
-        }
+        html += (n === currentPage)
+            ? '<li class="page-item active"><span class="page-link">' + n + '</span></li>'
+            : '<li class="page-item"><a class="page-link" onclick="goToPage(' + n + ')">' + n + '</a></li>';
     }
-
     if (currentPage < totalPages) {
         html += '<li class="page-item"><a class="page-link" onclick="goToPage(' + (currentPage + 1) + ')"><i class="fas fa-angle-right"></i></a></li>';
         html += '<li class="page-item"><a class="page-link" onclick="goToPage(' + totalPages + ')"><i class="fas fa-angle-double-right"></i></a></li>';
@@ -1505,7 +1514,6 @@ function renderPagination(totalPages) {
         html += '<li class="page-item disabled"><span class="page-link"><i class="fas fa-angle-right"></i></span></li>';
         html += '<li class="page-item disabled"><span class="page-link"><i class="fas fa-angle-double-right"></i></span></li>';
     }
-
     paginationControls.innerHTML = html;
 }
 
@@ -1518,7 +1526,7 @@ function goToPage(n) {
 }
 
 // ============================================================
-// FILTERING
+// FILTERS
 // ============================================================
 function applyFilters() {
     const term = (searchInput.value || '').trim().toLowerCase();
@@ -1526,17 +1534,12 @@ function applyFilters() {
 
     filteredProducts = ALL_PRODUCTS.filter(function (p) {
         const haystack = [
-            p.product_code || '',
-            p.name || '',
-            p.type || '',
-            p.brand || '',
-            p.model || '',
-            p.specs || '',
+            p.product_code || '', p.name || '', p.type || '',
+            p.brand || '', p.model || '', p.specs || '',
         ].join(' ').toLowerCase();
 
         const matchesSearch = !term || haystack.includes(term);
         const matchesCategory = !category || (p.type || '') === category;
-
         return matchesSearch && matchesCategory;
     });
 
@@ -1554,24 +1557,17 @@ function applyFilters() {
     }
 }
 
-
 function filterByBranch() {
     const branch = document.getElementById('branchFilter').value;
     const currentUrl = new URL(window.location.href);
-
-    if (branch) {
-        currentUrl.searchParams.set('branch', branch);
-    } else {
-        currentUrl.searchParams.delete('branch');
-    }
+    if (branch) currentUrl.searchParams.set('branch', branch);
+    else currentUrl.searchParams.delete('branch');
     window.location.href = currentUrl.toString();
 }
-
 
 function clearFilters() {
     searchInput.value = '';
     categoryFilter.value = '';
-
     const branchFilter = document.getElementById('branchFilter');
     if (branchFilter && branchFilter.value) {
         const currentUrl = new URL(window.location.href);
@@ -1579,7 +1575,6 @@ function clearFilters() {
         window.location.href = currentUrl.toString();
         return;
     }
-
     applyFilters();
     searchInput.focus();
 }
@@ -1594,16 +1589,12 @@ function sortTable(column) {
         sortState.column = column;
         sortState.direction = 'asc';
     }
-
     document.querySelectorAll('.sortable-header').forEach(h => {
         h.classList.remove('active', 'asc', 'desc');
         const icon = h.querySelector('.sort-icon');
         if (icon) icon.textContent = '';
-        if (h.dataset.sort === column) {
-            h.classList.add('active', sortState.direction);
-        }
+        if (h.dataset.sort === column) h.classList.add('active', sortState.direction);
     });
-
     renderTable();
 }
 
@@ -1612,9 +1603,9 @@ function sortTable(column) {
 // ============================================================
 function copyToClipboard(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(() => {
-            showCopyTooltip('Copied: ' + text);
-        }).catch(() => fallbackCopy(text));
+        navigator.clipboard.writeText(text)
+            .then(() => showCopyTooltip('Copied: ' + text))
+            .catch(() => fallbackCopy(text));
     } else {
         fallbackCopy(text);
     }
@@ -1642,9 +1633,8 @@ function showCopyTooltip(message) {
 }
 
 // ============================================================
-// ACTION MODAL
+// ACTION MODAL (row ⋮ button)
 // ============================================================
-// Keep last opened product info so the barcode action can reuse it
 let lastActionProduct = { pk: 0, kind: '', code: '', name: '' };
 
 function openActionModal(productCode, productName, productType, pk, kind) {
@@ -1655,17 +1645,16 @@ function openActionModal(productCode, productName, productType, pk, kind) {
     document.getElementById('actionProductType').className = 'category-badge category-' + typeClass;
     document.getElementById('actionProductCode').textContent = 'Code: ' + (productCode || 'N/A');
 
-    document.getElementById('viewLink').href = '/epa_shop/products/' + productCode + '/';
-    document.getElementById('editLink').href = '/epa_shop/products/' + productCode + '/edit/';
-    document.getElementById('restockLink').href = '/epa_shop/products/' + productCode + '/restock/';
-    document.getElementById('deleteLink').href = '/epa_shop/products/' + productCode + '/delete/';
+    document.getElementById('viewLink').href     = '/epa_shop/products/' + productCode + '/';
+    document.getElementById('editLink').href     = '/epa_shop/products/' + productCode + '/edit/';
+    document.getElementById('restockLink').href  = '/epa_shop/products/' + productCode + '/restock/';
+    document.getElementById('deleteLink').href   = '/epa_shop/products/' + productCode + '/delete/';
 
-    lastActionProduct = {
-        pk: pk || 0,
-        kind: kind || '',
-        code: productCode || '',
-        name: productName || '',
-    };
+    // Hide barcode action if user can't print labels
+    const bcBtn = document.getElementById('barcodeActionBtn');
+    if (bcBtn) bcBtn.style.display = canPrintLabels ? '' : 'none';
+
+    lastActionProduct = { pk: pk || 0, kind: kind || '', code: productCode || '', name: productName || '' };
 
     document.getElementById('actionModal').style.display = 'flex';
 }
@@ -1678,35 +1667,30 @@ document.getElementById('actionModal').addEventListener('click', function (e) {
     if (e.target === this) closeActionModal();
 });
 
-// Called from the "Print Barcode" button inside the Action Modal
 function printBarcodeFromActionModal() {
+    if (!canPrintLabels) return;
     const p = lastActionProduct;
-    if (!p || !p.pk || !p.kind) {
-        alert('Cannot print barcode: missing product info.');
-        return;
-    }
+    if (!p || !p.pk || !p.kind) { alert('Cannot print barcode: missing product info.'); return; }
     closeActionModal();
     openBarcodeModal(p.pk, p.kind, p.code, p.name);
 }
 
 // ============================================================
-// BARCODE PRINT MODAL
+// BARCODE PRINT MODAL (single product)
 // ============================================================
-let currentBarcode = { pk: 0, kind: '', code: '', name: '', size: 'medium' };
+let currentBarcode = { pk: 0, kind: '', code: '', name: '', size: 'medium', qty: 1 };
 
 function openBarcodeModal(pk, kind, code, name) {
-    currentBarcode = {
-        pk: pk,
-        kind: kind,
-        code: code,
-        name: name,
-        size: 'medium',
-    };
+    if (!canPrintLabels) {
+        alert('You do not have permission to print labels.');
+        return;
+    }
+
+    currentBarcode = { pk, kind, code, name, size: 'medium', qty: 1 };
 
     document.getElementById('bcProductName').textContent = name || '—';
     document.getElementById('bcProductCode').textContent = code || '—';
 
-    // Preview the barcode PNG (server-side generated)
     const img = document.getElementById('bcPreviewImg');
     if (pk && kind) {
         img.src = '/epa_shop/barcode/' + encodeURIComponent(kind) + '/' + pk + '.png?t=' + Date.now();
@@ -1722,6 +1706,10 @@ function openBarcodeModal(pk, kind, code, name) {
         lbl.classList.toggle('selected', isMedium);
     });
 
+    // Reset qty if the input exists
+    const qtyInput = document.getElementById('bcQtyInput');
+    if (qtyInput) qtyInput.value = 1;
+
     document.getElementById('barcodeModal').style.display = 'flex';
 }
 
@@ -1734,7 +1722,6 @@ document.getElementById('barcodeModal').addEventListener('click', function (e) {
     if (e.target === this) closeBarcodeModal();
 });
 
-// Size picker interaction
 document.getElementById('bcSizePicker').addEventListener('change', function (e) {
     if (e.target.name !== 'bcSize') return;
     currentBarcode.size = e.target.value;
@@ -1744,56 +1731,52 @@ document.getElementById('bcSizePicker').addEventListener('change', function (e) 
     });
 });
 
-// Print label (roll) — opens the single-label PDF in a new tab
 function doPrintBarcodeLabel() {
     const c = currentBarcode;
-    if (!c.pk || !c.kind) {
-        alert('Missing product info');
-        return;
-    }
-    const url = '/epa_shop/label/' + encodeURIComponent(c.kind) + '/' + c.pk +
-                '.pdf?size=' + encodeURIComponent(c.size);
-    window.open(url,);
+    if (!c.pk || !c.kind) { alert('Missing product info'); return; }
+
+    const qtyInput = document.getElementById('bcQtyInput');
+    let qty = qtyInput ? parseInt(qtyInput.value) || 1 : 1;
+    if (qty < 1) qty = 1;
+    if (qty > 500) qty = 500;
+
+    const url = '/epa_shop/labels-mixed.pdf' +
+                '?items=' + encodeURIComponent(c.kind + ':' + c.pk + ':' + qty) +
+                '&size=' + encodeURIComponent(c.size) +
+                '&sheet=0';
+    window.open(url, '_blank');
 }
 
-// Print A4 sheet (one label) — uses the same backend with sheet=1
 function doPrintBarcodeSheet() {
     const c = currentBarcode;
-    if (!c.pk || !c.kind) {
-        alert('Missing product info');
-        return;
-    }
-    const url = '/epa_shop/labels/' + encodeURIComponent(c.kind) +
-                '.pdf?ids=' + c.pk +
+    if (!c.pk || !c.kind) { alert('Missing product info'); return; }
+
+    const qtyInput = document.getElementById('bcQtyInput');
+    let qty = qtyInput ? parseInt(qtyInput.value) || 1 : 1;
+    if (qty < 1) qty = 1;
+    if (qty > 500) qty = 500;
+
+    const url = '/epa_shop/labels-mixed.pdf' +
+                '?items=' + encodeURIComponent(c.kind + ':' + c.pk + ':' + qty) +
                 '&size=' + encodeURIComponent(c.size) +
                 '&sheet=1';
-    window.open(url,);
+    window.open(url, '_blank');
 }
 
 // ============================================================
-// SCANNER LOOKUP
+// SCANNER
 // ============================================================
 function handleScanInput(value) {
     if (!value || !value.trim()) return;
-
     const query = value.trim();
-
-    // Visual feedback
     const scanBtn = document.getElementById('scanBtn');
     scanBtn.classList.add('scanning');
     scanBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Searching…';
 
     fetch('/epa_shop/scanner-lookup/?q=' + encodeURIComponent(query))
         .then(r => r.json())
-        .then(data => {
-            showScanResult(data, query);
-        })
-        .catch(err => {
-            showScanResult({
-                success: false,
-                error: 'Network error: ' + err,
-            }, query);
-        })
+        .then(data => showScanResult(data, query))
+        .catch(err => showScanResult({ success: false, error: 'Network error: ' + err }, query))
         .finally(() => {
             scanBtn.classList.remove('scanning');
             scanBtn.innerHTML = '<i class="fas fa-barcode"></i> Scan';
@@ -1821,7 +1804,7 @@ function showScanResult(data, query) {
 
     let html = '';
 
-    // ---------- Product block ----------
+    // Product block
     html += '<div class="scan-section">';
     html += '<div class="scan-section-title">' + esc(p.name) + '</div>';
     html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">';
@@ -1840,16 +1823,13 @@ function showScanResult(data, query) {
     html += '</table>';
     html += '</div>';
 
-
-    
-    // ---------- Unit block (if IMEI/serial matched) ----------
+    // Unit block
     if (u) {
         html += '<div class="scan-section unit-section">';
         html += '<div class="scan-section-title">📱 Unit: ' + esc(u.identifier) + '</div>';
         html += '<table class="scan-details-table">';
         html += '<tr><td>Type</td><td>' + esc(u.unit_type || 'N/A') + '</td></tr>';
         html += '<tr><td>Status</td><td><strong>' + esc(u.status) + '</strong></td></tr>';
-        // Owner visible to admins & stock controllers only
         if (canSeeScanActions && u.owner_name) {
             html += '<tr><td>Owner</td><td>' + esc(u.owner_name) + ' (' + esc(u.owner_phone) + ')</td></tr>';
         }
@@ -1857,7 +1837,7 @@ function showScanResult(data, query) {
         html += '</div>';
     }
 
-    // ---------- Sale block ----------
+    // Sale block
     if (s) {
         html += '<div class="scan-section sale-section">';
         html += '<div class="scan-section-title">🧾 Sold — Sale #' + esc(s.company_sale_id) + '</div>';
@@ -1867,9 +1847,8 @@ function showScanResult(data, query) {
         html += '</div>';
     }
 
-    // ---------- Action buttons (admins & stock controllers only) ----------
+    // Action buttons
     if (canManage) {
-        // Build restock URL from product code — same target as the ⋮ Action Modal
         var restockUrl = '/epa_shop/products/' + encodeURIComponent(p.product_code) + '/restock/';
 
         html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;">';
@@ -1880,7 +1859,6 @@ function showScanResult(data, query) {
         html += '</a>';
 
         if (p.type !== 'Accessory') {
-            // Phone / Electronic → View Units
             html += '<a href="' + esc(p.units_url) + '" class="action-btn action-btn-edit">';
             html += '<span class="action-btn-icon">📦</span>';
             html += '<span class="action-btn-label">View Units</span>';
@@ -1888,15 +1866,13 @@ function showScanResult(data, query) {
             html += '</a>';
         }
 
-        // Always show Restock (works for Phone, Electronic, and Accessory)
         html += '<a href="' + esc(restockUrl) + '" class="action-btn action-btn-restock">';
         html += '<span class="action-btn-icon">➕</span>';
         html += '<span class="action-btn-label">Restock</span>';
         html += '<span class="action-btn-desc">Add stock or units</span>';
         html += '</a>';
 
-        // Print Barcode from scan result
-        if (p.kind && p.pk) {
+        if (canPrintLabels && p.kind && p.pk) {
             html += '<button type="button" class="action-btn action-btn-barcode" ' +
                     'onclick="closeScanModal(); openBarcodeModal(' + p.pk + ', \'' + esc(p.kind) + '\', \'' + esc(p.product_code) + '\', \'' + esc(p.name) + '\')">' +
                     '<span class="action-btn-icon">🖨️</span>' +
@@ -1907,12 +1883,10 @@ function showScanResult(data, query) {
 
         html += '</div>';
     }
-    
 
     body.innerHTML = html;
     document.getElementById('scanResultModal').style.display = 'flex';
 }
-
 
 function closeScanModal() {
     document.getElementById('scanResultModal').style.display = 'none';
@@ -1924,14 +1898,11 @@ document.getElementById('scanResultModal').addEventListener('click', function (e
 });
 
 // ============================================================
-// SCANNER FOCUS MANAGEMENT
+// SCANNER FOCUS
 // ============================================================
 function focusScannerInput() {
     const si = document.getElementById('scannerInput');
-    if (si) {
-        si.value = '';
-        si.focus({ preventScroll: true });
-    }
+    if (si) { si.value = ''; si.focus({ preventScroll: true }); }
 }
 
 function initScannerInput() {
@@ -1945,9 +1916,7 @@ function initScannerInput() {
             e.preventDefault();
             const value = si.value.trim();
             si.value = '';
-
             if (value && value.length >= 3) {
-                // Debounce: ignore if identical scan within 1s
                 const now = Date.now();
                 if (now - lastScanTime < 1000) return;
                 lastScanTime = now;
@@ -1956,40 +1925,28 @@ function initScannerInput() {
         }
     });
 
-    // Keep the hidden input focused whenever user isn't typing elsewhere
     setInterval(() => {
         const active = document.activeElement;
         if (!active) return;
         const tag = (active.tagName || '').toLowerCase();
         const isEditable = (
-            tag === 'input' ||
-            tag === 'textarea' ||
-            tag === 'select' ||
+            tag === 'input' || tag === 'textarea' || tag === 'select' ||
             active.isContentEditable
         );
-        // Only re-focus if the user isn't actively typing somewhere meaningful
-        if (!isEditable || active === si) {
-            si.focus({ preventScroll: true });
-        }
+        if (!isEditable || active === si) si.focus({ preventScroll: true });
     }, 2000);
 }
 
-// Manual button opens a prompt as fallback
 document.getElementById('scanBtn').addEventListener('click', function () {
     focusScannerInput();
-    // If no scanner is attached, allow manual entry via prompt
-    // (useful for testing on desktop without a scanner)
     const value = prompt('Scan or type barcode / IMEI / serial number:');
-    if (value && value.trim()) {
-        handleScanInput(value.trim());
-    }
+    if (value && value.trim()) handleScanInput(value.trim());
 });
 
 // ============================================================
 // INIT
 // ============================================================
 document.addEventListener('DOMContentLoaded', function () {
-    // Default sort indicator
     const nameHeader = document.querySelector('[data-sort="name"]');
     if (nameHeader) {
         nameHeader.classList.add('active', 'asc');
@@ -1997,14 +1954,12 @@ document.addEventListener('DOMContentLoaded', function () {
         if (icon) icon.textContent = '▲';
     }
 
-    // Wire up filters
     searchInput.addEventListener('input', applyFilters);
     searchInput.addEventListener('keydown', e => {
         if (e.key === 'Escape') { searchInput.value = ''; applyFilters(); }
     });
     categoryFilter.addEventListener('change', applyFilters);
 
-    // Per-page selector
     perPageSelect.addEventListener('change', function () {
         const v = this.value;
         perPage = v === 'all' ? 'all' : parseInt(v);
@@ -2012,14 +1967,10 @@ document.addEventListener('DOMContentLoaded', function () {
         renderTable();
     });
 
-    // Initial render
     applyFilters();
-
-    // Init scanner
     initScannerInput();
     focusScannerInput();
 
-    // Keyboard shortcuts
     document.addEventListener('keydown', function (e) {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
             e.preventDefault();
@@ -2034,4 +1985,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
+
+
+
 {% endblock %}
