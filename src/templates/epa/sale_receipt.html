@@ -433,7 +433,7 @@
     .unauthorized-container p { color: #721c24; margin-bottom: 20px; }
 
     /* ============================================ */
-    /* PRINT                                         */
+    /* PRINT — ONLY the receipt container prints     */
     /* ============================================ */
     @media print {
         @page {
@@ -441,21 +441,41 @@
             margin: 6mm;
         }
 
-        .navbar, .sidebar, .sidebar-overlay, .sidebar-footer,
-        .sidebar-toggle-btn, .top-navbar, .footer, .action-buttons,
-        .btn, .alert, .breadcrumb, .page-title small,
-        .notification-btn, .search-wrapper, .user-profile,
-        .dropdown-menu, #sidebarToggleBtn, #sidebarToggleMobile,
-        .sidebar-toggle-mobile { display: none !important; }
+        html, body {
+            height: auto !important;
+            overflow: visible !important;
+            background: #ffffff !important;
+        }
 
-        .main-content { margin-left: 0 !important; padding: 0 !important; width: 100% !important; }
-        .sidebar { display: none !important; }
-        .content-area { padding: 10px !important; margin: 0 !important; width: 100% !important; }
+        /* 1. Hide EVERYTHING on the page */
+        body * {
+            visibility: hidden !important;
+            box-shadow: none !important;
+            background: transparent !important;
+        }
+
+        /* 2. Re-show only the receipt wrapper, its container, and their children */
+        html, body,
+        .receipt-wrapper,
+        .receipt-wrapper *,
+        .receipt-container,
+        .receipt-container * {
+            visibility: visible !important;
+            background: #ffffff !important;
+        }
+
+        /* 3. Pin the receipt to the top of the printed page */
         .receipt-wrapper {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            width: 100% !important;
             max-width: {{ receipt_settings.receipt_width|default:80 }}mm !important;
             padding: 0 !important;
             margin: 0 auto !important;
         }
+
         .receipt-container {
             border: 2px solid #000000 !important;
             border-radius: 0 !important;
@@ -464,22 +484,46 @@
             background: #ffffff !important;
         }
 
-        .etr-receipt, .etr-receipt * { border-color: #000000 !important; color: #000000 !important; }
-        .etr-receipt .etr-header { border-bottom-color: #000000 !important; }
-        .etr-receipt .etr-items  { border-bottom-color: #000000 !important; }
-        .etr-receipt .etr-totals { border-top-color:    #000000 !important; }
-        .etr-receipt .etr-footer { border-top-color:    #000000 !important; }
-        .etr-receipt .etr-customer-section { border-color: #000000 !important; }
-        .etr-receipt .etr-receipt-info { border-color: #000000 !important; }
-        .etr-receipt .etr-sale-barcode { border-top-color: #000000 !important; }
+        /* 4. Extra safety net — hide common floating widgets by name */
+        .action-buttons, .btn, .alert, .breadcrumb,
+        .navbar, .sidebar, .sidebar-overlay, .sidebar-footer,
+        .sidebar-toggle-btn, .top-navbar, .footer,
+        .page-title small, .notification-btn, .search-wrapper,
+        .user-profile, .dropdown-menu,
+        #sidebarToggleBtn, #sidebarToggleMobile, .sidebar-toggle-mobile,
+        .chat-widget, .chatbot, .chat-bubble, .chat-button,
+        [id*="chat"], [class*="chat-"],
+        [class*="chatbot"], [class*="livechat"],
+        .floating-button, .fab, .toast, .modal-backdrop,
+        .notification {
+            display: none !important;
+            visibility: hidden !important;
+        }
 
+        /* 5. Force everything inside the receipt to pure black on white */
+        .etr-receipt, .etr-receipt * {
+            border-color: #000000 !important;
+            color: #000000 !important;
+        }
+        .etr-receipt .etr-header,
+        .etr-receipt .etr-items,
+        .etr-receipt .etr-totals,
+        .etr-receipt .etr-footer,
+        .etr-receipt .etr-customer-section,
+        .etr-receipt .etr-receipt-info,
+        .etr-receipt .etr-sale-barcode {
+            border-color: #000000 !important;
+        }
         .etr-receipt .etr-total-row.vat-included,
         .etr-receipt .etr-total-row.vat-included .label,
         .etr-receipt .etr-total-row.vat-included .value {
             color: #000000 !important;
         }
 
-        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
     }
 
     @media (max-width: 576px) {
@@ -837,7 +881,7 @@
         </a>
         {% endif %}
 
-        <button class="btn btn-print" id="btnPrintEtr" onclick="qzPrintReceipt()">
+        <button class="btn btn-print" id="btnPrintEtr" onclick="window.print()">
             <i class="fas fa-print"></i> <span id="btnPrintLabel">Print ETR</span>
         </button>
     </div>
@@ -845,8 +889,7 @@
 </div>
 {% endif %}
 
-<!-- Libraries -->
-<script src="{% static 'vendor/qz-tray/qz-tray.js' %}"></script>
+<!-- Barcode library -->
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 
 <script>
@@ -876,122 +919,12 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 // ============================================================
-// QZ TRAY — signed, silent thermal printing
+// AUTO PRINT (browser print dialog)
 // ============================================================
-var QZ_PRINTER_NAME = null;
-
-qz.security.setCertificatePromise(function (resolve, reject) {
-    fetch('/static/qz_keys/certificate.crt', { cache: 'no-store' })
-        .then(function (r) {
-            if (!r.ok) throw new Error('Could not load certificate');
-            return r.text();
-        })
-        .then(resolve)
-        .catch(reject);
-});
-
-qz.security.setSignatureAlgorithm('SHA512');
-
-qz.security.setSignaturePromise(function (toSign) {
-    return function (resolve, reject) {
-        fetch('/qz/sign/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: toSign,
-        })
-        .then(function (r) {
-            if (!r.ok) throw new Error('Sign request failed');
-            return r.json();
-        })
-        .then(function (data) { resolve(data.signature); })
-        .catch(reject);
-    };
-});
-
-function buildReceiptHTML() {
-    var el = document.getElementById('receiptContainer');
-    if (!el) return '<html><body>Receipt not found</body></html>';
-
-    var styles = '';
-    document.querySelectorAll('style').forEach(function (s) {
-        styles += s.outerHTML;
-    });
-
-    var clone = el.cloneNode(true);
-
-    return '<!DOCTYPE html>'
-         + '<html><head><meta charset="utf-8">'
-         + '<style>'
-         + '  @page { margin: 0; }'
-         + '  html, body { margin:0; padding:0; background:#fff; }'
-         + '  .receipt-container { border:none !important; box-shadow:none !important;'
-         + '     padding:0 !important; margin:0 auto !important; background:#fff !important; }'
-         + styles
-         + '</style></head><body>'
-         + clone.outerHTML
-         + '</body></html>';
-}
-
-function qzPrintReceipt() {
-    var btn = document.getElementById('btnPrintEtr');
-    var label = document.getElementById('btnPrintLabel');
-
-    if (typeof qz === 'undefined') {
-        console.warn('QZ Tray library not loaded — using browser print.');
-        window.print();
-        return;
-    }
-
-    if (btn) btn.disabled = true;
-    if (label) label.textContent = 'Printing…';
-
-    var connectPromise = qz.websocket.isActive()
-        ? Promise.resolve()
-        : qz.websocket.connect();
-
-    connectPromise
-        .then(function () {
-            return QZ_PRINTER_NAME
-                ? qz.printers.find(QZ_PRINTER_NAME)
-                : qz.printers.getDefault();
-        })
-        .then(function (printerName) {
-            console.log('QZ Tray printing to:', printerName);
-
-            var config = qz.configs.create(printerName, {
-                size:  { width: {{ receipt_settings.receipt_width|default:80 }}, height: null },
-                units: 'mm',
-                margins: 0,
-                colorType: 'blackwhite',
-                rasterize: true,
-                density: 200,
-            });
-
-            var data = [{
-                type:   'html',
-                format: 'plain',
-                data:   buildReceiptHTML(),
-            }];
-
-            return qz.print(config, data);
-        })
-        .then(function () {
-            console.log('✓ Receipt sent to printer.');
-        })
-        .catch(function (err) {
-            console.error('QZ Tray print failed:', err);
-            window.print();
-        })
-        .finally(function () {
-            if (btn) btn.disabled = false;
-            if (label) label.textContent = 'Print ETR';
-        });
-}
-
 document.addEventListener('DOMContentLoaded', function () {
     var autoPrint = {{ receipt_settings.auto_print|yesno:"true,false" }};
     if (window.location.search.includes('print=1') || autoPrint) {
-        setTimeout(qzPrintReceipt, 800);
+        setTimeout(function () { window.print(); }, 800);
     }
 
     var unauthorized = document.querySelector('.unauthorized-container');
