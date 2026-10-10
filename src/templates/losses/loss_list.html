@@ -1,7 +1,7 @@
 {% extends base_template|default:"base.html" %}
 {% load static %}
 
-{% block title %}Losses & Returns {% endblock %}
+{% block title %}Losses & Returns{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -33,7 +33,47 @@
     .card-header h5 { color: #000 !important; font-weight: 700; margin: 0; }
 
     /* ============================================
-       STAT CARDS (multi-line with amounts + counts)
+       SCANNER BAR
+    ============================================ */
+    .scanner-bar {
+        border: 2px dashed #87CEEB;
+        background: #fdfdfd;
+        border-radius: 6px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+    }
+    .scanner-bar .scanner-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 800;
+        color: #6c757d;
+        margin-bottom: 6px;
+    }
+    .scanner-bar .form-control {
+        border: 2px solid #000;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 1rem;
+        height: 44px;
+    }
+    .scanner-bar .form-control:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 0.2rem rgba(135, 206, 235, 0.35);
+    }
+    .scanner-bar .btn {
+        border: 2px solid #000;
+        font-weight: 700;
+        height: 44px;
+    }
+    .scanner-status {
+        font-size: 0.82rem;
+        margin-top: 4px;
+        min-height: 1em;
+    }
+
+    /* ============================================
+       STAT CARDS
     ============================================ */
     .stat-box {
         border: 2px solid #000;
@@ -56,10 +96,7 @@
         border-bottom: 1px dashed #ccc;
         margin-bottom: 10px;
     }
-    .stat-header i {
-        font-size: 1rem;
-        color: #000;
-    }
+    .stat-header i { font-size: 1rem; color: #000; }
     .stat-overall  .stat-header i { color: #6c757d; }
     .stat-pending  .stat-header i { color: #ffc107; }
     .stat-verified .stat-header i { color: #28a745; }
@@ -135,16 +172,14 @@
         font-weight: 600; border: 1px solid #000;
         display: inline-block;
     }
-    /* Category badges */
     .badge-refund     { background: #cce5ff; color: #004085; }
     .badge-return     { background: #d4edda; color: #155724; }
     .badge-discount   { background: #fff3cd; color: #856404; }
     .badge-writeoff   { background: #e2e3e5; color: #383d41; }
     .badge-damage     { background: #f8d7da; color: #721c24; }
     .badge-shrinkage  { background: #f5c6cb; color: #721c24; }
-    /* Status badges */
-    .badge-pending  { background: #fff3cd; color: #856404; }
-    .badge-verified { background: #d4edda; color: #155724; }
+    .badge-pending    { background: #fff3cd; color: #856404; }
+    .badge-verified   { background: #d4edda; color: #155724; }
 
     /* ============================================
        BUTTONS
@@ -160,21 +195,13 @@
     .btn-warning:hover { background-color: #e0a800; color: #000; }
 
     .action-group { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
-    .locked-hint {
-        font-size: 0.68rem;
-        color: #6c757d;
-        margin-top: 2px;
-    }
+    .locked-hint { font-size: 0.68rem; color: #6c757d; margin-top: 2px; }
 
     /* ============================================
        RESPONSIVE
     ============================================ */
     @media (max-width: 768px) {
-        .table-excel th,
-        .table-excel td {
-            padding: 5px 6px;
-            font-size: 11px;
-        }
+        .table-excel th, .table-excel td { padding: 5px 6px; font-size: 11px; }
         .btn-sm { font-size: 10px; padding: 2px 6px; }
         .stat-num { font-size: 0.8rem; }
         .stat-key { font-size: 0.68rem; }
@@ -191,7 +218,7 @@
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <div>
             <h4 style="margin: 0; font-weight: 800;">
-                <i class="fas fa-exclamation-triangle"></i> Losses & Returns
+                <i class="fas fa-exclamation-triangle"></i> Losses &amp; Returns
             </h4>
             <small class="text-muted">{{ branch.name }} — {{ company.name }}</small>
         </div>
@@ -203,6 +230,37 @@
             {% endif %}
         </div>
     </div>
+
+    <!-- ============================================
+         SCANNER BAR
+         Scan a receipt barcode → jump to create form
+         with the barcode prefilled for auto-lookup.
+    ============================================ -->
+    {% if is_admin %}
+    <div class="scanner-bar">
+        <div class="scanner-label">
+            <i class="fas fa-barcode"></i> Scan Sale Receipt Barcode to Record a Return
+        </div>
+        <div class="row g-2 align-items-center">
+            <div class="col-md-9">
+                <input type="text"
+                       id="scannerInput"
+                       class="form-control"
+                       placeholder="Scan or type barcode (e.g. BAR-20261010-000001) and press Enter"
+                       autocomplete="off"
+                       autofocus>
+            </div>
+            <div class="col-md-3">
+                <button type="button"
+                        id="scannerGo"
+                        class="btn btn-success w-100">
+                    <i class="fas fa-arrow-right"></i> Open Return Form
+                </button>
+            </div>
+        </div>
+        <div id="scannerStatus" class="scanner-status"></div>
+    </div>
+    {% endif %}
 
     <!-- ============================================
          STATS ROW
@@ -429,14 +487,12 @@
                             <td class="text-center">
                                 <div class="action-group">
 
-                                    {# ── Detail (always available) ── #}
                                     <a href="{% url 'losses:loss_detail' company.id branch.id r.id %}"
                                     class="btn btn-sm btn-primary" title="View Details">
                                         <i class="fas fa-eye"></i>
                                     </a>
 
                                     {% if not r.is_verified %}
-                                        {# ── Editable ── #}
                                         {% if is_admin %}
                                         <a href="{% url 'losses:loss_edit' company.id branch.id r.id %}"
                                         class="btn btn-sm btn-primary" title="Edit">
@@ -455,7 +511,6 @@
                                         </a>
                                         {% endif %}
                                     {% else %}
-                                        {# ── Locked ── #}
                                         {% if can_verify %}
                                         <a href="{% url 'losses:loss_unverify' company.id branch.id r.id %}"
                                         class="btn btn-sm btn-warning" title="Un-verify">
@@ -486,9 +541,6 @@
             </div>
         </div>
 
-        <!-- ============================================
-             PAGINATION
-        ============================================ -->
         {% if records.has_other_pages %}
         <div class="card-footer" style="border-top: 2px solid #000;">
             <nav>
@@ -519,4 +571,97 @@
     </div>
 
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
+
+    const scannerInput  = document.getElementById('scannerInput');
+    const scannerGo     = document.getElementById('scannerGo');
+    const scannerStatus = document.getElementById('scannerStatus');
+
+    if (!scannerInput) return;
+
+    // ═══════════════════════════════════════════
+    // BUILD TARGET URL (create form + barcode in query)
+    // ═══════════════════════════════════════════
+    const CREATE_URL = "{% url 'losses:loss_create' company.id branch.id %}";
+
+    function go(barcode) {
+        const code = (barcode || '').trim();
+        if (!code) {
+            setStatus('Please scan or type a barcode first.', 'error');
+            scannerInput.focus();
+            return;
+        }
+
+        setStatus('<i class="fas fa-spinner fa-spin"></i> Opening return form…', 'info');
+
+        // Redirect to create form with the barcode in the querystring.
+        // The create view reads `?barcode=` and passes it as initial data
+        // (see view patch below), which in turn auto-triggers the existing
+        // lookupSale() on the form page.
+        const url = CREATE_URL + '?barcode=' + encodeURIComponent(code);
+        window.location.href = url;
+    }
+
+    function setStatus(msg, type) {
+        if (!scannerStatus) return;
+        scannerStatus.innerHTML = msg || '';
+        scannerStatus.style.color =
+            type === 'error'   ? '#b00020' :
+            type === 'success' ? '#0a7d32' :
+                                 '#555';
+    }
+
+    // ═══════════════════════════════════════════
+    // EVENT HANDLERS
+    // ═══════════════════════════════════════════
+    scannerInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            go(scannerInput.value);
+        }
+    });
+
+    if (scannerGo) {
+        scannerGo.addEventListener('click', function () {
+            go(scannerInput.value);
+        });
+    }
+
+    // ═══════════════════════════════════════════
+    // KEEP FOCUS ON THE SCANNER
+    // ═══════════════════════════════════════════
+    // Autofocus on load (belt & braces — attribute + JS)
+    setTimeout(function () { scannerInput.focus(); scannerInput.select(); }, 100);
+
+    // If the user clicks anywhere that's not a form control or link,
+    // refocus the scanner so a hardware scanner is always ready.
+    document.addEventListener('click', function (e) {
+        const t = e.target;
+        const tag = (t.tagName || '').toLowerCase();
+        if (tag === 'input' || tag === 'select' || tag === 'textarea' || tag === 'button' || tag === 'a') return;
+        scannerInput.focus();
+    });
+
+    // Redirect stray Enter presses (e.g. scanner firing into wrong field)
+    // back to the scanner input.
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter') return;
+        if (e.target === scannerInput) return;
+        const tag = (e.target.tagName || '').toLowerCase();
+        if (tag === 'textarea') return;
+        if (e.target.type === 'submit') return;
+        if (e.target.closest && e.target.closest('.modal')) return;
+
+        e.preventDefault();
+        scannerInput.focus();
+        scannerInput.select();
+    });
+
+});
+</script>
 {% endblock %}

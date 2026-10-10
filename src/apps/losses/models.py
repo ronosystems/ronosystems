@@ -79,6 +79,23 @@ class LossReturn(models.Model):
         help_text="Only for Refund / Return categories",
     )
 
+    # NEW: link to the originating sale (optional)
+    sale = models.ForeignKey(
+        'epa_shop.Sale',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='loss_return_records',
+        help_text="Sale this return/refund relates to (set via barcode scan).",
+    )
+
+    # NEW: store the scanned barcode for audit
+    sale_barcode = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Barcode of the linked sale (if scanned).",
+    )
+    
     # ─────────────────────────────────────────────
     # PRODUCT (optional — used for refunds/returns/damages/shrinkage)
     # ─────────────────────────────────────────────

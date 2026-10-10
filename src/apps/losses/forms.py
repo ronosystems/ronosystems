@@ -17,6 +17,9 @@ class LossReturnForm(forms.ModelForm):
             'customer_name',
             'customer_phone',
             'notes',
+            # NEW — sale barcode linkage
+            'sale',
+            'sale_barcode',
         ]
         widgets = {
             'category': forms.Select(attrs={
@@ -39,6 +42,7 @@ class LossReturnForm(forms.ModelForm):
             }),
             'description': forms.Textarea(attrs={
                 'class': 'form-control',
+                'id': 'id_description',
                 'rows': 3,
                 'placeholder': 'Describe the return / loss…',
             }),
@@ -75,8 +79,21 @@ class LossReturnForm(forms.ModelForm):
             }),
             'notes': forms.Textarea(attrs={
                 'class': 'form-control',
+                'id': 'id_notes',
                 'rows': 2,
                 'placeholder': 'Any additional notes…',
+            }),
+
+            # ── NEW: Sale linkage widgets ──
+            'sale': forms.HiddenInput(attrs={
+                'id': 'id_sale_id',
+            }),
+            'sale_barcode': forms.TextInput(attrs={
+                'class': 'form-control',
+                'id': 'id_sale_barcode',
+                'placeholder': 'Scan or type barcode (e.g. BAR-20261010-000001)',
+                'autocomplete': 'off',
+                'autofocus': 'autofocus',
             }),
         }
 
@@ -88,6 +105,7 @@ class LossReturnForm(forms.ModelForm):
         cost_amount = cleaned.get('cost_amount') or 0
         quantity = cleaned.get('quantity') or 1
 
+        # ── Existing validation ──
         if category in LossReturn.RETURN_STYLE_CATEGORIES:
             if not amount or amount <= 0:
                 self.add_error('amount', 'Enter the selling amount.')
@@ -101,5 +119,27 @@ class LossReturnForm(forms.ModelForm):
 
         if quantity < 1:
             self.add_error('quantity', 'Quantity must be at least 1.')
+
+        # ── NEW: sale barcode validation ──
+        sale = cleaned.get('sale')
+        barcode = (cleaned.get('sale_barcode') or '').strip()
+
+        if barcode and not sale:
+            self.add_error(
+                'sale_barcode',
+                f'Barcode "{barcode}" is not linked to any sale. '
+                f'Click "Look up" to verify before saving.',
+            )
+
+        # If a sale was linked, make sure it belongs to the same company
+        # as the LossReturn being saved. (`self.instance.company` is set
+        # in the view before form.save(commit=False) is called — but on
+        # POST the instance may not yet have a company, so we check
+        # defensively against cleaned data.)
+        if sale and self.instance.company_id and sale.company_id != self.instance.company_id:
+            self.add_error(
+                'sale',
+                'The linked sale does not belong to this company.',
+            )
 
         return cleaned

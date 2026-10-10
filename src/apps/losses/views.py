@@ -20,7 +20,13 @@ from .forms import LossReturnForm
 
 def is_admin_or_manager(user):
     """Full edit rights on unverified records."""
-    return user.role in ['super_admin', 'company_admin', 'company_manager', 'company_cashier', 'stock_controller']
+    return user.role in [
+        'super_admin',
+        'company_admin',
+        'company_manager',
+        'company_cashier',
+        'stock_controller',
+    ]
 
 
 def can_verify(user):
@@ -100,7 +106,6 @@ def loss_list(request, company_id=None, branch_id=None):
     pending_count = pending_qs.count()
     pending_selling = pending_qs.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
     pending_cost    = pending_qs.aggregate(total=Sum('cost_amount'))['total'] or Decimal('0.00')
-    # Combined "value at risk" (selling for returns + cost for losses)
     pending_value = pending_selling + pending_cost
 
     # ── Verified (locked) ──
@@ -176,9 +181,9 @@ def loss_list(request, company_id=None, branch_id=None):
         'search': search,
 
         # ── GRAND TOTALS ──
-        'total_amount': total_amount,    # all selling amounts
-        'total_cost': total_cost,        # all cost amounts
-        'record_count': record_count,    # all records
+        'total_amount': total_amount,
+        'total_cost': total_cost,
+        'record_count': record_count,
 
         # ── PENDING (unverified) ──
         'pending_count':   pending_count,
@@ -197,6 +202,7 @@ def loss_list(request, company_id=None, branch_id=None):
         'can_verify': can_verify(request.user),
     }
     return render(request, 'losses/loss_list.html', context)
+
 
 # ============================================
 # CREATE
@@ -242,7 +248,12 @@ def loss_create(request, company_id=None, branch_id=None):
         else:
             messages.error(request, 'Please fix the errors below.')
     else:
-        form = LossReturnForm(initial={'quantity': 1})
+        # Prefill the barcode when the list page redirects with ?barcode=...
+        initial = {'quantity': 1}
+        barcode = (request.GET.get('barcode') or '').strip()
+        if barcode:
+            initial['sale_barcode'] = barcode
+        form = LossReturnForm(initial=initial)
 
     context = {
         'company': company,
@@ -330,7 +341,13 @@ def loss_edit(request, company_id=None, branch_id=None, pk=None):
         else:
             messages.error(request, 'Please fix the errors below.')
     else:
-        form = LossReturnForm(instance=record)
+        # Load the record's existing data, but if the caller supplied
+        # ?barcode=..., overlay it as the initial value for that field.
+        initial = {}
+        barcode = (request.GET.get('barcode') or '').strip()
+        if barcode:
+            initial['sale_barcode'] = barcode
+        form = LossReturnForm(instance=record, initial=initial)
 
     context = {
         'company': company,
@@ -486,9 +503,6 @@ def loss_unverify(request, company_id=None, branch_id=None, pk=None):
 # API — Auto-fill cost price from product
 # ============================================
 
-from django.contrib.contenttypes.models import ContentType
-
-
 @login_required
 def api_product_lookup(request):
     """
@@ -539,6 +553,130 @@ def api_product_lookup(request):
                 })
 
     return JsonResponse({'results': results})
+
+
+# ============================================
+# API — Look up a Sale by barcode (for returns form)
+# ============================================
+
+@login_required
+def api_sale_lookup(request):
+    """
+    Look up a sale by its barcode_number and return customer + items
+    so the Loss/Return form can prefill itself.
+
+    Query params:
+      ?barcode=BAR-20261010-000001
+
+    Response (found=True):
+      {
+        "found": true,
+        "sale": {
+          "id": <int>,
+          "company_sale_id": "FIE-000001",
+          "barcode_number": "BAR-...",
+          "customer_name": "...",
+          "customer_phone": "...",
+          "customer_email": "...",
+          "customer_id": "...",
+          "sold_by": "Full Name / username",
+          "net_amount": 123.45,
+          "total_amount": 123.45,
+          "tax": 0.00,
+          "payment_method": "cash",
+          "payment_status": "paid",
+          "sale_date": "2026-10-10T12:34:56+03:00",
+          "branch_id": 1,
+          "branch_name": "Main",
+          "items": [
+            {
+              "name": "...",
+              "sku": "...",
+              "quantity": 1,
+              "unit_price": 123.45,
+              "total_price": 123.45,
+              "unit_identifier": "..."
+            }
+          ]
+        }
+      }
+    """
+    company, _ = get_active_company(request)
+    if not company:
+        return JsonResponse({'found': False, 'error': 'No company'}, status=400)
+
+    code = (request.GET.get('barcode') or '').strip()
+    if not code:
+        return JsonResponse({'found': False, 'error': 'No barcode provided'}, status=400)
+
+    from apps.epa_shop.models import Sale  # adjust import path if different
+
+    sale = (
+        Sale.objects
+        .filter(company=company, barcode_number__iexact=code)
+        .select_related('branch', 'customer', 'sold_by')
+        .prefetch_related('items', 'items__unit')
+        .first()
+    )
+
+    if not sale:
+        return JsonResponse({'found': False, 'error': f'No sale found for "{code}"'})
+
+    # ── Sold-by display name ──
+    sold_by_name = '—'
+    if sale.sold_by:
+        full_name = ''
+        try:
+            full_name = sale.sold_by.get_full_name() or ''
+        except Exception:
+            full_name = ''
+        sold_by_name = full_name or getattr(sale.sold_by, 'username', '') or '—'
+
+    # ── Customer national ID (from linked Customer record) ──
+    customer_id = ''
+    if sale.customer:
+        customer_id = getattr(sale.customer, 'id_number', '') or ''
+
+    # ── Items list ──
+    items = []
+    for it in sale.items.all():
+        items.append({
+            'name': it.item_name,
+            'sku': it.item_sku or '',
+            'quantity': it.quantity,
+            'unit_price': float(it.unit_price),
+            'total_price': float(it.total_price),
+            'unit_identifier': it.unit.identifier if it.unit else '',
+        })
+
+    return JsonResponse({
+        'found': True,
+        'sale': {
+            'id': sale.id,
+            'company_sale_id': sale.company_sale_id,
+            'barcode_number': sale.barcode_number,
+
+            # ── Customer ──
+            'customer_name': sale.customer_name,
+            'customer_phone': sale.customer_phone,
+            'customer_email': sale.customer_email,
+            'customer_id': customer_id,
+
+            # ── Sale meta ──
+            'sold_by': sold_by_name,
+            'net_amount': float(sale.net_amount),
+            'total_amount': float(sale.total_amount),
+            'tax': float(sale.tax),
+            'payment_method': sale.payment_method,
+            'payment_status': sale.payment_status,
+            'sale_date': sale.sale_date.isoformat(),
+
+            'branch_id': sale.branch_id,
+            'branch_name': sale.branch.name if sale.branch else '',
+
+            'items': items,
+        },
+    })
 
 
 # ============================================

@@ -61,16 +61,109 @@
         font-weight: 700; color: #000; margin-bottom: 10px;
         text-transform: uppercase; font-size: 0.8rem; letter-spacing: 1px;
     }
-    .hide-when-loss { display: block; }
-    .hide-when-return { display: none; }
-    .category-refund .hide-when-loss,
-    .category-return .hide-when-loss { display: block; }
-    .category-refund .hide-when-return,
-    .category-return .hide-when-return { display: block; }
-    .category-damage .hide-when-loss,
-    .category-shrinkage .hide-when-loss { display: none; }
-    .category-damage .hide-when-return,
-    .category-shrinkage .hide-when-return { display: block; }
+
+    /* ── Sale scan section ── */
+    #saleScanSection {
+        background: #fdfdfd;
+        border: 2px dashed #87CEEB;
+        border-radius: 4px;
+        padding: 14px 16px 4px 16px;
+        margin-bottom: 8px;
+    }
+
+    /* ── Receipt preview wrapper ── */
+    #saleSummary {
+        border: 2px solid #000;
+        background: #eaf7ff;
+        border-radius: 4px;
+        padding: 12px 14px;
+        margin-top: 6px;
+    }
+
+    /* ── Receipt preview ── */
+    .receipt-preview-title {
+        font-weight: 700;
+        font-size: 0.9rem;
+        color: #000;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .receipt-preview-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        margin-top: 6px;
+    }
+    @media (max-width: 640px) {
+        .receipt-preview-grid { grid-template-columns: 1fr; }
+    }
+    .receipt-preview-col {
+        background: #ffffff;
+        border: 2px solid #000;
+        border-radius: 4px;
+        padding: 10px 12px;
+    }
+    .receipt-col-title {
+        font-size: 0.72rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #000;
+        border-bottom: 1px dashed #999;
+        padding-bottom: 4px;
+        margin-bottom: 8px;
+    }
+    .receipt-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.85rem;
+        padding: 3px 0;
+    }
+    .receipt-label {
+        color: #555;
+        font-weight: 600;
+    }
+    .receipt-value {
+        color: #000;
+        font-weight: 600;
+        text-align: right;
+        word-break: break-word;
+        max-width: 60%;
+    }
+    .receipt-items-block {
+        margin-top: 12px;
+        background: #ffffff;
+        border: 2px solid #000;
+        border-radius: 4px;
+        padding: 10px 12px;
+    }
+    .receipt-items-block .receipt-col-title { margin-bottom: 6px; }
+    #ssItems .item-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.85rem;
+        padding: 5px 0;
+        border-bottom: 1px dotted #ddd;
+    }
+    #ssItems .item-row:last-child { border-bottom: none; }
+    #ssItems .item-name { font-weight: 600; color: #000; }
+    #ssItems .item-meta { font-size: 0.78rem; color: #666; }
+    #ssItems .item-price { font-weight: 700; color: #000; white-space: nowrap; }
+    .receipt-empty { font-size: 0.83rem; color: #888; font-style: italic; }
+    .receipt-totals {
+        margin-top: 12px;
+        background: #eaf7ff;
+        border: 2px solid #000;
+        border-radius: 4px;
+        padding: 10px 14px;
+    }
+    .receipt-total-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.95rem;
+        font-weight: 800;
+        color: #000;
+    }
 </style>
 {% endblock %}
 
@@ -81,7 +174,7 @@
         <ol class="breadcrumb mb-0" style="background: transparent; padding: 0;">
             <li class="breadcrumb-item">
                 <a href="{% url 'losses:loss_list' company.id branch.id %}" style="color: #000;">
-                    Losses & Returns
+                    Losses &amp; Returns
                 </a>
             </li>
             <li class="breadcrumb-item active" aria-current="page">
@@ -110,9 +203,136 @@
                         {% endfor %}
                     {% endif %}
 
-                    <form method="POST" novalidate>
+                    <form method="POST" novalidate id="lossReturnForm">
                         {% csrf_token %}
 
+                        {# ═══════════════════════════════════════════ #}
+                        {# SALE BARCODE SCAN                           #}
+                        {# ═══════════════════════════════════════════ #}
+                        <div id="saleScanSection">
+                            <div class="section-title" style="margin-top:0;">
+                                <i class="fas fa-barcode"></i> Scan Sale Barcode
+                                <span style="font-weight:400; text-transform:none; letter-spacing:0;">
+                                    (optional — for Returns / Refunds / Discounts / Write-offs)
+                                </span>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-8 mb-3">
+                                    <label class="form-label" for="id_sale_barcode">
+                                        <i class="fas fa-qrcode"></i> Sale Barcode
+                                    </label>
+                                    <div class="input-group">
+                                        {{ form.sale_barcode }}
+                                        <button type="button"
+                                                class="btn btn-dark"
+                                                id="btnLookupSale"
+                                                style="border:2px solid #000; font-weight:600;">
+                                            <i class="fas fa-search"></i> Look up
+                                        </button>
+                                        <button type="button"
+                                                class="btn btn-outline-secondary"
+                                                id="btnClearSale"
+                                                style="border:2px solid #000;">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                    <div class="help-text">
+                                        Scan the receipt barcode to auto-fill customer &amp; product details.
+                                    </div>
+                                </div>
+
+                                <div class="col-md-4 mb-3 d-flex align-items-end">
+                                    <div id="saleLookupStatus" style="font-size:0.85rem;"></div>
+                                </div>
+                            </div>
+
+                            {# Hidden input for the resolved sale FK #}
+                            {{ form.sale }}
+
+                            {# ═══════════════════════════════════ #}
+                            {# SALE RECEIPT PREVIEW                #}
+                            {# ═══════════════════════════════════ #}
+                            <div id="saleSummary" style="display:none;">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="receipt-preview-title">
+                                        <i class="fas fa-receipt"></i> Sale Receipt Preview
+                                    </div>
+                                    <button type="button"
+                                            class="btn-close"
+                                            id="btnCloseSummary"
+                                            aria-label="Close"></button>
+                                </div>
+
+                                <div class="receipt-preview-grid">
+
+                                    {# ── Left column: Customer ── #}
+                                    <div class="receipt-preview-col">
+                                        <div class="receipt-col-title">
+                                            <i class="fas fa-user"></i> Customer
+                                        </div>
+                                        <div class="receipt-row">
+                                            <span class="receipt-label">Name</span>
+                                            <span class="receipt-value" id="ssCustomerName">—</span>
+                                        </div>
+                                        <div class="receipt-row">
+                                            <span class="receipt-label">Phone</span>
+                                            <span class="receipt-value" id="ssCustomerPhone">—</span>
+                                        </div>
+                                        <div class="receipt-row">
+                                            <span class="receipt-label">ID</span>
+                                            <span class="receipt-value" id="ssCustomerId">—</span>
+                                        </div>
+                                    </div>
+
+                                    {# ── Right column: Sale meta ── #}
+                                    <div class="receipt-preview-col">
+                                        <div class="receipt-col-title">
+                                            <i class="fas fa-file-invoice"></i> Sale Details
+                                        </div>
+                                        <div class="receipt-row">
+                                            <span class="receipt-label">Receipt #</span>
+                                            <span class="receipt-value" id="ssReceiptNumber">—</span>
+                                        </div>
+                                        <div class="receipt-row">
+                                            <span class="receipt-label">Sale ID</span>
+                                            <span class="receipt-value" id="ssSaleId">—</span>
+                                        </div>
+                                        <div class="receipt-row">
+                                            <span class="receipt-label">Sold by</span>
+                                            <span class="receipt-value" id="ssSoldBy">—</span>
+                                        </div>
+                                        <div class="receipt-row">
+                                            <span class="receipt-label">Sale date</span>
+                                            <span class="receipt-value" id="ssSaleDate">—</span>
+                                        </div>
+                                    </div>
+
+                                </div>
+
+                                {# ── Item block ── #}
+                                <div class="receipt-items-block">
+                                    <div class="receipt-col-title">
+                                        <i class="fas fa-box-open"></i> Item(s) Sold
+                                    </div>
+                                    <div id="ssItems">
+                                        <div class="receipt-empty">No items.</div>
+                                    </div>
+                                </div>
+
+                                {# ── Totals ── #}
+                                <div class="receipt-totals">
+                                    <div class="receipt-total-row">
+                                        <span>Sale amount</span>
+                                        <span id="ssSaleAmount">KES 0.00</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {# ═══════════════════════════════════════════ #}
+                        {# CATEGORY                                    #}
+                        {# ═══════════════════════════════════════════ #}
                         <div class="section-title">Category</div>
 
                         <div class="mb-3">
@@ -134,6 +354,9 @@
                             </div>
                         </div>
 
+                        {# ═══════════════════════════════════════════ #}
+                        {# PRODUCT                                     #}
+                        {# ═══════════════════════════════════════════ #}
                         <div class="section-title">Product</div>
 
                         <div class="row">
@@ -152,10 +375,12 @@
                             {{ form.description }}
                         </div>
 
+                        {# ═══════════════════════════════════════════ #}
+                        {# AMOUNTS                                     #}
+                        {# ═══════════════════════════════════════════ #}
                         <div class="section-title">Amounts</div>
 
                         <div class="row">
-                            <!-- Selling-side amount (returns/refunds/discounts/writeoffs) -->
                             <div class="col-md-6 mb-3" id="amountWrap">
                                 <label class="form-label" for="id_amount">
                                     <i class="fas fa-money-bill-wave"></i> Amount Sold At (KES)
@@ -166,7 +391,6 @@
                                 </div>
                             </div>
 
-                            <!-- Cost-side amount (damages/shrinkage) -->
                             <div class="col-md-6 mb-3" id="costWrap">
                                 <label class="form-label" for="id_cost_amount">
                                     <i class="fas fa-coins"></i> Cost Price (KES)
@@ -183,6 +407,9 @@
                             </div>
                         </div>
 
+                        {# ═══════════════════════════════════════════ #}
+                        {# CUSTOMER                                    #}
+                        {# ═══════════════════════════════════════════ #}
                         <div class="section-title">Customer (optional)</div>
 
                         <div class="row">
@@ -230,6 +457,15 @@
                 </ul>
             </div>
 
+            <div class="info-panel mb-3">
+                <h6><i class="fas fa-barcode"></i> Scanning a Receipt</h6>
+                <p style="font-size: 0.83rem; color: #333; margin: 0;">
+                    Scan the sale's barcode into the field above to auto-fill
+                    the customer, product, and amount. The record will be
+                    linked to the original sale for audit.
+                </p>
+            </div>
+
             <div class="info-panel">
                 <h6><i class="fas fa-lightbulb"></i> Tip</h6>
                 <p style="font-size: 0.83rem; color: #333; margin: 0;">
@@ -240,68 +476,330 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
-    (function () {
-        const categoryEl = document.getElementById('id_category');
-        const refundWrap = document.getElementById('refundTypeWrap');
-        const amountWrap = document.getElementById('amountWrap');
-        const costWrap = document.getElementById('costWrap');
-        const costInput = document.getElementById('id_cost_amount');
-        const productNameInput = document.getElementById('id_product_name');
-        const productModelInput = document.getElementById('id_product_model');
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
 
-        const RETURN_STYLE = {{ return_style_categories|safe }};
-        const LOSS_STYLE = {{ loss_style_categories|safe }};
+    // ═══════════════════════════════════════════
+    // ELEMENT REFERENCES
+    // ═══════════════════════════════════════════
+    const categoryEl        = document.getElementById('id_category');
+    const refundWrap        = document.getElementById('refundTypeWrap');
+    const amountWrap        = document.getElementById('amountWrap');
+    const costWrap          = document.getElementById('costWrap');
+    const costInput         = document.getElementById('id_cost_amount');
+    const productNameInput  = document.getElementById('id_product_name');
+    const productModelInput = document.getElementById('id_product_model');
 
-        function applyCategory() {
-            const cat = categoryEl.value;
+    const barcodeInput      = document.getElementById('id_sale_barcode');
+    const btnLookup         = document.getElementById('btnLookupSale');
+    const btnClear          = document.getElementById('btnClearSale');
+    const btnCloseSum       = document.getElementById('btnCloseSummary');
+    const statusEl          = document.getElementById('saleLookupStatus');
+    const summaryEl         = document.getElementById('saleSummary');
+    const hiddenSaleId      = document.getElementById('id_sale_id');
 
-            // Show / hide refund type
-            if (cat === 'refund' || cat === 'return') {
-                refundWrap.style.display = '';
-            } else {
-                refundWrap.style.display = 'none';
-            }
+    const customerNameEl    = document.getElementById('id_customer_name');
+    const customerPhoneEl   = document.getElementById('id_customer_phone');
+    const amountEl          = document.getElementById('id_amount');
+    const descriptionEl     = document.getElementById('id_description');
 
-            // Show / hide amount vs cost
-            if (LOSS_STYLE.includes(cat)) {
-                amountWrap.style.display = 'none';
-                costWrap.style.display = '';
-                costInput.removeAttribute('readonly');   // allow manual override
-            } else {
-                amountWrap.style.display = '';
-                costWrap.style.display = 'none';
-            }
+    const RETURN_STYLE = {{ return_style_categories|default:"[]"|safe }};
+    const LOSS_STYLE   = {{ loss_style_categories|default:"[]"|safe }};
+    const IS_EDIT      = {% if is_edit %}true{% else %}false{% endif %};
+
+    // ═══════════════════════════════════════════
+    // CATEGORY TOGGLE
+    // ═══════════════════════════════════════════
+    function applyCategory() {
+        if (!categoryEl) return;
+        const cat = categoryEl.value;
+
+        if (refundWrap) {
+            refundWrap.style.display = (cat === 'refund' || cat === 'return') ? '' : 'none';
         }
 
+        const isLossStyle = LOSS_STYLE.indexOf(cat) !== -1;
+        if (isLossStyle) {
+            if (amountWrap) amountWrap.style.display = 'none';
+            if (costWrap)   costWrap.style.display   = '';
+            if (costInput)  costInput.removeAttribute('readonly');
+        } else {
+            if (amountWrap) amountWrap.style.display = '';
+            if (costWrap)   costWrap.style.display   = 'none';
+        }
+    }
+
+    if (categoryEl) {
         categoryEl.addEventListener('change', applyCategory);
         applyCategory();
+    }
 
-        // Auto-fill cost from product name (for damage/shrinkage)
-        let lookupTimer = null;
+    // ═══════════════════════════════════════════
+    // PRODUCT COST AUTO-FILL (damage/shrinkage)
+    // ═══════════════════════════════════════════
+    let lookupTimer = null;
+    if (productNameInput) {
         productNameInput.addEventListener('input', function () {
-            const cat = categoryEl.value;
-            if (!LOSS_STYLE.includes(cat)) return;
+            const cat = categoryEl ? categoryEl.value : '';
+            if (LOSS_STYLE.indexOf(cat) === -1) return;
 
             clearTimeout(lookupTimer);
-            lookupTimer = setTimeout(() => {
+            lookupTimer = setTimeout(function () {
                 const name = productNameInput.value.trim();
                 if (!name) return;
 
-                fetch(`{% url 'losses:api_product_lookup' %}?name=${encodeURIComponent(name)}`)
-                    .then(r => r.json())
-                    .then(data => {
+                fetch("{% url 'losses:api_product_lookup' %}?name=" + encodeURIComponent(name))
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
                         if (data.found) {
-                            costInput.value = data.purchase_price.toFixed(2);
-                            if (!productModelInput.value && data.model) {
+                            if (costInput) costInput.value = Number(data.purchase_price).toFixed(2);
+                            if (productModelInput && !productModelInput.value && data.model) {
                                 productModelInput.value = data.model;
                             }
                         }
                     })
-                    .catch(() => { /* silent */ });
+                    .catch(function () { /* silent */ });
             }, 400);
         });
-    })();
+    }
+
+    // ═══════════════════════════════════════════
+    // SALE BARCODE SCAN → AUTO-FILL
+    // ═══════════════════════════════════════════
+    function setStatus(msg, type) {
+        if (!statusEl) return;
+        statusEl.innerHTML = msg || '';
+        statusEl.style.color =
+            type === 'error'   ? '#b00020' :
+            type === 'success' ? '#0a7d32' :
+                                 '#555';
+    }
+
+    function clearSummary() {
+        if (summaryEl) summaryEl.style.display = 'none';
+        if (hiddenSaleId) hiddenSaleId.value = '';
+    }
+
+    function renderReceipt(s) {
+        // ── Customer column ──
+        const ssCustomerName  = document.getElementById('ssCustomerName');
+        const ssCustomerPhone = document.getElementById('ssCustomerPhone');
+        const ssCustomerId    = document.getElementById('ssCustomerId');
+
+        // ── Sale meta column ──
+        const ssReceiptNumber = document.getElementById('ssReceiptNumber');
+        const ssSaleId        = document.getElementById('ssSaleId');
+        const ssSoldBy        = document.getElementById('ssSoldBy');
+        const ssSaleDate      = document.getElementById('ssSaleDate');
+
+        // ── Items + totals ──
+        const ssItems         = document.getElementById('ssItems');
+        const ssSaleAmount    = document.getElementById('ssSaleAmount');
+
+        if (ssCustomerName)  ssCustomerName.textContent  = s.customer_name  || '—';
+        if (ssCustomerPhone) ssCustomerPhone.textContent = s.customer_phone || '—';
+        if (ssCustomerId)    ssCustomerId.textContent    = s.customer_id    || '—';
+
+        if (ssReceiptNumber) ssReceiptNumber.textContent = s.company_sale_id || '—';
+        if (ssSaleId)        ssSaleId.textContent        = s.id              || '—';
+        if (ssSoldBy)        ssSoldBy.textContent        = s.sold_by         || '—';
+        if (ssSaleDate)      ssSaleDate.textContent      = s.sale_date
+            ? new Date(s.sale_date).toLocaleString()
+            : '—';
+
+        if (ssItems) {
+            if (!s.items || !s.items.length) {
+                ssItems.innerHTML = '<div class="receipt-empty">No items.</div>';
+            } else {
+                let html = '';
+                s.items.forEach(function (it) {
+                    const name  = it.name || '—';
+                    const qty   = it.quantity || 1;
+                    const price = Number(it.unit_price || 0).toFixed(2);
+                    const line  = Number(
+                        it.total_price != null
+                            ? it.total_price
+                            : (it.unit_price || 0) * qty
+                    ).toFixed(2);
+                    const imei  = it.unit_identifier
+                        ? '<span class="item-meta">(' + it.unit_identifier + ') </span>'
+                        : '';
+                    const sku   = it.sku
+                        ? '<span class="item-meta">· ' + it.sku + '</span>'
+                        : '';
+
+                    html += '<div class="item-row">' +
+                                '<div>' +
+                                    '<div class="item-name">' + name + '</div>' +
+                                    '<div>' + imei + sku + '</div>' +
+                                    '<div class="item-meta">' + qty + ' × KES ' + price + '</div>' +
+                                '</div>' +
+                                '<div class="item-price">KES ' + line + '</div>' +
+                            '</div>';
+                });
+                ssItems.innerHTML = html;
+            }
+        }
+
+        if (ssSaleAmount) {
+            ssSaleAmount.textContent = 'KES ' + Number(s.net_amount || 0).toFixed(2);
+        }
+
+        if (summaryEl) summaryEl.style.display = '';
+    }
+
+    function lookupSale(barcode) {
+        if (!barcode) {
+            setStatus('Enter or scan a barcode first.', 'error');
+            return;
+        }
+        setStatus('<i class="fas fa-spinner fa-spin"></i> Looking up…', 'info');
+
+        fetch("{% url 'losses:api_sale_lookup' %}?barcode=" + encodeURIComponent(barcode))
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.found) {
+                    setStatus(data.error || 'Sale not found.', 'error');
+                    clearSummary();
+                    return;
+                }
+
+                const s = data.sale;
+
+                // ── Auto-fill customer fields on the main form ──
+                if (customerNameEl && s.customer_name) {
+                    customerNameEl.value = s.customer_name;
+                }
+                if (customerPhoneEl && s.customer_phone) {
+                    customerPhoneEl.value = s.customer_phone;
+                }
+
+                // ── Auto-fill product from first item ──
+                if (s.items && s.items.length) {
+                    const first = s.items[0];
+                    if (productNameInput && !productNameInput.value) {
+                        productNameInput.value = first.name || '';
+                    }
+                    if (productModelInput && !productModelInput.value && first.sku) {
+                        productModelInput.value = first.sku;
+                    }
+                }
+
+                // ── Amount ──
+                if (amountEl && (!amountEl.value || parseFloat(amountEl.value) === 0)) {
+                    amountEl.value = Number(s.net_amount).toFixed(2);
+                }
+
+                // ── Description ──
+                if (descriptionEl && !descriptionEl.value) {
+                    descriptionEl.value =
+                        'Linked to receipt ' + s.company_sale_id +
+                        ' (barcode ' + s.barcode_number + ').';
+                }
+
+                // ── Default category to "return" if empty ──
+                if (categoryEl && !categoryEl.value) {
+                    categoryEl.value = 'return';
+                    categoryEl.dispatchEvent(new Event('change'));
+                }
+
+                // ── Hidden sale_id ──
+                if (hiddenSaleId) hiddenSaleId.value = s.id;
+
+                // ── Render receipt preview ──
+                renderReceipt(s);
+
+                setStatus(
+                    '<i class="fas fa-check-circle"></i> Matched receipt ' + s.company_sale_id,
+                    'success'
+                );
+            })
+            .catch(function (err) {
+                console.error(err);
+                setStatus('Lookup failed. Please try again.', 'error');
+            });
+    }
+
+    // Lookup button
+    if (btnLookup && barcodeInput) {
+        btnLookup.addEventListener('click', function () {
+            lookupSale(barcodeInput.value.trim());
+        });
+    }
+
+    // Enter key → lookup + refocus for next scan
+    if (barcodeInput) {
+        barcodeInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                lookupSale(barcodeInput.value.trim());
+                setTimeout(function () {
+                    barcodeInput.focus();
+                    barcodeInput.select();
+                }, 100);
+            }
+        });
+    }
+
+    // Clear
+    if (btnClear && barcodeInput) {
+        btnClear.addEventListener('click', function () {
+            barcodeInput.value = '';
+            clearSummary();
+            setStatus('');
+            barcodeInput.focus();
+        });
+    }
+
+    // Close preview
+    if (btnCloseSum) {
+        btnCloseSum.addEventListener('click', function () {
+            if (summaryEl) summaryEl.style.display = 'none';
+            if (barcodeInput) barcodeInput.focus();
+        });
+    }
+
+    // ═══════════════════════════════════════════
+    // AUTOFOCUS THE SCANNER FIELD
+    // ═══════════════════════════════════════════
+    setTimeout(function () {
+        if (!barcodeInput) return;
+
+        const isEditWithBarcode = IS_EDIT && barcodeInput.value.trim() !== '';
+
+        if (isEditWithBarcode) {
+            lookupSale(barcodeInput.value.trim());
+            return;
+        }
+
+        barcodeInput.focus();
+        barcodeInput.select();
+    }, 150);
+
+    // ═══════════════════════════════════════════
+    // REDIRECT STRAY ENTER KEYPRESSES TO SCANNER
+    // ═══════════════════════════════════════════
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter') return;
+        if (!barcodeInput) return;
+
+        const target = e.target;
+        const tag = (target.tagName || '').toLowerCase();
+
+        if (tag === 'textarea') return;
+        if (target.type === 'submit') return;
+        if (target === barcodeInput) return;
+        if (target.closest && target.closest('.modal')) return;
+
+        e.preventDefault();
+        barcodeInput.focus();
+        barcodeInput.select();
+    });
+
+});
 </script>
 {% endblock %}

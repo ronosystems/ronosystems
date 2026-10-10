@@ -75,9 +75,6 @@ urlpatterns = [
     # ============================================
     # API — Auto-fill cost price from product
     # ============================================
-    path(
-        'api/product-lookup/',
-        views.api_product_lookup,
-        name='api_product_lookup',
-    ),
+    path('api/product-lookup/',   views.api_product_lookup, name='api_product_lookup',),
+    path('api/sale-lookup/',    views.api_sale_lookup, name='api_sale_lookup'), 
 ]
