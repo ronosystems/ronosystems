@@ -124,6 +124,7 @@ INSTALLED_APPS = [
     'apps.reports',
     'apps.settings',
     'apps.losses',
+    'apps.analytics',  
 
     # Business Type Apps
     'apps.epa_shop',
@@ -149,13 +150,10 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
-
-    # Auto-logout on inactivity
     'apps.accounts.middleware.InactivityLogoutMiddleware',
-
-    # Custom domain + subscription handling
     'apps.companies.middleware.CustomDomainMiddleware',
     'apps.companies.middleware.SubscriptionExpiryMiddleware',
+    'apps.analytics.middleware.VisitTrackingMiddleware', 
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -188,12 +186,23 @@ TEMPLATES = [
                 'apps.treasury.context_processors.company_context',
                 'apps.settings.context_processors.pending_payments_count',
                 'apps.settings.context_processors.pending_ai_chats_count',
+                'apps.analytics.context_processors.visit_count_today', 
             ],
         },
     },
 ]
 
 WSGI_APPLICATION = 'core.wsgi.application'
+
+
+# ============================================
+# VISIT TRACKING
+# ============================================
+VISIT_TRACKING_ENABLED = True
+VISIT_TRACKING_HASH_IP = False
+VISIT_TRACKING_IP_SALT = 'change-me-in-prod'
+GEOIP_PATH = BASE_DIR / 'geoip'
+
 
 
 # ============================================

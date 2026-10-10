@@ -50,6 +50,7 @@ urlpatterns = [
     path('settings/', include('apps.settings.urls')),
     path('profile/', include('apps.accounts.profile_urls')),
     path('accounts/', include('allauth.urls')),
+    path('analytics/', include('apps.analytics.urls')),
 
     # ============================================
     # API ENDPOINTS
