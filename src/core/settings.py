@@ -1,5 +1,10 @@
 import os
+import glob
+import shutil
+import logging
+import subprocess
 import dj_database_url
+
 from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
@@ -635,6 +640,8 @@ KCB_CALLBACK_URL = os.getenv(
 )
 
 
+
+
 # ============================================
 # LOGGING
 # ============================================
@@ -658,3 +665,40 @@ LOGGING = {
         },
     },
 }
+
+
+
+# ============================================
+# GEOIP AUTO-DOWNLOAD (survives ephemeral containers)
+# ============================================
+if ON_RENDER:
+
+    _log = logging.getLogger(__name__)
+    _mmdb = GEOIP_PATH / 'GeoLite2-City.mmdb'
+
+    if not _mmdb.exists():
+        _log.warning('GeoLite2-City.mmdb missing — attempting download…')
+        try:
+            GEOIP_PATH.mkdir(parents=True, exist_ok=True)
+            _account = os.getenv('MAXMIND_ACCOUNT_ID', '')
+            _key     = os.getenv('MAXMIND_LICENSE_KEY', '')
+
+            if _account and _key:
+                subprocess.run([
+                    'curl', '-fL', '-u', f'{_account}:{_key}',
+                    'https://download.maxmind.com/geoip/databases/GeoLite2-City/download?suffix=tar.gz',
+                    '-o', '/tmp/geolite2-city.tar.gz',
+                ], check=True, timeout=120)
+
+                subprocess.run(
+                    ['tar', '-xzf', '/tmp/geolite2-city.tar.gz', '-C', '/tmp'],
+                    check=True, timeout=60,
+                )
+
+                _extracted = glob.glob('/tmp/GeoLite2-City_*/GeoLite2-City.mmdb')
+                if _extracted:
+                    shutil.move(_extracted[0], str(_mmdb))
+                    _log.info('GeoLite2-City.mmdb installed at %s', _mmdb)
+        except Exception as _e:
+            _log.warning('GeoIP auto-download failed: %s', _e)
+
