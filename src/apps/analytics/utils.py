@@ -206,32 +206,37 @@ def _smart_device_label(ua_string, ua_lower, ua, device_type):
 # GEOIP LOOKUP (with DB + memory cache)
 # ============================================
 
+
 def lookup_geo(ip):
     """
     Return (country, country_code, city) for an IP.
     Returns ('', '', '') on any failure.
-    Caches result 30 days in Django cache and forever in IPGeoCache.
+
+    Caches successful results only — never caches blanks, so a temporarily
+    missing or unreadable GeoLite2 DB cannot poison the cache.
     """
     if not ip or is_private_ip(ip):
         return ('', '', '')
 
     cache_key = f'geoip:{ip}'
+
+    # ── 1. Memory cache (only trust non-empty results) ──
     cached = cache.get(cache_key)
-    if cached:
+    if cached and cached[0]:
         return cached
 
-    # DB cache
+    # ── 2. DB cache (only trust non-empty rows) ──
     try:
         from .models import IPGeoCache
         row = IPGeoCache.objects.filter(ip_address=ip).first()
-        if row:
+        if row and row.country:
             result = (row.country, row.country_code, row.city)
             cache.set(cache_key, result, 60 * 60 * 24 * 30)
             return result
     except Exception:
         pass
 
-    # MaxMind lookup
+    # ── 3. Actual MaxMind lookup ──
     country = country_code = city = ''
     try:
         import geoip2.database
@@ -244,24 +249,29 @@ def lookup_geo(ip):
                     country      = resp.country.name or ''
                     country_code = resp.country.iso_code or ''
                     city         = resp.city.name or ''
+            else:
+                logger.warning('GeoLite2-City.mmdb not found at %s', db_file)
     except Exception as e:
-        logger.debug('GeoIP lookup failed for %s: %s', ip, e)
+        logger.warning('GeoIP lookup failed for %s: %s', ip, e)
 
     result = (country, country_code, city)
 
-    # Persist to DB cache
-    try:
-        from .models import IPGeoCache
-        IPGeoCache.objects.update_or_create(
-            ip_address=ip,
-            defaults={
-                'country': country,
-                'country_code': country_code,
-                'city': city,
-            },
-        )
-    except Exception:
-        pass
+    # ── 4. Cache ONLY if we actually resolved something ──
+    if country:
+        try:
+            from .models import IPGeoCache
+            IPGeoCache.objects.update_or_create(
+                ip_address=ip,
+                defaults={
+                    'country': country,
+                    'country_code': country_code,
+                    'city': city,
+                },
+            )
+        except Exception:
+            pass
+        cache.set(cache_key, result, 60 * 60 * 24 * 30)
+    else:
+        logger.info('No geo data resolved for %s — not caching', ip)
 
-    cache.set(cache_key, result, 60 * 60 * 24 * 30)
     return result
