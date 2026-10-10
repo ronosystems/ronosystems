@@ -198,11 +198,23 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # ============================================
 # VISIT TRACKING
 # ============================================
-VISIT_TRACKING_ENABLED = True
-VISIT_TRACKING_HASH_IP = False
-VISIT_TRACKING_IP_SALT = 'change-me-in-prod'
-GEOIP_PATH = BASE_DIR / 'geoip'
+VISIT_TRACKING_ENABLED = env_bool('VISIT_TRACKING_ENABLED', default=True)
+VISIT_TRACKING_HASH_IP = env_bool('VISIT_TRACKING_HASH_IP', default=False)
+VISIT_TRACKING_IP_SALT = os.getenv(
+    'VISIT_TRACKING_IP_SALT',
+    'change-me-in-prod'
+)
 
+# GeoLite2 database location.
+# - Local dev:      BASE_DIR / 'geoip'
+# - Render (prod):  /opt/render/project/geoip  (Render Disk — mounted persistently)
+# - Fallback:       /tmp/geoip (ephemeral, only if disk isn't mounted)
+if ON_RENDER:
+    GEOIP_PATH = Path('/opt/render/project/geoip')
+    if not GEOIP_PATH.exists():
+        GEOIP_PATH = Path('/tmp/geoip')
+else:
+    GEOIP_PATH = BASE_DIR / 'geoip'
 
 
 # ============================================
