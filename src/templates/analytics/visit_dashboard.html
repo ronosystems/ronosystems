@@ -1,9 +1,23 @@
 {% extends base_template|default:"base.html" %}
+{% load static %}
 
 {% block title %}Visitor Analytics{% endblock %}
 
 {% block extra_css %}
 <style>
+    /* ============================================
+       VISITOR ANALYTICS PALETTE — matches auth pages
+    ============================================ */
+    :root {
+        --va-primary:   #2d5f7c;   /* nav-bg-top */
+        --va-primary-2: #1e4e6d;   /* nav-bg-bottom */
+        --va-green:     #7bc043;   /* nav-active-bg */
+        --va-green-bd:  #66cc33;   /* nav-border-green */
+        --va-link:      #2a6496;   /* ff-link */
+        --va-soft:      #eaf2f8;   /* soft blue tint */
+        --va-soft-2:    #f0f7fa;   /* hover tint */
+    }
+
     /* ═══════════════════════════════════════════
        TOOLBAR
     ═══════════════════════════════════════════ */
@@ -34,18 +48,25 @@
         gap: 6px;
         transition: all 0.15s;
         white-space: nowrap;
+        min-height: 38px;
     }
     .va-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-    .va-btn-primary  { background: #87CEEB; color: #000; }
-    .va-btn-primary:hover:not(:disabled)  { background: #6fb8d9; }
+
+    /* Primary buttons use the new deep-blue tone */
+    .va-btn-primary  { background: var(--va-primary); color: #fff; }
+    .va-btn-primary:hover:not(:disabled)  { background: var(--va-primary-2); color: #fff; }
+
     .va-btn-warning  { background: #ffc107; color: #000; }
     .va-btn-warning:hover:not(:disabled)  { background: #e0a800; }
+
     .va-btn-danger   { background: #dc3545; color: #fff; }
-    .va-btn-danger:hover:not(:disabled)   { background: #bb2d3b; }
+    .va-btn-danger:hover:not(:disabled)   { background: #bb2d3b; color: #fff; }
+
     .va-btn-dark     { background: #2d3436; color: #fff; }
-    .va-btn-dark:hover:not(:disabled)     { background: #1a1e20; }
+    .va-btn-dark:hover:not(:disabled)     { background: #1a1e20; color: #fff; }
+
     .va-btn-outline  { background: #fff; color: #000; }
-    .va-btn-outline:hover:not(:disabled)  { background: #f0f0f0; }
+    .va-btn-outline:hover:not(:disabled)  { background: #f0f0f0; border-color: var(--va-primary); color: var(--va-primary); }
 
     .va-count-chip {
         background: #fff;
@@ -92,6 +113,7 @@
         font-weight: 800;
         line-height: 1.1;
         color: #000;
+        word-break: break-word;
     }
     .va-card-sub {
         font-size: .75rem;
@@ -105,8 +127,9 @@
         word-break: break-all;
     }
 
-    .va-card.va-blue   { border-left: 5px solid #87CEEB; }
-    .va-card.va-green  { border-left: 5px solid #28a745; }
+    /* Left accent colors — recolored to the new palette */
+    .va-card.va-blue   { border-left: 5px solid var(--va-primary); }
+    .va-card.va-green  { border-left: 5px solid var(--va-green); }
     .va-card.va-yellow { border-left: 5px solid #ffc107; }
     .va-card.va-red    { border-left: 5px solid #dc3545; }
 
@@ -116,7 +139,7 @@
     tr.va-unread td { background: #fffbe6 !important; }
     tr.va-read   td { background: #f8f9fa !important; opacity: 0.72; }
     tr.va-unread:hover td,
-    tr.va-read:hover td { background: #eaf6fb !important; opacity: 1; }
+    tr.va-read:hover td { background: var(--va-soft-2) !important; opacity: 1; }
 
     .va-read-dot {
         display: inline-block;
@@ -127,13 +150,13 @@
         border: 1px solid #000;
         margin-right: 6px;
     }
-    .va-read-check { color: #28a745; font-size: 0.9rem; }
+    .va-read-check { color: var(--va-green); font-size: 0.9rem; }
 
     .va-checkbox {
         width: 16px;
         height: 16px;
         cursor: pointer;
-        accent-color: #000;
+        accent-color: var(--va-primary);
     }
     .va-select-col { width: 36px; text-align: center; }
     .va-status-col { width: 90px; text-align: center; }
@@ -154,11 +177,134 @@
         font-weight: 700;
         color: #495057;
     }
+
+    /* ═══════════════════════════════════════════
+       CARDS / FORM — matching new palette
+    ═══════════════════════════════════════════ */
+    .card {
+        border: 2px solid #000;
+        border-radius: 6px;
+        box-shadow: none;
+    }
+    .card-header {
+        background: var(--va-primary) !important;
+        border-bottom: 2px solid #000 !important;
+        color: #fff !important;
+        padding: 10px 16px;
+    }
+    .card-header h5 {
+        color: #fff !important;
+        font-weight: 700;
+        margin: 0;
+    }
+    .card-header h5 i { color: var(--va-green); }
+
+    .form-label { font-weight: 600; font-size: .85rem; color: #000; }
+    .form-control, .form-select {
+        border: 2px solid #000;
+        border-radius: 4px;
+        min-height: 42px;
+        font-size: 0.9rem;
+        color: #000;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: var(--va-primary);
+        box-shadow: 0 0 0 3px rgba(45,95,124,0.25);
+        outline: none;
+    }
+
+    /* Table header should match card-header */
+    .table thead th {
+        background: var(--va-primary) !important;
+        color: #fff !important;
+        font-weight: 700;
+        border-bottom: 2px solid #000 !important;
+    }
+    .table-bordered th,
+    .table-bordered td {
+        border-color: #000 !important;
+    }
+
+    /* Pagination links */
+    .pagination .page-link {
+        color: var(--va-primary);
+        border: 2px solid #000;
+        font-weight: 600;
+        margin: 0 2px;
+        border-radius: 4px;
+    }
+    .pagination .page-link:hover {
+        background: var(--va-soft);
+        color: var(--va-primary-2);
+    }
+    .pagination .page-item.active .page-link {
+        background: var(--va-primary);
+        border-color: #000;
+        color: #fff;
+    }
+
+    /* ═══════════════════════════════════════════
+       RESPONSIVE — TABLET
+    ═══════════════════════════════════════════ */
+    @media (max-width: 992px) {
+        .va-card-value { font-size: 1.5rem; }
+        .va-card-value-small { font-size: 0.95rem; }
+        .va-toolbar { gap: 8px; }
+    }
+
+    /* ═══════════════════════════════════════════
+       RESPONSIVE — MOBILE
+    ═══════════════════════════════════════════ */
+    @media (max-width: 768px) {
+        .va-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .va-toolbar-left,
+        .va-toolbar-right {
+            justify-content: space-between;
+            width: 100%;
+        }
+        .va-btn { padding: 6px 10px; font-size: 0.76rem; min-height: 36px; }
+        .va-count-chip { padding: 3px 10px; font-size: 0.68rem; min-width: 80px; }
+
+        .va-card-body { padding: 12px 14px; }
+        .va-card-value { font-size: 1.4rem; }
+        .va-card-value-small { font-size: 0.9rem; }
+        .va-card-label { font-size: 0.65rem; }
+        .va-card-sub { font-size: 0.7rem; }
+
+        .card-header { padding: 8px 12px; }
+        .card-header h5 { font-size: 0.95rem; }
+
+        .table { font-size: 0.78rem !important; }
+        .table th, .table td { padding: 6px 6px !important; }
+
+        .va-status-col { width: 70px; }
+        .va-select-col { width: 30px; }
+    }
+
+    /* ═══════════════════════════════════════════
+       RESPONSIVE — SMALL MOBILE
+    ═══════════════════════════════════════════ */
+    @media (max-width: 480px) {
+        .va-btn { padding: 5px 8px; font-size: 0.72rem; min-height: 34px; gap: 4px; }
+        .va-btn i { font-size: 0.85rem; }
+        .va-count-chip { padding: 2px 8px; font-size: 0.65rem; min-width: 70px; }
+
+        .va-card-value { font-size: 1.25rem; }
+        .va-card-value-small { font-size: 0.82rem; }
+        .va-card-body { padding: 10px 12px; }
+
+        .table { font-size: 0.72rem !important; }
+        .table th, .table td { padding: 5px 5px !important; }
+        .badge { font-size: 0.62rem !important; padding: 2px 6px !important; }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid">
+<div class="container-fluid px-2 px-md-3">
 
     {# ═══════════════════════════════════════════ #}
     {# PAGE HEADER                                   #}
@@ -166,7 +312,7 @@
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <div>
             <h4 style="margin:0; font-weight:800;">
-                <i class="fas fa-chart-line"></i> Visitor Analytics
+                <i class="fas fa-chart-line" style="color: var(--va-primary);"></i> Visitor Analytics
             </h4>
             <small class="text-muted">
                 Who visited, what they viewed, and from where.
@@ -177,7 +323,7 @@
                 {% endif %}
             </small>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 flex-wrap">
             <button type="button" class="va-btn va-btn-outline" id="vaToggleCompact" title="Toggle compact view">
                 <i class="fas fa-compress"></i> Compact
             </button>
@@ -191,9 +337,9 @@
     {# ═══════════════════════════════════════════ #}
     {# SUMMARY CARDS                                 #}
     {# ═══════════════════════════════════════════ #}
-    <div class="row mb-3">
+    <div class="row g-3 mb-3">
 
-        <div class="col-lg-3 col-md-6 mb-2">
+        <div class="col-lg-3 col-md-6 col-6">
             <a class="va-card va-blue" href="?range={{ range_key }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">
                 <div class="va-card-body">
                     <div class="va-card-label">Total Visits</div>
@@ -205,7 +351,7 @@
             </a>
         </div>
 
-        <div class="col-lg-3 col-md-6 mb-2">
+        <div class="col-lg-3 col-md-6 col-6">
             <div class="va-card va-green">
                 <div class="va-card-body">
                     <div class="va-card-label">Unique Visitors</div>
@@ -215,7 +361,7 @@
             </div>
         </div>
 
-        <div class="col-lg-3 col-md-6 mb-2">
+        <div class="col-lg-3 col-md-6 col-6">
             <div class="va-card va-yellow">
                 <div class="va-card-body">
                     <div class="va-card-label">Top Page</div>
@@ -227,7 +373,7 @@
             </div>
         </div>
 
-        <div class="col-lg-3 col-md-6 mb-2">
+        <div class="col-lg-3 col-md-6 col-6">
             <div class="va-card va-red">
                 <div class="va-card-body">
                     <div class="va-card-label">Top Location</div>
@@ -244,40 +390,40 @@
     {# ═══════════════════════════════════════════ #}
     {# FILTERS                                       #}
     {# ═══════════════════════════════════════════ #}
-    <div class="card mb-3" style="border:2px solid #000;">
+    <div class="card mb-3">
         <div class="card-body">
             <form method="GET" class="row g-2 align-items-end" id="vaFilterForm">
-                <div class="col-lg-2 col-md-3">
-                    <label class="form-label" for="vaRange" style="font-weight:600; font-size:.85rem;">Range</label>
-                    <select id="vaRange" name="range" class="form-select" style="border:2px solid #000;">
+                <div class="col-lg-2 col-md-3 col-6">
+                    <label class="form-label" for="vaRange">Range</label>
+                    <select id="vaRange" name="range" class="form-select">
                         <option value="today" {% if range_key == 'today' %}selected{% endif %}>Today</option>
                         <option value="7d"    {% if range_key == '7d' %}selected{% endif %}>Last 7 days</option>
                         <option value="30d"   {% if range_key == '30d' %}selected{% endif %}>Last 30 days</option>
                         <option value="custom"{% if range_key == 'custom' %}selected{% endif %}>Custom</option>
                     </select>
                 </div>
-                <div class="col-lg-2 col-md-3">
-                    <label class="form-label" for="vaFrom" style="font-weight:600; font-size:.85rem;">From</label>
+                <div class="col-lg-2 col-md-3 col-6">
+                    <label class="form-label" for="vaFrom">From</label>
                     <input type="date" id="vaFrom" name="date_from" value="{{ date_from }}" class="form-control">
                 </div>
-                <div class="col-lg-2 col-md-3">
-                    <label class="form-label" for="vaTo" style="font-weight:600; font-size:.85rem;">To</label>
+                <div class="col-lg-2 col-md-3 col-6">
+                    <label class="form-label" for="vaTo">To</label>
                     <input type="date" id="vaTo" name="date_to" value="{{ date_to }}" class="form-control">
                 </div>
-                <div class="col-lg-2 col-md-3">
-                    <label class="form-label" for="vaPage" style="font-weight:600; font-size:.85rem;">Page</label>
+                <div class="col-lg-2 col-md-3 col-6">
+                    <label class="form-label" for="vaPage">Page</label>
                     <input type="text" id="vaPage" name="page_q" value="{{ page_q }}"
                            list="pageOptions" class="form-control" placeholder="/products/">
                     <datalist id="pageOptions">
                         {% for p in page_options %}<option value="{{ p }}">{% endfor %}
                     </datalist>
                 </div>
-                <div class="col-lg-3 col-md-6">
-                    <label class="form-label" for="vaSearch" style="font-weight:600; font-size:.85rem;">Search (IP / city / user)</label>
+                <div class="col-lg-3 col-md-6 col-12">
+                    <label class="form-label" for="vaSearch">Search (IP / city / user)</label>
                     <input type="text" id="vaSearch" name="search" value="{{ search }}"
                            class="form-control" placeholder="197.232… or Nairobi">
                 </div>
-                <div class="col-lg-1 col-md-6 d-flex gap-1">
+                <div class="col-lg-1 col-md-6 col-12 d-flex gap-1">
                     <button type="submit" class="va-btn va-btn-primary flex-fill" title="Apply filters">
                         <i class="fas fa-filter"></i>
                     </button>
@@ -298,22 +444,22 @@
 
             <button type="button" class="va-btn va-btn-warning" id="vaMarkRead" disabled
                     title="Mark selected visits as read">
-                <i class="fas fa-check"></i> Mark as Read
+                <i class="fas fa-check"></i> <span class="d-none d-md-inline">Mark as Read</span>
             </button>
 
             <button type="button" class="va-btn va-btn-dark" id="vaMarkAllRead"
                     title="Mark every unread visit in the whole database as read">
-                <i class="fas fa-check-double"></i> Dismiss All
+                <i class="fas fa-check-double"></i> <span class="d-none d-md-inline">Dismiss All</span>
             </button>
         </div>
         <div class="va-toolbar-right">
             <button type="button" class="va-btn va-btn-danger" id="vaErase" disabled
                     title="Permanently delete selected visits">
-                <i class="fas fa-trash"></i> Erase Selected
+                <i class="fas fa-trash"></i> <span class="d-none d-md-inline">Erase Selected</span>
             </button>
             <button type="button" class="va-btn va-btn-danger" id="vaEraseAll"
                     title="Permanently delete ALL visits matching current filters">
-                <i class="fas fa-trash-alt"></i> Erase All in View
+                <i class="fas fa-trash-alt"></i> <span class="d-none d-md-inline">Erase All in View</span>
             </button>
         </div>
     </div>
@@ -321,9 +467,9 @@
     {# ═══════════════════════════════════════════ #}
     {# TABLE                                         #}
     {# ═══════════════════════════════════════════ #}
-    <div class="card" style="border:2px solid #000;">
-        <div class="card-header" style="background:#87CEEB; border-bottom:2px solid #000;">
-            <h5 style="margin:0; font-weight:700;">
+    <div class="card">
+        <div class="card-header">
+            <h5>
                 <i class="fas fa-list"></i> Visits
                 <span class="ms-2" style="font-size:0.85rem; font-weight:500;">
                     ({{ records.paginator.count }} total)
@@ -333,7 +479,7 @@
         <div class="card-body p-0">
             <div class="table-responsive" style="border-top:2px solid #000;">
                 <table class="table table-bordered mb-0" style="font-size:.82rem;">
-                    <thead style="background:#87CEEB;">
+                    <thead>
                         <tr>
                             <th class="va-select-col">
                                 <input type="checkbox" class="va-checkbox" id="vaSelectAll"
@@ -466,6 +612,30 @@
 document.addEventListener('DOMContentLoaded', function () {
     'use strict';
 
+    // ============================================================
+    // TRACKING-PREVENTION-PROOF STORAGE
+    // ============================================================
+    const safeStorage = (function () {
+        const memory = Object.create(null);
+        let backing = null;
+        try {
+            const probe = '__va_probe__' + Math.random();
+            window.localStorage.setItem(probe, '1');
+            window.localStorage.removeItem(probe);
+            backing = window.localStorage;
+        } catch (e) { backing = null; }
+        return {
+            get(k) {
+                try { return backing ? backing.getItem(k) : (memory[k] ?? null); }
+                catch (e) { return memory[k] ?? null; }
+            },
+            set(k, v) {
+                try { if (backing) backing.setItem(k, v); else memory[k] = v; }
+                catch (e) { memory[k] = v; }
+            }
+        };
+    })();
+
     const CSRF = '{{ csrf_token }}';
     const URL_MARK_READ = "{% url 'analytics:mark_visits_read' %}";
     const URL_ERASE     = "{% url 'analytics:erase_visits' %}";
@@ -584,7 +754,7 @@ document.addEventListener('DOMContentLoaded', function () {
     btnMarkAll.addEventListener('click', function () {
         if (!confirm('Mark ALL unread visits as read? The sidebar badge will reset to 0.')) return;
         const restore = brieflyDisable(btnMarkAll, 'Working…');
-        postForm(URL_MARK_READ, {})   // empty ids → all unread
+        postForm(URL_MARK_READ, {})
             .then(data => {
                 if (data.ok) {
                     location.reload();
@@ -631,8 +801,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const restore = brieflyDisable(btnEraseAll, 'Erasing…');
 
-        // Send the current filter query so the backend deletes only
-        // what's visible. We pass `all=1` and the querystring.
         postForm(URL_ERASE, {
             all: '1',
             filters: CURRENT_QUERY,
@@ -649,16 +817,16 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // ═══════════════════════════════════════════
-    // COMPACT MODE TOGGLE
+    // COMPACT MODE TOGGLE (uses safe storage)
     // ═══════════════════════════════════════════
-    if (localStorage.getItem('vaCompact') === '1') {
+    if (safeStorage.get('vaCompact') === '1') {
         document.body.classList.add('va-compact');
         if (btnCompact) btnCompact.innerHTML = '<i class="fas fa-expand"></i> Full';
     }
     if (btnCompact) {
         btnCompact.addEventListener('click', function () {
             const on = document.body.classList.toggle('va-compact');
-            localStorage.setItem('vaCompact', on ? '1' : '0');
+            safeStorage.set('vaCompact', on ? '1' : '0');
             btnCompact.innerHTML = on
                 ? '<i class="fas fa-expand"></i> Full'
                 : '<i class="fas fa-compress"></i> Compact';

@@ -5,84 +5,592 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign Up</title>
+    <title>Sign Up — {{ system_name|default:"RonoSystems" }}</title>
 
-    {# Favicon from Settings #}
+    {# ---------- Favicon from Settings ---------- #}
     {% if site_favicon_url %}
         <link rel="icon" type="image/png" href="{{ site_favicon_url }}">
         <link rel="shortcut icon" href="{{ site_favicon_url }}">
+        <link rel="apple-touch-icon" href="{{ site_favicon_url }}">
     {% endif %}
 
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* ============================================
+           FOREX FACTORY STYLE VARIABLES
+        ============================================ */
+        :root {
+            --nav-bg-top: #2d5f7c;
+            --nav-bg-bottom: #1e4e6d;
+            --nav-border-green: #66cc33;
+            --nav-active-bg: #7bc043;
+            --nav-active-text: #1e4e6d;
+            --nav-text: #ffffff;
+            --nav-divider: rgba(255,255,255,0.2);
+
+            --ff-bg: #f0f4f7;
+            --ff-border: #dcdcdc;
+            --ff-text: #333;
+            --ff-link: #2a6496;
+            --sidebar-width: 220px;
+
+            --mobile-header-bg: #2d5f7c;
+            --mobile-nav-bg: #1e4e6d;
+        }
 
         body {
-            font-family: 'Poppins', sans-serif;
-            background: #cfe8ee;
-            min-height: 100vh;
+            font-family: 'Open Sans', Arial, sans-serif;
+            font-size: 13px;
+            background-color: var(--ff-bg);
+            color: var(--ff-text);
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+        }
+
+        /* ============================================
+           DESKTOP HEADER
+        ============================================ */
+        .desktop-header {
+            background: linear-gradient(to bottom, var(--nav-bg-top), var(--nav-bg-bottom));
+            height: 52px;
             display: flex;
-            justify-content: center;
             align-items: center;
-            padding: 24px;
+            border-bottom: 4px solid var(--nav-border-green);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+            overflow: visible;
+        }
+
+        .ff-logo-section {
+            background: #3b7ea1;
+            width: 170px;
             position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            height: calc(100% + 8px);
+            margin-top: -4px;
+            margin-bottom: -4px;
+            clip-path: polygon(0 0, 100% 0, 85% 100%, 0 100%);
+            border-bottom: none;
+            z-index: 10;
+        }
+
+        .ff-logo-content {
+            display: flex;
+            align-items: center;
+            color: white;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 14px;
+            line-height: 1.1;
+            text-transform: uppercase;
+            padding-left: 10px;
+            padding-right: 20px;
+        }
+        .ff-logo-content i {
+            font-size: 24px;
+            margin-right: 8px;
+            color: #fff;
+        }
+        .ff-logo-text span {
+            display: block;
+            font-size: 16px;
+            letter-spacing: 0.5px;
+        }
+
+        .ff-nav-container {
+            display: flex;
+            flex-grow: 1;
+            align-items: center;
+        }
+
+        .brand-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+        .brand-icon img {
+            max-height: 32px;
+            max-width: 40px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            display: block;
+        }
+        .brand-icon i {
+            font-size: 24px;
+            color: #fff;
+        }
+
+        .ff-nav-item {
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            color: var(--nav-text);
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 13px;
+            text-transform: capitalize;
+            border-right: 1px solid var(--nav-divider);
+            position: relative;
+            transition: background 0.2s;
+            transform: skewX(-10deg);
+            margin-right: -5px;
+            height: 100%;
+        }
+        .ff-nav-item-inner {
+            transform: skewX(10deg);
+            display: flex;
+            align-items: center;
+        }
+        .ff-nav-item:hover {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            text-decoration: none;
+        }
+        .ff-nav-item.active {
+            background: var(--nav-active-bg);
+            color: var(--nav-active-text);
+            border-right: none;
+        }
+        .ff-nav-item i {
+            margin-right: 8px;
+            font-size: 14px;
+        }
+
+        .ff-tools {
+            display: flex;
+            align-items: center;
+            padding-right: 0;
+            color: white;
+            font-size: 12px;
+            height: 100%;
+        }
+        .ff-tool-item {
+            display: flex;
+            align-items: center;
+            color: white;
+            text-decoration: none;
+            padding: 0 15px;
+            height: 100%;
+            transform: skewX(-10deg);
+            border-left: 1px solid var(--nav-divider);
+            transition: background 0.2s;
+            position: relative;
+        }
+        .ff-tool-item-inner {
+            transform: skewX(10deg);
+            display: flex;
+            align-items: center;
+        }
+        .ff-tool-item:hover {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            text-decoration: none;
+        }
+        .ff-tool-item i {
+            margin-right: 6px;
+            font-size: 14px;
+        }
+
+        /* ============================================
+           MOBILE HEADER
+        ============================================ */
+        .mobile-header {
+            display: none;
+            background: var(--mobile-header-bg);
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+            flex-direction: column;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .mobile-header-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 48px;
+            padding: 0 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .mobile-header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .mobile-hamburger {
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 5px;
+            display: flex;
+            align-items: center;
+        }
+        .mobile-logo {
+            color: white;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            font-weight: 700;
+            font-size: 16px;
+            text-transform: uppercase;
+        }
+        .mobile-logo i {
+            font-size: 20px;
+            margin-right: 8px;
+        }
+        .mobile-header-right {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            color: #cbe6f5;
+        }
+        .mobile-header-right a {
+            color: #cbe6f5;
+            font-size: 16px;
+            text-decoration: none;
+        }
+
+        .mobile-nav-tabs {
+            display: flex;
+            background: var(--mobile-nav-bg);
+            overflow-x: auto;
+            white-space: nowrap;
+            height: 40px;
+            align-items: center;
+            scrollbar-width: none;
+            border-bottom: 3px solid var(--nav-border-green);
+        }
+        .mobile-nav-tabs::-webkit-scrollbar { display: none; }
+        .mobile-nav-tab {
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 13px;
+            height: 100%;
+            border-right: 1px solid rgba(255,255,255,0.1);
+            transform: skewX(-15deg);
+            margin-right: -5px;
+        }
+        .mobile-nav-tab-inner {
+            transform: skewX(15deg);
+            display: flex;
+            align-items: center;
+        }
+        .mobile-nav-tab.active {
+            background: var(--nav-active-bg);
+            color: var(--nav-active-text);
+            border-right: none;
+        }
+        .mobile-nav-tab i {
+            margin-right: 6px;
+            font-size: 14px;
+        }
+
+        /* ============================================
+           MOBILE SIDEBAR
+        ============================================ */
+        .mobile-sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+        }
+        .mobile-sidebar {
+            position: fixed;
+            top: 0;
+            left: -280px;
+            width: 280px;
+            height: 100%;
+            background: #fff;
+            z-index: 2001;
+            transition: left 0.3s ease;
+            overflow-y: auto;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+        }
+        .mobile-sidebar.open { left: 0; }
+        .mobile-sidebar-header {
+            background: var(--mobile-header-bg);
+            color: white;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid var(--nav-border-green);
+        }
+        .mobile-sidebar-header h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .mobile-sidebar-close {
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 5px;
+        }
+        .mobile-sidebar-content {
+            padding: 15px 0;
+            flex-grow: 1;
+        }
+
+        /* ============================================
+           LAYOUT CONTAINER
+        ============================================ */
+        .main-wrapper {
+            display: flex;
+            margin-top: 56px;
+            min-height: calc(100vh - 56px);
+        }
+
+        /* ============================================
+           SIDEBAR (Desktop)
+        ============================================ */
+        .ff-sidebar {
+            width: var(--sidebar-width);
+            background: #fff;
+            border-right: 1px solid var(--ff-border);
+            flex-shrink: 0;
+            padding: 15px 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-header {
+            font-size: 11px;
+            font-weight: 700;
+            color: #333;
+            padding: 8px 15px;
+            border-bottom: 1px solid #ddd;
+            border-top: 1px solid #ddd;
+            margin-bottom: 10px;
+            background: #e6e6e6;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .sidebar-link {
+            display: block;
+            padding: 6px 15px;
+            color: var(--ff-link);
+            text-decoration: none;
+            font-size: 13px;
+            border-left: 3px solid transparent;
+            transition: all 0.2s;
+        }
+        .sidebar-link:hover {
+            background: #f0f7fa;
+            border-left-color: var(--nav-bg-top);
+            text-decoration: none;
+            color: var(--nav-bg-bottom);
+        }
+
+        .sidebar-promo {
+            margin: 20px 15px;
+            padding: 15px;
+            background: #2d5f7c;
+            color: white;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .sidebar-promo h5 {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #7bc043;
+        }
+        .sidebar-promo p {
+            font-size: 11px;
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+        .sidebar-promo .btn {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            background: #7bc043;
+            color: #1e4e6d;
+            border: none;
+            width: 100%;
+            padding: 8px;
+        }
+        .sidebar-promo .btn:hover { background: #6aa838; }
+
+        /* ============================================
+           CONTENT AREA
+        ============================================ */
+        .ff-content {
+            flex-grow: 1;
+            padding: 20px;
+            background-color: #f0f4f7;
+            background-image: 
+                radial-gradient(circle, #c8d4dc 1px, transparent 1px),
+                radial-gradient(circle, #c8d4dc 1px, transparent 1px);
+            background-size: 7px 7px;
+            background-position: 0 0, 3.5px 3.5px;
             overflow-x: hidden;
         }
 
         /* ============================================
-           LOGIN BACKGROUND — same as login page
+        CONTENT HEADER (With Scrolling Marquee)
         ============================================ */
-        {% if login_background_url %}
-        body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background: url('{{ login_background_url }}') center center / cover no-repeat;
-            z-index: -2;
+        .content-header {
+            background: #f9f9f9;
+            border: 1px solid var(--ff-border);
+            padding: 10px 15px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 2px;
+            overflow: hidden; /* IMPORTANT: Keeps the scrolling text inside */
         }
-        body::after {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background: linear-gradient(
-                135deg,
-                rgba(207, 232, 238, 0.35) 0%,
-                rgba(207, 232, 238, 0.55) 100%
-            );
-            z-index: -1;
-            pointer-events: none;
+
+        .content-header h1 {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 0;
+            color: var(--nav-bg-bottom);
+            white-space: nowrap;
+            /* MARQUEE STYLES */
+            display: inline-block;
+            padding-left: 100%; /* Start off-screen right */
+            animation: headerMarquee 15s linear infinite;
+            will-change: transform;
         }
-        {% endif %}
+
+        /* Pause on hover so users can read it */
+        .content-header:hover h1 {
+            animation-play-state: paused;
+        }
+
+        /* Right-to-left scroll keyframes */
+        @keyframes headerMarquee {
+            0% {
+                transform: translateX(0);
+            }
+            100% {
+                transform: translateX(-100%);
+            }
+        }
+
+        .breadcrumb-custom {
+            font-size: 11px;
+            color: #666;
+            white-space: nowrap; /* Prevents breadcrumb from wrapping */
+            flex-shrink: 0;      /* Prevents breadcrumb from shrinking */
+            margin-left: 15px;
+        }
+        .breadcrumb-custom a {
+            color: var(--ff-link);
+            text-decoration: none;
+        }
+
 
         /* ============================================
-           SPLIT CARD (mirrored layout vs login)
+           REGISTER PANEL — with background image
         ============================================ */
-        .auth-card {
-            width: 100%;
-            max-width: 900px;
-            min-height: 620px;
-            background: #ffffff;
-            border-radius: 28px;
-            box-shadow:
-                0 20px 50px rgba(0, 0, 0, 0.25),
-                0 5px 15px rgba(0, 0, 0, 0.12);
-            overflow: hidden;
-            display: flex;
+        .register-bg-panel {
             position: relative;
-            animation: fadeIn 0.5s ease;
+            background-color: #ffffff;
+            border: 1px solid var(--ff-border);
+            margin-bottom: 25px;
+            box-shadow: 0 1px 3px rgb(0, 0, 0);
+            overflow: hidden;
+            border-radius: 4px;
+        }
+
+        /* Background image layer */
+        .register-bg-panel::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            {% if login_background_url %}
+                background: url('{{ login_background_url }}') center center / cover no-repeat;
+            {% else %}
+                background: linear-gradient(135deg, #e8f2f7 0%, #d5e6ef 100%);
+            {% endif %}
+        }
+
+        /* Dimming overlay so the register card stays readable */
+        .register-bg-panel::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            background: linear-gradient(
+                135deg,
+                rgba(240, 244, 247, 0.75) 0%,
+                rgba(240, 244, 247, 0.85) 100%
+            );
+            pointer-events: none;
+        }
+
+        .register-bg-panel > * {
+            position: relative;
             z-index: 1;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to   { opacity: 1; transform: translateY(0); }
+        .register-bg-panel .panel-header {
+            background: rgba(230, 230, 230, 0.92);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            padding: 8px 15px;
+            border-bottom: 1px solid var(--ff-border);
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #333;
+        }
+
+        .register-bg-panel .panel-body {
+            padding: 30px 20px 40px;
         }
 
         /* ============================================
-           LEFT PANEL — form
+           REGISTER CARD — split layout (form left, welcome right)
         ============================================ */
-        .panel-left {
+        .register-card {
+            display: flex;
+            width: 100%;
+            max-width: 900px;
+            min-height: 620px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 28px;
+            box-shadow:
+                0 20px 50px rgb(0, 0, 0),
+                0 5px 15px rgb(0, 0, 0);
+            overflow: hidden;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* ---------- LEFT PANEL — form ---------- */
+        .register-left {
             flex: 1;
             padding: 40px 45px;
             display: flex;
@@ -92,58 +600,51 @@
             overflow-y: auto;
         }
 
-        .panel-left .form-title {
+        .register-left .form-title {
             font-size: 1.9rem;
-            font-weight: 700;
-            color: #1f2937;
+            font-weight: 800;
+            color: var(--nav-bg-bottom);
             text-align: center;
-            margin-bottom: 24px;
+            margin: 0 0 24px 0;
         }
 
-        /* ============================================
-           INPUT FIELDS
-        ============================================ */
-        .field {
+        /* Input fields */
+        .register-field {
             display: flex;
             align-items: center;
             background: #f3f4f6;
             border-radius: 10px;
             padding: 12px 16px;
             margin-bottom: 14px;
-            transition: box-shadow 0.2s ease;
+            transition: box-shadow 0.2s ease, border-color 0.2s ease;
             border: 1px solid transparent;
         }
-
-        .field:focus-within {
+        .register-field:focus-within {
             background: #f9fafb;
-            border-color: #29c5e0;
-            box-shadow: 0 0 0 3px rgba(41, 197, 224, 0.15);
+            border-color: var(--nav-bg-top);
+            box-shadow: 0 0 0 3px rgba(45, 95, 124, 0.15);
         }
-
-        .field input {
+        .register-field input {
             flex: 1;
             border: none;
             background: transparent;
-            font-family: 'Poppins', sans-serif;
-            font-size: 0.92rem;
+            font-family: 'Open Sans', Arial, sans-serif;
+            font-size: 0.9rem;
             color: #1f2937;
             outline: none;
             min-width: 0;
         }
-
-        .field input::placeholder {
+        .register-field input::placeholder {
             color: #9ca3af;
             font-weight: 400;
         }
-
-        .field .field-icon {
+        .register-field .field-icon {
             color: #4b5563;
             font-size: 1rem;
             margin-left: 12px;
             flex-shrink: 0;
         }
-
-        .field .password-toggle {
+        .register-field .password-toggle {
             background: transparent;
             border: none;
             color: #4b5563;
@@ -152,11 +653,10 @@
             margin-left: 10px;
             font-size: 1rem;
         }
-
-        .field .password-toggle:hover { color: #1f2937; }
+        .register-field .password-toggle:hover { color: var(--nav-bg-bottom); }
 
         /* Company ID — uppercase monospace feel */
-        .field.company-id-group input {
+        .register-field.company-id-group input {
             font-weight: 600;
             letter-spacing: 1.2px;
             text-transform: uppercase;
@@ -172,19 +672,18 @@
         .password-feedback.match   { color: #059669; }
         .password-feedback.mismatch { color: #dc2626; }
 
-        /* ============================================
-           MAIN BUTTON — same gradient as login page
-        ============================================ */
-        .btn-primary-gradient {
+        /* Register button — gradient pill */
+        .btn-register-gradient {
             width: 100%;
             padding: 14px;
             border: none;
             border-radius: 50px;
-            background: linear-gradient(90deg, #0a2f45 0%, #1fb4d2 100%);
+            background: linear-gradient(90deg, var(--nav-bg-bottom) 0%, var(--nav-bg-top) 100%);
             color: #ffffff;
-            font-family: 'Poppins', sans-serif;
-            font-weight: 600;
+            font-family: 'Open Sans', Arial, sans-serif;
+            font-weight: 700;
             font-size: 1rem;
+            text-transform: capitalize;
             cursor: pointer;
             transition: all 0.25s ease;
             display: flex;
@@ -192,25 +691,21 @@
             justify-content: center;
             gap: 8px;
             margin-top: 6px;
+            box-shadow: 0 6px 18px rgba(30, 78, 109, 0.25);
         }
-
-        .btn-primary-gradient:hover {
+        .btn-register-gradient:hover {
             transform: translateY(-1px);
-            box-shadow: 0 10px 24px rgba(31, 180, 210, 0.35);
+            box-shadow: 0 12px 26px rgba(30, 78, 109, 0.35);
         }
-
-        .btn-primary-gradient:active { transform: translateY(0); }
-
-        .btn-primary-gradient:disabled {
+        .btn-register-gradient:active { transform: translateY(0); }
+        .btn-register-gradient:disabled {
             opacity: 0.55;
             cursor: not-allowed;
             transform: none;
             box-shadow: none;
         }
 
-        /* ============================================
-           DIVIDER
-        ============================================ */
+        /* Divider */
         .divider-text {
             text-align: center;
             color: #6b7280;
@@ -218,15 +713,12 @@
             margin: 22px 0 16px;
         }
 
-        /* ============================================
-           SOCIAL ICONS
-        ============================================ */
+        /* Social buttons */
         .socials {
             display: flex;
             justify-content: center;
             gap: 14px;
         }
-
         .social-btn {
             width: 46px;
             height: 46px;
@@ -241,23 +733,20 @@
             text-decoration: none;
             transition: all 0.2s ease;
         }
-
         .social-btn:hover {
-            border-color: #29c5e0;
-            background: #f0fbfd;
+            border-color: var(--nav-bg-top);
+            background: #f0f7fa;
             transform: translateY(-2px);
-            box-shadow: 0 4px 10px rgba(41, 197, 224, 0.15);
+            box-shadow: 0 4px 10px rgba(45, 95, 124, 0.15);
+            color: var(--nav-bg-bottom);
         }
-
         .social-btn img {
             width: 22px;
             height: 22px;
             object-fit: contain;
         }
 
-        /* ============================================
-           ALERTS
-        ============================================ */
+        /* Alerts */
         .alert {
             padding: 10px 14px;
             border-radius: 10px;
@@ -272,7 +761,6 @@
         }
         .alert.success { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
         .alert.info    { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
-
         .alert .btn-close {
             margin-left: auto;
             background: transparent;
@@ -284,12 +772,10 @@
         }
         .alert .btn-close:hover { opacity: 1; }
 
-        /* ============================================
-           RIGHT PANEL — cyan welcome (matches login's left panel)
-        ============================================ */
-        .panel-right {
+        /* ---------- RIGHT PANEL — colored welcome (mirrored) ---------- */
+        .register-right {
             flex: 1;
-            background: linear-gradient(160deg, #29c5e0 0%, #1fb4d2 100%);
+            background: linear-gradient(160deg, var(--nav-bg-top) 0%, var(--nav-bg-bottom) 100%);
             color: #ffffff;
             display: flex;
             flex-direction: column;
@@ -297,214 +783,724 @@
             align-items: center;
             padding: 40px 30px;
             text-align: center;
-            border-top-left-radius: 60% 100%;
-            border-bottom-left-radius: 60% 100%;
             position: relative;
             z-index: 1;
+            /* Smooth rounded left edge — mirrors login page */
+            border-top-left-radius: 55% 100%;
+            border-bottom-left-radius: 55% 100%;
         }
 
-        .panel-right .logo-wrap {
+        .register-right .logo-wrap {
             width: 90px;
             height: 90px;
             display: flex;
             align-items: center;
             justify-content: center;
             margin-bottom: 18px;
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 20px;
+            background: #ffffff;
+            border-radius: 16px;
             padding: 8px;
-            backdrop-filter: blur(4px);
+            box-shadow: 0 6px 18px rgba(0,0,0,0.15);
         }
-
-        .panel-right .logo-wrap img {
+        .register-right .logo-wrap img {
             max-width: 100%;
             max-height: 100%;
             object-fit: contain;
         }
-
-        .panel-right .logo-wrap i {
+        .register-right .logo-wrap i {
             font-size: 2.2rem;
+            color: var(--nav-bg-bottom);
+        }
+
+        .register-right .welcome-title {
+            font-size: 2.1rem;
+            font-weight: 800;
+            margin: 0 0 8px 0;
             color: #ffffff;
         }
 
-        .panel-right .welcome-title {
-            font-size: 2.1rem;
-            font-weight: 700;
-            margin-bottom: 8px;
-        }
-
-        .panel-right .welcome-sub {
+        .register-right .welcome-sub {
             font-size: 0.95rem;
             font-weight: 400;
             opacity: 0.95;
-            margin-bottom: 28px;
+            margin-bottom: 26px;
+            color: #ffffff;
         }
 
-        .panel-right .btn-outline-light {
+        .register-right .btn-login-outline {
             display: inline-block;
             padding: 12px 48px;
             border: 2px solid #ffffff;
             border-radius: 50px;
             color: #ffffff;
-            font-weight: 600;
+            font-weight: 700;
             font-size: 0.95rem;
             text-decoration: none;
             background: transparent;
             transition: all 0.25s ease;
         }
-
-        .panel-right .btn-outline-light:hover {
-            background: #ffffff;
-            color: #1fb4d2;
+        .register-right .btn-login-outline:hover {
+            background: var(--nav-border-green);
+            border-color: var(--nav-border-green);
+            color: var(--nav-bg-bottom);
             transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        /* ============================================
+           FOOTER
+        ============================================ */
+        .ff-footer {
+            background: #2c3e50;
+            color: #bdc3c7;
+            padding: 40px 0 20px;
+            font-size: 12px;
+            border-top: 4px solid var(--nav-bg-bottom);
+            width: 100%;
+        }
+        .ff-footer-inner {
+            width: 100%;
+            padding: 0 20px;
+            overflow: hidden;
+        }
+        .ff-footer .row {
+            margin-left: -10px;
+            margin-right: -10px;
+        }
+        .ff-footer [class*="col-"] {
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+        .ff-footer h5 {
+            color: white;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #34495e;
+            padding-bottom: 8px;
+            display: flex;
+            align-items: center;
+        }
+        .ff-footer a {
+            color: #bdc3c7;
+            text-decoration: none;
+            display: block;
+            margin-bottom: 8px;
+            transition: color 0.2s;
+        }
+        .ff-footer a:hover { color: #7bc043; }
+        .ff-footer .copyright {
+            border-top: 1px solid #34495e;
+            padding-top: 20px;
+            margin-top: 20px;
+            color: #7f8c8d;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .ff-footer .copyright-links a {
+            display: inline-block;
+            margin-bottom: 0;
+            margin-left: 15px;
+        }
+
+        /* Social icons in footer */
+        .ff-social {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 6px;
+        }
+        .ff-social-link {
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
+            width: 38px !important;
+            height: 38px !important;
+            border-radius: 50% !important;
+            color: #ffffff !important;
+            text-decoration: none !important;
+            font-size: 16px;
+            margin-bottom: 0 !important;
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+        .ff-social-link.facebook  { background: #1877f2; }
+        .ff-social-link.whatsapp  { background: #25d366; }
+        .ff-social-link.x         { background: #000000; }
+        .ff-social-link.telegram  { background: #229ed9; }
+        .ff-social-link.instagram {
+            background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+        }
+        .ff-social-link.linkedin  { background: #0a66c2; }
+        .ff-social-link:hover {
+            color: #ffffff !important;
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+            filter: brightness(1.1);
+            text-decoration: none !important;
+        }
+
+        .ff-footer h5 .brand-icon img {
+            max-height: 22px;
+            max-width: 28px;
+            object-fit: contain;
+            display: block;
         }
 
         /* ============================================
            RESPONSIVE
         ============================================ */
+        @media (max-width: 992px) {
+            .desktop-header { display: none; }
+            .mobile-header { display: flex; }
+            .main-wrapper { margin-top: 92px; }
+            .ff-sidebar { display: none; }
+            .ff-content { padding: 15px; }
+            .mobile-sidebar-overlay.active { display: block; }
+
+            .ff-footer { border-top: 4px solid var(--nav-border-green); }
+        }
+
         @media (max-width: 768px) {
-            .auth-card {
+            .register-bg-panel .panel-body {
+                padding: 20px 12px 25px;
+            }
+            .register-card {
                 flex-direction: column-reverse;
                 max-width: 440px;
                 min-height: auto;
+                border-radius: 22px;
             }
-
-            .panel-right {
-                border-top-left-radius: 0;
-                border-bottom-left-radius: 0;
+            .register-right {
+                border-top-left-radius: 22px;
+                border-top-right-radius: 22px;
                 border-bottom-left-radius: 40px;
                 border-bottom-right-radius: 40px;
-                padding: 30px 24px;
-                min-height: 220px;
+                padding: 32px 24px;
+                min-height: 240px;
             }
-
-            .panel-right .logo-wrap {
+            .register-right .logo-wrap {
                 width: 70px;
                 height: 70px;
                 margin-bottom: 12px;
             }
+            .register-right .welcome-title { font-size: 1.6rem; }
+            .register-right .welcome-sub { margin-bottom: 18px; font-size: 0.85rem; }
+            .register-right .btn-login-outline { padding: 10px 34px; font-size: 0.85rem; }
 
-            .panel-right .welcome-title { font-size: 1.6rem; }
-            .panel-right .welcome-sub { margin-bottom: 18px; font-size: 0.85rem; }
-            .panel-right .btn-outline-light { padding: 10px 34px; font-size: 0.85rem; }
+            .register-left { padding: 34px 24px; }
+            .register-left .form-title { font-size: 1.6rem; margin-bottom: 20px; }
+        }
 
-            .panel-left { padding: 34px 24px; }
-            .panel-left .form-title { font-size: 1.6rem; margin-bottom: 20px; }
+        @media (max-width: 576px) {
+            .content-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+
+            .ff-footer .col-lg-4,
+            .ff-footer .col-lg-2,
+            .ff-footer .col-md-3,
+            .ff-footer .col-6 {
+                text-align: center;
+                margin-bottom: 25px;
+            }
+            .ff-footer h5 { justify-content: center; }
+            .ff-footer a { margin-bottom: 8px; display: block; width: 100%; }
+            .ff-social { gap: 10px; justify-content: center; }
+            .ff-footer .copyright {
+                flex-direction: column;
+                text-align: center;
+                gap: 10px;
+                padding-top: 15px;
+            }
+            .ff-footer .copyright-links {
+                display: flex;
+                justify-content: center;
+                gap: 20px;
+            }
+            .ff-footer .copyright-links a {
+                margin: 0;
+                width: auto;
+                display: inline-block;
+            }
+            .ff-footer-inner { padding: 0 15px; }
         }
     </style>
 </head>
 <body>
 
-    <div class="auth-card">
+    <!-- ============================================
+    DESKTOP HEADER
+    ============================================ -->
+    <header class="desktop-header">
 
-        <!-- ==========================================
-             LEFT PANEL (Registration form)
-        =========================================== -->
-        <div class="panel-left">
-            <h2 class="form-title">Registration</h2>
-
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="alert {% if message.tags == 'success' %}success{% elif message.tags == 'info' %}info{% endif %}">
-                        <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-circle{% else %}info-circle{% endif %}"></i>
-                        <span>{{ message }}</span>
-                        <button type="button" class="btn-close" onclick="this.parentElement.remove()">×</button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-
-            <form method="post" action="/auth/register/" id="registerForm">
-                {% csrf_token %}
-
-                <!-- Username -->
-                <div class="field">
-                    <input type="text" name="username" placeholder="Username" required
-                           value="{{ request.POST.username|default:'' }}" autofocus autocomplete="username">
-                    <i class="fas fa-user field-icon"></i>
+        <div class="ff-logo-section">
+            <a href="/" class="ff-logo-content">
+                <span class="brand-icon">
+                    {% if site_logo_url %}
+                        <img src="{{ site_logo_url }}" alt="{{ system_name|default:'RonoSystems' }}">
+                    {% else %}
+                        <i class="fas fa-cube"></i>
+                    {% endif %}
+                </span>
+                <div class="ff-logo-text">
+                    {{ system_name|default:"RONO" }}<span>SYSTEMS</span>
                 </div>
-
-                <!-- Email -->
-                <div class="field">
-                    <input type="email" name="email" placeholder="Email" required
-                           value="{{ request.POST.email|default:'' }}" autocomplete="email">
-                    <i class="fas fa-envelope field-icon"></i>
-                </div>
-
-                <!-- Password -->
-                <div class="field">
-                    <input type="password" name="password" id="password" placeholder="Password" required
-                           minlength="8" autocomplete="new-password">
-                    <button class="password-toggle" type="button" id="togglePassword" tabindex="-1">
-                        <i class="fas fa-lock"></i>
-                    </button>
-                </div>
-                <small class="password-feedback" id="strengthFeedback"></small>
-
-                <!-- Confirm Password -->
-                <div class="field">
-                    <input type="password" name="confirm_password" id="confirmPassword" placeholder="Confirm Password" required
-                           autocomplete="new-password">
-                    <button class="password-toggle" type="button" id="toggleConfirmPassword" tabindex="-1">
-                        <i class="fas fa-lock"></i>
-                    </button>
-                </div>
-                <small class="password-feedback" id="matchFeedback"></small>
-
-                <!-- Company ID (optional) -->
-                <div class="field company-id-group">
-                    <input type="text" name="company_id" id="companyId" placeholder="Company ID (optional)"
-                           maxlength="20" autocomplete="off"
-                           value="{{ request.POST.company_id|default:'' }}">
-                    <i class="fas fa-hashtag field-icon"></i>
-                </div>
-
-                <!-- Register Button -->
-                <button type="submit" class="btn-primary-gradient" id="registerBtn">
-                    Register
-                </button>
-
-                <!-- Divider -->
-                <div class="divider-text">or register with social platforms</div>
-
-                <!-- Social Buttons -->
-                <div class="socials">
-                    <a href="{% provider_login_url 'google' %}" class="social-btn" title="Register with Google">
-                        <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google">
-                    </a>
-                    <a href="#" class="social-btn" title="Facebook (not configured)">
-                        <i class="fab fa-facebook-f"></i>
-                    </a>
-                    <a href="#" class="social-btn" title="GitHub (not configured)">
-                        <i class="fab fa-github"></i>
-                    </a>
-                    <a href="#" class="social-btn" title="LinkedIn (not configured)">
-                        <i class="fab fa-linkedin-in"></i>
-                    </a>
-                </div>
-            </form>
+            </a>
         </div>
 
-        <!-- ==========================================
-             RIGHT PANEL (Welcome Back + Login)
-        =========================================== -->
-        <div class="panel-right">
-            <div class="logo-wrap">
-                {% if site_logo_url %}
-                    <img src="{{ site_logo_url }}" alt="{{ system_name|default:'RonoSystems' }}">
+        <nav class="ff-nav-container">
+            <a href="/" class="ff-nav-item">
+                <div class="ff-nav-item-inner">
+                    <i class="fas fa-home"></i> <span>Home</span>
+                </div>
+            </a>
+            <a href="/features/" class="ff-nav-item">
+                <div class="ff-nav-item-inner">
+                    <i class="fas fa-cogs"></i> <span>Features</span>
+                </div>
+            </a>
+            <a href="/contact/" class="ff-nav-item">
+                <div class="ff-nav-item-inner">
+                    <i class="fas fa-envelope"></i> <span>Contact</span>
+                </div>
+            </a>
+            <a href="/about/" class="ff-nav-item">
+                <div class="ff-nav-item-inner">
+                    <i class="fas fa-info-circle"></i> <span>About</span>
+                </div>
+            </a>
+            <a href="/ai-assistant/" class="ff-nav-item">
+                <div class="ff-nav-item-inner">
+                    <i class="fas fa-robot"></i> <span>AI Assistant</span>
+                </div>
+            </a>
+        </nav>
+
+        <div class="ff-tools">
+            <a href="#" class="ff-tool-item" title="Notifications">
+                <div class="ff-tool-item-inner"><i class="fas fa-bell"></i></div>
+            </a>
+            <a href="#" class="ff-tool-item">
+                <div class="ff-tool-item-inner">
+                    <i class="far fa-clock"></i> <span id="desktop-clock">--:--</span>
+                </div>
+            </a>
+            <a href="/pricing/" class="ff-tool-item">
+                <div class="ff-tool-item-inner"><i class="fas fa-dollar"></i> <span>Pricing</span></div>
+            </a>
+            <a href="/documentation/" class="ff-tool-item">
+                <div class="ff-tool-item-inner"><i class="fas fa-book"></i> <span>Documentation</span></div>
+            </a>
+            <a href="/invoicing/" class="ff-tool-item">
+                <div class="ff-tool-item-inner"><i class="fas fa-receipt"></i> <span>Invoicing</span></div>
+            </a>
+            {% if user.is_authenticated %}
+            <a href="/dashboard/" class="ff-tool-item">
+                <div class="ff-tool-item-inner"><i class="fas fa-tachometer-alt"></i> <span>Dashboard</span></div>
+            </a>
+            {% else %}
+            <a href="/auth/login/" class="ff-tool-item">
+                <div class="ff-tool-item-inner"><i class="fas fa-sign-in-alt"></i> <span>Sign in</span></div>
+            </a>
+            {% endif %}
+        </div>
+    </header>
+
+    <!-- ============================================
+    MOBILE HEADER
+    ============================================ -->
+    <header class="mobile-header">
+        <div class="mobile-header-top">
+            <div class="mobile-header-left">
+                <div class="mobile-hamburger" id="mobile-menu-toggle">
+                    <i class="fas fa-bars"></i>
+                </div>
+                <a href="/" class="mobile-logo">
+                    <span class="brand-icon">
+                        {% if site_logo_url %}
+                            <img src="{{ site_logo_url }}" alt="{{ system_name|default:'RonoSystems' }}">
+                        {% else %}
+                            <i class="fas fa-cube"></i>
+                        {% endif %}
+                    </span>
+                    {{ system_name|default:"RONO" }}
+                </a>
+            </div>
+            <div class="mobile-header-right">
+                {% if user.is_authenticated %}
+                    <a href="/dashboard/"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
                 {% else %}
-                    <i class="fas fa-rocket"></i>
+                    <a href="/auth/login/"><i class="fas fa-user"></i> Sign in</a>
                 {% endif %}
             </div>
-            <h1 class="welcome-title">Welcome Back!</h1>
-            <p class="welcome-sub">Already have an Account</p>
-            <a href="/auth/login/" class="btn-outline-light">Login</a>
         </div>
 
+        <nav class="mobile-nav-tabs">
+            <a href="/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-home"></i> Home</div></a>
+            <a href="/features/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-cogs"></i> Features</div></a>
+            <a href="/documentation/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-book"></i> Documentation</div></a>
+            <a href="/invoicing/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-receipt"></i> Invoicing</div></a>
+            <a href="/pricing/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-tags"></i> Pricing</div></a>
+            <a href="/contact/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-envelope"></i> Contact</div></a>
+            <a href="/about/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-info-circle"></i> About</div></a>
+            <a href="/help/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-question-circle"></i> Help</div></a>
+            <a href="/privacy/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-shield-alt"></i> Privacy Policy</div></a>
+            <a href="/terms/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-gavel"></i> Terms of Service</div></a>
+            <a href="/ai-assistant/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-robot"></i> AI Assistant</div></a>
+            <a href="/auth/register/" class="mobile-nav-tab active"><div class="mobile-nav-tab-inner"><i class="fas fa-rocket"></i> Sign Up</div></a>
+        </nav>
+    </header>
+
+    <!-- ============================================
+    MOBILE SIDEBAR
+    ============================================ -->
+    <div class="mobile-sidebar-overlay" id="mobile-sidebar-overlay"></div>
+
+    <aside class="mobile-sidebar" id="mobile-sidebar">
+        <div class="mobile-sidebar-header">
+            <h3>Menu</h3>
+            <button class="mobile-sidebar-close" id="mobile-sidebar-close">&times;</button>
+        </div>
+        <div class="mobile-sidebar-content">
+            <div class="sidebar-header">Platform</div>
+            <a href="/" class="sidebar-link">Dashboard</a>
+            <a href="/features/" class="sidebar-link">Features</a>
+            <a href="/pricing/" class="sidebar-link">Pricing</a>
+            <a href="/documentation/" class="sidebar-link">Documentation</a>
+            <a href="/invoicing/" class="sidebar-link">Invoicing</a>
+            <a href="/contact/" class="sidebar-link">Contact</a>
+            <a href="/about/" class="sidebar-link">About</a>
+            <a href="/auth/register/" class="sidebar-link">Start Free Trial</a>
+
+            <div class="sidebar-header">Legal</div>
+            <a href="/privacy/" class="sidebar-link">Privacy Policy</a>
+            <a href="/terms/" class="sidebar-link">Terms of Service</a>
+
+            <div class="sidebar-promo">
+                <h5>Ready to transform?</h5>
+                <p>Join thousands of companies using {{ system_name|default:"RonoSystems" }}.</p>
+                <a href="/auth/register/" class="btn">Get Started</a>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ============================================
+    MAIN WRAPPER
+    ============================================ -->
+    <div class="main-wrapper">
+
+        <aside class="ff-sidebar">
+            <div class="sidebar-header">Platform</div>
+            <a href="/" class="sidebar-link">Dashboard</a>
+            <a href="/features/" class="sidebar-link">Features</a>
+            <a href="/pricing/" class="sidebar-link">Pricing</a>
+            <a href="/documentation/" class="sidebar-link">Documentation</a>
+            <a href="/invoicing/" class="sidebar-link">Invoicing</a>
+            <a href="/contact/" class="sidebar-link">Contact</a>
+            <a href="/about/" class="sidebar-link">About</a>
+            <a href="/auth/register/" class="sidebar-link">Start Free Trial</a>
+
+            <div class="sidebar-header">Legal</div>
+            <a href="/privacy/" class="sidebar-link">Privacy Policy</a>
+            <a href="/terms/" class="sidebar-link">Terms of Service</a>
+
+            <div class="sidebar-promo">
+                <h5>Ready to transform?</h5>
+                <p>Join thousands of companies using {{ system_name|default:"RonoSystems" }}.</p>
+                <a href="/auth/register/" class="btn">Get Started</a>
+            </div>
+        </aside>
+
+        <main class="ff-content">
+
+            <!-- ============================================
+                RUNNING TEXT
+            ============================================ -->
+            <div class="content-header">
+                <div style="flex-grow: 1; overflow: hidden; width: 100%;">
+                    <h1>Create Your {{ system_name|default:"RonoSystems" }} Account if already have an account click sign in button bellow</h1>
+                </div>
+                <div class="breadcrumb-custom">
+                    <a href="/">Home</a> &raquo; <span>Sign up</span>
+                </div>
+            </div>
+
+            <!-- ============================================
+                 REGISTER PANEL — background image + split card
+                 ============================================ -->
+            <div class="register-bg-panel">
+                <div class="panel-header">
+                    <i class="fas fa-user-plus me-1"></i> Get Started
+                </div>
+                <div class="panel-body">
+
+                    <!-- ALERTS -->
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert {% if message.tags == 'success' %}success{% elif message.tags == 'info' %}info{% endif %}">
+                                <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-circle{% else %}info-circle{% endif %}"></i>
+                                <span>{{ message }}</span>
+                                <button type="button" class="btn-close" onclick="this.parentElement.remove()">×</button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <!-- REGISTER CARD — form on left, welcome on right -->
+                    <div class="register-card">
+
+                        <!-- LEFT PANEL — Registration form -->
+                        <div class="register-left">
+                            <h2 class="form-title">Registration</h2>
+
+                            <form method="post" action="/auth/register/" id="registerForm">
+                                {% csrf_token %}
+
+                                <!-- Username -->
+                                <div class="register-field">
+                                    <input type="text" name="username" placeholder="Username" required
+                                           value="{{ request.POST.username|default:'' }}" autofocus autocomplete="username">
+                                    <i class="fas fa-user field-icon"></i>
+                                </div>
+
+                                <!-- Email -->
+                                <div class="register-field">
+                                    <input type="email" name="email" placeholder="Email" required
+                                           value="{{ request.POST.email|default:'' }}" autocomplete="email">
+                                    <i class="fas fa-envelope field-icon"></i>
+                                </div>
+
+                                <!-- Password -->
+                                <div class="register-field">
+                                    <input type="password" name="password" id="password" placeholder="Password" required
+                                           minlength="8" autocomplete="new-password">
+                                    <button class="password-toggle" type="button" id="togglePassword" tabindex="-1">
+                                        <i class="fas fa-lock"></i>
+                                    </button>
+                                </div>
+                                <small class="password-feedback" id="strengthFeedback"></small>
+
+                                <!-- Confirm Password -->
+                                <div class="register-field">
+                                    <input type="password" name="confirm_password" id="confirmPassword" placeholder="Confirm Password" required
+                                           autocomplete="new-password">
+                                    <button class="password-toggle" type="button" id="toggleConfirmPassword" tabindex="-1">
+                                        <i class="fas fa-lock"></i>
+                                    </button>
+                                </div>
+                                <small class="password-feedback" id="matchFeedback"></small>
+
+                                <!-- Company ID (optional) -->
+                                <div class="register-field company-id-group">
+                                    <input type="text" name="company_id" id="companyId" placeholder="Company ID (optional)"
+                                           maxlength="20" autocomplete="off"
+                                           value="{{ request.POST.company_id|default:'' }}">
+                                    <i class="fas fa-hashtag field-icon"></i>
+                                </div>
+
+                                <!-- Register Button -->
+                                <button type="submit" class="btn-register-gradient" id="registerBtn">
+                                    Register
+                                </button>
+
+                                <!-- Divider -->
+                                <div class="divider-text">or register with social platforms</div>
+
+                                <!-- Social Buttons -->
+                                <div class="socials">
+                                    <a href="{% provider_login_url 'google' %}" class="social-btn" title="Register with Google">
+                                        <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google">
+                                    </a>
+                                    <a href="#" class="social-btn" title="Facebook (not configured)">
+                                        <i class="fab fa-facebook-f"></i>
+                                    </a>
+                                    <a href="#" class="social-btn" title="GitHub (not configured)">
+                                        <i class="fab fa-github"></i>
+                                    </a>
+                                    <a href="#" class="social-btn" title="LinkedIn (not configured)">
+                                        <i class="fab fa-linkedin-in"></i>
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- RIGHT PANEL — Welcome Back + Login -->
+                        <div class="register-right">
+                            <div class="logo-wrap">
+                                {% if site_logo_url %}
+                                    <img src="{{ site_logo_url }}" alt="{{ system_name|default:'RonoSystems' }}">
+                                {% else %}
+                                    <i class="fas fa-rocket"></i>
+                                {% endif %}
+                            </div>
+                            <h1 class="welcome-title">Welcome Back!</h1>
+                            <p class="welcome-sub">Already have an Account</p>
+                            <a href="/auth/login/" class="btn-login-outline">Sign in</a>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+
+        </main>
     </div>
 
+    <footer class="ff-footer">
+        <div class="ff-footer-inner">
+            <div class="row">
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <h5>
+                        <span class="brand-icon">
+                            {% if site_logo_url %}
+                                <img src="{{ site_logo_url }}" alt="{{ system_name|default:'RonoSystems' }}">
+                            {% else %}
+                                <i class="fas fa-cube me-2"></i>
+                            {% endif %}
+                        </span>
+                        {{ system_name|default:"RonoSystems" }}
+                    </h5>
+                    <p style="line-height: 1.6; margin-bottom: 15px;">
+                        {{ site_tagline|default:"Enterprise Management Platform helping businesses streamline operations, manage teams, and drive growth with AI-powered insights." }}
+                    </p>
+
+                    <div class="ff-social">
+                        <a href="https://facebook.com/" rel="noopener" title="Facebook" class="ff-social-link facebook">
+                            <i class="fab fa-facebook-f"></i>
+                        </a>
+                        <a href="https://wa.me/254722527955" rel="noopener" title="WhatsApp" class="ff-social-link whatsapp">
+                            <i class="fab fa-whatsapp"></i>
+                        </a>
+                        <a href="https://x.com/" rel="noopener" title="X (Twitter)" class="ff-social-link x">
+                            <i class="fab fa-x-twitter"></i>
+                        </a>
+                        <a href="https://t.me/" rel="noopener" title="Telegram" class="ff-social-link telegram">
+                            <i class="fab fa-telegram-plane"></i>
+                        </a>
+                        <a href="https://instagram.com/" rel="noopener" title="Instagram" class="ff-social-link instagram">
+                            <i class="fab fa-instagram"></i>
+                        </a>
+                        <a href="https://linkedin.com/" rel="noopener" title="LinkedIn" class="ff-social-link linkedin">
+                            <i class="fab fa-linkedin-in"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="col-lg-2 col-md-3 col-6 mb-4">
+                    <h5>About</h5>
+                    <a href="/about/">Our Company</a>
+                    <a href="/about/">Team</a>
+                    <a href="/about/">Mission & Vision</a>
+                    <a href="/about/">Our Story</a>
+                </div>
+
+                <div class="col-lg-2 col-md-3 col-6 mb-4">
+                    <h5>Features</h5>
+                    <a href="/features/">POS System</a>
+                    <a href="/features/">Analytics</a>
+                    <a href="/features/">AI Assistant</a>
+                    <a href="/features/">Team Management</a>
+                </div>
+
+                <div class="col-lg-2 col-md-3 col-6 mb-4">
+                    <h5>Pricing</h5>
+                    <a href="/pricing/">Basic</a>
+                    <a href="/pricing/">Standard</a>
+                    <a href="/pricing/">Premium</a>
+                    <a href="/pricing/">Enterprise</a>
+                </div>
+
+                <div class="col-lg-2 col-md-3 col-6 mb-4">
+                    <h5>Contact</h5>
+                    <a href="/contact/">Email Us</a>
+                    <a href="/contact/">Call Us</a>
+                    <a href="/contact/">Live Chat</a>
+                    <a href="/contact/">Help Center</a>
+                </div>
+            </div>
+
+            <div class="copyright">
+                <span class="copyright-text">
+                    &copy; {% now "Y" %} {{ system_name|default:"RonoSystems" }}. All rights reserved.
+                </span>
+                <span class="copyright-links">
+                    <a href="/privacy/">Privacy Policy</a>
+                    <a href="/terms/">Terms of Service</a>
+                </span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
     <script>
-        // ---- Password visibility toggles ----
+        // ============================================
+        // LIVE CLOCK
+        // ============================================
+        function updateClock() {
+            const now = new Date();
+            let hours = now.getHours();
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const ampm = hours >= 12 ? 'pm' : 'am';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            const timeString = hours + ':' + minutes + ampm;
+            const desktopClock = document.getElementById('desktop-clock');
+            if (desktopClock) desktopClock.textContent = timeString;
+        }
+        updateClock();
+        setInterval(updateClock, 1000);
+
+        // ============================================
+        // MOBILE SIDEBAR TOGGLE
+        // ============================================
+        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+        const mobileSidebar = document.getElementById('mobile-sidebar');
+        const mobileSidebarOverlay = document.getElementById('mobile-sidebar-overlay');
+        const mobileSidebarClose = document.getElementById('mobile-sidebar-close');
+
+        function openMobileSidebar() {
+            mobileSidebar.classList.add('open');
+            mobileSidebarOverlay.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeMobileSidebar() {
+            mobileSidebar.classList.remove('open');
+            mobileSidebarOverlay.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+        if (mobileMenuToggle) mobileMenuToggle.addEventListener('click', openMobileSidebar);
+        if (mobileSidebarClose) mobileSidebarClose.addEventListener('click', closeMobileSidebar);
+        if (mobileSidebarOverlay) mobileSidebarOverlay.addEventListener('click', closeMobileSidebar);
+
+        document.querySelectorAll('.mobile-sidebar .sidebar-link, .mobile-sidebar .btn').forEach(link => {
+            link.addEventListener('click', closeMobileSidebar);
+        });
+
+        // ============================================
+        // SMOOTH SCROLL
+        // ============================================
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                const targetId = this.getAttribute('href');
+                if (targetId === '#') return;
+                const target = document.querySelector(targetId);
+                if (target) {
+                    e.preventDefault();
+                    const isMobile = window.innerWidth <= 992;
+                    const headerOffset = isMobile ? 100 : 60;
+                    const elementPosition = target.getBoundingClientRect().top;
+                    const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                    window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+                }
+            });
+        });
+
+        // ============================================
+        // PASSWORD VISIBILITY TOGGLES
+        // ============================================
         function setupToggle(toggleId, inputId) {
             const toggle = document.getElementById(toggleId);
             const input = document.getElementById(inputId);
@@ -526,7 +1522,9 @@
         setupToggle('togglePassword', 'password');
         setupToggle('toggleConfirmPassword', 'confirmPassword');
 
-        // ---- Auto-uppercase + trim company ID ----
+        // ============================================
+        // AUTO-UPPERCASE + TRIM COMPANY ID
+        // ============================================
         const companyIdEl = document.getElementById('companyId');
         if (companyIdEl) {
             companyIdEl.addEventListener('input', function() {
@@ -540,7 +1538,9 @@
             });
         }
 
-        // ---- Password strength ----
+        // ============================================
+        // PASSWORD STRENGTH + MATCH VALIDATION
+        // ============================================
         const pwInput = document.getElementById('password');
         const cpwInput = document.getElementById('confirmPassword');
         const strengthEl = document.getElementById('strengthFeedback');

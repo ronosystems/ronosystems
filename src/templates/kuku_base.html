@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}{{ system_name|default:"RonoSystems" }}{% endblock %}</title>
+    <title>{% block title %}{{ system_name|default:"Kuku Biz" }}{% endblock %}</title>
 
     {% if site_favicon_url %}
         <link rel="icon" type="image/png" href="{{ site_favicon_url }}">
@@ -13,26 +13,32 @@
     {% endif %}
 
     <link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'vendor/fontawesome/css/all.min.css' %}">
 
     <style>
         /* ============================================
-           TENANT-THEMED CSS VARIABLES
-           `site_primary_color` / `site_accent_color`
-           are injected by `company_branding_context`.
-           Fallbacks keep the platform look when there's
-           no active tenant (mother site, public pages).
+           KUKU BIZ PALETTE — matches auth pages
+           --nav-bg-top     : #2d5f7c  (primary blue)
+           --nav-bg-bottom  : #1e4e6d  (deep blue)
+           --nav-border-green: #66cc33 (accent green)
+           --nav-active-bg  : #7bc043  (light green)
         ============================================ */
         :root {
             --sidebar-width: 280px;
             --sidebar-collapsed: 70px;
 
-            /* Per-tenant palette */
-            --primary-color: {{ site_primary_color|default:"#87CEEB" }};
-            --sidebar-bg: {{ site_accent_color|default:"#036a77" }};
+            /* Tenant palette (falls back to platform blue) */
+            --primary-color:   {{ site_primary_color|default:"#2d5f7c" }};
+            --sidebar-bg:      {{ site_accent_color|default:"#1e4e6d" }};
+            --accent-green:    #7bc043;
+            --border-green:    #66cc33;
+            --link-color:      #2a6496;
+            --soft-tint:       #eaf2f8;
+            --soft-tint-hover: #f0f7fa;
 
-            /* Derived shades — color-mix keeps them in sync with --sidebar-bg */
-            --sidebar-hover: color-mix(in srgb, var(--sidebar-bg) 80%, #000);
+            /* Derived shades — color-mix keeps them synced with --sidebar-bg */
+            --sidebar-hover:   color-mix(in srgb, var(--sidebar-bg) 80%, #000);
+            --sidebar-active:  color-mix(in srgb, var(--sidebar-bg) 60%, #000);
             --secondary-color: color-mix(in srgb, var(--primary-color) 85%, #000);
 
             --text-light: #e0f7fa;
@@ -61,20 +67,17 @@
             z-index: 1050;
             display: flex;
             flex-direction: column;
-            box-shadow: 2px 0 15px rgba(0, 0, 0, 0.986);
+            box-shadow: 2px 0 15px rgba(0, 0, 0, 0.15);
         }
-
         .sidebar::-webkit-scrollbar { width: 4px; }
         .sidebar::-webkit-scrollbar-track { background: var(--sidebar-bg); }
         .sidebar::-webkit-scrollbar-thumb {
             background: var(--primary-color);
             border-radius: 10px;
-            border: 1px solid #000000;
         }
-
         .sidebar.collapsed { width: var(--sidebar-collapsed); }
 
-        /* Brand */
+        /* --- Brand --- */
         .sidebar-brand {
             padding: 20px 20px 15px;
             border-bottom: 3px solid #000000;
@@ -97,41 +100,19 @@
             margin: 8px 0 0;
             color: #fff;
             letter-spacing: 0.5px;
-            transition: opacity 0.2s;
         }
         .sidebar-brand .company-name {
             font-size: 0.7rem;
             color: rgba(255,255,255,0.8);
             margin-top: 2px;
             display: block;
-            transition: opacity 0.2s;
         }
         .sidebar.collapsed .sidebar-brand h5,
         .sidebar.collapsed .sidebar-brand .company-name { display: none; }
         .sidebar.collapsed .sidebar-brand .logo-img { max-width: 45px; max-height: 45px; }
         .sidebar.collapsed .sidebar-brand .logo-icon { font-size: 1.5rem; }
 
-        /* Branch chip under company name */
-        .sidebar-brand .user-branch-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            margin-top: 8px;
-            padding: 3px 10px;
-            background: color-mix(in srgb, var(--primary-color) 20%, transparent);
-            border: 1px solid var(--primary-color);
-            border-radius: 50px;
-            font-size: 0.68rem;
-            font-weight: 700;
-            color: #e0f7fa;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            transition: opacity 0.2s;
-        }
-        .sidebar-brand .user-branch-chip i { font-size: 0.7rem; color: var(--primary-color); }
-        .sidebar.collapsed .sidebar-brand .user-branch-chip { display: none; }
-
-        /* Nav wrapper */
+        /* --- Nav wrapper --- */
         .sidebar-nav-wrapper {
             flex: 1;
             overflow-y: auto;
@@ -143,19 +124,17 @@
         .sidebar-nav-wrapper::-webkit-scrollbar-thumb {
             background: var(--primary-color);
             border-radius: 10px;
-            border: 1px solid #000000;
         }
 
         .sidebar-nav { padding: 10px 0; }
 
         .sidebar-nav .nav-label {
-            padding: 8px 20px;
-            font-size: 0.8rem;
+            padding: 10px 20px 6px;
+            font-size: 0.72rem;
             text-transform: uppercase;
-            color: rgb(1, 8, 77);
+            color: rgba(255,255,255,0.55);
             letter-spacing: 1px;
             font-weight: 800;
-            transition: opacity 0.2s;
         }
 
         .sidebar-nav .nav-item { list-style: none; }
@@ -164,9 +143,9 @@
             display: flex;
             align-items: center;
             padding: 10px 20px;
-            color: rgba(255, 255, 255, 0.9);
+            color: rgba(255, 255, 255, 0.85);
             text-decoration: none;
-            transition: all 0.3s;
+            transition: all 0.2s;
             border-left: 3px solid transparent;
             gap: 12px;
             font-size: 0.9rem;
@@ -179,26 +158,36 @@
         .sidebar-nav .nav-link.active {
             background: var(--sidebar-hover);
             color: #fff;
-            border-left-color: var(--primary-color);
+            border-left-color: var(--accent-green);
         }
+        .sidebar-nav .nav-link.active {
+            background: var(--sidebar-active);
+        }
+
         .sidebar-nav .nav-link i {
             width: 22px;
             text-align: center;
-            font-size: 1.1rem;
+            font-size: 1.05rem;
             flex-shrink: 0;
-            color: var(--primary-color);
+            color: var(--accent-green);
+            transition: color 0.2s;
         }
+        .sidebar-nav .nav-link:hover i,
+        .sidebar-nav .nav-link.active i {
+            color: #ffffff;
+        }
+
         .sidebar-nav .nav-link .badge {
             margin-left: auto;
-            background: var(--primary-color);
-            color: #000000;
-            font-size: 0.6rem;
+            background: var(--accent-green);
+            color: #000;
+            font-size: 0.65rem;
             padding: 2px 8px;
             border-radius: 50px;
             flex-shrink: 0;
-            border: 1px solid #000000;
-            font-weight: 600;
+            font-weight: 700;
         }
+
         .sidebar-nav .nav-link .badge.bg-danger {
             background: #dc3545 !important;
             color: #ffffff !important;
@@ -216,24 +205,24 @@
         }
         .sidebar.collapsed .sidebar-nav .nav-link span:not(.badge) { display: none; }
         .sidebar.collapsed .sidebar-nav .nav-link .badge { display: none; }
-        .sidebar.collapsed .sidebar-nav .nav-link i { font-size: 1.3rem; margin: 0; }
+        .sidebar.collapsed .sidebar-nav .nav-link i { font-size: 1.25rem; margin: 0; }
 
-        /* Footer */
+        /* --- Sidebar footer --- */
         .sidebar-footer {
             flex-shrink: 0;
             border-top: 3px solid #000000;
             padding: 15px 20px;
-            background: rgba(0,0,0,0.3);
+            background: rgba(0,0,0,0.25);
         }
         .sidebar-toggle-btn {
             width: 100%;
             padding: 10px;
             border-radius: 4px;
-            background: rgba(255,255,255,0.05);
-            border: 2px solid #000000;
-            color: rgba(255,255,255,0.8);
+            background: rgba(255,255,255,0.06);
+            border: 2px solid #000;
+            color: rgba(255,255,255,0.85);
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -242,9 +231,9 @@
             font-weight: 600;
         }
         .sidebar-toggle-btn:hover {
-            background: rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.12);
             color: #fff;
-            border-color: var(--primary-color);
+            border-color: var(--accent-green);
         }
         .sidebar.collapsed .sidebar-footer { padding: 15px 10px; }
         .sidebar.collapsed .sidebar-toggle-btn { padding: 10px; justify-content: center; }
@@ -269,8 +258,8 @@
             background: #fff;
             padding: 12px 30px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            border-top: 3px solid #000000;
-            border-bottom: 3px solid #000000;
+            border-top: 3px solid #000;
+            border-bottom: 3px solid #000;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -281,11 +270,11 @@
         .top-navbar .page-title {
             font-size: 1.1rem;
             font-weight: 700;
-            color: #000000;
+            color: #000;
         }
         .top-navbar .page-title small {
             font-weight: 400;
-            color: #000000;
+            color: #555;
             font-size: 0.85rem;
         }
         .top-navbar .navbar-actions {
@@ -293,6 +282,8 @@
             align-items: center;
             gap: 15px;
         }
+
+        /* User profile */
         .top-navbar .user-profile {
             display: flex;
             align-items: center;
@@ -300,13 +291,13 @@
             cursor: pointer;
             padding: 5px 12px;
             border-radius: 4px;
-            transition: all 0.3s;
+            transition: all 0.2s;
             text-decoration: none;
-            color: #000000;
-            border: 2px solid #000000;
+            color: #000;
+            border: 2px solid #000;
         }
         .top-navbar .user-profile:hover {
-            background: #f8f9fa;
+            background: var(--soft-tint-hover);
             border-color: var(--primary-color);
         }
         .top-navbar .user-profile .avatar-sm {
@@ -321,8 +312,8 @@
             justify-content: center;
             font-weight: 700;
             font-size: 0.9rem;
-            color: #000000;
-            border: 2px solid #000000;
+            color: #fff;
+            border: 2px solid #000;
         }
         .top-navbar .user-profile .avatar-sm img {
             width: 100%;
@@ -332,36 +323,41 @@
         .top-navbar .user-profile .user-name {
             font-weight: 600;
             font-size: 0.9rem;
-            color: #000000;
+            color: #000;
         }
         .top-navbar .user-profile .user-role {
             font-size: 0.7rem;
-            color: #000000;
+            color: #555;
         }
+
         .sidebar-toggle-mobile {
             display: none;
             background: none;
             border: none;
             font-size: 1.5rem;
-            color: #000000;
+            color: #000;
             cursor: pointer;
             padding: 5px 10px;
             border-radius: 4px;
-            transition: background 0.3s;
+            transition: background 0.2s;
         }
         .sidebar-toggle-mobile:hover { background: #f0f2f5; }
 
-        /* Content */
+        /* ============================================
+           CONTENT
+        ============================================ */
         .content-area {
             flex: 1;
             padding: 25px 30px;
         }
 
-        /* Footer */
+        /* ============================================
+           FOOTER
+        ============================================ */
         .footer {
             background: #fff;
             padding: 15px 30px;
-            border-top: 2px solid #000000;
+            border-top: 2px solid #000;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -370,15 +366,18 @@
         }
         .footer .copyright {
             font-size: 0.85rem;
-            color: #000000;
+            color: #000;
         }
-        .footer .copyright i { color: #fc019c; }
+        /* Green accent matches auth-page footer icon */
+        .footer .copyright i { color: var(--accent-green); }
+
         .footer .powered-by {
             font-size: 0.85rem;
-            color: #000000;
+            color: #000;
         }
+        /* Link color matches auth-page footer link */
         .footer .powered-by a {
-            color: #008cff;
+            color: var(--link-color);
             text-decoration: none;
             font-weight: 700;
         }
@@ -387,42 +386,45 @@
             color: var(--primary-color);
         }
 
-        /* Overlay */
+        /* ============================================
+           OVERLAY (mobile)
+        ============================================ */
         .sidebar-overlay {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            inset: 0;
             background: rgba(0,0,0,0.5);
             z-index: 1045;
         }
         .sidebar-overlay.active { display: block; }
 
-        /* Alerts */
+        /* ============================================
+           ALERTS
+        ============================================ */
         .alert {
-            border: 2px solid #000000;
+            border: 2px solid #000;
             border-radius: 4px;
         }
-        .alert-success { background: #d4edda; color: #155724; border-color: #000000; }
-        .alert-danger  { background: #f8d7da; color: #721c24; border-color: #000000; }
-        .alert-warning { background: #fff3cd; color: #856404; border-color: #000000; }
-        .alert-info    { background: #cce5ff; color: #004085; border-color: #000000; }
+        .alert-success { background: #d4edda; color: #155724; }
+        .alert-danger  { background: #f8d7da; color: #721c24; }
+        .alert-warning { background: #fff3cd; color: #856404; }
+        .alert-info    { background: #cce5ff; color: #004085; }
 
-        /* Support mode banner */
+        /* ============================================
+           SUPPORT MODE BANNER
+        ============================================ */
         .support-mode-banner {
             background: linear-gradient(135deg, #ff6b35 0%, #dc3545 100%);
             color: white;
             padding: 10px 20px;
             box-shadow: 0 4px 15px rgba(220, 53, 69, 0.5);
-            border-bottom: 3px solid #000000;
+            border-bottom: 3px solid #000;
             animation: supportPulse 2s infinite;
             flex-shrink: 0;
         }
         @keyframes supportPulse {
             0%, 100% { box-shadow: 0 4px 15px rgba(220, 53, 69, 0.5); }
-            50% { box-shadow: 0 4px 25px rgba(220, 53, 69, 0.8); }
+            50%      { box-shadow: 0 4px 25px rgba(220, 53, 69, 0.8); }
         }
         .support-mode-content {
             display: flex;
@@ -482,128 +484,26 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: #ffffff;
+            background: #fff;
             color: #dc3545;
             padding: 7px 18px;
             border-radius: 4px;
             text-decoration: none;
             font-weight: 700;
             font-size: 0.9rem;
-            border: 2px solid #000000;
-            transition: all 0.3s;
+            border: 2px solid #000;
+            transition: all 0.2s;
         }
         .support-exit-btn:hover {
-            background: #000000;
-            color: #ffffff;
+            background: #000;
+            color: #fff;
             transform: translateY(-2px);
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
 
         /* ============================================
-           TENANT FEEDBACK WIDGET
+           RESPONSIVE
         ============================================ */
-        .fb-fab {
-            position: fixed;
-            right: 22px;
-            bottom: 22px;
-            z-index: 1055;
-            width: 54px;
-            height: 54px;
-            border-radius: 50%;
-            background: var(--primary-color);
-            border: 2px solid #000;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-            transition: transform 0.15s, box-shadow 0.15s;
-        }
-        .fb-fab:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
-        }
-        .fb-fab i { font-size: 22px; color: #000; }
-
-        .fb-modal {
-            display: none;
-            position: fixed;
-            inset: 0;
-            z-index: 1060;
-            background: rgba(0, 0, 0, 0.55);
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        .fb-modal.open { display: flex; }
-
-        .fb-modal-inner {
-            background: #fff;
-            border: 3px solid #000;
-            border-radius: 6px;
-            width: 100%;
-            max-width: 560px;
-            max-height: 92vh;
-            overflow: auto;
-        }
-        .fb-modal-header {
-            background: var(--primary-color);
-            border-bottom: 2px solid #000;
-            padding: 12px 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .fb-modal-header strong {
-            font-size: 1rem;
-            color: #000;
-        }
-        .fb-modal-close {
-            background: #dc3545;
-            color: #fff;
-            border: 2px solid #000;
-            border-radius: 4px;
-            padding: 2px 10px;
-            cursor: pointer;
-            font-weight: 700;
-        }
-        .fb-modal-body { padding: 16px; }
-        .fb-form-label {
-            font-weight: 700;
-            font-size: 0.8rem;
-            color: #000;
-            margin-bottom: 4px;
-            display: block;
-        }
-        .fb-form-control {
-            width: 100%;
-            border: 2px solid #000;
-            border-radius: 4px;
-            padding: 6px 10px;
-            font-size: 0.88rem;
-        }
-        .fb-form-control:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 30%, transparent);
-        }
-        .fb-modal-footer {
-            display: flex;
-            justify-content: flex-end;
-            gap: 8px;
-            margin-top: 16px;
-        }
-        .fb-toast {
-            padding: 8px 12px;
-            border: 1px solid #000;
-            border-radius: 4px;
-            margin-top: 10px;
-            font-size: 0.88rem;
-        }
-        .fb-toast.ok  { background: #d4edda; color: #155724; }
-        .fb-toast.err { background: #f8d7da; color: #721c24; }
-
-        /* Responsive */
         @media (max-width: 992px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -625,9 +525,9 @@
                 text-align: center;
                 padding: 15px;
             }
+            /* In mobile, force-show labels even if collapsed */
             .sidebar.collapsed .sidebar-brand h5,
             .sidebar.collapsed .sidebar-brand .company-name,
-            .sidebar.collapsed .sidebar-brand .user-branch-chip,
             .sidebar.collapsed .sidebar-nav .nav-label,
             .sidebar.collapsed .sidebar-nav .nav-link span:not(.badge),
             .sidebar.collapsed .sidebar-nav .nav-link .badge {
@@ -651,12 +551,9 @@
 
         @media (max-width: 576px) {
             .top-navbar { padding: 10px 15px; }
-            .top-navbar .user-profile .user-name { display: none; }
+            .top-navbar .user-profile .user-name,
             .top-navbar .user-profile .user-role { display: none; }
             .content-area { padding: 10px; }
-
-            .fb-fab { width: 48px; height: 48px; right: 16px; bottom: 16px; }
-            .fb-fab i { font-size: 18px; }
         }
     </style>
     {% block extra_css %}{% endblock %}
@@ -671,9 +568,7 @@
     <!-- ============================================================ -->
     <aside class="sidebar" id="sidebar">
 
-        <!-- Brand — uses `current_company` (support-mode, custom-domain, or
-             user's own company, in that precedence). Falls back to platform
-             defaults for super-admin / logged-out pages. -->
+        <!-- Brand -->
         <div class="sidebar-brand">
             {% if current_company %}
                 {% if current_company.logo %}
@@ -681,9 +576,7 @@
                 {% elif site_logo_url %}
                     <img src="{{ site_logo_url }}" alt="{{ current_company.display_name }}" class="logo-img">
                 {% else %}
-                    <div class="logo-icon">
-                        <i class="fas fa-rocket"></i>
-                    </div>
+                    <div class="logo-icon"><i class="fas fa-kiwi-bird"></i></div>
                 {% endif %}
                 <span class="company-name">
                     <h5>{{ current_company.display_name }}</h5>
@@ -692,12 +585,10 @@
                 {% if site_logo_url %}
                     <img src="{{ site_logo_url }}" alt="{{ system_name }}" class="logo-img">
                 {% else %}
-                    <div class="logo-icon">
-                        <i class="fas fa-rocket"></i>
-                    </div>
+                    <div class="logo-icon"><i class="fas fa-kiwi-bird"></i></div>
                 {% endif %}
                 <span class="company-name">
-                    <h5>{{ system_name|default:"Enterprise Platform" }}</h5>
+                    <h5>{{ system_name|default:"Kuku Biz" }}</h5>
                 </span>
             {% endif %}
         </div>
@@ -706,14 +597,13 @@
         <div class="sidebar-nav-wrapper" id="sidebarNavWrapper">
             <nav class="sidebar-nav">
                 <ul class="nav flex-column">
-
                     {% with role=user.role %}
 
                     {# ============================================================ #}
-                    {# KUKU MANAGEMENT — Dashboard for all Kuku Biz roles            #}
+                    {# MAIN HOME — Dashboard for all Kuku Biz roles                 #}
                     {# ============================================================ #}
                     {% if role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or role == 'stock_controller' or role == 'company_cashier' or role == 'company_agent' or role == 'mpesa_agent' or user.is_superuser %}
-                    <li class="nav-label">MAIN HOME</li>
+                    <li class="nav-label">Main Home</li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.path == '/kuku_biz/dashboard/' %}active{% endif %}"
                            href="{% url 'kuku_biz:dashboard' %}">
@@ -725,28 +615,28 @@
                     {# ============================================================ #}
                     {# M-PESA SHOP — HQ + mpesa_agent only                          #}
                     {# ============================================================ #}
-                    {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' or user.role == 'mpesa_agent' %}
                     {% if company and company_has_treasury %}
+                        {% if role == 'company_admin' or role == 'company_manager' or role == 'super_admin' or role == 'mpesa_agent' or user.is_superuser %}
                         <li class="nav-item">
                             <a class="nav-link {% if '/treasury/' in request.path %}active{% endif %}"
-                            href="{% url 'treasury:dashboard' company.id %}">
-                                <i class="fas fa-money-bill"></i> <span>Mpesa</span>
+                               href="{% url 'treasury:dashboard' company.id %}">
+                                <i class="fas fa-money-bill"></i> <span>M-Pesa Shop</span>
                                 {% if unverified_daily_records_count and unverified_daily_records_count > 0 %}
                                     <span class="badge bg-danger"
-                                        title="{{ unverified_daily_records_count }} unverified daily record{{ unverified_daily_records_count|pluralize }}">
+                                          title="{{ unverified_daily_records_count }} unverified daily record{{ unverified_daily_records_count|pluralize }}">
                                         {{ unverified_daily_records_count }}
                                     </span>
                                 {% endif %}
                             </a>
                         </li>
-                    {% endif %}
+                        {% endif %}
                     {% endif %}
 
                     {# ============================================================ #}
-                    {# KUKU SALES SHOP — cashiers, agents, stock controllers, HQ    #}
+                    {# SALES SHOP — cashiers, agents, stock, HQ                     #}
                     {# ============================================================ #}
                     {% if role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or role == 'stock_controller' or role == 'company_cashier' or role == 'company_agent' or user.is_superuser %}
-                    <li class="nav-label">SALES SHOP</li>
+                    <li class="nav-label">Sales Shop</li>
 
                     <li class="nav-item">
                         <a class="nav-link {% if '/kuku_biz/sales/' in request.path %}active{% endif %}"
@@ -771,10 +661,10 @@
                     {% endif %}
 
                     {# ============================================================ #}
-                    {# KUKU PRODUCTION — HQ + stock controller                      #}
+                    {# PRODUCTION — HQ + stock controller                           #}
                     {# ============================================================ #}
                     {% if role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or role == 'stock_controller' or user.is_superuser %}
-                    <li class="nav-label">PRODUCTION</li>
+                    <li class="nav-label">Production</li>
 
                     <li class="nav-item">
                         <a class="nav-link {% if '/kuku_biz/flocks/' in request.path %}active{% endif %}"
@@ -793,7 +683,7 @@
                     <li class="nav-item">
                         <a class="nav-link {% if '/kuku_biz/eggs/' in request.path and 'inventory' not in request.path %}active{% endif %}"
                            href="{% url 'kuku_biz:egg_list' %}">
-                            <i class="fas fa-egg"></i> <span>Production</span>
+                            <i class="fas fa-egg"></i> <span>Egg Production</span>
                         </a>
                     </li>
 
@@ -814,14 +704,14 @@
                     <li class="nav-item">
                         <a class="nav-link {% if '/kuku_biz/feed/consumption/' in request.path %}active{% endif %}"
                            href="{% url 'kuku_biz:feed_consumption_list' %}">
-                            <i class="fas fa-utensils"></i> <span>Consumption</span>
+                            <i class="fas fa-utensils"></i> <span>Feed Consumption</span>
                         </a>
                     </li>
 
                     <li class="nav-item">
                         <a class="nav-link {% if '/kuku_biz/health/' in request.path %}active{% endif %}"
                            href="{% url 'kuku_biz:health_list' %}">
-                            <i class="fas fa-briefcase-medical"></i> <span>Health</span>
+                            <i class="fas fa-briefcase-medical"></i> <span>Health Records</span>
                         </a>
                     </li>
 
@@ -841,11 +731,10 @@
                     {% endif %}
 
                     {# ============================================================ #}
-                    {# STOCK / INVENTORY — cashiers, agents, stock, HQ              #}
+                    {# STOCK — everyone except mpesa_agent                          #}
                     {# ============================================================ #}
-                    {% if role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or role == 'stock_controller' or role == 'company_cashier' or role == 'company_agent' or role == 'mpesa_agent' or user.is_superuser %}
-                    <li class="nav-label">STOCK</li>
-
+                    {% if role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or role == 'stock_controller' or role == 'company_cashier' or role == 'company_agent' or user.is_superuser %}
+                    <li class="nav-label">Stock</li>
                     <li class="nav-item">
                         <a class="nav-link {% if '/kuku_biz/inventory/' in request.path %}active{% endif %}"
                            href="{% url 'kuku_biz:inventory_hub' %}">
@@ -855,11 +744,10 @@
                     {% endif %}
 
                     {# ============================================================ #}
-                    {# KUKU REPORTS — HQ + stock controller                         #}
+                    {# REPORTS — HQ + stock controller                              #}
                     {# ============================================================ #}
                     {% if role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or role == 'stock_controller' or user.is_superuser %}
-                    <li class="nav-label">REPORTS</li>
-
+                    <li class="nav-label">Reports</li>
                     <li class="nav-item">
                         <a class="nav-link {% if '/kuku_biz/reports/' in request.path %}active{% endif %}"
                            href="{% url 'kuku_biz:reports' %}">
@@ -869,10 +757,10 @@
                     {% endif %}
 
                     {# ============================================================ #}
-                    {# EMPLOYEES SETTINGS — admin / manager / super_admin           #}
+                    {# EMPLOYEES — admin / manager only                             #}
                     {# ============================================================ #}
-                    {% if company and role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or user.is_superuser %}
-                    <li class="nav-label">EMPLOYEES</li>
+                    {% if company and role == 'super_admin' or company and role == 'company_admin' or company and role == 'company_manager' %}
+                    <li class="nav-label">Employees</li>
 
                     <li class="nav-item">
                         <a class="nav-link {% if '/company/employees/' in request.path %}active{% endif %}"
@@ -893,10 +781,10 @@
                     {% endif %}
 
                     {# ============================================================ #}
-                    {# COMPANY SETTINGS — admin / super_admin only                  #}
+                    {# SETTINGS — admin / super_admin only                          #}
                     {# ============================================================ #}
-                    {% if company and role == 'super_admin' or role == 'company_admin' %}
-                    <li class="nav-label">SETTINGS</li>
+                    {% if company and role == 'super_admin' or company and role == 'company_admin' %}
+                    <li class="nav-label">Settings</li>
 
                     <li class="nav-item">
                         <a class="nav-link {% if '/company/branches/' in request.path %}active{% endif %}"
@@ -921,10 +809,10 @@
                     {% endif %}
 
                     {# ============================================================ #}
-                    {# SUPER ADMIN — Hub administration links                      #}
+                    {# ADMINISTRATION — super_admin only                             #}
                     {# ============================================================ #}
                     {% if user.is_authenticated and user.role == 'super_admin' and not is_support_mode %}
-                    <li class="nav-label">ADMINISTRATION</li>
+                    <li class="nav-label">Administration</li>
 
                     <li class="nav-item">
                         <a class="nav-link {% if '/support/' in request.path %}active{% endif %}"
@@ -945,7 +833,7 @@
                     {# GUEST — minimal fallback                                     #}
                     {# ============================================================ #}
                     {% if role == 'guest' %}
-                    <li class="nav-label">HOME</li>
+                    <li class="nav-label">Home</li>
                     <li class="nav-item">
                         <a class="nav-link {% if '/no-access/' in request.path %}active{% endif %}"
                            href="/no-access/">
@@ -955,7 +843,6 @@
                     {% endif %}
 
                     {% endwith %}
-
                 </ul>
             </nav>
         </div>
@@ -1001,7 +888,7 @@
         <!-- Top navbar -->
         <nav class="top-navbar">
             <div class="d-flex align-items-center gap-3">
-                <button class="sidebar-toggle-mobile" id="sidebarToggleMobile">
+                <button class="sidebar-toggle-mobile" id="sidebarToggleMobile" aria-label="Toggle menu">
                     <i class="fas fa-bars"></i>
                 </button>
                 <div class="page-title">
@@ -1011,7 +898,7 @@
             </div>
 
             <div class="navbar-actions">
-                <a href="#" class="user-profile" data-bs-toggle="dropdown">
+                <a href="#" class="user-profile" data-bs-toggle="dropdown" aria-expanded="false">
                     <div class="avatar-sm">
                         {% if user.is_authenticated and user.profile_picture %}
                             <img src="{{ user.profile_picture.url }}" alt="{{ user.get_full_name|default:user.username }}">
@@ -1023,21 +910,25 @@
                         <div class="user-name">{{ user.first_name|default:user.username }}</div>
                         <div class="user-role">{{ user.role|title }}</div>
                     </div>
-                    <i class="fas fa-chevron-down text-muted" style="font-size: 0.7rem; color: #000000 !important;"></i>
+                    <i class="fas fa-chevron-down" style="font-size: 0.7rem; color: #000 !important;"></i>
                 </a>
-                <ul class="dropdown-menu dropdown-menu-end" style="border: 2px solid #000000; border-radius: 4px;">
+                <ul class="dropdown-menu dropdown-menu-end" style="border: 2px solid #000; border-radius: 4px;">
                     <li><span class="dropdown-item-text">
-                        <strong style="color: #000000;">{{ user.first_name|default:user.username }}</strong>
-                        <br><small style="color: #000000;">{{ user.email }}</small>
+                        <strong style="color: #000;">{{ user.first_name|default:user.username }}</strong>
+                        <br><small style="color: #000;">{{ user.email }}</small>
                     </span></li>
-                    <li><hr class="dropdown-divider" style="border-top: 2px solid #000000;"></li>
-                    <li><a class="dropdown-item" href="/profile/" style="color: #000000; font-weight: 500;">
-                        <i class="fas fa-user-circle"></i> Profile
-                    </a></li>
-                    <li><hr class="dropdown-divider" style="border-top: 2px solid #000000;"></li>
-                    <li><a class="dropdown-item text-danger" href="/auth/logout/" style="font-weight: 600;">
-                        <i class="fas fa-sign-out-alt"></i> Logout
-                    </a></li>
+                    <li><hr class="dropdown-divider" style="border-top: 2px solid #000;"></li>
+                    <li>
+                        <a class="dropdown-item" href="/profile/" style="color: #000; font-weight: 500;">
+                            <i class="fas fa-user-circle"></i> Profile
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider" style="border-top: 2px solid #000;"></li>
+                    <li>
+                        <a class="dropdown-item text-danger" href="/auth/logout/" style="font-weight: 600;">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </a>
+                    </li>
                 </ul>
             </div>
         </nav>
@@ -1049,7 +940,7 @@
                     <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
                         <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-circle{% else %}info-circle{% endif %}"></i>
                         {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                 {% endfor %}
             {% endif %}
@@ -1068,222 +959,176 @@
         </footer>
     </div>
 
-    <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}" defer></script>
     <script>
         // ============================================================
-        // SIDEBAR COLLAPSE / EXPAND
+        // SAFE STORAGE — Tracking-Prevention-proof wrapper
         // ============================================================
-        const sidebar = document.getElementById('sidebar');
-        const mainContent = document.getElementById('mainContent');
-        const toggleBtn = document.getElementById('sidebarToggleBtn');
-        const toggleIcon = document.getElementById('toggleIcon');
-        const toggleText = document.getElementById('toggleText');
-
-        if (localStorage.getItem('sidebarCollapsed') === 'true') {
-            sidebar.classList.add('collapsed');
-            mainContent.classList.add('expanded');
-            toggleIcon.className = 'fas fa-chevron-right';
-            toggleText.textContent = 'Expand';
-        }
-
-        toggleBtn.addEventListener('click', function() {
-            sidebar.classList.toggle('collapsed');
-            mainContent.classList.toggle('expanded');
-            const isCollapsed = sidebar.classList.contains('collapsed');
-            toggleIcon.className = isCollapsed ? 'fas fa-chevron-right' : 'fas fa-chevron-left';
-            toggleText.textContent = isCollapsed ? 'Expand' : 'Collapse';
-            localStorage.setItem('sidebarCollapsed', isCollapsed);
-        });
-
-        // ============================================================
-        // SIDEBAR SCROLL PERSISTENCE
-        // ============================================================
-        (function () {
-            var wrapper = document.getElementById('sidebarNavWrapper');
-            if (!wrapper) return;
-
-            var STORAGE_KEY = 'kuku_sidebar_scroll_{{ user.id|default:"anon" }}';
-
-            function loadScroll() {
-                try { return localStorage.getItem(STORAGE_KEY); }
-                catch (e) { return null; }
+        const safeStorage = (function () {
+            const memory = Object.create(null);
+            let backing = null;
+            try {
+                const probe = '__kuku_probe__' + Math.random();
+                window.localStorage.setItem(probe, '1');
+                window.localStorage.removeItem(probe);
+                backing = window.localStorage;
+            } catch (e) {
+                backing = null; // blocked — use memory only
             }
-            function saveScroll(value) {
-                try { localStorage.setItem(STORAGE_KEY, value); }
-                catch (e) { /* localStorage unavailable */ }
-            }
+            return {
+                get(k) {
+                    try { return backing ? backing.getItem(k) : (memory[k] ?? null); }
+                    catch (e) { return memory[k] ?? null; }
+                },
+                set(k, v) {
+                    try {
+                        if (backing) backing.setItem(k, v);
+                        else memory[k] = v;
+                    } catch (e) { memory[k] = v; }
+                },
+                remove(k) {
+                    try {
+                        if (backing) backing.removeItem(k);
+                        else delete memory[k];
+                    } catch (e) { delete memory[k]; }
+                }
+            };
+        })();
 
-            var savedScroll = loadScroll();
-            if (savedScroll !== null) {
-                wrapper.scrollTop = parseInt(savedScroll, 10) || 0;
-            }
+        document.addEventListener('DOMContentLoaded', function () {
 
-            var activeLink = wrapper.querySelector('.nav-link.active');
-            if (activeLink) {
-                setTimeout(function () {
-                    activeLink.scrollIntoView({
-                        block: 'center',
-                        behavior: 'smooth'
-                    });
-                }, 50);
-            }
+            // ============================================================
+            // SIDEBAR COLLAPSE / EXPAND
+            // ============================================================
+            const sidebar     = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            const toggleBtn   = document.getElementById('sidebarToggleBtn');
+            const toggleIcon  = document.getElementById('toggleIcon');
+            const toggleText  = document.getElementById('toggleText');
 
-            var saveTimer = null;
-            wrapper.addEventListener('scroll', function () {
-                if (saveTimer) clearTimeout(saveTimer);
-                saveTimer = setTimeout(function () {
-                    saveScroll(wrapper.scrollTop);
-                }, 150);
-            });
+            if (sidebar && toggleBtn) {
+                if (safeStorage.get('sidebarCollapsed') === 'true') {
+                    sidebar.classList.add('collapsed');
+                    if (mainContent) mainContent.classList.add('expanded');
+                    if (toggleIcon) toggleIcon.className = 'fas fa-chevron-right';
+                    if (toggleText) toggleText.textContent = 'Expand';
+                }
 
-            window.addEventListener('beforeunload', function () {
-                saveScroll(wrapper.scrollTop);
-            });
-
-            wrapper.querySelectorAll('.nav-link').forEach(function (link) {
-                link.addEventListener('click', function () {
-                    saveScroll(wrapper.scrollTop);
+                toggleBtn.addEventListener('click', function () {
+                    sidebar.classList.toggle('collapsed');
+                    if (mainContent) mainContent.classList.toggle('expanded');
+                    const isCollapsed = sidebar.classList.contains('collapsed');
+                    if (toggleIcon) toggleIcon.className = isCollapsed ? 'fas fa-chevron-right' : 'fas fa-chevron-left';
+                    if (toggleText) toggleText.textContent = isCollapsed ? 'Expand' : 'Collapse';
+                    safeStorage.set('sidebarCollapsed', isCollapsed);
                 });
-            });
-        })();
-
-        // ============================================================
-        // MOBILE SIDEBAR
-        // ============================================================
-        const mobileToggle = document.getElementById('sidebarToggleMobile');
-        const overlay = document.getElementById('sidebarOverlay');
-
-        mobileToggle.addEventListener('click', function() {
-            sidebar.classList.toggle('mobile-open');
-            overlay.classList.toggle('active');
-        });
-
-        overlay.addEventListener('click', function() {
-            sidebar.classList.remove('mobile-open');
-            overlay.classList.remove('active');
-        });
-
-        window.addEventListener('resize', function() {
-            if (window.innerWidth > 992) {
-                sidebar.classList.remove('mobile-open');
-                overlay.classList.remove('active');
             }
-        });
 
-        // ============================================================
-        // CTRL+B SHORTCUT — toggle sidebar
-        // ============================================================
-        document.addEventListener('keydown', function(e) {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
-                e.preventDefault();
-                toggleBtn.click();
-            }
-        });
+            // ============================================================
+            // SIDEBAR SCROLL PERSISTENCE
+            // ============================================================
+            (function () {
+                var wrapper = document.getElementById('sidebarNavWrapper');
+                if (!wrapper) return;
 
-        // ============================================================
-        // SUPPORT MODE TIMER
-        // ============================================================
-        {% if is_support_mode %}
-        (function() {
-            const startedAtStr = "{{ request.session.support_started_at|default:'' }}";
-            const elapsedEl = document.getElementById('supportElapsed');
-            if (!elapsedEl || !startedAtStr) return;
-            const startedAt = new Date(startedAtStr);
-            function updateTimer() {
-                const now = new Date();
-                const diff = Math.floor((now - startedAt) / 1000);
-                if (diff < 0 || isNaN(diff)) { elapsedEl.textContent = '00:00'; return; }
-                const hours = Math.floor(diff / 3600);
-                const mins = Math.floor((diff % 3600) / 60);
-                const secs = diff % 60;
-                if (hours > 0) {
-                    elapsedEl.textContent = `${String(hours).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
-                } else {
-                    elapsedEl.textContent = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+                var STORAGE_KEY = 'kuku_sidebar_scroll_{{ user.id|default:"anon" }}';
+
+                var savedScroll = safeStorage.get(STORAGE_KEY);
+                if (savedScroll !== null) {
+                    wrapper.scrollTop = parseInt(savedScroll, 10) || 0;
                 }
-            }
-            updateTimer();
-            setInterval(updateTimer, 1000);
-        })();
-        {% endif %}
 
-        // ============================================================
-        // TENANT FEEDBACK WIDGET
-        // ============================================================
-        (function () {
-            const fab    = document.getElementById('fbFab');
-            const modal  = document.getElementById('fbModal');
-            const form   = document.getElementById('fbForm');
-            const btn    = document.getElementById('fbSubmit');
-            const msgBox = document.getElementById('fbMsg');
-            const urlInput = document.getElementById('fbPageUrl');
-
-            if (!fab || !modal) return;   // widget not rendered for this user
-
-            window.openFb = function () {
-                urlInput.value = window.location.href;
-                modal.classList.add('open');
-                document.body.style.overflow = 'hidden';
-            };
-            window.closeFb = function () {
-                modal.classList.remove('open');
-                document.body.style.overflow = '';
-                msgBox.innerHTML = '';
-            };
-
-            fab.addEventListener('click', window.openFb);
-            modal.addEventListener('click', function (e) {
-                if (e.target === modal) window.closeFb();
-            });
-            document.addEventListener('keydown', function (e) {
-                if (e.key === 'Escape' && modal.classList.contains('open')) {
-                    window.closeFb();
+                var activeLink = wrapper.querySelector('.nav-link.active');
+                if (activeLink) {
+                    setTimeout(function () {
+                        activeLink.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                    }, 50);
                 }
-            });
 
-            form.addEventListener('submit', async function (e) {
-                e.preventDefault();
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
-                msgBox.innerHTML = '';
+                var saveTimer = null;
+                wrapper.addEventListener('scroll', function () {
+                    if (saveTimer) clearTimeout(saveTimer);
+                    saveTimer = setTimeout(function () {
+                        safeStorage.set(STORAGE_KEY, wrapper.scrollTop);
+                    }, 150);
+                });
 
-                try {
-                    const fd = new FormData(form);
-                    const res = await fetch('{% url "companies:tenant-feedback-submit" %}', {
-                        method: 'POST',
-                        body: fd,
-                        headers: {'X-Requested-With': 'XMLHttpRequest'},
+                window.addEventListener('beforeunload', function () {
+                    safeStorage.set(STORAGE_KEY, wrapper.scrollTop);
+                });
+
+                wrapper.querySelectorAll('.nav-link').forEach(function (link) {
+                    link.addEventListener('click', function () {
+                        safeStorage.set(STORAGE_KEY, wrapper.scrollTop);
                     });
-                    const data = await res.json();
+                });
+            })();
 
-                    if (data.ok) {
-                        msgBox.innerHTML =
-                            '<div class="fb-toast ok">' +
-                            '<i class="fas fa-check"></i> Thank you! Your feedback has been sent.' +
-                            '</div>';
-                        form.reset();
-                        setTimeout(window.closeFb, 1500);
-                    } else {
-                        msgBox.innerHTML =
-                            '<div class="fb-toast err">' +
-                            '<i class="fas fa-exclamation-triangle"></i> ' +
-                            (data.error || 'Something went wrong.') + '</div>';
+            // ============================================================
+            // MOBILE SIDEBAR
+            // ============================================================
+            const mobileToggle = document.getElementById('sidebarToggleMobile');
+            const overlay      = document.getElementById('sidebarOverlay');
+
+            if (mobileToggle && sidebar && overlay) {
+                mobileToggle.addEventListener('click', function () {
+                    sidebar.classList.toggle('mobile-open');
+                    overlay.classList.toggle('active');
+                });
+
+                overlay.addEventListener('click', function () {
+                    sidebar.classList.remove('mobile-open');
+                    overlay.classList.remove('active');
+                });
+
+                window.addEventListener('resize', function () {
+                    if (window.innerWidth > 992) {
+                        sidebar.classList.remove('mobile-open');
+                        overlay.classList.remove('active');
                     }
-                } catch (err) {
-                    msgBox.innerHTML =
-                        '<div class="fb-toast err">' +
-                        'Network error. Please try again.</div>';
-                } finally {
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send';
+                });
+            }
+
+            // ============================================================
+            // CTRL+B SHORTCUT — toggle sidebar
+            // ============================================================
+            document.addEventListener('keydown', function (e) {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'b' && toggleBtn) {
+                    e.preventDefault();
+                    toggleBtn.click();
                 }
             });
-        })();
+
+            // ============================================================
+            // SUPPORT MODE TIMER
+            // ============================================================
+            {% if is_support_mode %}
+            (function () {
+                const startedAtStr = "{{ request.session.support_started_at|default:'' }}";
+                const elapsedEl = document.getElementById('supportElapsed');
+                if (!elapsedEl || !startedAtStr) return;
+
+                const startedAt = new Date(startedAtStr);
+                function updateTimer() {
+                    const now = new Date();
+                    const diff = Math.floor((now - startedAt) / 1000);
+                    if (diff < 0 || isNaN(diff)) { elapsedEl.textContent = '00:00'; return; }
+                    const hours = Math.floor(diff / 3600);
+                    const mins  = Math.floor((diff % 3600) / 60);
+                    const secs  = diff % 60;
+                    if (hours > 0) {
+                        elapsedEl.textContent = `${String(hours).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+                    } else {
+                        elapsedEl.textContent = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+                    }
+                }
+                updateTimer();
+                setInterval(updateTimer, 1000);
+            })();
+            {% endif %}
+        });
     </script>
 
-    {# ============================================ #}
-    {# AUTO-LOGOUT IDLE WARNING (30 min inactivity) #}
-    {# ============================================ #}
     {% if not is_support_mode %}
         {% include 'partials/idle_logout.html' %}
     {% endif %}

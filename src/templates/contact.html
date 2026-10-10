@@ -443,10 +443,18 @@
         .ff-content {
             flex-grow: 1;
             padding: 20px;
-            background: #fff;
+            background-color: #f0f4f7;
+            background-image: 
+                radial-gradient(circle, #c8d4dc 1px, transparent 1px),
+                radial-gradient(circle, #c8d4dc 1px, transparent 1px);
+            background-size: 7px 7px;
+            background-position: 0 0, 3.5px 3.5px;
             overflow-x: hidden;
         }
 
+        /* ============================================
+        CONTENT HEADER (With Scrolling Marquee)
+        ============================================ */
         .content-header {
             background: #f9f9f9;
             border: 1px solid var(--ff-border);
@@ -456,27 +464,55 @@
             justify-content: space-between;
             align-items: center;
             border-radius: 2px;
+            overflow: hidden; /* IMPORTANT: Keeps the scrolling text inside */
         }
+
         .content-header h1 {
             font-size: 18px;
             font-weight: 700;
             margin: 0;
             color: var(--nav-bg-bottom);
+            white-space: nowrap;
+            /* MARQUEE STYLES */
+            display: inline-block;
+            padding-left: 100%; /* Start off-screen right */
+            animation: headerMarquee 15s linear infinite;
+            will-change: transform;
         }
+
+        /* Pause on hover so users can read it */
+        .content-header:hover h1 {
+            animation-play-state: paused;
+        }
+
+        /* Right-to-left scroll keyframes */
+        @keyframes headerMarquee {
+            0% {
+                transform: translateX(0);
+            }
+            100% {
+                transform: translateX(-100%);
+            }
+        }
+
         .breadcrumb-custom {
             font-size: 11px;
             color: #666;
+            white-space: nowrap; /* Prevents breadcrumb from wrapping */
+            flex-shrink: 0;      /* Prevents breadcrumb from shrinking */
+            margin-left: 15px;
         }
         .breadcrumb-custom a {
             color: var(--ff-link);
             text-decoration: none;
         }
 
+
         .dashboard-panel {
             background: #fff;
             border: 1px solid var(--ff-border);
             margin-bottom: 25px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            box-shadow: 0 1px 3px rgb(0, 0, 0);
         }
         .panel-header {
             background: #e6e6e6;
@@ -925,11 +961,11 @@
             </a>
             {% if user.is_authenticated %}
             <a href="/dashboard/" class="ff-tool-item">
-                <div class="ff-tool-item-inner"><i class="fas fa-tachometer-alt"></i> <span>Dashboard</span></div>
+                <div class="ff-tool-item-inner"><i class="fas fa-tachometer-alt"></i> <span> Dashboard</span></div>
             </a>
             {% else %}
             <a href="/auth/login/" class="ff-tool-item">
-                <div class="ff-tool-item-inner"><i class="fas fa-sign-in-alt"></i> <span>Login</span></div>
+                <div class="ff-tool-item-inner"><i class="fas fa-sign-in-alt"></i> <span> Sign in</span></div>
             </a>
             {% endif %}
         </div>
@@ -959,7 +995,7 @@
                 {% if user.is_authenticated %}
                     <a href="/dashboard/"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
                 {% else %}
-                    <a href="/auth/login/"><i class="fas fa-user"></i> Login</a>
+                    <a href="/auth/login/"><i class="fas fa-user"></i> Sign in</a>
                 {% endif %}
             </div>
         </div>
@@ -1042,8 +1078,13 @@
 
         <main class="ff-content">
 
+            <!-- ============================================
+                RUNNING TEXT
+            ============================================ -->
             <div class="content-header">
+                <div style="flex-grow: 1; overflow: hidden; width: 100%;">
                 <h1>Contact {{ system_name|default:"RonoSystems" }}</h1>
+                </div>
                 <div class="breadcrumb-custom">
                     <a href="/">Home</a> &raquo; <span>Contact</span>
                 </div>

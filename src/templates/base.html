@@ -13,8 +13,8 @@
     {% endif %}
 
     <link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
+    <link rel="stylesheet" href="{% static 'vendor/fontawesome/css/all.min.css' %}">
+     
     <style>
         /* ============================================
            TENANT-THEMED CSS VARIABLES
@@ -27,9 +27,9 @@
             --sidebar-width: 280px;
             --sidebar-collapsed: 70px;
 
-            /* Per-tenant palette */
-            --primary-color: {{ site_primary_color|default:"#87CEEB" }};
-            --sidebar-bg: {{ site_accent_color|default:"#036a77" }};
+            /* Per-tenant palette — falls back to auth-page palette */
+            --primary-color: {{ site_primary_color|default:"#2d5f7c" }};
+            --sidebar-bg: {{ site_accent_color|default:"#1e4e6d" }};
 
             /* Derived shades — color-mix keeps them in sync with --sidebar-bg */
             --sidebar-hover: color-mix(in srgb, var(--sidebar-bg) 80%, #000);
@@ -192,7 +192,14 @@
             text-align: center;
             font-size: 1.1rem;
             flex-shrink: 0;
-            color: var(--primary-color);
+            /* Guarantee contrast on the dark sidebar regardless of tenant branding */
+            color: color-mix(in srgb, var(--primary-color) 55%, #ffffff);
+            transition: color 0.2s;
+        }
+
+        .sidebar-nav .nav-link:hover i,
+        .sidebar-nav .nav-link.active i {
+            color: #ffffff;
         }
 
         .sidebar-nav .nav-link .badge {
@@ -435,15 +442,17 @@
             color: #000000;
         }
 
-        .footer .copyright i { color: #fc019c; }
+        /* Copyright icon now uses the green accent from the auth pages */
+        .footer .copyright i { color: #7bc043; }
 
         .footer .powered-by {
             font-size: 0.85rem;
             color: #000000;
         }
 
+        /* Powered-by link now uses the standard link color from auth pages */
         .footer .powered-by a {
-            color: #008cff;
+            color: #2a6496;
             text-decoration: none;
             font-weight: 700;
         }
@@ -740,13 +749,11 @@
         .fb-toast.ok  { background: #d4edda; color: #155724; }
         .fb-toast.err { background: #f8d7da; color: #721c24; }
 
-
-
         /* ============================================
         AI CHATS — navbar button with corner badge
         ============================================ */
         .ai-chats-btn {
-            position: relative;              /* 👈 REQUIRED for badge to anchor */
+            position: relative;
             display: inline-flex !important;
             align-items: center;
             gap: 8px;
@@ -762,29 +769,31 @@
             transition: all 0.2s ease;
         }
 
+        /* Icon colour now matches the sidebar-bottom (nav-bg-bottom) */
         .ai-chats-btn i {
             font-size: 1rem;
-            color: #036a77;
+            color: #1e4e6d;
             transition: color 0.2s;
         }
 
         .ai-chats-btn:hover {
-            background: #036a77;
+            background: #1e4e6d;
             color: #fff !important;
             transform: translateY(-1px);
             box-shadow: 0 4px 10px rgba(0,0,0,0.15);
         }
         .ai-chats-btn:hover i { color: #fff; }
 
+        /* Active state now uses the nav-bg-top tone */
         .ai-chats-btn.active {
-            background: #87CEEB;
-            color: #000 !important;
+            background: #2d5f7c;
+            color: #fff !important;
         }
-        .ai-chats-btn.active i { color: #000; }
+        .ai-chats-btn.active i { color: #fff; }
 
         /* ---- Corner badge ---- */
         .ai-chats-badge {
-            position: absolute;              /* 👈 anchors to .ai-chats-btn */
+            position: absolute;
             top: -8px;
             right: -8px;
             min-width: 18px;
@@ -810,8 +819,6 @@
             .ai-chats-btn  { position: relative; }
             .ai-chats-badge { position: absolute; top: -8px; right: -8px; }
         }
-
-
 
         /* ============================================
            RESPONSIVE
@@ -1368,6 +1375,10 @@
         </div>
         {% endif %}
 
+
+        <!-- ============================================
+        TOP NAVBAR
+        ============================================ -->
         <nav class="top-navbar">
             <div class="d-flex align-items-center gap-3">
                 <button class="sidebar-toggle-mobile" id="sidebarToggleMobile">
@@ -1424,6 +1435,11 @@
             </div>
         </nav>
 
+
+
+    <!-- ============================================
+    CONTENT  AREA
+    ============================================ -->
         <div class="content-area">
             {% if messages %}
                 {% for message in messages %}
@@ -1438,6 +1454,10 @@
             {% block content %}{% endblock %}
         </div>
 
+
+    <!-- ============================================
+    FOOTER
+    ============================================ -->
         <footer class="footer">
             <div class="copyright">
                 <i class="fas fa-copyright"></i> {% now "Y" %}.
@@ -1449,10 +1469,70 @@
     </div>
 
 
+
+
+
+    <!-- ============================================ -->
+    <!-- JAVASCRIPT — load order matters!              -->
+    <!-- ============================================ -->
+
+    <!-- 1️⃣ Bootstrap JS bundle (dropdowns, modals, toasts, alerts) -->
     <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
+
+    <!-- 2️⃣ Chart.js (used only on reports page) -->
+    <script src="{% static 'vendor/chartjs/chart.umd.min.js' %}"></script>
+
+
     <script>
-        // Tenant-aware highlight color for the global search
-        const HIGHLIGHT_COLOR = "{{ site_primary_color|default:'#87CEEB' }}";
+
+        // ============================================================
+        // SAFE STORAGE — Tracking-Prevention-proof localStorage wrapper
+        // Falls back to in-memory store if browser blocks access.
+        // ============================================================
+        const safeStorage = (function () {
+            const memory = Object.create(null);
+            let backing = null;
+
+            // Probe once. If it throws, we never touch localStorage again.
+            try {
+                const probe = '__storage_probe__' + Math.random();
+                window.localStorage.setItem(probe, '1');
+                window.localStorage.removeItem(probe);
+                backing = window.localStorage;
+            } catch (e) {
+                backing = null;   // blocked — use memory only
+            }
+
+            return {
+                get(key) {
+                    try {
+                        return backing ? backing.getItem(key) : (memory[key] ?? null);
+                    } catch (e) {
+                        return memory[key] ?? null;
+                    }
+                },
+                set(key, value) {
+                    try {
+                        if (backing) backing.setItem(key, value);
+                        else memory[key] = value;
+                    } catch (e) {
+                        memory[key] = value;
+                    }
+                },
+                remove(key) {
+                    try {
+                        if (backing) backing.removeItem(key);
+                        else delete memory[key];
+                    } catch (e) {
+                        delete memory[key];
+                    }
+                }
+            };
+        })();
+
+
+        // Tenant-aware highlight color for the global search — fallback matches auth pages
+        const HIGHLIGHT_COLOR = "{{ site_primary_color|default:'#2d5f7c' }}";
 
         // ============================================================
         // SIDEBAR COLLAPSE / EXPAND
@@ -1463,7 +1543,20 @@
         const toggleIcon = document.getElementById('toggleIcon');
         const toggleText = document.getElementById('toggleText');
 
-        if (localStorage.getItem('sidebarCollapsed') === 'true') {
+        // ------------------------------------------------
+        // Safe localStorage helpers (tracking-protection proof)
+        // ------------------------------------------------
+        function safeGet(key) {
+            try { return localStorage.getItem(key); }
+            catch (e) { return null; }
+        }
+        function safeSet(key, value) {
+            try { localStorage.setItem(key, value); }
+            catch (e) { /* silently ignore */ }
+        }
+
+        // --- SIDEBAR COLLAPSE / EXPAND ---
+        if (safeGet('sidebarCollapsed') === 'true') {
             sidebar.classList.add('collapsed');
             mainContent.classList.add('expanded');
             toggleIcon.className = 'fas fa-chevron-right';
@@ -1476,7 +1569,7 @@
             const isCollapsed = sidebar.classList.contains('collapsed');
             toggleIcon.className = isCollapsed ? 'fas fa-chevron-right' : 'fas fa-chevron-left';
             toggleText.textContent = isCollapsed ? 'Expand' : 'Collapse';
-            localStorage.setItem('sidebarCollapsed', isCollapsed);
+            safeSet('sidebarCollapsed', isCollapsed);
         });
 
         // ============================================================
@@ -1489,14 +1582,11 @@
             var STORAGE_KEY = 'sidebar_scroll_{{ user.id|default:"anon" }}';
 
             function loadScroll() {
-                try { return localStorage.getItem(STORAGE_KEY); }
-                catch (e) { return null; }
+                return safeGet(STORAGE_KEY);
             }
             function saveScroll(value) {
-                try { localStorage.setItem(STORAGE_KEY, value); }
-                catch (e) { /* silently ignore */ }
+                safeSet(STORAGE_KEY, value);
             }
-
             var savedScroll = loadScroll();
             if (savedScroll !== null) {
                 wrapper.scrollTop = parseInt(savedScroll, 10) || 0;
