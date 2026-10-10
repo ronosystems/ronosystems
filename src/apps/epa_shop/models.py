@@ -789,6 +789,34 @@ class Sale(models.Model):
 
         super().save(*args, **kwargs)
 
+
+
+
+    @property
+    def short_sale_id(self):
+        """
+        Return only the numeric part of company_sale_id.
+            'FIE-000123'  →  '000123'
+            'ABC-000456'  →  '000456'
+        Falls back to the full string if no '-' is present.
+        """
+        if not self.company_sale_id:
+            return ''
+        return self.company_sale_id.split('-')[-1]
+
+    @property
+    def short_barcode(self):
+        """
+        Return barcode minus its leading 'BAR-' prefix.
+            'BAR-20261010-000123'  →  '20261010-000123'
+        Falls back to the full string if the prefix isn't present.
+        """
+        if not self.barcode_number:
+            return ''
+        prefix = 'BAR-'
+        if self.barcode_number.upper().startswith(prefix):
+            return self.barcode_number[len(prefix):]
+        return self.barcode_number
         
 
 class SaleItem(models.Model):

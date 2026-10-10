@@ -655,6 +655,9 @@ def api_sale_lookup(request):
             'id': sale.id,
             'company_sale_id': sale.company_sale_id,
             'barcode_number': sale.barcode_number,
+            # 👇 NEW — short display versions
+            'short_sale_id': sale.short_sale_id,
+            'short_barcode': sale.short_barcode,
 
             # ── Customer ──
             'customer_name': sale.customer_name,
