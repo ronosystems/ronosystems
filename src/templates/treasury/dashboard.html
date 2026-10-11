@@ -1,11 +1,135 @@
 {% extends base_template|default:"base.html" %}
-
 {% load static %}
 
-{% block title %} {{ company.name }}{% endblock %}
+{% block title %}{{ company.name }} - Treasury Dashboard{% endblock %}
 
 {% block extra_css %}
 <style>
+    /* ============================================
+       GLOBAL RESETS & VARIABLES
+    ============================================ */
+    :root {
+        --excel-border: #000000;
+        --excel-header-bg: #87CEEB;
+        --excel-hover: #f0f0f0;
+        --wallet-dark: #1a1e21;
+        --wallet-darker: #0f1113;
+        --wallet-accent: #87CEEB;
+        --wallet-green: #28a745;
+        --wallet-gold: #ffc107;
+        --card-radius: 12px;
+        --transition-speed: 0.25s;
+    }
+
+    * { box-sizing: border-box; }
+
+    /* ============================================
+       4-CARD SUMMARY GRID
+    ============================================ */
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        margin-bottom: 24px;
+    }
+
+    .summary-card {
+        position: relative;
+        background: linear-gradient(135deg, var(--wallet-dark) 0%, var(--wallet-darker) 100%);
+        border: 3px solid #000000;
+        border-radius: var(--card-radius);
+        padding: 20px 16px;
+        text-align: center;
+        color: #ffffff;
+        overflow: hidden;
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
+    }
+
+    .summary-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 26px rgba(0, 0, 0, 0.32);
+    }
+
+    .summary-card::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -30%;
+        width: 220px;
+        height: 220px;
+        border-radius: 50%;
+        background: rgba(135, 206, 235, 0.08);
+        pointer-events: none;
+        transition: transform 0.6s ease;
+    }
+
+    .summary-card:hover::before { transform: scale(1.15); }
+
+    .summary-card.total::before { background: rgba(135, 206, 235, 0.12); }
+    .summary-card.bank::before  { background: rgba(135, 206, 235, 0.10); }
+    .summary-card.mpesa::before { background: rgba(40, 167, 69, 0.10); }
+    .summary-card.cash::before  { background: rgba(255, 193, 7, 0.10); }
+
+    .summary-card .summary-icon {
+        width: 72px;
+        height: 72px;
+        margin: 0 auto 12px;
+        border-radius: 50%;
+        background: rgba(135, 206, 235, 0.12);
+        border: 2px solid rgba(135, 206, 235, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        z-index: 2;
+        transition: all 0.25s ease;
+    }
+
+    .summary-card:hover .summary-icon {
+        background: rgba(135, 206, 235, 0.22);
+        border-color: rgba(135, 206, 235, 0.6);
+    }
+
+    .summary-card .summary-icon i {
+        font-size: 2.1rem;
+        color: var(--wallet-accent);
+    }
+
+    .summary-card.mpesa .summary-icon i { color: var(--wallet-green); }
+    .summary-card.cash  .summary-icon i { color: var(--wallet-gold); }
+
+    .summary-card .summary-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 1.8px;
+        font-weight: 700;
+        color: rgba(255, 255, 255, 0.6);
+        margin-bottom: 6px;
+        position: relative;
+        z-index: 2;
+    }
+
+    .summary-card .summary-value {
+        font-size: 1.35rem;
+        font-weight: 800;
+        color: #ffffff;
+        line-height: 1.15;
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        position: relative;
+        z-index: 2;
+        letter-spacing: -0.5px;
+        word-break: break-word;
+    }
+
+    .summary-card .summary-value .currency {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--wallet-accent);
+        margin-right: 3px;
+        vertical-align: middle;
+    }
+
     /* ============================================
        EXCEL-LIKE TABLE STYLING
     ============================================ */
@@ -13,26 +137,25 @@
         border-collapse: collapse;
         width: 100%;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 13px;
     }
 
     .table-excel th,
     .table-excel td {
-        border-left: 1px solid #000000 !important;
-        border-right: 1px solid #000000 !important;
-        border-top: 1px solid #000000 !important;
-        border-bottom: 1px solid #000000 !important;
-        padding: 8px 12px;
+        border: 1px solid var(--excel-border) !important;
+        padding: 10px 14px;
         vertical-align: middle;
     }
 
     .table-excel thead th {
-        background-color: #87CEEB !important;
+        background-color: var(--excel-header-bg) !important;
         color: #000000 !important;
-        font-weight: 600;
-        border-bottom: 2px solid #000000 !important;
+        font-weight: 700;
+        border-bottom: 2px solid var(--excel-border) !important;
         position: sticky;
         top: 0;
         z-index: 10;
+        white-space: nowrap;
     }
 
     .table-excel tbody td {
@@ -40,231 +163,34 @@
         color: #000000;
     }
 
-    .table-excel tbody tr:hover td {
-        background-color: #f5f5f5;
-    }
-
-    .table-excel tbody tr:nth-child(even) td {
-        background-color: #f9f9f9;
-    }
-
-    .table-excel tbody tr:nth-child(even):hover td {
-        background-color: #f0f0f0;
-    }
-
-    /* ============================================
-       NET BALANCE HERO CARD - CENTERED
-    ============================================ */
-    .net-balance-hero {
-        background: linear-gradient(135deg, #2d3436 0%, #1a1e21 100%);
-        border: 3px solid #000000;
-        border-radius: 8px;
-        padding: 40px 30px;
-        text-align: center;
-        color: #ffffff;
-        position: relative;
-        overflow: hidden;
-        margin-bottom: 25px;
-        box-shadow: 0 6px 25px rgba(0,0,0,0.2);
-    }
-
-    .net-balance-hero::before {
-        content: '';
-        position: absolute;
-        top: -50%;
-        right: -20%;
-        width: 400px;
-        height: 400px;
-        background: rgba(135, 206, 235, 0.08);
-        border-radius: 50%;
-        pointer-events: none;
-    }
-
-    .net-balance-hero::after {
-        content: '';
-        position: absolute;
-        bottom: -30%;
-        left: -10%;
-        width: 300px;
-        height: 300px;
-        background: rgba(40, 167, 69, 0.08);
-        border-radius: 50%;
-        pointer-events: none;
-    }
-
-    .net-balance-hero .hero-icon {
-        font-size: 3rem;
-        color: #87CEEB;
-        margin-bottom: 10px;
-        display: block;
-        position: relative;
-        z-index: 1;
-    }
-
-    .net-balance-hero .hero-label {
-        font-size: 1rem;
-        color: rgba(255, 255, 255, 0.7);
-        text-transform: uppercase;
-        letter-spacing: 2px;
-        font-weight: 600;
-        margin-bottom: 10px;
-        position: relative;
-        z-index: 1;
-    }
-
-    .net-balance-hero .hero-amount {
-        font-size: 3.5rem;
-        font-weight: 800;
-        color: #ffffff;
-        margin: 0;
-        line-height: 1.1;
-        position: relative;
-        z-index: 1;
-        text-shadow: 0 2px 10px rgba(0,0,0,0.3);
-    }
-
-    .net-balance-hero .hero-subtitle {
-        font-size: 0.95rem;
-        color: rgba(255, 255, 255, 0.6);
-        margin-top: 10px;
-        position: relative;
-        z-index: 1;
-    }
-
-    .net-balance-hero .hero-currency {
-        font-size: 1.5rem;
-        font-weight: 600;
-        color: #87CEEB;
-        margin-right: 5px;
-    }
-
-    /* Breakdown Pills */
-    .balance-breakdown {
-        display: flex;
-        justify-content: center;
-        gap: 15px;
-        flex-wrap: wrap;
-        margin-top: 20px;
-        position: relative;
-        z-index: 1;
-    }
-
-    .balance-pill {
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 50px;
-        padding: 8px 20px;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        backdrop-filter: blur(10px);
-    }
-
-    .balance-pill i {
-        font-size: 1rem;
-    }
-
-    .balance-pill.bank i { color: #87CEEB; }
-    .balance-pill.mpesa i { color: #28a745; }
-    .balance-pill.cash i { color: #ffc107; }
-
-    .balance-pill .pill-label {
-        font-size: 0.75rem;
-        color: rgba(255, 255, 255, 0.7);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    .balance-pill .pill-value {
-        font-size: 0.95rem;
-        font-weight: 700;
-        color: #ffffff;
-    }
-
-    /* ============================================
-       STAT CARDS
-    ============================================ */
-    .stat-card {
-        border: 2px solid #000000;
-        border-radius: 4px;
-        transition: transform 0.2s;
-        cursor: default;
-    }
-    .stat-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    }
-    .stat-card.bg-primary {
-        background: #87CEEB !important;
-        color: #000000 !important;
-    }
-    .stat-card.bg-primary h3 {
-        color: #000000 !important;
-    }
-    .stat-card.bg-primary h6 {
-        color: #000000 !important;
-    }
-    .stat-card.bg-info {
-        background: #cce5ff !important;
-        color: #004085 !important;
-    }
-    .stat-card.bg-info h3 {
-        color: #004085 !important;
-    }
-    .stat-card.bg-info h6 {
-        color: #004085 !important;
-    }
-    .stat-card.bg-success {
-        background: #d4edda !important;
-        color: #155724 !important;
-    }
-    .stat-card.bg-success h3 {
-        color: #155724 !important;
-    }
-    .stat-card.bg-success h6 {
-        color: #155724 !important;
-    }
-    .stat-card.bg-warning {
-        background: #fff3cd !important;
-        color: #000000 !important;
-    }
-    .stat-card.bg-warning h3 {
-        color: #856404 !important;
-    }
-    .stat-card.bg-warning h6 {
-        color: #856404 !important;
-    }
-    .stat-card.bg-secondary {
-        background: #f8f9fa !important;
-        color: #000000 !important;
-        border-color: #000000;
-    }
+    .table-excel tbody tr:hover td { background-color: var(--excel-hover); }
+    .table-excel tbody tr:nth-child(even) td { background-color: #f9f9f9; }
+    .table-excel tbody tr:nth-child(even):hover td { background-color: #f0f0f0; }
 
     /* ============================================
        CARD STYLING
     ============================================ */
     .card {
         border: 2px solid #000000;
-        border-radius: 4px;
+        border-radius: 8px;
         box-shadow: none;
+        overflow: hidden;
     }
 
-    .card-body {
-        color: #000000;
-    }
+    .card-body { color: #000000; }
 
     .card-header {
-        background-color: #87CEEB !important;
+        background-color: var(--excel-header-bg) !important;
         border-bottom: 2px solid #000000;
-        padding: 12px 20px;
+        padding: 14px 20px;
         color: #000000 !important;
-        border-radius: 0 !important;
     }
 
     .card-header h5 {
         color: #000000 !important;
         font-weight: 700;
         margin: 0;
+        font-size: 1rem;
     }
 
     .card-header h5 i {
@@ -272,17 +198,53 @@
         margin-right: 8px;
     }
 
+    /* Card header with inline action buttons */
+    .card-header-flex {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .card-header-flex h5 {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+    }
+
+    .card-header-actions {
+        display: flex;
+        gap: 6px;
+        flex-shrink: 0;
+        flex-wrap: nowrap;
+    }
+
+    .card-header-actions .btn {
+        white-space: nowrap;
+        font-size: 12px;
+        padding: 5px 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
     /* ============================================
        BUTTONS
     ============================================ */
+    .btn {
+        border-radius: 6px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        font-size: 13px;
+        padding: 8px 16px;
+    }
+
     .btn-primary {
         background-color: #87CEEB;
         border: 2px solid #000000;
         color: #000000;
-        border-radius: 4px;
-        font-weight: 600;
     }
-
     .btn-primary:hover {
         background-color: #7bb8d8;
         border-color: #000000;
@@ -293,10 +255,7 @@
         background-color: #28a745;
         border: 2px solid #000000;
         color: #ffffff;
-        border-radius: 4px;
-        font-weight: 600;
     }
-
     .btn-success:hover {
         background-color: #218838;
         border-color: #000000;
@@ -307,10 +266,7 @@
         background-color: #87CEEB;
         border: 2px solid #000000;
         color: #000000;
-        border-radius: 4px;
-        font-weight: 600;
     }
-
     .btn-info:hover {
         background-color: #7bb8d8;
         border-color: #000000;
@@ -321,10 +277,7 @@
         background-color: #ffc107;
         border: 2px solid #000000;
         color: #000000;
-        border-radius: 4px;
-        font-weight: 600;
     }
-
     .btn-warning:hover {
         background-color: #e0a800;
         border-color: #000000;
@@ -335,10 +288,7 @@
         background-color: #f8f9fa;
         border: 2px solid #000000;
         color: #000000;
-        border-radius: 4px;
-        font-weight: 600;
     }
-
     .btn-secondary:hover {
         background-color: #87CEEB;
         border-color: #000000;
@@ -349,25 +299,18 @@
         background-color: #2d3436;
         border: 2px solid #000000;
         color: #ffffff;
-        border-radius: 4px;
-        font-weight: 600;
     }
-
     .btn-dark:hover {
         background-color: #1a1e21;
         border-color: #000000;
         color: #ffffff;
     }
 
-    /* Commission button — distinct purple so it stands out */
     .btn-commission {
         background-color: #6f42c1;
         border: 2px solid #000000;
         color: #ffffff;
-        border-radius: 4px;
-        font-weight: 600;
     }
-
     .btn-commission:hover {
         background-color: #5a32a3;
         border-color: #000000;
@@ -377,12 +320,20 @@
     .btn-outline-primary {
         border: 2px solid #000000;
         color: #000000;
-        border-radius: 4px;
-        font-weight: 600;
         background: transparent;
     }
-
     .btn-outline-primary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+
+    .btn-outline-secondary {
+        border: 2px solid #000000;
+        color: #000000;
+        background: transparent;
+    }
+    .btn-outline-secondary:hover {
         background-color: #87CEEB;
         border-color: #000000;
         color: #000000;
@@ -393,27 +344,34 @@
         font-size: 12px;
     }
 
-    /* Action button grid so buttons wrap nicely instead of squishing */
+    /* ============================================
+       ACTION BUTTON GRID
+    ============================================ */
     .action-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 8px;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 10px;
     }
 
     .action-grid .btn {
         width: 100%;
         text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
     }
 
     /* ============================================
        BADGES
     ============================================ */
     .badge {
-        padding: 4px 10px;
+        padding: 4px 12px;
         border-radius: 50px;
         font-size: 11px;
-        font-weight: 600;
+        font-weight: 700;
         border: 1px solid #000000;
+        letter-spacing: 0.3px;
     }
 
     .badge.bg-dark {
@@ -436,8 +394,9 @@
     ============================================ */
     .alert {
         border: 2px solid #000000;
-        border-radius: 4px;
+        border-radius: 8px;
         color: #000000;
+        font-size: 14px;
     }
 
     .alert.alert-warning {
@@ -446,172 +405,226 @@
     }
 
     /* ============================================
-       TEXT COLORS
+       TEXT HELPERS
     ============================================ */
-    .text-muted {
-        color: #000000 !important;
-    }
-    .text-center {
-        text-align: center;
+    .text-muted { color: #000000 !important; }
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+
+    /* ============================================
+       RESPONSIVE — TABLET (≤992px)
+    ============================================ */
+    @media (max-width: 992px) {
+        .summary-grid { gap: 10px; }
+        .summary-card { padding: 16px 10px; }
+        .summary-card .summary-icon {
+            width: 60px;
+            height: 60px;
+            margin-bottom: 10px;
+        }
+        .summary-card .summary-icon i { font-size: 1.7rem; }
+        .summary-card .summary-value { font-size: 1.15rem; }
+        .summary-card .summary-value .currency { font-size: 0.72rem; }
     }
 
     /* ============================================
-       RESPONSIVE
+       RESPONSIVE — MOBILE (≤768px)
     ============================================ */
     @media (max-width: 768px) {
-        .net-balance-hero {
-            padding: 25px 15px;
+        .summary-grid {
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+            margin-bottom: 18px;
         }
-        .net-balance-hero .hero-amount {
-            font-size: 2.2rem;
+        .summary-card {
+            padding: 12px 6px;
+            border-width: 2px;
+            border-radius: 8px;
         }
-        .net-balance-hero .hero-icon {
-            font-size: 2.2rem;
+        .summary-card .summary-icon {
+            width: 44px;
+            height: 44px;
+            margin-bottom: 6px;
+            border-width: 1.5px;
         }
-        .net-balance-hero .hero-label {
-            font-size: 0.85rem;
+        .summary-card .summary-icon i { font-size: 1.25rem; }
+        .summary-card .summary-label {
+            font-size: 0.55rem;
+            letter-spacing: 0.8px;
+            margin-bottom: 3px;
         }
-        .balance-breakdown {
-            gap: 8px;
+        .summary-card .summary-value {
+            font-size: 0.82rem;
+            letter-spacing: -0.2px;
         }
-        .balance-pill {
-            padding: 6px 14px;
-        }
-        .balance-pill .pill-value {
-            font-size: 0.85rem;
-        }
-        .table-excel th,
-        .table-excel td {
-            padding: 4px 6px;
-            font-size: 11px;
-        }
-        .table-excel th {
-            font-size: 10px;
-        }
-        .btn-sm {
-            font-size: 9px;
-            padding: 2px 6px;
-        }
-        .btn-sm i {
-            font-size: 10px;
-        }
-        .badge {
-            font-size: 9px;
-            padding: 2px 6px;
-        }
-        .card-header h5 {
-            font-size: 0.9rem;
-        }
+        .summary-card .summary-value .currency { font-size: 0.6rem; }
+
+        /* Action grid — one row (4 cols) */
         .action-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
+        }
+        .action-grid .btn {
+            font-size: 9px;
+            padding: 6px 4px;
+            flex-direction: column;
+            gap: 2px;
+            line-height: 1.1;
+            border-width: 1.5px;
+            border-radius: 5px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .action-grid .btn i { font-size: 12px; margin: 0; }
+
+        /* Table */
+        .table-excel { font-size: 11px; }
+        .table-excel th,
+        .table-excel td { padding: 6px 8px; }
+        .table-excel thead th { font-size: 10px; letter-spacing: 0.2px; }
+        .btn-sm { font-size: 10px; padding: 3px 8px; }
+        .badge { font-size: 9px; padding: 3px 8px; }
+
+        /* Card header with actions — stays one row */
+        .card-header h5 { font-size: 0.88rem; }
+        .card-header { padding: 10px 14px; }
+        .card-header-flex { gap: 6px; }
+        .card-header-actions { gap: 4px; }
+        .card-header-actions .btn {
+            font-size: 10px;
+            padding: 4px 8px;
         }
     }
 
+    /* ============================================
+       RESPONSIVE — SMALL MOBILE (≤480px)
+    ============================================ */
     @media (max-width: 480px) {
-        .net-balance-hero {
-            padding: 20px 10px;
+        .summary-grid {
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
         }
-        .net-balance-hero .hero-amount {
-            font-size: 1.8rem;
+        .summary-card {
+            padding: 10px 3px;
+            border-width: 1.5px;
+            border-radius: 6px;
         }
-        .net-balance-hero .hero-currency {
-            font-size: 1rem;
+        .summary-card .summary-icon {
+            width: 36px;
+            height: 36px;
+            margin-bottom: 5px;
+            border-width: 1px;
         }
-        .net-balance-hero .hero-icon {
-            font-size: 1.8rem;
+        .summary-card .summary-icon i { font-size: 1.05rem; }
+        .summary-card .summary-label {
+            font-size: 0.48rem;
+            letter-spacing: 0.5px;
+            margin-bottom: 2px;
         }
-        .balance-breakdown {
-            flex-direction: column;
-            gap: 6px;
+        .summary-card .summary-value {
+            font-size: 0.68rem;
+            letter-spacing: 0;
+            line-height: 1.1;
         }
-        .balance-pill {
-            width: 100%;
-            justify-content: center;
+        .summary-card .summary-value .currency {
+            font-size: 0.52rem;
+            display: block;
+            margin: 0 0 1px 0;
         }
+
+        /* Action grid — still one row (4 cols) */
+        .action-grid {
+            grid-template-columns: repeat(4, 1fr);
+            gap: 3px;
+        }
+        .action-grid .btn {
+            font-size: 7.5px;
+            padding: 5px 2px;
+            border-width: 1px;
+            gap: 1px;
+        }
+        .action-grid .btn i { font-size: 10px; }
+
+        /* Table */
+        .table-excel { font-size: 9px; }
         .table-excel th,
-        .table-excel td {
-            padding: 3px 4px;
-            font-size: 9px;
+        .table-excel td { padding: 4px 5px; }
+        .table-excel thead th { font-size: 8px; }
+        .btn-sm { font-size: 8px; padding: 2px 5px; }
+        .btn-sm i { font-size: 9px; }
+        .badge { font-size: 8px; padding: 2px 6px; }
+        .card-header h5 { font-size: 0.8rem; }
+        .card-header { padding: 8px 10px; }
+        .card-body { padding: 8px; }
+        .alert { font-size: 11px; padding: 8px 10px; }
+
+        /* Card header with actions — still one row, tighter */
+        .card-header-flex { gap: 4px; }
+        .card-header-actions { gap: 3px; }
+        .card-header-actions .btn {
+            font-size: 8.5px;
+            padding: 3px 6px;
+            gap: 2px;
         }
-        .table-excel th {
-            font-size: 8px;
-        }
-        .btn-sm {
-            font-size: 8px;
-            padding: 1px 4px;
-        }
-        .btn-sm i {
-            font-size: 8px;
-        }
-        .badge {
-            font-size: 8px;
-            padding: 1px 4px;
-        }
-        .card-header h5 {
-            font-size: 0.8rem;
-        }
-        .card-header {
-            padding: 8px 12px;
-        }
-        .btn {
-            font-size: 11px;
-            padding: 4px 8px;
-        }
-        .alert {
-            font-size: 12px;
-            padding: 10px;
-        }
-        .card-body {
-            padding: 10px;
-        }
+        .card-header-actions .btn i { font-size: 9px; }
     }
+
+    /* ============================================
+       SCROLLBAR (subtle)
+    ============================================ */
+    .table-responsive::-webkit-scrollbar { height: 6px; }
+    .table-responsive::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 3px;
+    }
+    .table-responsive::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 3px;
+    }
+    .table-responsive::-webkit-scrollbar-thumb:hover { background: #555; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid">
+<div class="container-fluid px-3 px-md-4 py-3">
 
     <!-- ============================================ -->
-    <!-- NET BALANCE HERO - CENTERED -->
+    <!-- 4-CARD SUMMARY ROW                            -->
     <!-- ============================================ -->
-    <div class="net-balance-hero">
-        <i class="fas fa-wallet hero-icon"></i>
-        <div class="hero-label">Total Available Net Balance</div>
-        <h1 class="hero-amount">
-            <span class="hero-currency">KES</span>{{ total_net|floatformat:2 }}
-        </h1>
-        <div class="hero-subtitle">
-            <i class="fas fa-chart-line"></i> Combined across all accounts and branches
+    <div class="summary-grid">
+        <div class="summary-card total">
+            <div class="summary-icon"><i class="fas fa-wallet"></i></div>
+            <div class="summary-label">Total Wallet</div>
+            <div class="summary-value">
+                <span class="currency">KES</span>{{ total_net|floatformat:2 }}
+            </div>
         </div>
-
-        <!-- Breakdown Pills -->
-        <div class="balance-breakdown">
-            <div class="balance-pill bank">
-                <i class="fas fa-university"></i>
-                <div>
-                    <div class="pill-label">Bank</div>
-                    <div class="pill-value">KES {{ total_bank|floatformat:2 }}</div>
-                </div>
+        <div class="summary-card bank">
+            <div class="summary-icon"><i class="fas fa-university"></i></div>
+            <div class="summary-label">Bank</div>
+            <div class="summary-value">
+                <span class="currency">KES</span>{{ total_bank|floatformat:2 }}
             </div>
-            <div class="balance-pill mpesa">
-                <i class="fas fa-mobile-alt"></i>
-                <div>
-                    <div class="pill-label">M-Pesa</div>
-                    <div class="pill-value">KES {{ total_mpesa|floatformat:2 }}</div>
-                </div>
+        </div>
+        <div class="summary-card mpesa">
+            <div class="summary-icon"><i class="fas fa-mobile-alt"></i></div>
+            <div class="summary-label">M-Pesa</div>
+            <div class="summary-value">
+                <span class="currency">KES</span>{{ total_mpesa|floatformat:2 }}
             </div>
-            <div class="balance-pill cash">
-                <i class="fas fa-money-bill-wave"></i>
-                <div>
-                    <div class="pill-label">Cash</div>
-                    <div class="pill-value">KES {{ total_cash|floatformat:2 }}</div>
-                </div>
+        </div>
+        <div class="summary-card cash">
+            <div class="summary-icon"><i class="fas fa-money-bill-wave"></i></div>
+            <div class="summary-label">Cash</div>
+            <div class="summary-value">
+                <span class="currency">KES</span>{{ total_cash|floatformat:2 }}
             </div>
         </div>
     </div>
 
     <!-- ============================================ -->
-    <!-- QUICK ACTIONS 1 -->
+    <!-- QUICK ACTIONS 1                              -->
     <!-- ============================================ -->
     <div class="row mt-3">
         <div class="col-12">
@@ -644,7 +657,7 @@
     </div>
 
     <!-- ============================================ -->
-    <!-- BRANCH DETAILS -->
+    <!-- BRANCH BALANCES TABLE                        -->
     <!-- ============================================ -->
     <div class="row mt-4">
         <div class="col-12">
@@ -659,7 +672,7 @@
                     </h5>
                 </div>
                 <div class="card-body p-0">
-                    <div class="table-responsive" style="border: 2px solid #000000;">
+                    <div class="table-responsive" style="border-top: 2px solid #000000;">
                         <table class="table-excel table-hover mb-0" id="treasuryTable">
                             <thead>
                                 <tr>
@@ -675,7 +688,7 @@
                                 {% for data in treasury_data %}
                                 <tr>
                                     <td><strong>{{ data.branch.name }}</strong></td>
-                                    <td class="text-right" style="color: #000000;">KES {{ data.treasury.total_bank_balance|floatformat:2 }}</td>
+                                    <td class="text-right">KES {{ data.treasury.total_bank_balance|floatformat:2 }}</td>
                                     <td class="text-right" style="color: #155724;">KES {{ data.treasury.total_mpesa_balance|floatformat:2 }}</td>
                                     <td class="text-right" style="color: #856404;">KES {{ data.treasury.cash_balance|floatformat:2 }}</td>
                                     <td class="text-right">
@@ -692,9 +705,9 @@
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="7" class="text-center">
-                                        <i class="fas fa-info-circle" style="color: #000000;"></i>
-                                        <span style="color: #000000;"> No branches found</span>
+                                    <td colspan="6" class="text-center py-4">
+                                        <i class="fas fa-info-circle"></i>
+                                        <span> No branches found</span>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -707,59 +720,208 @@
     </div>
 
     <!-- ============================================ -->
-    <!-- QUICK ACTIONS 2 -->
-    <!-- Now includes: Record Commission + View Commissions -->
+    <!-- DAILY RECORDS — LAST 5 ACROSS ALL BRANCHES   -->
     <!-- ============================================ -->
-    <div class="row mt-3">
-        <div class="col-12">
-            {% if branches %}
-                {% with first_branch=branches|first %}
-                <div class="action-grid">
-                    {% if user.role == 'company_admin' or user.role == 'super_admin' or user.role == 'company_manager' %}
-                    <a href="{% url 'treasury:bank_account_create' company.id first_branch.id %}" class="btn btn-info text-white">
-                        <i class="fas fa-university"></i> Add Bank Account
-                    </a>
-                    <a href="{% url 'treasury:mpesa_account_create' company.id first_branch.id %}" class="btn btn-warning text-white">
-                        <i class="fas fa-mobile-alt"></i> Add M-Pesa Account
-                    </a>
-                    <a href="{% url 'treasury:movement_create' company.id first_branch.id %}" class="btn btn-success">
-                        <i class="fas fa-exchange-alt"></i> Boost Mpesa / Transfer 
-                    </a>
-                    <a href="{% url 'treasury:movements_list' company.id first_branch.id %}" class="btn btn-dark">
-                        <i class="fas fa-history"></i> View Movements / History
-                    </a>
-                    {% endif %}
-                </div>
-                {% endwith %}
-            {% else %}
-                <div class="alert alert-warning mb-0">
-                    <i class="fas fa-exclamation-triangle"></i> No branches available.
-                </div>
-            {% endif %}
-        </div>
-    </div>
-
-    {% if user.role == 'company_admin' or user.role == 'super_admin' %}
-    <!-- ============================================ -->
-    <!-- RECENT MOVEMENTS -->
-    <!-- ============================================ -->
+    {% if user.role == 'company_admin' or user.role == 'super_admin' or user.role == 'company_manager' %}
     <div class="row mt-4">
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-history"></i> Boost / Transfer History</h5>
+                    <div class="card-header-flex">
+                        <h5><i class="fas fa-calendar-day"></i> Recent Daily Records</h5>
+                        <div class="card-header-actions">
+                            {% if branches %}
+                                {% with first_branch=branches|first %}
+                                <a href="{% url 'treasury:daily_record_create' company.id first_branch.id %}"
+                                   class="btn btn-sm btn-primary">
+                                    <i class="fas fa-plus"></i>
+                                    <span class="d-none d-sm-inline">New Record</span>
+                                </a>
+                                <a href="{% url 'treasury:daily_records_list' company.id first_branch.id %}"
+                                   class="btn btn-sm btn-secondary">
+                                    <i class="fas fa-list"></i>
+                                    <span class="d-none d-sm-inline">View All</span>
+                                </a>
+                                {% endwith %}
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body p-0">
-                    <div class="table-responsive" style="border: 2px solid #000000;">
-                        <table class="table-excel table-sm mb-0" id="movementsTable">
+                    <div class="table-responsive" style="border-top: 2px solid #000000;">
+                        <table class="table-excel table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 14%;">Date</th>
+                                    <th style="width: 14%;">Branch</th>
+                                    <th style="width: 12%;" class="text-right">Bank</th>
+                                    <th style="width: 12%;" class="text-right">M-Pesa</th>
+                                    <th style="width: 12%;" class="text-right">Cash</th>
+                                    <th style="width: 14%;" class="text-right">Net</th>
+                                    <th style="width: 12%;">Submitted By</th>
+                                    <th style="width: 10%;" class="text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for record in recent_daily_records %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ record.date|date:"Y-m-d" }}</strong>
+                                        <br>
+                                        <small>{{ record.date|date:"D" }}</small>
+                                    </td>
+                                    <td>{{ record.branch.name }}</td>
+                                    <td class="text-right">KES {{ record.total_bank_balance|floatformat:2 }}</td>
+                                    <td class="text-right" style="color: #155724;">KES {{ record.total_mpesa_balance|floatformat:2 }}</td>
+                                    <td class="text-right" style="color: #856404;">KES {{ record.cash_balance|floatformat:2 }}</td>
+                                    <td class="text-right">
+                                        <span class="badge bg-dark">KES {{ record.net_balance|floatformat:2 }}</span>
+                                    </td>
+                                    <td>
+                                        {% if record.created_by %}
+                                            {{ record.created_by.get_full_name|default:record.created_by.username }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if record.is_approved %}
+                                            <span class="badge bg-success">Approved</span>
+                                        {% else %}
+                                            <span class="badge bg-info">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="8" class="text-center py-4">
+                                        <i class="fas fa-info-circle"></i>
+                                        <span> No daily records yet</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ============================================ -->
+    <!-- M-PESA COMMISSIONS — LAST 5 ACROSS ALL BRANCHES -->
+    <!-- ============================================ -->
+    {% if user.role == 'company_admin' or user.role == 'super_admin' %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-header-flex">
+                        <h5><i class="fas fa-hand-holding-usd"></i> Recent Commissions</h5>
+                        <div class="card-header-actions">
+                            {% if branches %}
+                                {% with first_branch=branches|first %}
+                                <a href="{% url 'treasury:commission_create' company.id first_branch.id %}"
+                                   class="btn btn-sm btn-commission">
+                                    <i class="fas fa-plus"></i>
+                                    <span class="d-none d-sm-inline">Record</span>
+                                </a>
+                                <a href="{% url 'treasury:commissions_list' company.id first_branch.id %}"
+                                   class="btn btn-sm btn-secondary">
+                                    <i class="fas fa-list"></i>
+                                    <span class="d-none d-sm-inline">View All</span>
+                                </a>
+                                {% endwith %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="border-top: 2px solid #000000;">
+                        <table class="table-excel table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 18%;">Month</th>
+                                    <th style="width: 18%;">Branch</th>
+                                    <th style="width: 22%;" class="text-right">Commission</th>
+                                    <th style="width: 22%;">Recorded By</th>
+                                    <th style="width: 20%;">Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for commission in recent_commissions_all %}
+                                <tr>
+                                    <td><strong>{{ commission.month|date:"F Y" }}</strong></td>
+                                    <td>{{ commission.branch.name }}</td>
+                                    <td class="text-right">
+                                        <span class="badge bg-success">KES {{ commission.amount|floatformat:2 }}</span>
+                                    </td>
+                                    <td>
+                                        {% if commission.recorded_by %}
+                                            {{ commission.recorded_by.get_full_name|default:commission.recorded_by.username }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ commission.created_at|date:"Y-m-d H:i" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-4">
+                                        <i class="fas fa-info-circle"></i>
+                                        <span> No commissions recorded yet</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ============================================ -->
+    <!-- BOOST / TRANSFER — LAST 5 ACROSS ALL BRANCHES -->
+    <!-- ============================================ -->
+    {% if user.role == 'company_admin' or user.role == 'super_admin' %}
+    <div class="row mt-4 mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-header-flex">
+                        <h5><i class="fas fa-history"></i> Recent Boost / Transfers</h5>
+                        <div class="card-header-actions">
+                            {% if branches %}
+                                {% with first_branch=branches|first %}
+                                <a href="{% url 'treasury:movement_create' company.id first_branch.id %}"
+                                   class="btn btn-sm btn-success">
+                                    <i class="fas fa-plus"></i>
+                                    <span class="d-none d-sm-inline">New</span>
+                                </a>
+                                <a href="{% url 'treasury:movements_list' company.id first_branch.id %}"
+                                   class="btn btn-sm btn-secondary">
+                                    <i class="fas fa-list"></i>
+                                    <span class="d-none d-sm-inline">View All</span>
+                                </a>
+                                {% endwith %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="border-top: 2px solid #000000;">
+                        <table class="table-excel table-hover mb-0" id="movementsTable">
                             <thead>
                                 <tr>
                                     <th style="width: 15%;">Branch</th>
                                     <th style="width: 12%;">Type</th>
-                                    <th style="width: 18%;">From</th>
-                                    <th style="width: 18%;">To</th>
-                                    <th style="width: 17%;" class="text-right">Amount</th>
-                                    <th style="width: 20%;">Time</th>
+                                    <th style="width: 16%;">From</th>
+                                    <th style="width: 16%;">To</th>
+                                    <th style="width: 16%;" class="text-right">Amount</th>
+                                    <th style="width: 25%;">Time</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -776,13 +938,13 @@
                                     <td>{{ movement.get_from_account_display }}</td>
                                     <td>{{ movement.get_to_account_display }}</td>
                                     <td class="text-right" style="color: #155724;">KES {{ movement.amount|floatformat:2 }}</td>
-                                    <td>{{ movement.created_at|date:"H:i" }}</td>
+                                    <td>{{ movement.created_at|date:"Y-m-d H:i" }}</td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="6" class="text-center">
-                                        <i class="fas fa-info-circle" style="color: #000000;"></i>
-                                        <span style="color: #000000;"> No boosts or transfers yet</span>
+                                    <td colspan="6" class="text-center py-4">
+                                        <i class="fas fa-info-circle"></i>
+                                        <span> No boosts or transfers yet</span>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -794,5 +956,37 @@
         </div>
     </div>
     {% endif %}
+
+    <!-- ============================================ -->
+    <!-- QUICK ACTIONS 2                              -->
+    <!-- ============================================ -->
+    <div class="row mt-3">
+        <div class="col-12">
+            {% if branches %}
+                {% with first_branch=branches|first %}
+                <div class="action-grid">
+                    {% if user.role == 'company_admin' or user.role == 'super_admin' or user.role == 'company_manager' %}
+                    <a href="{% url 'treasury:bank_account_create' company.id first_branch.id %}" class="btn btn-info">
+                        <i class="fas fa-university"></i> Add Bank Account
+                    </a>
+                    <a href="{% url 'treasury:mpesa_account_create' company.id first_branch.id %}" class="btn btn-warning">
+                        <i class="fas fa-mobile-alt"></i> Add M-Pesa Account
+                    </a>
+                    <a href="{% url 'treasury:movement_create' company.id first_branch.id %}" class="btn btn-success">
+                        <i class="fas fa-exchange-alt"></i> Boost Mpesa / Transfer
+                    </a>
+                    <a href="{% url 'treasury:movements_list' company.id first_branch.id %}" class="btn btn-dark">
+                        <i class="fas fa-history"></i> View Movements / History
+                    </a>
+                    {% endif %}
+                </div>
+                {% endwith %}
+            {% else %}
+                <div class="alert alert-warning mb-0">
+                    <i class="fas fa-exclamation-triangle"></i> No branches available.
+                </div>
+            {% endif %}
+        </div>
+    </div>
 </div>
 {% endblock %}

@@ -145,6 +145,8 @@ def branch_access_required(view_func):
     return _wrapped_view
 
 
+
+
 # ============================================
 # TREASURY DASHBOARD
 # ============================================
@@ -156,63 +158,61 @@ def treasury_dashboard(request, company_id=None):
     company = get_user_company(request, company_id)
     if not company:
         return redirect('dashboard')
-    
+
     # Get the user's branch
     user_branch = get_user_branch(request.user)
-    
+
     # Determine which branches to show
-    branches = None
-    
     # Super admin and company admin can see all branches
     if request.user.role in ['super_admin', 'company_admin']:
         branches = Branch.objects.filter(company=company, is_active=True)
     else:
         # Other roles can only see their own branch
         if user_branch:
-            branches = Branch.objects.filter(id=user_branch.id, company=company, is_active=True)
+            branches = Branch.objects.filter(
+                id=user_branch.id, company=company, is_active=True
+            )
         else:
             branches = Branch.objects.none()
             messages.warning(request, 'You are not assigned to any branch.')
-    
-    # Get treasury data for the filtered branches
+
+    # ============================================
+    # PER-BRANCH TREASURY DATA
+    # ============================================
     treasury_data = []
     total_net = 0
-    
+
     for branch in branches:
-        treasury, created = Treasury.objects.get_or_create(
+        treasury, _ = Treasury.objects.get_or_create(
             company=company,
             branch=branch
         )
-        
-        # Get today's record
+
         today_record = DailyRecord.objects.filter(
             company=company,
             branch=branch,
             date=timezone.now().date()
         ).first()
-        
-        # Get recent movements (last 5)
+
         recent_movements = Movement.objects.filter(
             company=company,
             branch=branch
         ).order_by('-created_at')[:5]
-        
-        # Get bank accounts with their current balances
+
         bank_accounts = BankAccount.objects.filter(
             company=company,
             branch=branch,
             is_active=True
         )
-        
-        # Get M-Pesa accounts with their current balances
+
         mpesa_accounts = MpesaAccount.objects.filter(
             company=company,
             branch=branch,
             is_active=True
         )
-        
+
         total_net += treasury.net_balance
-        
+
         treasury_data.append({
             'branch': branch,
             'treasury': treasury,
@@ -221,22 +221,46 @@ def treasury_dashboard(request, company_id=None):
             'bank_accounts': bank_accounts,
             'mpesa_accounts': mpesa_accounts,
         })
-    
-    # Get overall company totals (only for branches the user can see)
+
+    # ============================================
+    # COMPANY TOTALS (only for visible branches)
+    # ============================================
     total_bank = sum(t['treasury'].total_bank_balance for t in treasury_data)
     total_mpesa = sum(t['treasury'].total_mpesa_balance for t in treasury_data)
     total_cash = sum(t['treasury'].cash_balance for t in treasury_data)
     total_credit = sum(t['treasury'].credit_balance for t in treasury_data)
-    
-    # Get recent movements across all visible branches
-    recent_movements_all = Movement.objects.filter(
-        company=company,
-        branch__in=branches
-    ).order_by('-created_at')[:10]
-    
+
+    # ============================================
+    # RECENT TABLES — LAST 5 ACROSS VISIBLE BRANCHES
+    # ============================================
+
+    # Recent movements (last 5)
+    recent_movements_all = (
+        Movement.objects
+        .filter(company=company, branch__in=branches)
+        .select_related('branch')
+        .order_by('-created_at')[:5]
+    )
+
+    # Recent daily records (last 5)
+    recent_daily_records = (
+        DailyRecord.objects
+        .filter(company=company, branch__in=branches)
+        .select_related('branch', 'created_by', 'approved_by')
+        .order_by('-date', '-created_at')[:5]
+    )
+
+    # Recent M-Pesa commissions (last 5)
+    recent_commissions_all = (
+        MpesaCommission.objects
+        .filter(company=company, branch__in=branches)
+        .select_related('branch', 'recorded_by')
+        .order_by('-month', '-created_at')[:5]
+    )
+
     # Determine if user is admin
     is_admin = request.user.role in ['super_admin', 'company_admin']
-    
+
     context = {
         'company': company,
         'branches': branches,
@@ -246,14 +270,19 @@ def treasury_dashboard(request, company_id=None):
         'total_cash': total_cash,
         'total_credit': total_credit,
         'total_net': total_net,
-        'recent_movements_all': recent_movements_all,
+        'recent_movements_all': recent_movements_all,          # last 5
+        'recent_daily_records': recent_daily_records,          # NEW — last 5
+        'recent_commissions_all': recent_commissions_all,      # NEW — last 5
         'today': timezone.now().date(),
         'is_admin': is_admin,
         'is_agent': is_agent(request.user),
         'user_branch': user_branch,
-        'show_all_branches': is_admin,  # Flag to show/hide all branches in template
+        'show_all_branches': is_admin,
     }
     return render(request, 'treasury/dashboard.html', context)
+    
+
+
 
 # ============================================
 # BRANCH TREASURY VIEW
