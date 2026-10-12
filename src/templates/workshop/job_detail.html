@@ -1,0 +1,1352 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ job.job_number }} {% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       DIAGONAL TAB BAR (module-level)
+    ============================================ */
+    .ws-tabbar {
+        display: flex;
+        align-items: flex-end;
+        gap: 0;
+        padding: 18px 0 0;
+        margin-bottom: 0;
+        background: transparent;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        border-bottom: 3px solid #1e4e6d;
+        position: relative;
+    }
+    .ws-tabbar::-webkit-scrollbar { height: 4px; }
+    .ws-tabbar::-webkit-scrollbar-thumb { background: #87CEEB; border-radius: 4px; }
+
+    .ws-tab {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 22px 11px 26px;
+        margin-right: 4px;
+        background: #1e4e6d;
+        color: rgba(255,255,255,0.85) !important;
+        text-decoration: none !important;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+        transform: skewX(-14deg);
+        transition: background 0.15s, color 0.15s;
+        border-top: 2px solid #000;
+        border-left: 2px solid #000;
+        border-right: 2px solid #000;
+        border-radius: 6px 6px 0 0;
+        height: 40px;
+        margin-top: 4px;
+    }
+    .ws-tab > * {
+        display: inline-block;
+        transform: skewX(14deg);
+    }
+    .ws-tab:hover {
+        background: #2d5f7c;
+        color: #ffffff !important;
+    }
+    .ws-tab.active {
+        background: #ffffff;
+        color: #000000 !important;
+        height: 46px;
+        padding-top: 13px;
+        padding-bottom: 13px;
+        margin-top: 0;
+        z-index: 2;
+    }
+    .ws-tab.active i { color: #022ceb; }
+    .ws-tab i {
+        font-size: 13px;
+        color: #87CEEB;
+        transition: color 0.15s;
+    }
+    .ws-tab:hover i { color: #ffffff; }
+
+    .ws-tab.active::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -3px;
+        height: 3px;
+        background: #7bc043;
+        transform: skewX(14deg);
+        transform-origin: left bottom;
+    }
+
+    /* Sub-strip */
+    .ws-substrip {
+        background: #f0f7ff;
+        border: 2px solid #1e4e6d;
+        border-top: none;
+        border-radius: 0 0 4px 4px;
+        padding: 8px 16px;
+        font-size: 12px;
+        color: #000;
+        margin-bottom: 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .ws-substrip strong { color: #022ceb; }
+    .ws-substrip .sub-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .ws-substrip .sub-btn {
+        background: #ffffff;
+        border: 2px solid #000;
+        color: #000;
+        font-weight: 600;
+        font-size: 11px;
+        padding: 4px 10px;
+        border-radius: 4px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        white-space: nowrap;
+    }
+    .ws-substrip .sub-btn:hover {
+        background: #000;
+        color: #fff;
+    }
+
+    /* ============================================
+       JOB TITLE CARD
+    ============================================ */
+    .job-title-card {
+        background: #ffffff;
+        border: 2px solid #000000;
+        border-top: none;
+        padding: 14px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .job-title-card .job-num {
+        font-size: 12px;
+        color: #022ceb;
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+    .job-title-card h2 {
+        font-size: 1.35rem;
+        font-weight: 700;
+        margin: 2px 0 0;
+        color: #000000;
+    }
+    .job-title-card .job-sub {
+        font-size: 12px;
+        color: #666;
+        margin-top: 2px;
+    }
+    .job-title-card .actions {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+    .btn-outline-dark {
+        background: #ffffff;
+        border: 2px solid #000000;
+        color: #000000;
+        font-weight: 600;
+        font-size: 12px;
+        padding: 5px 14px;
+        border-radius: 4px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+    }
+    .btn-outline-dark:hover {
+        background: #000000;
+        color: #ffffff;
+    }
+
+    /* ============================================
+       STATUS STRIP
+    ============================================ */
+    .status-strip {
+        background: #ffffff;
+        border: 2px solid #000000;
+        border-top: none;
+        border-radius: 0 0 4px 4px;
+        padding: 10px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+    .status-pill {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        border: 1px solid #000000;
+    }
+    .status-pill.received           { background: #e7f1ff; color: #004085; }
+    .status-pill.diagnosed          { background: #cce5ff; color: #004085; }
+    .status-pill.awaiting_approval  { background: #fff3cd; color: #856404; }
+    .status-pill.approved           { background: #d1ecf1; color: #0c5460; }
+    .status-pill.in_progress        { background: #ffd6a5; color: #7d3c00; }
+    .status-pill.on_hold            { background: #f8d7da; color: #721c24; }
+    .status-pill.completed          { background: #d4edda; color: #155724; }
+    .status-pill.delivered          { background: #c3e6cb; color: #0a4d0a; }
+    .status-pill.cancelled          { background: #f1f1f1; color: #4d4d4d; }
+    .status-pill.unrepairable       { background: #f8d7da; color: #721c24; }
+
+    .priority-badge {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 50px;
+        border: 1px solid #000;
+    }
+    .priority-badge.urgent { background: #f8d7da; color: #721c24; }
+    .priority-badge.high   { background: #fff3cd; color: #856404; }
+    .priority-badge.normal { background: #e7f1ff; color: #004085; }
+    .priority-badge.low    { background: #f1f1f1; color: #4d4d4d; }
+
+    /* ============================================
+       INNER TAB NAV (Summary / Materials / ...)
+    ============================================ */
+    .tab-nav {
+        display: flex;
+        background: #ffffff;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin-bottom: 14px;
+    }
+    .tab-nav::-webkit-scrollbar { height: 4px; }
+    .tab-nav::-webkit-scrollbar-thumb { background: #87CEEB; border-radius: 4px; }
+
+    .tab-btn {
+        flex: 1 0 auto;
+        background: none;
+        border: none;
+        border-bottom: 3px solid transparent;
+        padding: 10px 16px;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        color: #666;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: all 0.15s;
+    }
+    .tab-btn:hover { color: #022ceb; background: #f8f9fa; }
+    .tab-btn.active {
+        color: #022ceb;
+        border-bottom-color: #022ceb;
+        background: #f0f7ff;
+    }
+    .tab-btn i { margin-right: 6px; }
+
+    /* ============================================
+       CARD
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 10px 16px;
+        color: #000000 !important;
+        border-radius: 0 !important;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .card-header h6 {
+        color: #000000 !important;
+        font-weight: 700;
+        margin: 0;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+    }
+    .card-body { color: #000000; }
+
+    /* ============================================
+       INFO GRID
+    ============================================ */
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    .info-row {
+        display: flex;
+        flex-direction: column;
+        padding: 10px 12px;
+        border-bottom: 1px solid #e0e0e0;
+        border-right: 1px solid #e0e0e0;
+        background: #ffffff;
+        min-width: 0;
+    }
+    .info-row:nth-child(even) { border-right: none; }
+    .info-row .k {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: #666;
+        margin-bottom: 3px;
+    }
+    .info-row .v {
+        font-size: 13px;
+        font-weight: 500;
+        color: #000000;
+        word-break: break-word;
+    }
+    .info-row .v.empty { color: #999; font-style: italic; font-weight: 400; }
+
+    /* ============================================
+       MONEY BOXES
+    ============================================ */
+    .money-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+    }
+    .money-box {
+        background: #f8f9fa;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 10px 12px;
+    }
+    .money-box .lbl {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: #666;
+    }
+    .money-box .val {
+        font-size: 18px;
+        font-weight: 700;
+        color: #000000;
+        line-height: 1.2;
+        margin-top: 4px;
+    }
+    .money-box.success { background: #d4edda; }
+    .money-box.success .val { color: #155724; }
+    .money-box.danger  { background: #f8d7da; }
+    .money-box.danger .val { color: #721c24; }
+
+    /* ============================================
+       TABLE (materials / payments)
+    ============================================ */
+    .mini-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+    .mini-table th {
+        background: #f8f9fa;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        padding: 8px 10px;
+        text-align: left;
+        border-bottom: 2px solid #000000;
+        color: #000000;
+    }
+    .mini-table td {
+        padding: 9px 10px;
+        border-bottom: 1px solid #e0e0e0;
+        vertical-align: middle;
+    }
+    .mini-table tr:last-child td { border-bottom: none; }
+    .mini-table tr:hover td { background: #f8f8f8; }
+    .mini-table .num { text-align: right; font-weight: 600; }
+    .mini-table .muted { color: #666; font-size: 11px; }
+
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-sky {
+        background: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        font-weight: 600;
+        font-size: 12px;
+        padding: 5px 14px;
+        border-radius: 4px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+    }
+    .btn-sky:hover {
+        background: #7bb8d8;
+        color: #000000;
+    }
+    .btn-green {
+        background: #28a745;
+        border: 2px solid #000000;
+        color: #ffffff;
+        font-weight: 600;
+        font-size: 12px;
+        padding: 5px 14px;
+        border-radius: 4px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+    }
+    .btn-green:hover {
+        background: #1e7e34;
+        color: #ffffff;
+    }
+    .btn-icon {
+        width: 28px;
+        height: 28px;
+        border-radius: 4px;
+        border: 2px solid #000000;
+        background: #ffffff;
+        color: #000000;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        font-size: 11px;
+        transition: background 0.15s, color 0.15s;
+    }
+    .btn-icon:hover { background: #87CEEB; color: #000000; }
+    .btn-icon.danger:hover { background: #dc3545; color: #ffffff; }
+
+    /* ============================================
+       STATUS CHANGE FORM
+    ============================================ */
+    .status-form {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    .status-form select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 12px;
+        padding: 5px 10px;
+        font-weight: 600;
+    }
+    .status-form select:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+
+    /* ============================================
+       NOTE / PAYMENT CARDS
+    ============================================ */
+    .note-card {
+        background: #ffffff;
+        border: 2px solid #e0e0e0;
+        border-radius: 4px;
+        padding: 10px 14px;
+        margin-bottom: 8px;
+    }
+    .note-card.public { border-color: #87CEEB; }
+    .note-body { font-size: 13px; color: #000000; }
+    .note-meta {
+        font-size: 11px;
+        color: #666;
+        margin-top: 6px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .pay-method {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        padding: 2px 8px;
+        border-radius: 50px;
+        border: 1px solid #000000;
+        background: #f0f0f0;
+    }
+    .pay-method.cash            { background: #d4edda; color: #155724; }
+    .pay-method.mpesa_till      { background: #e7f1ff; color: #004085; }
+    .pay-method.mpesa_withdrawal{ background: #e7f1ff; color: #004085; }
+    .pay-method.bank_transfer   { background: #fff3cd; color: #856404; }
+    .pay-method.card            { background: #cce5ff; color: #004085; }
+
+    /* ============================================
+       PAYOUT BANNER
+    ============================================ */
+    .payout-banner {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 14px 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .payout-banner.pending { background: #fff3cd; }
+    .payout-banner.paid    { background: #d4edda; }
+    .payout-banner.cancelled { background: #f1f1f1; }
+
+    .payout-amount {
+        font-size: 24px;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    /* ============================================
+       TAB PANEL
+    ============================================ */
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ============================================
+       EMPTY STATE
+    ============================================ */
+    .empty-mini {
+        text-align: center;
+        padding: 30px 16px;
+        color: #666;
+    }
+    .empty-mini i {
+        font-size: 1.8rem;
+        color: #87CEEB;
+        display: block;
+        margin-bottom: 8px;
+    }
+    .empty-mini p { font-size: 12px; margin: 0; }
+
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .ws-tabbar { padding: 14px 0 0; }
+        .ws-tab {
+            padding: 9px 16px 9px 20px;
+            font-size: 12px;
+            height: 36px;
+        }
+        .ws-tab.active {
+            height: 42px;
+            padding-top: 11px;
+            padding-bottom: 11px;
+        }
+        .ws-tab i { font-size: 12px; }
+
+        .job-title-card { padding: 12px 14px; }
+        .job-title-card h2 { font-size: 1.1rem; }
+        .job-title-card .actions { width: 100%; }
+        .job-title-card .actions .btn-outline-dark { flex: 1; justify-content: center; }
+
+        .status-strip { padding: 10px 14px; }
+        .status-strip > div:first-child { width: 100%; }
+
+        .info-grid { grid-template-columns: 1fr; }
+        .info-row { border-right: none; }
+        .info-row:nth-child(even) { border-right: none; }
+
+        .money-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+        .money-box { padding: 8px; }
+        .money-box .val { font-size: 15px; }
+        .money-box .lbl { font-size: 9px; letter-spacing: 0.2px; }
+
+        .tab-btn { padding: 9px 12px; font-size: 11px; }
+        .tab-btn i { margin-right: 4px; }
+
+        .mini-table th,
+        .mini-table td { padding: 7px 8px; font-size: 12px; }
+
+        .payout-amount { font-size: 20px; }
+    }
+
+    @media (max-width: 480px) {
+        .ws-tabbar { padding: 10px 0 0; }
+        .ws-tab {
+            padding: 8px 12px 8px 16px;
+            font-size: 11px;
+            height: 34px;
+            gap: 6px;
+        }
+        .ws-tab.active {
+            height: 38px;
+            padding-top: 9px;
+            padding-bottom: 9px;
+        }
+        .ws-tab i { font-size: 11px; }
+
+        .job-title-card h2 { font-size: 1rem; }
+        .money-grid { gap: 5px; }
+        .money-box .val { font-size: 14px; }
+        .money-box .lbl { font-size: 8px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ============================================================ #}
+{# HERO — diagonal tab bar                                       #}
+{# ============================================================ #}
+<div class="ws-tabbar">
+    <a href="{% url 'workshop:dashboard' %}" class="ws-tab">
+        <i class="fas fa-tools"></i>
+        <span>Workshop</span>
+    </a>
+
+    {% if user.role == 'company_technician' %}
+        <a href="{% url 'workshop:my-work' %}" class="ws-tab">
+            <i class="fas fa-clipboard-list"></i>
+            <span>My Work</span>
+        </a>
+        <a href="{% url 'workshop:job-create' %}" class="ws-tab">
+            <i class="fas fa-plus-circle"></i>
+            <span>New Job</span>
+        </a>
+    {% else %}
+        <a href="{% url 'workshop:job-list' %}" class="ws-tab active">
+            <i class="fas fa-list"></i>
+            <span>All Jobs</span>
+        </a>
+        <a href="{% url 'workshop:payout-list' %}" class="ws-tab">
+            <i class="fas fa-hand-holding-usd"></i>
+            <span>Payouts</span>
+        </a>
+        <a href="{% url 'workshop:job-create' %}" class="ws-tab">
+            <i class="fas fa-plus-circle"></i>
+            <span>New Job</span>
+        </a>
+    {% endif %}
+</div>
+
+{# Sub-strip #}
+<div class="ws-substrip">
+    <div>
+        <i class="fas fa-hashtag"></i>
+        <strong>{{ job.job_number }}</strong>
+        · {{ job.get_repair_category_display }}
+        {% if job.customer %} · {{ job.customer.name }}{% else %} · Store Stock{% endif %}
+    </div>
+    <div class="sub-actions">
+        {% if can_edit %}
+            <a href="{% url 'workshop:job-edit' job.id %}" class="sub-btn">
+                <i class="fas fa-edit"></i> Edit
+            </a>
+        {% endif %}
+        <a href="{% url 'workshop:job-receipt' job.id %}" class="sub-btn" target="_blank">
+            <i class="fas fa-print"></i> Receipt
+        </a>
+        <a href="{% url 'workshop:job-list' %}" class="sub-btn">
+            <i class="fas fa-arrow-left"></i> Jobs
+        </a>
+    </div>
+</div>
+
+{# ============================================================ #}
+{# JOB TITLE CARD                                                #}
+{# ============================================================ #}
+<div class="job-title-card">
+    <div>
+        <div class="job-num">{{ job.job_number }}</div>
+        <h2><i class="fas fa-mobile-alt me-1"></i> {{ job.device_name }}</h2>
+        <div class="job-sub">
+            {{ job.get_repair_category_display }}
+            {% if job.customer %} · {{ job.customer.name }}{% else %} · Store Stock{% endif %}
+        </div>
+    </div>
+    <div class="actions">
+        {% if can_edit %}
+            <a href="{% url 'workshop:job-edit' job.id %}" class="btn-outline-dark">
+                <i class="fas fa-edit"></i> Edit
+            </a>
+        {% endif %}
+        <a href="{% url 'workshop:job-receipt' job.id %}" class="btn-outline-dark" target="_blank">
+            <i class="fas fa-print"></i> Receipt
+        </a>
+    </div>
+</div>
+
+{# ============================================================ #}
+{# STATUS STRIP                                                  #}
+{# ============================================================ #}
+<div class="status-strip">
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+        <span class="status-pill {{ job.status }}">{{ job.get_status_display }}</span>
+        <span class="priority-badge {{ job.priority }}">{{ job.get_priority_display }}</span>
+        {% if job.warranty_days %}
+            <span class="priority-badge normal">
+                <i class="fas fa-shield-alt"></i> {{ job.warranty_days }}d warranty
+            </span>
+        {% endif %}
+    </div>
+
+    {% if can_edit %}
+    <form method="post" action="{% url 'workshop:job-status-update' job.id %}" class="status-form">
+        {% csrf_token %}
+        <label style="font-size:11px;font-weight:700;margin:0;">Change Status:</label>
+        <select name="status" onchange="this.form.submit()">
+            {% for value, label in status_choices %}
+                <option value="{{ value }}" {% if job.status == value %}selected{% endif %}>
+                    {{ label }}
+                </option>
+            {% endfor %}
+        </select>
+    </form>
+    {% endif %}
+</div>
+
+{# ============================================================ #}
+{# INNER TABS                                                    #}
+{# ============================================================ #}
+<div class="tab-nav">
+    <button class="tab-btn active" data-tab="summary">
+        <i class="fas fa-info-circle"></i> Summary
+    </button>
+    <button class="tab-btn" data-tab="materials">
+        <i class="fas fa-tools"></i> Materials
+        <span style="font-weight:400;">({{ materials|length }})</span>
+    </button>
+    <button class="tab-btn" data-tab="payments">
+        <i class="fas fa-money-bill"></i> Payments
+        <span style="font-weight:400;">({{ payments|length }})</span>
+    </button>
+    <button class="tab-btn" data-tab="notes">
+        <i class="fas fa-comment"></i> Notes
+        <span style="font-weight:400;">({{ notes|length }})</span>
+    </button>
+    <button class="tab-btn" data-tab="payout">
+        <i class="fas fa-hand-holding-usd"></i> Payout
+    </button>
+</div>
+
+{# ============================================================ #}
+{# TAB: SUMMARY                                                  #}
+{# ============================================================ #}
+<div class="tab-panel active" data-panel="summary">
+
+    {# ---- Money overview ---- #}
+    <div class="card">
+        <div class="card-header">
+            <h6><i class="fas fa-coins me-1"></i> Money Overview</h6>
+        </div>
+        <div class="card-body">
+            <div class="money-grid">
+                <div class="money-box">
+                    <div class="lbl">Material Cost</div>
+                    <div class="val">KSh {{ job.actual_material_cost|floatformat:2 }}</div>
+                </div>
+                <div class="money-box">
+                    <div class="lbl">Final Amount</div>
+                    <div class="val">KSh {{ job.final_amount|floatformat:2 }}</div>
+                </div>
+                <div class="money-box {% if job.balance_due <= 0 %}success{% else %}danger{% endif %}">
+                    <div class="lbl">Balance Due</div>
+                    <div class="val">KSh {{ job.balance_due|floatformat:2 }}</div>
+                </div>
+            </div>
+            <div class="money-grid mt-2">
+                <div class="money-box">
+                    <div class="lbl">Transport</div>
+                    <div class="val">KSh {{ job.transport_cost|default:0|floatformat:2 }}</div>
+                </div>
+                <div class="money-box success">
+                    <div class="lbl">Paid</div>
+                    <div class="val">KSh {{ job.amount_paid|floatformat:2 }}</div>
+                </div>
+                <div class="money-box">
+                    <div class="lbl">Profit</div>
+                    <div class="val">KSh {{ job.profit|floatformat:2 }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ---- Customer ---- #}
+    <div class="card mt-3">
+        <div class="card-header">
+            <h6><i class="fas fa-user me-1"></i> Customer</h6>
+            {% if job.customer %}
+            <a href="{% url 'workshop:customer-edit' job.customer.id %}" class="btn-icon" title="Edit Customer">
+                <i class="fas fa-edit"></i>
+            </a>
+            {% endif %}
+        </div>
+        <div class="card-body p-0">
+            {% if job.customer %}
+                <div class="info-grid">
+                    <div class="info-row">
+                        <span class="k">Name</span>
+                        <span class="v">{{ job.customer.name }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="k">Phone</span>
+                        <span class="v">{{ job.customer.phone }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="k">Email</span>
+                        <span class="v {% if not job.customer.email %}empty{% endif %}">
+                            {{ job.customer.email|default:"—" }}
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="k">Address</span>
+                        <span class="v {% if not job.customer.address %}empty{% endif %}">
+                            {{ job.customer.address|default:"—" }}
+                        </span>
+                    </div>
+                </div>
+            {% else %}
+                <div class="empty-mini">
+                    <i class="fas fa-store"></i>
+                    <p>Store-stock repair — no customer attached.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ---- Device ---- #}
+    <div class="card mt-3">
+        <div class="card-header">
+            <h6><i class="fas fa-mobile-alt me-1"></i> Device</h6>
+        </div>
+        <div class="card-body p-0">
+            <div class="info-grid">
+                <div class="info-row">
+                    <span class="k">Device</span>
+                    <span class="v">{{ job.device_name }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="k">Brand / Model</span>
+                    <span class="v {% if not job.device_brand and not job.device_model %}empty{% endif %}">
+                        {{ job.device_brand|default:"" }}{% if job.device_brand and job.device_model %} · {% endif %}{{ job.device_model|default:"" }}
+                        {% if not job.device_brand and not job.device_model %}—{% endif %}
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="k">Serial / IMEI</span>
+                    <span class="v {% if not job.device_serial %}empty{% endif %}">
+                        {{ job.device_serial|default:"—" }}
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="k">Password / PIN</span>
+                    <span class="v {% if not job.device_password %}empty{% endif %}">
+                        {% if job.device_password %}
+                            <code style="background:#f0f0f0;padding:2px 6px;border-radius:3px;">{{ job.device_password }}</code>
+                        {% else %}—{% endif %}
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="k">Accessories</span>
+                    <span class="v {% if not job.device_accessories %}empty{% endif %}">
+                        {{ job.device_accessories|default:"—" }}
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="k">Work Source</span>
+                    <span class="v">{{ job.get_work_source_display }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ---- Problem / Diagnosis / Summary ---- #}
+    <div class="card mt-3">
+        <div class="card-header">
+            <h6><i class="fas fa-stethoscope me-1"></i> Problem &amp; Diagnosis</h6>
+        </div>
+        <div class="card-body">
+            <div style="margin-bottom:12px;">
+                <div class="k" style="font-size:10px;font-weight:700;text-transform:uppercase;color:#666;letter-spacing:0.4px;margin-bottom:3px;">Reported Problem</div>
+                <div style="background:#f8f9fa;border:2px solid #e0e0e0;border-radius:4px;padding:10px;font-size:13px;">{{ job.reported_problem }}</div>
+            </div>
+            {% if job.diagnosis %}
+            <div style="margin-bottom:12px;">
+                <div class="k" style="font-size:10px;font-weight:700;text-transform:uppercase;color:#666;letter-spacing:0.4px;margin-bottom:3px;">Diagnosis</div>
+                <div style="background:#f8f9fa;border:2px solid #e0e0e0;border-radius:4px;padding:10px;font-size:13px;">{{ job.diagnosis }}</div>
+            </div>
+            {% endif %}
+            {% if job.work_summary %}
+            <div>
+                <div class="k" style="font-size:10px;font-weight:700;text-transform:uppercase;color:#666;letter-spacing:0.4px;margin-bottom:3px;">Work Summary</div>
+                <div style="background:#e7f1ff;border:2px solid #022ceb;border-radius:4px;padding:10px;font-size:13px;">{{ job.work_summary }}</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ---- Assignment & Dates ---- #}
+    <div class="card mt-3">
+        <div class="card-header">
+            <h6><i class="fas fa-user-cog me-1"></i> Assignment &amp; Timeline</h6>
+        </div>
+        <div class="card-body p-0">
+            <div class="info-grid">
+                <div class="info-row">
+                    <span class="k">Assigned Technician</span>
+                    <span class="v {% if not job.assigned_technician %}empty{% endif %}">
+                        {% if job.assigned_technician %}
+                            {{ job.assigned_technician.full_name }}
+                        {% else %}Unassigned{% endif %}
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="k">Branch</span>
+                    <span class="v {% if not job.branch %}empty{% endif %}">
+                        {{ job.branch.name|default:"—" }}
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="k">Received</span>
+                    <span class="v">{{ job.received_at|date:"Y-m-d H:i" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="k">Diagnosed</span>
+                    <span class="v {% if not job.diagnosed_at %}empty{% endif %}">
+                        {{ job.diagnosed_at|date:"Y-m-d H:i"|default:"—" }}
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="k">Started</span>
+                    <span class="v {% if not job.started_at %}empty{% endif %}">
+                        {{ job.started_at|date:"Y-m-d H:i"|default:"—" }}
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="k">Completed</span>
+                    <span class="v {% if not job.completed_at %}empty{% endif %}">
+                        {{ job.completed_at|date:"Y-m-d H:i"|default:"—" }}
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="k">Delivered</span>
+                    <span class="v {% if not job.delivered_at %}empty{% endif %}">
+                        {{ job.delivered_at|date:"Y-m-d H:i"|default:"—" }}
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="k">Expected Delivery</span>
+                    <span class="v {% if not job.expected_delivery %}empty{% endif %}">
+                        {{ job.expected_delivery|date:"Y-m-d"|default:"—" }}
+                    </span>
+                </div>
+                {% if job.warranty_expires_at %}
+                <div class="info-row">
+                    <span class="k">Warranty Expires</span>
+                    <span class="v">{{ job.warranty_expires_at|date:"Y-m-d" }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if job.internal_notes %}
+    <div class="card mt-3">
+        <div class="card-header">
+            <h6><i class="fas fa-lock me-1"></i> Internal Notes</h6>
+        </div>
+        <div class="card-body">
+            <div style="background:#f8f9fa;border:2px solid #e0e0e0;border-radius:4px;padding:10px;font-size:13px;white-space:pre-wrap;">{{ job.internal_notes }}</div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+{# ============================================================ #}
+{# TAB: MATERIALS                                                #}
+{# ============================================================ #}
+<div class="tab-panel" data-panel="materials">
+    <div class="card">
+        <div class="card-header">
+            <h6><i class="fas fa-tools me-1"></i> Materials Used</h6>
+            {% if can_edit %}
+                <a href="{% url 'workshop:material-add' job.id %}" class="btn-icon" title="Add Material">
+                    <i class="fas fa-plus"></i>
+                </a>
+            {% endif %}
+        </div>
+        <div class="card-body p-0">
+            {% if materials %}
+                <div class="table-responsive">
+                    <table class="mini-table">
+                        <thead>
+                            <tr>
+                                <th>Material</th>
+                                <th style="width:70px;">Qty</th>
+                                <th style="width:100px;" class="num">Unit</th>
+                                <th style="width:110px;" class="num">Total</th>
+                                <th style="width:110px;">Source</th>
+                                {% if can_edit %}<th style="width:80px;"></th>{% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for m in materials %}
+                            <tr>
+                                <td>
+                                    <div style="font-weight:600;">{{ m.name }}</div>
+                                    {% if m.description %}<div class="muted">{{ m.description|truncatechars:60 }}</div>{% endif %}
+                                </td>
+                                <td>{{ m.quantity|floatformat:2 }}</td>
+                                <td class="num">KSh {{ m.unit_cost|floatformat:2 }}</td>
+                                <td class="num">KSh {{ m.total_cost|floatformat:2 }}</td>
+                                <td>
+                                    <span style="font-size:11px;font-weight:600;">
+                                        {{ m.get_source_display }}
+                                    </span>
+                                    {% if m.fund_source %}
+                                        <div class="muted">{{ m.get_fund_source_display }}</div>
+                                    {% endif %}
+                                </td>
+                                {% if can_edit %}
+                                <td>
+                                    <div class="d-flex gap-1">
+                                        <a href="{% url 'workshop:material-edit' m.id %}" class="btn-icon" title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form method="post" action="{% url 'workshop:material-delete' m.id %}"
+                                              onsubmit="return confirm('Delete this material?');" style="display:inline;">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn-icon danger" title="Delete">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                                {% endif %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr style="background:#f8f9fa;">
+                                <td colspan="3" style="text-align:right;font-weight:700;border-top:2px solid #000;">
+                                    TOTAL MATERIAL COST
+                                </td>
+                                <td class="num" style="font-weight:700;border-top:2px solid #000;">
+                                    KSh {{ job.actual_material_cost|floatformat:2 }}
+                                </td>
+                                <td colspan="{% if can_edit %}2{% else %}1{% endif %}" style="border-top:2px solid #000;"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-mini">
+                    <i class="fas fa-tools"></i>
+                    <p>No materials recorded yet.</p>
+                    {% if can_edit %}
+                        <a href="{% url 'workshop:material-add' job.id %}" class="btn-sky mt-2">
+                            <i class="fas fa-plus"></i> Add Material
+                        </a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# ============================================================ #}
+{# TAB: PAYMENTS                                                 #}
+{# ============================================================ #}
+<div class="tab-panel" data-panel="payments">
+    <div class="card">
+        <div class="card-header">
+            <h6><i class="fas fa-money-bill me-1"></i> Customer Payments</h6>
+            {% if can_edit %}
+                <a href="{% url 'workshop:payment-add' job.id %}" class="btn-icon" title="Record Payment">
+                    <i class="fas fa-plus"></i>
+                </a>
+            {% endif %}
+        </div>
+        <div class="card-body p-0">
+            {% if payments %}
+                <div class="table-responsive">
+                    <table class="mini-table">
+                        <thead>
+                            <tr>
+                                <th>Method</th>
+                                <th>Reference</th>
+                                <th style="width:130px;">Date</th>
+                                <th style="width:120px;" class="num">Amount</th>
+                                {% if can_edit %}<th style="width:60px;"></th>{% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in payments %}
+                            <tr>
+                                <td>
+                                    <span class="pay-method {{ p.method }}">{{ p.get_method_display }}</span>
+                                </td>
+                                <td>
+                                    {% if p.reference %}
+                                        <code style="font-size:11px;">{{ p.reference }}</code>
+                                    {% else %}
+                                        <span class="muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td style="font-size:12px;">{{ p.received_at|date:"Y-m-d H:i" }}</td>
+                                <td class="num">KSh {{ p.amount|floatformat:2 }}</td>
+                                {% if can_edit %}
+                                <td>
+                                    <form method="post" action="{% url 'workshop:payment-delete' p.id %}"
+                                          onsubmit="return confirm('Delete this payment?');" style="display:inline;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn-icon danger" title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                                {% endif %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr style="background:#f8f9fa;">
+                                <td colspan="3" style="text-align:right;font-weight:700;border-top:2px solid #000;">
+                                    TOTAL PAID
+                                </td>
+                                <td class="num" style="font-weight:700;border-top:2px solid #000;">
+                                    KSh {{ job.amount_paid|floatformat:2 }}
+                                </td>
+                                {% if can_edit %}<td style="border-top:2px solid #000;"></td>{% endif %}
+                            </tr>
+                            <tr>
+                                <td colspan="3" style="text-align:right;font-weight:700;color:{% if job.balance_due > 0 %}#721c24{% else %}#155724{% endif %};">
+                                    BALANCE DUE
+                                </td>
+                                <td class="num" style="font-weight:700;color:{% if job.balance_due > 0 %}#721c24{% else %}#155724{% endif %};">
+                                    KSh {{ job.balance_due|floatformat:2 }}
+                                </td>
+                                {% if can_edit %}<td></td>{% endif %}
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-mini">
+                    <i class="fas fa-money-bill"></i>
+                    <p>No payments recorded yet.</p>
+                    {% if can_edit %}
+                        <a href="{% url 'workshop:payment-add' job.id %}" class="btn-sky mt-2">
+                            <i class="fas fa-plus"></i> Record Payment
+                        </a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# ============================================================ #}
+{# TAB: NOTES                                                    #}
+{# ============================================================ #}
+<div class="tab-panel" data-panel="notes">
+    <div class="card">
+        <div class="card-header">
+            <h6><i class="fas fa-comment me-1"></i> Progress Notes</h6>
+        </div>
+        <div class="card-body">
+            {% if can_edit %}
+            <form method="post" action="{% url 'workshop:note-add' job.id %}" style="margin-bottom:16px;">
+                {% csrf_token %}
+                <textarea name="note" class="form-control" rows="3"
+                          placeholder="Add a progress note..."
+                          style="border:2px solid #000;border-radius:4px;font-size:13px;"></textarea>
+                <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+                    <label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer;">
+                        <input type="checkbox" name="is_customer_visible">
+                        Show on customer receipt
+                    </label>
+                    <button type="submit" class="btn-sky">
+                        <i class="fas fa-plus"></i> Add Note
+                    </button>
+                </div>
+            </form>
+            {% endif %}
+
+            {% if notes %}
+                {% for n in notes %}
+                <div class="note-card {% if n.is_customer_visible %}public{% endif %}">
+                    <div class="note-body">{{ n.note|linebreaksbr }}</div>
+                    <div class="note-meta">
+                        <span>
+                            <i class="fas fa-user"></i>
+                            {{ n.created_by.full_name|default:"Unknown" }}
+                            · {{ n.created_at|date:"Y-m-d H:i" }}
+                        </span>
+                        {% if n.is_customer_visible %}
+                            <span style="background:#87CEEB;padding:2px 8px;border-radius:50px;font-size:10px;font-weight:700;">
+                                <i class="fas fa-eye"></i> CUSTOMER VISIBLE
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-mini">
+                    <i class="fas fa-comment"></i>
+                    <p>No notes yet.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# ============================================================ #}
+{# TAB: PAYOUT                                                   #}
+{# ============================================================ #}
+<div class="tab-panel" data-panel="payout">
+    <div class="card">
+        <div class="card-header">
+            <h6><i class="fas fa-hand-holding-usd me-1"></i> Technician Payout</h6>
+            {% if payout and can_pay and payout.status == 'pending' %}
+                <a href="{% url 'workshop:payout-mark-paid' payout.id %}" class="btn-icon" title="Mark Paid">
+                    <i class="fas fa-check"></i>
+                </a>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            {% if payout %}
+                <div class="payout-banner {% if payout.status == 'paid' %}paid{% elif payout.status == 'cancelled' %}cancelled{% else %}pending{% endif %}">
+                    <div>
+                        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#666;">
+                            Technician Payment
+                        </div>
+                        <div class="payout-amount">KSh {{ payout.amount|floatformat:2 }}</div>
+                        <div style="font-size:11px;margin-top:4px;">
+                            <strong>{{ payout.get_status_display }}</strong>
+                            · {{ payout.get_basis_display }}
+                            {% if payout.percentage %} ({{ payout.percentage }}%){% endif %}
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a href="{% url 'workshop:payout-detail' payout.id %}" class="btn-outline-dark">
+                            <i class="fas fa-eye"></i> View
+                        </a>
+                        {% if can_pay and payout.status == 'pending' %}
+                            <a href="{% url 'workshop:payout-mark-paid' payout.id %}" class="btn-green">
+                                <i class="fas fa-check"></i> Pay
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="info-grid mt-3">
+                    <div class="info-row">
+                        <span class="k">Technician</span>
+                        <span class="v">
+                            {% if payout.technician %}{{ payout.technician.full_name }}{% else %}Unassigned{% endif %}
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="k">Basis Amount</span>
+                        <span class="v">KSh {{ payout.basis_amount|floatformat:2 }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="k">Payment Method</span>
+                        <span class="v {% if not payout.payment_method %}empty{% endif %}">
+                            {{ payout.get_payment_method_display|default:"—" }}
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="k">Paid At</span>
+                        <span class="v {% if not payout.paid_at %}empty{% endif %}">
+                            {{ payout.paid_at|date:"Y-m-d H:i"|default:"—" }}
+                        </span>
+                    </div>
+                    {% if payout.paid_by %}
+                    <div class="info-row">
+                        <span class="k">Paid By</span>
+                        <span class="v">{{ payout.paid_by.full_name }}</span>
+                    </div>
+                    {% endif %}
+                    {% if payout.payment_reference %}
+                    <div class="info-row">
+                        <span class="k">Reference</span>
+                        <span class="v"><code>{{ payout.payment_reference }}</code></span>
+                    </div>
+                    {% endif %}
+                    {% if payout.notes %}
+                    <div class="info-row">
+                        <span class="k">Notes</span>
+                        <span class="v">{{ payout.notes }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            {% else %}
+                <div class="empty-mini">
+                    <i class="fas fa-hand-holding-usd"></i>
+                    <p>
+                        No payout yet for this job.
+                        {% if job.assigned_technician %}
+                            Payout will be computed when the job is completed.
+                        {% else %}
+                            Assign a technician to this job first.
+                        {% endif %}
+                    </p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        const tabs = document.querySelectorAll('.tab-btn');
+        const panels = document.querySelectorAll('.tab-panel');
+
+        function activate(name) {
+            tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+            panels.forEach(p => p.classList.toggle('active', p.dataset.panel === name));
+            try { history.replaceState(null, '', '#' + name); } catch (e) {}
+        }
+
+        tabs.forEach(t => {
+            t.addEventListener('click', () => activate(t.dataset.tab));
+        });
+
+        // Restore the last-used tab from the URL hash
+        const hash = window.location.hash.replace('#', '');
+        if (hash && document.querySelector('.tab-btn[data-tab="' + hash + '"]')) {
+            activate(hash);
+        }
+    })();
+</script>
+{% endblock %}

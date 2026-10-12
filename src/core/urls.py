@@ -51,6 +51,7 @@ urlpatterns = [
     path('profile/', include('apps.accounts.profile_urls')),
     path('accounts/', include('allauth.urls')),
     path('analytics/', include('apps.analytics.urls')),
+    path('workshop/', include('apps.workshop.urls', namespace='workshop')),
 
     # ============================================
     # API ENDPOINTS

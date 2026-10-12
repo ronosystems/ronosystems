@@ -1,0 +1,753 @@
+{% extends 'base.html' %}
+
+{% block title %}Payout {{ payout.id }} {% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       DIAGONAL TAB BAR
+    ============================================ */
+    .ws-tabbar {
+        display: flex;
+        align-items: flex-end;
+        gap: 0;
+        padding: 18px 0 0;
+        margin-bottom: 0;
+        background: transparent;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        border-bottom: 3px solid #1e4e6d;
+        position: relative;
+    }
+    .ws-tabbar::-webkit-scrollbar { height: 4px; }
+    .ws-tabbar::-webkit-scrollbar-thumb { background: #87CEEB; border-radius: 4px; }
+
+    .ws-tab {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 22px 11px 26px;
+        margin-right: 4px;
+        background: #1e4e6d;
+        color: rgba(255,255,255,0.85) !important;
+        text-decoration: none !important;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+        transform: skewX(-14deg);
+        transition: background 0.15s, color 0.15s;
+        border-top: 2px solid #000;
+        border-left: 2px solid #000;
+        border-right: 2px solid #000;
+        border-radius: 6px 6px 0 0;
+        height: 40px;
+        margin-top: 4px;
+    }
+    .ws-tab > * {
+        display: inline-block;
+        transform: skewX(14deg);
+    }
+    .ws-tab:hover {
+        background: #2d5f7c;
+        color: #ffffff !important;
+    }
+    .ws-tab.active {
+        background: #ffffff;
+        color: #000000 !important;
+        height: 46px;
+        padding-top: 13px;
+        padding-bottom: 13px;
+        margin-top: 0;
+        z-index: 2;
+    }
+    .ws-tab.active i { color: #022ceb; }
+    .ws-tab i {
+        font-size: 13px;
+        color: #87CEEB;
+        transition: color 0.15s;
+    }
+    .ws-tab:hover i { color: #ffffff; }
+
+    .ws-tab.active::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -3px;
+        height: 3px;
+        background: #7bc043;
+        transform: skewX(14deg);
+        transform-origin: left bottom;
+    }
+
+    /* Sub-strip */
+    .ws-substrip {
+        background: #f0f7ff;
+        border: 2px solid #1e4e6d;
+        border-top: none;
+        border-radius: 0 0 4px 4px;
+        padding: 8px 16px;
+        font-size: 12px;
+        color: #000;
+        margin-bottom: 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .ws-substrip strong { color: #022ceb; }
+    .ws-substrip .sub-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .ws-substrip .sub-btn {
+        background: #ffffff;
+        border: 2px solid #000;
+        color: #000;
+        font-weight: 600;
+        font-size: 11px;
+        padding: 4px 10px;
+        border-radius: 4px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        white-space: nowrap;
+    }
+    .ws-substrip .sub-btn:hover {
+        background: #000;
+        color: #fff;
+    }
+
+    /* ============================================
+       PAYOUT HERO CARD
+    ============================================ */
+    .payout-hero {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 20px 24px;
+        margin-bottom: 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+    .payout-hero.pending   { background: #fff3cd; }
+    .payout-hero.paid      { background: #d4edda; }
+    .payout-hero.cancelled { background: #f1f1f1; }
+
+    .payout-hero .left {
+        flex: 1;
+        min-width: 220px;
+    }
+    .payout-hero .left .label {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #666;
+    }
+    .payout-hero .left .amount {
+        font-size: 34px;
+        font-weight: 700;
+        line-height: 1.1;
+        color: #000;
+    }
+    .payout-hero .left .tech {
+        font-size: 14px;
+        font-weight: 600;
+        color: #000;
+        margin-top: 6px;
+    }
+    .payout-hero .left .job {
+        font-size: 12px;
+        color: #555;
+        margin-top: 2px;
+    }
+
+    .payout-hero .right {
+        text-align: right;
+    }
+    .status-pill {
+        display: inline-block;
+        padding: 5px 14px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        border: 1px solid #000000;
+    }
+    .status-pill.pending    { background: #ffe69c; color: #856404; }
+    .status-pill.paid       { background: #a8e0a8; color: #0a4d0a; }
+    .status-pill.cancelled  { background: #e0e0e0; color: #4d4d4d; }
+
+    .basis-tag {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 50px;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        border: 1px solid #000;
+        margin-top: 6px;
+    }
+    .basis-tag.profit  { background: #e7f1ff; color: #004085; }
+    .basis-tag.revenue { background: #fff3cd; color: #856404; }
+    .basis-tag.manual  { background: #f0f0f0; color: #333; }
+
+    /* ============================================
+       CARD
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 10px 16px;
+        color: #000000 !important;
+        border-radius: 0 !important;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .card-header h6 {
+        color: #000000 !important;
+        font-weight: 700;
+        margin: 0;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+    }
+    .card-body { color: #000000; }
+
+    /* ============================================
+       INFO GRID
+    ============================================ */
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    .info-row {
+        display: flex;
+        flex-direction: column;
+        padding: 10px 12px;
+        border-bottom: 1px solid #e0e0e0;
+        border-right: 1px solid #e0e0e0;
+        background: #ffffff;
+        min-width: 0;
+    }
+    .info-row:nth-child(even) { border-right: none; }
+    .info-row .k {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: #666;
+        margin-bottom: 3px;
+    }
+    .info-row .v {
+        font-size: 13px;
+        font-weight: 500;
+        color: #000000;
+        word-break: break-word;
+    }
+    .info-row .v.empty { color: #999; font-style: italic; font-weight: 400; }
+
+    /* ============================================
+       CALCULATION BOX
+    ============================================ */
+    .calc-box {
+        background: #f8f9fa;
+        border: 2px solid #000;
+        border-radius: 4px;
+        padding: 14px 16px;
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+    }
+    .calc-line {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 5px 0;
+        border-bottom: 1px dashed #ccc;
+    }
+    .calc-line:last-child {
+        border-bottom: none;
+        border-top: 2px solid #000;
+        margin-top: 4px;
+        padding-top: 10px;
+        font-weight: 700;
+        font-size: 15px;
+    }
+    .calc-line .lbl { color: #666; }
+    .calc-line .val { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        padding: 6px 16px;
+        font-size: 13px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        color: #000000;
+    }
+    .btn-green {
+        background: #28a745;
+        border: 2px solid #000000;
+        color: #ffffff;
+        font-weight: 600;
+        padding: 6px 16px;
+        font-size: 13px;
+        border-radius: 4px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .btn-green:hover {
+        background: #1e7e34;
+        color: #ffffff;
+    }
+    .btn-outline-dark {
+        background: #ffffff;
+        border: 2px solid #000000;
+        color: #000000;
+        font-weight: 600;
+        padding: 6px 16px;
+        font-size: 13px;
+        border-radius: 4px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .btn-outline-dark:hover {
+        background: #000000;
+        color: #ffffff;
+    }
+    .btn-warning {
+        background: #ffc107;
+        border: 2px solid #000000;
+        color: #000000;
+        font-weight: 600;
+        padding: 6px 16px;
+        font-size: 13px;
+        border-radius: 4px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .btn-warning:hover {
+        background: #e0a800;
+        color: #000000;
+    }
+
+    /* ============================================
+       ACTION ROW
+    ============================================ */
+    .action-row {
+        background: #f8f9fa;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 14px 18px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+    }
+    .action-row .actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .ws-tabbar { padding: 14px 0 0; }
+        .ws-tab {
+            padding: 9px 16px 9px 20px;
+            font-size: 12px;
+            height: 36px;
+        }
+        .ws-tab.active {
+            height: 42px;
+            padding-top: 11px;
+            padding-bottom: 11px;
+        }
+        .ws-tab i { font-size: 12px; }
+
+        .payout-hero { padding: 16px; }
+        .payout-hero .left .amount { font-size: 26px; }
+        .payout-hero .right { text-align: left; }
+
+        .info-grid { grid-template-columns: 1fr; }
+        .info-row { border-right: none; }
+        .info-row:nth-child(even) { border-right: none; }
+
+        .action-row { flex-direction: column; align-items: stretch; }
+        .action-row .actions { width: 100%; }
+        .action-row .actions .btn-primary,
+        .action-row .actions .btn-green,
+        .action-row .actions .btn-outline-dark,
+        .action-row .actions .btn-warning {
+            flex: 1;
+            justify-content: center;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .ws-tabbar { padding: 10px 0 0; }
+        .ws-tab {
+            padding: 8px 12px 8px 16px;
+            font-size: 11px;
+            height: 34px;
+            gap: 6px;
+        }
+        .ws-tab.active {
+            height: 38px;
+            padding-top: 9px;
+            padding-bottom: 9px;
+        }
+        .ws-tab i { font-size: 11px; }
+
+        .payout-hero .left .amount { font-size: 22px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ============================================================ #}
+{# HERO — diagonal tab bar                                       #}
+{# ============================================================ #}
+<div class="ws-tabbar">
+    <a href="{% url 'workshop:dashboard' %}" class="ws-tab">
+        <i class="fas fa-tools"></i>
+        <span>Workshop</span>
+    </a>
+
+    {% if user.role == 'company_technician' %}
+        <a href="{% url 'workshop:my-work' %}" class="ws-tab">
+            <i class="fas fa-clipboard-list"></i>
+            <span>My Work</span>
+        </a>
+        <a href="{% url 'workshop:job-create' %}" class="ws-tab">
+            <i class="fas fa-plus-circle"></i>
+            <span>New Job</span>
+        </a>
+    {% else %}
+        <a href="{% url 'workshop:job-list' %}" class="ws-tab">
+            <i class="fas fa-list"></i>
+            <span>All Jobs</span>
+        </a>
+        <a href="{% url 'workshop:payout-list' %}" class="ws-tab active">
+            <i class="fas fa-hand-holding-usd"></i>
+            <span>Payouts</span>
+        </a>
+        <a href="{% url 'workshop:job-create' %}" class="ws-tab">
+            <i class="fas fa-plus-circle"></i>
+            <span>New Job</span>
+        </a>
+    {% endif %}
+</div>
+
+{# Sub-strip #}
+<div class="ws-substrip">
+    <div>
+        <i class="fas fa-receipt"></i>
+        Payout #<strong>{{ payout.id }}</strong>
+        for job <strong>{{ payout.job.job_number }}</strong>
+    </div>
+    <div class="sub-actions">
+        <a href="{% url 'workshop:payout-list' %}" class="sub-btn">
+            <i class="fas fa-arrow-left"></i> All Payouts
+        </a>
+        <a href="{% url 'workshop:job-detail' payout.job.id %}" class="sub-btn">
+            <i class="fas fa-external-link-alt"></i> View Job
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-9 mx-auto">
+
+        {# ============================================================ #}
+        {# PAYOUT HERO                                                   #}
+        {# ============================================================ #}
+        <div class="payout-hero {{ payout.status }}">
+            <div class="left">
+                <div class="label">Amount Owed to Technician</div>
+                <div class="amount">KSh {{ payout.amount|floatformat:2 }}</div>
+                <div class="tech">
+                    <i class="fas fa-user-cog"></i>
+                    {{ payout.technician.full_name|default:"Unassigned" }}
+                    {% if payout.technician.get_role_display %}
+                        <span style="color:#666;font-weight:400;font-size:12px;">
+                            · {{ payout.technician.get_role_display }}
+                        </span>
+                    {% endif %}
+                </div>
+                <div class="job">
+                    <i class="fas fa-hashtag"></i> {{ payout.job.job_number }}
+                    · {{ payout.job.device_name }}
+                    · {{ payout.job.get_repair_category_display }}
+                </div>
+            </div>
+            <div class="right">
+                <span class="status-pill {{ payout.status }}">{{ payout.get_status_display }}</span>
+                <div>
+                    <span class="basis-tag {{ payout.basis }}">
+                        {% if payout.basis == 'profit' %}
+                            <i class="fas fa-chart-line"></i>
+                        {% elif payout.basis == 'revenue' %}
+                            <i class="fas fa-coins"></i>
+                        {% else %}
+                            <i class="fas fa-edit"></i>
+                        {% endif %}
+                        {{ payout.get_basis_display }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        {# ============================================================ #}
+        {# CALCULATION BREAKDOWN                                         #}
+        {# ============================================================ #}
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-calculator me-1"></i> How This Amount Was Calculated</h6>
+            </div>
+            <div class="card-body">
+                <div class="calc-box">
+                    <div class="calc-line">
+                        <span class="lbl">Final Amount (customer pays)</span>
+                        <span class="val">KSh {{ payout.job.final_amount|floatformat:2 }}</span>
+                    </div>
+                    <div class="calc-line">
+                        <span class="lbl">− Material Cost</span>
+                        <span class="val">KSh {{ payout.job.actual_material_cost|floatformat:2 }}</span>
+                    </div>
+                    {% if payout.job.transport_cost %}
+                    <div class="calc-line">
+                        <span class="lbl">− Transport Cost</span>
+                        <span class="val">KSh {{ payout.job.transport_cost|floatformat:2 }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="calc-line">
+                        <span class="lbl">= Basis ({{ payout.get_basis_display }})</span>
+                        <span class="val">KSh {{ payout.basis_amount|floatformat:2 }}</span>
+                    </div>
+                    <div class="calc-line">
+                        <span class="lbl">× {{ payout.percentage }}%</span>
+                        <span class="val">= KSh {{ payout.amount|floatformat:2 }}</span>
+                    </div>
+                </div>
+
+                {% if payout.basis == 'manual' %}
+                <div style="margin-top:10px;padding:10px 12px;background:#fff8e1;border-left:4px solid #ffc107;border-radius:4px;font-size:12px;color:#664d03;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Manual Override:</strong> This amount was set by an administrator
+                    and does not follow an automatic rate calculation.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {# ============================================================ #}
+        {# TECHNICIAN & JOB INFO                                         #}
+        {# ============================================================ #}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6><i class="fas fa-info-circle me-1"></i> Payout Details</h6>
+            </div>
+            <div class="card-body p-0">
+                <div class="info-grid">
+                    <div class="info-row">
+                        <span class="k">Technician</span>
+                        <span class="v {% if not payout.technician %}empty{% endif %}">
+                            {% if payout.technician %}
+                                {{ payout.technician.full_name }}
+                                <div style="font-size:11px;color:#666;font-weight:400;">
+                                    {{ payout.technician.email }}
+                                </div>
+                            {% else %}
+                                Unassigned
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="k">Job Number</span>
+                        <span class="v">
+                            <a href="{% url 'workshop:job-detail' payout.job.id %}"
+                               style="color:#022ceb;text-decoration:none;font-weight:600;">
+                                {{ payout.job.job_number }}
+                            </a>
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="k">Repair Category</span>
+                        <span class="v">{{ payout.job.get_repair_category_display }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="k">Job Status</span>
+                        <span class="v">{{ payout.job.get_status_display }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="k">Payout Created</span>
+                        <span class="v">{{ payout.created_at|date:"Y-m-d H:i" }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="k">Last Updated</span>
+                        <span class="v">{{ payout.updated_at|date:"Y-m-d H:i" }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# ============================================================ #}
+        {# PAYMENT INFO (only shown when paid)                           #}
+        {# ============================================================ #}
+        {% if payout.status == 'paid' %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6><i class="fas fa-check-circle me-1"></i> Payment Information</h6>
+            </div>
+            <div class="card-body p-0">
+                <div class="info-grid">
+                    <div class="info-row">
+                        <span class="k">Paid At</span>
+                        <span class="v">{{ payout.paid_at|date:"Y-m-d H:i"|default:"—" }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="k">Paid By</span>
+                        <span class="v {% if not payout.paid_by %}empty{% endif %}">
+                            {{ payout.paid_by.full_name|default:"—" }}
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="k">Payment Method</span>
+                        <span class="v {% if not payout.payment_method %}empty{% endif %}">
+                            {{ payout.get_payment_method_display|default:"—" }}
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="k">Reference</span>
+                        <span class="v {% if not payout.payment_reference %}empty{% endif %}">
+                            {% if payout.payment_reference %}
+                                <code style="background:#f0f0f0;padding:2px 6px;border-radius:3px;">
+                                    {{ payout.payment_reference }}
+                                </code>
+                            {% else %}—{% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {# ============================================================ #}
+        {# NOTES                                                         #}
+        {# ============================================================ #}
+        {% if payout.notes or payout.review_note %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6><i class="fas fa-comment me-1"></i> Notes</h6>
+            </div>
+            <div class="card-body">
+                {% if payout.notes %}
+                <div style="margin-bottom:10px;">
+                    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#666;letter-spacing:0.4px;margin-bottom:4px;">
+                        Payout Notes
+                    </div>
+                    <div style="background:#f8f9fa;border:2px solid #e0e0e0;border-radius:4px;padding:10px;font-size:13px;white-space:pre-wrap;">{{ payout.notes }}</div>
+                </div>
+                {% endif %}
+                {% if payout.review_note %}
+                <div>
+                    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#666;letter-spacing:0.4px;margin-bottom:4px;">
+                        Review Note
+                    </div>
+                    <div style="background:#f8f9fa;border:2px solid #e0e0e0;border-radius:4px;padding:10px;font-size:13px;white-space:pre-wrap;">{{ payout.review_note }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {# ============================================================ #}
+        {# ACTION ROW                                                    #}
+        {# ============================================================ #}
+        <div class="action-row">
+            <div>
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#666;">
+                    {% if payout.status == 'pending' %}
+                        Awaiting Payment
+                    {% elif payout.status == 'paid' %}
+                        Payment Complete
+                    {% else %}
+                        Payout {{ payout.get_status_display }}
+                    {% endif %}
+                </div>
+                <div style="font-size:13px;font-weight:600;color:#000;margin-top:2px;">
+                    {% if payout.status == 'pending' and can_pay %}
+                        Ready to pay KSh {{ payout.amount|floatformat:2 }}
+                    {% elif payout.status == 'paid' %}
+                        Paid on {{ payout.paid_at|date:"d M Y" }}
+                    {% else %}
+                        No action available
+                    {% endif %}
+                </div>
+            </div>
+            <div class="actions">
+                <a href="{% url 'workshop:payout-list' %}" class="btn-outline-dark">
+                    <i class="fas fa-arrow-left"></i> Back
+                </a>
+                <a href="{% url 'workshop:job-detail' payout.job.id %}" class="btn-outline-dark">
+                    <i class="fas fa-eye"></i> View Job
+                </a>
+
+                {% if can_pay and payout.status == 'pending' %}
+                    <a href="{% url 'workshop:payout-edit' payout.id %}" class="btn-warning">
+                        <i class="fas fa-edit"></i> Adjust Amount
+                    </a>
+                    <a href="{% url 'workshop:payout-mark-paid' payout.id %}" class="btn-green">
+                        <i class="fas fa-check-circle"></i> Pay Technician
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}

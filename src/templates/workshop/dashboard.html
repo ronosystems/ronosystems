@@ -1,0 +1,811 @@
+{% extends 'base.html' %}
+
+{% block title %}Workshop {% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       DIAGONAL TAB BAR
+    ============================================ */
+    .ws-tabbar {
+        display: flex;
+        align-items: flex-end;
+        gap: 0;
+        padding: 18px 0 0;
+        margin-bottom: 0;
+        background: transparent;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        border-bottom: 3px solid #1e4e6d;
+        position: relative;
+    }
+    .ws-tabbar::-webkit-scrollbar { height: 4px; }
+    .ws-tabbar::-webkit-scrollbar-thumb { background: #87CEEB; border-radius: 4px; }
+
+    .ws-tab {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 22px 11px 26px;
+        margin-right: 4px;
+        background: #1e4e6d;
+        color: rgba(255,255,255,0.85) !important;
+        text-decoration: none !important;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+        transform: skewX(-14deg);
+        transition: background 0.15s, color 0.15s;
+        border-top: 2px solid #000;
+        border-left: 2px solid #000;
+        border-right: 2px solid #000;
+        border-radius: 6px 6px 0 0;
+        height: 40px;
+        margin-top: 4px;
+    }
+    .ws-tab > * {
+        display: inline-block;
+        transform: skewX(14deg);
+    }
+    .ws-tab:hover {
+        background: #2d5f7c;
+        color: #ffffff !important;
+    }
+    .ws-tab.active {
+        background: #ffffff;
+        color: #000000 !important;
+        height: 46px;
+        padding-top: 13px;
+        padding-bottom: 13px;
+        margin-top: 0;
+        z-index: 2;
+    }
+    .ws-tab.active i { color: #022ceb; }
+    .ws-tab i {
+        font-size: 13px;
+        color: #87CEEB;
+        transition: color 0.15s;
+    }
+    .ws-tab:hover i { color: #ffffff; }
+
+    .ws-tab.active::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -3px;
+        height: 3px;
+        background: #7bc043;
+        transform: skewX(14deg);
+        transform-origin: left bottom;
+    }
+
+    /* ============================================
+       SUB-STRIP (always visible)
+    ============================================ */
+    .ws-substrip {
+        background: #f0f7ff;
+        border: 2px solid #1e4e6d;
+        border-top: none;
+        border-radius: 0 0 4px 4px;
+        padding: 8px 16px;
+        font-size: 12px;
+        color: #000;
+        margin-bottom: 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .ws-substrip strong { color: #022ceb; }
+    .ws-substrip .sub-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .ws-substrip .sub-btn {
+        background: #ffffff;
+        border: 2px solid #000;
+        color: #000;
+        font-weight: 600;
+        font-size: 11px;
+        padding: 4px 10px;
+        border-radius: 4px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        white-space: nowrap;
+    }
+    .ws-substrip .sub-btn:hover {
+        background: #000;
+        color: #fff;
+    }
+
+    /* ============================================
+       BRANCH SELECTOR
+    ============================================ */
+    .branch-bar {
+        background: #ffffff;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 10px 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .branch-bar label {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: #000000;
+        margin: 0;
+    }
+    .branch-bar select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 13px;
+        padding: 5px 10px;
+        min-width: 200px;
+        max-width: 320px;
+        flex: 1;
+    }
+    .branch-bar select:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+
+    /* ============================================
+       PERIOD STAT CARDS
+    ============================================ */
+    .period-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-top: 14px;
+    }
+    .period-card {
+        background: #ffffff;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 14px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        position: relative;
+        overflow: hidden;
+    }
+    .period-card .period-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #000000;
+        font-weight: 700;
+    }
+    .period-card .period-value {
+        font-size: 26px;
+        font-weight: 700;
+        line-height: 1;
+        color: #000000;
+    }
+    .period-card .period-sub {
+        font-size: 11px;
+        color: #666;
+    }
+    .period-card .period-icon {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+    }
+    .period-icon.year  { background: #e7f1ff; color: #022ceb; }
+    .period-icon.month { background: #d4edda; color: #155724; }
+    .period-icon.week  { background: #fff3cd; color: #856404; }
+    .period-icon.today { background: #ffd6a5; color: #7d3c00; }
+
+    /* ============================================
+       GENERIC CARD
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 10px 16px;
+        color: #000000 !important;
+        border-radius: 0 !important;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .card-header h6 {
+        color: #000000 !important;
+        font-weight: 700;
+        margin: 0;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+    }
+    .card-body { color: #000000; }
+
+    /* ============================================
+       TECHNICIAN LEADERBOARD
+    ============================================ */
+    .tech-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+    .tech-table th {
+        background: #f8f9fa;
+        color: #000000;
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 10px;
+        letter-spacing: 0.5px;
+        padding: 8px 12px;
+        text-align: left;
+        border-bottom: 2px solid #000000;
+        white-space: nowrap;
+    }
+    .tech-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #e0e0e0;
+        vertical-align: middle;
+        color: #000000;
+    }
+    .tech-table tr:last-child td { border-bottom: none; }
+    .tech-table tbody tr:hover td { background: #f8f8f8; }
+
+    .rank-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        font-weight: 700;
+        font-size: 11px;
+        border: 2px solid #000000;
+        background: #f0f0f0;
+        color: #000000;
+    }
+    .rank-badge.gold   { background: #ffd700; color: #6a4a00; }
+    .rank-badge.silver { background: #c0c0c0; color: #333; }
+    .rank-badge.bronze { background: #cd7f32; color: #fff; }
+
+    .tech-name { font-weight: 600; }
+    .tech-role { font-size: 11px; color: #666; }
+    .count-pill {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 50px;
+        font-size: 12px;
+        font-weight: 700;
+        background: #e7f1ff;
+        color: #022ceb;
+        border: 1px solid #000000;
+    }
+
+    /* ============================================
+       RECENT JOBS
+    ============================================ */
+    .recent-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        border-bottom: 1px solid #eee;
+        text-decoration: none;
+        color: #000000;
+        transition: background 0.15s;
+    }
+    .recent-row:last-child { border-bottom: none; }
+    .recent-row:hover { background: #f8f8f8; color: #000000; }
+
+    .recent-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: #e7f1ff;
+        color: #022ceb;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        flex-shrink: 0;
+    }
+    .recent-body { flex: 1; min-width: 0; }
+    .recent-title {
+        font-weight: 600;
+        font-size: 13px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .recent-sub {
+        font-size: 11px;
+        color: #666;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .recent-meta { text-align: right; flex-shrink: 0; }
+    .recent-date { font-size: 11px; color: #666; }
+
+    /* ============================================
+       STATUS PILLS
+    ============================================ */
+    .status-pill {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 50px;
+        font-size: 9px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        border: 1px solid #000000;
+        white-space: nowrap;
+    }
+    .status-pill.received           { background: #e7f1ff; color: #004085; }
+    .status-pill.diagnosed          { background: #cce5ff; color: #004085; }
+    .status-pill.awaiting_approval  { background: #fff3cd; color: #856404; }
+    .status-pill.approved           { background: #d1ecf1; color: #0c5460; }
+    .status-pill.in_progress        { background: #ffd6a5; color: #7d3c00; }
+    .status-pill.on_hold            { background: #f8d7da; color: #721c24; }
+    .status-pill.completed          { background: #d4edda; color: #155724; }
+    .status-pill.delivered          { background: #c3e6cb; color: #0a4d0a; }
+    .status-pill.cancelled          { background: #f1f1f1; color: #4d4d4d; }
+    .status-pill.unrepairable       { background: #f8d7da; color: #721c24; }
+
+    /* ============================================
+       PAYOUT WIDGET
+    ============================================ */
+    .payout-widget {
+        background: #ffffff;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+    }
+    .payout-widget .icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: #fff3cd;
+        color: #856404;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+    .payout-widget .num {
+        font-size: 22px;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .payout-widget .lbl {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+        margin-top: 3px;
+    }
+    .payout-widget .amount {
+        font-size: 15px;
+        font-weight: 700;
+        color: #155724;
+    }
+
+    /* ============================================
+       EMPTY STATE
+    ============================================ */
+    .empty-mini {
+        text-align: center;
+        padding: 28px 16px;
+        color: #666;
+    }
+    .empty-mini i {
+        font-size: 1.8rem;
+        color: #87CEEB;
+        display: block;
+        margin-bottom: 8px;
+    }
+    .empty-mini p { font-size: 12px; margin: 0; }
+
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 992px) {
+        .period-grid { grid-template-columns: repeat(4, 1fr); }
+        .period-card { padding: 12px; }
+        .period-card .period-value { font-size: 22px; }
+        .period-card .period-icon { width: 30px; height: 30px; font-size: 12px; }
+    }
+
+    @media (max-width: 768px) {
+        .ws-tabbar { padding: 14px 0 0; }
+        .ws-tab {
+            padding: 9px 16px 9px 20px;
+            font-size: 12px;
+            height: 36px;
+        }
+        .ws-tab.active {
+            height: 42px;
+            padding-top: 11px;
+            padding-bottom: 11px;
+        }
+        .ws-tab i { font-size: 12px; }
+
+        .period-grid { gap: 8px; margin-top: 10px; }
+        .period-card { padding: 10px 8px; gap: 4px; }
+        .period-card .period-value { font-size: 20px; }
+        .period-card .period-icon {
+            width: 26px; height: 26px; font-size: 11px;
+            top: 8px; right: 8px;
+        }
+        .period-card .period-label { font-size: 9px; }
+        .period-card .period-sub { font-size: 10px; }
+
+        .tech-table th,
+        .tech-table td { padding: 8px 8px; font-size: 12px; }
+
+        .recent-row { padding: 8px 10px; gap: 10px; }
+        .recent-icon { width: 32px; height: 32px; font-size: 12px; }
+
+        .branch-bar select { min-width: 0; width: 100%; }
+    }
+
+    @media (max-width: 480px) {
+        .ws-tabbar { padding: 10px 0 0; }
+        .ws-tab {
+            padding: 8px 12px 8px 16px;
+            font-size: 11px;
+            height: 34px;
+            gap: 6px;
+        }
+        .ws-tab.active {
+            height: 38px;
+            padding-top: 9px;
+            padding-bottom: 9px;
+        }
+        .ws-tab i { font-size: 11px; }
+
+        .period-grid { gap: 6px; }
+        .period-card { padding: 8px 6px; border-width: 1.5px; }
+        .period-card .period-value { font-size: 17px; }
+        .period-card .period-icon {
+            width: 22px; height: 22px; font-size: 9px;
+            top: 6px; right: 6px;
+        }
+        .period-card .period-label { font-size: 8px; letter-spacing: 0.2px; }
+        .period-card .period-sub { display: none; }
+
+        .tech-table th,
+        .tech-table td { padding: 6px 6px; font-size: 11px; }
+        .rank-badge { width: 22px; height: 22px; font-size: 10px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ============================================================ #}
+{# HERO — diagonal tab bar                                       #}
+{# ============================================================ #}
+<div class="ws-tabbar">
+    <a href="{% url 'workshop:dashboard' %}" class="ws-tab active">
+        <i class="fas fa-tools"></i>
+        <span>Workshop</span>
+    </a>
+
+    {% if user.role == 'company_technician' %}
+        <a href="{% url 'workshop:my-work' %}" class="ws-tab">
+            <i class="fas fa-clipboard-list"></i>
+            <span>My Work</span>
+        </a>
+        <a href="{% url 'workshop:job-create' %}" class="ws-tab">
+            <i class="fas fa-plus-circle"></i>
+            <span>New Job</span>
+        </a>
+    {% else %}
+        <a href="{% url 'workshop:job-list' %}" class="ws-tab">
+            <i class="fas fa-list"></i>
+            <span>All Jobs</span>
+        </a>
+        <a href="{% url 'workshop:payout-list' %}" class="ws-tab">
+            <i class="fas fa-hand-holding-usd"></i>
+            <span>Payouts</span>
+        </a>
+        <a href="{% url 'workshop:job-create' %}" class="ws-tab">
+            <i class="fas fa-plus-circle"></i>
+            <span>New Job</span>
+        </a>
+    {% endif %}
+</div>
+
+{# Subtitle strip — always visible, matches the other pages #}
+<div class="ws-substrip">
+    <div>
+        <i class="fas fa-tools"></i>
+        {% if is_technician_view %}
+            Your repairs overview
+        {% else %}
+            Workshop overview
+            {% if selected_branch %}
+                · <strong>{{ selected_branch.name }}</strong>
+            {% else %}
+                · all branches
+            {% endif %}
+        {% endif %}
+    </div>
+    <div class="sub-actions">
+        <a href="{% url 'workshop:job-create' %}" class="sub-btn">
+            <i class="fas fa-plus"></i> New Job
+        </a>
+        {% if is_technician_view %}
+            <a href="{% url 'workshop:my-work' %}" class="sub-btn">
+                <i class="fas fa-clipboard-list"></i> My Work
+            </a>
+        {% else %}
+            <a href="{% url 'workshop:job-list' %}" class="sub-btn">
+                <i class="fas fa-list"></i> All Jobs
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+{# ============================================================ #}
+{# BRANCH SELECTOR (admins only)                                 #}
+{# ============================================================ #}
+{% if not is_technician_view and branches %}
+<div class="branch-bar mb-3">
+    <label><i class="fas fa-building me-1"></i> Branch</label>
+    <form method="get" id="branchForm" style="display:flex;gap:8px;flex:1;">
+        <select name="branch" onchange="document.getElementById('branchForm').submit()">
+            <option value="">All Branches</option>
+            {% for b in branches %}
+                <option value="{{ b.id }}" {% if selected_branch and selected_branch.id == b.id %}selected{% endif %}>
+                    {{ b.name }}
+                </option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+{% endif %}
+
+{# ============================================================ #}
+{# PERIOD STATS                                                  #}
+{# ============================================================ #}
+<div class="period-grid">
+
+    <div class="period-card">
+        <div class="period-icon year"><i class="fas fa-calendar-alt"></i></div>
+        <div class="period-label">This Year</div>
+        <div class="period-value">{{ stats.year.total }}</div>
+        <div class="period-sub">{{ stats.year.open }} open · {{ stats.year.completed }} done</div>
+    </div>
+
+    <div class="period-card">
+        <div class="period-icon month"><i class="fas fa-calendar"></i></div>
+        <div class="period-label">This Month</div>
+        <div class="period-value">{{ stats.month.total }}</div>
+        <div class="period-sub">{{ stats.month.open }} open · {{ stats.month.completed }} done</div>
+    </div>
+
+    <div class="period-card">
+        <div class="period-icon week"><i class="fas fa-calendar-week"></i></div>
+        <div class="period-label">This Week</div>
+        <div class="period-value">{{ stats.week.total }}</div>
+        <div class="period-sub">{{ stats.week.open }} open · {{ stats.week.completed }} done</div>
+    </div>
+
+    <div class="period-card">
+        <div class="period-icon today"><i class="fas fa-sun"></i></div>
+        <div class="period-label">Today</div>
+        <div class="period-value">{{ stats.today.total }}</div>
+        <div class="period-sub">{{ stats.today.open }} open · {{ stats.today.completed }} done</div>
+    </div>
+
+</div>
+
+{# ============================================================ #}
+{# BODY — ADMINS vs TECHNICIANS                                  #}
+{# ============================================================ #}
+<div class="row g-3 mt-3">
+
+    {% if is_technician_view %}
+
+        {# ============================================ #}
+        {# TECHNICIAN VIEW                               #}
+        {# ============================================ #}
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="fas fa-history me-1"></i> Last 5 Jobs</h6>
+                    <a href="{% url 'workshop:my-work' %}" style="font-size:11px;color:#022ceb;text-decoration:none;font-weight:700;">
+                        View All <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent_jobs %}
+                        {% for job in recent_jobs %}
+                            <a href="{% url 'workshop:job-detail' job.id %}" class="recent-row">
+                                <div class="recent-icon"><i class="fas fa-mobile-alt"></i></div>
+                                <div class="recent-body">
+                                    <div class="recent-title">
+                                        <span style="color:#022ceb;">{{ job.job_number }}</span> — {{ job.device_name }}
+                                    </div>
+                                    <div class="recent-sub">
+                                        {{ job.get_repair_category_display }}
+                                        {% if job.customer %} · {{ job.customer.name }}{% else %} · Store Stock{% endif %}
+                                    </div>
+                                </div>
+                                <div class="recent-meta">
+                                    <span class="status-pill {{ job.status }}">{{ job.get_status_display }}</span>
+                                    <div class="recent-date">{{ job.received_at|date:"M d" }}</div>
+                                </div>
+                            </a>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-mini">
+                            <i class="fas fa-inbox"></i>
+                            <p>No jobs yet. <a href="{% url 'workshop:job-create' %}">Create your first job</a>.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    {% else %}
+
+        {# ============================================ #}
+        {# ADMIN / MANAGER VIEW                          #}
+        {# ============================================ #}
+
+        {# ---- Top Performing Technicians ---- #}
+        <div class="col-lg-7">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h6><i class="fas fa-trophy me-1"></i> Top Technicians</h6>
+                    <span style="font-size:11px;color:#000;opacity:0.7;">{{ stats.year.total }} jobs this year</span>
+                </div>
+                <div class="card-body p-0">
+                    {% if top_technicians %}
+                        <div class="table-responsive">
+                            <table class="tech-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:50px;">#</th>
+                                        <th>Technician</th>
+                                        <th>Branch</th>
+                                        <th style="width:90px;text-align:right;">Jobs</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for tech in top_technicians %}
+                                    <tr>
+                                        <td>
+                                            <span class="rank-badge {% if forloop.counter == 1 %}gold{% elif forloop.counter == 2 %}silver{% elif forloop.counter == 3 %}bronze{% endif %}">
+                                                {{ forloop.counter }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="tech-name">{{ tech.full_name|default:tech.username }}</div>
+                                            <div class="tech-role">{{ tech.get_role_display }}</div>
+                                        </td>
+                                        <td>
+                                            {% if tech.branch %}{{ tech.branch.name }}{% else %}<span class="text-muted" style="font-size:11px;">—</span>{% endif %}
+                                        </td>
+                                        <td style="text-align:right;">
+                                            <span class="count-pill">{{ tech.job_count }}</span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="empty-mini">
+                            <i class="fas fa-users"></i>
+                            <p>No technician activity yet.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {# ---- Pending Payouts Widget ---- #}
+        <div class="col-lg-5">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h6><i class="fas fa-wallet me-1"></i> Pending Payouts</h6>
+                    <a href="{% url 'workshop:payout-list' %}" style="font-size:11px;color:#022ceb;text-decoration:none;font-weight:700;">
+                        Manage <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="payout-widget">
+                        <div class="icon"><i class="fas fa-hourglass-half"></i></div>
+                        <div style="flex:1;">
+                            <div class="num">{{ pending_payouts_count }}</div>
+                            <div class="lbl">Pending</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div class="amount">KSh {{ pending_payouts_total|floatformat:0 }}</div>
+                            <div class="lbl" style="color:#666;">Owed</div>
+                        </div>
+                    </div>
+
+                    <a href="{% url 'workshop:job-list' %}?status=received"
+                       style="background:#87CEEB;border:2px solid #000;color:#000;font-weight:600;padding:8px 14px;border-radius:4px;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:6px;margin-top:14px;">
+                        <i class="fas fa-inbox"></i> View Unassigned Jobs
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        {# ---- Last 5 Jobs (full width) ---- #}
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="fas fa-history me-1"></i> Last 5 Jobs</h6>
+                    <a href="{% url 'workshop:job-list' %}" style="font-size:11px;color:#022ceb;text-decoration:none;font-weight:700;">
+                        View All <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent_jobs %}
+                        {% for job in recent_jobs %}
+                            <a href="{% url 'workshop:job-detail' job.id %}" class="recent-row">
+                                <div class="recent-icon"><i class="fas fa-mobile-alt"></i></div>
+                                <div class="recent-body">
+                                    <div class="recent-title">
+                                        <span style="color:#022ceb;">{{ job.job_number }}</span> — {{ job.device_name }}
+                                    </div>
+                                    <div class="recent-sub">
+                                        {{ job.get_repair_category_display }}
+                                        {% if job.customer %} · {{ job.customer.name }}{% else %} · Store Stock{% endif %}
+                                        {% if job.assigned_technician %} · {{ job.assigned_technician.full_name }}{% endif %}
+                                    </div>
+                                </div>
+                                <div class="recent-meta">
+                                    <span class="status-pill {{ job.status }}">{{ job.get_status_display }}</span>
+                                    <div class="recent-date">{{ job.received_at|date:"M d" }}</div>
+                                </div>
+                            </a>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-mini">
+                            <i class="fas fa-inbox"></i>
+                            <p>No jobs yet. <a href="{% url 'workshop:job-create' %}">Create the first one</a>.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    {% endif %}
+
+</div>
+
+{% endblock %}

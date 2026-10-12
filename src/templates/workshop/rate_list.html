@@ -1,0 +1,621 @@
+{% extends 'base.html' %}
+
+{% block title %}Technician Rates {% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       DIAGONAL TAB BAR
+    ============================================ */
+    .ws-tabbar {
+        display: flex;
+        align-items: flex-end;
+        gap: 0;
+        padding: 18px 0 0;
+        margin-bottom: 0;
+        background: transparent;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        border-bottom: 3px solid #1e4e6d;
+        position: relative;
+    }
+    .ws-tabbar::-webkit-scrollbar { height: 4px; }
+    .ws-tabbar::-webkit-scrollbar-thumb { background: #87CEEB; border-radius: 4px; }
+
+    .ws-tab {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 22px 11px 26px;
+        margin-right: 4px;
+        background: #1e4e6d;
+        color: rgba(255,255,255,0.85) !important;
+        text-decoration: none !important;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+        transform: skewX(-14deg);
+        transition: background 0.15s, color 0.15s;
+        border-top: 2px solid #000;
+        border-left: 2px solid #000;
+        border-right: 2px solid #000;
+        border-radius: 6px 6px 0 0;
+        height: 40px;
+        margin-top: 4px;
+    }
+    .ws-tab > * {
+        display: inline-block;
+        transform: skewX(14deg);
+    }
+    .ws-tab:hover {
+        background: #2d5f7c;
+        color: #ffffff !important;
+    }
+    .ws-tab.active {
+        background: #ffffff;
+        color: #000000 !important;
+        height: 46px;
+        padding-top: 13px;
+        padding-bottom: 13px;
+        margin-top: 0;
+        z-index: 2;
+    }
+    .ws-tab.active i { color: #022ceb; }
+    .ws-tab i {
+        font-size: 13px;
+        color: #87CEEB;
+        transition: color 0.15s;
+    }
+    .ws-tab:hover i { color: #ffffff; }
+
+    .ws-tab.active::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -3px;
+        height: 3px;
+        background: #7bc043;
+        transform: skewX(14deg);
+        transform-origin: left bottom;
+    }
+
+    /* Sub-strip */
+    .ws-substrip {
+        background: #f0f7ff;
+        border: 2px solid #1e4e6d;
+        border-top: none;
+        border-radius: 0 0 4px 4px;
+        padding: 8px 16px;
+        font-size: 12px;
+        color: #000;
+        margin-bottom: 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .ws-substrip strong { color: #022ceb; }
+    .ws-substrip .sub-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .ws-substrip .sub-btn {
+        background: #ffffff;
+        border: 2px solid #000;
+        color: #000;
+        font-weight: 600;
+        font-size: 11px;
+        padding: 4px 10px;
+        border-radius: 4px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        white-space: nowrap;
+    }
+    .ws-substrip .sub-btn:hover {
+        background: #000;
+        color: #fff;
+    }
+
+    /* ============================================
+       STAT TILES
+    ============================================ */
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-bottom: 14px;
+    }
+    .stat-tile {
+        background: #ffffff;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 10px 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+    }
+    .stat-tile .icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: #e7f1ff;
+        color: #022ceb;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        flex-shrink: 0;
+    }
+    .stat-tile .icon.green  { background: #d4edda; color: #155724; }
+    .stat-tile .icon.orange { background: #fff3cd; color: #856404; }
+    .stat-tile .number {
+        font-size: 20px;
+        font-weight: 700;
+        line-height: 1;
+        color: #000000;
+    }
+    .stat-tile .label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: #000000;
+        margin-top: 3px;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .stat-tile .text { min-width: 0; flex: 1; }
+
+    /* ============================================
+       CARD
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 10px 16px;
+        color: #000000 !important;
+        border-radius: 0 !important;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .card-header h6 {
+        color: #000000 !important;
+        font-weight: 700;
+        margin: 0;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+    }
+
+    /* ============================================
+       RATE TABLE
+    ============================================ */
+    .rate-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+    .rate-table th {
+        background: #87CEEB;
+        color: #000000;
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 10px;
+        letter-spacing: 0.5px;
+        padding: 10px 12px;
+        text-align: left;
+        border-bottom: 2px solid #000000;
+        white-space: nowrap;
+    }
+    .rate-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #e0e0e0;
+        vertical-align: middle;
+        color: #000000;
+    }
+    .rate-table tr:last-child td { border-bottom: none; }
+    .rate-table tbody tr:hover td { background: #f8f8f8; }
+    .rate-table tbody tr.row-inactive td { opacity: 0.55; }
+
+    .tech-name {
+        font-weight: 600;
+        font-size: 13px;
+    }
+    .tech-meta {
+        font-size: 11px;
+        color: #666;
+    }
+
+    .category-pill {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 50px;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        border: 1px solid #000000;
+        background: #e7f1ff;
+        color: #004085;
+        white-space: nowrap;
+    }
+    .category-pill.all { background: #f0f0f0; color: #333; }
+
+    .pct-badge {
+        display: inline-block;
+        padding: 5px 12px;
+        border-radius: 4px;
+        font-size: 15px;
+        font-weight: 700;
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #000000;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .basis-tag {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        padding: 2px 8px;
+        border-radius: 50px;
+        border: 1px solid #000000;
+    }
+    .basis-tag.profit  { background: #e7f1ff; color: #004085; }
+    .basis-tag.revenue { background: #fff3cd; color: #856404; }
+
+    .status-pill {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 50px;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        border: 1px solid #000000;
+        white-space: nowrap;
+    }
+    .status-pill.active   { background: #d4edda; color: #155724; }
+    .status-pill.inactive { background: #f8d7da; color: #721c24; }
+
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-sky {
+        background: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        font-weight: 600;
+        font-size: 12px;
+        padding: 6px 14px;
+        border-radius: 4px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 34px;
+        white-space: nowrap;
+    }
+    .btn-sky:hover {
+        background: #7bb8d8;
+        color: #000000;
+    }
+    .btn-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 4px;
+        border: 2px solid #000000;
+        background: #ffffff;
+        color: #000000;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        font-size: 12px;
+        transition: background 0.15s, color 0.15s;
+    }
+    .btn-icon:hover { background: #87CEEB; color: #000000; }
+    .btn-icon.danger:hover { background: #dc3545; color: #ffffff; }
+
+    /* ============================================
+       EMPTY STATE
+    ============================================ */
+    .empty-state {
+        text-align: center;
+        padding: 50px 20px;
+        color: #666;
+    }
+    .empty-state i {
+        font-size: 3rem;
+        color: #87CEEB;
+        margin-bottom: 16px;
+        display: block;
+    }
+    .empty-state h5 {
+        color: #000000;
+        font-weight: 700;
+        margin-bottom: 6px;
+    }
+
+    /* ============================================
+       HINT BOX
+    ============================================ */
+    .hint-box {
+        background: #e7f1ff;
+        border-left: 4px solid #022ceb;
+        padding: 10px 14px;
+        border-radius: 4px;
+        font-size: 12px;
+        color: #000;
+        margin-bottom: 14px;
+    }
+    .hint-box i { color: #022ceb; margin-right: 6px; }
+
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .ws-tabbar { padding: 14px 0 0; }
+        .ws-tab {
+            padding: 9px 16px 9px 20px;
+            font-size: 12px;
+            height: 36px;
+        }
+        .ws-tab.active {
+            height: 42px;
+            padding-top: 11px;
+            padding-bottom: 11px;
+        }
+        .ws-tab i { font-size: 12px; }
+
+        .stat-tile { padding: 8px 8px; gap: 8px; }
+        .stat-tile .icon { width: 32px; height: 32px; font-size: 13px; }
+        .stat-tile .number { font-size: 18px; }
+        .stat-tile .label { font-size: 9px; }
+
+        .rate-table th,
+        .rate-table td { padding: 8px 8px; font-size: 12px; }
+        .pct-badge { font-size: 13px; padding: 4px 10px; }
+    }
+
+    @media (max-width: 480px) {
+        .ws-tabbar { padding: 10px 0 0; }
+        .ws-tab {
+            padding: 8px 12px 8px 16px;
+            font-size: 11px;
+            height: 34px;
+            gap: 6px;
+        }
+        .ws-tab.active {
+            height: 38px;
+            padding-top: 9px;
+            padding-bottom: 9px;
+        }
+        .ws-tab i { font-size: 11px; }
+
+        .stat-tile {
+            padding: 6px 5px;
+            gap: 4px;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .stat-tile .icon { width: 26px; height: 26px; font-size: 11px; }
+        .stat-tile .number { font-size: 15px; }
+        .stat-tile .label { font-size: 8px; letter-spacing: 0; }
+
+        .rate-table th,
+        .rate-table td { padding: 6px 6px; font-size: 11px; }
+        .btn-icon { width: 26px; height: 26px; font-size: 10px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ============================================================ #}
+{# HERO — diagonal tab bar                                       #}
+{# ============================================================ #}
+<div class="ws-tabbar">
+    <a href="{% url 'workshop:dashboard' %}" class="ws-tab">
+        <i class="fas fa-tools"></i>
+        <span>Workshop</span>
+    </a>
+
+    {% if user.role == 'company_technician' %}
+        <a href="{% url 'workshop:my-work' %}" class="ws-tab">
+            <i class="fas fa-clipboard-list"></i>
+            <span>My Work</span>
+        </a>
+        <a href="{% url 'workshop:job-create' %}" class="ws-tab">
+            <i class="fas fa-plus-circle"></i>
+            <span>New Job</span>
+        </a>
+    {% else %}
+        <a href="{% url 'workshop:job-list' %}" class="ws-tab">
+            <i class="fas fa-list"></i>
+            <span>All Jobs</span>
+        </a>
+        <a href="{% url 'workshop:payout-list' %}" class="ws-tab active">
+            <i class="fas fa-hand-holding-usd"></i>
+            <span>Payouts</span>
+        </a>
+        <a href="{% url 'workshop:job-create' %}" class="ws-tab">
+            <i class="fas fa-plus-circle"></i>
+            <span>New Job</span>
+        </a>
+    {% endif %}
+</div>
+
+{# Sub-strip #}
+<div class="ws-substrip">
+    <div>
+        <i class="fas fa-percentage"></i>
+        <strong>{{ rates|length }}</strong> technician rate{{ rates|length|pluralize }}
+    </div>
+    <div class="sub-actions">
+        <a href="{% url 'workshop:rate-create' %}" class="sub-btn">
+            <i class="fas fa-plus"></i> New Rate
+        </a>
+        <a href="{% url 'workshop:payout-list' %}" class="sub-btn">
+            <i class="fas fa-hand-holding-usd"></i> Payouts
+        </a>
+    </div>
+</div>
+
+{# ============================================================ #}
+{# STAT TILES                                                    #}
+{# ============================================================ #}
+<div class="stats-row">
+    <div class="stat-tile">
+        <div class="icon"><i class="fas fa-list"></i></div>
+        <div class="text">
+            <div class="number">{{ rates|length }}</div>
+            <div class="label">Total Rates</div>
+        </div>
+    </div>
+    <div class="stat-tile">
+        <div class="icon green"><i class="fas fa-check-circle"></i></div>
+        <div class="text">
+            <div class="number">{{ active_count|default:0 }}</div>
+            <div class="label">Active</div>
+        </div>
+    </div>
+    <div class="stat-tile">
+        <div class="icon orange"><i class="fas fa-user-cog"></i></div>
+        <div class="text">
+            <div class="number">{{ technician_count|default:0 }}</div>
+            <div class="label">Technicians</div>
+        </div>
+    </div>
+</div>
+
+{# ============================================================ #}
+{# HINT                                                          #}
+{# ============================================================ #}
+<div class="hint-box">
+    <i class="fas fa-info-circle"></i>
+    <strong>How rates work:</strong>
+    When a job is completed, the technician's payout is calculated based on the
+    <strong>most specific rate</strong> that matches — a rate for the exact
+    <em>category</em> wins over the <em>all-categories</em> default.
+</div>
+
+{# ============================================================ #}
+{# RATE TABLE                                                    #}
+{# ============================================================ #}
+<div class="card">
+    <div class="card-body p-0">
+        {% if rates %}
+            <div class="table-responsive">
+                <table class="rate-table">
+                    <thead>
+                        <tr>
+                            <th>Technician</th>
+                            <th>Category</th>
+                            <th style="width:110px;">Percentage</th>
+                            <th style="width:110px;">Basis</th>
+                            <th style="width:100px;">Status</th>
+                            <th style="width:120px;">Updated</th>
+                            <th style="width:110px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in rates %}
+                        <tr class="{% if not r.is_active %}row-inactive{% endif %}">
+                            <td>
+                                {% if r.technician %}
+                                    <div class="tech-name">{{ r.technician.full_name }}</div>
+                                    <div class="tech-meta">{{ r.technician.get_role_display }}</div>
+                                {% else %}
+                                    <span class="tech-meta">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if r.repair_category %}
+                                    <span class="category-pill">
+                                        {{ r.get_repair_category_display }}
+                                    </span>
+                                {% else %}
+                                    <span class="category-pill all">
+                                        <i class="fas fa-globe"></i> All Categories
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="pct-badge">{{ r.percentage }}%</span>
+                            </td>
+                            <td>
+                                <span class="basis-tag {{ r.basis }}">
+                                    {% if r.basis == 'profit' %}
+                                        <i class="fas fa-chart-line"></i>
+                                    {% else %}
+                                        <i class="fas fa-coins"></i>
+                                    {% endif %}
+                                    {{ r.get_basis_display|truncatechars:8 }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if r.is_active %}
+                                    <span class="status-pill active">Active</span>
+                                {% else %}
+                                    <span class="status-pill inactive">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div style="font-size:12px;">{{ r.updated_at|date:"Y-m-d" }}</div>
+                                <div class="tech-meta">{{ r.updated_at|date:"H:i" }}</div>
+                            </td>
+                            <td>
+                                <div class="d-flex gap-1">
+                                    <a href="{% url 'workshop:rate-edit' r.id %}"
+                                       class="btn-icon" title="Edit rate">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <form method="post" action="{% url 'workshop:rate-delete' r.id %}"
+                                          onsubmit="return confirm('Delete this rate for {{ r.technician.full_name|default:'this technician' }}?');"
+                                          style="display:inline;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn-icon danger" title="Delete rate">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-percentage"></i>
+                <h5>No rates configured yet</h5>
+                <p>
+                    Add a rate for each technician so their payouts are calculated automatically
+                    when a job is completed.
+                </p>
+                <a href="{% url 'workshop:rate-create' %}" class="btn-sky mt-2">
+                    <i class="fas fa-plus"></i> Add First Rate
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

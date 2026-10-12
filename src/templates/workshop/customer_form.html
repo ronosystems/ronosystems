@@ -1,0 +1,276 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if customer %}Edit Customer{% else %}New Customer{% endif %} {% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       FORM SECTIONS
+    ============================================ */
+    .required:after {
+        content: " *";
+        color: #dc3545;
+        font-weight: bold;
+    }
+
+    .form-section {
+        background: #f8f9fa;
+        padding: 15px 20px;
+        border-radius: 4px;
+        margin-bottom: 18px;
+        border: 2px solid #000000;
+    }
+    .form-section h6 {
+        font-weight: 700;
+        color: #000000;
+        margin-bottom: 15px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .form-section h6 i {
+        margin-right: 8px;
+        color: #000000;
+    }
+
+    /* ============================================
+       CARD
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+        color: #000000 !important;
+        border-radius: 0 !important;
+    }
+    .card-header h6 {
+        color: #000000 !important;
+        font-weight: 700;
+        margin: 0;
+        font-size: 14px;
+    }
+
+    /* ============================================
+       FORM ELEMENTS
+    ============================================ */
+    .form-control, .form-select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        color: #000000;
+        font-size: 14px;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .form-label {
+        color: #000000;
+        font-weight: 600;
+        font-size: 13px;
+        margin-bottom: 4px;
+    }
+    textarea.form-control {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 13px;
+    }
+    textarea.form-control:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .help-text {
+        font-size: 11px;
+        color: #666;
+        margin-top: 3px;
+    }
+
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+
+    /* ============================================
+       FORM ERRORS
+    ============================================ */
+    .field-error {
+        color: #dc3545;
+        font-size: 12px;
+        margin-top: 3px;
+    }
+    .is-invalid {
+        border-color: #dc3545 !important;
+    }
+
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .form-section { padding: 12px 14px; }
+        .form-section h6 { font-size: 12px; }
+        .card-body { padding: 14px !important; }
+        .form-control, .form-select { font-size: 13px; }
+        .btn { font-size: 12px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+
+        {# ============================================================ #}
+        {# HEADER CARD                                                   #}
+        {# ============================================================ #}
+        <div class="card mb-3">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h6 class="mb-0">
+                        <i class="fas fa-{% if customer %}user-edit{% else %}user-plus{% endif %}"></i>
+                        {% if customer %}
+                            Edit Customer — {{ customer.name }}
+                        {% else %}
+                            Add New Customer
+                        {% endif %}
+                    </h6>
+                    {% if customer %}
+                    <a href="{% url 'workshop:customer-list' %}" style="font-size:11px;color:#022ceb;text-decoration:none;font-weight:700;">
+                        <i class="fas fa-arrow-left"></i> Back to Customers
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {# ============================================================ #}
+        {# FORM                                                          #}
+        {# ============================================================ #}
+        <form method="post" id="customerForm">
+            {% csrf_token %}
+
+            {# Non-field errors #}
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle"></i>
+                {{ form.non_field_errors }}
+            </div>
+            {% endif %}
+
+            {# ============================================================ #}
+            {# BASIC INFO                                                    #}
+            {# ============================================================ #}
+            <div class="form-section">
+                <h6><i class="fas fa-id-card"></i> Basic Information</h6>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label required" for="{{ form.name.id_for_label }}">
+                            Full Name
+                        </label>
+                        {{ form.name }}
+                        {% if form.name.errors %}
+                        <div class="field-error">{{ form.name.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label required" for="{{ form.phone.id_for_label }}">
+                            Phone Number
+                        </label>
+                        {{ form.phone }}
+                        <div class="help-text">Primary contact for reaching the customer</div>
+                        {% if form.phone.errors %}
+                        <div class="field-error">{{ form.phone.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-12 mb-3">
+                        <label class="form-label" for="{{ form.email.id_for_label }}">
+                            Email Address
+                        </label>
+                        {{ form.email }}
+                        <div class="help-text">Optional — used for receipts and notifications</div>
+                        {% if form.email.errors %}
+                        <div class="field-error">{{ form.email.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            {# ============================================================ #}
+            {# ADDRESS & NOTES                                               #}
+            {# ============================================================ #}
+            <div class="form-section">
+                <h6><i class="fas fa-map-marker-alt"></i> Address &amp; Notes</h6>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="{{ form.address.id_for_label }}">
+                            Address
+                        </label>
+                        {{ form.address }}
+                        <div class="help-text">Optional physical or postal address</div>
+                        {% if form.address.errors %}
+                        <div class="field-error">{{ form.address.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="{{ form.notes.id_for_label }}">
+                            Internal Notes
+                        </label>
+                        {{ form.notes }}
+                        <div class="help-text">Staff-only — not visible to the customer</div>
+                        {% if form.notes.errors %}
+                        <div class="field-error">{{ form.notes.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            {# ============================================================ #}
+            {# SUBMIT                                                        #}
+            {# ============================================================ #}
+            <div class="d-flex gap-2 mt-3 flex-wrap">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i>
+                    {% if customer %}Update Customer{% else %}Create Customer{% endif %}
+                </button>
+                <a href="{% url 'workshop:customer-list' %}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Cancel
+                </a>
+                {% if customer %}
+                <a href="{% url 'workshop:job-create' %}" class="btn btn-secondary ms-auto">
+                    <i class="fas fa-plus"></i> Create Job For This Customer
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,716 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if is_edit %}Edit Job{% else %}New Job{% endif %} {% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       DIAGONAL TAB BAR
+    ============================================ */
+    .ws-tabbar {
+        display: flex;
+        align-items: flex-end;
+        gap: 0;
+        padding: 18px 0 0;
+        margin-bottom: 0;
+        background: transparent;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        border-bottom: 3px solid #1e4e6d;
+        position: relative;
+    }
+    .ws-tabbar::-webkit-scrollbar { height: 4px; }
+    .ws-tabbar::-webkit-scrollbar-thumb { background: #87CEEB; border-radius: 4px; }
+
+    .ws-tab {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 22px 11px 26px;
+        margin-right: 4px;
+        background: #1e4e6d;
+        color: rgba(255,255,255,0.85) !important;
+        text-decoration: none !important;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+        transform: skewX(-14deg);
+        transition: background 0.15s, color 0.15s;
+        border-top: 2px solid #000;
+        border-left: 2px solid #000;
+        border-right: 2px solid #000;
+        border-radius: 6px 6px 0 0;
+        height: 40px;
+        margin-top: 4px;
+    }
+    .ws-tab > * {
+        display: inline-block;
+        transform: skewX(14deg);
+    }
+    .ws-tab:hover {
+        background: #2d5f7c;
+        color: #ffffff !important;
+    }
+    .ws-tab.active {
+        background: #ffffff;
+        color: #000000 !important;
+        height: 46px;
+        padding-top: 13px;
+        padding-bottom: 13px;
+        margin-top: 0;
+        z-index: 2;
+    }
+    .ws-tab.active i { color: #022ceb; }
+    .ws-tab i {
+        font-size: 13px;
+        color: #87CEEB;
+        transition: color 0.15s;
+    }
+    .ws-tab:hover i { color: #ffffff; }
+
+    .ws-tab.active::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -3px;
+        height: 3px;
+        background: #7bc043;
+        transform: skewX(14deg);
+        transform-origin: left bottom;
+    }
+
+    /* Subtitle strip */
+    .ws-substrip {
+        background: #f0f7ff;
+        border: 2px solid #1e4e6d;
+        border-top: none;
+        border-radius: 0 0 4px 4px;
+        padding: 8px 16px;
+        font-size: 12px;
+        color: #000;
+        margin-bottom: 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .ws-substrip strong { color: #022ceb; }
+    .ws-substrip .sub-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .ws-substrip .sub-btn {
+        background: #ffffff;
+        border: 2px solid #000;
+        color: #000;
+        font-weight: 600;
+        font-size: 11px;
+        padding: 4px 10px;
+        border-radius: 4px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        white-space: nowrap;
+    }
+    .ws-substrip .sub-btn:hover {
+        background: #000;
+        color: #fff;
+    }
+
+    /* ============================================
+       FORM SECTIONS
+    ============================================ */
+    .required:after {
+        content: " *";
+        color: #dc3545;
+        font-weight: bold;
+    }
+
+    .form-section {
+        background: #f8f9fa;
+        padding: 15px 20px;
+        border-radius: 4px;
+        margin-bottom: 18px;
+        border: 2px solid #000000;
+    }
+    .form-section h6 {
+        font-weight: 700;
+        color: #000000;
+        margin-bottom: 15px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .form-section h6 i {
+        margin-right: 8px;
+        color: #000000;
+    }
+
+    /* ============================================
+       CARD
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+        color: #000000 !important;
+        border-radius: 0 !important;
+    }
+    .card-header h6 {
+        color: #000000 !important;
+        font-weight: 700;
+        margin: 0;
+        font-size: 14px;
+    }
+    .card-body {
+        color: #000000;
+    }
+
+    /* ============================================
+       FORM ELEMENTS
+    ============================================ */
+    .form-control, .form-select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        color: #000000;
+        font-size: 14px;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .form-control[readonly],
+    .form-control:disabled {
+        background: #e9ecef;
+        cursor: not-allowed;
+        color: #000000;
+        font-weight: 600;
+    }
+    .form-label {
+        color: #000000;
+        font-weight: 600;
+        font-size: 13px;
+        margin-bottom: 4px;
+    }
+    textarea.form-control {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 13px;
+    }
+    textarea.form-control:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+
+    .help-text {
+        font-size: 11px;
+        color: #666;
+        margin-top: 3px;
+    }
+
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-outline-info {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+        font-size: 12px;
+    }
+    .btn-outline-info:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+
+    /* ============================================
+       FORM ERROR
+    ============================================ */
+    .field-error {
+        color: #dc3545;
+        font-size: 12px;
+        margin-top: 3px;
+    }
+
+    /* ============================================
+       STATUS PILL IN HEADER
+    ============================================ */
+    .status-pill {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 50px;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        border: 1px solid #000000;
+    }
+    .status-pill.received           { background: #e7f1ff; color: #004085; }
+    .status-pill.diagnosed          { background: #cce5ff; color: #004085; }
+    .status-pill.awaiting_approval  { background: #fff3cd; color: #856404; }
+    .status-pill.approved           { background: #d1ecf1; color: #0c5460; }
+    .status-pill.in_progress        { background: #ffd6a5; color: #7d3c00; }
+    .status-pill.on_hold            { background: #f8d7da; color: #721c24; }
+    .status-pill.completed          { background: #d4edda; color: #155724; }
+    .status-pill.delivered          { background: #c3e6cb; color: #0a4d0a; }
+    .status-pill.cancelled          { background: #f1f1f1; color: #4d4d4d; }
+    .status-pill.unrepairable       { background: #f8d7da; color: #721c24; }
+
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .ws-tabbar { padding: 14px 0 0; }
+        .ws-tab {
+            padding: 9px 16px 9px 20px;
+            font-size: 12px;
+            height: 36px;
+        }
+        .ws-tab.active {
+            height: 42px;
+            padding-top: 11px;
+            padding-bottom: 11px;
+        }
+        .ws-tab i { font-size: 12px; }
+
+        .form-section { padding: 12px 14px; }
+        .form-section h6 { font-size: 12px; }
+        .card-body { padding: 14px !important; }
+        .form-control, .form-select { font-size: 13px; }
+        .btn { font-size: 12px; }
+    }
+
+    @media (max-width: 480px) {
+        .ws-tabbar { padding: 10px 0 0; }
+        .ws-tab {
+            padding: 8px 12px 8px 16px;
+            font-size: 11px;
+            height: 34px;
+            gap: 6px;
+        }
+        .ws-tab.active {
+            height: 38px;
+            padding-top: 9px;
+            padding-bottom: 9px;
+        }
+        .ws-tab i { font-size: 11px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ============================================================ #}
+{# HERO — diagonal tab bar                                       #}
+{# ============================================================ #}
+<div class="ws-tabbar">
+    <a href="{% url 'workshop:dashboard' %}" class="ws-tab">
+        <i class="fas fa-tools"></i>
+        <span>Workshop</span>
+    </a>
+
+    {% if user.role == 'company_technician' %}
+        <a href="{% url 'workshop:my-work' %}" class="ws-tab">
+            <i class="fas fa-clipboard-list"></i>
+            <span>My Work</span>
+        </a>
+        <a href="{% url 'workshop:job-create' %}" class="ws-tab {% if not is_edit %}active{% endif %}">
+            <i class="fas fa-plus-circle"></i>
+            <span>New Job</span>
+        </a>
+    {% else %}
+        <a href="{% url 'workshop:job-list' %}" class="ws-tab">
+            <i class="fas fa-list"></i>
+            <span>All Jobs</span>
+        </a>
+        <a href="{% url 'workshop:payout-list' %}" class="ws-tab">
+            <i class="fas fa-hand-holding-usd"></i>
+            <span>Payouts</span>
+        </a>
+        <a href="{% url 'workshop:job-create' %}" class="ws-tab {% if not is_edit %}active{% endif %}">
+            <i class="fas fa-plus-circle"></i>
+            <span>New Job</span>
+        </a>
+    {% endif %}
+</div>
+
+{# Subtitle strip #}
+<div class="ws-substrip">
+    <div>
+        {% if is_edit %}
+            <i class="fas fa-edit"></i> Editing job
+            <strong>{{ job.job_number }}</strong>
+            — {{ job.device_name }}
+        {% else %}
+            <i class="fas fa-plus-circle"></i> Creating a new repair job
+        {% endif %}
+    </div>
+    <div class="sub-actions">
+        <a href="{% if is_edit %}{% url 'workshop:job-detail' job.id %}{% else %}{% url 'workshop:my-work' %}{% endif %}"
+           class="sub-btn">
+            <i class="fas fa-arrow-left"></i> {% if is_edit %}Back to Job{% else %}My Work{% endif %}
+        </a>
+        {% if not is_edit %}
+        <a href="{% url 'workshop:dashboard' %}" class="sub-btn">
+            <i class="fas fa-tools"></i> Workshop
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-11 mx-auto">
+
+        {# ============================================================ #}
+        {# FORM                                                          #}
+        {# ============================================================ #}
+        <form method="post" id="jobForm" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle"></i>
+                {{ form.non_field_errors }}
+            </div>
+            {% endif %}
+
+            {# ============================================================ #}
+            {# CLASSIFICATION                                                #}
+            {# ============================================================ #}
+            <div class="form-section">
+                <h6><i class="fas fa-tags"></i> Classification</h6>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label required" for="{{ form.repair_category.id_for_label }}">
+                            Repair Category
+                        </label>
+                        {{ form.repair_category }}
+                        {% if form.repair_category.errors %}
+                        <div class="field-error">{{ form.repair_category.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label required" for="{{ form.work_source.id_for_label }}">
+                            Work Source
+                        </label>
+                        {{ form.work_source }}
+                        <div class="help-text">Customer walk-in or store stock</div>
+                        {% if form.work_source.errors %}
+                        <div class="field-error">{{ form.work_source.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label" for="{{ form.priority.id_for_label }}">
+                            Priority
+                        </label>
+                        {{ form.priority }}
+                        {% if form.priority.errors %}
+                        <div class="field-error">{{ form.priority.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label" for="{{ form.expected_delivery.id_for_label }}">
+                            Expected Delivery
+                        </label>
+                        {{ form.expected_delivery }}
+                        {% if form.expected_delivery.errors %}
+                        <div class="field-error">{{ form.expected_delivery.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            {# ============================================================ #}
+            {# CUSTOMER                                                      #}
+            {# ============================================================ #}
+            <div class="form-section">
+                <h6><i class="fas fa-user"></i> Customer</h6>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="{{ form.customer.id_for_label }}">
+                            Customer
+                        </label>
+                        {{ form.customer }}
+                        <div class="help-text">
+                            Required for customer walk-ins.
+                            <a href="{% url 'workshop:customer-create' %}" target="_blank" style="color:#022ceb;font-weight:600;">
+                                NEW CUSTOMER
+                            </a>
+                        </div>
+                        {% if form.customer.errors %}
+                        <div class="field-error">{{ form.customer.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Store Stock</label>
+                        <div style="padding:7px 10px;border:2px solid #000;border-radius:4px;background:#f8f9fa;font-size:13px;color:#000;">
+                            <i class="fas fa-store"></i>
+                            Select <strong>"Store Stock"</strong> in Work Source above to use a company device.
+                        </div>
+                        <div class="help-text">Leave Customer blank for store-stock repairs.</div>
+                    </div>
+                </div>
+            </div>
+
+            {# ============================================================ #}
+            {# DEVICE                                                        #}
+            {# ============================================================ #}
+            <div class="form-section">
+                <h6><i class="fas fa-mobile-alt"></i> Device</h6>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label required" for="{{ form.device_name.id_for_label }}">
+                            Device Name
+                        </label>
+                        {{ form.device_name }}
+                        <div class="help-text">E.g. "Samsung Galaxy A14", "HP Laptop"</div>
+                        {% if form.device_name.errors %}
+                        <div class="field-error">{{ form.device_name.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label" for="{{ form.device_brand.id_for_label }}">
+                            Brand
+                        </label>
+                        {{ form.device_brand }}
+                        {% if form.device_brand.errors %}
+                        <div class="field-error">{{ form.device_brand.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label" for="{{ form.device_model.id_for_label }}">
+                            Model
+                        </label>
+                        {{ form.device_model }}
+                        {% if form.device_model.errors %}
+                        <div class="field-error">{{ form.device_model.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="{{ form.device_serial.id_for_label }}">
+                            Serial / IMEI
+                        </label>
+                        {{ form.device_serial }}
+                        {% if form.device_serial.errors %}
+                        <div class="field-error">{{ form.device_serial.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label" for="{{ form.device_password.id_for_label }}">
+                            Device Password / PIN
+                        </label>
+                        {{ form.device_password }}
+                        <div class="help-text">If the customer provided one</div>
+                        {% if form.device_password.errors %}
+                        <div class="field-error">{{ form.device_password.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label" for="{{ form.device_accessories.id_for_label }}">
+                            Accessories Received
+                        </label>
+                        {{ form.device_accessories }}
+                        <div class="help-text">E.g. "charger, case, SIM tray"</div>
+                        {% if form.device_accessories.errors %}
+                        <div class="field-error">{{ form.device_accessories.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            {# ============================================================ #}
+            {# PROBLEM & DIAGNOSIS                                           #}
+            {# ============================================================ #}
+            <div class="form-section">
+                <h6><i class="fas fa-stethoscope"></i> Problem &amp; Diagnosis</h6>
+                <div class="row">
+                    <div class="col-12 col-md-4 mb-3">
+                        <label class="form-label required" for="{{ form.reported_problem.id_for_label }}">
+                            Reported Problem
+                        </label>
+                        {{ form.reported_problem }}
+                        <div class="help-text">What the customer said is wrong</div>
+                        {% if form.reported_problem.errors %}
+                        <div class="field-error">{{ form.reported_problem.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-12 col-md-4 mb-3">
+                        <label class="form-label" for="{{ form.diagnosis.id_for_label }}">
+                            Diagnosis
+                        </label>
+                        {{ form.diagnosis }}
+                        <div class="help-text">Technician findings after inspection</div>
+                        {% if form.diagnosis.errors %}
+                        <div class="field-error">{{ form.diagnosis.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-12 col-md-4 mb-3">
+                        <label class="form-label" for="{{ form.work_summary.id_for_label }}">
+                            Work Summary
+                        </label>
+                        {{ form.work_summary }}
+                        <div class="help-text">Final summary of what was done</div>
+                        {% if form.work_summary.errors %}
+                        <div class="field-error">{{ form.work_summary.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            {# ============================================================ #}
+            {# MONEY — exactly 3 columns, plain inputs                      #}
+            {# ============================================================ #}
+            <div class="form-section">
+                <h6><i class="fas fa-dollar-sign"></i> Money</h6>
+
+                <div class="row">
+
+                    {# ---- 1. Amount Customer to Pay ---- #}
+                    <div class="col-12 col-md-4 mb-3">
+                        <label class="form-label" for="{{ form.final_amount.id_for_label }}">
+                            Amount Customer to Pay
+                        </label>
+                        {{ form.final_amount }}
+                        <div class="help-text">Total the customer pays</div>
+                        {% if form.final_amount.errors %}
+                        <div class="field-error">{{ form.final_amount.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    {# ---- 2. Amount Used for Transport ---- #}
+                    <div class="col-12 col-md-4 mb-3">
+                        <label class="form-label" for="{{ form.transport_cost.id_for_label }}">
+                            Amount Used for Transport
+                        </label>
+                        {{ form.transport_cost }}
+                        <div class="help-text">Fuel, boda, courier</div>
+                        {% if form.transport_cost.errors %}
+                        <div class="field-error">{{ form.transport_cost.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    {# ---- 3. Amount Cost of the Material (auto, read-only) ---- #}
+                    <div class="col-12 col-md-4 mb-3">
+                        <label class="form-label">
+                            Amount Cost of the Material
+                        </label>
+                        <input type="text"
+                               class="form-control"
+                               value="{% if job %}{{ job.actual_material_cost|floatformat:2 }}{% else %}0.00{% endif %}"
+                               readonly>
+                        <div class="help-text">Auto from materials</div>
+                    </div>
+
+                </div>
+            </div>
+
+            {# ============================================================ #}
+            {# ASSIGNMENT                                                    #}
+            {# ============================================================ #}
+            <div class="form-section">
+                <h6><i class="fas fa-user-cog"></i> Assignment</h6>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="{{ form.assigned_technician.id_for_label }}">
+                            Assigned Technician
+                        </label>
+                        {{ form.assigned_technician }}
+                        <div class="help-text">Leave blank for the unassigned queue</div>
+                        {% if form.assigned_technician.errors %}
+                        <div class="field-error">{{ form.assigned_technician.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="{{ form.branch.id_for_label }}">
+                            Branch
+                        </label>
+                        {{ form.branch }}
+                        {% if form.branch.errors %}
+                        <div class="field-error">{{ form.branch.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            {# ============================================================ #}
+            {# INTERNAL NOTES                                                #}
+            {# ============================================================ #}
+            <div class="form-section">
+                <h6><i class="fas fa-lock"></i> Internal Notes</h6>
+                <div class="row">
+                    <div class="col-12">
+                        <label class="form-label" for="{{ form.internal_notes.id_for_label }}">
+                            Staff-only Notes
+                        </label>
+                        {{ form.internal_notes }}
+                        <div class="help-text">Not visible to the customer</div>
+                        {% if form.internal_notes.errors %}
+                        <div class="field-error">{{ form.internal_notes.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            {# ============================================================ #}
+            {# SUBMIT                                                        #}
+            {# ============================================================ #}
+            <div class="d-flex gap-2 mt-3 flex-wrap">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i>
+                    {% if is_edit %}Update Job{% else %}Create Job{% endif %}
+                </button>
+                <a href="{% if is_edit %}{% url 'workshop:job-detail' job.id %}{% else %}{% url 'workshop:my-work' %}{% endif %}"
+                   class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Cancel
+                </a>
+                {% if is_edit %}
+                <a href="{% url 'workshop:job-detail' job.id %}" class="btn btn-outline-info ms-auto">
+                    <i class="fas fa-eye"></i> View Job
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,401 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if is_edit %}Edit Rate{% else %}New Rate{% endif %} {% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       FORM SECTIONS
+    ============================================ */
+    .required:after {
+        content: " *";
+        color: #dc3545;
+        font-weight: bold;
+    }
+
+    .form-section {
+        background: #f8f9fa;
+        padding: 15px 20px;
+        border-radius: 4px;
+        margin-bottom: 18px;
+        border: 2px solid #000000;
+    }
+    .form-section h6 {
+        font-weight: 700;
+        color: #000000;
+        margin-bottom: 15px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .form-section h6 i {
+        margin-right: 8px;
+        color: #000000;
+    }
+
+    /* ============================================
+       CARD
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+        color: #000000 !important;
+        border-radius: 0 !important;
+    }
+    .card-header h6 {
+        color: #000000 !important;
+        font-weight: 700;
+        margin: 0;
+        font-size: 14px;
+    }
+
+    /* ============================================
+       FORM ELEMENTS
+    ============================================ */
+    .form-control, .form-select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        color: #000000;
+        font-size: 14px;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .form-label {
+        color: #000000;
+        font-weight: 600;
+        font-size: 13px;
+        margin-bottom: 4px;
+    }
+    .help-text {
+        font-size: 11px;
+        color: #666;
+        margin-top: 3px;
+    }
+    .input-group-text {
+        border: 2px solid #000000;
+        border-right: none;
+        border-radius: 4px 0 0 4px;
+        background: #f8f9fa;
+        color: #000000;
+        font-weight: 600;
+        font-size: 13px;
+    }
+    .input-group .form-control {
+        border-radius: 0 4px 4px 0;
+        border-left: none;
+    }
+    .input-group:focus-within .input-group-text {
+        border-color: #87CEEB;
+    }
+
+    /* ============================================
+       FORM SWITCH
+    ============================================ */
+    .form-switch .form-check-input {
+        width: 40px;
+        height: 22px;
+        cursor: pointer;
+        border: 2px solid #000000;
+        background: #ccc;
+        border-radius: 22px;
+    }
+    .form-switch .form-check-input:checked {
+        background-color: #28a745;
+        border-color: #000000;
+    }
+    .form-switch .form-check-input:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .form-switch .form-check-label {
+        color: #000000;
+        font-weight: 600;
+        margin-left: 8px;
+    }
+
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-danger {
+        background-color: #dc3545;
+        border: 2px solid #000000;
+        color: #ffffff;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-danger:hover {
+        background-color: #b02a37;
+        border-color: #000000;
+        color: #ffffff;
+    }
+
+    /* ============================================
+       FORM ERRORS
+    ============================================ */
+    .field-error {
+        color: #dc3545;
+        font-size: 12px;
+        margin-top: 3px;
+    }
+    .is-invalid {
+        border-color: #dc3545 !important;
+    }
+
+    /* ============================================
+       DELETE MODE
+    ============================================ */
+    .delete-box {
+        background: #fff5f5;
+        border: 2px solid #dc3545;
+        border-radius: 4px;
+        padding: 20px;
+        text-align: center;
+    }
+    .delete-box i.warn {
+        font-size: 3rem;
+        color: #dc3545;
+        display: block;
+        margin-bottom: 12px;
+    }
+    .delete-box h5 {
+        color: #000;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .form-section { padding: 12px 14px; }
+        .form-section h6 { font-size: 12px; }
+        .card-body { padding: 14px !important; }
+        .form-control, .form-select { font-size: 13px; }
+        .btn { font-size: 12px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ============================================================ #}
+{# DELETE MODE — different UI                                    #}
+{# ============================================================ #}
+{% if not is_edit and rate %}
+
+<div class="row">
+    <div class="col-lg-6 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-trash"></i> Delete Technician Rate</h6>
+            </div>
+            <div class="card-body">
+                <div class="delete-box">
+                    <i class="fas fa-exclamation-triangle warn"></i>
+                    <h5>Delete this rate?</h5>
+                    <p style="font-size:13px;margin-bottom:16px;">
+                        <strong>{{ rate.technician.full_name|default:"Technician" }}</strong>
+                        — 
+                        {% if rate.repair_category %}
+                            {{ rate.get_repair_category_display }}
+                        {% else %}
+                            All Categories
+                        {% endif %}
+                        ({{ rate.percentage }}% of {{ rate.get_basis_display }})
+                    </p>
+                    <p style="font-size:12px;color:#666;">
+                        This action cannot be undone. Existing payouts already computed
+                        using this rate are not affected.
+                    </p>
+
+                    <form method="post" style="margin-top:20px;">
+                        {% csrf_token %}
+                        <div class="d-flex gap-2 justify-content-center flex-wrap">
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Yes, Delete
+                            </button>
+                            <a href="{% url 'workshop:rate-list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+
+{# ============================================================ #}
+{# CREATE / EDIT MODE                                            #}
+{# ============================================================ #}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h6 class="mb-0">
+                        <i class="fas fa-{% if is_edit %}edit{% else %}plus-circle{% endif %}"></i>
+                        {% if is_edit %}
+                            Edit Rate
+                        {% else %}
+                            New Technician Rate
+                        {% endif %}
+                    </h6>
+                    {% if is_edit and rate.technician %}
+                    <span style="font-size:11px;font-weight:700;color:#000;">
+                        {{ rate.technician.full_name }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <form method="post" id="rateForm">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle"></i>
+                {{ form.non_field_errors }}
+            </div>
+            {% endif %}
+
+            {# ---------- TECHNICIAN & CATEGORY ---------- #}
+            <div class="form-section">
+                <h6><i class="fas fa-user-cog"></i> Assignment</h6>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label required" for="{{ form.technician.id_for_label }}">
+                            Technician
+                        </label>
+                        {{ form.technician }}
+                        <div class="help-text">Only technicians in your company are listed</div>
+                        {% if form.technician.errors %}
+                        <div class="field-error">{{ form.technician.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="{{ form.repair_category.id_for_label }}">
+                            Repair Category
+                        </label>
+                        {{ form.repair_category }}
+                        <div class="help-text">
+                            Leave blank for the technician's <strong>default rate</strong>
+                            across all categories
+                        </div>
+                        {% if form.repair_category.errors %}
+                        <div class="field-error">{{ form.repair_category.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            {# ---------- RATE VALUE ---------- #}
+            <div class="form-section">
+                <h6><i class="fas fa-percentage"></i> Payout Rate</h6>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label required" for="{{ form.percentage.id_for_label }}">
+                            Percentage
+                        </label>
+                        <div class="input-group">
+                            {{ form.percentage }}
+                            <span class="input-group-text" style="border-left:2px solid #000;border-right:2px solid #000;border-radius:0;">%</span>
+                        </div>
+                        <div class="help-text">Between 0 and 100 — e.g. 30 for 30%</div>
+                        {% if form.percentage.errors %}
+                        <div class="field-error">{{ form.percentage.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label required" for="{{ form.basis.id_for_label }}">
+                            Calculated On
+                        </label>
+                        {{ form.basis }}
+                        <div class="help-text">
+                            <strong>Profit</strong> = final amount − material cost.
+                            <strong>Revenue</strong> = final amount.
+                        </div>
+                        {% if form.basis.errors %}
+                        <div class="field-error">{{ form.basis.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            {# ---------- STATUS ---------- #}
+            <div class="form-section">
+                <h6><i class="fas fa-toggle-on"></i> Status</h6>
+                <div class="form-check form-switch">
+                    <input type="checkbox" class="form-check-input"
+                           name="is_active" id="{{ form.is_active.id_for_label }}"
+                           {% if form.is_active.value %}checked{% endif %}>
+                    <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                        <i class="fas fa-check-circle text-success"></i> Active
+                    </label>
+                </div>
+                <div class="help-text" style="margin-left:48px;">
+                    Inactive rates are ignored when computing technician payouts.
+                </div>
+            </div>
+
+            {# ---------- SUBMIT ---------- #}
+            <div class="d-flex gap-2 mt-3 flex-wrap">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i>
+                    {% if is_edit %}Update Rate{% else %}Create Rate{% endif %}
+                </button>
+                <a href="{% url 'workshop:rate-list' %}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Cancel
+                </a>
+                {% if is_edit %}
+                <a href="{% url 'workshop:rate-delete' rate.id %}"
+                   class="btn btn-danger ms-auto"
+                   onclick="return confirm('Delete this rate?');">
+                    <i class="fas fa-trash"></i> Delete Rate
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,631 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if mode == 'pay' %}Pay Technician{% else %}Edit Payout{% endif %} {% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       DIAGONAL TAB BAR
+    ============================================ */
+    .ws-tabbar {
+        display: flex;
+        align-items: flex-end;
+        gap: 0;
+        padding: 18px 0 0;
+        margin-bottom: 0;
+        background: transparent;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        border-bottom: 3px solid #1e4e6d;
+        position: relative;
+    }
+    .ws-tabbar::-webkit-scrollbar { height: 4px; }
+    .ws-tabbar::-webkit-scrollbar-thumb { background: #87CEEB; border-radius: 4px; }
+
+    .ws-tab {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 22px 11px 26px;
+        margin-right: 4px;
+        background: #1e4e6d;
+        color: rgba(255,255,255,0.85) !important;
+        text-decoration: none !important;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+        transform: skewX(-14deg);
+        transition: background 0.15s, color 0.15s;
+        border-top: 2px solid #000;
+        border-left: 2px solid #000;
+        border-right: 2px solid #000;
+        border-radius: 6px 6px 0 0;
+        height: 40px;
+        margin-top: 4px;
+    }
+    .ws-tab > * {
+        display: inline-block;
+        transform: skewX(14deg);
+    }
+    .ws-tab:hover {
+        background: #2d5f7c;
+        color: #ffffff !important;
+    }
+    .ws-tab.active {
+        background: #ffffff;
+        color: #000000 !important;
+        height: 46px;
+        padding-top: 13px;
+        padding-bottom: 13px;
+        margin-top: 0;
+        z-index: 2;
+    }
+    .ws-tab.active i { color: #022ceb; }
+    .ws-tab i {
+        font-size: 13px;
+        color: #87CEEB;
+        transition: color 0.15s;
+    }
+    .ws-tab:hover i { color: #ffffff; }
+
+    .ws-tab.active::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -3px;
+        height: 3px;
+        background: #7bc043;
+        transform: skewX(14deg);
+        transform-origin: left bottom;
+    }
+
+    /* Sub-strip */
+    .ws-substrip {
+        background: #f0f7ff;
+        border: 2px solid #1e4e6d;
+        border-top: none;
+        border-radius: 0 0 4px 4px;
+        padding: 8px 16px;
+        font-size: 12px;
+        color: #000;
+        margin-bottom: 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .ws-substrip strong { color: #022ceb; }
+    .ws-substrip .sub-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .ws-substrip .sub-btn {
+        background: #ffffff;
+        border: 2px solid #000;
+        color: #000;
+        font-weight: 600;
+        font-size: 11px;
+        padding: 4px 10px;
+        border-radius: 4px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        white-space: nowrap;
+    }
+    .ws-substrip .sub-btn:hover {
+        background: #000;
+        color: #fff;
+    }
+
+    /* ============================================
+       FORM SECTIONS
+    ============================================ */
+    .required:after {
+        content: " *";
+        color: #dc3545;
+        font-weight: bold;
+    }
+
+    .form-section {
+        background: #f8f9fa;
+        padding: 15px 20px;
+        border-radius: 4px;
+        margin-bottom: 18px;
+        border: 2px solid #000000;
+    }
+    .form-section h6 {
+        font-weight: 700;
+        color: #000000;
+        margin-bottom: 15px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .form-section h6 i {
+        margin-right: 8px;
+        color: #000000;
+    }
+
+    /* ============================================
+       CARD
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+        color: #000000 !important;
+        border-radius: 0 !important;
+    }
+    .card-header h6 {
+        color: #000000 !important;
+        font-weight: 700;
+        margin: 0;
+        font-size: 14px;
+    }
+
+    /* ============================================
+       PAYOUT SUMMARY BOX
+    ============================================ */
+    .payout-summary {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 16px 20px;
+        margin-bottom: 18px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+    .payout-summary.pending   { background: #fff3cd; }
+    .payout-summary.paid      { background: #d4edda; }
+    .payout-summary.cancelled { background: #f1f1f1; }
+
+    .payout-summary .left {
+        flex: 1;
+        min-width: 200px;
+    }
+    .payout-summary .left .label {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #666;
+    }
+    .payout-summary .left .amount {
+        font-size: 28px;
+        font-weight: 700;
+        line-height: 1.1;
+        color: #000;
+    }
+    .payout-summary .left .tech {
+        font-size: 13px;
+        font-weight: 600;
+        color: #000;
+        margin-top: 4px;
+    }
+    .payout-summary .left .job {
+        font-size: 11px;
+        color: #666;
+        margin-top: 2px;
+    }
+
+    .payout-summary .right {
+        text-align: right;
+    }
+    .status-pill {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        border: 1px solid #000000;
+    }
+    .status-pill.pending    { background: #ffe69c; color: #856404; }
+    .status-pill.paid       { background: #a8e0a8; color: #0a4d0a; }
+    .status-pill.cancelled  { background: #e0e0e0; color: #4d4d4d; }
+
+    /* ============================================
+       FORM ELEMENTS
+    ============================================ */
+    .form-control, .form-select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        color: #000000;
+        font-size: 14px;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .form-label {
+        color: #000000;
+        font-weight: 600;
+        font-size: 13px;
+        margin-bottom: 4px;
+    }
+    textarea.form-control {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 13px;
+    }
+    textarea.form-control:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .help-text {
+        font-size: 11px;
+        color: #666;
+        margin-top: 3px;
+    }
+    .input-group-text {
+        border: 2px solid #000000;
+        border-right: none;
+        border-radius: 4px 0 0 4px;
+        background: #f8f9fa;
+        color: #000000;
+        font-weight: 600;
+        font-size: 13px;
+    }
+    .input-group .form-control {
+        border-radius: 0 4px 4px 0;
+        border-left: none;
+    }
+    .input-group:focus-within .input-group-text {
+        border-color: #87CEEB;
+    }
+
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-success {
+        background-color: #28a745;
+        border: 2px solid #000000;
+        color: #ffffff;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-success:hover {
+        background-color: #1e7e34;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-secondary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-outline-info {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+        font-size: 12px;
+    }
+    .btn-outline-info:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+
+    /* ============================================
+       FORM ERRORS
+    ============================================ */
+    .field-error {
+        color: #dc3545;
+        font-size: 12px;
+        margin-top: 3px;
+    }
+
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .ws-tabbar { padding: 14px 0 0; }
+        .ws-tab {
+            padding: 9px 16px 9px 20px;
+            font-size: 12px;
+            height: 36px;
+        }
+        .ws-tab.active {
+            height: 42px;
+            padding-top: 11px;
+            padding-bottom: 11px;
+        }
+        .ws-tab i { font-size: 12px; }
+
+        .form-section { padding: 12px 14px; }
+        .form-section h6 { font-size: 12px; }
+        .card-body { padding: 14px !important; }
+        .form-control, .form-select { font-size: 13px; }
+        .btn { font-size: 12px; }
+
+        .payout-summary { padding: 14px; }
+        .payout-summary .left .amount { font-size: 22px; }
+    }
+
+    @media (max-width: 480px) {
+        .ws-tabbar { padding: 10px 0 0; }
+        .ws-tab {
+            padding: 8px 12px 8px 16px;
+            font-size: 11px;
+            height: 34px;
+            gap: 6px;
+        }
+        .ws-tab.active {
+            height: 38px;
+            padding-top: 9px;
+            padding-bottom: 9px;
+        }
+        .ws-tab i { font-size: 11px; }
+
+        .payout-summary .left .amount { font-size: 20px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ============================================================ #}
+{# HERO — diagonal tab bar                                       #}
+{# ============================================================ #}
+<div class="ws-tabbar">
+    <a href="{% url 'workshop:dashboard' %}" class="ws-tab">
+        <i class="fas fa-tools"></i>
+        <span>Workshop</span>
+    </a>
+
+    {% if user.role == 'company_technician' %}
+        <a href="{% url 'workshop:my-work' %}" class="ws-tab">
+            <i class="fas fa-clipboard-list"></i>
+            <span>My Work</span>
+        </a>
+        <a href="{% url 'workshop:job-create' %}" class="ws-tab">
+            <i class="fas fa-plus-circle"></i>
+            <span>New Job</span>
+        </a>
+    {% else %}
+        <a href="{% url 'workshop:job-list' %}" class="ws-tab">
+            <i class="fas fa-list"></i>
+            <span>All Jobs</span>
+        </a>
+        <a href="{% url 'workshop:payout-list' %}" class="ws-tab active">
+            <i class="fas fa-hand-holding-usd"></i>
+            <span>Payouts</span>
+        </a>
+        <a href="{% url 'workshop:job-create' %}" class="ws-tab">
+            <i class="fas fa-plus-circle"></i>
+            <span>New Job</span>
+        </a>
+    {% endif %}
+</div>
+
+{# Sub-strip #}
+<div class="ws-substrip">
+    <div>
+        {% if mode == 'pay' %}
+            <i class="fas fa-check-circle"></i> Recording payment to
+            <strong>{{ payout.technician.full_name|default:"technician" }}</strong>
+        {% else %}
+            <i class="fas fa-edit"></i> Adjusting payout for job
+            <strong>{{ payout.job.job_number }}</strong>
+        {% endif %}
+    </div>
+    <div class="sub-actions">
+        <a href="{% url 'workshop:payout-detail' payout.id %}" class="sub-btn">
+            <i class="fas fa-arrow-left"></i> Back to Payout
+        </a>
+        <a href="{% url 'workshop:payout-list' %}" class="sub-btn">
+            <i class="fas fa-list"></i> All Payouts
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+
+        {# ============================================================ #}
+        {# PAYOUT SUMMARY CARD                                           #}
+        {# ============================================================ #}
+        <div class="payout-summary {{ payout.status }}">
+            <div class="left">
+                <div class="label">
+                    {% if mode == 'pay' %}Amount to Pay{% else %}Current Amount{% endif %}
+                </div>
+                <div class="amount">KSh {{ payout.amount|floatformat:2 }}</div>
+                <div class="tech">
+                    <i class="fas fa-user-cog"></i>
+                    {{ payout.technician.full_name|default:"Unassigned" }}
+                </div>
+                <div class="job">
+                    <i class="fas fa-hashtag"></i> {{ payout.job.job_number }}
+                    · {{ payout.job.device_name }}
+                    · {{ payout.job.get_repair_category_display }}
+                </div>
+            </div>
+            <div class="right">
+                <span class="status-pill {{ payout.status }}">{{ payout.get_status_display }}</span>
+                {% if payout.basis %}
+                    <div style="font-size:11px;color:#666;margin-top:6px;">
+                        {{ payout.get_basis_display }}
+                        {% if payout.percentage %} · {{ payout.percentage }}%{% endif %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {# ============================================================ #}
+        {# FORM                                                          #}
+        {# ============================================================ #}
+        <form method="post" id="payoutForm">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle"></i>
+                {{ form.non_field_errors }}
+            </div>
+            {% endif %}
+
+            {% if mode == 'pay' %}
+
+                {# ============================================================ #}
+                {# PAY MODE — payment details                                    #}
+                {# ============================================================ #}
+                <div class="form-section">
+                    <h6><i class="fas fa-money-bill"></i> Payment Details</h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required" for="{{ form.payment_method.id_for_label }}">
+                                Payment Method
+                            </label>
+                            {{ form.payment_method }}
+                            <div class="help-text">How the technician is being paid</div>
+                            {% if form.payment_method.errors %}
+                            <div class="field-error">{{ form.payment_method.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="{{ form.payment_reference.id_for_label }}">
+                                Reference
+                            </label>
+                            {{ form.payment_reference }}
+                            <div class="help-text">M-Pesa code, receipt number, or bank reference</div>
+                            {% if form.payment_reference.errors %}
+                            <div class="field-error">{{ form.payment_reference.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12 mb-3">
+                            <label class="form-label" for="{{ form.notes.id_for_label }}">
+                                Notes
+                            </label>
+                            {{ form.notes }}
+                            <div class="help-text">Optional — any additional context for this payment</div>
+                            {% if form.notes.errors %}
+                            <div class="field-error">{{ form.notes.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+            {% else %}
+
+                {# ============================================================ #}
+                {# EDIT MODE — adjust amount                                     #}
+                {# ============================================================ #}
+                <div class="form-section">
+                    <h6><i class="fas fa-dollar-sign"></i> Adjust Amount</h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required" for="{{ form.amount.id_for_label }}">
+                                Amount to Pay
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">KSh</span>
+                                {{ form.amount }}
+                            </div>
+                            <div class="help-text">Override the computed amount for this payout</div>
+                            {% if form.amount.errors %}
+                            <div class="field-error">{{ form.amount.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h6><i class="fas fa-comment"></i> Notes</h6>
+                    <div class="row">
+                        <div class="col-12">
+                            <label class="form-label" for="{{ form.notes.id_for_label }}">
+                                Reason for Adjustment
+                            </label>
+                            {{ form.notes }}
+                            <div class="help-text">Explain why the amount is being changed from the auto-computed value</div>
+                            {% if form.notes.errors %}
+                            <div class="field-error">{{ form.notes.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                {# Info box explaining the override #}
+                <div class="form-section" style="background:#fff8e1;border-color:#f0ad4e;">
+                    <h6 style="color:#856404;"><i class="fas fa-info-circle"></i> Why edit?</h6>
+                    <div style="font-size:12px;color:#664d03;line-height:1.6;">
+                        The payout was computed as
+                        <strong>KSh {{ payout.basis_amount|floatformat:2 }}</strong>
+                        × <strong>{{ payout.percentage }}%</strong>
+                        ({{ payout.get_basis_display }})
+                        = <strong>KSh {{ payout.amount|floatformat:2 }}</strong>.
+                        Editing this will set a manual override and mark the basis as
+                        <em>Manual</em>. Existing payments already made are not affected.
+                    </div>
+                </div>
+
+            {% endif %}
+
+            {# ============================================================ #}
+            {# SUBMIT                                                        #}
+            {# ============================================================ #}
+            <div class="d-flex gap-2 mt-3 flex-wrap">
+                {% if mode == 'pay' %}
+                    <button type="submit" class="btn btn-success"
+                            onclick="return confirm('Record payment of KSh {{ payout.amount|floatformat:2 }}?');">
+                        <i class="fas fa-check-circle"></i> Mark as Paid
+                    </button>
+                {% else %}
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Update Amount
+                    </button>
+                {% endif %}
+
+                <a href="{% url 'workshop:payout-detail' payout.id %}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Cancel
+                </a>
+
+                <a href="{% url 'workshop:job-detail' payout.job.id %}" class="btn btn-outline-info ms-auto">
+                    <i class="fas fa-eye"></i> View Job
+                </a>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+{% endblock %}
