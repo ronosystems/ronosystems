@@ -15,6 +15,8 @@ class User(AbstractUser):
         ('stock_controller', 'Stock Controller'),
         ('company_agent', 'Company Agent'),
         ('mpesa_agent', 'Mpesa Agent'),
+        ('company_technician', 'Company Technician'), 
+        ('customer_care', 'Customer Care'),         
         ('company_staff', 'Company Staff'),
     )
 
@@ -93,12 +95,37 @@ class User(AbstractUser):
         return self.role == 'mpesa_agent'
 
     @property
+    def is_company_technician(self):
+        return self.role == 'company_technician'
+
+    @property
+    def is_customer_care(self):
+        return self.role == 'customer_care'
+
+    @property
     def is_company_staff(self):
         return self.role == 'company_staff'
 
     @property
     def is_admin_or_manager(self):
         return self.role in ['super_admin', 'company_admin', 'company_manager']
+
+    @property
+    def role_flags(self):
+        """Serializable dict of role flags for the frontend."""
+        return {
+            'is_super_admin': self.is_super_admin,
+            'is_company_admin': self.is_company_admin,
+            'is_company_manager': self.is_company_manager,
+            'is_company_cashier': self.is_company_cashier,
+            'is_company_agent': self.is_company_agent,
+            'is_company_staff': self.is_company_staff,
+            'is_stock_controller': self.is_stock_controller,
+            'is_mpesa_agent': self.is_mpesa_agent,
+            'is_company_technician': self.is_company_technician,
+            'is_customer_care': self.is_customer_care,
+            'is_guest': self.is_guest,
+        }
 
     # ============================================================
     # DISPLAY HELPERS

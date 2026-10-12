@@ -124,6 +124,7 @@ def plan_create(request):
                 has_custom_domain=request.POST.get('has_custom_domain') == 'on',
                 has_mpesa_integration=request.POST.get('has_mpesa_integration') == 'on',
                 has_treasury=request.POST.get('has_treasury') == 'on',
+                has_workshop=request.POST.get('has_workshop') == 'on',           # NEW
                 is_active=request.POST.get('is_active') == 'on',
                 is_featured=request.POST.get('is_featured') == 'on',
                 order=int(request.POST.get('order', 0)),
@@ -208,6 +209,7 @@ def plan_edit(request, pk):
             plan.has_custom_domain = request.POST.get('has_custom_domain') == 'on'
             plan.has_mpesa_integration = request.POST.get('has_mpesa_integration') == 'on'
             plan.has_treasury = request.POST.get('has_treasury') == 'on'
+            plan.has_workshop = request.POST.get('has_workshop') == 'on'          # NEW
             plan.is_active = request.POST.get('is_active') == 'on'
             plan.is_featured = request.POST.get('is_featured') == 'on'
             plan.order = int(request.POST.get('order', 0))
@@ -337,7 +339,7 @@ def subscription_list(request):
         'page_subtitle': 'Manage company subscriptions',
     }
     return render(request, 'subscriptions/list.html', context)
-    
+
 
 # ============================================
 # SUBSCRIPTION DETAIL
@@ -559,7 +561,7 @@ def get_plans_api(request):
     plans = Plan.objects.filter(is_active=True).values(
         'id', 'name', 'display_name', 'price', 'billing_cycle', 'currency',
         'max_employees', 'max_companies', 'max_branches', 'max_storage',
-        'has_treasury',
+        'has_treasury', 'has_workshop',                                         # NEW
     )
     return JsonResponse(list(plans), safe=False)
 
@@ -588,6 +590,7 @@ def get_plan_detail_api(request, pk):
         'has_custom_domain': plan.has_custom_domain,
         'has_mpesa_integration': plan.has_mpesa_integration,
         'has_treasury': plan.has_treasury,
+        'has_workshop': plan.has_workshop,                                      # NEW
     })
 
 
@@ -614,6 +617,7 @@ def get_company_subscription_api(request, company_id):
                 'days_until_expiry': sub.days_until_expiry,
                 'is_active': sub.is_active_subscription(),
                 'has_treasury': sub.plan.has_treasury,
+                'has_workshop': sub.plan.has_workshop,                          # NEW
                 'has_mpesa_integration': sub.plan.has_mpesa_integration,
                 'has_api_access': sub.plan.has_api_access,
                 'has_advanced_reports': sub.plan.has_advanced_reports,
@@ -630,6 +634,7 @@ def get_company_subscription_api(request, company_id):
                 'display_state': 'lifetime',
                 'is_active': True,
                 'has_treasury': False,
+                'has_workshop': False,                                          # NEW
                 'has_mpesa_integration': False,
                 'has_api_access': False,
                 'has_advanced_reports': False,

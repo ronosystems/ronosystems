@@ -961,7 +961,7 @@
             <nav class="sidebar-nav">
                 <ul class="nav flex-column">
 
-                    {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'company_cashier' or user.role == 'company_agent' or user.role == 'mpesa_agent' or user.role == 'stock_controller' %}
+                    {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'company_cashier' or user.role == 'company_agent' or user.role == 'mpesa_agent' or user.role == 'stock_controller' or user.role == 'company_technician' %}
                     <li class="nav-label">HOME DASHBOARD</li>
 
                     <li class="nav-item">
@@ -977,6 +977,7 @@
                     </li>
                     {% endif %}
 
+                    <!-- ============ M-PESA SHOP (existing) ============ -->
                     {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' or user.role == 'mpesa_agent' %}
                     {% if company and company_has_treasury %}
                         <li class="nav-item">
@@ -995,6 +996,45 @@
                         </li>
                     {% endif %}
                     {% endif %}
+
+                    <!-- ============ WORKSHOP (NEW) ============ -->
+                    {% if user.role == 'company_admin' or user.role == 'company_technician' or user.role == 'stock_controller' or user.role == 'super_admin' %}
+                    {% if company and company_has_workshop %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/workshop/' in request.path %}active{% endif %}"
+                               href="{% url 'workshop:dashboard' %}">
+                                <i class="fas fa-tools"></i> <span>Workshop</span>
+                            </a>
+                        </li>
+                    {% endif %}
+                    {% endif %}
+
+
+                    {% if user.role == 'company_technician' or user.role == 'super_admin' %}
+                    {% if company and company_has_workshop %}
+
+                        {# -------- My Work (technicians + admins) -------- #}
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/workshop/my-work/' in request.path %}active{% endif %}"
+                            href="{% url 'workshop:my-work' %}">
+                                <i class="fas fa-clipboard-list"></i> <span>My Work</span>
+                                {% if my_open_jobs_count and my_open_jobs_count > 0 %}
+                                    <span class="badge">{{ my_open_jobs_count }}</span>
+                                {% endif %}
+                            </a>
+                        </li>
+
+                        {# -------- New Job (technicians + admins) -------- #}
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/workshop/jobs/new/' in request.path %}active{% endif %}"
+                            href="{% url 'workshop:job-create' %}">
+                                <i class="fas fa-plus-circle"></i> <span>New Job</span>
+                            </a>
+                        </li>
+
+                    {% endif %}
+                    {% endif %}
+
 
                     {% if is_support_mode and support_company %}
                         <li class="nav-label">SITE MANAGEMENT</li>
@@ -1097,7 +1137,7 @@
 
                     {% else %}
                         {% if user.is_authenticated %}
-                            {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'company_cashier' or user.role == 'company_agent' or user.role == 'mpesa_agent' or user.role == 'stock_controller' %}
+                            {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'company_cashier' or user.role == 'company_agent'  or user.role == 'stock_controller' %}
                                 {% if user.company and user.company.business_type %}
                                     {% if 'epa' in user.company.business_type.name.lower or 'electronics' in user.company.business_type.name.lower %}
                                     <li class="nav-label">SHOP MANAGEMENT</li>

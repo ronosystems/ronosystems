@@ -3,6 +3,10 @@
 from rest_framework import permissions
 
 
+# ============================================================
+# SINGLE-ROLE PERMISSIONS
+# ============================================================
+
 class IsSuperAdmin(permissions.BasePermission):
     """Allow only super admins"""
     def has_permission(self, request, view):
@@ -44,17 +48,37 @@ class IsMpesaAgent(permissions.BasePermission):
     def has_permission(self, request, view):
         return request.user.is_authenticated and request.user.role == 'mpesa_agent'
 
+
 class IsStockController(permissions.BasePermission):
     """Allow only stock controller"""
     def has_permission(self, request, view):
         return request.user.is_authenticated and request.user.role == 'stock_controller'
+
+
+class IsCompanyTechnician(permissions.BasePermission):
+    """Allow only company technicians"""
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.role == 'company_technician'
+
+
+class IsCustomerCare(permissions.BasePermission):
+    """Allow only customer care staff"""
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.role == 'customer_care'
+
+
+# ============================================================
+# COMPOSITE / GROUP PERMISSIONS
+# ============================================================
 
 class IsAdminOrManager(permissions.BasePermission):
     """Allow company admins, managers, and super admins"""
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-        return request.user.role in ['super_admin', 'company_admin', 'company_manager', 'stock_controller']
+        return request.user.role in [
+            'super_admin', 'company_admin', 'company_manager', 'stock_controller'
+        ]
 
 
 class IsSuperAdminOrCompanyAdmin(permissions.BasePermission):
@@ -65,30 +89,64 @@ class IsSuperAdminOrCompanyAdmin(permissions.BasePermission):
         return request.user.role in ['super_admin', 'company_admin']
 
 
+class IsManagement(permissions.BasePermission):
+    """Pure management tier — no operational roles"""
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.role in ['super_admin', 'company_admin', 'company_manager']
+
+
+class IsOperationalStaff(permissions.BasePermission):
+    """
+    Operational staff who handle day-to-day company work but are
+    not part of management: technicians, customer care, stock
+    controllers, cashiers, agents and general staff.
+    """
+    OPERATIONAL_ROLES = [
+        'stock_controller',
+        'company_cashier',
+        'company_agent',
+        'mpesa_agent',
+        'company_technician',
+        'customer_care',
+        'company_staff',
+    ]
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.role in self.OPERATIONAL_ROLES
+
+
+# ============================================================
+# TENANCY / SCOPE PERMISSIONS
+# ============================================================
+
 class IsSameCompany(permissions.BasePermission):
     """Check if user belongs to same company"""
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-        
+
         if request.user.role == 'super_admin':
             return True
-        
+
         company_id = request.query_params.get('company_id') or request.data.get('company_id')
         if company_id:
             return str(request.user.company.id) == str(company_id)
-        
+
         return True
-    
+
     def has_object_permission(self, request, view, obj):
         if request.user.role == 'super_admin':
             return True
-        
+
         if hasattr(obj, 'company'):
             return obj.company == request.user.company
         elif hasattr(obj, 'company_id'):
             return obj.company_id == request.user.company.id
-        
+
         return False
 
 
@@ -97,14 +155,14 @@ class IsSameBranch(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-        
+
         if request.user.role in ['super_admin', 'company_admin', 'company_manager']:
             return True
-        
+
         branch_id = request.query_params.get('branch_id') or request.data.get('branch_id')
         if branch_id and request.user.branch:
             return str(request.user.branch.id) == str(branch_id)
-        
+
         return True
 
 
@@ -113,21 +171,25 @@ class HasCompanyAccess(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-        
+
         # Super admins can access everything
         if request.user.role == 'super_admin':
             return True
-        
+
         # Company admins and managers can access their own company
         if request.user.role in ['company_admin', 'company_manager']:
             company_id = request.query_params.get('company_id') or request.data.get('company_id')
             if company_id:
                 return str(request.user.company.id) == str(company_id)
             return True
-        
+
         # Other roles have limited access
         return False
 
+
+# ============================================================
+# FUNCTIONAL / BUSINESS-CAPABILITY PERMISSIONS
+# ============================================================
 
 class CanProcessSales(permissions.BasePermission):
     """Allow users who can process sales"""
@@ -135,7 +197,7 @@ class CanProcessSales(permissions.BasePermission):
         if not request.user.is_authenticated:
             return False
         return request.user.role in [
-            'super_admin', 'company_admin', 'company_manager', 
+            'super_admin', 'company_admin', 'company_manager',
             'company_cashier', 'company_agent', 'stock_controller'
         ]
 
@@ -145,7 +207,9 @@ class CanApproveSales(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-        return request.user.role in ['super_admin', 'company_admin', 'company_manager', 'stock_controller']
+        return request.user.role in [
+            'super_admin', 'company_admin', 'company_manager', 'stock_controller'
+        ]
 
 
 class CanViewReports(permissions.BasePermission):
@@ -153,7 +217,9 @@ class CanViewReports(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
-        return request.user.role in ['super_admin', 'company_admin', 'company_manager', 'stock_controller']
+        return request.user.role in [
+            'super_admin', 'company_admin', 'company_manager', 'stock_controller'
+        ]
 
 
 class CanManageUsers(permissions.BasePermission):
@@ -163,6 +229,32 @@ class CanManageUsers(permissions.BasePermission):
             return False
         return request.user.role in ['super_admin', 'company_admin']
 
+
+class CanHandleSupportTickets(permissions.BasePermission):
+    """Customer care + management can handle support tickets"""
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.role in [
+            'super_admin', 'company_admin', 'company_manager',
+            'customer_care',
+        ]
+
+
+class CanPerformServiceJobs(permissions.BasePermission):
+    """Technicians + management can perform service / repair jobs"""
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        return request.user.role in [
+            'super_admin', 'company_admin', 'company_manager',
+            'company_technician',
+        ]
+
+
+# ============================================================
+# MISC
+# ============================================================
 
 class IsAuthenticatedOrReadOnly(permissions.BasePermission):
     """Allow read-only access for unauthenticated users"""

@@ -53,6 +53,11 @@ class Plan(models.Model):
     has_mpesa_integration = models.BooleanField(default=False)
     has_treasury = models.BooleanField(default=False)
 
+    has_workshop = models.BooleanField(
+        default=False,
+        help_text='Company can access the workshop / technician app.',
+    )
+
     # Business type access
     allowed_business_types = models.ManyToManyField(
         'companies.BusinessType',
@@ -97,6 +102,8 @@ class Plan(models.Model):
             features.append("M-Pesa Integration")
         if self.has_treasury:
             features.append("MpesaShop")
+        if self.has_workshop:
+            features.append("Workshop / Technician App")
 
         return features
 
@@ -181,6 +188,21 @@ class Subscription(models.Model):
         if self.end_date and timezone.now() > self.end_date:
             return False
         return True
+
+    # ============================================
+    # FEATURE ACCESS HELPERS
+    # ============================================
+
+    @property
+    def has_workshop_access(self):
+        """
+        True if this subscription is active and the plan includes the
+        workshop feature. This is the single source of truth for gating
+        the workshop app.
+        """
+        if not self.is_active_subscription():
+            return False
+        return bool(self.plan and self.plan.has_workshop)
 
     # ============================================
     # DATE HELPERS (used by UI)
