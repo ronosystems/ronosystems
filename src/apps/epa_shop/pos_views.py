@@ -58,8 +58,6 @@ def pos_dashboard(request):
     # ============================================
     # Filter branches based on user role
     # ============================================
-    # In support mode, super admin sees all branches
-    # Cashiers only see their assigned branch
     if is_viewing_company:
         # Support mode: Show all branches of the viewed company
         branches = Branch.objects.filter(company=company, is_active=True)
@@ -159,7 +157,7 @@ def pos_search_products(request):
                 'price': float(phone.selling_price),
                 'stock': units.count(),
                 'units': [{'identifier': u.identifier, 'status': u.status} for u in units],
-                'image': phone.image.url if phone.image else None,
+                'image': phone.image_url,           # ✅ FIXED
                 'ram': phone.ram or '',
                 'storage_capacity': phone.storage_capacity or '',
                 'screen_size': phone.screen_size or '',
@@ -198,7 +196,7 @@ def pos_search_products(request):
                 'price': float(item.selling_price),
                 'stock': units.count(),
                 'units': [{'identifier': u.identifier, 'status': u.status} for u in units],
-                'image': item.image.url if item.image else None,
+                'image': item.image_url,            # ✅ correct (`item` is the loop var here)
                 'ram': item.ram or '',
                 'storage': item.storage or '',
                 'processor': item.processor or '',
@@ -236,7 +234,7 @@ def pos_search_products(request):
                 'price': float(item.selling_price),
                 'stock': item.quantity_in_stock,
                 'units': [],
-                'image': item.image.url if item.image else None,
+                'image': item.image_url,            # ✅ correct
                 'accessory_type': item.accessory_type or 'other',
                 'compatible_phone_models': item.compatible_phone_models or '',
             })
@@ -331,7 +329,7 @@ def pos_search_barcode(request):
                     'condition': p.condition or 'new',
                     'battery_capacity': p.battery_capacity or '',
                 },
-                'image': p.image.url if p.image else None,
+                'image': p.image_url,           # ✅ p is a Phone here
             })
 
         # (b) Match on Phone.barcode (exact)
@@ -359,7 +357,7 @@ def pos_search_barcode(request):
                     'condition': p.condition or 'new',
                     'battery_capacity': p.battery_capacity or '',
                 },
-                'image': p.image.url if p.image else None,
+                'image': p.image_url,           # ✅ p is a Phone here
             })
 
         # ============================================================
@@ -405,7 +403,7 @@ def pos_search_barcode(request):
                     'screen_size': p.screen_size or '',
                     'color': p.color or '',
                 },
-                'image': p.image.url if p.image else None,
+                'image': p.image_url,           # ✅ p is an Electronic here
             })
 
         # (b) Match on Electronic.barcode (exact)
@@ -433,7 +431,7 @@ def pos_search_barcode(request):
                     'screen_size': p.screen_size or '',
                     'color': p.color or '',
                 },
-                'image': p.image.url if p.image else None,
+                'image': p.image_url,           # ✅ p is an Electronic here
             })
 
         # ============================================================
@@ -484,7 +482,7 @@ def pos_search_barcode(request):
                     'accessory_type': a.accessory_type or 'other',
                     'compatible_phone_models': a.compatible_phone_models or '',
                 },
-                'image': a.image.url if a.image else None,
+                'image': a.image_url,           # ✅ FIXED — `a` is the loop var
             })
 
         # Sort: exact identifier matches first, then alphabetical
@@ -505,7 +503,6 @@ def pos_search_barcode(request):
             status=500,
         )
 
-        
 
 @login_required
 def pos_search_imei(request):
