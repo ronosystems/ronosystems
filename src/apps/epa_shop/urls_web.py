@@ -12,7 +12,7 @@ urlpatterns = [
     # DASHBOARD
     # ============================================
     path('dashboard/', dashboard_views.epa_dashboard, name='epa-dashboard'),
-    
+
     # ============================================
     # INVENTORY
     # ============================================
@@ -21,48 +21,46 @@ urlpatterns = [
     path('inventory/movement/', inventory_views.stock_movement, name='epa-stock-movement'),
     path('inventory/bulk-transfer/', inventory_views.bulk_transfer, name='bulk-transfer'),
     path('inventory/bulk-transfer/check/', inventory_views.bulk_transfer_check, name='bulk-transfer-check'),
-    
+
     # ============================================
     # PRODUCTS - Full CRUD (Using Product Code)
     # ============================================
     path('scanner-lookup/', product_views.scanner_lookup, name='scanner_lookup'),
-    path('barcode/<str:kind>/<int:pk>.png', product_views.barcode_png,      name='barcode_png'),
+    path('barcode/<str:kind>/<int:pk>.png', product_views.barcode_png, name='barcode_png'),
     path('label/<str:kind>/<int:pk>.pdf', product_views.label_single_pdf, name='label_single_pdf'),
-    path('labels-mixed.pdf', product_views.labels_mixed_pdf, name='labels_mixed_pdf'), 
-    path('labels/<str:kind>.pdf', product_views.labels_bulk_pdf,  name='labels_bulk_pdf'),
+    path('labels-mixed.pdf', product_views.labels_mixed_pdf, name='labels_mixed_pdf'),
+    path('labels/<str:kind>.pdf', product_views.labels_bulk_pdf, name='labels_bulk_pdf'),
     path('labels/print/', product_views.labels_print_page, name='labels-print'),
 
-    
-      
     path('products/', product_views.product_list, name='epa-products'),
     path('products/add/', product_views.product_create, name='epa-product-create'),
     path('products/<str:product_code>/', product_views.product_detail, name='epa-product-detail'),
     path('products/<str:product_code>/edit/', product_views.product_edit, name='epa-product-edit'),
     path('products/<str:product_code>/delete/', product_views.product_delete, name='epa-product-delete'),
     path('products/<str:product_code>/restock/', product_views.product_restock, name='epa-product-restock'),
-    path('products/<str:product_code>/units/', product_views.product_units, name='epa-product-units'), 
-    
+    path('products/<str:product_code>/units/', product_views.product_units, name='epa-product-units'),
+
     # ============================================
     # UNIT MANAGEMENT
     # ============================================
     path('unit/<int:unit_id>/edit/', product_views.unit_edit, name='epa-unit-edit'),
     path('unit/<int:unit_id>/transfer/', product_views.unit_transfer, name='epa-unit-transfer'),
     path('products/<str:product_code>/unit/<str:identifier>/delete/', product_views.unit_delete, name='epa-unit-delete'),
-    
+
     # ============================================
     # ALL UNITS PAGES
     # ============================================
     path('units/phones/', product_views.all_phone_units, name='epa-all-phone-units'),
     path('units/electronics/', product_views.all_electronic_units, name='epa-all-electronic-units'),
     path('accessories/', product_views.accessory_list, name='epa-accessories'),
-    
+
     # ============================================
     # SALE MANAGEMENT - Use pk (int) for receipts
     # ============================================
     path('sale/<int:sale_id>/reverse/', product_views.unit_reverse_sale, name='epa-sale-reverse'),
     path('sale/<int:sale_id>/complete/', sale_views.sale_complete, name='epa-sale-complete'),
     path('sale/lookup/', sale_views.sale_lookup_by_barcode, name='epa-sale-lookup'),
-    
+
     # ============================================
     # POINT OF SALE (POS)
     # ============================================
@@ -71,27 +69,57 @@ urlpatterns = [
     path('pos/search-imei/', pos_views.pos_search_imei, name='epa-pos-search-imei'),
     path('pos/search/barcode/', pos_views.pos_search_barcode, name='epa-pos-search-barcode'),
     path('pos/branches/', sale_views.get_branches, name='epa-pos-branches'),
-    
+
     # ============================================
     # SALE MANAGEMENT
     # ============================================
     path('sales/', sale_views.sale_list, name='epa-sales'),
     path('sales/add/', sale_views.sale_create, name='epa-sale-create'),
     path('sales/<int:pk>/', sale_views.sale_detail, name='epa-sale-detail'),
-    path('sales/<int:pk>/edit/', sale_views.sale_edit, name='epa-sale-edit'), 
+    path('sales/<int:pk>/edit/', sale_views.sale_edit, name='epa-sale-edit'),
     path('sale/process/', sale_views.process_sale, name='epa-sale-process'),
-    
-    # Receipt views - support both pk and company_sale_id
-    path('sale/receipt/<int:pk>/', sale_views.sale_receipt, name='epa-sale-receipt'),
-    path('sale/receipt/<str:company_sale_id>/', sale_views.sale_receipt_by_id, name='epa-sale-receipt-by-id'),
-    
-    # Reverse sale - support both pk and company_sale_id
-    path('sale/<int:sale_id>/reverse/', product_views.unit_reverse_sale, name='epa-sale-reverse'),
-    path('sale/<str:company_sale_id>/reverse/', product_views.unit_reverse_sale, name='epa-sale-reverse-by-id'),
-    
-    # Complete sale - support both pk and company_sale_id
-    path('sale/<int:sale_id>/complete/', sale_views.sale_complete, name='epa-sale-complete'),
-    path('sale/<str:company_sale_id>/complete/', sale_views.sale_complete, name='epa-sale-complete-by-id'),
+
+    # ============================================
+    # SALE RECEIPTS
+    # Order matters — Django matches top-to-bottom.
+    # The most specific pattern must come first, otherwise
+    # <str:company_sale_id> will swallow '/print/' suffixes
+    # and any integer-style company_sale_id.
+    # ============================================
+    path('sale/receipt/<int:sale_id>/print/',
+         sale_views.sale_receipt_print,
+         name='epa-sale-receipt-print'),
+
+    path('sale/receipt/<int:pk>/',
+         sale_views.sale_receipt,
+         name='epa-sale-receipt'),
+
+    path('sale/receipt/<str:company_sale_id>/',
+         sale_views.sale_receipt_by_id,
+         name='epa-sale-receipt-by-id'),
+
+    # ============================================
+    # REVERSE SALE — int first, then str
+    # ============================================
+    path('sale/<int:sale_id>/reverse/',
+         product_views.unit_reverse_sale,
+         name='epa-sale-reverse'),
+
+    path('sale/<str:company_sale_id>/reverse/',
+         product_views.unit_reverse_sale,
+         name='epa-sale-reverse-by-id'),
+
+    # ============================================
+    # COMPLETE SALE — int first, then str
+    # ============================================
+    path('sale/<int:sale_id>/complete/',
+         sale_views.sale_complete,
+         name='epa-sale-complete'),
+
+    path('sale/<str:company_sale_id>/complete/',
+         sale_views.sale_complete,
+         name='epa-sale-complete-by-id'),
+
     path('sale/history/', sale_views.sale_history, name='epa-sale-history'),
     path('sale/<int:pk>/delete/', sale_views.sale_delete, name='epa-sale-delete'),
 
@@ -103,7 +131,7 @@ urlpatterns = [
     path('sale/get-unit/', sale_views.sale_get_unit_by_identifier, name='epa-sale-get-unit'),
     path('sale/process-single/', sale_views.sale_process_single, name='epa-sale-process-single'),
     path('sales/pending/', sale_views.sale_pending_list, name='epa-sales-pending'),
-    
+
     # ============================================
     # CATEGORIES - Full CRUD
     # ============================================
@@ -113,7 +141,7 @@ urlpatterns = [
     path('categories/<int:pk>/delete/', category_views.category_delete, name='epa-category-delete'),
     path('categories/<int:pk>/products/', category_views.category_products, name='epa-category-products'),
     path('categories/<int:pk>/toggle-status/', category_views.category_toggle_status, name='epa-category-toggle-status'),
-    
+
     # ============================================
     # FINANCE - Full CRUD (EPA Shop Finance)
     # ============================================
@@ -131,14 +159,11 @@ urlpatterns = [
     path('finance/api/balance/', finance_views.api_cogs_balance, name='finance-api-balance'),
     path('finance/export/', finance_views.export_cogs_report, name='finance-export-cogs'),
     path('finance/debug/', finance_views.debug_cogs_balance, name='finance-debug'),
+
     # ============================================
     # FINANCE - ALL TRANSACTIONS
     # ============================================
-    path(
-        'finance/transactions/',
-        finance_views.all_transactions,
-        name='all-teansactions-records',
-    ),
+    path('finance/transactions/', finance_views.all_transactions, name='all-teansactions-records'),
 
     # ============================================
     # FINANCE - COGS Detail Views
@@ -146,5 +171,4 @@ urlpatterns = [
     path('finance/cogs-daily/<str:date_str>/', finance_views.cogs_daily_detail, name='finance-cogs-daily-detail'),
     path('finance/cogs-weekly/<int:year>/<int:week>/', finance_views.cogs_weekly_detail, name='finance-cogs-weekly-detail'),
     path('finance/cogs-monthly/<int:year>/<int:month>/', finance_views.cogs_monthly_detail, name='finance-cogs-monthly-detail'),
-    
 ]

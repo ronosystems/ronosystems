@@ -799,6 +799,38 @@ def sale_receipt_by_id(request, company_sale_id):
     }
     return render(request, 'epa/sale_receipt.html', context)
 
+
+@login_required
+def sale_receipt_print(request, sale_id):
+    """
+    Barebones receipt page for silent printing via hidden iframe.
+    Does NOT extend base.html — prints only the receipt content.
+    """
+    company, is_viewing_company = get_active_company(request)
+
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+
+    sale = get_object_or_404(Sale, id=sale_id, company=company)
+
+    # Branch access check (skip in support mode)
+    if not is_viewing_company and not is_admin_or_manager(request.user):
+        user_branch = get_user_branch(request.user)
+        if user_branch and sale.branch and sale.branch.id != user_branch.id:
+            messages.error(request, 'You do not have permission to view this receipt.')
+            return redirect('/epa_shop/sales/')
+
+    context = {
+        'company': company,
+        'sale': sale,
+        'items': sale.items.all(),
+    }
+    return render(request, 'epa/sale_receipt_print.html', context)
+
+
 # ============================================
 # GET BRANCHES FOR POS
 # ============================================
