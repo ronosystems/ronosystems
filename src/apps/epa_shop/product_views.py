@@ -21,8 +21,58 @@ from apps.companies.support_utils import (
 )
 import json
 import os
+import time
+import cloudinary
+import cloudinary.uploader
+from django.conf import settings
+
+
+
+
 
 User = get_user_model()
+
+
+
+def _cloudinary_configure():
+    """Match accounts.profile_picture_upload's config pattern."""
+    cfg = getattr(settings, 'CLOUDINARY_STORAGE', {})
+    cloudinary.config(
+        cloud_name=cfg.get('CLOUD_NAME', ''),
+        api_key=cfg.get('API_KEY', ''),
+        api_secret=cfg.get('API_SECRET', ''),
+        secure=True,
+    )
+
+
+def _upload_product_image_to_cloudinary(uploaded_file, folder='epa/products'):
+    """
+    Upload to Cloudinary and return the public_id, mirroring the
+    accounts.profile_picture_upload pattern. Returns None on failure.
+    """
+    if not uploaded_file:
+        return None
+
+    try:
+        _cloudinary_configure()
+
+        # Unique public_id per upload, same idea as profiles
+        base = f"{folder}/p_{int(time.time() * 1000)}"
+
+        result = cloudinary.uploader.upload(
+            uploaded_file,
+            public_id=base,
+            overwrite=False,
+            resource_type='image',
+        )
+        public_id = result.get('public_id') or base
+        print(f"✅ Cloudinary upload OK: {public_id}")
+        return public_id
+    except Exception as e:
+        import traceback
+        print(f"❌ Cloudinary upload FAILED: {e}")
+        traceback.print_exc()
+        return None
 
 
 
@@ -1300,6 +1350,8 @@ def product_detail(request, product_code):
     }
     return render(request, 'epa/product_detail.html', context)
 
+
+
 # ============================================
 # PRODUCT CREATE
 # ============================================
@@ -1403,6 +1455,36 @@ def product_create(request):
             size = request.POST.get('size', '').strip()
 
             image = request.FILES.get('product_image')
+
+            # --- Upload to Cloudinary explicitly ---
+            # Pick the right folder based on category
+            if category_type in ('smartphone', 'feature_phone'):
+                _folder_root = 'epa/phones'
+            elif category_type == 'electronics':
+                _folder_root = 'epa/electronics'
+            elif category_type == 'accessory':
+                _folder_root = 'epa/accessories'
+            else:
+                _folder_root = 'epa/products'
+
+            image_public_id = _upload_product_image_to_cloudinary(
+                image,
+                folder=f"{_folder_root}/{timezone.now().strftime('%Y/%m')}",
+            )
+
+            # If the user uploaded a file but the upload failed → abort
+            if image and not image_public_id:
+                messages.error(request, 'Image upload failed. Please try again or check Cloudinary credentials.')
+                return render(request, 'epa/product_form.html', {
+                    'branches': branches,
+                    'form_data': request.POST,
+                    'category_value': request.POST.get('category', ''),
+                    'units': [],
+                    'units_json': '[]',
+                    'is_edit': False,
+                    'page_title': 'Add Product',
+                    'page_subtitle': 'Create a new product',
+                })
 
             try:
                 purchase_price = Decimal(str(request.POST.get('purchase_price', 0) or 0))
@@ -1627,6 +1709,9 @@ def product_create(request):
                     # Also update barcode if a new one was provided
                     if barcode:
                         existing_product.barcode = barcode
+                    # Also update image if a new one was uploaded
+                    if image_public_id:
+                        existing_product.image = image_public_id
                     existing_product.save()
                     added_count = quantity
 
@@ -1706,7 +1791,9 @@ def product_create(request):
                     screen_size=screen_size or '', battery_capacity=battery_capacity or '',
                     condition=condition, purchase_price=purchase_price,
                     selling_price=selling_price, best_price=best_price,
-                    quantity_in_stock=len(units), image=image, owner=owner,
+                    quantity_in_stock=len(units),
+                    image=image_public_id,      # ✅ Cloudinary public_id
+                    owner=owner,
                     phone_type=phone_type_value, network_type=network_type_value,
                     memory_card=memory_card_value, features=features_value
                 )
@@ -1730,7 +1817,8 @@ def product_create(request):
                     screen_size=screen_size or '', color=color or '',
                     purchase_price=purchase_price, selling_price=selling_price,
                     best_price=best_price, quantity_in_stock=len(units),
-                    image=image, owner=owner
+                    image=image_public_id,      # ✅ Cloudinary public_id
+                    owner=owner
                 )
 
                 for unit_data in units:
@@ -1750,7 +1838,8 @@ def product_create(request):
                     barcode=barcode,              # barcode goes here now
                     purchase_price=purchase_price, selling_price=selling_price,
                     best_price=best_price, quantity_in_stock=quantity,
-                    image=image, owner=owner
+                    image=image_public_id,        # ✅ Cloudinary public_id
+                    owner=owner
                 )
                 messages.success(request, f'✅ New Accessory "{product.name}" created! Code: {product.product_code}')
 
@@ -1893,6 +1982,24 @@ def product_edit(request, product_code):
 
             image = request.FILES.get('product_image')
 
+            # --- Upload new image to Cloudinary (if provided) ---
+            if image:
+                new_public_id = _upload_product_image_to_cloudinary(
+                    image,
+                    folder=f"epa/{product_type.lower()}s/{timezone.now().strftime('%Y/%m')}",
+                )
+                if not new_public_id:
+                    messages.error(request, 'Image upload failed. Keeping the previous image.')
+                else:
+                    # Delete old Cloudinary asset if there was one
+                    if product.image:
+                        try:
+                            _cloudinary_configure()
+                            cloudinary.uploader.destroy(str(product.image.name))
+                        except Exception as e:
+                            print(f"⚠️ Could not delete old Cloudinary asset: {e}")
+                    product.image = new_public_id
+
             try:
                 purchase_price = Decimal(str(request.POST.get('purchase_price', 0) or 0))
             except:
@@ -1992,14 +2099,9 @@ def product_edit(request, product_code):
             if branch_id:
                 product.branch_id = branch_id
 
-            if image:
-                if product.image:
-                    try:
-                        if os.path.isfile(product.image.path):
-                            os.remove(product.image.path)
-                    except:
-                        pass
-                product.image = image
+            # NOTE: image was already set above if a new one was uploaded.
+            # Do NOT re-assign product.image here — that would clobber the
+            # Cloudinary public_id with the raw UploadedFile.
 
             if product_type == 'Phone':
                 product.model = model
