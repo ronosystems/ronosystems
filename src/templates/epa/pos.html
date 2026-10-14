@@ -874,11 +874,11 @@
                                 <th class="col-index">Index</th>
                                 <th class="col-product">Product</th>
                                 <th class="col-qty">Qty</th>
-                                <th class="col-price">Unit Price</th>
+                                <th class="col-price">Price</th>
                                 <th class="col-disc">Discount</th>
-                                <th class="col-total">Line Total</th>
-                                <th class="col-tax">Line TAX</th>
-                                <th style="width: 34px;"></th>
+                                <th class="col-total">Total</th>
+                                <th class="col-tax">TAX</th>
+                                <th style="width: 34px;">❌</th>
                             </tr>
                         </thead>
                         <tbody id="ticketBody">
@@ -891,30 +891,6 @@
                     </table>
                 </div>
             </div>
-
-
-
-            <!-- ----------(read-only) ---------- -->
-            <div class="groupbox" style="margin-top: 6px;">
-                <span class="groupbox-title"></span>
-                <div style="
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    height: 60px;
-                    background: #000;
-                    color: #00ff00;
-                    font-family: 'Courier New', monospace;
-                    font-size: 32px;
-                    font-weight: 900;
-                    letter-spacing: 1px;
-                    border: 2px solid;
-                    border-color: #808080 #ffffff #ffffff #808080;
-                    text-shadow: 0 0 8px #000000;
-                ">
-                </div>
-            </div>
-
 
             <!-- ---------- Totals ---------- -->
             <div class="totals-grid">
@@ -1193,10 +1169,10 @@
             <span class="fn-label">Pay / Save</span>
         </button>
 
-        <button class="fn-btn fn-yellow" onclick="payLater()">
-            <div class="fn-icon"><i class="fas fa-clock"></i></div>
+        <button class="fn-btn fn-yellow" id="f8Btn" onclick="onF8Click()">
+            <div class="fn-icon"><i class="fas fa-clock" id="f8Icon"></i></div>
             <span class="fn-key">[F8]</span>
-            <span class="fn-label">Pay Later</span>
+            <span class="fn-label" id="f8Label">Pending Sales</span>
         </button>
 
         <button class="fn-btn fn-red" onclick="returnSale()">
@@ -1231,7 +1207,7 @@
 <!-- ============================================ -->
 <!-- PRODUCT MODAL                                 -->
 <!-- ============================================ -->
-<div class="pos-modal-overlay" id="productModal">
+ <div class="pos-modal-overlay" id="productModal">
     <div class="pos-modal">
         <div class="pos-modal-header">
             <h3 id="modalTitle">Add to Cart</h3>
@@ -1293,7 +1269,7 @@
 <!-- ============================================ -->
 <!-- RETURN MODAL                                  -->
 <!-- ============================================ -->
-<div class="pos-modal-overlay" id="returnModal">
+ <div class="pos-modal-overlay" id="returnModal">
     <div class="pos-modal" style="max-width:640px;">
         <div class="pos-modal-header" style="background:#cc0000;">
             <h3>↩️ Process Return</h3>
@@ -1381,7 +1357,7 @@
 
 
 <!-- ============================================ -->
-<!-- RECEIPT MODAL — opened after every sale       -->
+<!-- RECEIPT MODAL                                  -->
 <!-- ============================================ -->
 <div class="pos-modal-overlay" id="receiptModal">
     <div class="pos-modal" style="max-width:520px; width:95%; max-height:88vh; display:flex; flex-direction:column; padding:0;">
@@ -1404,6 +1380,95 @@
             </button>
             <button type="button" class="btn-primary" onclick="closeReceiptModal()">
                 <i class="fas fa-check"></i> Done — New Sale
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<!-- ============================================ -->
+<!-- PENDING SALES MODAL                          -->
+<!-- ============================================ -->
+<div class="pos-modal-overlay" id="pendingSalesModal">
+    <div class="pos-modal" style="max-width:560px;">
+        <div class="pos-modal-header" style="background:#cc8800;">
+            <h3>💳 Pending Sales — Search & Pay</h3>
+            <button class="pos-modal-close" onclick="closePendingSalesModal()">✕</button>
+        </div>
+
+        <div class="pos-modal-body">
+
+            <!-- STEP 1: Lookup -->
+            <div class="groupbox" id="pendingLookupStep">
+                <span class="groupbox-title">Find Pending Sale</span>
+
+                <div class="modal-field">
+                    <label>Sale ID / Barcode / Customer Phone</label>
+                    <input type="text" id="pendingLookupInput"
+                           placeholder="Scan barcode or type sale id / phone"
+                           autocomplete="off"
+                           onkeydown="if(event.key==='Enter'){event.preventDefault();lookupPendingSale();}">
+                </div>
+
+                <button type="button" class="btn-3d"
+                        style="height:34px; background:#cc8800; color:#fff; border-color:#ffcc66 #664400 #664400 #ffcc66;"
+                        onclick="lookupPendingSale()">
+                    <i class="fas fa-search"></i> Find Pending Sale
+                </button>
+
+                <div id="pendingLookupError"
+                     style="display:none; margin-top:10px; padding:8px;
+                            background:#f8d7da; color:#721c24; border:2px solid #cc0000; font-size:12px;">
+                </div>
+
+                <!-- ✅ Quick list of pending sales, if any -->
+                <div style="margin-top:12px;">
+                    <div style="font-weight:700; font-size:12px; margin-bottom:4px;">
+                        Or pick from the list:
+                    </div>
+                    <div id="pendingSalesList"
+                         style="background:#fff; border:2px inset #808080; padding:6px;
+                                max-height:220px; overflow-y:auto; font-size:12px;">
+                        <em style="color:#888;">Loading pending sales…</em>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STEP 2: Payment (shown after sale found) -->
+            <div class="groupbox" id="pendingPayStep" style="display:none;">
+                <span class="groupbox-title">Pay Pending Sale</span>
+
+                <div id="pendingSaleHeader"
+                     style="background:#fffbe6; padding:8px; margin-bottom:10px;
+                            border:1px solid #808080; font-size:12px;"></div>
+
+                <div class="modal-field">
+                    <label>Amount to Pay <span class="text-danger">*</span></label>
+                    <input type="number" id="pendingPayAmount" step="0.01" min="0.01"
+                           placeholder="0.00">
+                    <small id="pendingPayHint">Total due: KSh 0.00</small>
+                </div>
+
+                <div class="modal-field">
+                    <label>Payment Method</label>
+                    <select id="pendingPayMethod">
+                        <option value="cash">Cash</option>
+                        <option value="mpesa">M-Pesa</option>
+                        <option value="card">Card</option>
+                        <option value="bank_transfer">Bank Transfer</option>
+                    </select>
+                </div>
+
+                <div id="pendingPayStatus" class="payment-status"></div>
+            </div>
+
+        </div>
+
+        <div class="pos-modal-footer">
+            <button type="button" onclick="closePendingSalesModal()">Cancel</button>
+            <button type="button" class="btn-primary" id="pendingPaySubmitBtn"
+                    onclick="submitPendingPayment()" disabled>
+                Submit Payment
             </button>
         </div>
     </div>
@@ -1685,7 +1750,7 @@ function _hr(width = 42, char = '-') {
     return char.repeat(width);
 }
 
-// ---------- The main print function ----------
+// ----- The main print function ----------
 async function printReceiptEscPos(saleData) {
     if (!usbPrinterDevice || !usbPrinterEndpoint) {
         // No printer → fall back to the modal so the cashier can
@@ -1833,9 +1898,6 @@ function _center(text, width) {
     const pad = Math.floor((width - text.length) / 2);
     return ' '.repeat(pad) + text;
 }
-
-
-
 
 
 // ============================================
@@ -2272,6 +2334,7 @@ function renderTicket() {
     if (cart.length === 0) {
         tbody.innerHTML = `<tr><td colspan="8" class="empty-ticket">Ticket is empty — scan or pick a product to start.</td></tr>`;
         updateTotalsBar();
+        updateF8Button(); 
         return;
     }
 
@@ -2297,6 +2360,7 @@ function renderTicket() {
     }).join('');
 
     updateTotalsBar();
+    updateF8Button();   
 }
 
 function selectTicketRow(idx) {
@@ -2393,6 +2457,7 @@ function newTicket() {
     set('discountPct', 0);
     set('discountAmt', 0);
     renderTicket();
+    updateF8Button(); 
     searchInput.focus();
 }
 
@@ -2573,11 +2638,23 @@ async function completeSale() {
         thank_you: 'Thank you for your business!',
     };
 
-    // Fill in the branch name
-    const branchOption = branchEl && branchEl.options[branchEl.selectedIndex];
-    if (branchOption) {
-        receiptSnapshot.branch_name = branchOption.text.split('(')[0].trim();
+    // Fill in the branch name — works for both <select> (admins) and
+    // hidden <input> (cashiers with a fixed branch)
+    let branchName = '';
+    if (branchEl) {
+        if (branchEl.tagName === 'SELECT') {
+            const opt = branchEl.options[branchEl.selectedIndex];
+            if (opt) branchName = opt.text.split('(')[0].trim();
+        } else {
+            // Cashier path: the visible readonly <input> sits next to the
+            // hidden #branchSelect input. Read the branch name from it.
+            const visibleInput = branchEl.previousElementSibling;
+            if (visibleInput && visibleInput.tagName === 'INPUT') {
+                branchName = (visibleInput.value || '').trim();
+            }
+        }
     }
+    receiptSnapshot.branch_name = branchName;
 
     const saleData = {
         branch_id: branchId,
@@ -2753,6 +2830,208 @@ async function loadPendingPayments() {
             </div>`).join('');
     } catch (err) { console.error(err); }
 }
+
+
+// ============================================
+// PENDING SALES (search + pay)
+// ============================================
+let pendingSaleData = null;   // the sale being paid
+
+function openPendingSalesModal() {
+    pendingSaleData = null;
+
+    document.getElementById('pendingLookupInput').value = '';
+    document.getElementById('pendingLookupError').style.display = 'none';
+    document.getElementById('pendingPayStep').style.display = 'none';
+    document.getElementById('pendingSaleHeader').innerHTML = '';
+    document.getElementById('pendingPayAmount').value = '';
+    document.getElementById('pendingPayStatus').className = 'payment-status';
+    document.getElementById('pendingPayStatus').style.display = 'none';
+    document.getElementById('pendingPaySubmitBtn').disabled = true;
+
+    document.getElementById('pendingSalesModal').classList.add('active');
+    loadPendingSalesList();
+
+    setTimeout(() => document.getElementById('pendingLookupInput').focus(), 100);
+}
+
+function closePendingSalesModal() {
+    document.getElementById('pendingSalesModal').classList.remove('active');
+    searchInput.focus();
+}
+
+async function loadPendingSalesList() {
+    const list = document.getElementById('pendingSalesList');
+    list.innerHTML = '<em style="color:#888;">Loading pending sales…</em>';
+
+    try {
+        const res = await fetch('/epa_shop/pos/pending/');
+        const data = await res.json();
+        if (!data.pending || !data.pending.length) {
+            list.innerHTML = '<em style="color:#888;">No pending sales.</em>';
+            return;
+        }
+        list.innerHTML = data.pending.map(p => `
+            <div class="pending-list-item"
+                 style="padding:6px; border-bottom:1px solid #ccc; cursor:pointer; display:flex; justify-content:space-between;"
+                 onclick="selectPendingSale(${p.id})">
+                <span>
+                    <b>#${p.company_sale_id}</b> —
+                    ${p.customer_name || 'Walk-in'}
+                    ${p.customer_phone ? '(' + p.customer_phone + ')' : ''}
+                </span>
+                <span style="color:#cc8800; font-weight:700;">
+                    KSh ${p.net_amount.toFixed(2)}
+                </span>
+            </div>`).join('');
+    } catch (err) {
+        list.innerHTML = '<em style="color:#cc0000;">Failed to load.</em>';
+    }
+}
+
+// Fetch full sale details by ID and show the payment step
+async function selectPendingSale(saleId) {
+    try {
+        const res = await fetch(`/epa_shop/sale/${saleId}/return-data/`);
+        const data = await res.json();
+        if (!data.success) {
+            document.getElementById('pendingLookupError').textContent =
+                data.error || 'Could not load sale.';
+            document.getElementById('pendingLookupError').style.display = 'block';
+            return;
+        }
+        showPendingPayStep(data.sale);
+    } catch (err) {
+        document.getElementById('pendingLookupError').textContent =
+            'Error: ' + err.message;
+        document.getElementById('pendingLookupError').style.display = 'block';
+    }
+}
+
+async function lookupPendingSale() {
+    const q = document.getElementById('pendingLookupInput').value.trim();
+    const errEl = document.getElementById('pendingLookupError');
+    errEl.style.display = 'none';
+
+    if (!q) {
+        errEl.textContent = 'Please enter a sale ID, barcode, or phone.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    // Reuse the existing sale lookup endpoint (barcode / sale id / phone)
+    try {
+        const res = await fetch(`/epa_shop/sale/lookup/?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        if (!data.success || !data.sale) {
+            errEl.textContent = data.error || `No sale found for "${q}".`;
+            errEl.style.display = 'block';
+            return;
+        }
+        if (data.sale.payment_status !== 'pending') {
+            errEl.textContent = `Sale #${data.sale.company_sale_id} is already ${data.sale.payment_status}.`;
+            errEl.style.display = 'block';
+            return;
+        }
+        // Now fetch full details (items etc.) via selectPendingSale
+        await selectPendingSale(data.sale.id);
+    } catch (err) {
+        errEl.textContent = 'Lookup failed: ' + err.message;
+        errEl.style.display = 'block';
+    }
+}
+
+function showPendingPayStep(sale) {
+    pendingSaleData = sale;
+
+    document.getElementById('pendingSaleHeader').innerHTML = `
+        <b>Sale #${sale.company_sale_id}</b> —
+        ${sale.customer_name || 'Walk-in'}
+        ${sale.customer_phone ? '(' + sale.customer_phone + ')' : ''}<br>
+        Date: ${new Date(sale.sale_date).toLocaleString()}<br>
+        Status: <b style="color:#cc8800;">PENDING</b>
+    `;
+
+    const amount = parseFloat(sale.net_amount) || 0;
+    const input = document.getElementById('pendingPayAmount');
+    input.value = amount.toFixed(2);
+    input.max = amount.toFixed(2);
+    document.getElementById('pendingPayHint').textContent =
+        `Total due: KSh ${amount.toFixed(2)}`;
+
+    input.oninput = function () {
+        const v = parseFloat(this.value) || 0;
+        document.getElementById('pendingPaySubmitBtn').disabled = v <= 0;
+    };
+
+    document.getElementById('pendingPayStep').style.display = 'block';
+    document.getElementById('pendingPaySubmitBtn').disabled = false;
+
+    setTimeout(() => input.focus(), 100);
+}
+
+async function submitPendingPayment() {
+    if (!pendingSaleData) return;
+
+    const statusEl = document.getElementById('pendingPayStatus');
+    const amount = parseFloat(document.getElementById('pendingPayAmount').value) || 0;
+    const method = document.getElementById('pendingPayMethod').value;
+    const total  = parseFloat(pendingSaleData.net_amount) || 0;
+
+    if (amount <= 0) {
+        statusEl.className = 'payment-status error';
+        statusEl.textContent = '❌ Amount must be greater than 0.';
+        return;
+    }
+    if (amount < total) {
+        statusEl.className = 'payment-status error';
+        statusEl.textContent = `❌ Amount is less than the total due (KSh ${total.toFixed(2)}).`;
+        return;
+    }
+
+    statusEl.className = 'payment-status pending';
+    statusEl.textContent = 'Processing payment…';
+
+    try {
+        const res = await fetch(`/epa_shop/sale/${pendingSaleData.id}/complete-json/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+            body: JSON.stringify({
+                payment_method: method,
+                amount_tendered: amount,
+            }),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            statusEl.className = 'payment-status success';
+            statusEl.textContent = `✅ Paid! Sale #${pendingSaleData.company_sale_id}`;
+            showSuccessToast(`✅ Pending sale #${pendingSaleData.company_sale_id} completed`);
+
+            // Refresh both lists
+            loadPendingSalesList();
+            loadPendingPayments();
+
+            setTimeout(() => {
+                closePendingSalesModal();
+                if (data.redirect_url) openReceiptModal(pendingSaleData.id);
+            }, 1200);
+        } else {
+            statusEl.className = 'payment-status error';
+            statusEl.textContent = '❌ ' + (data.error || 'Unknown error');
+        }
+    } catch (err) {
+        statusEl.className = 'payment-status error';
+        statusEl.textContent = '❌ ' + err.message;
+    }
+}
+
+// Close modal on backdrop click
+document.getElementById('pendingSalesModal').addEventListener('click', function (e) {
+    if (e.target === this) closePendingSalesModal();
+});
+
+
 
 // ============================================
 // RETURN SALE
@@ -3119,6 +3398,7 @@ function updateFullscreenButton(isFs) {
     });
 
 
+
 // ============================================
 // TABS
 // ============================================
@@ -3126,6 +3406,29 @@ function switchTab(tab) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + tab));
 }
+
+function onF8Click() {
+    if (cart.length === 0) {
+        openPendingSalesModal();
+    } else {
+        payLater();
+    }
+}
+
+function updateF8Button() {
+    const label = document.getElementById('f8Label');
+    const icon  = document.getElementById('f8Icon');
+    if (!label || !icon) return;
+
+    if (cart.length === 0) {
+        label.textContent = 'Pending Sales';
+        icon.className = 'fas fa-list';
+    } else {
+        label.textContent = 'Pay Later';
+        icon.className = 'fas fa-clock';
+    }
+}
+
 
 // ============================================
 // HELPERS
@@ -3264,6 +3567,7 @@ document.addEventListener('keydown', function (e) {
         if (document.getElementById('paymentModal').classList.contains('active')) closePaymentModal();
         if (document.getElementById('returnModal').classList.contains('active')) closeReturnModal();
         if (document.getElementById('receiptModal').classList.contains('active')) closeReceiptModal();
+        if (document.getElementById('pendingSalesModal').classList.contains('active')) closePendingSalesModal();
     }
 
     // ---------------------------------------------------------
@@ -3283,7 +3587,7 @@ document.addEventListener('keydown', function (e) {
     if (e.key === 'F5')  { e.preventDefault(); downloadPDF(); }          // PDF
     if (e.key === 'F6')  { e.preventDefault(); openPaymentModal('cash'); }  // Pay Due
     if (e.key === 'F7')  { e.preventDefault(); openPaymentModal('cash'); }  // Pay / Save
-    if (e.key === 'F8')  { e.preventDefault(); payLater(); }             // Pay Later
+    if (e.key === 'F8')  { e.preventDefault(); onF8Click(); }            // Pay Later/ pending
     if (e.key === 'F9')  { e.preventDefault(); returnSale(); }           // Return
     if (e.key === 'F10') { e.preventDefault(); focusScanner(); }         // Search
     if (e.key === 'F11') { e.preventDefault(); switchTab('receipt'); }   // Customers

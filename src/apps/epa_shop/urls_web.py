@@ -68,7 +68,7 @@ urlpatterns = [
     path('pos/pending/',               sale_views.pos_pending_payments,  name='pos-pending-payments'),
 
     # ============================================
-    # SALE MANAGEMENT
+    # SALE MANAGEMENT (list, detail, edit, delete)
     # ============================================
     path('sales/',                     sale_views.sale_list,     name='epa-sales'),
     path('sales/add/',                 sale_views.sale_create,   name='epa-sale-create'),
@@ -88,7 +88,7 @@ urlpatterns = [
     path('sales/pending/',             sale_views.sale_pending_list,            name='epa-sales-pending'),
 
     # ============================================
-    # SALE LOOKUP (used by POS Return modal)
+    # SALE LOOKUP (used by POS Return + Pending modals)
     # ============================================
     path('sale/lookup/',               sale_views.sale_lookup_by_barcode,  name='epa-sale-lookup'),
 
@@ -97,6 +97,23 @@ urlpatterns = [
     # ============================================
     path('sale/<int:sale_id>/return-data/',  sale_views.sale_return_data,     name='sale-return-data'),
     path('sale/process-return/',             sale_views.sale_process_return,  name='sale-process-return'),
+
+    # ============================================
+    # COMPLETE SALE — TWO DISTINCT PATHS
+    #   /complete-json/  → JSON API for POS pending modal
+    #   /complete/       → form-based flow for admin verify page
+    # ============================================
+    path('sale/<int:sale_id>/complete-json/',
+         sale_views.sale_complete_json,
+         name='sale-complete-json'),
+
+    path('sale/<int:sale_id>/complete/',
+         sale_views.sale_complete,
+         name='epa-sale-complete'),
+
+    path('sale/<str:company_sale_id>/complete/',
+         sale_views.sale_complete,
+         name='epa-sale-complete-by-id'),
 
     # ============================================
     # SALE RECEIPTS
@@ -122,17 +139,6 @@ urlpatterns = [
     path('sale/<str:company_sale_id>/reverse/',
          product_views.unit_reverse_sale,
          name='epa-sale-reverse-by-id'),
-
-    # ============================================
-    # COMPLETE SALE — int first, then str
-    # ============================================
-    path('sale/<int:sale_id>/complete/',
-         sale_views.sale_complete,
-         name='epa-sale-complete'),
-
-    path('sale/<str:company_sale_id>/complete/',
-         sale_views.sale_complete,
-         name='epa-sale-complete-by-id'),
 
     # ============================================
     # CATEGORIES — Full CRUD

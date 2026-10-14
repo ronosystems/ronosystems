@@ -7,7 +7,7 @@ from django.utils import timezone
 from django.http import JsonResponse
 from django.db import transaction
 from apps.company.models import Branch
-from .models import Phone, Electronic, Accessory, Category, Unit, Sale, SaleItem, Customer, Owner
+from .models import Phone, Electronic, Accessory, Category, Unit, Sale, SaleItem, Customer, Owner, ReturnItem
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from .utils import record_stock_movement
@@ -25,6 +25,7 @@ import json
 from datetime import timedelta
 from django.db.models import Sum, Q
 from django.views.decorators.clickjacking import xframe_options_sameorigin
+from django.views.decorators.http import require_POST
 
 
 
@@ -1796,11 +1797,14 @@ def pos_pending_payments(request):
     qs = Sale.objects.filter(
         company=company,
         payment_status='pending',
-    ).select_related('branch').order_by('-sale_date')[:50]
+    ).select_related('branch').order_by('-sale_date')
 
     # Cashiers see only their own branch
     if request.user.role == 'company_cashier' and request.user.branch:
         qs = qs.filter(branch=request.user.branch)
+
+    # Slice LAST, after all filters
+    qs = qs[:50]
 
     return JsonResponse({'pending': [{
         'id': s.id,
@@ -1811,7 +1815,6 @@ def pos_pending_payments(request):
         'sale_date': s.sale_date.isoformat(),
         'receipt_url': f'/epa_shop/sale/receipt/{s.id}/',
     } for s in qs]})
-
 
 # ============================================
 # PENDING SALES LIST
@@ -1863,6 +1866,102 @@ def sale_pending_list(request):
         'page_subtitle': 'Sales awaiting completion verification',
     }
     return render(request, 'epa/sales_pending.html', context)
+
+
+# ============================================
+# SALE COMPLETE JSON
+# ============================================
+@login_required
+@require_POST
+def sale_complete_json(request, sale_id):
+    """JSON version of sale_complete for POS pending-sales flow."""
+    from django.views.decorators.http import require_POST  # if not already imported top-level
+    company, is_viewing_company = get_active_company(request)
+    if not company:
+        return JsonResponse({'success': False, 'error': 'No company assigned'}, status=400)
+
+    sale = Sale.objects.filter(id=sale_id, company=company).first()
+    if not sale:
+        return JsonResponse({'success': False, 'error': 'Sale not found.'}, status=404)
+
+    if sale.payment_status != 'pending':
+        return JsonResponse({
+            'success': False,
+            'error': f'Sale is already {sale.payment_status}.',
+        }, status=400)
+
+    is_authorized = (
+        is_viewing_company or
+        request.user.is_company_admin or
+        request.user.is_company_manager or
+        request.user.is_super_admin or
+        request.user.is_superuser or
+        request.user.is_staff
+    )
+    if not is_authorized and request.user.role == 'company_cashier':
+        if sale.branch_id == getattr(request.user.branch, 'id', None):
+            is_authorized = True
+
+    if not is_authorized:
+        return JsonResponse({'success': False, 'error': 'Not authorized.'}, status=403)
+
+    try:
+        payload = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON.'}, status=400)
+
+    method = (payload.get('payment_method') or '').strip().lower()
+    amount_raw = payload.get('amount_tendered')
+
+    allowed_methods = {'cash', 'mpesa', 'card', 'bank_transfer'}
+    if method not in allowed_methods:
+        return JsonResponse({'success': False, 'error': 'Invalid payment method.'}, status=400)
+
+    try:
+        amount_tendered = Decimal(str(amount_raw))
+    except (ValueError, TypeError, ArithmeticError):
+        return JsonResponse({'success': False, 'error': 'Invalid amount.'}, status=400)
+
+    total_due = Decimal(str(sale.net_amount))
+
+    if method == 'cash':
+        if amount_tendered < total_due:
+            return JsonResponse({
+                'success': False,
+                'error': f'Tendered KSh {amount_tendered} < total KSh {total_due}.',
+            }, status=400)
+    else:
+        if amount_tendered != total_due:
+            return JsonResponse({
+                'success': False,
+                'error': f'For {method}, amount must equal {total_due}.',
+            }, status=400)
+
+    with transaction.atomic():
+        sale.payment_status = 'paid'
+        sale.payment_method = method
+        sale.save(update_fields=['payment_status', 'payment_method'])
+
+        if sale.customer:
+            sale.customer.total_purchases += sale.net_amount
+            sale.customer.visit_count += 1
+            sale.customer.last_visit = timezone.now()
+            sale.customer.save()
+
+        for item in sale.items.all():
+            if item.unit and item.unit.owner:
+                owner = item.unit.owner
+                owner.total_purchases += item.total_price
+                owner.purchase_count += 1
+                owner.last_purchase_date = timezone.now()
+                owner.save()
+
+    return JsonResponse({
+        'success': True,
+        'message': f'Sale #{sale.company_sale_id} completed.',
+        'sale_id': sale.id,
+        'redirect_url': f'/epa_shop/sale/receipt/{sale.id}/',
+    })
 
 
 # ============================================
