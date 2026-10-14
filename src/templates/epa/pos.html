@@ -56,7 +56,8 @@
         display: grid;
         grid-template-columns: 520px 1fr;
         gap: 8px;
-        align-items: start;
+        align-items: stretch;       /* ⬅️ was 'start' — lets both columns match height */
+        min-height: calc(100vh - 220px);
     }
 
     /* ============================================
@@ -177,7 +178,8 @@
         background: #ffff99;
         border: 2px solid;
         border-color: #808080 #ffffff #ffffff #808080;
-        height: 260px;
+        flex: 1 1 auto;             /* ⬅️ grows to fill leftover space */
+        min-height: 500px;          /* ⬅️ never smaller than this */
         overflow-y: auto;
     }
     table.ticket {
@@ -634,6 +636,15 @@
         cursor: not-allowed;
     }
 
+    /* Checkout — active payment-method button */
+    .checkout-pm { opacity: 0.55; }
+    .checkout-pm.active {
+        opacity: 1;
+        outline: 2px solid #009900;
+        outline-offset: -2px;
+        transform: translateY(-1px);
+    }
+
     /* Payment modal */
     .payment-amount-display {
         background: #000;
@@ -911,52 +922,6 @@
             </div>
 
 
-            <!-- ----------(read-only) ---------- -->
-            <div class="groupbox" style="margin-top: 6px;">
-                <span class="groupbox-title"></span>
-                <div style="
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    height: 60px;
-                    background: #000;
-                    color: #00ff00;
-                    font-family: 'Courier New', monospace;
-                    font-size: 32px;
-                    font-weight: 900;
-                    letter-spacing: 1px;
-                    border: 2px solid;
-                    border-color: #808080 #ffffff #ffffff #808080;
-                    text-shadow: 0 0 8px #000000;
-                ">
-                </div>
-            </div>
-
-
-
-            <!-- ============================================
-                PAYMENT METHOD BUTTONS
-            ============================================ -->
-            <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-top:8px;">
-                <button class="btn-3d" style="height:36px; background:#e8f5e9; border-color:#66ff66 #003300 #003300 #66ff66;"
-                        onclick="openPaymentModal('cash')">
-                    <i class="fas fa-money-bill-wave" style="color:#009900;"></i> CASH
-                </button>
-                <button class="btn-3d" style="height:36px; background:#e8f5e9; border-color:#66ff66 #003300 #003300 #66ff66;"
-                        onclick="openPaymentModal('mpesa')">
-                    <i class="fas fa-mobile-alt" style="color:#009900;"></i> M-PESA
-                </button>
-                <button class="btn-3d" style="height:36px; background:#e7f1ff; border-color:#7a9fd4 #000080 #000080 #7a9fd4;"
-                        onclick="openPaymentModal('bank')">
-                    <i class="fas fa-credit-card" style="color:#000080;"></i> CARD
-                </button>
-                <button class="btn-3d" style="height:36px; background:#fff8e1; border-color:#ffcc66 #806600 #806600 #ffcc66;"
-                        onclick="openPaymentModal('points')">
-                    <i class="fas fa-star" style="color:#cc8800;"></i> POINTS
-                </button>
-            </div>
-
-
             <!-- ============================================
                  BIG SUBMIT BUTTON — Complete Sale
             ============================================ -->
@@ -1133,7 +1098,7 @@
             <span class="fn-label">Close</span>
         </button>
 
-        <button class="fn-btn fn-gray" onclick="alert('Shortcut keys:\nF1 Close · F2 Help · F3 New · F4 Print\nF5 PDF · F6 Pay Due · F7 Pay/Save · F8 Pay Later\nF9 Return · F10 Search · F11 Customers · F12 Fullscreen')">
+        <button class="fn-btn fn-gray" onclick="openShortcutsModal()">
             <div class="fn-icon"><i class="fas fa-keyboard"></i></div>
             <span class="fn-key">[F2]</span>
             <span class="fn-label">Shortcut Keys</span>
@@ -1475,6 +1440,228 @@
 </div>
 
 
+<!-- ============================================ -->
+<!-- CHECKOUT / CUSTOMER MODAL                    -->
+<!-- ============================================ -->
+<div class="pos-modal-overlay" id="checkoutModal">
+    <div class="pos-modal" style="max-width:560px;">
+        <div class="pos-modal-header" style="background:#009900;">
+            <h3>🧾 Complete Sale — Payment &amp; Customer</h3>
+            <button class="pos-modal-close" onclick="closeCheckoutModal()">✕</button>
+        </div>
+
+        <div class="pos-modal-body">
+
+            <!-- Live total -->
+            <div class="payment-amount-display" style="margin-bottom:12px;">
+                <div class="label">TOTAL TO PAY</div>
+                <div class="amount" id="checkoutTotalDisplay">KSh 0.00</div>
+            </div>
+
+            <!-- ============ PAYMENT METHOD ============ -->
+            <div class="groupbox" style="margin-top:4px;">
+                <span class="groupbox-title">Payment Method</span>
+
+                <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px;">
+                    <button type="button" class="btn-3d checkout-pm active" data-pm="cash"
+                            style="height:40px; background:#e8f5e9; border-color:#66ff66 #003300 #003300 #66ff66;"
+                            onclick="selectCheckoutPaymentMethod('cash')">
+                        <i class="fas fa-money-bill-wave" style="color:#009900;"></i> CASH
+                    </button>
+                    <button type="button" class="btn-3d checkout-pm" data-pm="mpesa"
+                            style="height:40px; background:#e8f5e9; border-color:#66ff66 #003300 #003300 #66ff66;"
+                            onclick="selectCheckoutPaymentMethod('mpesa')">
+                        <i class="fas fa-mobile-alt" style="color:#009900;"></i> M-PESA
+                    </button>
+                    <button type="button" class="btn-3d checkout-pm" data-pm="bank"
+                            style="height:40px; background:#e7f1ff; border-color:#7a9fd4 #000080 #000080 #7a9fd4;"
+                            onclick="selectCheckoutPaymentMethod('bank')">
+                        <i class="fas fa-credit-card" style="color:#000080;"></i> CARD
+                    </button>
+                    <button type="button" class="btn-3d checkout-pm" data-pm="points"
+                            style="height:40px; background:#fff8e1; border-color:#ffcc66 #806600 #806600 #ffcc66;"
+                            onclick="selectCheckoutPaymentMethod('points')">
+                        <i class="fas fa-star" style="color:#cc8800;"></i> POINTS
+                    </button>
+                </div>
+
+                <!-- Amount tendered (Cash only) -->
+                <div id="checkoutCashPanel" style="margin-top:10px;">
+                    <div class="modal-field" style="margin-bottom:6px;">
+                        <label>Amount Tendered <span class="text-danger">*</span></label>
+                        <input type="number" id="checkoutTendered"
+                               step="0.01" min="0"
+                               placeholder="0.00"
+                               oninput="updateCheckoutChange()"
+                               onkeydown="handleCheckoutEnter(event, 'tendered')">
+                    </div>
+                    <div style="display:flex; justify-content:space-between; padding:6px 8px;
+                                background:#e8f5e9; border:2px solid; border-color:#808080 #ffffff #ffffff #808080;">
+                        <span style="font-weight:700;">Change Due:</span>
+                        <span id="checkoutChange" style="font-weight:900; color:#009900; font-size:16px;">
+                            KSh 0.00
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Reference / phone for non-cash -->
+                <div id="checkoutRefPanel" style="margin-top:10px; display:none;">
+                    <div class="modal-field" style="margin-bottom:0;">
+                        <label id="checkoutRefLabel">Reference / Phone</label>
+                        <input type="text" id="checkoutReference"
+                               placeholder="e.g. 07XX XXX XXX or txn code"
+                               autocomplete="off"
+                               onkeydown="handleCheckoutEnter(event, 'reference')">
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ BRANCH ============ -->
+            <div class="groupbox" style="margin-top:10px;">
+                <span class="groupbox-title">Branch</span>
+                <div class="modal-field" style="margin-bottom:0;">
+                    <select id="checkoutBranch" class="pos-select" style="width:100%;"
+                            onkeydown="handleCheckoutEnter(event, 'branch')">
+                        <option value="">— Select Branch —</option>
+                    </select>
+                    <small style="color:#555;">Required · press <b>Enter</b> to move on</small>
+                </div>
+            </div>
+
+            <!-- ============ CUSTOMER ============ -->
+            <div class="groupbox" style="margin-top:10px;">
+                <span class="groupbox-title">Customer</span>
+
+                <div style="display:flex; gap:18px; margin-bottom:8px;">
+                    <label style="font-size:12px; font-weight:700; cursor:pointer;">
+                        <input type="radio" name="checkoutCustType" value="walkin"
+                               id="checkoutWalkin" checked
+                               onchange="onCheckoutCustomerTypeChange()"> Walk-in
+                    </label>
+                    <label style="font-size:12px; font-weight:700; cursor:pointer;">
+                        <input type="radio" name="checkoutCustType" value="named"
+                               id="checkoutNamed"
+                               onchange="onCheckoutCustomerTypeChange()"> Named Customer
+                    </label>
+                </div>
+
+                <div id="checkoutWalkinNote"
+                     style="padding:6px 8px; background:#fffbe6;
+                            border:2px solid; border-color:#808080 #ffffff #ffffff #808080;
+                            font-size:12px;">
+                    ℹ️ Sale will be recorded as <b>Walk-in Customer</b>.
+                </div>
+
+                <div id="checkoutNamedFields" style="display:none;">
+                    <div class="modal-field">
+                        <label>Name <span class="text-danger">*</span></label>
+                        <input type="text" id="checkoutName"
+                               placeholder="Customer full name" autocomplete="off"
+                               onkeydown="handleCheckoutEnter(event, 'name')">
+                    </div>
+                    <div class="modal-field">
+                        <label>Phone <span class="text-danger">*</span></label>
+                        <input type="text" id="checkoutPhone"
+                               placeholder="07XX XXX XXX" autocomplete="off"
+                               onkeydown="handleCheckoutEnter(event, 'phone')">
+                    </div>
+                    <div class="modal-field">
+                        <label>Email (optional)</label>
+                        <input type="email" id="checkoutEmail"
+                               placeholder="optional@email.com" autocomplete="off"
+                               onkeydown="handleCheckoutEnter(event, 'email')">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Validation / status -->
+            <div id="checkoutError"
+                 style="display:none; margin-top:10px; padding:8px;
+                        background:#f8d7da; color:#721c24;
+                        border:2px solid #cc0000; font-size:12px;">
+            </div>
+
+            <div class="payment-status" id="checkoutStatus"></div>
+
+        </div>
+
+        <div class="pos-modal-footer">
+            <button type="button" onclick="closeCheckoutModal()">Cancel</button>
+            <button type="button" class="btn-primary" id="checkoutSubmitBtn"
+                    onclick="submitCheckout()">
+                <i class="fas fa-check"></i> Complete Sale (Enter)
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<!-- ============================================ -->
+<!-- SHORTCUT KEYS MODAL                          -->
+<!-- ============================================ -->
+<div class="pos-modal-overlay" id="shortcutsModal">
+    <div class="pos-modal" style="max-width:620px;">
+        <div class="pos-modal-header" style="background:#4a4a4a;">
+            <h3>⌨️ Keyboard Shortcuts</h3>
+            <button class="pos-modal-close" onclick="closeShortcutsModal()">✕</button>
+        </div>
+
+        <div class="pos-modal-body">
+
+            <div class="groupbox" style="margin-top: 4px;">
+                <span class="groupbox-title">Function Keys</span>
+                <div id="shortcutsGrid" style="
+                    display: grid;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 6px 16px;
+                    font-size: 12px;
+                ">
+                    <!-- Filled by JS -->
+                </div>
+            </div>
+
+            <div class="groupbox" style="margin-top: 12px;">
+                <span class="groupbox-title">Other Shortcuts</span>
+                <div style="display:grid; grid-template-columns: 90px 1fr; gap: 4px 12px; font-size:12px;">
+                    <span class="fn-key" style="text-align:center;">Enter</span>
+                    <span>Complete sale (when focus is not in a text field)</span>
+
+                    <span class="fn-key" style="text-align:center;">Esc</span>
+                    <span>Close any open dialog / modal</span>
+
+                    <span class="fn-key" style="text-align:center;">Enter</span>
+                    <span>Print receipt (inside the Receipt modal)</span>
+
+                    <span class="fn-key" style="text-align:center;">Ctrl + R</span>
+                    <span>Refresh product list</span>
+                </div>
+            </div>
+
+            <div style="
+                margin-top: 12px;
+                padding: 8px 10px;
+                background: #fffbe6;
+                border: 2px solid;
+                border-color: #808080 #ffffff #ffffff #808080;
+                font-size: 11px;
+                color: #555;
+            ">
+                💡 <b>Tip:</b> While the Scan Barcode box is empty, press
+                <b>Enter</b> to jump straight to <b>Complete Sale</b>.
+                Scan or type a code first to add items.
+            </div>
+
+        </div>
+
+        <div class="pos-modal-footer">
+            <button type="button" class="btn-primary" onclick="closeShortcutsModal()">
+                <i class="fas fa-check"></i> Got it
+            </button>
+        </div>
+    </div>
+</div>
+
+
 <!-- Toasts -->
 <div class="success-toast" id="successToast">
     <span id="successMessage">Sale completed!</span>
@@ -1510,23 +1697,10 @@ let currentTotal = 0;
 let selectedTicketIndex = -1;  // selected row in ticket table
 let returnSaleData = null;   // the looked-up sale
 let returnSelections = {};   // { sale_item_id: qty_to_return }
-// ============================================
-// USB THERMAL PRINTER (XPrinter XP-365B, ESC/POS)
-// ============================================
-// The XPrinter USB interface is usually a USB Printer Class device.
-// Most cheap thermal printers expose TWO interfaces:
-//   - Interface 0: USB Printer Class (bulk OUT endpoint) ← we use this
-//   - Interface 1: sometimes a vendor-specific interface
-// We always pick the first interface that has a bulk OUT endpoint.
-
 let usbPrinterDevice = null;
 let usbPrinterEndpoint = null;
+let pendingSaleData = null;   // the sale being paid
 
-// XPrinter vendor IDs commonly seen:
-//   0x0483 (STMicro), 0x0416 (Winbond), 0x1a86 (QinHeng),
-//   0x0fe6 (ICS Advent), 0x1504 (XPrinter)
-// We don't filter by VID because some units ship with generic VID/PID.
-// The user picks the printer from Chrome's device chooser once.
 
 const PRINTER_DB_NAME = 'pos-printer';
 const PRINTER_DB_STORE = 'devices';
@@ -1582,6 +1756,9 @@ async function _savePrinterHandle(device) {
     }
 }
 
+
+
+
 async function _loadPrinterHandle() {
     try {
         const db = await _openPrinterDB();
@@ -1593,7 +1770,6 @@ async function _loadPrinterHandle() {
     }
 }
 
-// ---------- Device setup ----------
 async function connectPrinter() {
     if (!('usb' in navigator)) {
         alert('WebUSB is not supported in this browser. Use Chrome or Edge.');
@@ -1683,7 +1859,6 @@ async function _setupPrinterDevice(device) {
     });
 }
 
-// Try to restore printer on page load (Chrome remembers permission)
 async function restorePrinter() {
     if (!('usb' in navigator)) return;
 
@@ -1721,7 +1896,6 @@ function updatePrinterButton(connected) {
     }
 }
 
-// ---------- ESC/POS payload builder ----------
 function _escposEncode(text) {
     // ESC/POS default code page is CP437. For ASCII-only receipts, plain
     // TextEncoder is fine. For non-ASCII, swap in a CP437 encoder.
@@ -1750,7 +1924,6 @@ function _hr(width = 42, char = '-') {
     return char.repeat(width);
 }
 
-// ----- The main print function ----------
 async function printReceiptEscPos(saleData) {
     if (!usbPrinterDevice || !usbPrinterEndpoint) {
         // No printer → fall back to the modal so the cashier can
@@ -1900,6 +2073,7 @@ function _center(text, width) {
 }
 
 
+
 // ============================================
 // PRODUCTS: LOAD / FILTER / RENDER
 // ============================================
@@ -2013,6 +2187,9 @@ function clearProductFilter() {
     searchInput.focus();
 }
 
+
+
+
 // ============================================
 // BARCODE / IMEI / SERIAL SEARCH
 // ============================================
@@ -2044,18 +2221,8 @@ searchInput.addEventListener('keydown', async function (e) {
     // (this is the primary "ready to pay" gesture)
     // ------------------------------------------------
     if (!q) {
-        if (cart.length === 0) return;                      // nothing to sell
-        if (!validateCustomer()) return;                    // will switch tabs + show error
-
-        const branchEl = document.getElementById('branchSelect');
-        const branchId = branchEl ? branchEl.value : '';
-        if (!branchId) {
-            alert('Please select a branch (Receipt Details tab).');
-            switchTab('receipt');
-            return;
-        }
-
-        completeSale();
+        if (cart.length === 0) return;   // nothing to sell
+        completeSale();                  // now opens the checkout modal
         return;
     }
 
@@ -2149,6 +2316,9 @@ function autoAddBarcodeMatch(match) {
     searchInput.focus();
     showIndicator(`✅ Added: ${match.name}`);
 }
+
+
+
 
 // ============================================
 // PRODUCT MODAL
@@ -2312,6 +2482,9 @@ function addToCartFromModal() {
     closeModal();
 }
 
+
+
+
 // ============================================
 // TICKET / CART
 // ============================================
@@ -2375,20 +2548,21 @@ function selectTicketRow(idx) {
     renderTicket();
 }
 
-function removeSelectedLine() {
-    if (selectedTicketIndex < 0) { alert('Select a ticket row first.'); return; }
-    removeLine(selectedTicketIndex);
-    selectedTicketIndex = -1;
-    const el = document.getElementById('selectedProduct');
-    if (el) el.value = '';
+function removeLine(idx) {
+    if (idx < 0 || idx >= cart.length) return;
+    cart.splice(idx, 1);
+    if (selectedTicketIndex === idx) selectedTicketIndex = -1;
+    else if (selectedTicketIndex > idx) selectedTicketIndex -= 1;
+    renderTicket();
+    updateTotalsBar();   // already called inside renderTicket, but explicit is fine
 }
 
 function removeSelectedLine() {
-    if (selectedTicketIndex < 0) { alert('Select a ticket row first.'); return; }
+    if (selectedTicketIndex < 0) {
+        alert('Select a ticket row first.');
+        return;
+    }
     removeLine(selectedTicketIndex);
-    selectedTicketIndex = -1;
-    const el = document.getElementById('selectedProduct');
-    if (el) el.value = '';        // ✅ guarded
 }
 
 function addSelectedToTicket() {
@@ -2433,12 +2607,7 @@ function updateTotalsBar() {
     const btn      = document.getElementById('completeSaleBtn');
     const btnTotal = document.getElementById('btnTotal');
     if (btnTotal) btnTotal.textContent = `KSh ${subtotal.toFixed(2)}`;
-
-    const customerChosen =
-        document.getElementById('custTypeWalkin').checked ||
-        document.getElementById('custTypeNamed').checked;
-
-    if (btn) btn.disabled = (cart.length === 0 || !customerChosen);
+    if (btn) btn.disabled = (cart.length === 0);
 }
 
 function clearCart() {
@@ -2461,12 +2630,14 @@ function newTicket() {
     searchInput.focus();
 }
 
+
+
+
 // ============================================
 // PAYMENT MODAL
 // ============================================
 function openPaymentModal(method) {
     if (cart.length === 0) { alert('Ticket is empty. Add items first.'); return; }
-    if (!validateCustomer()) return;
     currentPaymentMethod = method;
     const modal = document.getElementById('paymentModal');
     const title = document.getElementById('paymentModalTitle');
@@ -2593,26 +2764,28 @@ function processPayment() {
     setTimeout(() => { closePaymentModal(); completeSale(); }, 800);
 }
 
-// ============================================
-// COMPLETE SALE
-// ============================================
-async function completeSale() {
-    if (cart.length === 0) { alert('Ticket is empty.'); return; }
 
-    const customer = validateCustomer();
-    if (!customer) return;
+
+
+// ============================================
+// COMPLETE SALE — internal (called from checkout modal)
+// Returns true on success, false on failure.
+// ============================================
+async function completeSaleInternal(customer) {
+    if (cart.length === 0) { alert('Ticket is empty.'); return false; }
+    if (!customer) return false;
 
     const branchEl = document.getElementById('branchSelect');
     const branchId = branchEl ? branchEl.value : '';
     if (!branchId) {
         alert('Please select a branch (Receipt Details tab).');
         switchTab('receipt');
-        return;
+        return false;
     }
 
     const total = currentTotal;
 
-    // Snapshot the receipt data BEFORE we clear the cart
+    // Snapshot for the receipt printer
     const receiptSnapshot = {
         items: cart.map(item => ({
             name: item.name,
@@ -2638,7 +2811,6 @@ async function completeSale() {
         thank_you: 'Thank you for your business!',
     };
 
-    // Fill in the branch name — works for both <select> and hidden <input>
     let branchName = '';
     if (branchEl) {
         if (branchEl.tagName === 'SELECT') {
@@ -2685,29 +2857,386 @@ async function completeSale() {
             receiptSnapshot.date_str = now.toISOString().slice(0, 10);
             receiptSnapshot.time_str = now.toTimeString().slice(0, 5);
 
-            // Reset ticket
             newTicket();
             resetCustomerBlock();
             await refreshProductsAfterSale();
 
-            // ============================================
-            // PRINT — native browser path (same as manual Print)
-            // ============================================
             if (POS_AUTO_PRINT && data.sale_id) {
-                // Silent print via hidden iframe.
-                // Requires Chrome to be launched with --kiosk-printing
-                // for true silent printing (no dialog).
                 printReceiptDirectly(data.sale_id);
             } else if (data.sale_id) {
-                // Auto-print off → show the receipt modal so the
-                // operator can click Print manually.
                 setTimeout(() => openReceiptModal(data.sale_id), 300);
             }
+
+            return true;
         } else {
             alert('Error: ' + (data.error || 'Unknown error'));
+            return false;
         }
     } catch (err) {
         alert('Error: ' + err.message);
+        return false;
+    }
+}
+
+function completeSale() {
+    if (cart.length === 0) { alert('Ticket is empty.'); return; }
+
+    document.getElementById('checkoutTotalDisplay').textContent =
+        `KSh ${currentTotal.toFixed(2)}`;
+
+    // Branch dropdown
+    populateCheckoutBranch();
+
+    // Seed payment method from whatever the main screen had
+    selectCheckoutPaymentMethod(currentPaymentMethod || 'cash');
+
+    // Seed customer type from Receipt Details tab
+    const namedChecked = document.getElementById('custTypeNamed').checked;
+    if (namedChecked) {
+        document.getElementById('checkoutNamed').checked  = true;
+        document.getElementById('checkoutWalkin').checked = false;
+    } else {
+        document.getElementById('checkoutWalkin').checked = true;
+        document.getElementById('checkoutNamed').checked  = false;
+    }
+    document.getElementById('checkoutName').value  = document.getElementById('customerName').value  || '';
+    document.getElementById('checkoutPhone').value = document.getElementById('customerPhone').value || '';
+    document.getElementById('checkoutEmail').value = document.getElementById('customerEmail').value || '';
+
+    onCheckoutCustomerTypeChange();
+    hideCheckoutError();
+
+    document.getElementById('checkoutModal').classList.add('active');
+
+    // Focus first relevant field
+    setTimeout(() => {
+        if (currentPaymentMethod === 'cash') {
+            document.getElementById('checkoutTendered').focus();
+        } else if (currentPaymentMethod !== 'cash') {
+            document.getElementById('checkoutReference').focus();
+        } else {
+            const branchEl = document.getElementById('checkoutBranch');
+            if (!branchEl.value) branchEl.focus();
+            else focusFirstCheckoutField();
+        }
+    }, 100);
+}
+
+function populateCheckoutBranch() {
+    const src = document.getElementById('branchSelect');
+    const dst = document.getElementById('checkoutBranch');
+    dst.innerHTML = '<option value="">— Select Branch —</option>';
+
+    if (!src) return;
+
+    if (src.tagName === 'SELECT') {
+        // Copy options from Receipt Details tab
+        Array.from(src.options).forEach(opt => {
+            if (!opt.value) return;
+            const o = document.createElement('option');
+            o.value = opt.value;
+            o.textContent = opt.textContent;
+            dst.appendChild(o);
+        });
+        dst.value = src.value || '';
+    } else {
+        // Hidden input (cashier) — single fixed branch
+        const visible = src.previousElementSibling;
+        const branchId = src.value || '';
+        const branchName = (visible && visible.value) ? visible.value : 'Assigned Branch';
+        if (branchId) {
+            const o = document.createElement('option');
+            o.value = branchId;
+            o.textContent = branchName;
+            dst.appendChild(o);
+            dst.value = branchId;
+        }
+        dst.disabled = true;   // cashier cannot change
+    }
+}
+
+function closeCheckoutModal() {
+    document.getElementById('checkoutModal').classList.remove('active');
+    searchInput.focus();
+}
+
+function onCheckoutCustomerTypeChange() {
+    const isNamed = document.getElementById('checkoutNamed').checked;
+    document.getElementById('checkoutNamedFields').style.display    = isNamed ? 'block' : 'none';
+    document.getElementById('checkoutWalkinNote').style.display     = isNamed ? 'none'  : 'block';
+    hideCheckoutError();
+}
+
+function focusFirstCheckoutField() {
+    const branch = document.getElementById('checkoutBranch');
+    if (!branch.disabled && !branch.value) { branch.focus(); return; }
+
+    if (document.getElementById('checkoutNamed').checked) {
+        const name = document.getElementById('checkoutName');
+        if (!name.value.trim()) { name.focus(); return; }
+        const phone = document.getElementById('checkoutPhone');
+        if (!phone.value.trim()) { phone.focus(); return; }
+    }
+    // Otherwise focus the submit button
+    document.getElementById('checkoutSubmitBtn').focus();
+}
+
+function selectCheckoutPaymentMethod(method) {
+    currentPaymentMethod = method;                       // ← this is what the backend uses
+
+    // Highlight the active button
+    document.querySelectorAll('#checkoutModal .checkout-pm').forEach(b => {
+        b.classList.toggle('active', b.dataset.pm === method);
+    });
+
+    // Show / hide panels
+    const cashPanel = document.getElementById('checkoutCashPanel');
+    const refPanel  = document.getElementById('checkoutRefPanel');
+    const refLabel  = document.getElementById('checkoutRefLabel');
+
+    if (method === 'cash') {
+        cashPanel.style.display = 'block';
+        refPanel.style.display  = 'none';
+        document.getElementById('checkoutChange').textContent = 'KSh 0.00';
+        document.getElementById('checkoutTendered').value = '';
+    } else {
+        cashPanel.style.display = 'none';
+        refPanel.style.display  = 'block';
+
+        if (method === 'mpesa') {
+            refLabel.textContent = 'M-Pesa Phone';
+            document.getElementById('checkoutReference').placeholder = '07XX XXX XXX';
+        } else if (method === 'bank') {
+            refLabel.textContent = 'Card / Txn Ref';
+            document.getElementById('checkoutReference').placeholder = 'e.g. auth code';
+        } else if (method === 'points') {
+            refLabel.textContent = 'Customer Phone (loyalty)';
+            document.getElementById('checkoutReference').placeholder = '07XX XXX XXX';
+        }
+    }
+
+    hideCheckoutError();
+}
+
+function updateCheckoutChange() {
+    const tendered = parseFloat(document.getElementById('checkoutTendered').value) || 0;
+    const change   = tendered - currentTotal;
+    const el       = document.getElementById('checkoutChange');
+
+    if (change >= 0) {
+        el.textContent = `KSh ${change.toFixed(2)}`;
+        el.style.color = '#009900';
+    } else {
+        el.textContent = `KSh ${Math.abs(change).toFixed(2)} short`;
+        el.style.color = '#cc0000';
+    }
+}
+
+function handleCheckoutEnter(e, currentField) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    hideCheckoutError();
+
+    const isNamed = document.getElementById('checkoutNamed').checked;
+    const pm      = currentPaymentMethod;
+
+    // --- 1. Cash tendered -----------------------------------
+    if (currentField === 'tendered') {
+        const tendered = parseFloat(document.getElementById('checkoutTendered').value) || 0;
+        if (tendered < currentTotal) {
+            showCheckoutError(`⚠️ Amount tendered (KSh ${tendered.toFixed(2)}) is less than the total.`);
+            return;
+        }
+        // Next: branch
+        const branch = document.getElementById('checkoutBranch');
+        if (!branch.disabled && !branch.value) { branch.focus(); return; }
+        if (isNamed) { document.getElementById('checkoutName').focus(); return; }
+        // Ready to submit
+        submitCheckout();
+        return;
+    }
+
+    // --- 2. Non-cash reference ------------------------------
+    if (currentField === 'reference') {
+        const ref = document.getElementById('checkoutReference').value.trim();
+        if (pm === 'mpesa' && !/^[+\d][\d\s\-()]{6,}$/.test(ref)) {
+            showCheckoutError('⚠️ Enter a valid M-Pesa phone number.');
+            return;
+        }
+        if (pm === 'bank' && !ref) {
+            showCheckoutError('⚠️ Enter the card / transaction reference.');
+            return;
+        }
+        const branch = document.getElementById('checkoutBranch');
+        if (!branch.disabled && !branch.value) { branch.focus(); return; }
+        if (isNamed) { document.getElementById('checkoutName').focus(); return; }
+        submitCheckout();
+        return;
+    }
+
+    // --- 3. Branch ------------------------------------------
+    if (currentField === 'branch') {
+        if (!document.getElementById('checkoutBranch').value) {
+            showCheckoutError('⚠️ Please select a branch.');
+            return;
+        }
+        if (isNamed) { document.getElementById('checkoutName').focus(); return; }
+        submitCheckout();          // Walk-in → go straight to submit
+        return;
+    }
+
+    // --- 4. Named customer fields ---------------------------
+    if (!isNamed) { submitCheckout(); return; }
+
+    if (currentField === 'name') {
+        if (!document.getElementById('checkoutName').value.trim()) {
+            showCheckoutError('⚠️ Customer name is required.'); return;
+        }
+        document.getElementById('checkoutPhone').focus();
+        return;
+    }
+    if (currentField === 'phone') {
+        const phone = document.getElementById('checkoutPhone').value.trim();
+        if (!phone) { showCheckoutError('⚠️ Customer phone is required.'); return; }
+        if (!/^[+\d][\d\s\-()]{6,}$/.test(phone)) {
+            showCheckoutError('⚠️ Please enter a valid customer phone number.'); return;
+        }
+        document.getElementById('checkoutEmail').focus();
+        return;
+    }
+    if (currentField === 'email') {
+        const email = document.getElementById('checkoutEmail').value.trim();
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            showCheckoutError('⚠️ Enter a valid email address, or leave blank.'); return;
+        }
+        submitCheckout();
+    }
+}
+
+function showCheckoutError(msg) {
+    const el = document.getElementById('checkoutError');
+    el.textContent = msg;
+    el.style.display = 'block';
+}
+
+function hideCheckoutError() {
+    const el = document.getElementById('checkoutError');
+    el.style.display = 'none';
+    el.textContent = '';
+}
+
+async function submitCheckout() {
+    hideCheckoutError();
+
+    const branchId = document.getElementById('checkoutBranch').value;
+    if (!branchId) {
+        showCheckoutError('⚠️ Please select a branch.');
+        document.getElementById('checkoutBranch').focus();
+        return;
+    }
+
+    // ---- Payment method validation ----
+    let tendered = null;
+    let reference = '';
+
+    if (currentPaymentMethod === 'cash') {
+        tendered = parseFloat(document.getElementById('checkoutTendered').value) || 0;
+        if (tendered < currentTotal) {
+            showCheckoutError(`⚠️ Amount tendered (KSh ${tendered.toFixed(2)}) is less than the total (KSh ${currentTotal.toFixed(2)}).`);
+            document.getElementById('checkoutTendered').focus();
+            return;
+        }
+    } else {
+        reference = document.getElementById('checkoutReference').value.trim();
+        if (currentPaymentMethod === 'mpesa' && !reference) {
+            showCheckoutError('⚠️ Enter the M-Pesa phone number.');
+            document.getElementById('checkoutReference').focus();
+            return;
+        }
+        if (currentPaymentMethod === 'bank' && !reference) {
+            showCheckoutError('⚠️ Enter the card / transaction reference.');
+            document.getElementById('checkoutReference').focus();
+            return;
+        }
+    }
+
+    // ---- Customer validation ----
+    const isNamed = document.getElementById('checkoutNamed').checked;
+    let customer;
+    if (isNamed) {
+        const name  = document.getElementById('checkoutName').value.trim();
+        const phone = document.getElementById('checkoutPhone').value.trim();
+        const email = document.getElementById('checkoutEmail').value.trim();
+
+        if (!name)  { showCheckoutError('⚠️ Customer name is required.');  document.getElementById('checkoutName').focus();  return; }
+        if (!phone) { showCheckoutError('⚠️ Customer phone is required.'); document.getElementById('checkoutPhone').focus(); return; }
+        if (!/^[+\d][\d\s\-()]{6,}$/.test(phone)) {
+            showCheckoutError('⚠️ Enter a valid customer phone number.');
+            document.getElementById('checkoutPhone').focus(); return;
+        }
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            showCheckoutError('⚠️ Enter a valid email address, or leave blank.');
+            document.getElementById('checkoutEmail').focus(); return;
+        }
+        customer = { type: 'named', name, phone, email };
+    } else {
+        customer = { type: 'walkin', name: 'Walk-in Customer', phone: '', email: '' };
+    }
+
+    // ---- Mirror to Receipt Details tab ----
+    if (isNamed) {
+        document.getElementById('custTypeNamed').checked  = true;
+        document.getElementById('custTypeWalkin').checked = false;
+        document.getElementById('customerName').value  = customer.name;
+        document.getElementById('customerPhone').value = customer.phone;
+        document.getElementById('customerEmail').value = customer.email;
+    } else {
+        document.getElementById('custTypeWalkin').checked = true;
+        document.getElementById('custTypeNamed').checked  = false;
+    }
+
+    const mainBranch = document.getElementById('branchSelect');
+    if (mainBranch && mainBranch.tagName === 'SELECT') mainBranch.value = branchId;
+
+    // ---- Update the totals bar with what was tendered ----
+    if (currentPaymentMethod === 'cash') {
+        document.getElementById('paidDisplay').textContent = tendered.toFixed(2);
+        document.getElementById('dueDisplay').textContent  = '0.00';
+    } else {
+        document.getElementById('paidDisplay').textContent = currentTotal.toFixed(2);
+        document.getElementById('dueDisplay').textContent  = '0.00';
+    }
+    document.getElementById('typeDisplay').textContent =
+        PAYMENT_LABELS[currentPaymentMethod] || 'DEBIT CARD';
+
+    // ---- Show the reference in the totals "RN" cell ----
+    const rnEl = document.getElementById('refNumberDisplay');
+    if (rnEl) rnEl.textContent = reference || '—';
+
+    // ---- Fire the sale ----
+    const status = document.getElementById('checkoutStatus');
+    status.className = 'payment-status pending';
+    status.textContent = 'Processing sale…';
+
+    const btn = document.getElementById('checkoutSubmitBtn');
+    btn.disabled = true;
+
+    try {
+        const ok = await completeSaleInternal(customer);
+        if (ok) {
+            status.className = 'payment-status success';
+            status.textContent = '✅ Sale completed.';
+            setTimeout(() => {
+                closeCheckoutModal();
+                status.className = 'payment-status';
+                status.textContent = '';
+            }, 700);
+        } else {
+            status.className = 'payment-status error';
+            status.textContent = '❌ Sale failed. See alert for details.';
+        }
+    } finally {
+        btn.disabled = false;
     }
 }
 
@@ -2810,10 +3339,12 @@ async function loadPendingPayments() {
 }
 
 
+
+
+
 // ============================================
 // PENDING SALES (search + pay)
 // ============================================
-let pendingSaleData = null;   // the sale being paid
 
 function openPendingSalesModal() {
     pendingSaleData = null;
@@ -2867,7 +3398,6 @@ async function loadPendingSalesList() {
     }
 }
 
-// Fetch full sale details by ID and show the payment step
 async function selectPendingSale(saleId) {
     try {
         const res = await fetch(`/epa_shop/sale/${saleId}/return-data/`);
@@ -3004,7 +3534,6 @@ async function submitPendingPayment() {
     }
 }
 
-// Close modal on backdrop click
 document.getElementById('pendingSalesModal').addEventListener('click', function (e) {
     if (e.target === this) closePendingSalesModal();
 });
@@ -3219,7 +3748,6 @@ async function submitReturn() {
     }
 }
 
-// Close return modal on overlay click
 document.getElementById('returnModal').addEventListener('click', function (e) {
     if (e.target === this) closeReturnModal();
 });
@@ -3293,7 +3821,6 @@ function printReceiptIframe() {
     }, 400);
 }
 
-// Close the receipt modal on backdrop click
 document.getElementById('receiptModal').addEventListener('click', function (e) {
     if (e.target === this) closeReceiptModal();
 });
@@ -3409,6 +3936,51 @@ function updateF8Button() {
 
 
 // ============================================
+// SHORTCUT KEYS MODAL
+// ============================================
+const SHORTCUTS = [
+    { key: 'F1',  label: 'Close / Clear ticket' },
+    { key: 'F2',  label: 'Shortcut keys (this dialog)' },
+    { key: 'F3',  label: 'New ticket' },
+    { key: 'F4',  label: 'Print page' },
+    { key: 'F5',  label: 'Download / PDF' },
+    { key: 'F6',  label: 'Pay Due (cash)' },
+    { key: 'F7',  label: 'Pay / Save (cash)' },
+    { key: 'F8',  label: 'Pay Later / Pending sales' },
+    { key: 'F9',  label: 'Process Return' },
+    { key: 'F10', label: 'Focus barcode search' },
+    { key: 'F11', label: 'Receipt / Customer details' },
+    { key: 'F12', label: 'Toggle fullscreen' },
+];
+
+function buildShortcutsGrid() {
+    const grid = document.getElementById('shortcutsGrid');
+    if (!grid) return;
+    grid.innerHTML = SHORTCUTS.map(s => `
+        <div style="display:flex; align-items:center; gap:8px;">
+            <span class="fn-key" style="min-width:44px; text-align:center;">${s.key}</span>
+            <span>${s.label}</span>
+        </div>
+    `).join('');
+}
+
+function openShortcutsModal() {
+    buildShortcutsGrid();
+    document.getElementById('shortcutsModal').classList.add('active');
+}
+
+function closeShortcutsModal() {
+    document.getElementById('shortcutsModal').classList.remove('active');
+    searchInput.focus();
+}
+
+document.getElementById('shortcutsModal').addEventListener('click', function (e) {
+    if (e.target === this) closeShortcutsModal();
+});
+
+
+
+// ============================================
 // HELPERS
 // ============================================
 async function refreshProductsAfterSale() {
@@ -3438,6 +4010,7 @@ function showIndicator(msg, isError = false) {
 }
 
 function focusScanner() { searchInput.focus(); searchInput.select(); }
+
 
 
 // ============================================
@@ -3546,6 +4119,8 @@ document.addEventListener('keydown', function (e) {
         if (document.getElementById('returnModal').classList.contains('active')) closeReturnModal();
         if (document.getElementById('receiptModal').classList.contains('active')) closeReceiptModal();
         if (document.getElementById('pendingSalesModal').classList.contains('active')) closePendingSalesModal();
+        if (document.getElementById('shortcutsModal').classList.contains('active')) closeShortcutsModal();
+        if (document.getElementById('checkoutModal').classList.contains('active')) closeCheckoutModal();
     }
 
     // ---------------------------------------------------------
@@ -3559,7 +4134,7 @@ document.addEventListener('keydown', function (e) {
 
     // ---- FN-bar mappings (must match the labels) ----
     if (e.key === 'F1')  { e.preventDefault(); clearCart(); }            // Close / clear
-    // F2 — help popup handled inline by the button; no key binding needed
+    if (e.key === 'F2')  { e.preventDefault(); openShortcutsModal(); }    // shotcuts
     if (e.key === 'F3')  { e.preventDefault(); newTicket(); }            // New
     if (e.key === 'F4')  { e.preventDefault(); window.print(); }         // Print
     if (e.key === 'F5')  { e.preventDefault(); downloadPDF(); }          // PDF
@@ -3596,6 +4171,8 @@ document.addEventListener('keydown', function (e) {
             document.getElementById('productModal').classList.contains('active') ||
             document.getElementById('paymentModal').classList.contains('active') ||
             document.getElementById('returnModal').classList.contains('active') ||
+            document.getElementById('shortcutsModal').classList.contains('active') ||
+            document.getElementById('checkoutModal').classList.contains('active') || 
             document.getElementById('receiptModal').classList.contains('active');
 
         if (modalOpen) return;
@@ -3615,6 +4192,7 @@ document.addEventListener('keydown', function (e) {
 // Close modal on overlay click
 document.getElementById('productModal').addEventListener('click', function (e) { if (e.target === this) closeModal(); });
 document.getElementById('paymentModal').addEventListener('click', function (e) { if (e.target === this) closePaymentModal(); });
+document.getElementById('checkoutModal').addEventListener('click', function (e) { if (e.target === this) closeCheckoutModal(); });
 
 // ============================================
 // INIT
