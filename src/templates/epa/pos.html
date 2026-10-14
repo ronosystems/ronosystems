@@ -2624,30 +2624,27 @@ async function completeSale() {
         customer_name: customer.name,
         customer_phone: customer.phone,
         subtotal: currentTotal,
-        discount: 0,      // update if you track discounts at cart level
-        tax: 0,           // update if you track tax
+        discount: 0,
+        tax: 0,
         total: currentTotal,
         payment_method: currentPaymentMethod,
         payment_status: 'paid',
         cashier: '{{ user.get_full_name|default:user.username }}' || 'Cashier',
         company_name: '{{ company.name|escapejs }}',
-        branch_name: '',  // fill from the selected branch below
+        branch_name: '',
         company_phone: '{{ company.phone|escapejs }}',
         company_address: '{{ company.address|escapejs }}',
         company_pin: '{{ company.company_pin|escapejs }}',
         thank_you: 'Thank you for your business!',
     };
 
-    // Fill in the branch name — works for both <select> (admins) and
-    // hidden <input> (cashiers with a fixed branch)
+    // Fill in the branch name — works for both <select> and hidden <input>
     let branchName = '';
     if (branchEl) {
         if (branchEl.tagName === 'SELECT') {
             const opt = branchEl.options[branchEl.selectedIndex];
             if (opt) branchName = opt.text.split('(')[0].trim();
         } else {
-            // Cashier path: the visible readonly <input> sits next to the
-            // hidden #branchSelect input. Read the branch name from it.
             const visibleInput = branchEl.previousElementSibling;
             if (visibleInput && visibleInput.tagName === 'INPUT') {
                 branchName = (visibleInput.value || '').trim();
@@ -2682,31 +2679,28 @@ async function completeSale() {
         if (data.success) {
             showSuccessToast(`✅ Sale completed! Total: KSh ${total.toLocaleString()}`);
 
-            // Augment the receipt snapshot with server-side info
             receiptSnapshot.short_sale_id = String(data.sale_number || data.sale_id).split('-').pop();
             receiptSnapshot.sale_id = data.sale_id;
             const now = new Date();
             receiptSnapshot.date_str = now.toISOString().slice(0, 10);
             receiptSnapshot.time_str = now.toTimeString().slice(0, 5);
 
-            // ✅ Try silent ESC/POS print first
-            let printed = false;
-            if (POS_AUTO_PRINT) {
-                printed = await printReceiptEscPos(receiptSnapshot);
-            }
-
             // Reset ticket
             newTicket();
             resetCustomerBlock();
             await refreshProductsAfterSale();
 
-            // If auto-print was on but USB print failed, fall back to the modal
-            if (POS_AUTO_PRINT && !printed && data.sale_id) {
-                console.warn('ESC/POS print failed — falling back to receipt modal');
-                setTimeout(() => openReceiptModal(data.sale_id), 300);
-            }
-            // If auto-print was off, show the modal
-            else if (!POS_AUTO_PRINT && data.sale_id) {
+            // ============================================
+            // PRINT — native browser path (same as manual Print)
+            // ============================================
+            if (POS_AUTO_PRINT && data.sale_id) {
+                // Silent print via hidden iframe.
+                // Requires Chrome to be launched with --kiosk-printing
+                // for true silent printing (no dialog).
+                printReceiptDirectly(data.sale_id);
+            } else if (data.sale_id) {
+                // Auto-print off → show the receipt modal so the
+                // operator can click Print manually.
                 setTimeout(() => openReceiptModal(data.sale_id), 300);
             }
         } else {
@@ -2718,9 +2712,6 @@ async function completeSale() {
 }
 
 function printReceiptDirectly(saleId) {
-    const wasFullscreen = isFullscreen();
-
-    // Load the receipt in a hidden iframe
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
     iframe.style.right = '0';
@@ -2731,7 +2722,6 @@ function printReceiptDirectly(saleId) {
     iframe.src = `/epa_shop/sale/receipt/${saleId}/?embed=1&print=1`;
 
     iframe.onload = function () {
-        // Wait a tick for the barcode/render to finish
         setTimeout(function () {
             try {
                 iframe.contentWindow.focus();
@@ -2739,20 +2729,8 @@ function printReceiptDirectly(saleId) {
             } catch (e) {
                 console.warn('Direct print failed:', e);
             }
-
-            // Clean up
             setTimeout(function () {
                 document.body.removeChild(iframe);
-
-                // Re-enter fullscreen if we were in it
-                if (wasFullscreen && !isFullscreen()) {
-                    const el = document.documentElement;
-                    const req = el.requestFullscreen || el.webkitRequestFullscreen
-                             || el.mozRequestFullScreen || el.msRequestFullscreen;
-                    if (req) req.call(el).catch(function () {
-                        showIndicator('🖥 Press F12 to re-enter fullscreen', true);
-                    });
-                }
             }, 500);
         }, 400);
     };
