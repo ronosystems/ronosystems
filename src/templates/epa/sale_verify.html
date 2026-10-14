@@ -13,13 +13,13 @@
         margin: 0 auto;
         background: #ffffff;
     }
-    
+
     .verify-card .icon {
         font-size: 64px;
         color: #fd7e14;
         margin-bottom: 20px;
     }
-    
+
     .verify-card .sale-details {
         background: #f8f9fa;
         border: 1px solid #dee2e6;
@@ -28,33 +28,127 @@
         margin: 20px 0;
         text-align: left;
     }
-    
+
     .verify-card .sale-details .detail-row {
         display: flex;
         justify-content: space-between;
         padding: 6px 0;
         border-bottom: 1px solid #f0f0f0;
     }
-    
+
     .verify-card .sale-details .detail-row:last-child {
         border-bottom: none;
     }
-    
+
     .verify-card .sale-details .label {
         color: #6c757d;
         font-weight: 500;
     }
-    
+
     .verify-card .sale-details .value {
         font-weight: 600;
         color: #2d3436;
     }
-    
+
     .verify-card .sale-details .value.identifier {
         font-family: 'Courier New', monospace;
         color: #036a77;
     }
-    
+
+    /* ============================================
+       PAYMENT SECTION — method + amount + change
+    ============================================ */
+    .payment-section {
+        text-align: left;
+        margin-top: 20px;
+        padding: 16px;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+    }
+
+    .payment-section .field-label {
+        font-weight: 700;
+        font-size: 13px;
+        color: #000;
+        margin-bottom: 6px;
+        display: block;
+    }
+
+    .payment-section select,
+    .payment-section input[type="number"] {
+        width: 100%;
+        border: 2px solid #000;
+        padding: 10px 12px;
+        font-size: 14px;
+        font-family: Tahoma, sans-serif;
+        border-radius: 4px;
+        background: #fff;
+        color: #000;
+    }
+
+    .payment-section select:focus,
+    .payment-section input[type="number"]:focus {
+        outline: none;
+        border-color: #036a77;
+        background: #ffffe0;
+    }
+
+    .payment-section input[readonly] {
+        background: #e8e8e8;
+        color: #333;
+        cursor: not-allowed;
+    }
+
+    .payment-section .amount-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid #e6e6e6;
+        font-size: 14px;
+    }
+
+    .payment-section .amount-row:last-child {
+        border-bottom: none;
+    }
+
+    .payment-section .amount-row .amount-label {
+        color: #555;
+        font-weight: 600;
+    }
+
+    .payment-section .amount-row .amount-value {
+        font-weight: 700;
+        color: #000;
+        font-family: Tahoma, sans-serif;
+    }
+
+    .payment-section .amount-row.total-row .amount-value {
+        color: #cc0000;
+        font-size: 16px;
+    }
+
+    .payment-section .amount-row.change-row .amount-value {
+        color: #009900;
+        font-size: 16px;
+    }
+
+    #amountError {
+        display: none;
+        margin-top: 10px;
+        padding: 10px 12px;
+        background: #f8d7da;
+        color: #721c24;
+        border: 2px solid #cc0000;
+        border-radius: 4px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    /* ============================================
+       BUTTONS
+    ============================================ */
     .btn-verify {
         background: #28a745;
         color: white;
@@ -64,20 +158,20 @@
         border-radius: 4px;
         transition: all 0.2s;
     }
-    
+
     .btn-verify:hover {
         background: #218838;
         color: white;
         transform: translateY(-2px);
         box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
-    
+
     .btn-verify:disabled {
         opacity: 0.6;
         cursor: not-allowed;
         transform: none;
     }
-    
+
     .btn-cancel {
         background: #6c757d;
         color: white;
@@ -86,13 +180,18 @@
         font-weight: 600;
         border-radius: 4px;
         transition: all 0.2s;
+        text-decoration: none;
     }
-    
+
     .btn-cancel:hover {
         background: #5a6268;
         color: white;
+        text-decoration: none;
     }
-    
+
+    /* ============================================
+       WARNING BOX
+    ============================================ */
     .warning-box {
         background: #fff3cd;
         border: 2px solid #856404;
@@ -100,27 +199,32 @@
         padding: 12px 15px;
         margin: 15px 0;
         color: #856404;
+        text-align: left;
+        font-size: 13px;
     }
-    
+
     .warning-box i {
         margin-right: 8px;
     }
 </style>
 {% endblock %}
 
+
 {% block content %}
 <div class="row">
     <div class="col-12">
         <div class="verify-card text-center">
-            
+
             <div class="icon">
                 <i class="fas fa-check-circle"></i>
             </div>
-            
-            <h4>Verify Sale #{{ sale.id }}</h4>
-            <p class="text-muted">Please review the sale details before completing</p>
-            
-            <!-- Sale Details -->
+
+            <h4>Verify Sale #{{ sale.company_sale_id|default:sale.id }}</h4>
+            <p class="text-muted">Review the sale details, choose a payment method, and enter the amount tendered.</p>
+
+            <!-- ============================================ -->
+            <!-- SALE DETAILS                                  -->
+            <!-- ============================================ -->
             <div class="sale-details">
                 <div class="detail-row">
                     <span class="label">Customer Name</span>
@@ -131,12 +235,8 @@
                     <span class="value">{{ sale.customer_phone|default:"-" }}</span>
                 </div>
                 <div class="detail-row">
-                    <span class="label">Payment Method</span>
-                    <span class="value">{{ sale.payment_method|title }}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="label">Amount</span>
-                    <span class="value">KSh {{ sale.net_amount|floatformat:0 }}</span>
+                    <span class="label">Amount Due</span>
+                    <span class="value">KSh {{ sale.net_amount|floatformat:2 }}</span>
                 </div>
                 <div class="detail-row">
                     <span class="label">Date</span>
@@ -144,8 +244,11 @@
                 </div>
                 <div class="detail-row">
                     <span class="label">Sold By</span>
-                    <span class="value">{{ sale.sold_by.get_full_name|default:sale.sold_by.username|title }}</span>
+                    <span class="value">
+                        {{ sale.sold_by.get_full_name|default:sale.sold_by.username|title }}
+                    </span>
                 </div>
+
                 {% for item in sale.items.all %}
                     {% if item.unit %}
                     <div class="detail-row">
@@ -159,26 +262,179 @@
                     {% endif %}
                 {% endfor %}
             </div>
-            
+
+            <!-- ============================================ -->
+            <!-- WARNING                                       -->
+            <!-- ============================================ -->
             <div class="warning-box">
                 <i class="fas fa-exclamation-triangle"></i>
-                <strong>Warning:</strong> This action will mark the sale as completed and cannot be undone.
+                <strong>Warning:</strong> Completing this sale will mark it as <b>Paid</b> and cannot be undone.
             </div>
-            
-            <form method="post" class="mt-3">
+
+            <!-- ============================================ -->
+            <!-- COMPLETE FORM — method + amount + change      -->
+            <!-- ============================================ -->
+            <form method="post" id="completeSaleForm" onsubmit="return validateForm()">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="complete">
-                <div class="d-flex justify-content-center gap-3">
+
+                <div class="payment-section">
+
+                    <!-- Payment method -->
+                    <label class="field-label" for="paymentMethodSelect">
+                        Payment Method <span style="color:#cc0000;">*</span>
+                    </label>
+                    <select id="paymentMethodSelect"
+                            name="payment_method"
+                            onchange="onPaymentMethodChange()">
+                        <option value="cash"
+                                {% if sale.payment_method == 'cash' %}selected{% endif %}>
+                            💵 Cash
+                        </option>
+                        <option value="mpesa"
+                                {% if sale.payment_method == 'mpesa' %}selected{% endif %}>
+                            📱 M-Pesa
+                        </option>
+                        <option value="card"
+                                {% if sale.payment_method == 'card' %}selected{% endif %}>
+                            💳 Card
+                        </option>
+                        <option value="bank_transfer"
+                                {% if sale.payment_method == 'bank_transfer' %}selected{% endif %}>
+                            🏦 Bank Transfer
+                        </option>
+                    </select>
+
+                    <!-- Amount tendered -->
+                    <label class="field-label" for="amountTendered"
+                           style="margin-top:14px;">
+                        Amount Tendered <span style="color:#cc0000;">*</span>
+                    </label>
+                    <input type="number"
+                           id="amountTendered"
+                           name="amount_tendered"
+                           step="0.01"
+                           min="0"
+                           value="{{ sale.net_amount|floatformat:2 }}"
+                           oninput="updateChange()">
+
+                    <!-- Totals -->
+                    <div style="margin-top:14px;">
+                        <div class="amount-row total-row">
+                            <span class="amount-label">Total Due</span>
+                            <span class="amount-value" id="totalDueDisplay">
+                                KSh {{ sale.net_amount|floatformat:2 }}
+                            </span>
+                        </div>
+                        <div class="amount-row change-row">
+                            <span class="amount-label">Change Due</span>
+                            <span class="amount-value" id="changeDisplay">
+                                KSh 0.00
+                            </span>
+                        </div>
+                    </div>
+
+                    <div id="amountError"></div>
+                </div>
+
+                <div class="d-flex justify-content-center gap-3 mt-3">
                     <a href="/epa_shop/sales/" class="btn-cancel btn">
                         <i class="fas fa-times"></i> Cancel
                     </a>
                     <button type="submit" class="btn-verify btn">
-                        <i class="fas fa-check-circle"></i> Confirm & Complete
+                        <i class="fas fa-check-circle"></i> Confirm &amp; Complete
                     </button>
                 </div>
             </form>
-            
+
         </div>
     </div>
 </div>
+
+<script>
+    // Total due — passed from the server as a number
+    const TOTAL_DUE = parseFloat("{{ sale.net_amount|floatformat:2 }}") || 0;
+
+    // ============================================
+    // PAYMENT METHOD CHANGE
+    // ============================================
+    function onPaymentMethodChange() {
+        const method        = document.getElementById('paymentMethodSelect').value;
+        const tenderedInput = document.getElementById('amountTendered');
+
+        if (method === 'cash') {
+            // Cash — editable, default to total (cashier can change it)
+            tenderedInput.readOnly = false;
+            tenderedInput.value    = TOTAL_DUE.toFixed(2);
+        } else {
+            // Non-cash — locked to exact total
+            tenderedInput.readOnly = true;
+            tenderedInput.value    = TOTAL_DUE.toFixed(2);
+        }
+        updateChange();
+    }
+
+    // ============================================
+    // LIVE CHANGE CALCULATION
+    // ============================================
+    function updateChange() {
+        const method    = document.getElementById('paymentMethodSelect').value;
+        const tendered  = parseFloat(document.getElementById('amountTendered').value) || 0;
+        const change    = tendered - TOTAL_DUE;
+        const changeEl  = document.getElementById('changeDisplay');
+        const errEl     = document.getElementById('amountError');
+
+        if (method === 'cash') {
+            if (change >= 0) {
+                changeEl.textContent = 'KSh ' + change.toFixed(2);
+                changeEl.style.color = '#009900';
+                errEl.style.display  = 'none';
+            } else {
+                changeEl.textContent = 'KSh ' + Math.abs(change).toFixed(2) + ' short';
+                changeEl.style.color = '#cc0000';
+                errEl.textContent    = '⚠️ Amount tendered is less than the total due.';
+                errEl.style.display  = 'block';
+            }
+        } else {
+            // Non-cash: must match exactly
+            changeEl.textContent = 'KSh 0.00';
+            changeEl.style.color = '#009900';
+
+            if (Math.abs(tendered - TOTAL_DUE) > 0.001) {
+                errEl.textContent   = '⚠️ For non-cash methods, the amount must equal the total due.';
+                errEl.style.display = 'block';
+            } else {
+                errEl.style.display = 'none';
+            }
+        }
+    }
+
+    // ============================================
+    // FINAL SUBMIT VALIDATION
+    // ============================================
+    function validateForm() {
+        const method   = document.getElementById('paymentMethodSelect').value;
+        const tendered = parseFloat(document.getElementById('amountTendered').value) || 0;
+
+        if (method === 'cash') {
+            if (tendered < TOTAL_DUE) {
+                alert('Amount tendered must be at least KSh ' + TOTAL_DUE.toFixed(2));
+                return false;
+            }
+        } else {
+            if (Math.abs(tendered - TOTAL_DUE) > 0.001) {
+                alert('For non-cash methods, the amount must equal KSh ' + TOTAL_DUE.toFixed(2));
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // ============================================
+    // INIT
+    // ============================================
+    document.addEventListener('DOMContentLoaded', function () {
+        onPaymentMethodChange();
+    });
+</script>
 {% endblock %}

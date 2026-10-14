@@ -5,6 +5,7 @@ from apps.company.models import Branch
 from .models import Phone, Electronic, Accessory, Unit
 from django.db.models import Q
 from django.http import JsonResponse
+from apps.company.settings_views import get_company_settings
 from apps.companies.support_utils import (
     get_active_company,
     is_support_mode,
@@ -84,6 +85,12 @@ def pos_dashboard(request):
     # ============================================
     enable_tax, tax_rate = get_pos_tax_config(company)
 
+    # ============================================
+    # Load receipt settings for auto_print
+    # ============================================
+    company_settings = get_company_settings(company)
+    receipt_settings = company_settings.get('receipt', {})
+
     context = {
         'company': company,
         'branches': branches,
@@ -97,6 +104,7 @@ def pos_dashboard(request):
         # ---- Tax settings (used by the POS cart JS) ----
         'enable_tax': enable_tax,
         'tax_rate': tax_rate,
+        'auto_print': receipt_settings.get('auto_print', False), 
     }
     return render(request, 'epa/pos.html', context)
 
@@ -631,7 +639,6 @@ def pos_get_branches(request):
 
     except Exception as e:
         return JsonResponse({'error': str(e), 'branches': []}, status=500)
-
 
 # ============================================
 # TAX PREVIEW — live calculation for POS UI

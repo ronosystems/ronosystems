@@ -24,6 +24,8 @@ from apps.companies.support_utils import (
 import json
 from datetime import timedelta
 from django.db.models import Sum, Q
+from django.views.decorators.clickjacking import xframe_options_sameorigin
+
 
 
 
@@ -82,188 +84,214 @@ def calculate_tax(company, subtotal):
 # ============================================
 # PROCESS SALE
 # ============================================
+
+class SaleError(Exception):
+    """Raised to abort a sale cleanly inside transaction.atomic()."""
+    def __init__(self, message, status=400):
+        super().__init__(message)
+        self.message = message
+        self.status = status
+
+
+def _resolve_product(company, product_code):
+    """
+    Look up a product across the three models by product_code.
+    Returns (product, category_type, sku) or (None, None, None).
+    """
+    # Phone
+    p = Phone.objects.filter(company=company, product_code=product_code).first()
+    if p:
+        return p, 'Phone', (p.model or '')
+
+    # Electronic
+    p = Electronic.objects.filter(company=company, product_code=product_code).first()
+    if p:
+        return p, 'Electronic', (p.model_number or '')
+
+    # Accessory
+    p = Accessory.objects.filter(company=company, product_code=product_code).first()
+    if p:
+        return p, 'Accessory', (p.model or '')
+
+    return None, None, None
+
+
+def _content_type_for(product):
+    if isinstance(product, Phone):
+        return ContentType.objects.get_for_model(Phone)
+    if isinstance(product, Electronic):
+        return ContentType.objects.get_for_model(Electronic)
+    if isinstance(product, Accessory):
+        return ContentType.objects.get_for_model(Accessory)
+    return None
+
+
 @login_required
 def process_sale(request):
-    """Process a sale from the POS using product_code"""
+    """Process a sale from the POS using product_code."""
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
-    
+
     # ============================================
     # SUPPORT MODE: Get active company
     # ============================================
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
-            return JsonResponse({'error': 'Please select a company in support mode'}, status=400)
+            return JsonResponse(
+                {'error': 'Please select a company in support mode'},
+                status=400,
+            )
         return JsonResponse({'error': 'No company assigned'}, status=400)
-    
+
+    # ============================================
+    # Parse JSON
+    # ============================================
     try:
         data = json.loads(request.body)
-        branch_id = data.get('branch_id')
-        customer_name = data.get('customer_name', 'Walk-in Customer')
-        customer_phone = data.get('customer_phone', '')
-        customer_email = data.get('customer_email', '')
-        items = data.get('items', [])
-        
-        if not branch_id:
-            return JsonResponse({'error': 'Branch is required'}, status=400)
-        
-        if not items:
-            return JsonResponse({'error': 'No items in cart'}, status=400)
-        
-        branch = Branch.objects.filter(id=branch_id, company=company).first()
-        if not branch:
-            return JsonResponse({'error': 'Branch not found'}, status=404)
-        
-        # Create customer if phone exists
-        customer = None
-        if customer_phone:
-            customer = Customer.objects.filter(phone=customer_phone, company=company).first()
-            if not customer:
-                customer = Customer.objects.create(
-                    company=company,
-                    name=customer_name,
-                    phone=customer_phone,
-                    email=customer_email,
-                    is_active=True
-                )
-        
-        # Start transaction
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+
+    branch_id        = data.get('branch_id')
+    customer_name    = (data.get('customer_name') or 'Walk-in Customer').strip()
+    customer_phone   = (data.get('customer_phone') or '').strip()
+    customer_email   = (data.get('customer_email') or '').strip()
+    items            = data.get('items', []) or []
+    payment_method   = data.get('payment_method', 'cash')
+    payment_status   = data.get('payment_status', 'paid')
+
+    # ============================================
+    # Basic top-level validation (cheap, no DB writes)
+    # ============================================
+    if not branch_id:
+        return JsonResponse({'error': 'Branch is required'}, status=400)
+
+    if not items:
+        return JsonResponse({'error': 'No items in cart'}, status=400)
+
+    if payment_status not in ('paid', 'pending'):
+        return JsonResponse({'error': 'Invalid payment status'}, status=400)
+
+    branch = Branch.objects.filter(id=branch_id, company=company).first()
+    if not branch:
+        return JsonResponse({'error': 'Branch not found'}, status=404)
+
+    # ============================================
+    # PHASE 1 + PHASE 2 inside one atomic block
+    # ============================================
+    try:
         with transaction.atomic():
-            # Calculate totals
+
+            # ------------------------------------------------
+            # PHASE 1 — VALIDATE EVERY LINE (no writes yet)
+            # ------------------------------------------------
             subtotal = 0
             sale_items_data = []
-            
-            for item in items:
-                product_code = item.get('product_code')
-                quantity = item.get('quantity', 1)
-                price = item.get('price', 0)
-                unit_identifier = item.get('unit_identifier')
-                
+
+            for idx, item in enumerate(items, start=1):
+                product_code    = (item.get('product_code') or '').strip()
+                quantity        = int(item.get('quantity', 1) or 1)
+                price           = Decimal(str(item.get('price', 0) or 0))
+                unit_identifier = item.get('unit_identifier') or None
+
                 if not product_code:
-                    return JsonResponse({'error': 'Product code is required'}, status=400)
-                
-                # Find product by product_code across all models
-                product = None
-                product_name = ''
-                sku = ''
-                category_type = ''
-                
-                # Try Phone
-                try:
-                    product = Phone.objects.get(company=company, product_code=product_code)
-                    category_type = 'Phone'
-                    sku = product.model or ''
-                except Phone.DoesNotExist:
-                    pass
-                
-                # Try Electronic
+                    raise SaleError(f'Row {idx}: product code is required.')
+
+                if quantity <= 0:
+                    raise SaleError(f'Row {idx}: quantity must be greater than 0.')
+
+                if price < 0:
+                    raise SaleError(f'Row {idx}: price cannot be negative.')
+
+                # Resolve product
+                product, category_type, sku = _resolve_product(company, product_code)
                 if not product:
-                    try:
-                        product = Electronic.objects.get(company=company, product_code=product_code)
-                        category_type = 'Electronic'
-                        sku = product.model_number or ''
-                    except Electronic.DoesNotExist:
-                        pass
-                
-                # Try Accessory
-                if not product:
-                    try:
-                        product = Accessory.objects.get(company=company, product_code=product_code)
-                        category_type = 'Accessory'
-                        sku = product.model or ''
-                    except Accessory.DoesNotExist:
-                        pass
-                
-                if not product:
-                    return JsonResponse({'error': f'Product with code "{product_code}" not found'}, status=404)
-                
-                product_name = product.name
-                subtotal += price * quantity
-                
-                # Handle stock/units based on product type
-                previous_quantity = product.quantity_in_stock
+                    raise SaleError(
+                        f'Product with code "{product_code}" not found.',
+                        status=404,
+                    )
+
+                # ---- Resolve & validate unit for tracked products ----
                 unit = None
-                
                 if category_type == 'Phone':
                     if unit_identifier:
                         unit = Unit.objects.filter(
-                            phone=product, 
-                            identifier=unit_identifier, 
-                            status='available'
+                            phone=product,
+                            identifier=unit_identifier,
+                            status='available',
                         ).first()
-                        if unit:
-                            unit.status = 'sold'
-                            unit.sold_date = timezone.now()
-                            unit.owner_name = customer_name
-                            unit.owner_phone = customer_phone
-                            unit.save()
-                        else:
-                            return JsonResponse({'error': f'IMEI "{unit_identifier}" not available'}, status=400)
-                    
-                    product.quantity_in_stock -= quantity
-                    product.save()
-                    
+                        if not unit:
+                            raise SaleError(
+                                f'IMEI "{unit_identifier}" is not available.'
+                            )
+                    if product.quantity_in_stock < quantity:
+                        raise SaleError(
+                            f'Insufficient stock for "{product.name}". '
+                            f'Available: {product.quantity_in_stock}'
+                        )
+
                 elif category_type == 'Electronic':
                     if unit_identifier:
                         unit = Unit.objects.filter(
-                            electronic=product, 
-                            identifier=unit_identifier, 
-                            status='available'
+                            electronic=product,
+                            identifier=unit_identifier,
+                            status='available',
                         ).first()
-                        if unit:
-                            unit.status = 'sold'
-                            unit.sold_date = timezone.now()
-                            unit.owner_name = customer_name
-                            unit.owner_phone = customer_phone
-                            unit.save()
-                        else:
-                            return JsonResponse({'error': f'Serial "{unit_identifier}" not available'}, status=400)
-                    
-                    product.quantity_in_stock -= quantity
-                    product.save()
-                    
+                        if not unit:
+                            raise SaleError(
+                                f'Serial "{unit_identifier}" is not available.'
+                            )
+                    if product.quantity_in_stock < quantity:
+                        raise SaleError(
+                            f'Insufficient stock for "{product.name}". '
+                            f'Available: {product.quantity_in_stock}'
+                        )
+
                 elif category_type == 'Accessory':
                     if product.quantity_in_stock < quantity:
-                        return JsonResponse({
-                            'error': f'Insufficient stock for "{product_name}". Available: {product.quantity_in_stock}'
-                        }, status=400)
-                    
-                    product.quantity_in_stock -= quantity
-                    product.save()
-                
-                # Record stock movement for sale
-                record_stock_movement(
-                    product=product,
-                    movement_type='sale',
-                    quantity=-quantity,
-                    previous_quantity=previous_quantity,
-                    new_quantity=product.quantity_in_stock,
-                    branch=branch,
-                    unit=unit,
-                    notes=f"Sale - {customer_name}",
-                    performed_by=request.user
-                )
-                
+                        raise SaleError(
+                            f'Insufficient stock for "{product.name}". '
+                            f'Available: {product.quantity_in_stock}'
+                        )
+
+                subtotal += price * quantity
                 sale_items_data.append({
-                    'product': product,
-                    'product_code': product_code,
-                    'product_name': product_name,
-                    'sku': sku,
-                    'category_type': category_type,
-                    'quantity': quantity,
-                    'unit_price': price,
-                    'total_price': price * quantity,
-                    'unit_identifier': unit_identifier
+                    'product':         product,
+                    'product_code':    product_code,
+                    'product_name':    product.name,
+                    'sku':             sku,
+                    'category_type':   category_type,
+                    'quantity':        quantity,
+                    'unit_price':      price,
+                    'total_price':     price * quantity,
+                    'unit':            unit,            # ← already resolved
+                    'unit_identifier': unit_identifier,
                 })
 
-            # ------------------------------------------------------------
-            # Calculate tax from Payment Settings
-            # ------------------------------------------------------------
+            # ------------------------------------------------
+            # PHASE 2 — WRITE EVERYTHING (validation passed)
+            # ------------------------------------------------
+
+            # Tax
             tax_amount, net_amount = calculate_tax(company, subtotal)
 
-            
+            # Customer (create or reuse) — inside the atomic block
+            customer = None
+            if customer_phone:
+                customer = Customer.objects.filter(
+                    phone=customer_phone, company=company
+                ).first()
+                if not customer:
+                    customer = Customer.objects.create(
+                        company=company,
+                        name=customer_name,
+                        phone=customer_phone,
+                        email=customer_email,
+                        is_active=True,
+                    )
+
+            # Sale
             sale = Sale.objects.create(
                 company=company,
                 branch=branch,
@@ -271,83 +299,98 @@ def process_sale(request):
                 customer_name=customer_name,
                 customer_phone=customer_phone,
                 customer_email=customer_email,
-                total_amount=subtotal,        # subtotal (before tax)
+                total_amount=subtotal,       # pre-tax subtotal
                 discount=0,
-                tax=tax_amount,               # ✅ calculated
-                net_amount=net_amount,        # ✅ subtotal + tax
-                payment_status='paid',
-                payment_method=data.get('payment_method', 'cash'),
+                tax=tax_amount,
+                net_amount=net_amount,       # what customer pays
+                payment_status=payment_status,
+                payment_method=payment_method,
                 sold_by=request.user,
-                sale_date=timezone.now()
+                sale_date=timezone.now(),
             )
-            
-            # Create sale items
+
+            # Sale items + unit/stock mutations
             for item_data in sale_items_data:
                 product = item_data['product']
-                
-                if isinstance(product, Phone):
-                    content_type = ContentType.objects.get_for_model(Phone)
-                elif isinstance(product, Electronic):
-                    content_type = ContentType.objects.get_for_model(Electronic)
-                elif isinstance(product, Accessory):
-                    content_type = ContentType.objects.get_for_model(Accessory)
-                else:
-                    content_type = None
-                
-                sale_item = SaleItem.objects.create(
+                unit    = item_data['unit']
+                qty     = item_data['quantity']
+
+                previous_quantity = product.quantity_in_stock
+
+                # Mark unit as sold (Phone / Electronic)
+                if unit is not None:
+                    unit.status = 'sold'
+                    unit.sold_date = timezone.now()
+                    unit.owner_name = customer_name
+                    unit.owner_phone = customer_phone
+                    unit.save()
+
+                # Decrement stock
+                product.quantity_in_stock -= qty
+                product.save()
+
+                # Create SaleItem
+                SaleItem.objects.create(
                     sale=sale,
-                    content_type=content_type,
+                    content_type=_content_type_for(product),
                     object_id=product.id,
                     item=product,
                     item_name=item_data['product_name'],
                     item_sku=item_data['product_code'],
-                    quantity=item_data['quantity'],
+                    quantity=qty,
                     unit_price=item_data['unit_price'],
-                    total_price=item_data['total_price']
+                    total_price=item_data['total_price'],
+                    unit=unit,
                 )
-                
-                if item_data.get('unit_identifier'):
-                    if item_data['category_type'] == 'Phone':
-                        unit = Unit.objects.filter(
-                            phone=product, 
-                            identifier=item_data['unit_identifier']
-                        ).first()
-                    elif item_data['category_type'] == 'Electronic':
-                        unit = Unit.objects.filter(
-                            electronic=product, 
-                            identifier=item_data['unit_identifier']
-                        ).first()
-                    else:
-                        unit = None
-                    
-                    if unit:
-                        sale_item.unit = unit
-                        sale_item.save()
-            
-            # Update customer stats
-            if customer:
-                customer.total_purchases += net_amount    # ✅ includes tax
+
+                # Stock movement
+                record_stock_movement(
+                    product=product,
+                    movement_type='sale',
+                    quantity=-qty,
+                    previous_quantity=previous_quantity,
+                    new_quantity=product.quantity_in_stock,
+                    branch=branch,
+                    unit=unit,
+                    notes=f"Sale ({payment_status}) - {customer_name}",
+                    performed_by=request.user,
+                )
+
+            # Customer stats — only count PAID sales toward purchases
+            if customer and payment_status == 'paid':
+                customer.total_purchases += net_amount
                 customer.visit_count += 1
                 customer.last_visit = timezone.now()
                 customer.save()
-            
+
+            # ------------------------------------------------
+            # SUCCESS
+            # ------------------------------------------------
             return JsonResponse({
                 'success': True,
-                'message': 'Sale completed successfully!',
+                'message': (
+                    'Sale completed successfully!'
+                    if payment_status == 'paid'
+                    else 'Sale saved as PENDING.'
+                ),
                 'sale_id': sale.id,
                 'sale_number': sale.company_sale_id,
+                'payment_status': payment_status,
                 'subtotal': float(subtotal),
-                'tax': float(tax_amount),        # ✅ new
-                'total': float(net_amount),      # ✅ now includes tax
+                'tax': float(tax_amount),
+                'total': float(net_amount),
                 'items_count': len(sale_items_data),
-                'customer': customer_name
+                'customer': customer_name,
             })
-            
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+
+    except SaleError as e:
+        # Expected validation failure — atomic block already rolled back
+        return JsonResponse({'error': e.message}, status=e.status)
+
     except Exception as e:
+        # Unexpected — print and return 500
         import traceback
-        print(traceback.format_exc())
+        traceback.print_exc()
         return JsonResponse({'error': str(e)}, status=500)
 
 
@@ -495,9 +538,8 @@ def sale_search_units(request):
 # ============================================
 
 @login_required
-@transaction.atomic
 def sale_process_single(request):
-    """Process a single item sale"""
+    """Process a single item sale."""
     company, is_viewing_company = get_active_company(request)
 
     if not company:
@@ -506,205 +548,263 @@ def sale_process_single(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
+    # ============================================================
+    # PHASE 0 — READ + VALIDATE FORM INPUT (no DB writes)
+    # ============================================================
+    unit_id              = (request.POST.get('unit_id') or '').strip()
+    customer_name        = (request.POST.get('customer_name') or '').strip()
+    customer_phone       = (request.POST.get('customer_phone') or '').strip()
+    customer_id_number   = (request.POST.get('customer_id_number') or '').strip()
+    customer_email       = (request.POST.get('customer_email') or '').strip()
+    next_of_keen_name    = (request.POST.get('next_of_keen_name') or '').strip()
+    next_of_keen_phone   = (request.POST.get('next_of_keen_phone') or '').strip()
+    sale_price_raw       = request.POST.get('sale_price', '0')
+    sale_type            = (request.POST.get('sale_type') or 'cash').strip()
+    branch_id            = (request.POST.get('branch_id') or '').strip()
+
+    if not unit_id:
+        return JsonResponse({'error': 'Please scan or enter a unit identifier'}, status=400)
+
+    if not customer_name:
+        return JsonResponse({'error': 'Customer name is required'}, status=400)
+
+    if not customer_phone:
+        return JsonResponse({'error': 'Customer phone number is required'}, status=400)
+
+    if not customer_id_number:
+        return JsonResponse({'error': 'Customer ID number is required'}, status=400)
+
+    if not sale_type:
+        return JsonResponse({'error': 'Please select a sale type'}, status=400)
+
     try:
-        unit_id = request.POST.get('unit_id')
-        customer_name = request.POST.get('customer_name', '').strip()
-        customer_phone = request.POST.get('customer_phone', '').strip()
-        customer_id_number = request.POST.get('customer_id_number', '').strip()
-        customer_email = request.POST.get('customer_email', '').strip()
-        next_of_keen_name = request.POST.get('next_of_keen_name', '').strip()
-        next_of_keen_phone = request.POST.get('next_of_keen_phone', '').strip()
+        sale_price = Decimal(str(sale_price_raw))
+        if sale_price <= 0:
+            return JsonResponse({'error': 'Sale price must be greater than 0'}, status=400)
+    except (ValueError, TypeError, ArithmeticError):
+        return JsonResponse({'error': 'Invalid sale price'}, status=400)
 
-        sale_price = request.POST.get('sale_price', '0')
-        sale_type = request.POST.get('sale_type', 'cash')
-        branch_id = request.POST.get('branch_id')
+    # ============================================================
+    # PHASE 1 — VALIDATE EVERYTHING AGAINST THE DB (no writes)
+    # ============================================================
+    try:
+        with transaction.atomic():
 
-        if not unit_id:
-            return JsonResponse({'error': 'Please scan or enter a unit identifier'}, status=400)
+            # --- Resolve + validate unit ---
+            unit = Unit.objects.filter(id=unit_id).select_related(
+                'phone', 'phone__branch',
+                'electronic', 'electronic__branch',
+            ).first()
 
-        if not customer_name:
-            return JsonResponse({'error': 'Customer name is required'}, status=400)
+            if not unit:
+                raise SaleError(f'Unit "{unit_id}" not found.', status=404)
 
-        if not customer_phone:
-            return JsonResponse({'error': 'Customer phone number is required'}, status=400)
+            if unit.status != 'available':
+                raise SaleError(f'Unit "{unit.identifier}" is not available.')
 
-        if not customer_id_number:
-            return JsonResponse({'error': 'Customer ID number is required'}, status=400)
+            # --- Resolve product ---
+            if unit.phone:
+                product = unit.phone
+            elif unit.electronic:
+                product = unit.electronic
+            else:
+                raise SaleError('Invalid product attached to this unit.')
 
-        if not sale_type:
-            return JsonResponse({'error': 'Please select a sale type'}, status=400)
+            # --- Verify product belongs to the active company ---
+            if product.company_id != company.id:
+                raise SaleError('Product does not belong to this company.', status=403)
 
-        try:
-            sale_price = Decimal(str(sale_price))
-            if sale_price <= 0:
-                return JsonResponse({'error': 'Sale price must be greater than 0'}, status=400)
-        except:
-            return JsonResponse({'error': 'Invalid sale price'}, status=400)
+            # --- Resolve branch ---
+            branch = None
+            if branch_id:
+                branch = Branch.objects.filter(id=branch_id, company=company).first()
+                if not branch:
+                    raise SaleError('Branch not found.', status=404)
+            if not branch:
+                branch = product.branch
+            if not branch:
+                raise SaleError('No branch assigned to this product.')
 
-        unit = get_object_or_404(Unit, id=unit_id)
+            # --- Tax ---
+            tax_amount, net_amount = calculate_tax(company, sale_price)
 
-        if unit.status != 'available':
-            return JsonResponse({'error': f'Unit "{unit.identifier}" is not available'}, status=400)
+            # ============================================================
+            # PHASE 2 — WRITE EVERYTHING (all validation passed)
+            # ============================================================
 
-        product = None
-        if unit.phone:
-            product = unit.phone
-        elif unit.electronic:
-            product = unit.electronic
-        else:
-            return JsonResponse({'error': 'Invalid product'}, status=400)
+            # --- Create or reuse customer ---
+            customer = Customer.objects.filter(
+                phone=customer_phone, company=company
+            ).first()
 
-        # Verify product belongs to active company
-        if product.company != company:
-            return JsonResponse({'error': 'Product does not belong to this company'}, status=403)
+            if not customer:
+                customer = Customer.objects.create(
+                    company=company,
+                    branch=branch,
+                    name=customer_name,
+                    phone=customer_phone,
+                    email=customer_email,
+                    id_number=customer_id_number,
+                    next_of_keen_name=next_of_keen_name,
+                    next_of_keen_phone=next_of_keen_phone,
+                    address=(
+                        f"ID: {customer_id_number} | "
+                        f"Next of Keen: {next_of_keen_name} | "
+                        f"NOK Phone: {next_of_keen_phone}"
+                    ),
+                    is_active=True,
+                )
+            else:
+                # Merge any newly-provided fields
+                if customer_name and customer.name != customer_name:
+                    customer.name = customer_name
+                if customer_email and not customer.email:
+                    customer.email = customer_email
+                if customer_id_number and customer.id_number != customer_id_number:
+                    customer.id_number = customer_id_number
+                if next_of_keen_name and customer.next_of_keen_name != next_of_keen_name:
+                    customer.next_of_keen_name = next_of_keen_name
+                if next_of_keen_phone and customer.next_of_keen_phone != next_of_keen_phone:
+                    customer.next_of_keen_phone = next_of_keen_phone
+                customer.address = (
+                    f"ID: {customer_id_number} | "
+                    f"Next of Keen: {next_of_keen_name} | "
+                    f"NOK Phone: {next_of_keen_phone}"
+                )
+                customer.save()
 
-        branch = None
-        if branch_id:
-            branch = Branch.objects.filter(id=branch_id, company=company).first()
-        if not branch:
-            branch = product.branch
+            # --- Create or reuse owner ---
+            owner = Owner.objects.filter(
+                phone=customer_phone, company=company
+            ).first()
 
-        if not branch:
-            return JsonResponse({'error': 'No branch assigned to this product'}, status=400)
+            if not owner:
+                owner = Owner.objects.create(
+                    company=company,
+                    branch=branch,
+                    name=customer_name,
+                    phone=customer_phone,
+                    email=customer_email,
+                    id_number=customer_id_number,
+                    address=(
+                        f"ID: {customer_id_number} | "
+                        f"Next of Keen: {next_of_keen_name} | "
+                        f"NOK Phone: {next_of_keen_phone}"
+                    ),
+                    is_active=True,
+                )
 
-        # ------------------------------------------------------------
-        # Calculate tax based on company payment settings.
-        # Returns (tax_amount, net_amount) where net = subtotal + tax.
-        # If tax is disabled, tax_amount = 0 and net = subtotal.
-        # ------------------------------------------------------------
-        tax_amount, net_amount = calculate_tax(company, sale_price)
+            # --- Determine payment status ---
+            paid_methods = {'cash', 'm-pesa', 'mpesa', 'bank_transfer', 'card'}
+            payment_status = 'paid' if sale_type in paid_methods else 'pending'
 
-        # Create or get customer
-        customer = Customer.objects.filter(phone=customer_phone, company=company).first()
-        if not customer:
-            customer = Customer.objects.create(
+            # --- Create Sale ---
+            sale = Sale.objects.create(
                 company=company,
                 branch=branch,
-                name=customer_name,
-                phone=customer_phone,
-                email=customer_email,
-                id_number=customer_id_number,
-                next_of_keen_name=next_of_keen_name,
-                next_of_keen_phone=next_of_keen_phone,
-                address=f"ID: {customer_id_number} | Next of Keen: {next_of_keen_name} | NOK Phone: {next_of_keen_phone}",
-                is_active=True
+                customer=customer,
+                customer_name=customer_name,
+                customer_phone=customer_phone,
+                customer_email=customer_email,
+                total_amount=sale_price,       # pre-tax subtotal
+                discount=Decimal('0'),
+                tax=tax_amount,
+                net_amount=net_amount,         # what customer pays
+                payment_status=payment_status,
+                payment_method=sale_type,
+                sold_by=request.user,
+                sale_date=timezone.now(),
             )
-        else:
-            if customer_name and customer.name != customer_name:
-                customer.name = customer_name
-            if customer_email and not customer.email:
-                customer.email = customer_email
-            if customer_id_number and customer.id_number != customer_id_number:
-                customer.id_number = customer_id_number
-            if next_of_keen_name and customer.next_of_keen_name != next_of_keen_name:
-                customer.next_of_keen_name = next_of_keen_name
-            if next_of_keen_phone and customer.next_of_keen_phone != next_of_keen_phone:
-                customer.next_of_keen_phone = next_of_keen_phone
-            customer.address = f"ID: {customer_id_number} | Next of Keen: {next_of_keen_name} | NOK Phone: {next_of_keen_phone}"
-            customer.save()
 
-        # Create owner (if not exists)
-        owner = Owner.objects.filter(phone=customer_phone, company=company).first()
-        if not owner:
-            owner = Owner.objects.create(
-                company=company,
+            # --- Create SaleItem ---
+            content_type = ContentType.objects.get_for_model(product)
+            SaleItem.objects.create(
+                sale=sale,
+                content_type=content_type,
+                object_id=product.id,
+                item=product,
+                item_name=f"{product.brand} {product.name}",
+                item_sku=product.product_code,
+                quantity=1,
+                unit_price=sale_price,
+                total_price=sale_price,
+                unit=unit,
+            )
+
+            # --- Mark unit as sold ---
+            unit.status = 'sold'
+            unit.owner = owner
+            unit.owner_name = customer_name
+            unit.owner_phone = customer_phone
+            unit.sold_date = timezone.now()
+            unit.save()
+
+            # --- Decrement product stock ---
+            previous_quantity = product.quantity_in_stock
+            if product.quantity_in_stock > 0:
+                product.quantity_in_stock -= 1
+                product.save()
+
+            # --- Customer stats (only for PAID) ---
+            if payment_status == 'paid':
+                customer.total_purchases += net_amount
+                customer.visit_count += 1
+                customer.last_visit = timezone.now()
+                customer.save()
+
+                owner.total_purchases += net_amount
+                owner.purchase_count += 1
+                owner.last_purchase_date = timezone.now()
+                owner.save()
+
+            # --- Stock movement ---
+            record_stock_movement(
+                product=product,
+                movement_type='sale',
+                quantity=-1,
+                previous_quantity=previous_quantity,
+                new_quantity=product.quantity_in_stock,
                 branch=branch,
-                name=customer_name,
-                phone=customer_phone,
-                email=customer_email,
-                id_number=customer_id_number,
-                address=f"ID: {customer_id_number} | Next of Keen: {next_of_keen_name} | NOK Phone: {next_of_keen_phone}",
-                is_active=True
+                unit=unit,
+                reference_id=f"SALE-{sale.id}",
+                reference_model='Sale',
+                notes=f"Sale #{sale.id} ({payment_status}) - {customer_name} ({customer_phone})",
+                performed_by=request.user,
             )
 
-        # Create sale — use the calculated tax and net_amount
-        sale = Sale.objects.create(
-            company=company,
-            branch=branch,
-            customer=customer,
-            customer_name=customer_name,
-            customer_phone=customer_phone,
-            customer_email=customer_email,
-            total_amount=sale_price,          # subtotal (before tax)
-            discount=Decimal('0'),
-            tax=tax_amount,                   # ✅ calculated tax
-            net_amount=net_amount,            # ✅ subtotal + tax
-            payment_status='paid' if sale_type in ['cash', 'm-pesa', 'bank_transfer'] else 'pending',
-            payment_method=sale_type,
-            sold_by=request.user,
-            sale_date=timezone.now()
-        )
+            # ============================================================
+            # SUCCESS
+            # ============================================================
+            return JsonResponse({
+                'success': True,
+                'sale_id': sale.id,
+                'payment_status': payment_status,
+                'message': (
+                    f'Sale completed successfully! Receipt #{sale.company_sale_id}'
+                    if payment_status == 'paid'
+                    else f'Sale saved as PENDING. Ref #{sale.company_sale_id}'
+                ),
+                'redirect_url': f'/epa_shop/sale/receipt/{sale.id}/',
+            })
 
-        # Create sale item
-        content_type = ContentType.objects.get_for_model(product)
-        sale_item = SaleItem.objects.create(
-            sale=sale,
-            content_type=content_type,
-            object_id=product.id,
-            item=product,
-            item_name=f"{product.brand} {product.name}",
-            item_sku=product.product_code,
-            quantity=1,
-            unit_price=sale_price,
-            total_price=sale_price,
-            unit=unit
-        )
-
-        # Update unit status
-        unit.status = 'sold'
-        unit.owner = owner
-        unit.owner_name = customer_name
-        unit.owner_phone = customer_phone
-        unit.sold_date = timezone.now()
-        unit.save()
-
-        # Update product stock
-        previous_quantity = product.quantity_in_stock
-        if product.quantity_in_stock > 0:
-            product.quantity_in_stock -= 1
-            product.save()
-
-        # Update customer stats — use net_amount so totals reflect what they paid
-        customer.total_purchases += net_amount
-        customer.visit_count += 1
-        customer.last_visit = timezone.now()
-        customer.save()
-
-        # Update owner stats — same
-        owner.total_purchases += net_amount
-        owner.purchase_count += 1
-        owner.last_purchase_date = timezone.now()
-        owner.save()
-
-        # Record stock movement
-        record_stock_movement(
-            product=product,
-            movement_type='sale',
-            quantity=-1,
-            previous_quantity=previous_quantity,
-            new_quantity=product.quantity_in_stock,
-            branch=branch,
-            unit=unit,
-            reference_id=f"SALE-{sale.id}",
-            reference_model='Sale',
-            notes=f"Sale #{sale.id} - {customer_name} ({customer_phone})",
-            performed_by=request.user
-        )
-
-        return JsonResponse({
-            'success': True,
-            'sale_id': sale.id,
-            'message': f'Sale completed successfully! Receipt #{sale.company_sale_id}',
-            'redirect_url': f'/epa_shop/sale/receipt/{sale.id}/'
-        })
+    except SaleError as e:
+        # Expected validation failure — atomic block already rolled back
+        return JsonResponse({'error': e.message}, status=e.status)
 
     except Exception as e:
+        # Unexpected — print traceback and return 500
         import traceback
         traceback.print_exc()
         return JsonResponse({'error': str(e)}, status=500)
 
 
+
+
+# ============================================
+# SALE RECEIPT 
+# ============================================     
 @login_required
+@xframe_options_sameorigin
 def sale_receipt(request, pk):
     """Generate and return sale receipt HTML page"""
     company, is_viewing_company = get_active_company(request)
@@ -748,16 +848,18 @@ def sale_receipt(request, pk):
         'receipt_settings': receipt_settings,   # ✅ NEW
         'page_title': f'Receipt #{sale.company_sale_id}',
         'page_subtitle': 'Sale receipt',
+        'is_embed': request.GET.get('embed') == '1', 
         'is_receipt': True,
     }
     return render(request, 'epa/sale_receipt.html', context)
 
 
 # ============================================
-# SALE RECEIPT BY COMPANY SALE ID
+# SALE RECEIPT BY  ID
 # ============================================
 
 @login_required
+@xframe_options_sameorigin
 def sale_receipt_by_id(request, company_sale_id):
     """Generate and return sale receipt data using company_sale_id"""
     company, is_viewing_company = get_active_company(request)
@@ -795,40 +897,10 @@ def sale_receipt_by_id(request, company_sale_id):
         'receipt_settings': receipt_settings,   # ✅ NEW
         'page_title': f'Receipt #{sale.company_sale_id}',
         'page_subtitle': 'Sale receipt',
+        'is_embed': request.GET.get('embed') == '1',
         'is_receipt': True,
     }
     return render(request, 'epa/sale_receipt.html', context)
-
-
-@login_required
-def sale_receipt_print(request, sale_id):
-    """
-    Barebones receipt page for silent printing via hidden iframe.
-    Does NOT extend base.html — prints only the receipt content.
-    """
-    company, is_viewing_company = get_active_company(request)
-
-    if not company:
-        if request.user.role == 'super_admin':
-            return redirect('/api/support/select/')
-        messages.warning(request, 'You are not assigned to any company.')
-        return redirect('/dashboard/')
-
-    sale = get_object_or_404(Sale, id=sale_id, company=company)
-
-    # Branch access check (skip in support mode)
-    if not is_viewing_company and not is_admin_or_manager(request.user):
-        user_branch = get_user_branch(request.user)
-        if user_branch and sale.branch and sale.branch.id != user_branch.id:
-            messages.error(request, 'You do not have permission to view this receipt.')
-            return redirect('/epa_shop/sales/')
-
-    context = {
-        'company': company,
-        'sale': sale,
-        'items': sale.items.all(),
-    }
-    return render(request, 'epa/sale_receipt_print.html', context)
 
 
 # ============================================
@@ -1583,26 +1655,26 @@ def sale_edit(request, pk):
 
 @login_required
 def sale_complete(request, sale_id):
-    """Mark a sale as completed (Admin & Manager only)"""
+    """Mark a sale as completed — with payment method + amount tendered."""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             return JsonResponse({'error': 'No company assigned'}, status=400)
         messages.error(request, 'No company assigned.')
         return redirect('epa-dashboard')
-    
+
     sale = get_object_or_404(Sale, id=sale_id, company=company)
-    
+
     is_authorized = (
         is_viewing_company or
-        request.user.is_company_admin or 
-        request.user.is_company_manager or 
+        request.user.is_company_admin or
+        request.user.is_company_manager or
         request.user.is_super_admin or
         request.user.is_superuser or
         request.user.is_staff
     )
-    
+
     if not is_authorized:
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             return JsonResponse({
@@ -1610,18 +1682,69 @@ def sale_complete(request, sale_id):
             }, status=403)
         messages.error(request, 'You do not have permission to complete sales.')
         return redirect('epa-sales')
-    
+
     if request.method == 'POST':
         try:
+            payment_method      = (request.POST.get('payment_method') or '').strip().lower()
+            amount_tendered_raw = (request.POST.get('amount_tendered') or '').strip()
+
+            allowed_methods = {'cash', 'mpesa', 'card', 'bank_transfer'}
+            if payment_method not in allowed_methods:
+                messages.error(request, 'Please choose a valid payment method.')
+                return render(request, 'epa/sale_verify.html', {
+                    'sale': sale,
+                    'page_title': 'Verify Sale',
+                    'page_subtitle': f'Verify and complete sale #{sale.company_sale_id}',
+                })
+
+            try:
+                amount_tendered = Decimal(amount_tendered_raw)
+            except (ValueError, TypeError, ArithmeticError):
+                messages.error(request, 'Invalid amount tendered.')
+                return render(request, 'epa/sale_verify.html', {
+                    'sale': sale,
+                    'page_title': 'Verify Sale',
+                    'page_subtitle': f'Verify and complete sale #{sale.company_sale_id}',
+                })
+
+            total_due = Decimal(str(sale.net_amount))
+
+            if payment_method == 'cash':
+                if amount_tendered < total_due:
+                    messages.error(
+                        request,
+                        f'Amount tendered (KSh {amount_tendered}) is less than '
+                        f'total due (KSh {total_due}).'
+                    )
+                    return render(request, 'epa/sale_verify.html', {
+                        'sale': sale,
+                        'page_title': 'Verify Sale',
+                        'page_subtitle': f'Verify and complete sale #{sale.company_sale_id}',
+                    })
+            else:
+                if amount_tendered != total_due:
+                    messages.error(
+                        request,
+                        f'For {payment_method.replace("_", " ").title()}, the amount '
+                        f'must equal the total due (KSh {total_due}).'
+                    )
+                    return render(request, 'epa/sale_verify.html', {
+                        'sale': sale,
+                        'page_title': 'Verify Sale',
+                        'page_subtitle': f'Verify and complete sale #{sale.company_sale_id}',
+                    })
+
+            # ---- Apply ----
             sale.payment_status = 'paid'
+            sale.payment_method = payment_method
             sale.save()
-            
+
             if sale.customer:
                 sale.customer.total_purchases += sale.net_amount
                 sale.customer.visit_count += 1
                 sale.customer.last_visit = timezone.now()
                 sale.customer.save()
-            
+
             for item in sale.items.all():
                 if item.unit and item.unit.owner:
                     owner = item.unit.owner
@@ -1629,19 +1752,24 @@ def sale_complete(request, sale_id):
                     owner.purchase_count += 1
                     owner.last_purchase_date = timezone.now()
                     owner.save()
-            
-            messages.success(request, f'Sale #{sale.company_sale_id} has been marked as completed!')
-            
-            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
+
+            messages.success(
+                request,
+                f'Sale #{sale.company_sale_id} marked as completed '
+                f'({payment_method.replace("_", " ").title()}).'
+            )
+
+            if (request.headers.get('x-requested-with') == 'XMLHttpRequest'
+                    or request.content_type == 'application/json'):
                 return JsonResponse({
                     'success': True,
                     'message': f'Sale #{sale.company_sale_id} marked as completed.',
                     'sale_id': sale.id,
-                    'redirect_url': f'/epa_shop/sale/receipt/{sale.id}/'
+                    'redirect_url': f'/epa_shop/sale/receipt/{sale.id}/',
                 })
-            
+
             return redirect(f'/epa_shop/sale/receipt/{sale.id}/')
-            
+
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -1649,13 +1777,40 @@ def sale_complete(request, sale_id):
                 return JsonResponse({'error': str(e)}, status=500)
             messages.error(request, f'Error completing sale: {str(e)}')
             return redirect('epa-sales')
-    
+
     context = {
         'sale': sale,
         'page_title': 'Verify Sale',
         'page_subtitle': f'Verify and complete sale #{sale.company_sale_id}',
     }
     return render(request, 'epa/sale_verify.html', context)
+
+
+@login_required
+def pos_pending_payments(request):
+    """List pending sales for the POS Pending Payments tab."""
+    company, _ = get_active_company(request)
+    if not company:
+        return JsonResponse({'pending': []})
+
+    qs = Sale.objects.filter(
+        company=company,
+        payment_status='pending',
+    ).select_related('branch').order_by('-sale_date')[:50]
+
+    # Cashiers see only their own branch
+    if request.user.role == 'company_cashier' and request.user.branch:
+        qs = qs.filter(branch=request.user.branch)
+
+    return JsonResponse({'pending': [{
+        'id': s.id,
+        'company_sale_id': s.company_sale_id,
+        'customer_name': s.customer_name,
+        'customer_phone': s.customer_phone,
+        'net_amount': float(s.net_amount),
+        'sale_date': s.sale_date.isoformat(),
+        'receipt_url': f'/epa_shop/sale/receipt/{s.id}/',
+    } for s in qs]})
 
 
 # ============================================
@@ -1845,3 +2000,175 @@ def sale_delete(request, pk):
         'page_subtitle': f'Confirm deletion of sale #{sale.company_sale_id}',
     }
     return render(request, 'epa/sale_delete_confirm.html', context)
+
+
+@login_required
+def sale_return_data(request, sale_id):
+    """Return a sale's items (with already-returned quantities) for the Return modal."""
+    company, _ = get_active_company(request)
+    if not company:
+        return JsonResponse({'success': False, 'error': 'No company assigned.'}, status=400)
+
+    sale = Sale.objects.filter(id=sale_id, company=company).first()
+    if not sale:
+        return JsonResponse({'success': False, 'error': 'Sale not found.'}, status=404)
+
+    # Build items with returned_qty
+    items_out = []
+    for item in sale.items.all():
+        # Count how much of this item has already been returned
+        returned_qty = ReturnItem.objects.filter(sale_item=item).aggregate(
+            s=Sum('quantity')
+        )['s'] or 0
+
+        items_out.append({
+            'id': item.id,
+            'item_name': item.item_name,
+            'item_sku': item.item_sku,
+            'unit_price': float(item.unit_price),
+            'quantity': item.quantity,
+            'returned_qty': returned_qty,
+            'unit_identifier': item.unit.identifier if item.unit else None,
+        })
+
+    return JsonResponse({
+        'success': True,
+        'sale': {
+            'id': sale.id,
+            'company_sale_id': sale.company_sale_id,
+            'customer_name': sale.customer_name,
+            'customer_phone': sale.customer_phone,
+            'payment_method': sale.payment_method,
+            'payment_status': sale.payment_status,
+            'net_amount': float(sale.net_amount),
+            'sale_date': sale.sale_date.isoformat(),
+            'items': items_out,
+        },
+    })
+
+
+@login_required
+def sale_process_return(request):
+    """Process a return against an existing sale."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    company, _ = get_active_company(request)
+    if not company:
+        return JsonResponse({'error': 'No company assigned'}, status=400)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    sale_id       = data.get('sale_id')
+    refund_method = (data.get('refund_method') or 'cash').strip()
+    reason        = (data.get('reason') or '').strip()
+    items_in      = data.get('items') or []
+
+    if not sale_id:
+        return JsonResponse({'error': 'Sale ID is required.'}, status=400)
+    if not items_in:
+        return JsonResponse({'error': 'No items selected for return.'}, status=400)
+
+    sale = Sale.objects.filter(id=sale_id, company=company).first()
+    if not sale:
+        return JsonResponse({'error': 'Sale not found.'}, status=404)
+
+    try:
+        with transaction.atomic():
+            refund_total = Decimal('0')
+            created_returns = []
+
+            for entry in items_in:
+                sale_item_id = entry.get('sale_item_id')
+                qty          = int(entry.get('quantity') or 0)
+
+                sale_item = SaleItem.objects.filter(id=sale_item_id, sale=sale).first()
+                if not sale_item:
+                    raise SaleError(f'Sale item {sale_item_id} not found on this sale.')
+                if qty <= 0:
+                    raise SaleError('Return quantity must be greater than 0.')
+
+                already_returned = ReturnItem.objects.filter(
+                    sale_item=sale_item
+                ).aggregate(s=Sum('quantity'))['s'] or 0
+                remaining = sale_item.quantity - already_returned
+
+                if qty > remaining:
+                    raise SaleError(
+                        f'Cannot return {qty} of "{sale_item.item_name}" — '
+                        f'only {remaining} remaining.'
+                    )
+
+                # Create ReturnItem
+                r = ReturnItem.objects.create(
+                    sale=sale,
+                    sale_item=sale_item,
+                    quantity=qty,
+                    unit_price=sale_item.unit_price,
+                    refund_method=refund_method,
+                    reason=reason,
+                    processed_by=request.user,
+                )
+                created_returns.append(r)
+
+                # Unit goes back to available (only if fully returned AND it's a tracked unit)
+                if sale_item.unit and (already_returned + qty >= sale_item.quantity):
+                    unit = sale_item.unit
+                    unit.status = 'available'
+                    unit.owner_name = ''
+                    unit.owner_phone = ''
+                    unit.sold_date = None
+                    unit.save()
+
+                # Restock
+                product = sale_item.item  # GFK: the actual Phone/Electronic/Accessory
+                if product:
+                    previous_qty = product.quantity_in_stock
+                    product.quantity_in_stock += qty
+                    product.save()
+
+                    record_stock_movement(
+                        product=product,
+                        movement_type='return',
+                        quantity=qty,
+                        previous_quantity=previous_qty,
+                        new_quantity=product.quantity_in_stock,
+                        branch=sale.branch,
+                        unit=sale_item.unit,
+                        reference_id=f"RETURN-{r.id}",
+                        reference_model='ReturnItem',
+                        notes=f'Return for Sale #{sale.company_sale_id} — {reason or "no reason"}',
+                        performed_by=request.user,
+                    )
+
+                refund_total += sale_item.unit_price * qty
+
+            # If ALL items are now fully returned, mark the sale refunded
+            all_fully_returned = True
+            for item in sale.items.all():
+                ret = ReturnItem.objects.filter(sale_item=item).aggregate(s=Sum('quantity'))['s'] or 0
+                if ret < item.quantity:
+                    all_fully_returned = False
+                    break
+
+            if all_fully_returned:
+                sale.payment_status = 'refunded'
+                sale.save()
+
+            return JsonResponse({
+                'success': True,
+                'refund_total': float(refund_total),
+                'refund_method': refund_method,
+                'sale_fully_returned': all_fully_returned,
+                'return_receipt_url': f'/epa_shop/sale/return-receipt/{created_returns[0].id}/',
+            })
+
+    except SaleError as e:
+        return JsonResponse({'error': e.message}, status=e.status)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'error': str(e)}, status=500)

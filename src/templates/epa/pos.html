@@ -829,9 +829,9 @@
 
             <!-- ---------- Scanner Code row ---------- -->
             <div class="groupbox" style="margin-top: 4px;">
-                <span class="groupbox-title">Quick Scan</span>
+                <span class="groupbox-title"></span>
                 <div class="row">
-                    <span class="badge-scanner">Scanner Code</span>
+                    <span class="badge-scanner">........................................ SCAN BARCODE ........................................</span>
                     <div style="position: relative; flex: 1;">
                         <input type="text" id="searchProducts"
                                class="pos-input full scanner-input"
@@ -839,60 +839,6 @@
                                autocomplete="off">
                         <div class="barcode-results" id="barcodeResults"></div>
                     </div>
-                </div>
-            </div>
-
-            <!-- ---------- Products / Product / Price / Code ---------- -->
-            <div class="groupbox">
-                <span class="groupbox-title">Item Entry</span>
-
-                <div class="row">
-                    <span class="pos-label">Products</span>
-                    <select id="productPicker" class="pos-select grow">
-                        <option value="">Type product name here and press Enter</option>
-                    </select>
-                </div>
-
-                <div class="row">
-                    <span class="pos-label">Product</span>
-                    <input type="text" id="selectedProduct" class="pos-input"
-                           style="width: 180px;" readonly placeholder="Selected Product">
-                    <span class="pos-label" style="width: auto; padding-left: 6px;">Sale Price</span>
-                    <input type="number" id="salePrice" class="pos-input sm"
-                           placeholder="Custom Price" step="0.01" min="0">
-                    <button class="btn-3d" onclick="focusScanner()">Enter Item Code</button>
-                </div>
-
-                <!-- Discount % / Discount $ / Quantity — one row, 4:4:4 -->
-                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; align-items:end; margin-bottom:6px; margin-top:6px;">
-                    <div>
-                        <label class="pos-label" style="display:block; width:auto; margin-bottom:2px;">Discount %</label>
-                        <input type="number" id="discountPct" class="pos-input"
-                               style="width:100%;" value="0" step="0.01" min="0" max="100"
-                               oninput="recalcTicketLine()">
-                    </div>
-                    <div>
-                        <label class="pos-label" style="display:block; width:auto; margin-bottom:2px;">Discount $</label>
-                        <input type="number" id="discountAmt" class="pos-input"
-                               style="width:100%;" value="0" step="0.01" min="0"
-                               oninput="recalcTicketLine()">
-                    </div>
-                    <div>
-                        <label class="pos-label" style="display:block; width:auto; margin-bottom:2px;">Quantity</label>
-                        <input type="number" id="qtyInput" class="pos-input"
-                               style="width:100%;" value="1" min="1" step="1">
-                    </div>
-                </div>
-
-                <!-- Action buttons on their own row -->
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
-                    <button class="btn-3d" style="height:32px;" onclick="removeSelectedLine()">
-                        <i class="fas fa-trash"></i> Delete Item
-                    </button>
-                    <button class="btn-3d" style="height:32px; background:#e8f5e9; border-color:#66ff66 #003300 #003300 #66ff66;"
-                            onclick="addSelectedToTicket()">
-                        <i class="fas fa-plus" style="color:#009900;"></i> Add Item
-                    </button>
                 </div>
             </div>
 
@@ -1043,11 +989,13 @@
                 <div class="tab-content" id="tab-receipt">
                     <div class="groupbox" style="margin-top: 14px;">
                         <span class="groupbox-title">Receipt / Customer Details</span>
+
+                        <!-- Branch row (unchanged) -->
                         <div class="row">
                             <span class="pos-label">Branch</span>
                             {% if user.role == 'company_cashier' %}
                                 <input type="text" class="pos-input med" readonly
-                                       value="{{ user.branch.name|default:'Not Assigned' }}">
+                                    value="{{ user.branch.name|default:'Not Assigned' }}">
                                 <input type="hidden" id="branchSelect" value="{{ user.branch.id|default:'' }}">
                             {% else %}
                                 <select id="branchSelect" class="pos-select med">
@@ -1058,14 +1006,54 @@
                                 </select>
                             {% endif %}
                         </div>
-                        <div class="row">
-                            <span class="pos-label">Customer</span>
-                            <input type="text" id="customerName" class="pos-input med" placeholder="Walk-in Customer">
+
+                        <!-- ✅ NEW: Customer type radio row -->
+                        <div class="row" style="align-items:flex-start;">
+                            <span class="pos-label" style="padding-top:6px;">Customer</span>
+                            <div style="display:flex; gap:14px; padding-top:4px;">
+                                <label style="font-size:12px; font-weight:700; cursor:pointer;">
+                                    <input type="radio" name="customerType" value="walkin" id="custTypeWalkin"
+                                        onchange="onCustomerTypeChange()"> Walk-in
+                                </label>
+                                <label style="font-size:12px; font-weight:700; cursor:pointer;">
+                                    <input type="radio" name="customerType" value="named" id="custTypeNamed"
+                                        onchange="onCustomerTypeChange()"> Named Customer
+                                </label>
+                            </div>
                         </div>
-                        <div class="row">
-                            <span class="pos-label">Phone</span>
-                            <input type="text" id="customerPhone" class="pos-input med" placeholder="07XX XXX XXX">
+
+                        <!-- ✅ Named customer fields (hidden when walk-in selected) -->
+                        <div id="namedCustomerFields" style="display:none;">
+                            <div class="row">
+                                <span class="pos-label">Name <span style="color:#cc0000;">*</span></span>
+                                <input type="text" id="customerName" class="pos-input med"
+                                    placeholder="Customer full name" autocomplete="off">
+                            </div>
+                            <div class="row">
+                                <span class="pos-label">Phone <span style="color:#cc0000;">*</span></span>
+                                <input type="text" id="customerPhone" class="pos-input med"
+                                    placeholder="07XX XXX XXX" autocomplete="off">
+                            </div>
+                            <div class="row">
+                                <span class="pos-label">Email</span>
+                                <input type="email" id="customerEmail" class="pos-input med"
+                                    placeholder="optional@email.com" autocomplete="off">
+                            </div>
                         </div>
+
+                        <!-- ✅ Walk-in confirmation note -->
+                        <div id="walkinNote" style="display:none; margin-top:6px; padding:8px;
+                                    background:#fffbe6; border:2px solid; border-color:#808080 #ffffff #ffffff #808080;
+                                    font-size:12px;">
+                            ℹ️ Ticket will be recorded as <b>Walk-in Customer</b>.
+                        </div>
+
+                        <!-- ✅ Warning / validation message -->
+                        <div id="customerValidationMsg"
+                            style="display:none; margin-top:8px; padding:8px;
+                                    background:#f8d7da; color:#721c24; border:2px solid #cc0000; font-size:12px;">
+                        </div>
+
                     </div>
                 </div>
 
@@ -1100,7 +1088,7 @@
             <span class="fn-label">Close</span>
         </button>
 
-        <button class="fn-btn fn-gray" onclick="alert('Shortcut keys:\nF1 Close · F2 Help · F3 New · F4 Print\nF5 PDF · F6 Pay Due · F7 Pay/Save\nF8 Search · F9 Pay Later · F10 Customers')">
+        <button class="fn-btn fn-gray" onclick="alert('Shortcut keys:\nF1 Close · F2 Help · F3 New · F4 Print\nF5 PDF · F6 Pay Due · F7 Pay/Save · F8 Pay Later\nF9 Return · F10 Search · F11 Customers · F12 Fullscreen')">
             <div class="fn-icon"><i class="fas fa-keyboard"></i></div>
             <span class="fn-key">[F2]</span>
             <span class="fn-label">Shortcut Keys</span>
@@ -1130,7 +1118,7 @@
             <span class="fn-label">Pay Due</span>
         </button>
 
-        <button class="fn-btn fn-orange" onclick="completeSale()">
+        <button class="fn-btn fn-orange" onclick="openPaymentModal('cash')">
             <div class="fn-icon"><i class="fas fa-cash-register"></i></div>
             <span class="fn-key">[F7]</span>
             <span class="fn-label">Pay / Save</span>
@@ -1138,32 +1126,32 @@
 
         <button class="fn-btn fn-yellow" onclick="payLater()">
             <div class="fn-icon"><i class="fas fa-clock"></i></div>
-            <span class="fn-key">[F9]</span>
+            <span class="fn-key">[F8]</span>
             <span class="fn-label">Pay Later</span>
         </button>
 
         <button class="fn-btn fn-red" onclick="returnSale()">
             <div class="fn-icon"><i class="fas fa-undo"></i></div>
-            <span class="fn-key">[F8]</span>
+            <span class="fn-key">[F9]</span>
             <span class="fn-label">Return</span>
         </button>
 
         <button class="fn-btn fn-blue" onclick="focusScanner()">
             <div class="fn-icon"><i class="fas fa-search"></i></div>
-            <span class="fn-key">[F8]</span>
+            <span class="fn-key">[F10]</span>
             <span class="fn-label">Search</span>
         </button>
 
-        <button class="fn-btn fn-blue" onclick="switchTab('receipt')">
-            <div class="fn-icon"><i class="fas fa-users"></i></div>
-            <span class="fn-key">[F10]</span>
-            <span class="fn-label">Customers</span>
+        <button class="fn-btn fn-gray" id="printerBtn" onclick="connectPrinter()">
+            <div class="fn-icon"><i class="fas fa-print" id="printerIcon"></i></div>
+            <span class="fn-key">[F11]</span>
+            <span class="fn-label" id="printerLabel">Connect Printer</span>
         </button>
 
-        <button class="fn-btn fn-gray" onclick="toggleReceiptMode()">
-            <div class="fn-icon"><i class="fas fa-receipt"></i></div>
+        <button class="fn-btn fn-gray" id="fullscreenBtn" onclick="toggleFullscreen()">
+            <div class="fn-icon"><i class="fas fa-expand" id="fullscreenIcon"></i></div>
             <span class="fn-key">[F12]</span>
-            <span class="fn-label">Receipt Mode</span>
+            <span class="fn-label" id="fullscreenLabel">Fullscreen</span>
         </button>
 
     </div><!-- /fn-bar -->
@@ -1205,6 +1193,7 @@
     </div>
 </div>
 
+
 <!-- ============================================ -->
 <!-- PAYMENT MODAL                                 -->
 <!-- ============================================ -->
@@ -1230,6 +1219,127 @@
         </div>
     </div>
 </div>
+
+
+<!-- ============================================ -->
+<!-- RETURN MODAL                                  -->
+<!-- ============================================ -->
+<div class="pos-modal-overlay" id="returnModal">
+    <div class="pos-modal" style="max-width:640px;">
+        <div class="pos-modal-header" style="background:#cc0000;">
+            <h3>↩️ Process Return</h3>
+            <button class="pos-modal-close" onclick="closeReturnModal()">✕</button>
+        </div>
+
+        <div class="pos-modal-body">
+
+            <!-- STEP 1: Lookup -->
+            <div class="groupbox" id="returnLookupStep">
+                <span class="groupbox-title">Find Original Sale</span>
+
+                <div class="modal-field">
+                    <label>Receipt Barcode / Sale ID / Customer Phone</label>
+                    <input type="text" id="returnLookupInput"
+                           placeholder="Scan receipt barcode or type Sale ID / phone"
+                           autocomplete="off"
+                           onkeydown="if(event.key==='Enter'){event.preventDefault();lookupReturnSale();}">
+                </div>
+
+                <button type="button" class="btn-3d"
+                        style="height:34px; background:#cc0000; color:#fff; border-color:#ff6666 #660000 #660000 #ff6666;"
+                        onclick="lookupReturnSale()">
+                    <i class="fas fa-search"></i> Find Sale
+                </button>
+
+                <div id="returnLookupError"
+                     style="display:none; margin-top:10px; padding:8px;
+                            background:#f8d7da; color:#721c24; border:2px solid #cc0000; font-size:12px;">
+                </div>
+            </div>
+
+            <!-- STEP 2: Sale items + quantities -->
+            <div class="groupbox" id="returnItemsStep" style="display:none;">
+                <span class="groupbox-title">Select Items to Return</span>
+
+                <div id="returnSaleHeader"
+                     style="background:#fffbe6; padding:8px; margin-bottom:10px;
+                            border:1px solid #808080; font-size:12px;"></div>
+
+                <div id="returnItemsList"
+                     style="background:#fff; border:2px inset #808080; padding:8px;
+                            max-height:260px; overflow-y:auto; font-size:12px;">
+                </div>
+
+                <div style="margin-top:10px; padding-top:10px; border-top:2px solid #808080;">
+                    <div style="display:flex; justify-content:space-between; font-weight:700;">
+                        <span>Refund Total:</span>
+                        <span id="returnTotalDisplay">KSh 0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STEP 3: Refund method -->
+            <div class="groupbox" id="returnRefundStep" style="display:none;">
+                <span class="groupbox-title">Refund Method</span>
+                <div class="modal-field">
+                    <label>Refund As</label>
+                    <select id="returnRefundMethod">
+                        <option value="cash">Cash</option>
+                        <option value="mpesa">M-Pesa</option>
+                        <option value="card">Card Reversal</option>
+                        <option value="store_credit">Store Credit</option>
+                    </select>
+                </div>
+                <div class="modal-field">
+                    <label>Reason (optional)</label>
+                    <input type="text" id="returnReason"
+                           placeholder="e.g. faulty unit, customer changed mind">
+                </div>
+            </div>
+
+            <div class="payment-status" id="returnStatus"></div>
+        </div>
+
+        <div class="pos-modal-footer">
+            <button type="button" onclick="closeReturnModal()">Cancel</button>
+            <button type="button" class="btn-primary" id="returnSubmitBtn"
+                    onclick="submitReturn()" disabled>
+                Process Return
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<!-- ============================================ -->
+<!-- RECEIPT MODAL — opened after every sale       -->
+<!-- ============================================ -->
+<div class="pos-modal-overlay" id="receiptModal">
+    <div class="pos-modal" style="max-width:520px; width:95%; max-height:88vh; display:flex; flex-direction:column; padding:0;">
+
+        <div class="pos-modal-header" style="background:#009900; margin:0;">
+            <h3>🧾 Sale Receipt</h3>
+            <button class="pos-modal-close" onclick="closeReceiptModal()">✕</button>
+        </div>
+
+        <div style="flex:1; overflow:hidden; padding:6px; background:#d4d0c8; height:520px;">
+            <iframe id="receiptIframe"
+                    src="about:blank"
+                    style="width:100%; height:100%; border:2px inset #808080; background:#fff;">
+            </iframe>
+        </div>
+
+        <div class="pos-modal-footer" style="margin:0; border-top:2px solid #808080; padding:10px;">
+            <button type="button" onclick="printReceiptIframe()">
+                <i class="fas fa-print"></i> Print Receipt
+            </button>
+            <button type="button" class="btn-primary" onclick="closeReceiptModal()">
+                <i class="fas fa-check"></i> Done — New Sale
+            </button>
+        </div>
+    </div>
+</div>
+
 
 <!-- Toasts -->
 <div class="success-toast" id="successToast">
@@ -1264,7 +1374,29 @@ let isRefreshing = false;
 let currentPaymentMethod = 'cash';
 let currentTotal = 0;
 let selectedTicketIndex = -1;  // selected row in ticket table
-let receiptMode = false;
+let returnSaleData = null;   // the looked-up sale
+let returnSelections = {};   // { sale_item_id: qty_to_return }
+// ============================================
+// USB THERMAL PRINTER (XPrinter XP-365B, ESC/POS)
+// ============================================
+// The XPrinter USB interface is usually a USB Printer Class device.
+// Most cheap thermal printers expose TWO interfaces:
+//   - Interface 0: USB Printer Class (bulk OUT endpoint) ← we use this
+//   - Interface 1: sometimes a vendor-specific interface
+// We always pick the first interface that has a bulk OUT endpoint.
+
+let usbPrinterDevice = null;
+let usbPrinterEndpoint = null;
+
+// XPrinter vendor IDs commonly seen:
+//   0x0483 (STMicro), 0x0416 (Winbond), 0x1a86 (QinHeng),
+//   0x0fe6 (ICS Advent), 0x1504 (XPrinter)
+// We don't filter by VID because some units ship with generic VID/PID.
+// The user picks the printer from Chrome's device chooser once.
+
+const PRINTER_DB_NAME = 'pos-printer';
+const PRINTER_DB_STORE = 'devices';
+const PRINTER_DB_KEY = 'xprinter';
 
 const CATEGORY_MAP = { phones: 'Phone', electronics: 'Electronics', accessories: 'Accessories' };
 const CATEGORY_EMOJI = { Phone: '📱', Electronics: '💻', Accessories: '🎧' };
@@ -1272,6 +1404,7 @@ const CATEGORY_EMOJI = { Phone: '📱', Electronics: '💻', Accessories: '🎧'
 const POS_ENABLE_TAX = {{ enable_tax|yesno:"true,false" }};
 const POS_TAX_RATE   = {{ tax_rate|default:0 }};
 const BARCODE_MIN_LEN = 6;
+const POS_AUTO_PRINT = {{ auto_print|yesno:"true,false" }};
 
 // Payment-method display labels for the TYPE cell in the totals grid
 const PAYMENT_LABELS = {
@@ -1287,6 +1420,354 @@ const searchWrap = searchInput.closest('div[style*="position"]');
 const barcodeResults = document.getElementById('barcodeResults');
 
 let barcodeDebounce = null;
+
+
+
+
+
+// ---------- IndexedDB helpers ----------
+function _openPrinterDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(PRINTER_DB_NAME, 1);
+        req.onupgradeneeded = () => {
+            req.result.createObjectStore(PRINTER_DB_STORE);
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function _savePrinterHandle(device) {
+    try {
+        const db = await _openPrinterDB();
+        const tx = db.transaction(PRINTER_DB_STORE, 'readwrite');
+        tx.objectStore(PRINTER_DB_STORE).put(device, PRINTER_DB_KEY);
+        return new Promise(res => { tx.oncomplete = res; });
+    } catch (e) {
+        console.warn('Could not persist printer handle:', e);
+    }
+}
+
+async function _loadPrinterHandle() {
+    try {
+        const db = await _openPrinterDB();
+        const tx = db.transaction(PRINTER_DB_STORE, 'readonly');
+        const req = tx.objectStore(PRINTER_DB_STORE).get(PRINTER_DB_KEY);
+        return new Promise(res => { req.onsuccess = () => res(req.result || null); });
+    } catch (e) {
+        return null;
+    }
+}
+
+// ---------- Device setup ----------
+async function connectPrinter() {
+    if (!('usb' in navigator)) {
+        alert('WebUSB is not supported in this browser. Use Chrome or Edge.');
+        return;
+    }
+
+    try {
+        // Ask the user to pick the printer
+        const device = await navigator.usb.requestDevice({
+            filters: [
+                { classCode: 7 },                     // USB Printer Class
+                { vendorId: 0x0483 },                 // common thermal
+                { vendorId: 0x0416 },
+                { vendorId: 0x1a86 },
+                { vendorId: 0x0fe6 },
+                { vendorId: 0x1504 },                 // XPrinter
+            ],
+        });
+
+        await _setupPrinterDevice(device);
+        await _savePrinterHandle(device);
+
+        alert(`✅ Printer connected: ${device.productName || 'XPrinter'}\n\nAll future sales will print automatically.`);
+        updatePrinterButton(true);
+
+    } catch (err) {
+        if (err.name === 'NotFoundError') {
+            // User cancelled the chooser — no error
+            return;
+        }
+        console.error('Printer connect failed:', err);
+        alert('Could not connect to printer: ' + err.message);
+    }
+}
+
+async function _setupPrinterDevice(device) {
+    await device.open();
+
+    // Sometimes selectConfiguration is needed on first open
+    if (device.configuration === null) {
+        await device.selectConfiguration(1);
+    }
+
+    // Find the first interface with a bulk OUT endpoint
+    let foundIface = null;
+    let foundEndpoint = null;
+
+    for (const iface of device.configuration.interfaces) {
+        // Skip if this interface has no alternate with endpoints
+        for (const alt of iface.alternates) {
+            const bulkOut = alt.endpoints.find(
+                ep => ep.direction === 'out' && ep.type === 'bulk'
+            );
+            if (bulkOut) {
+                foundIface = iface;
+                foundEndpoint = bulkOut;
+                break;
+            }
+        }
+        if (foundEndpoint) break;
+    }
+
+    if (!foundEndpoint) {
+        throw new Error('No bulk OUT endpoint found on printer. Is it a printer-class device?');
+    }
+
+    // Claim the interface
+    await device.claimInterface(foundIface.interfaceNumber);
+
+    usbPrinterDevice = device;
+    usbPrinterEndpoint = foundEndpoint;
+
+    // Auto-reconnect if the printer is unplugged and replugged
+    navigator.usb.addEventListener('disconnect', (e) => {
+        if (e.device === device) {
+            console.warn('Printer disconnected');
+            usbPrinterDevice = null;
+            usbPrinterEndpoint = null;
+            updatePrinterButton(false);
+        }
+    });
+
+    console.log('Printer ready:', {
+        name: device.productName,
+        iface: foundIface.interfaceNumber,
+        endpoint: foundEndpoint.endpointNumber,
+    });
+}
+
+// Try to restore printer on page load (Chrome remembers permission)
+async function restorePrinter() {
+    if (!('usb' in navigator)) return;
+
+    const saved = await _loadPrinterHandle();
+    if (!saved) return;
+
+    try {
+        await _setupPrinterDevice(saved);
+        updatePrinterButton(true);
+        console.log('Printer restored:', saved.productName);
+    } catch (e) {
+        // The user may have revoked permission, or the device is unplugged.
+        // Ask them to reconnect.
+        console.warn('Could not restore printer:', e);
+        updatePrinterButton(false);
+    }
+}
+
+function updatePrinterButton(connected) {
+    const icon = document.getElementById('printerIcon');
+    const label = document.getElementById('printerLabel');
+    const btn = document.getElementById('printerBtn');
+    if (!icon || !label || !btn) return;
+
+    if (connected) {
+        icon.className = 'fas fa-print';
+        label.textContent = 'Printer ✓';
+        btn.classList.add('fn-green');
+        btn.classList.remove('fn-gray');
+    } else {
+        icon.className = 'fas fa-print';
+        label.textContent = 'Connect Printer';
+        btn.classList.add('fn-gray');
+        btn.classList.remove('fn-green');
+    }
+}
+
+// ---------- ESC/POS payload builder ----------
+function _escposEncode(text) {
+    // ESC/POS default code page is CP437. For ASCII-only receipts, plain
+    // TextEncoder is fine. For non-ASCII, swap in a CP437 encoder.
+    return new TextEncoder().encode(text);
+}
+
+function _padRight(str, len) {
+    str = String(str);
+    return str.length >= len ? str.slice(0, len) : str + ' '.repeat(len - str.length);
+}
+
+function _padLeft(str, len) {
+    str = String(str);
+    return str.length >= len ? str.slice(0, len) : ' '.repeat(len - str.length) + str;
+}
+
+function _line(label, value, width = 42) {
+    // Two-column line: label on left, value right-aligned
+    const labelLen = label.length;
+    const valueLen = String(value).length;
+    const gap = Math.max(1, width - labelLen - valueLen);
+    return label + ' '.repeat(gap) + value;
+}
+
+function _hr(width = 42, char = '-') {
+    return char.repeat(width);
+}
+
+// ---------- The main print function ----------
+async function printReceiptEscPos(saleData) {
+    if (!usbPrinterDevice || !usbPrinterEndpoint) {
+        // No printer → fall back to the modal so the cashier can
+        // at least preview and print via the OS dialog
+        console.warn('No USB printer connected — falling back to modal');
+        return false;
+    }
+
+    try {
+        // Build the receipt as plain text lines
+        const W = 42;   // 80mm paper usually fits 42-48 chars at font A
+        const lines = [];
+
+        // ---- header ----
+        if (saleData.company_name) {
+            lines.push(_center(saleData.company_name.toUpperCase(), W));
+        }
+        if (saleData.branch_name) {
+            lines.push(_center('Branch: ' + saleData.branch_name, W));
+        }
+        if (saleData.company_phone) {
+            lines.push(_center('Tel: ' + saleData.company_phone, W));
+        }
+        if (saleData.company_address) {
+            lines.push(_center(saleData.company_address, W));
+        }
+        if (saleData.company_pin) {
+            lines.push(_center('PIN: ' + saleData.company_pin, W));
+        }
+
+        lines.push(_hr(W, '='));
+        lines.push(_center('RECEIPT', W));
+        lines.push(_hr(W, '='));
+
+        // ---- receipt info ----
+        lines.push(_line('RCPT No.', '#' + saleData.short_sale_id, W));
+        lines.push(_line('Date', saleData.date_str, W));
+        lines.push(_line('Time', saleData.time_str, W));
+        lines.push(_line('Cashier', saleData.cashier, W));
+        lines.push(_hr(W, '-'));
+
+        // ---- customer ----
+        lines.push(_line('Customer', saleData.customer_name, W));
+        if (saleData.customer_phone) {
+            lines.push(_line('Phone', saleData.customer_phone, W));
+        }
+        lines.push(_hr(W, '-'));
+
+        // ---- items header ----
+        lines.push('Item                Qty   Price   Total');
+        lines.push(_hr(W, '-'));
+
+        // ---- items ----
+        for (const it of saleData.items) {
+            // item name (truncate to fit)
+            const name = String(it.name).slice(0, 20);
+            lines.push(
+                _padRight(name, 20) +
+                _padLeft(it.quantity, 4) + ' ' +
+                _padLeft(it.unit_price.toFixed(0), 7) + ' ' +
+                _padLeft(it.total_price.toFixed(0), 8)
+            );
+            if (it.identifier) {
+                lines.push('  ' + it.identifier);
+            }
+        }
+
+        lines.push(_hr(W, '-'));
+
+        // ---- totals ----
+        lines.push(_line('Subtotal', 'KSh ' + saleData.subtotal.toFixed(2), W));
+        if (saleData.discount > 0) {
+            lines.push(_line('Discount', '-KSh ' + saleData.discount.toFixed(2), W));
+        }
+        if (saleData.tax > 0) {
+            lines.push(_line('VAT (incl.)', 'KSh ' + saleData.tax.toFixed(2), W));
+        }
+        lines.push(_hr(W, '='));
+        lines.push(_line('TOTAL', 'KSh ' + saleData.total.toFixed(2), W));
+        lines.push(_hr(W, '='));
+
+        lines.push(_line('Payment', saleData.payment_method, W));
+        lines.push(_line('Status', saleData.payment_status, W));
+
+        lines.push('');
+        if (saleData.thank_you) {
+            lines.push(_center(saleData.thank_you, W));
+        }
+        lines.push('');
+        lines.push('');
+        lines.push('');
+
+        // ---- Build the ESC/POS byte sequence ----
+        const chunks = [];
+
+        // Init
+        chunks.push(_escposEncode('\x1B\x40'));
+
+        // Set to font A (small) — change to \x01 for larger
+        chunks.push(_escposEncode('\x1B\x21\x00'));
+
+        // Print each line + LF
+        for (const line of lines) {
+            chunks.push(_escposEncode(line + '\n'));
+        }
+
+        // Feed and cut
+        chunks.push(_escposEncode('\n\n\n\n'));
+        chunks.push(_escposEncode('\x1D\x56\x42\x00'));   // partial cut
+
+        // Concatenate into one Uint8Array
+        const totalLen = chunks.reduce((n, c) => n + c.length, 0);
+        const payload = new Uint8Array(totalLen);
+        let offset = 0;
+        for (const c of chunks) {
+            payload.set(c, offset);
+            offset += c.length;
+        }
+
+        // Send to printer — chunked to avoid overwhelming the buffer
+        const CHUNK = 4096;
+        for (let i = 0; i < payload.length; i += CHUNK) {
+            const slice = payload.slice(i, i + CHUNK);
+            const result = await usbPrinterDevice.transferOut(
+                usbPrinterEndpoint.endpointNumber,
+                slice
+            );
+            if (result.status !== 'ok') {
+                throw new Error('USB transferOut failed: ' + result.status);
+            }
+        }
+
+        console.log('✅ Receipt printed silently');
+        return true;
+
+    } catch (err) {
+        console.error('ESC/POS print failed:', err);
+        return false;
+    }
+}
+
+function _center(text, width) {
+    text = String(text);
+    if (text.length >= width) return text.slice(0, width);
+    const pad = Math.floor((width - text.length) / 2);
+    return ' '.repeat(pad) + text;
+}
+
+
+
+
 
 // ============================================
 // PRODUCTS: LOAD / FILTER / RENDER
@@ -1424,15 +1905,39 @@ searchInput.addEventListener('input', function () {
 searchInput.addEventListener('keydown', async function (e) {
     if (e.key !== 'Enter') return;
     e.preventDefault();
-    const q = this.value.trim();
-    if (!q) return;
 
+    const q = this.value.trim();
+
+    // ------------------------------------------------
+    // ENTER on an EMPTY scan box → Complete Sale
+    // (this is the primary "ready to pay" gesture)
+    // ------------------------------------------------
+    if (!q) {
+        if (cart.length === 0) return;                      // nothing to sell
+        if (!validateCustomer()) return;                    // will switch tabs + show error
+
+        const branchEl = document.getElementById('branchSelect');
+        const branchId = branchEl ? branchEl.value : '';
+        if (!branchId) {
+            alert('Please select a branch (Receipt Details tab).');
+            switchTab('receipt');
+            return;
+        }
+
+        completeSale();
+        return;
+    }
+
+    // ------------------------------------------------
+    // ENTER with a code in the box
+    // ------------------------------------------------
     if (looksLikeIdentifier(q)) {
         const result = await runBarcodeSearch(q, true);
         if (result && result.match) { autoAddBarcodeMatch(result.match); return; }
         showIndicator(`❌ No match for "${q}"`, true);
         return;
     }
+
     const first = filteredProducts.find(p => p.stock > 0);
     if (first) openModal(first.product_code);
 });
@@ -1644,6 +2149,7 @@ function validateAccessoryFields() {
     const stock = currentProduct?.stock || 0;
     document.getElementById('addToCartBtn').disabled = !(qty > 0 && price > 0 && qty <= stock);
 }
+
 function updateTotalDisplay() {
     const qty = parseInt(document.getElementById('modalQuantity')?.value) || 0;
     const price = parseFloat(document.getElementById('modalPrice')?.value) || 0;
@@ -1727,17 +2233,12 @@ function renderTicket() {
 function selectTicketRow(idx) {
     selectedTicketIndex = idx;
     const item = cart[idx];
-    document.getElementById('selectedProduct').value = item.name;
-    document.getElementById('salePrice').value = item.price;
-    document.getElementById('qtyInput').value = item.quantity;
-    document.getElementById('discountPct').value = item.discountPct || 0;
-    document.getElementById('discountAmt').value = item.discountAmt || 0;
-    renderTicket();
-}
-
-function removeLine(idx) {
-    cart.splice(idx, 1);
-    if (selectedTicketIndex === idx) selectedTicketIndex = -1;
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    set('selectedProduct', item.name);
+    set('salePrice', item.price);
+    set('qtyInput', item.quantity);
+    set('discountPct', item.discountPct || 0);
+    set('discountAmt', item.discountAmt || 0);
     renderTicket();
 }
 
@@ -1745,34 +2246,29 @@ function removeSelectedLine() {
     if (selectedTicketIndex < 0) { alert('Select a ticket row first.'); return; }
     removeLine(selectedTicketIndex);
     selectedTicketIndex = -1;
-    document.getElementById('selectedProduct').value = '';
+    const el = document.getElementById('selectedProduct');
+    if (el) el.value = '';
+}
+
+function removeSelectedLine() {
+    if (selectedTicketIndex < 0) { alert('Select a ticket row first.'); return; }
+    removeLine(selectedTicketIndex);
+    selectedTicketIndex = -1;
+    const el = document.getElementById('selectedProduct');
+    if (el) el.value = '';        // ✅ guarded
 }
 
 function addSelectedToTicket() {
-    const code = document.getElementById('productPicker').value;
-    if (!code) { alert('Pick a product from the list first.'); return; }
-    const p = allProducts.find(x => x.product_code === code);
-    if (!p) return;
-    const qty = parseInt(document.getElementById('qtyInput').value) || 1;
-    const price = parseFloat(document.getElementById('salePrice').value) || p.price;
-    addLineToTicket({
-        product_code: p.product_code, name: p.name, brand: p.brand, model: p.model,
-        category: p.category, price, quantity: qty, unit: null,
-        discountPct: parseFloat(document.getElementById('discountPct').value) || 0,
-        discountAmt: parseFloat(document.getElementById('discountAmt').value) || 0,
-    });
-    document.getElementById('productPicker').value = '';
-    document.getElementById('selectedProduct').value = '';
-    document.getElementById('qtyInput').value = 1;
-    document.getElementById('salePrice').value = '';
-    document.getElementById('discountPct').value = 0;
-    document.getElementById('discountAmt').value = 0;
+    const picker = document.getElementById('productPicker');
+    if (!picker) return;   // feature removed
 }
 
 function recalcTicketLine() {
     if (selectedTicketIndex < 0) return;
-    cart[selectedTicketIndex].discountPct = parseFloat(document.getElementById('discountPct').value) || 0;
-    cart[selectedTicketIndex].discountAmt = parseFloat(document.getElementById('discountAmt').value) || 0;
+    const pctEl = document.getElementById('discountPct');
+    const amtEl = document.getElementById('discountAmt');
+    cart[selectedTicketIndex].discountPct = pctEl ? (parseFloat(pctEl.value) || 0) : 0;
+    cart[selectedTicketIndex].discountAmt = amtEl ? (parseFloat(amtEl.value) || 0) : 0;
     renderTicket();
 }
 
@@ -1791,21 +2287,25 @@ function updateTotalsBar() {
             taxTotal += net * POS_TAX_RATE / (100 + POS_TAX_RATE);
         }
     });
-
     currentTotal = subtotal;
 
-    document.getElementById('taxDisplay').textContent = taxTotal.toFixed(2);
+    document.getElementById('taxDisplay').textContent   = taxTotal.toFixed(2);
     document.getElementById('totalDisplay').textContent = subtotal.toFixed(2);
-    document.getElementById('paidDisplay').textContent = '0';
-    document.getElementById('dueDisplay').textContent = subtotal.toFixed(2);
-    document.getElementById('typeDisplay').textContent =
+    document.getElementById('paidDisplay').textContent  = '0';
+    document.getElementById('dueDisplay').textContent   = subtotal.toFixed(2);
+    document.getElementById('typeDisplay').textContent  =
         PAYMENT_LABELS[currentPaymentMethod] || 'DEBIT CARD';
 
-    // --- Update the big Complete Sale button ---
-    const btn = document.getElementById('completeSaleBtn');
+    // --- Big Complete Sale button ---
+    const btn      = document.getElementById('completeSaleBtn');
     const btnTotal = document.getElementById('btnTotal');
     if (btnTotal) btnTotal.textContent = `KSh ${subtotal.toFixed(2)}`;
-    if (btn) btn.disabled = cart.length === 0;
+
+    const customerChosen =
+        document.getElementById('custTypeWalkin').checked ||
+        document.getElementById('custTypeNamed').checked;
+
+    if (btn) btn.disabled = (cart.length === 0 || !customerChosen);
 }
 
 function clearCart() {
@@ -1813,14 +2313,16 @@ function clearCart() {
     if (!confirm('Clear the whole ticket?')) return;
     newTicket();
 }
+
 function newTicket() {
     cart = [];
     selectedTicketIndex = -1;
-    document.getElementById('selectedProduct').value = '';
-    document.getElementById('salePrice').value = '';
-    document.getElementById('qtyInput').value = 1;
-    document.getElementById('discountPct').value = 0;
-    document.getElementById('discountAmt').value = 0;
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    set('selectedProduct', '');
+    set('salePrice', '');
+    set('qtyInput', 1);
+    set('discountPct', 0);
+    set('discountAmt', 0);
     renderTicket();
     searchInput.focus();
 }
@@ -1830,6 +2332,7 @@ function newTicket() {
 // ============================================
 function openPaymentModal(method) {
     if (cart.length === 0) { alert('Ticket is empty. Add items first.'); return; }
+    if (!validateCustomer()) return;
     currentPaymentMethod = method;
     const modal = document.getElementById('paymentModal');
     const title = document.getElementById('paymentModalTitle');
@@ -1917,20 +2420,24 @@ function calculateCashChange() {
     if (change >= 0) { el.textContent = `KSh ${change.toFixed(2)}`; el.style.color = '#009900'; }
     else { el.textContent = `KSh ${Math.abs(change).toFixed(2)} short`; el.style.color = '#cc0000'; }
 }
+
 function calculatePointsValue() {
     const p = parseInt(document.getElementById('pointsToRedeem').value) || 0;
     document.getElementById('pointsValueDisplay').textContent = `KSh ${p.toFixed(2)}`;
 }
+
 function formatCardNumber(input) {
     let v = input.value.replace(/\D/g, '').slice(0, 16), out = '';
     for (let i = 0; i < v.length; i++) { if (i > 0 && i % 4 === 0) out += ' '; out += v[i]; }
     input.value = out;
 }
+
 function formatExpiry(input) {
     let v = input.value.replace(/\D/g, '').slice(0, 4);
     if (v.length >= 2) { let m = parseInt(v.slice(0,2)); if (m>12) m=12; if (m<1) m=1; v = String(m).padStart(2,'0') + v.slice(2); }
     input.value = v.length > 2 ? v.slice(0,2) + '/' + v.slice(2) : v;
 }
+
 function sendSTKPush() {
     const phone = document.getElementById('mpesaPhone').value.trim();
     const s = document.getElementById('mpesaStatusDisplay');
@@ -1938,6 +2445,7 @@ function sendSTKPush() {
     s.innerHTML = '<span style="color:#cc8800;">Sending STK Push...</span>';
     setTimeout(() => { s.innerHTML = '<span style="color:#009900;">✅ Payment confirmed!</span>'; }, 2500);
 }
+
 function processPayment() {
     const status = document.getElementById('paymentStatus');
     if (currentPaymentMethod === 'cash') {
@@ -1957,19 +2465,57 @@ function processPayment() {
 async function completeSale() {
     if (cart.length === 0) { alert('Ticket is empty.'); return; }
 
-    const customerName = document.getElementById('customerName').value || 'Walk-in Customer';
-    const customerPhone = document.getElementById('customerPhone').value || '';
+    const customer = validateCustomer();
+    if (!customer) return;
+
     const branchEl = document.getElementById('branchSelect');
     const branchId = branchEl ? branchEl.value : '';
-
-    if (!branchId) { alert('Please select a branch (Receipt Details tab).'); switchTab('receipt'); return; }
+    if (!branchId) {
+        alert('Please select a branch (Receipt Details tab).');
+        switchTab('receipt');
+        return;
+    }
 
     const total = currentTotal;
 
+    // Snapshot the receipt data BEFORE we clear the cart
+    const receiptSnapshot = {
+        items: cart.map(item => ({
+            name: item.name,
+            quantity: item.quantity,
+            unit_price: item.price,
+            total_price: item.price * item.quantity,
+            identifier: item.unit || null,
+        })),
+        customer_name: customer.name,
+        customer_phone: customer.phone,
+        subtotal: currentTotal,
+        discount: 0,      // update if you track discounts at cart level
+        tax: 0,           // update if you track tax
+        total: currentTotal,
+        payment_method: currentPaymentMethod,
+        payment_status: 'paid',
+        cashier: '{{ user.get_full_name|default:user.username }}' || 'Cashier',
+        company_name: '{{ company.name|escapejs }}',
+        branch_name: '',  // fill from the selected branch below
+        company_phone: '{{ company.phone|escapejs }}',
+        company_address: '{{ company.address|escapejs }}',
+        company_pin: '{{ company.company_pin|escapejs }}',
+        thank_you: 'Thank you for your business!',
+    };
+
+    // Fill in the branch name
+    const branchOption = branchEl && branchEl.options[branchEl.selectedIndex];
+    if (branchOption) {
+        receiptSnapshot.branch_name = branchOption.text.split('(')[0].trim();
+    }
+
     const saleData = {
         branch_id: branchId,
-        customer_name: customerName,
-        customer_phone: customerPhone,
+        customer_type: customer.type,
+        customer_name: customer.name,
+        customer_phone: customer.phone,
+        customer_email: customer.email,
         payment_method: currentPaymentMethod,
         items: cart.map(item => ({
             product_code: item.product_code,
@@ -1986,13 +2532,37 @@ async function completeSale() {
             body: JSON.stringify(saleData),
         });
         const data = await res.json();
+
         if (data.success) {
             showSuccessToast(`✅ Sale completed! Total: KSh ${total.toLocaleString()}`);
+
+            // Augment the receipt snapshot with server-side info
+            receiptSnapshot.short_sale_id = String(data.sale_number || data.sale_id).split('-').pop();
+            receiptSnapshot.sale_id = data.sale_id;
+            const now = new Date();
+            receiptSnapshot.date_str = now.toISOString().slice(0, 10);
+            receiptSnapshot.time_str = now.toTimeString().slice(0, 5);
+
+            // ✅ Try silent ESC/POS print first
+            let printed = false;
+            if (POS_AUTO_PRINT) {
+                printed = await printReceiptEscPos(receiptSnapshot);
+            }
+
+            // Reset ticket
             newTicket();
-            document.getElementById('customerName').value = '';
-            document.getElementById('customerPhone').value = '';
+            resetCustomerBlock();
             await refreshProductsAfterSale();
-            if (data.sale_id) setTimeout(() => { window.location.href = `/epa_shop/sale/receipt/${data.sale_id}/`; }, 1200);
+
+            // If auto-print was on but USB print failed, fall back to the modal
+            if (POS_AUTO_PRINT && !printed && data.sale_id) {
+                console.warn('ESC/POS print failed — falling back to receipt modal');
+                setTimeout(() => openReceiptModal(data.sale_id), 300);
+            }
+            // If auto-print was off, show the modal
+            else if (!POS_AUTO_PRINT && data.sale_id) {
+                setTimeout(() => openReceiptModal(data.sale_id), 300);
+            }
         } else {
             alert('Error: ' + (data.error || 'Unknown error'));
         }
@@ -2001,32 +2571,484 @@ async function completeSale() {
     }
 }
 
-function payLater() {
-    if (cart.length === 0) { alert('Ticket is empty.'); return; }
-    const list = document.getElementById('pendingPaymentsList');
-    const name = document.getElementById('customerName').value || 'Walk-in';
-    const total = currentTotal.toFixed(2);
-    list.innerHTML = `<div style="padding:6px; border-bottom:1px solid #ccc;">
-        <b>${name}</b> — KSh ${total} — <em>pending</em>
-    </div>` + list.innerHTML;
-    showSuccessToast('💾 Saved as pending payment');
-    newTicket();
+function printReceiptDirectly(saleId) {
+    const wasFullscreen = isFullscreen();
+
+    // Load the receipt in a hidden iframe
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.src = `/epa_shop/sale/receipt/${saleId}/?embed=1&print=1`;
+
+    iframe.onload = function () {
+        // Wait a tick for the barcode/render to finish
+        setTimeout(function () {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } catch (e) {
+                console.warn('Direct print failed:', e);
+            }
+
+            // Clean up
+            setTimeout(function () {
+                document.body.removeChild(iframe);
+
+                // Re-enter fullscreen if we were in it
+                if (wasFullscreen && !isFullscreen()) {
+                    const el = document.documentElement;
+                    const req = el.requestFullscreen || el.webkitRequestFullscreen
+                             || el.mozRequestFullScreen || el.msRequestFullscreen;
+                    if (req) req.call(el).catch(function () {
+                        showIndicator('🖥 Press F12 to re-enter fullscreen', true);
+                    });
+                }
+            }, 500);
+        }, 400);
+    };
+
+    document.body.appendChild(iframe);
 }
+
+async function payLater() {
+    if (cart.length === 0) { alert('Ticket is empty.'); return; }
+
+    // Same validation as Complete Sale
+    const customer = validateCustomer();
+    if (!customer) return;
+
+    const branchEl = document.getElementById('branchSelect');
+    const branchId = branchEl ? branchEl.value : '';
+    if (!branchId) {
+        alert('Please select a branch (Receipt Details tab).');
+        switchTab('receipt');
+        return;
+    }
+
+    const saleData = {
+        branch_id: branchId,
+        customer_type:  customer.type,
+        customer_name:  customer.name,
+        customer_phone: customer.phone,
+        customer_email: customer.email,
+        payment_method: currentPaymentMethod,
+        payment_status: 'pending',                 // ✅ NEW
+        items: cart.map(item => ({
+            product_code: item.product_code,
+            quantity: item.quantity,
+            price: item.price,
+            unit_identifier: item.unit || null,
+        })),
+    };
+
+    try {
+        const res = await fetch('/epa_shop/sale/process/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+            body: JSON.stringify(saleData),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showSuccessToast(`💾 Saved as pending — KSh ${currentTotal.toFixed(2)}`);
+            newTicket();
+            resetCustomerBlock();
+            await refreshProductsAfterSale();
+            // Optionally reload the pending list from server
+            loadPendingPayments();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+async function loadPendingPayments() {
+    try {
+        const res = await fetch('/epa_shop/pos/pending/');
+        const data = await res.json();
+        const list = document.getElementById('pendingPaymentsList');
+        if (!data.pending || !data.pending.length) {
+            list.innerHTML = '<em style="color:#888;">No pending payments yet.</em>';
+            return;
+        }
+        list.innerHTML = data.pending.map(p => `
+            <div style="padding:6px; border-bottom:1px solid #ccc; display:flex; justify-content:space-between;">
+                <span><b>#${p.company_sale_id}</b> — ${p.customer_name} (${p.customer_phone || '—'})</span>
+                <span>KSh ${p.net_amount.toFixed(2)}</span>
+            </div>`).join('');
+    } catch (err) { console.error(err); }
+}
+
+// ============================================
+// RETURN SALE
+// ============================================
 
 function returnSale() {
-    switchTab('receipt');
-    alert('Return: enter the receipt barcode or customer phone to process a return.');
+    openReturnModal();
 }
 
-function toggleReceiptMode() {
-    receiptMode = !receiptMode;
-    document.body.style.background = receiptMode ? '#000' : '';
-    showSuccessToast(receiptMode ? '🖨 Receipt Mode ON' : '🖨 Receipt Mode OFF');
+function openReturnModal() {
+    returnSaleData = null;
+    returnSelections = {};
+
+    document.getElementById('returnLookupInput').value = '';
+    document.getElementById('returnLookupError').style.display = 'none';
+    document.getElementById('returnItemsStep').style.display = 'none';
+    document.getElementById('returnRefundStep').style.display = 'none';
+    document.getElementById('returnItemsList').innerHTML = '';
+    document.getElementById('returnSaleHeader').innerHTML = '';
+    document.getElementById('returnTotalDisplay').textContent = 'KSh 0.00';
+    document.getElementById('returnStatus').className = 'payment-status';
+    document.getElementById('returnStatus').style.display = 'none';
+    document.getElementById('returnSubmitBtn').disabled = true;
+
+    document.getElementById('returnModal').classList.add('active');
+    setTimeout(() => document.getElementById('returnLookupInput').focus(), 100);
 }
+
+function closeReturnModal() {
+    document.getElementById('returnModal').classList.remove('active');
+    searchInput.focus();
+}
+
+async function lookupReturnSale() {
+    const code = document.getElementById('returnLookupInput').value.trim();
+    const errEl = document.getElementById('returnLookupError');
+    errEl.style.display = 'none';
+
+    if (!code) {
+        errEl.textContent = 'Please enter a receipt barcode, sale ID, or phone number.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    try {
+        const res = await fetch(`/epa_shop/sale/lookup/?q=${encodeURIComponent(code)}`);
+        const data = await res.json();
+
+        if (!data.success || !data.sale) {
+            errEl.textContent = data.error || `No sale found for "${code}".`;
+            errEl.style.display = 'block';
+            return;
+        }
+
+        // Fetch full sale detail (items) — we need the items list
+        await loadReturnSaleItems(data.sale.id);
+    } catch (err) {
+        errEl.textContent = 'Lookup failed: ' + err.message;
+        errEl.style.display = 'block';
+    }
+}
+
+async function loadReturnSaleItems(saleId) {
+    try {
+        const res = await fetch(`/epa_shop/sale/${saleId}/return-data/`);
+        const data = await res.json();
+
+        if (!data.success) {
+            document.getElementById('returnLookupError').textContent =
+                data.error || 'Could not load sale items.';
+            document.getElementById('returnLookupError').style.display = 'block';
+            return;
+        }
+
+        returnSaleData = data.sale;
+        returnSelections = {};
+
+        // Header
+        document.getElementById('returnSaleHeader').innerHTML = `
+            <b>Sale #${data.sale.company_sale_id}</b> —
+            ${data.sale.customer_name} (${data.sale.customer_phone || '—'})<br>
+            Date: ${new Date(data.sale.sale_date).toLocaleString()} —
+            Status: <b>${data.sale.payment_status}</b>
+        `;
+
+        // Items
+        const list = document.getElementById('returnItemsList');
+        if (!data.sale.items || !data.sale.items.length) {
+            list.innerHTML = '<em style="color:#888;">This sale has no items to return.</em>';
+            document.getElementById('returnItemsStep').style.display = 'block';
+            document.getElementById('returnRefundStep').style.display = 'block';
+            return;
+        }
+
+        list.innerHTML = data.sale.items.map(it => {
+            const remaining = it.quantity - (it.returned_qty || 0);
+            const disabled = remaining <= 0 ? 'disabled' : '';
+            return `
+                <div style="padding:6px 4px; border-bottom:1px solid #eee; display:flex; gap:8px; align-items:center;">
+                    <input type="checkbox" data-item-id="${it.id}" ${disabled}
+                           onchange="onReturnItemToggle(${it.id}, ${remaining})">
+                    <div style="flex:1;">
+                        <div><b>${it.item_name}</b> ${it.unit_identifier ? '<span style="color:#666;">(' + it.unit_identifier + ')</span>' : ''}</div>
+                        <div style="color:#666; font-size:11px;">
+                            Unit price: KSh ${it.unit_price.toFixed(2)}
+                            · Sold: ${it.quantity}
+                            · Already returned: ${it.returned_qty || 0}
+                            · Remaining: ${remaining}
+                        </div>
+                    </div>
+                    <input type="number" data-item-id="${it.id}" class="return-qty"
+                           min="1" max="${remaining}" value="${remaining}" ${disabled}
+                           style="width:70px; height:26px; border:2px inset #808080;"
+                           oninput="onReturnQtyChange(${it.id})">
+                </div>`;
+        }).join('');
+
+        document.getElementById('returnItemsStep').style.display = 'block';
+        document.getElementById('returnRefundStep').style.display = 'block';
+        updateReturnTotal();
+
+    } catch (err) {
+        document.getElementById('returnLookupError').textContent =
+            'Failed to load items: ' + err.message;
+        document.getElementById('returnLookupError').style.display = 'block';
+    }
+}
+
+function onReturnItemToggle(itemId, maxQty) {
+    const checkbox = document.querySelector(`#returnItemsList input[type="checkbox"][data-item-id="${itemId}"]`);
+    if (checkbox.checked) {
+        returnSelections[itemId] = maxQty;
+    } else {
+        delete returnSelections[itemId];
+    }
+    updateReturnTotal();
+}
+
+function onReturnQtyChange(itemId) {
+    const input = document.querySelector(`#returnItemsList input.return-qty[data-item-id="${itemId}"]`);
+    const checkbox = document.querySelector(`#returnItemsList input[type="checkbox"][data-item-id="${itemId}"]`);
+    const qty = Math.max(1, parseInt(input.value) || 1);
+    input.value = qty;
+
+    if (checkbox.checked) {
+        returnSelections[itemId] = qty;
+    }
+    updateReturnTotal();
+}
+
+function updateReturnTotal() {
+    if (!returnSaleData) return;
+    let total = 0;
+    Object.entries(returnSelections).forEach(([itemId, qty]) => {
+        const item = returnSaleData.items.find(i => i.id == itemId);
+        if (item) total += item.unit_price * qty;
+    });
+    document.getElementById('returnTotalDisplay').textContent = 'KSh ' + total.toFixed(2);
+    document.getElementById('returnSubmitBtn').disabled = Object.keys(returnSelections).length === 0;
+}
+
+async function submitReturn() {
+    if (!returnSaleData) return;
+    if (!Object.keys(returnSelections).length) {
+        alert('Select at least one item to return.');
+        return;
+    }
+
+    const status = document.getElementById('returnStatus');
+    status.className = 'payment-status pending';
+    status.textContent = 'Processing return…';
+
+    const payload = {
+        sale_id: returnSaleData.id,
+        refund_method: document.getElementById('returnRefundMethod').value,
+        reason: document.getElementById('returnReason').value.trim(),
+        items: Object.entries(returnSelections).map(([itemId, qty]) => ({
+            sale_item_id: parseInt(itemId),
+            quantity: qty,
+        })),
+    };
+
+    try {
+        const res = await fetch('/epa_shop/sale/process-return/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+            body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            status.className = 'payment-status success';
+            status.textContent = `✅ Return processed. Refund: KSh ${data.refund_total.toFixed(2)}`;
+            showSuccessToast(`↩️ Return processed — KSh ${data.refund_total.toFixed(2)}`);
+            setTimeout(() => {
+                closeReturnModal();
+                refreshProductsAfterSale();
+                if (data.return_receipt_url) window.open(data.return_receipt_url, '_blank');
+            }, 1200);
+        } else {
+            status.className = 'payment-status error';
+            status.textContent = '❌ ' + (data.error || 'Unknown error');
+        }
+    } catch (err) {
+        status.className = 'payment-status error';
+        status.textContent = '❌ ' + err.message;
+    }
+}
+
+// Close return modal on overlay click
+document.getElementById('returnModal').addEventListener('click', function (e) {
+    if (e.target === this) closeReturnModal();
+});
 
 function downloadPDF() {
     window.print();
 }
+
+
+
+// ============================================
+// RECEIPT MODAL — embedded iframe, keeps fullscreen alive
+// ============================================
+function openReceiptModal(saleId) {
+    const iframe = document.getElementById('receiptIframe');
+    iframe.src = `/epa_shop/sale/receipt/${saleId}/?embed=1`;
+    document.getElementById('receiptModal').classList.add('active');
+    searchInput.blur();
+
+    // ✅ Attach an Enter → Print listener inside the iframe document,
+    // so pressing Enter while focus is inside the receipt also prints.
+    iframe.addEventListener('load', function () {
+        try {
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
+            doc.addEventListener('keydown', function (ev) {
+                if (ev.key === 'Enter') {
+                    ev.preventDefault();
+                    printReceiptIframe();
+                } else if (ev.key === 'Escape') {
+                    ev.preventDefault();
+                    closeReceiptModal();
+                }
+            });
+        } catch (err) {
+            // Cross-origin — unlikely on the same origin, but guard anyway
+            console.warn('Could not attach iframe listeners:', err);
+        }
+    }, { once: true });   // only attach once per load
+}
+
+function closeReceiptModal() {
+    document.getElementById('receiptModal').classList.remove('active');
+    const iframe = document.getElementById('receiptIframe');
+    if (iframe) iframe.src = 'about:blank';
+    searchInput.focus();
+}
+
+function printReceiptIframe() {
+    const iframe = document.getElementById('receiptIframe');
+    if (!iframe || !iframe.contentWindow) return;
+
+    const wasFullscreen = isFullscreen();
+
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+
+    setTimeout(function () {
+        if (document.getElementById('receiptModal').classList.contains('active')) {
+            closeReceiptModal();
+        }
+        if (wasFullscreen && !isFullscreen()) {
+            const el = document.documentElement;
+            const req = el.requestFullscreen
+                     || el.webkitRequestFullscreen
+                     || el.mozRequestFullScreen
+                     || el.msRequestFullscreen;
+            if (req) req.call(el).catch(function () {
+                showIndicator('🖥 Press F12 to re-enter fullscreen', true);
+            });
+        }
+    }, 400);
+}
+
+// Close the receipt modal on backdrop click
+document.getElementById('receiptModal').addEventListener('click', function (e) {
+    if (e.target === this) closeReceiptModal();
+});
+
+
+// ============================================
+// FULLSCREEN TOGGLE
+// ============================================
+function isFullscreen() {
+    return !!(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement
+    );
+}
+
+async function toggleFullscreen() {
+    try {
+        if (!isFullscreen()) {
+            const el = document.documentElement;   // whole page
+            const req =
+                el.requestFullscreen ||
+                el.webkitRequestFullscreen ||
+                el.mozRequestFullScreen ||
+                el.msRequestFullscreen;
+
+            if (req) {
+                await req.call(el);
+                updateFullscreenButton(true);
+                showSuccessToast('🖥 Fullscreen ON — press F12 or ESC to exit');
+            } else {
+                showIndicator('⚠️ Fullscreen not supported in this browser', true);
+            }
+        } else {
+            const exit =
+                document.exitFullscreen ||
+                document.webkitExitFullscreen ||
+                document.mozCancelFullScreen ||
+                document.msExitFullscreen;
+
+            if (exit) {
+                await exit.call(document);
+                updateFullscreenButton(false);
+                showSuccessToast('🖥 Fullscreen OFF');
+            }
+        }
+    } catch (err) {
+        console.error('Fullscreen toggle failed:', err);
+        showIndicator('⚠️ Fullscreen blocked by browser', true);
+    }
+}
+
+function updateFullscreenButton(isFs) {
+    const icon  = document.getElementById('fullscreenIcon');
+    const label = document.getElementById('fullscreenLabel');
+    const btn   = document.getElementById('fullscreenBtn');
+
+    if (!icon || !label || !btn) return;
+
+    if (isFs) {
+        icon.className  = 'fas fa-compress';
+        label.textContent = 'Exit Full';
+        btn.classList.add('fn-green');
+        btn.classList.remove('fn-gray');
+    } else {
+        icon.className  = 'fas fa-expand';
+        label.textContent = 'Fullscreen';
+        btn.classList.add('fn-gray');
+        btn.classList.remove('fn-green');
+    }
+}
+
+// Keep the button in sync if the user exits via ESC or the browser's own control
+['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange']
+    .forEach(evt => {
+        document.addEventListener(evt, function () {
+            updateFullscreenButton(isFullscreen());
+        });
+    });
+
 
 // ============================================
 // TABS
@@ -2056,6 +3078,7 @@ function showSuccessToast(msg) {
     t.style.display = 'block';
     setTimeout(() => { t.style.display = 'none'; }, 3500);
 }
+
 function showIndicator(msg, isError = false) {
     const i = document.getElementById('stockUpdateIndicator');
     i.textContent = msg;
@@ -2063,22 +3086,179 @@ function showIndicator(msg, isError = false) {
     i.style.display = 'block';
     setTimeout(() => { i.style.display = 'none'; }, 2000);
 }
+
 function focusScanner() { searchInput.focus(); searchInput.select(); }
+
+
+// ============================================
+// CUSTOMER SELECTION (mandatory)
+// ============================================
+function onCustomerTypeChange() {
+    const isWalkin = document.getElementById('custTypeWalkin').checked;
+    const isNamed  = document.getElementById('custTypeNamed').checked;
+
+    document.getElementById('namedCustomerFields').style.display = isNamed ? 'block' : 'none';
+    document.getElementById('walkinNote').style.display          = isWalkin ? 'block' : 'none';
+
+    // Clear validation message when user picks something
+    hideCustomerError();
+
+    // If they switch to walk-in, clear named fields so stale data isn't submitted
+    if (isWalkin) {
+        document.getElementById('customerName').value  = '';
+        document.getElementById('customerPhone').value = '';
+        document.getElementById('customerEmail').value = '';
+    }
+
+    // Re-evaluate the Complete Sale button state
+    if (typeof updateTotalsBar === 'function') updateTotalsBar();
+}
+
+function showCustomerError(msg) {
+    const el = document.getElementById('customerValidationMsg');
+    el.textContent = msg;
+    el.style.display = 'block';
+    switchTab('receipt');
+}
+
+function hideCustomerError() {
+    const el = document.getElementById('customerValidationMsg');
+    el.style.display = 'none';
+    el.textContent = '';
+}
+
+function validateCustomer() {
+    const walkin = document.getElementById('custTypeWalkin').checked;
+    const named  = document.getElementById('custTypeNamed').checked;
+
+    // Nothing selected at all
+    if (!walkin && !named) {
+        showCustomerError('⚠️ Please choose a Customer type: Walk-in or Named Customer.');
+        return null;
+    }
+
+    if (walkin) {
+        return { type: 'walkin', name: 'Walk-in Customer', phone: '', email: '' };
+    }
+
+    // Named customer — require name + phone
+    const name  = (document.getElementById('customerName').value || '').trim();
+    const phone = (document.getElementById('customerPhone').value || '').trim();
+    const email = (document.getElementById('customerEmail').value || '').trim();
+
+    if (!name) {
+        showCustomerError('⚠️ Customer name is required.');
+        document.getElementById('customerName').focus();
+        return null;
+    }
+    if (!phone) {
+        showCustomerError('⚠️ Customer phone is required.');
+        document.getElementById('customerPhone').focus();
+        return null;
+    }
+    // Basic phone sanity (digits, +, -, space, min 7 chars)
+    if (!/^[+\d][\d\s\-()]{6,}$/.test(phone)) {
+        showCustomerError('⚠️ Please enter a valid customer phone number.');
+        document.getElementById('customerPhone').focus();
+        return null;
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showCustomerError('⚠️ Please enter a valid email address, or leave it blank.');
+        document.getElementById('customerEmail').focus();
+        return null;
+    }
+
+    hideCustomerError();
+    return { type: 'named', name, phone, email };
+}
+
+function resetCustomerBlock() {
+    document.getElementById('custTypeWalkin').checked = false;
+    document.getElementById('custTypeNamed').checked  = false;
+    document.getElementById('customerName').value  = '';
+    document.getElementById('customerPhone').value = '';
+    document.getElementById('customerEmail').value = '';
+    document.getElementById('namedCustomerFields').style.display = 'none';
+    document.getElementById('walkinNote').style.display = 'none';
+    hideCustomerError();
+}
+
 
 // ============================================
 // KEYBOARD SHORTCUTS
 // ============================================
 document.addEventListener('keydown', function (e) {
+
+    // Escape closes any open modal
     if (e.key === 'Escape') {
         if (document.getElementById('productModal').classList.contains('active')) closeModal();
         if (document.getElementById('paymentModal').classList.contains('active')) closePaymentModal();
+        if (document.getElementById('returnModal').classList.contains('active')) closeReturnModal();
+        if (document.getElementById('receiptModal').classList.contains('active')) closeReceiptModal();
     }
-    if (e.key === 'F3') { e.preventDefault(); newTicket(); }
-    if (e.key === 'F6') { e.preventDefault(); openPaymentModal('cash'); }
-    if (e.key === 'F7') { e.preventDefault(); completeSale(); }
-    if (e.key === 'F9') { e.preventDefault(); payLater(); }
-    if (e.key === 'F10') { e.preventDefault(); switchTab('receipt'); }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'r') { e.preventDefault(); refreshProductsAfterSale(); }
+
+    // ---------------------------------------------------------
+    // ENTER inside the receipt modal → Print
+    // ---------------------------------------------------------
+    if (e.key === 'Enter' && document.getElementById('receiptModal').classList.contains('active')) {
+        e.preventDefault();
+        printReceiptIframe();
+        return;
+    }
+
+    // ---- FN-bar mappings (must match the labels) ----
+    if (e.key === 'F1')  { e.preventDefault(); clearCart(); }            // Close / clear
+    // F2 — help popup handled inline by the button; no key binding needed
+    if (e.key === 'F3')  { e.preventDefault(); newTicket(); }            // New
+    if (e.key === 'F4')  { e.preventDefault(); window.print(); }         // Print
+    if (e.key === 'F5')  { e.preventDefault(); downloadPDF(); }          // PDF
+    if (e.key === 'F6')  { e.preventDefault(); openPaymentModal('cash'); }  // Pay Due
+    if (e.key === 'F7')  { e.preventDefault(); openPaymentModal('cash'); }  // Pay / Save
+    if (e.key === 'F8')  { e.preventDefault(); payLater(); }             // Pay Later
+    if (e.key === 'F9')  { e.preventDefault(); returnSale(); }           // Return
+    if (e.key === 'F10') { e.preventDefault(); focusScanner(); }         // Search
+    if (e.key === 'F11') { e.preventDefault(); switchTab('receipt'); }   // Customers
+    if (e.key === 'F12') { e.preventDefault(); toggleFullscreen(); }     // Fullscreen toggle
+
+    // ---------------------------------------------------------
+    // Enter key → Complete Sale
+    // ---------------------------------------------------------
+    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+
+        // Do NOT hijack Enter when the user is typing in an input or
+        // textarea. This prevents accidental sales while filling the
+        // customer name / phone / price / discount fields.
+        const tag = (document.activeElement && document.activeElement.tagName || '').toLowerCase();
+        const isTypingField =
+            tag === 'input' ||
+            tag === 'textarea' ||
+            tag === 'select' ||
+            (document.activeElement && document.activeElement.isContentEditable);
+
+        if (isTypingField) return;   // let the browser handle it
+
+        // Nothing to sell? Bail out silently.
+        if (cart.length === 0) return;
+
+        // Any modal open? Don't fire the sale.
+        const modalOpen =
+            document.getElementById('productModal').classList.contains('active') ||
+            document.getElementById('paymentModal').classList.contains('active') ||
+            document.getElementById('returnModal').classList.contains('active') ||
+            document.getElementById('receiptModal').classList.contains('active');
+
+        if (modalOpen) return;
+
+        e.preventDefault();
+        completeSale();
+    }
+
+
+    // Ctrl/Cmd+R — refresh products
+    if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+        e.preventDefault();
+        refreshProductsAfterSale();
+    }
 });
 
 // Close modal on overlay click
@@ -2090,7 +3270,9 @@ document.getElementById('paymentModal').addEventListener('click', function (e) {
 // ============================================
 document.addEventListener('DOMContentLoaded', function () {
     loadProducts();
+    loadPendingPayments();  
     searchInput.focus();
+    restorePrinter();      
 });
 </script>
 {% endblock %}

@@ -14,6 +14,15 @@
         padding: 20px;
     }
 
+    /* Embed mode: the iframe inside the POS modal */
+    .receipt-wrapper.embed {
+        max-width: 100%;
+        padding: 4px;
+    }
+    .receipt-wrapper.embed .receipt-container {
+        box-shadow: none;
+    }
+
     .receipt-container {
         background: #ffffff;
         border: 2px solid #2d3436;
@@ -439,7 +448,6 @@
     /* PRINT — 80mm THERMAL ROLL, RECEIPT ONLY       */
     /* ============================================ */
     @media print {
-        /* Force 80mm roll, no margins */
         @page {
             size: 80mm auto;
             margin: 0;
@@ -562,23 +570,29 @@
 {% endif %}
 {% endblock %}
 
+
 {% block content %}
+{# Detect embed mode from the query string #}
+{% with is_embed=request.GET.embed %}
+
 {% if not sale or sale.company != company %}
-<div class="unauthorized-container">
-    <i class="fas fa-lock"></i>
-    <h2>Unauthorized Access</h2>
-    <p>You do not have permission to view this receipt.</p>
-    <a href="/dashboard/" class="btn btn-back-dashboard">
-        <i class="fas fa-tachometer-alt"></i> Return to Dashboard
-    </a>
-</div>
+    <div class="unauthorized-container">
+        <i class="fas fa-lock"></i>
+        <h2>Unauthorized Access</h2>
+        <p>You do not have permission to view this receipt.</p>
+        <a href="/dashboard/" class="btn btn-back-dashboard">
+            <i class="fas fa-tachometer-alt"></i> Return to Dashboard
+        </a>
+    </div>
 {% else %}
 
-<div class="receipt-wrapper">
+<div class="receipt-wrapper{% if is_embed %} embed{% endif %}">
     <div class="receipt-container" id="receiptContainer">
         <div class="etr-receipt">
 
-            <!-- HEADER -->
+            <!-- ============================================ -->
+            <!-- HEADER                                        -->
+            <!-- ============================================ -->
             <div class="etr-header">
                 {% if receipt_settings.show_receipt_header and receipt_settings.receipt_header %}
                     <span class="etr-receipt-header-text">{{ receipt_settings.receipt_header }}</span>
@@ -631,7 +645,9 @@
                 {% endif %}
             </div>
 
-            <!-- RECEIPT INFO -->
+            <!-- ============================================ -->
+            <!-- RECEIPT INFO — RCPT No. / Date / User / Time  -->
+            <!-- ============================================ -->
             {% if receipt_settings.show_receipt_info %}
             <div class="etr-receipt-info">
                 <div class="etr-info-cell etr-align-left">
@@ -653,7 +669,9 @@
             </div>
             {% endif %}
 
-            <!-- CUSTOMER -->
+            <!-- ============================================ -->
+            <!-- CUSTOMER                                      -->
+            <!-- ============================================ -->
             {% if receipt_settings.show_customer_details %}
                 <div class="etr-customer-section">
                     <div class="etr-customer-title">Customer Details</div>
@@ -676,7 +694,9 @@
                 </div>
             {% endif %}
 
-            <!-- NEXT OF KIN -->
+            <!-- ============================================ -->
+            <!-- NEXT OF KIN                                   -->
+            <!-- ============================================ -->
             {% if receipt_settings.show_next_of_kin %}
                 {% if sale.customer.next_of_keen_name or sale.customer.next_of_keen_phone %}
                     <div class="etr-customer-section">
@@ -695,7 +715,9 @@
                 {% endif %}
             {% endif %}
 
-            <!-- ITEMS -->
+            <!-- ============================================ -->
+            <!-- ITEMS                                         -->
+            <!-- ============================================ -->
             {% if receipt_settings.show_items %}
                 <div class="etr-items">
                     <div class="item-header">
@@ -735,7 +757,9 @@
                 </div>
             {% endif %}
 
-            <!-- TOTALS -->
+            <!-- ============================================ -->
+            <!-- TOTALS                                        -->
+            <!-- ============================================ -->
             {% if receipt_settings.show_subtotal or receipt_settings.show_vat or receipt_settings.show_totals %}
                 <div class="etr-totals">
                     {% if receipt_settings.show_subtotal %}
@@ -768,7 +792,9 @@
                 </div>
             {% endif %}
 
-            <!-- PAYMENT -->
+            <!-- ============================================ -->
+            <!-- PAYMENT                                       -->
+            <!-- ============================================ -->
             {% if receipt_settings.show_payment_method or receipt_settings.show_payment_status %}
                 <div class="etr-totals" style="border-top:none; padding-top:0; margin-top:4px;">
                     {% if receipt_settings.show_payment_method %}
@@ -786,7 +812,9 @@
                 </div>
             {% endif %}
 
-            <!-- SIGNATURE -->
+            <!-- ============================================ -->
+            <!-- SIGNATURE                                     -->
+            <!-- ============================================ -->
             {% if receipt_settings.show_signature %}
                 <div class="etr-signature-section">
                     <div class="sig-block">
@@ -800,7 +828,9 @@
                 </div>
             {% endif %}
 
-            <!-- SALE BARCODE -->
+            <!-- ============================================ -->
+            <!-- SALE BARCODE                                  -->
+            <!-- ============================================ -->
             {% if receipt_settings.show_sale_barcode and sale.barcode_number %}
             <div class="etr-sale-barcode">
                 <div class="sale-bc-label"></div>
@@ -808,7 +838,9 @@
             </div>
             {% endif %}
 
-            <!-- FOOTER -->
+            <!-- ============================================ -->
+            <!-- FOOTER                                        -->
+            <!-- ============================================ -->
             <div class="etr-footer">
                 {% if receipt_settings.show_receipt_footer and receipt_settings.receipt_footer %}
                     <div class="etr-footer-note">{{ receipt_settings.receipt_footer }}</div>
@@ -825,10 +857,13 @@
                 {% endif %}
             </div>
 
-        </div>
-    </div>
+        </div><!-- /etr-receipt -->
+    </div><!-- /receipt-container -->
 
-    <!-- ACTION BUTTONS -->
+    <!-- ============================================ -->
+    <!-- ACTION BUTTONS — hidden in embed mode         -->
+    <!-- ============================================ -->
+    {% if not is_embed %}
     <div class="action-buttons">
         {% if user.role == 'company_agent' %}
         <a href="/epa_shop/sales/single/" class="btn btn-success">
@@ -852,13 +887,21 @@
             <i class="fas fa-print"></i> <span id="btnPrintLabel">Print ETR</span>
         </button>
     </div>
-</div>
+    {% endif %}
+
+</div><!-- /receipt-wrapper -->
 {% endif %}
 
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+{% endwith %}
+{% endblock %}
 
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+
+    // ---- Barcode ----
     var svg = document.getElementById('saleBarcodeSvg');
     if (svg) {
         var code = "{{ sale.barcode_number|escapejs }}";
@@ -879,11 +922,19 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // ---- Embed-mode detection ----
+    var params = new URLSearchParams(window.location.search);
+    var isEmbed = params.get('embed') === '1';
+
+    // ---- Auto-print (skip when embeded unless parent explicitly asks) ----
     var autoPrint = {{ receipt_settings.auto_print|yesno:"true,false" }};
-    if (window.location.search.includes('print=1') || autoPrint) {
+    var explicitPrint = params.get('print') === '1';
+
+    if (!isEmbed && (explicitPrint || autoPrint)) {
         setTimeout(function () { window.print(); }, 800);
     }
 
+    // ---- Unauthorized: hide any action buttons ----
     var unauthorized = document.querySelector('.unauthorized-container');
     if (unauthorized) {
         document.querySelectorAll('.action-buttons .btn').forEach(function (b) {
@@ -892,5 +943,4 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
-
 {% endblock %}

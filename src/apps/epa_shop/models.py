@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
+from django.conf import settings
 from django.conf import settings as django_settings
 from apps.companies.models import Company
 from decimal import Decimal
@@ -850,6 +851,23 @@ class SaleItem(models.Model):
     def __str__(self):
         return f"{self.quantity}x {self.item_name}"
 
+class ReturnItem(models.Model):
+    sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name='returns')
+    sale_item = models.ForeignKey(SaleItem, on_delete=models.CASCADE, related_name='return_items')
+    quantity = models.PositiveIntegerField()
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2)
+    refund_method = models.CharField(max_length=30, default='cash')
+    reason = models.CharField(max_length=255, blank=True)
+    processed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+    )
+    processed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-processed_at']
+
+    def __str__(self):
+        return f'Return #{self.id} — Sale #{self.sale_id} — {self.quantity}×'
 
 # ============================================
 # STOCK MOVEMENT

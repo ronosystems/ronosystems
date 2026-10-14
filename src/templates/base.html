@@ -14,24 +14,18 @@
 
     <link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'vendor/fontawesome/css/all.min.css' %}">
-     
+
     <style>
         /* ============================================
            TENANT-THEMED CSS VARIABLES
-           `site_primary_color` and `site_accent_color`
-           are injected by `company_branding_context`.
-           Fallbacks keep the platform look on pages
-           without an active tenant.
         ============================================ */
         :root {
             --sidebar-width: 280px;
             --sidebar-collapsed: 70px;
 
-            /* Per-tenant palette — falls back to auth-page palette */
             --primary-color: {{ site_primary_color|default:"#2d5f7c" }};
             --sidebar-bg: {{ site_accent_color|default:"#1e4e6d" }};
 
-            /* Derived shades — color-mix keeps them in sync with --sidebar-bg */
             --sidebar-hover: color-mix(in srgb, var(--sidebar-bg) 80%, #000);
             --secondary-color: color-mix(in srgb, var(--primary-color) 85%, #000);
 
@@ -192,7 +186,6 @@
             text-align: center;
             font-size: 1.1rem;
             flex-shrink: 0;
-            /* Guarantee contrast on the dark sidebar regardless of tenant branding */
             color: color-mix(in srgb, var(--primary-color) 55%, #ffffff);
             transition: color 0.2s;
         }
@@ -315,6 +308,11 @@
 
         .main-content.expanded { margin-left: var(--sidebar-collapsed); }
 
+        /* Embed mode — no sidebar, no margin */
+        .main-content.no-sidebar {
+            margin-left: 0 !important;
+        }
+
         /* ============================================
            TOP NAVBAR
         ============================================ */
@@ -423,6 +421,11 @@
             padding: 25px 30px;
         }
 
+        /* Embed mode — strip all padding so the receipt fills the frame */
+        .content-area.embed-area {
+            padding: 0 !important;
+        }
+
         /* ============================================
            FOOTER
         ============================================ */
@@ -442,7 +445,6 @@
             color: #000000;
         }
 
-        /* Copyright icon now uses the green accent from the auth pages */
         .footer .copyright i { color: #7bc043; }
 
         .footer .powered-by {
@@ -450,7 +452,6 @@
             color: #000000;
         }
 
-        /* Powered-by link now uses the standard link color from auth pages */
         .footer .powered-by a {
             color: #2a6496;
             text-decoration: none;
@@ -750,7 +751,7 @@
         .fb-toast.err { background: #f8d7da; color: #721c24; }
 
         /* ============================================
-        AI CHATS — navbar button with corner badge
+           AI CHATS
         ============================================ */
         .ai-chats-btn {
             position: relative;
@@ -769,7 +770,6 @@
             transition: all 0.2s ease;
         }
 
-        /* Icon colour now matches the sidebar-bottom (nav-bg-bottom) */
         .ai-chats-btn i {
             font-size: 1rem;
             color: #1e4e6d;
@@ -784,14 +784,12 @@
         }
         .ai-chats-btn:hover i { color: #fff; }
 
-        /* Active state now uses the nav-bg-top tone */
         .ai-chats-btn.active {
             background: #2d5f7c;
             color: #fff !important;
         }
         .ai-chats-btn.active i { color: #fff; }
 
-        /* ---- Corner badge ---- */
         .ai-chats-badge {
             position: absolute;
             top: -8px;
@@ -864,7 +862,6 @@
                 white-space: nowrap;
             }
 
-
             .sidebar.collapsed .sidebar-brand h5,
             .sidebar.collapsed .sidebar-brand .company-name,
             .sidebar.collapsed .sidebar-user .user-info,
@@ -918,6 +915,7 @@
 </head>
 <body>
 
+    {% if not is_embed %}
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
     <!-- ============================================
@@ -925,9 +923,7 @@
     ============================================ -->
     <aside class="sidebar" id="sidebar">
 
-        <!-- Brand — uses `current_company` (support-mode, custom-domain, or
-             user's own company, in that precedence). Falls back to platform
-             defaults for super-admin / logged-out pages. -->
+        <!-- Brand -->
         <div class="sidebar-brand">
             {% if current_company %}
                 {% if current_company.logo %}
@@ -977,7 +973,7 @@
                     </li>
                     {% endif %}
 
-                    <!-- ============ M-PESA SHOP (existing) ============ -->
+                    <!-- ============ M-PESA SHOP ============ -->
                     {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' or user.role == 'mpesa_agent' %}
                     {% if company and company_has_treasury %}
                         <li class="nav-item">
@@ -997,7 +993,7 @@
                     {% endif %}
                     {% endif %}
 
-                    <!-- ============ WORKSHOP (NEW) ============ -->
+                    <!-- ============ WORKSHOP ============ -->
                     {% if user.role == 'company_admin' or user.role == 'company_technician' or user.role == 'stock_controller' or user.role == 'super_admin' %}
                     {% if company and company_has_workshop %}
                         <li class="nav-item">
@@ -1009,11 +1005,8 @@
                     {% endif %}
                     {% endif %}
 
-
                     {% if user.role == 'company_technician' or user.role == 'super_admin' %}
                     {% if company and company_has_workshop %}
-
-                        {# -------- My Work (technicians + admins) -------- #}
                         <li class="nav-item">
                             <a class="nav-link {% if '/workshop/my-work/' in request.path %}active{% endif %}"
                             href="{% url 'workshop:my-work' %}">
@@ -1024,17 +1017,14 @@
                             </a>
                         </li>
 
-                        {# -------- New Job (technicians + admins) -------- #}
                         <li class="nav-item">
                             <a class="nav-link {% if '/workshop/jobs/new/' in request.path %}active{% endif %}"
                             href="{% url 'workshop:job-create' %}">
                                 <i class="fas fa-plus-circle"></i> <span>New Job</span>
                             </a>
                         </li>
-
                     {% endif %}
                     {% endif %}
-
 
                     {% if is_support_mode and support_company %}
                         <li class="nav-label">SITE MANAGEMENT</li>
@@ -1201,7 +1191,6 @@
 
                                     {% if user.role == 'company_admin' or user.role == 'super_admin' or user.role == 'stock_controller' %}
                                     <li class="nav-label">STORE MANAGEMENT</li>
-                                    <!-- Inventory -->
                                     <li class="nav-item">
                                         <a class="nav-link {% if request.path == '/epa_shop/inventory/' %}active{% endif %}"
                                         href="/epa_shop/inventory/">
@@ -1209,7 +1198,6 @@
                                         </a>
                                     </li>
 
-                                    <!-- Low Stock -->
                                     <li class="nav-item">
                                         <a class="nav-link {% if '/epa_shop/inventory/low-stock/' in request.path %}active{% endif %}"
                                         href="/epa_shop/inventory/low-stock/">
@@ -1223,7 +1211,6 @@
                                         </a>
                                     </li>
 
-                                    <!-- Movements -->
                                     <li class="nav-item">
                                         <a class="nav-link {% if '/epa_shop/inventory/movement/' in request.path %}active{% endif %}"
                                         href="/epa_shop/inventory/movement/">
@@ -1231,7 +1218,6 @@
                                         </a>
                                     </li>
 
-                                    <!-- Bulk Transfer -->
                                     <li class="nav-item">
                                         <a class="nav-link {% if '/epa_shop/inventory/bulk-transfer/' in request.path %}active{% endif %}"
                                         href="/epa_shop/inventory/bulk-transfer/">
@@ -1239,7 +1225,6 @@
                                         </a>
                                     </li>
 
-                                    <!-- Categories -->
                                     <li class="nav-item">
                                         <a class="nav-link {% if '/epa_shop/categories/' in request.path %}active{% endif %}"
                                         href="/epa_shop/categories/">
@@ -1397,11 +1382,13 @@
             </button>
         </div>
     </aside>
+    {% endif %}
+
 
     <!-- ============================================
     MAIN CONTENT
     ============================================ -->
-    <div class="main-content" id="mainContent">
+    <div class="main-content{% if is_embed %} no-sidebar{% endif %}" id="mainContent">
 
         {% if is_support_mode and support_company %}
         <div class="support-mode-banner">
@@ -1427,6 +1414,7 @@
         {% endif %}
 
 
+        {% if not is_embed %}
         <!-- ============================================
         TOP NAVBAR
         ============================================ -->
@@ -1485,14 +1473,14 @@
                 </ul>
             </div>
         </nav>
+        {% endif %}
 
 
-
-    <!-- ============================================
-    CONTENT  AREA
-    ============================================ -->
-        <div class="content-area">
-            {% if messages %}
+        <!-- ============================================
+        CONTENT AREA
+        ============================================ -->
+        <div class="content-area{% if is_embed %} embed-area{% endif %}">
+            {% if not is_embed and messages %}
                 {% for message in messages %}
                     <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
                         <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-circle{% else %}info-circle{% endif %}"></i>
@@ -1506,52 +1494,44 @@
         </div>
 
 
-    <!-- ============================================
-    FOOTER
-    ============================================ -->
+        {% if not is_embed %}
+        <!-- ============================================
+        FOOTER
+        ============================================ -->
         <footer class="footer">
             <div class="copyright">
-                <i class="fas fa-copyright"></i> {% now "Y" %}.
+            Copyright  <i class="fas fa-copyright"></i>  {% now "Y" %}.
             </div>
             <div class="powered-by">
                 Powered by <a href="/">{{ system_name|default:"RonoSystems" }}</a>
             </div>
         </footer>
+        {% endif %}
     </div>
 
 
-
-
-
     <!-- ============================================ -->
-    <!-- JAVASCRIPT — load order matters!              -->
+    <!-- JAVASCRIPT                                    -->
     <!-- ============================================ -->
 
-    <!-- 1️⃣ Bootstrap JS bundle (dropdowns, modals, toasts, alerts) -->
     <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
-
-    <!-- 2️⃣ Chart.js (used only on reports page) -->
     <script src="{% static 'vendor/chartjs/chart.umd.min.js' %}"></script>
 
-
     <script>
-
         // ============================================================
-        // SAFE STORAGE — Tracking-Prevention-proof localStorage wrapper
-        // Falls back to in-memory store if browser blocks access.
+        // SAFE STORAGE
         // ============================================================
         const safeStorage = (function () {
             const memory = Object.create(null);
             let backing = null;
 
-            // Probe once. If it throws, we never touch localStorage again.
             try {
                 const probe = '__storage_probe__' + Math.random();
                 window.localStorage.setItem(probe, '1');
                 window.localStorage.removeItem(probe);
                 backing = window.localStorage;
             } catch (e) {
-                backing = null;   // blocked — use memory only
+                backing = null;
             }
 
             return {
@@ -1581,22 +1561,7 @@
             };
         })();
 
-
-        // Tenant-aware highlight color for the global search — fallback matches auth pages
-        const HIGHLIGHT_COLOR = "{{ site_primary_color|default:'#2d5f7c' }}";
-
-        // ============================================================
-        // SIDEBAR COLLAPSE / EXPAND
-        // ============================================================
-        const sidebar = document.getElementById('sidebar');
-        const mainContent = document.getElementById('mainContent');
-        const toggleBtn = document.getElementById('sidebarToggleBtn');
-        const toggleIcon = document.getElementById('toggleIcon');
-        const toggleText = document.getElementById('toggleText');
-
-        // ------------------------------------------------
-        // Safe localStorage helpers (tracking-protection proof)
-        // ------------------------------------------------
+        // Safe localStorage helpers (function-scoped — kept for existing callers)
         function safeGet(key) {
             try { return localStorage.getItem(key); }
             catch (e) { return null; }
@@ -1606,111 +1571,121 @@
             catch (e) { /* silently ignore */ }
         }
 
-        // --- SIDEBAR COLLAPSE / EXPAND ---
-        if (safeGet('sidebarCollapsed') === 'true') {
-            sidebar.classList.add('collapsed');
-            mainContent.classList.add('expanded');
-            toggleIcon.className = 'fas fa-chevron-right';
-            toggleText.textContent = 'Expand';
-        }
-
-        toggleBtn.addEventListener('click', function() {
-            sidebar.classList.toggle('collapsed');
-            mainContent.classList.toggle('expanded');
-            const isCollapsed = sidebar.classList.contains('collapsed');
-            toggleIcon.className = isCollapsed ? 'fas fa-chevron-right' : 'fas fa-chevron-left';
-            toggleText.textContent = isCollapsed ? 'Expand' : 'Collapse';
-            safeSet('sidebarCollapsed', isCollapsed);
-        });
+        const HIGHLIGHT_COLOR = "{{ site_primary_color|default:'#2d5f7c' }}";
 
         // ============================================================
-        // SIDEBAR SCROLL PERSISTENCE
+        // SIDEBAR COLLAPSE / EXPAND + MOBILE + SCROLL PERSISTENCE
+        // Guarded so the rest of the script never crashes in embed
+        // mode (or any page without a sidebar).
         // ============================================================
         (function () {
-            var wrapper = document.getElementById('sidebarNavWrapper');
-            if (!wrapper) return;
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            const toggleBtn = document.getElementById('sidebarToggleBtn');
+            const toggleIcon = document.getElementById('toggleIcon');
+            const toggleText = document.getElementById('toggleText');
 
-            var STORAGE_KEY = 'sidebar_scroll_{{ user.id|default:"anon" }}';
-
-            function loadScroll() {
-                return safeGet(STORAGE_KEY);
-            }
-            function saveScroll(value) {
-                safeSet(STORAGE_KEY, value);
-            }
-            var savedScroll = loadScroll();
-            if (savedScroll !== null) {
-                wrapper.scrollTop = parseInt(savedScroll, 10) || 0;
+            if (!sidebar || !toggleBtn) {
+                // Embed mode or any page without a sidebar — skip cleanly.
+                return;
             }
 
-            var activeLink = wrapper.querySelector('.nav-link.active');
-            if (activeLink) {
-                setTimeout(function () {
-                    activeLink.scrollIntoView({
-                        block: 'center',
-                        behavior: 'smooth'
-                    });
-                }, 50);
+            // --- Restore collapsed state ---
+            if (safeGet('sidebarCollapsed') === 'true') {
+                sidebar.classList.add('collapsed');
+                if (mainContent) mainContent.classList.add('expanded');
+                if (toggleIcon) toggleIcon.className = 'fas fa-chevron-right';
+                if (toggleText) toggleText.textContent = 'Expand';
             }
 
-            var saveTimer = null;
-            wrapper.addEventListener('scroll', function () {
-                if (saveTimer) clearTimeout(saveTimer);
-                saveTimer = setTimeout(function () {
-                    saveScroll(wrapper.scrollTop);
-                }, 150);
+            toggleBtn.addEventListener('click', function () {
+                sidebar.classList.toggle('collapsed');
+                if (mainContent) mainContent.classList.toggle('expanded');
+                const isCollapsed = sidebar.classList.contains('collapsed');
+                if (toggleIcon) toggleIcon.className = isCollapsed ? 'fas fa-chevron-right' : 'fas fa-chevron-left';
+                if (toggleText) toggleText.textContent = isCollapsed ? 'Expand' : 'Collapse';
+                safeSet('sidebarCollapsed', isCollapsed);
             });
 
-            window.addEventListener('beforeunload', function () {
-                saveScroll(wrapper.scrollTop);
-            });
+            // --- Sidebar scroll persistence ---
+            (function () {
+                var wrapper = document.getElementById('sidebarNavWrapper');
+                if (!wrapper) return;
 
-            wrapper.querySelectorAll('.nav-link').forEach(function (link) {
-                link.addEventListener('click', function () {
-                    saveScroll(wrapper.scrollTop);
+                var STORAGE_KEY = 'sidebar_scroll_{{ user.id|default:"anon" }}';
+
+                var savedScroll = safeGet(STORAGE_KEY);
+                if (savedScroll !== null) {
+                    wrapper.scrollTop = parseInt(savedScroll, 10) || 0;
+                }
+
+                var activeLink = wrapper.querySelector('.nav-link.active');
+                if (activeLink) {
+                    setTimeout(function () {
+                        activeLink.scrollIntoView({
+                            block: 'center',
+                            behavior: 'smooth'
+                        });
+                    }, 50);
+                }
+
+                var saveTimer = null;
+                wrapper.addEventListener('scroll', function () {
+                    if (saveTimer) clearTimeout(saveTimer);
+                    saveTimer = setTimeout(function () {
+                        safeSet(STORAGE_KEY, wrapper.scrollTop);
+                    }, 150);
                 });
+
+                window.addEventListener('beforeunload', function () {
+                    safeSet(STORAGE_KEY, wrapper.scrollTop);
+                });
+
+                wrapper.querySelectorAll('.nav-link').forEach(function (link) {
+                    link.addEventListener('click', function () {
+                        safeSet(STORAGE_KEY, wrapper.scrollTop);
+                    });
+                });
+            })();
+
+            // --- Mobile sidebar ---
+            const mobileToggle = document.getElementById('sidebarToggleMobile');
+            const overlay = document.getElementById('sidebarOverlay');
+
+            if (mobileToggle && overlay) {
+                mobileToggle.addEventListener('click', function () {
+                    sidebar.classList.toggle('mobile-open');
+                    overlay.classList.toggle('active');
+                });
+
+                overlay.addEventListener('click', function () {
+                    sidebar.classList.remove('mobile-open');
+                    overlay.classList.remove('active');
+                });
+
+                window.addEventListener('resize', function () {
+                    if (window.innerWidth > 992) {
+                        sidebar.classList.remove('mobile-open');
+                        overlay.classList.remove('active');
+                    }
+                });
+            }
+
+            // --- Ctrl+B shortcut ---
+            document.addEventListener('keydown', function (e) {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+                    e.preventDefault();
+                    toggleBtn.click();
+                }
             });
         })();
-
-        // ============================================================
-        // MOBILE SIDEBAR
-        // ============================================================
-        const mobileToggle = document.getElementById('sidebarToggleMobile');
-        const overlay = document.getElementById('sidebarOverlay');
-
-        mobileToggle.addEventListener('click', function() {
-            sidebar.classList.toggle('mobile-open');
-            overlay.classList.toggle('active');
-        });
-
-        overlay.addEventListener('click', function() {
-            sidebar.classList.remove('mobile-open');
-            overlay.classList.remove('active');
-        });
-
-        window.addEventListener('resize', function() {
-            if (window.innerWidth > 992) {
-                sidebar.classList.remove('mobile-open');
-                overlay.classList.remove('active');
-            }
-        });
-
-        // ============================================================
-        // CTRL+B SHORTCUT
-        // ============================================================
-        document.addEventListener('keydown', function(e) {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
-                e.preventDefault();
-                toggleBtn.click();
-            }
-        });
 
         // ============================================================
         // GLOBAL SEARCH
         // ============================================================
         const globalSearch = document.getElementById('globalSearch');
         if (globalSearch) {
-            globalSearch.addEventListener('keyup', function(e) {
+            globalSearch.addEventListener('keyup', function (e) {
                 if (e.key === 'Enter') {
                     const query = this.value.trim();
                     const items = document.querySelectorAll('.card, .list-group-item, tr');
@@ -1742,7 +1717,7 @@
         // SUPPORT MODE TIMER
         // ============================================================
         {% if is_support_mode %}
-        (function() {
+        (function () {
             const startedAtStr = "{{ request.session.support_started_at|default:'' }}";
             const elapsedEl = document.getElementById('supportElapsed');
 
@@ -1762,9 +1737,9 @@
                 const secs = diff % 60;
 
                 if (hours > 0) {
-                    elapsedEl.textContent = `${String(hours).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+                    elapsedEl.textContent = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
                 } else {
-                    elapsedEl.textContent = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+                    elapsedEl.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
                 }
             }
 
@@ -1777,14 +1752,14 @@
         // TENANT FEEDBACK WIDGET
         // ============================================================
         (function () {
-            const fab    = document.getElementById('fbFab');
-            const modal  = document.getElementById('fbModal');
-            const form   = document.getElementById('fbForm');
-            const btn    = document.getElementById('fbSubmit');
+            const fab = document.getElementById('fbFab');
+            const modal = document.getElementById('fbModal');
+            const form = document.getElementById('fbForm');
+            const btn = document.getElementById('fbSubmit');
             const msgBox = document.getElementById('fbMsg');
             const urlInput = document.getElementById('fbPageUrl');
 
-            if (!fab || !modal) return;   // not rendered for this user
+            if (!fab || !modal) return;
 
             window.openFb = function () {
                 urlInput.value = window.location.href;
@@ -1818,7 +1793,7 @@
                     const res = await fetch('{% url "companies:tenant-feedback-submit" %}', {
                         method: 'POST',
                         body: fd,
-                        headers: {'X-Requested-With': 'XMLHttpRequest'},
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
                     });
                     const data = await res.json();
 
@@ -1850,7 +1825,7 @@
     {# ============================================ #}
     {# AUTO-LOGOUT IDLE WARNING (30 min inactivity) #}
     {# ============================================ #}
-    {% if not is_support_mode %}
+    {% if not is_support_mode and not is_embed %}
         {% include 'partials/idle_logout.html' %}
     {% endif %}
 
