@@ -376,7 +376,7 @@
         border-top: 0 solid #000;
     }
     .pay-group.is-open .pay-group-body {
-        max-height: 1000px;
+        max-height: 2000px;
         border-top: 2px dashed #ccc;
     }
     .pay-group-body-inner {
@@ -1060,6 +1060,8 @@
                                                 </div>
                                             </div>
                                             <div class="pay-group-body"><div class="pay-group-body-inner">
+
+                                                <!-- Row 1: Shortcode + Passkey -->
                                                 <div class="row">
                                                     <div class="col-md-6"><div class="form-group">
                                                         <label>Business Shortcode</label>
@@ -1075,13 +1077,78 @@
                                                         <input type="password" class="form-control"
                                                             name="mpesa_stk_passkey"
                                                             value="{{ settings.payment.mpesa_stk_passkey|default:'' }}"
-                                                            placeholder="Lipa na M-Pesa passkey">
-                                                        <small class="override-hint">Leave blank to use platform default</small>
+                                                            placeholder="Lipa na M-Pesa passkey"
+                                                            autocomplete="new-password">
+                                                        <small class="override-hint">From Safaricom Daraja → Lipa na M-Pesa Online</small>
                                                     </div></div>
                                                 </div>
+
+                                                <!-- Row 2: Consumer Key + Secret -->
+                                                <div class="row">
+                                                    <div class="col-md-6"><div class="form-group">
+                                                        <label>Consumer Key</label>
+                                                        <input type="text" class="form-control"
+                                                            name="mpesa_consumer_key"
+                                                            value="{{ settings.payment.mpesa_consumer_key|default:'' }}"
+                                                            placeholder="From Safaricom Daraja portal"
+                                                            autocomplete="off">
+                                                        <small class="override-hint">Daraja → My Apps → Consumer Key</small>
+                                                    </div></div>
+                                                    <div class="col-md-6"><div class="form-group">
+                                                        <label>Consumer Secret</label>
+                                                        <input type="password" class="form-control"
+                                                            name="mpesa_consumer_secret"
+                                                            value="{{ settings.payment.mpesa_consumer_secret|default:'' }}"
+                                                            placeholder="From Safaricom Daraja portal"
+                                                            autocomplete="new-password">
+                                                        <small class="override-hint">Daraja → My Apps → Consumer Secret</small>
+                                                    </div></div>
+                                                </div>
+
+                                                <!-- Row 3: Environment + Shortcode Type + Account Reference -->
+                                                <div class="row">
+                                                    <div class="col-md-4"><div class="form-group">
+                                                        <label>Environment</label>
+                                                        <select class="form-select" name="mpesa_environment">
+                                                            <option value="sandbox" {% if settings.payment.mpesa_environment == 'sandbox' %}selected{% endif %}>Sandbox</option>
+                                                            <option value="production" {% if settings.payment.mpesa_environment == 'production' %}selected{% endif %}>Production</option>
+                                                        </select>
+                                                    </div></div>
+                                                    <div class="col-md-4"><div class="form-group">
+                                                        <label>Shortcode Type</label>
+                                                        <select class="form-select" name="mpesa_shortcode_type">
+                                                            <option value="paybill" {% if settings.payment.mpesa_shortcode_type == 'paybill' %}selected{% endif %}>Paybill</option>
+                                                            <option value="till" {% if settings.payment.mpesa_shortcode_type == 'till' %}selected{% endif %}>Buy Goods (Till)</option>
+                                                        </select>
+                                                    </div></div>
+                                                    <div class="col-md-4"><div class="form-group">
+                                                        <label>Account Reference</label>
+                                                        <input type="text" class="form-control"
+                                                            name="mpesa_account_reference"
+                                                            value="{{ settings.payment.mpesa_account_reference|default:'' }}"
+                                                            placeholder="POS-SALE">
+                                                        <small class="override-hint">Sent as AccountReference in STK push</small>
+                                                    </div></div>
+                                                </div>
+
+                                                <!-- Row 4: Callback URL -->
+                                                <div class="form-group">
+                                                    <label>Callback URL</label>
+                                                    <input type="url" class="form-control"
+                                                        name="mpesa_callback_url"
+                                                        value="{{ settings.payment.mpesa_callback_url|default:'' }}"
+                                                        placeholder="https://yourdomain.com/mpesa/callback/">
+                                                    <small class="override-hint">
+                                                        Public HTTPS URL Safaricom will POST the result to.
+                                                        On this platform, use:
+                                                        <code>https://&lt;your-domain&gt;/mpesa/callback/</code>
+                                                    </small>
+                                                </div>
+
                                                 <p class="override-hint">
                                                     <i class="fas fa-info-circle"></i>
                                                     Customer receives an STK prompt on their phone to enter their M-Pesa PIN.
+                                                    All credentials are stored per company — no shared platform secrets.
                                                 </p>
                                             </div></div>
                                         </div>
@@ -1343,6 +1410,9 @@
                                             </div>
                                             <div id="pvBody-stk" style="display:none;padding-left:20px;font-size:10px;">
                                                 <div class="pv-row"><span>Shortcode</span><span class="pv-value" id="pvVal-stk-shortcode">—</span></div>
+                                                <div class="pv-row"><span>Env</span><span class="pv-value" id="pvVal-stk-env">—</span></div>
+                                                <div class="pv-row"><span>Type</span><span class="pv-value" id="pvVal-stk-type">—</span></div>
+                                                <div class="pv-row"><span>Callback</span><span class="pv-value" id="pvVal-stk-callback">—</span></div>
                                             </div>
 
                                             <!-- Buy Goods -->
@@ -1938,6 +2008,248 @@ document.addEventListener('DOMContentLoaded', function () {
         bindText('receipt_phone',        'pvCompanyPhone', 'Tel: ');
         bindText('receipt_address',      'pvCompanyAddress');
         bindText('receipt_email',        'pvCompanyEmail', 'Email: ');
+    }
+
+    // ============================================
+    // Payment live preview bindings (currency + methods)
+    // ============================================
+    var payForm = document.getElementById('paymentSettingsForm');
+    if (payForm) {
+
+        // --- Currency ---
+        function bindPayText(inputName, elId, transform) {
+            var input = payForm.querySelector('[name="' + inputName + '"]');
+            var el = document.getElementById(elId);
+            if (!input || !el) return;
+            function apply() {
+                var v = input.value;
+                if (transform) v = transform(v);
+                el.textContent = v || '—';
+            }
+            input.addEventListener('input', apply);
+            apply();
+        }
+
+        bindPayText('currency',        'pvCurrency');
+        bindPayText('currency_symbol', 'pvSymbol');
+        bindPayText('decimal_places',  'pvDecimals');
+
+        // Sample amount follows symbol + decimals
+        (function bindSample() {
+            var symEl   = payForm.querySelector('[name="currency_symbol"]');
+            var decEl   = payForm.querySelector('[name="decimal_places"]');
+            var out     = document.getElementById('pvSample');
+            if (!symEl || !decEl || !out) return;
+            function apply() {
+                var sym = symEl.value || '';
+                var dec = parseInt(decEl.value) || 0;
+                var sample = (1250).toLocaleString('en-KE', {
+                    minimumFractionDigits: dec,
+                    maximumFractionDigits: dec,
+                });
+                out.textContent = sym + ' ' + sample;
+            }
+            symEl.addEventListener('input', apply);
+            decEl.addEventListener('change', apply);
+            apply();
+        })();
+
+        // --- Payment methods ---
+
+        // STK
+        (function bindStk() {
+            var chk      = payForm.querySelector('[name="enable_mpesa_stk"]');
+            var body     = document.getElementById('pvBody-stk');
+            var status   = document.getElementById('pvStatus-stk');
+            var scInput  = payForm.querySelector('[name="mpesa_stk_shortcode"]');
+            var envSel   = payForm.querySelector('[name="mpesa_environment"]');
+            var typeSel  = payForm.querySelector('[name="mpesa_shortcode_type"]');
+            var cbInput  = payForm.querySelector('[name="mpesa_callback_url"]');
+
+            var vSc = document.getElementById('pvVal-stk-shortcode');
+            var vEnv = document.getElementById('pvVal-stk-env');
+            var vTyp = document.getElementById('pvVal-stk-type');
+            var vCb  = document.getElementById('pvVal-stk-callback');
+
+            function setStatus(on) {
+                status.textContent = on ? 'On' : 'Off';
+                status.className = 'pv-method-status ' + (on ? 'pv-active' : '');
+                body.style.display = on ? 'block' : 'none';
+            }
+            function refreshVals() {
+                if (vSc)  vSc.textContent  = scInput  && scInput.value  ? scInput.value  : '—';
+                if (vEnv) vEnv.textContent = envSel   && envSel.value   ? envSel.value   : '—';
+                if (vTyp) vTyp.textContent = typeSel  && typeSel.value  ? typeSel.value  : '—';
+                if (vCb)  vCb.textContent  = cbInput  && cbInput.value  ? cbInput.value  : '—';
+            }
+            chk.addEventListener('change', function () { setStatus(chk.checked); });
+            [scInput, envSel, typeSel, cbInput].forEach(function (el) {
+                if (el) el.addEventListener('input', refreshVals);
+                if (el) el.addEventListener('change', refreshVals);
+            });
+            setStatus(chk.checked);
+            refreshVals();
+        })();
+
+        // Buy Goods
+        (function bindBuy() {
+            var chk    = payForm.querySelector('[name="enable_buy_goods"]');
+            var body   = document.getElementById('pvBody-buy_goods');
+            var status = document.getElementById('pvStatus-buy_goods');
+            var till   = payForm.querySelector('[name="buy_goods_till"]');
+            var name   = payForm.querySelector('[name="buy_goods_name"]');
+            var vTill  = document.getElementById('pvVal-buy-till');
+            var vName  = document.getElementById('pvVal-buy-name');
+
+            function setStatus(on) {
+                status.textContent = on ? 'On' : 'Off';
+                status.className = 'pv-method-status ' + (on ? 'pv-active' : '');
+                body.style.display = on ? 'block' : 'none';
+            }
+            function refresh() {
+                if (vTill) vTill.textContent = till && till.value ? till.value : '—';
+                if (vName) vName.textContent = name && name.value ? name.value : '—';
+            }
+            chk.addEventListener('change', function () { setStatus(chk.checked); });
+            [till, name].forEach(function (el) {
+                if (el) el.addEventListener('input', refresh);
+            });
+            setStatus(chk.checked);
+            refresh();
+        })();
+
+        // Paybill
+        (function bindPb() {
+            var chk    = payForm.querySelector('[name="enable_paybill"]');
+            var body   = document.getElementById('pvBody-paybill');
+            var status = document.getElementById('pvStatus-paybill');
+            var num    = payForm.querySelector('[name="paybill_number"]');
+            var acc    = payForm.querySelector('[name="paybill_account"]');
+            var name   = payForm.querySelector('[name="paybill_name"]');
+            var vNum   = document.getElementById('pvVal-pb-number');
+            var vAcc   = document.getElementById('pvVal-pb-account');
+            var vName  = document.getElementById('pvVal-pb-name');
+
+            function setStatus(on) {
+                status.textContent = on ? 'On' : 'Off';
+                status.className = 'pv-method-status ' + (on ? 'pv-active' : '');
+                body.style.display = on ? 'block' : 'none';
+            }
+            function refresh() {
+                if (vNum)  vNum.textContent  = num  && num.value  ? num.value  : '—';
+                if (vAcc)  vAcc.textContent  = acc  && acc.value  ? acc.value  : '—';
+                if (vName) vName.textContent = name && name.value ? name.value : '—';
+            }
+            chk.addEventListener('change', function () { setStatus(chk.checked); });
+            [num, acc, name].forEach(function (el) {
+                if (el) el.addEventListener('input', refresh);
+            });
+            setStatus(chk.checked);
+            refresh();
+        })();
+
+        // Bank
+        (function bindBank() {
+            var chk    = payForm.querySelector('[name="enable_bank"]');
+            var body   = document.getElementById('pvBody-bank');
+            var status = document.getElementById('pvStatus-bank');
+            var bName  = payForm.querySelector('[name="bank_name"]');
+            var bAcc   = payForm.querySelector('[name="bank_account"]');
+            var bBr    = payForm.querySelector('[name="bank_branch"]');
+            var bSw    = payForm.querySelector('[name="bank_swift"]');
+            var vName  = document.getElementById('pvVal-bank-name');
+            var vAcc   = document.getElementById('pvVal-bank-account');
+            var vBr    = document.getElementById('pvVal-bank-branch');
+            var vSw    = document.getElementById('pvVal-bank-swift');
+
+            function setStatus(on) {
+                status.textContent = on ? 'On' : 'Off';
+                status.className = 'pv-method-status ' + (on ? 'pv-active' : '');
+                body.style.display = on ? 'block' : 'none';
+            }
+            function refresh() {
+                if (vName) vName.textContent = bName && bName.value ? bName.value : '—';
+                if (vAcc)  vAcc.textContent  = bAcc  && bAcc.value  ? bAcc.value  : '—';
+                if (vBr)   vBr.textContent   = bBr   && bBr.value   ? bBr.value   : '—';
+                if (vSw)   vSw.textContent   = bSw   && bSw.value   ? bSw.value   : '—';
+            }
+            chk.addEventListener('change', function () { setStatus(chk.checked); });
+            [bName, bAcc, bBr, bSw].forEach(function (el) {
+                if (el) el.addEventListener('input', refresh);
+            });
+            setStatus(chk.checked);
+            refresh();
+        })();
+
+        // Tax
+        (function bindTax() {
+            var chk    = payForm.querySelector('[name="enable_tax"]');
+            var status = document.getElementById('pvStatus-tax');
+            var rate   = payForm.querySelector('[name="default_tax_rate"]');
+            var vRate  = document.getElementById('pvVal-taxrate');
+
+            function setStatus() {
+                status.textContent = chk.checked ? 'On' : 'Off';
+                status.className = 'pv-method-status ' + (chk.checked ? 'pv-active' : '');
+            }
+            function refreshRate() {
+                var v = parseFloat(rate.value) || 0;
+                if (vRate) vRate.textContent = v + '%';
+            }
+            chk.addEventListener('change', setStatus);
+            rate.addEventListener('input', refreshRate);
+            setStatus();
+            refreshRate();
+        })();
+
+        // Discount
+        (function bindDisc() {
+            var chk    = payForm.querySelector('[name="enable_discount"]');
+            var status = document.getElementById('pvStatus-discount');
+            function setStatus() {
+                status.textContent = chk.checked ? 'On' : 'Off';
+                status.className = 'pv-method-status ' + (chk.checked ? 'pv-active' : '');
+            }
+            chk.addEventListener('change', setStatus);
+            setStatus();
+        })();
+
+        // Credit
+        (function bindCredit() {
+            var chk    = payForm.querySelector('[name="enable_credit"]');
+            var status = document.getElementById('pvStatus-credit');
+            var limit  = payForm.querySelector('[name="credit_limit"]');
+            var terms  = payForm.querySelector('[name="payment_terms"]');
+            var vLim   = document.getElementById('pvVal-creditlimit');
+            var vTerm  = document.getElementById('pvVal-terms');
+
+            function setStatus() {
+                status.textContent = chk.checked ? 'On' : 'Off';
+                status.className = 'pv-method-status ' + (chk.checked ? 'pv-active' : '');
+            }
+            function refresh() {
+                if (vLim)  vLim.textContent  = limit && limit.value ? limit.value : '0';
+                if (vTerm) vTerm.textContent = (terms && terms.value ? terms.value : '30') + ' days';
+            }
+            chk.addEventListener('change', setStatus);
+            [limit, terms].forEach(function (el) {
+                if (el) el.addEventListener('input', refresh);
+            });
+            setStatus();
+            refresh();
+        })();
+
+        // Partial payment
+        (function bindPartial() {
+            var chk    = payForm.querySelector('[name="enable_partial_payment"]');
+            var status = document.getElementById('pvStatus-partial');
+            function setStatus() {
+                status.textContent = chk.checked ? 'On' : 'Off';
+                status.className = 'pv-method-status ' + (chk.checked ? 'pv-active' : '');
+            }
+            chk.addEventListener('change', setStatus);
+            setStatus();
+        })();
     }
 });
 </script>

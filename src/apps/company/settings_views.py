@@ -328,6 +328,14 @@ def settings_payment(request):
                 'mpesa_stk_shortcode': request.POST.get('mpesa_stk_shortcode', ''),
                 'mpesa_stk_passkey': request.POST.get('mpesa_stk_passkey', ''),
 
+                # ---------- M-Pesa STK Push: Daraja credentials (per company) ----------
+                'mpesa_consumer_key':       request.POST.get('mpesa_consumer_key', '').strip(),
+                'mpesa_consumer_secret':    request.POST.get('mpesa_consumer_secret', '').strip(),
+                'mpesa_environment':        request.POST.get('mpesa_environment', 'sandbox'),
+                'mpesa_callback_url':       request.POST.get('mpesa_callback_url', '').strip(),
+                'mpesa_shortcode_type':     request.POST.get('mpesa_shortcode_type', 'paybill'),
+                'mpesa_account_reference':  request.POST.get('mpesa_account_reference', '').strip(),
+
                 # ---------- M-Pesa Buy Goods (Till) ----------
                 'enable_buy_goods': request.POST.get('enable_buy_goods') == 'on',
                 'buy_goods_till': request.POST.get('buy_goods_till', ''),
@@ -347,19 +355,21 @@ def settings_payment(request):
                 'bank_branch': request.POST.get('bank_branch', ''),
                 'bank_swift': request.POST.get('bank_swift', ''),
 
-                # ---------- Legacy aliases (keep old code paths working) ----------
-                # `enable_mpesa` is True if ANY M-Pesa variant is on
+                # ---------- Legacy aliases ----------
                 'enable_mpesa': (
                     request.POST.get('enable_mpesa_stk') == 'on'
                     or request.POST.get('enable_buy_goods') == 'on'
                     or request.POST.get('enable_paybill') == 'on'
                 ),
-                # `mpesa_till` / `mpesa_paybill` mirror the new fields
                 'mpesa_till': request.POST.get('buy_goods_till', ''),
                 'mpesa_paybill': request.POST.get('paybill_number', ''),
             }
 
             save_company_settings(company, payment_settings, 'payment')
+
+            # Mirror the saved settings into an MpesaConfig row (per company)
+            _sync_mpesa_config(company, payment_settings)
+
             messages.success(request, 'Payment settings updated successfully!')
             return redirect('company-settings-payment')
 
@@ -416,37 +426,37 @@ def settings_receipt(request):
                 'show_signature':        request.POST.get('show_signature') == 'on',
 
                 # ---- Granular toggles ----
-                'show_company_name':     request.POST.get('show_company_name') == 'on',
-                'show_branch':           request.POST.get('show_branch') == 'on',
-                'show_company_email':    request.POST.get('show_company_email') == 'on',
-                'show_company_phone':    request.POST.get('show_company_phone') == 'on',
-                'show_company_pin':      request.POST.get('show_company_pin') == 'on',
-                'show_receipt_title':    request.POST.get('show_receipt_title') == 'on',
-                'show_receipt_header':   request.POST.get('show_receipt_header') == 'on',
-                'show_receipt_footer':   request.POST.get('show_receipt_footer') == 'on',
-                'show_thank_you':        request.POST.get('show_thank_you') == 'on',
-                'show_receipt_info':     request.POST.get('show_receipt_info') == 'on',
-                'show_next_of_kin':      request.POST.get('show_next_of_kin') == 'on',
-                'show_subtotal':         request.POST.get('show_subtotal') == 'on',
-                'show_vat':              request.POST.get('show_vat') == 'on',
-                'show_payment_method':   request.POST.get('show_payment_method') == 'on',
-                'show_payment_status':   request.POST.get('show_payment_status') == 'on',
-                'show_customer_phone':   request.POST.get('show_customer_phone') == 'on',
-                'show_customer_id':      request.POST.get('show_customer_id') == 'on',
+                'show_company_name':      request.POST.get('show_company_name') == 'on',
+                'show_branch':            request.POST.get('show_branch') == 'on',
+                'show_company_email':     request.POST.get('show_company_email') == 'on',
+                'show_company_phone':     request.POST.get('show_company_phone') == 'on',
+                'show_company_pin':       request.POST.get('show_company_pin') == 'on',
+                'show_receipt_title':     request.POST.get('show_receipt_title') == 'on',
+                'show_receipt_header':    request.POST.get('show_receipt_header') == 'on',
+                'show_receipt_footer':    request.POST.get('show_receipt_footer') == 'on',
+                'show_thank_you':         request.POST.get('show_thank_you') == 'on',
+                'show_receipt_info':      request.POST.get('show_receipt_info') == 'on',
+                'show_next_of_kin':       request.POST.get('show_next_of_kin') == 'on',
+                'show_subtotal':          request.POST.get('show_subtotal') == 'on',
+                'show_vat':               request.POST.get('show_vat') == 'on',
+                'show_payment_method':    request.POST.get('show_payment_method') == 'on',
+                'show_payment_status':    request.POST.get('show_payment_status') == 'on',
+                'show_customer_phone':    request.POST.get('show_customer_phone') == 'on',
+                'show_customer_id':       request.POST.get('show_customer_id') == 'on',
                 'show_next_of_kin_phone': request.POST.get('show_next_of_kin_phone') == 'on',
-                'receipt_title':         request.POST.get('receipt_title', 'RECEIPT'),
-                'thank_you_message':     request.POST.get('thank_you_message', 'Thank you for your business!'),
-                'include_barcode':       request.POST.get('include_barcode') == 'on',
-                'print_copies':          int(request.POST.get('print_copies', 1)),
-                'auto_print':            request.POST.get('auto_print') == 'on',
-                'receipt_font_size':     request.POST.get('receipt_font_size', '14'),
-                'receipt_width':         request.POST.get('receipt_width', '80'),
-                'custom_css':            request.POST.get('custom_css', ''),
-                'receipt_company_name':  request.POST.get('receipt_company_name', ''),
-                'receipt_address':       request.POST.get('receipt_address', ''),
-                'receipt_phone':         request.POST.get('receipt_phone', ''),
-                'receipt_email':         request.POST.get('receipt_email', ''),
-                'show_sale_barcode':     request.POST.get('show_sale_barcode') == 'on',
+                'receipt_title':          request.POST.get('receipt_title', 'RECEIPT'),
+                'thank_you_message':      request.POST.get('thank_you_message', 'Thank you for your business!'),
+                'include_barcode':        request.POST.get('include_barcode') == 'on',
+                'print_copies':           int(request.POST.get('print_copies', 1)),
+                'auto_print':             request.POST.get('auto_print') == 'on',
+                'receipt_font_size':      request.POST.get('receipt_font_size', '14'),
+                'receipt_width':          request.POST.get('receipt_width', '80'),
+                'custom_css':             request.POST.get('custom_css', ''),
+                'receipt_company_name':   request.POST.get('receipt_company_name', ''),
+                'receipt_address':        request.POST.get('receipt_address', ''),
+                'receipt_phone':          request.POST.get('receipt_phone', ''),
+                'receipt_email':          request.POST.get('receipt_email', ''),
+                'show_sale_barcode':      request.POST.get('show_sale_barcode') == 'on',
             }
             save_company_settings(company, receipt_settings, 'receipt')
             messages.success(request, 'Receipt settings updated successfully!')
@@ -508,8 +518,6 @@ def settings_preview_receipt(request):
         'cashier': 'Admin',
     }
 
-    # Build the effective email/phone/address to display in the preview,
-    # preferring the receipt override, then the company value, then a dash.
     preview_email   = settings_data['receipt'].get('receipt_email')   or company.email   or '—'
     preview_phone   = settings_data['receipt'].get('receipt_phone')   or company.phone   or '—'
     preview_address = settings_data['receipt'].get('receipt_address') or company.address or '—'
@@ -520,8 +528,6 @@ def settings_preview_receipt(request):
         'settings': settings_data,
         'receipt': receipt_data,
         'is_viewing_company': is_viewing_company,
-        # ---- Explicit preview values so the template never
-        #      falls back to the logged-in user's email/phone/address ----
         'preview_email':   preview_email,
         'preview_phone':   preview_phone,
         'preview_address': preview_address,
@@ -590,6 +596,14 @@ def get_company_settings(company):
             'enable_mpesa_stk': False,
             'mpesa_stk_shortcode': '',
             'mpesa_stk_passkey': '',
+
+            # ---------- M-Pesa STK Push: Daraja credentials (per company) ----------
+            'mpesa_consumer_key':       '',
+            'mpesa_consumer_secret':    '',
+            'mpesa_environment':        'sandbox',
+            'mpesa_callback_url':       '',
+            'mpesa_shortcode_type':     'paybill',
+            'mpesa_account_reference':  '',
 
             # ---------- M-Pesa Buy Goods (Till) ----------
             'enable_buy_goods': False,
@@ -693,3 +707,73 @@ def save_company_settings(company, settings_data, section=None):
 
     company.company_settings = existing
     company.save(update_fields=['company_settings'])
+
+
+def _sync_mpesa_config(company, payment_settings):
+    """
+    Mirror the per-company payment settings into an MpesaConfig row.
+
+    Rules:
+      - Only creates / updates when the company has enabled STK push AND
+        provided at least a shortcode, consumer_key and consumer_secret.
+      - If STK is disabled, deactivates the existing row (does not delete —
+        so historical MpesaTransaction rows keep their FK).
+    """
+    try:
+        from apps.mpesa.models import MpesaConfig
+    except Exception:
+        # mpesa app not installed yet — silently skip
+        return
+
+    enabled = bool(payment_settings.get('enable_mpesa_stk'))
+    shortcode        = (payment_settings.get('mpesa_stk_shortcode') or '').strip()
+    consumer_key     = (payment_settings.get('mpesa_consumer_key') or '').strip()
+    consumer_secret  = (payment_settings.get('mpesa_consumer_secret') or '').strip()
+    passkey          = (payment_settings.get('mpesa_stk_passkey') or '').strip()
+    callback         = (payment_settings.get('mpesa_callback_url') or '').strip()
+    environment      = (payment_settings.get('mpesa_environment') or 'sandbox').strip()
+    shortcode_type   = (payment_settings.get('mpesa_shortcode_type') or 'paybill').strip()
+    account_ref      = (payment_settings.get('mpesa_account_reference') or '').strip()
+
+    existing = MpesaConfig.objects.filter(
+        company=company, branch__isnull=True
+    ).first()
+
+    if not enabled:
+        if existing and existing.is_active:
+            existing.is_active = False
+            existing.save(update_fields=['is_active', 'updated_at'])
+        return
+
+    # Enabled — require the minimum fields
+    if not (shortcode and consumer_key and consumer_secret and passkey and callback):
+        # Incomplete: leave whatever exists untouched
+        return
+
+    if existing is None:
+        MpesaConfig.objects.create(
+            company=company,
+            branch=None,
+            label='Company-wide M-Pesa',
+            environment=environment,
+            consumer_key=consumer_key,
+            consumer_secret=consumer_secret,
+            shortcode=shortcode,
+            passkey=passkey,
+            callback_url=callback,
+            shortcode_type=shortcode_type,
+            account_reference=account_ref,
+            is_active=True,
+        )
+    else:
+        existing.environment       = environment
+        existing.consumer_key      = consumer_key
+        existing.consumer_secret   = consumer_secret
+        existing.shortcode         = shortcode
+        existing.passkey           = passkey
+        existing.callback_url      = callback
+        existing.shortcode_type    = shortcode_type
+        existing.account_reference = account_ref
+        existing.is_active         = True
+        existing.save()
+

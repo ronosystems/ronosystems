@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Point of Sale{% endblock %}
+{% block title %}POS{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -99,8 +99,11 @@
 
     .scanner-input {
         background: #ffffe0 !important;
-        font-weight: 700;
-        letter-spacing: 0.5px;
+        font-weight: 1000;
+        font-size:15px;
+        letter-spacing: 1px;
+        height:60px;
+
     }
 
     /* ============================================
@@ -840,10 +843,9 @@
 
             <!-- ---------- Scanner Code row ---------- -->
             <div class="groupbox" style="margin-top: 4px;">
-                <span class="groupbox-title"></span>
+                <span class="groupbox-title">Scan</span>
                 <div class="row">
-                    <span class="badge-scanner">........................................ SCAN BARCODE ........................................</span>
-                    <div style="position: relative; flex: 1;">
+                    <div style="flex:1; height:60px; font-size:15px; font-weight:1000;">
                         <input type="text" id="searchProducts"
                                class="pos-input full scanner-input"
                                placeholder="Scanner output or enter code and press enter"
@@ -905,18 +907,27 @@
 
             <!-- ---------- Totals ---------- -->
             <div class="totals-grid">
-                <div class="t-label">TAX $</div>
-                <div class="t-value" id="taxDisplay">0.00</div>
-                <div class="t-label">TOTAL $</div>
+                <div class="t-label">TOTAL</div>
+                <div class="t-value" id="subtotalDisplay">0.00</div>
+
+                <div class="t-label" style="text-align:right;">TOTALS</div>
                 <div class="t-value total-red" id="totalDisplay">0.00</div>
 
-                <div class="t-label">PAID $</div>
+                <div class="t-label">TAX</div>
+                <div class="t-value" id="taxDisplay">0.00</div>
+
+                <div class="t-label" style="text-align:right;">RATE</div>
+                <div class="t-value" id="taxRateDisplay">0%</div>
+
+                <div class="t-label">PAID</div>
                 <div class="t-value paid-green" id="paidDisplay">0</div>
-                <div class="t-label">DUE $</div>
+
+                <div class="t-label" style="text-align:right;">DUE</div>
                 <div class="t-value due-yellow" id="dueDisplay">0.00</div>
 
                 <div class="t-label">TYPE</div>
-                <div class="t-value type-cell" id="typeDisplay">DEBIT CARD</div>
+                <div class="t-value type-cell" id="typeDisplay">CASH/MPESA/BANK </div>
+
                 <div class="t-label" style="text-align:right;">RN</div>
                 <div class="t-value rn-cell" id="refNumberDisplay">Reference Number</div>
             </div>
@@ -926,19 +937,13 @@
                  BIG SUBMIT BUTTON — Complete Sale
             ============================================ -->
             <div style="display:flex; gap:8px; margin-top:8px;">
-                <button class="btn-3d dark"
-                        style="flex:0 0 130px; height:44px; font-size:13px;"
-                        onclick="newTicket()">
-                    <i class="fas fa-broom"></i> CLEAR
-                </button>
-
                 <button id="completeSaleBtn"
                         class="btn-3d"
-                        style="flex:1; height:44px; font-size:15px; font-weight:800;"
+                        style="flex:1; height:60px; font-size:15px; font-weight:1000;"
                         onclick="completeSale()"
                         disabled>
                     <i class="fas fa-cash-register"></i>
-                    COMPLETE SALE
+                    COMPLETE SALE PAYMENT
                 </button>
             </div>
 
@@ -1095,7 +1100,7 @@
         <button class="fn-btn fn-red" onclick="clearCart()">
             <div class="fn-icon"><i class="fas fa-times"></i></div>
             <span class="fn-key">[F1]</span>
-            <span class="fn-label">Close</span>
+            <span class="fn-label">Clear Cart</span>
         </button>
 
         <button class="fn-btn fn-gray" onclick="openShortcutsModal()">
@@ -1107,7 +1112,7 @@
         <button class="fn-btn fn-green" onclick="newTicket()">
             <div class="fn-icon"><i class="fas fa-plus"></i></div>
             <span class="fn-key">[F3]</span>
-            <span class="fn-label">New</span>
+            <span class="fn-label">New Ticket</span>
         </button>
 
         <button class="fn-btn fn-blue" onclick="window.print()">
@@ -1352,12 +1357,12 @@
 
 
 <!-- ============================================ -->
-<!-- PENDING SALES MODAL                          -->
+<!-- PENDING SALES MODAL — lookup + redirect      -->
 <!-- ============================================ -->
 <div class="pos-modal-overlay" id="pendingSalesModal">
     <div class="pos-modal" style="max-width:560px;">
         <div class="pos-modal-header" style="background:#cc8800;">
-            <h3>💳 Pending Sales — Search & Pay</h3>
+            <h3>💳 Pending Sales — Search &amp; Pay</h3>
             <button class="pos-modal-close" onclick="closePendingSalesModal()">✕</button>
         </div>
 
@@ -1386,7 +1391,7 @@
                             background:#f8d7da; color:#721c24; border:2px solid #cc0000; font-size:12px;">
                 </div>
 
-                <!-- ✅ Quick list of pending sales, if any -->
+                <!-- Quick list of pending sales -->
                 <div style="margin-top:12px;">
                     <div style="font-weight:700; font-size:12px; margin-bottom:4px;">
                         Or pick from the list:
@@ -1399,46 +1404,14 @@
                 </div>
             </div>
 
-            <!-- STEP 2: Payment (shown after sale found) -->
-            <div class="groupbox" id="pendingPayStep" style="display:none;">
-                <span class="groupbox-title">Pay Pending Sale</span>
-
-                <div id="pendingSaleHeader"
-                     style="background:#fffbe6; padding:8px; margin-bottom:10px;
-                            border:1px solid #808080; font-size:12px;"></div>
-
-                <div class="modal-field">
-                    <label>Amount to Pay <span class="text-danger">*</span></label>
-                    <input type="number" id="pendingPayAmount" step="0.01" min="0.01"
-                           placeholder="0.00">
-                    <small id="pendingPayHint">Total due: KSh 0.00</small>
-                </div>
-
-                <div class="modal-field">
-                    <label>Payment Method</label>
-                    <select id="pendingPayMethod">
-                        <option value="cash">Cash</option>
-                        <option value="mpesa">M-Pesa</option>
-                        <option value="card">Card</option>
-                        <option value="bank_transfer">Bank Transfer</option>
-                    </select>
-                </div>
-
-                <div id="pendingPayStatus" class="payment-status"></div>
-            </div>
-
         </div>
 
         <div class="pos-modal-footer">
             <button type="button" onclick="closePendingSalesModal()">Cancel</button>
-            <button type="button" class="btn-primary" id="pendingPaySubmitBtn"
-                    onclick="submitPendingPayment()" disabled>
-                Submit Payment
-            </button>
+            <!-- Submit button removed — selection auto-opens checkout -->
         </div>
     </div>
 </div>
-
 
 <!-- ============================================ -->
 <!-- CHECKOUT / CUSTOMER MODAL                    -->
@@ -1509,11 +1482,89 @@
                     <div class="modal-field" style="margin-bottom:0;">
                         <label id="checkoutRefLabel">Reference / Phone</label>
                         <input type="text" id="checkoutReference"
-                               placeholder="e.g. 07XX XXX XXX or txn code"
-                               autocomplete="off"
-                               onkeydown="handleCheckoutEnter(event, 'reference')">
+                            placeholder="e.g. 07XX XXX XXX or txn code"
+                            autocomplete="off"
+                            onkeydown="handleCheckoutEnter(event, 'reference')">
                     </div>
                 </div>
+
+                <!-- ================= M-PESA FLOW ================= -->
+                <div id="checkoutMpesaPanel" style="margin-top:10px; display:none;">
+
+                    <!-- Two action buttons: Send STK / Confirm message -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:10px;">
+                        <button type="button" class="btn-3d" id="mpesaSendStkBtn"
+                                style="height:38px; background:#e8f5e9; border-color:#66ff66 #003300 #003300 #66ff66;"
+                                onclick="mpesaShowStkStep()">
+                            <i class="fas fa-paper-plane" style="color:#009900;"></i> Send STK Push
+                        </button>
+                        <button type="button" class="btn-3d" id="mpesaConfirmBtn"
+                                style="height:38px; background:#fff8e1; border-color:#ffcc66 #806600 #806600 #ffcc66;"
+                                onclick="mpesaShowConfirmStep()">
+                            <i class="fas fa-search" style="color:#cc8800;"></i> Search By Code
+                        </button>
+                    </div>
+
+                    <!-- ---- STEP A: Send STK ---- -->
+                    <div id="mpesaStkStep" class="groupbox" style="display:none; margin-top:0;">
+                        <span class="groupbox-title">Send STK Push</span>
+                        <div class="modal-field">
+                            <label>M-Pesa Phone <span class="text-danger">*</span></label>
+                            <input type="text" id="mpesaStkPhone"
+                                placeholder="07XX XXX XXX"
+                                autocomplete="off"
+                                onkeydown="if(event.key==='Enter'){event.preventDefault();sendMpesaStkPush();}">
+                        </div>
+                        <button type="button" class="btn-3d"
+                                style="height:36px; width:100%; background:#009900; color:#fff;
+                                    border-color:#66ff66 #003300 #003300 #66ff66;"
+                                onclick="sendMpesaStkPush()">
+                            <i class="fas fa-paper-plane"></i> Push STK to Phone
+                        </button>
+
+                        <div id="mpesaStkStatus"
+                            style="display:none; margin-top:10px; padding:8px; font-size:12px;
+                                    border:2px solid; border-color:#808080 #ffffff #ffffff #808080;">
+                        </div>
+                    </div>
+
+                    <!-- ---- STEP B: Confirm M-Pesa message ---- -->
+                    <div id="mpesaConfirmStep" class="groupbox" style="display:none; margin-top:0;">
+                        <span class="groupbox-title">Customer Paid Directly — Enter M-Pesa Code</span>
+
+                        <div class="modal-field">
+                            <label>M-Pesa Transaction Code <span class="text-danger">*</span></label>
+                            <input type="text" id="mpesaConfirmCode"
+                                placeholder="e.g. QGH7X8Y2Z1"
+                                autocomplete="off"
+                                style="text-transform:uppercase; font-family:'Courier New',monospace; font-weight:700;"
+                                onkeydown="if(event.key==='Enter'){event.preventDefault();confirmMpesaMessage();}">
+                            <small style="color:#555;">
+                                Paste or scan the M-Pesa confirmation code. We'll match it against a
+                                transaction of <b id="mpesaExpectedAmount">KSh 0.00</b>.
+                            </small>
+                        </div>
+
+                        <div class="modal-field">
+                            <label>Amount Received (auto-filled)</label>
+                            <input type="number" id="mpesaConfirmAmount" step="0.01" min="0" readonly
+                                style="background:#e8e8e8;">
+                        </div>
+
+                        <button type="button" class="btn-3d"
+                                style="height:36px; width:100%; background:#cc8800; color:#fff;
+                                    border-color:#ffcc66 #664400 #664400 #ffcc66;"
+                                onclick="confirmMpesaMessage()">
+                            <i class="fas fa-search"></i> Search & Match Transaction
+                        </button>
+
+                        <div id="mpesaConfirmStatus"
+                            style="display:none; margin-top:10px; padding:8px; font-size:12px;
+                                    border:2px solid; border-color:#808080 #ffffff #ffffff #808080;">
+                        </div>
+                    </div>
+                </div>
+                <!-- =============== /M-PESA FLOW =============== -->
             </div>
 
             <!-- ============ BRANCH ============ -->
@@ -1554,10 +1605,11 @@
 
                 <div id="checkoutNamedFields" style="display:none;">
                     <div class="modal-field">
-                        <label>Name <span class="text-danger">*</span></label>
+                        <label>Name</label>
                         <input type="text" id="checkoutName"
-                               placeholder="Customer full name" autocomplete="off"
-                               onkeydown="handleCheckoutEnter(event, 'name')">
+                            placeholder="Customer full name (optional)"
+                            autocomplete="off"
+                            onkeydown="handleCheckoutEnter(event, 'name')">
                     </div>
                     <div class="modal-field">
                         <label>Phone <span class="text-danger">*</span></label>
@@ -1700,8 +1752,18 @@ let returnSelections = {};   // { sale_item_id: qty_to_return }
 let usbPrinterDevice = null;
 let usbPrinterEndpoint = null;
 let pendingSaleData = null;   // the sale being paid
+let checkoutMode = 'new';   // 'new' | 'pending'
 
 
+
+
+const CURRENCY = 'KSh ';
+function money(n) {
+    return CURRENCY + Number(n).toLocaleString('en-KE', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+}
 const PRINTER_DB_NAME = 'pos-printer';
 const PRINTER_DB_STORE = 'devices';
 const PRINTER_DB_KEY = 'xprinter';
@@ -2507,9 +2569,11 @@ function renderTicket() {
     if (cart.length === 0) {
         tbody.innerHTML = `<tr><td colspan="8" class="empty-ticket">Ticket is empty — scan or pick a product to start.</td></tr>`;
         updateTotalsBar();
-        updateF8Button(); 
+        updateF8Button();
         return;
     }
+
+    const rate = POS_ENABLE_TAX && POS_TAX_RATE > 0 ? POS_TAX_RATE : 0;
 
     tbody.innerHTML = cart.map((item, i) => {
         const lineTotal = item.price * item.quantity;
@@ -2517,8 +2581,9 @@ function renderTicket() {
         if (item.discountPct) discount = lineTotal * item.discountPct / 100;
         else if (item.discountAmt) discount = item.discountAmt * item.quantity;
         const netLine = Math.max(0, lineTotal - discount);
-        const lineTax = POS_ENABLE_TAX && POS_TAX_RATE > 0
-            ? netLine * POS_TAX_RATE / (100 + POS_TAX_RATE) : 0;
+
+        // Tax extracted from the line (tax-inclusive pricing)
+        const lineTax = rate > 0 ? netLine * rate / (100 + rate) : 0;
 
         return `<tr data-index="${i}" class="${i === selectedTicketIndex ? 'active-row' : ''}" onclick="selectTicketRow(${i})">
             <td class="col-index">${i + 1}</td>
@@ -2533,7 +2598,7 @@ function renderTicket() {
     }).join('');
 
     updateTotalsBar();
-    updateF8Button();   
+    updateF8Button();
 }
 
 function selectTicketRow(idx) {
@@ -2580,33 +2645,47 @@ function recalcTicketLine() {
 }
 
 function updateTotalsBar() {
-    let subtotal = 0, taxTotal = 0;
+    let subtotal = 0;
 
     cart.forEach(item => {
         const lineTotal = item.price * item.quantity;
+
         let discount = 0;
         if (item.discountPct) discount = lineTotal * item.discountPct / 100;
         else if (item.discountAmt) discount = item.discountAmt * item.quantity;
+
         const net = Math.max(0, lineTotal - discount);
         subtotal += net;
-
-        if (POS_ENABLE_TAX && POS_TAX_RATE > 0) {
-            taxTotal += net * POS_TAX_RATE / (100 + POS_TAX_RATE);
-        }
     });
-    currentTotal = subtotal;
 
-    document.getElementById('taxDisplay').textContent   = taxTotal.toFixed(2);
-    document.getElementById('totalDisplay').textContent = subtotal.toFixed(2);
-    document.getElementById('paidDisplay').textContent  = '0';
-    document.getElementById('dueDisplay').textContent   = subtotal.toFixed(2);
-    document.getElementById('typeDisplay').textContent  =
-        PAYMENT_LABELS[currentPaymentMethod] || 'DEBIT CARD';
+    // ---- Tax (extracted from the tax-inclusive total) ----
+    let taxTotal = 0;
+    const rate = POS_ENABLE_TAX && POS_TAX_RATE > 0 ? POS_TAX_RATE : 0;
+    if (rate > 0) {
+        taxTotal = subtotal * rate / (100 + rate);
+    }
 
-    // --- Big Complete Sale button ---
+    // Kenyan retail: customer pays the shelf price; tax is extracted, not added
+    const grandTotal = subtotal;
+
+    // ---- State used elsewhere in the app ----
+    currentTotal = grandTotal;
+
+    // ---- Push values into the totals grid ----
+    document.getElementById('subtotalDisplay').textContent = money(subtotal);
+    document.getElementById('taxRateDisplay').textContent   = rate.toFixed(2).replace(/\.00$/, '') + '%';
+    document.getElementById('taxDisplay').textContent       = money(taxTotal);
+    document.getElementById('totalDisplay').textContent     = money(grandTotal);
+
+    document.getElementById('paidDisplay').textContent      = '0';
+    document.getElementById('dueDisplay').textContent       = money(grandTotal);
+    document.getElementById('typeDisplay').textContent      =
+        PAYMENT_LABELS[currentPaymentMethod] || 'CASH';
+
+    // ---- Big Complete Sale button + total display ----
     const btn      = document.getElementById('completeSaleBtn');
     const btnTotal = document.getElementById('btnTotal');
-    if (btnTotal) btnTotal.textContent = `KSh ${subtotal.toFixed(2)}`;
+    if (btnTotal) btnTotal.textContent = `KSh ${grandTotal.toFixed(2)}`;
     if (btn) btn.disabled = (cart.length === 0);
 }
 
@@ -2743,14 +2822,6 @@ function formatExpiry(input) {
     input.value = v.length > 2 ? v.slice(0,2) + '/' + v.slice(2) : v;
 }
 
-function sendSTKPush() {
-    const phone = document.getElementById('mpesaPhone').value.trim();
-    const s = document.getElementById('mpesaStatusDisplay');
-    if (!phone || phone.length < 10) { s.innerHTML = '<span style="color:#cc0000;">Enter a valid phone</span>'; return; }
-    s.innerHTML = '<span style="color:#cc8800;">Sending STK Push...</span>';
-    setTimeout(() => { s.innerHTML = '<span style="color:#009900;">✅ Payment confirmed!</span>'; }, 2500);
-}
-
 function processPayment() {
     const status = document.getElementById('paymentStatus');
     if (currentPaymentMethod === 'cash') {
@@ -2832,6 +2903,7 @@ async function completeSaleInternal(customer) {
         customer_phone: customer.phone,
         customer_email: customer.email,
         payment_method: currentPaymentMethod,
+        payment_reference: (document.getElementById('checkoutReference').value || '').trim() || null,  
         items: cart.map(item => ({
             product_code: item.product_code,
             quantity: item.quantity,
@@ -2906,6 +2978,7 @@ function completeSale() {
     onCheckoutCustomerTypeChange();
     hideCheckoutError();
 
+    window._mpesaStkConfirmed = false; 
     document.getElementById('checkoutModal').classList.add('active');
 
     // Focus first relevant field
@@ -2957,6 +3030,7 @@ function populateCheckoutBranch() {
 
 function closeCheckoutModal() {
     document.getElementById('checkoutModal').classList.remove('active');
+    resetCheckoutMode();  
     searchInput.focus();
 }
 
@@ -2982,31 +3056,36 @@ function focusFirstCheckoutField() {
 }
 
 function selectCheckoutPaymentMethod(method) {
-    currentPaymentMethod = method;                       // ← this is what the backend uses
+    currentPaymentMethod = method;
 
-    // Highlight the active button
     document.querySelectorAll('#checkoutModal .checkout-pm').forEach(b => {
         b.classList.toggle('active', b.dataset.pm === method);
     });
 
-    // Show / hide panels
-    const cashPanel = document.getElementById('checkoutCashPanel');
-    const refPanel  = document.getElementById('checkoutRefPanel');
-    const refLabel  = document.getElementById('checkoutRefLabel');
+    const cashPanel   = document.getElementById('checkoutCashPanel');
+    const refPanel    = document.getElementById('checkoutRefPanel');
+    const refLabel    = document.getElementById('checkoutRefLabel');
+    const mpesaPanel  = document.getElementById('checkoutMpesaPanel');
+
+    // Hide everything first
+    cashPanel.style.display  = 'none';
+    refPanel.style.display   = 'none';
+    if (mpesaPanel) mpesaPanel.style.display = 'none';
 
     if (method === 'cash') {
         cashPanel.style.display = 'block';
-        refPanel.style.display  = 'none';
         document.getElementById('checkoutChange').textContent = 'KSh 0.00';
         document.getElementById('checkoutTendered').value = '';
-    } else {
-        cashPanel.style.display = 'none';
-        refPanel.style.display  = 'block';
 
-        if (method === 'mpesa') {
-            refLabel.textContent = 'M-Pesa Phone';
-            document.getElementById('checkoutReference').placeholder = '07XX XXX XXX';
-        } else if (method === 'bank') {
+    } else if (method === 'mpesa') {
+        // Use the dedicated M-Pesa two-step panel
+        showMpesaPanel();
+
+    } else {
+        // bank / points → generic reference field
+        refPanel.style.display = 'block';
+
+        if (method === 'bank') {
             refLabel.textContent = 'Card / Txn Ref';
             document.getElementById('checkoutReference').placeholder = 'e.g. auth code';
         } else if (method === 'points') {
@@ -3016,6 +3095,287 @@ function selectCheckoutPaymentMethod(method) {
     }
 
     hideCheckoutError();
+}
+
+function showMpesaPanel() {
+    document.getElementById('checkoutMpesaPanel').style.display = 'block';
+
+    // Only reset the sub-steps if we're arriving fresh
+    const stkVisible = document.getElementById('mpesaStkStep').style.display === 'block';
+    const confirmVisible = document.getElementById('mpesaConfirmStep').style.display === 'block';
+
+    if (!stkVisible && !confirmVisible) {
+        document.getElementById('mpesaStkStep').style.display     = 'none';
+        document.getElementById('mpesaConfirmStep').style.display = 'none';
+        document.getElementById('mpesaStkStatus').style.display   = 'none';
+        document.getElementById('mpesaConfirmStatus').style.display = 'none';
+
+        document.getElementById('mpesaConfirmAmount').value = currentTotal.toFixed(2);
+        document.getElementById('mpesaExpectedAmount').textContent =
+            'KSh ' + currentTotal.toFixed(2);
+
+        mpesaShowStkStep();
+    }
+}
+
+function hideMpesaPanel() {
+    document.getElementById('checkoutMpesaPanel').style.display = 'none';
+}
+
+function mpesaShowConfirmStep() {
+    document.getElementById('mpesaStkStep').style.display     = 'none';
+    document.getElementById('mpesaConfirmStep').style.display = 'block';
+    document.getElementById('mpesaConfirmBtn').classList.add('active');
+    document.getElementById('mpesaSendStkBtn').classList.remove('active');
+
+    // 👇 Re-apply any receipt code cached during polling
+    if (window._mpesaReceiptCode) {
+        document.getElementById('mpesaConfirmCode').value   = window._mpesaReceiptCode;
+        document.getElementById('mpesaConfirmAmount').value = window._mpesaReceiptAmount;
+    }
+
+    setTimeout(() => document.getElementById('mpesaConfirmCode').focus(), 80);
+}
+
+function mpesaShowStkStep() {
+    const alreadyOnStk = document.getElementById('mpesaStkStep').style.display === 'block';
+    document.getElementById('mpesaStkStep').style.display     = 'block';
+    document.getElementById('mpesaConfirmStep').style.display = 'none';
+    document.getElementById('mpesaSendStkBtn').classList.add('active');
+    document.getElementById('mpesaConfirmBtn').classList.remove('active');
+
+    // Only focus the phone field when we're actually transitioning INTO this step
+    if (!alreadyOnStk) {
+        setTimeout(() => {
+            const el = document.getElementById('mpesaStkPhone');
+            if (el && document.activeElement !== el) el.focus();
+        }, 80);
+    }
+}
+
+function mpesaAutoFillCustomer(name, phone) {
+    name  = (name  || '').trim();
+    phone = (phone || '').trim();
+
+    if (!name && !phone) return;
+
+    const nameEl  = document.getElementById('checkoutName');
+    const phoneEl = document.getElementById('checkoutPhone');
+
+    // Only fill when the cashier hasn't already typed something
+    if (name  && nameEl  && !nameEl.value.trim())  nameEl.value  = name;
+    if (phone && phoneEl && !phoneEl.value.trim()) phoneEl.value = phone;
+
+    // Only flip to Named Customer if at least one field got populated
+    const filled = (nameEl && nameEl.value.trim()) || (phoneEl && phoneEl.value.trim());
+    const namedRadio  = document.getElementById('checkoutNamed');
+    const walkinRadio = document.getElementById('checkoutWalkin');
+    if (namedRadio && walkinRadio && filled) {
+        namedRadio.checked  = true;
+        walkinRadio.checked = false;
+        onCheckoutCustomerTypeChange();
+    }
+
+    const tabName  = document.getElementById('customerName');
+    const tabPhone = document.getElementById('customerPhone');
+    if (name  && tabName  && !tabName.value.trim())  tabName.value  = name;
+    if (phone && tabPhone && !tabPhone.value.trim()) tabPhone.value = phone;
+
+    const tabNamed  = document.getElementById('custTypeNamed');
+    const tabWalkin = document.getElementById('custTypeWalkin');
+    if (tabNamed && tabWalkin && filled) {
+        tabNamed.checked  = true;
+        tabWalkin.checked = false;
+    }
+}
+
+async function sendMpesaStkPush() {
+    // Reset any previous receipt so we don't confuse the cashier
+    window._mpesaReceiptCode   = '';
+    window._mpesaReceiptAmount = '';
+    window._mpesaStkConfirmed  = false;   
+
+    const phoneEl = document.getElementById('mpesaStkPhone');
+    const statusEl = document.getElementById('mpesaStkStatus');
+    const phone = (phoneEl.value || '').trim();
+
+    if (!/^[+\d][\d\s\-()]{6,}$/.test(phone)) {
+        statusEl.style.display = 'block';
+        statusEl.style.background = '#f8d7da';
+        statusEl.style.color = '#721c24';
+        statusEl.textContent = '⚠️ Enter a valid M-Pesa phone number.';
+        phoneEl.focus();
+        return;
+    }
+
+    statusEl.style.display = 'block';
+    statusEl.style.background = '#fff3cd';
+    statusEl.style.color = '#856404';
+    statusEl.innerHTML = '⏳ Sending STK push…';
+
+    try {
+        const res = await fetch('/mpesa/stk-push/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+            body: JSON.stringify({
+                phone: phone,
+                amount: currentTotal,
+                account_reference: 'POS-SALE',
+                description: 'POS Payment',
+                // 👇 NEW: tells the backend which branch's MpesaConfig to use
+                branch_id: document.getElementById('checkoutBranch').value
+                        || (document.getElementById('branchSelect') || {}).value
+                        || null,
+            }),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            statusEl.style.background = '#d4edda';
+            statusEl.style.color = '#155724';
+            statusEl.innerHTML =
+                '✅ STK push sent to <b>' + phone + '</b>.<br>' +
+                '<span style="display:inline-block;margin-top:4px;">' +
+                '⏳ <b>Waiting for payment…</b> Ask the customer to enter their PIN.' +
+                '</span>';
+
+            // Auto-poll every 4s for up to ~2 minutes
+            pollMpesaStkStatus(data.checkout_request_id || data.request_id, 30);
+        } else {
+            statusEl.style.background = '#f8d7da';
+            statusEl.style.color = '#721c24';
+            statusEl.textContent = '❌ ' + (data.error || 'STK push failed.');
+        }
+    } catch (err) {
+        statusEl.style.background = '#f8d7da';
+        statusEl.style.color = '#721c24';
+        statusEl.textContent = '❌ ' + err.message;
+    }
+}
+
+async function pollMpesaStkStatus(requestId, attemptsLeft) {
+    if (!requestId || attemptsLeft <= 0) return;
+
+    try {
+        const res = await fetch(
+            `/mpesa/stk-status/?request_id=${encodeURIComponent(requestId)}`
+        );
+        const data = await res.json();
+
+        const statusEl = document.getElementById('mpesaStkStatus');
+
+        if (data.status === 'success') {
+            // 👇 NEW: mark that the STK push already confirmed the payment
+            window._mpesaStkConfirmed = true;
+            // STK push succeeded — payment is confirmed by Safaricom.
+            // Auto-fill and submit the sale; no cashier confirmation needed.
+            window._mpesaReceiptCode   = data.mpesa_code || '';
+            window._mpesaReceiptAmount = Number(data.amount || currentTotal).toFixed(2);
+
+            statusEl.style.background = '#d4edda';
+            statusEl.style.color = '#155724';
+            statusEl.innerHTML =
+                '✅ <b>Payment received!</b><br>' +
+                'Code: <b>' + window._mpesaReceiptCode + '</b> · ' +
+                'KSh ' + window._mpesaReceiptAmount +
+                '<br><span style="display:inline-block;margin-top:4px;">' +
+                '🧾 Completing sale…</span>';
+
+            // Mirror the code into the generic reference field
+            const refEl = document.getElementById('checkoutReference');
+            if (refEl) refEl.value = window._mpesaReceiptCode;
+
+            // Also fill the confirm step, in case the cashier opens it
+            const codeEl = document.getElementById('mpesaConfirmCode');
+            const amtEl  = document.getElementById('mpesaConfirmAmount');
+            if (codeEl) codeEl.value = window._mpesaReceiptCode;
+            if (amtEl)  amtEl.value  = window._mpesaReceiptAmount;
+
+            // 👇 NEW: auto-fill customer details from the M-Pesa SMS
+            mpesaAutoFillCustomer(data.customer_name, data.customer_phone);
+
+            // Auto-submit the sale (no manual confirm required)
+            setTimeout(() => { submitCheckout(); }, 500);
+            return;
+        }
+
+        if (data.status === 'failed' || data.status === 'cancelled') {
+            statusEl.style.background = '#f8d7da';
+            statusEl.style.color = '#721c24';
+            statusEl.textContent = '❌ Payment ' + data.status + ': ' + (data.message || '');
+            return;
+        }
+
+        // Still pending — keep polling
+        setTimeout(() => pollMpesaStkStatus(requestId, attemptsLeft - 1), 4000);
+
+    } catch (err) {
+        // Network hiccup — keep trying
+        setTimeout(() => pollMpesaStkStatus(requestId, attemptsLeft - 1), 5000);
+    }
+}
+
+async function confirmMpesaMessage() {
+    const codeEl  = document.getElementById('mpesaConfirmCode');
+    const amtEl   = document.getElementById('mpesaConfirmAmount');
+    const statusEl = document.getElementById('mpesaConfirmStatus');
+    const code = (codeEl.value || '').trim().toUpperCase();
+
+    if (!code) {
+        statusEl.style.display = 'block';
+        statusEl.style.background = '#f8d7da';
+        statusEl.style.color = '#721c24';
+        statusEl.textContent = '⚠️ Enter the M-Pesa transaction code from the SMS.';
+        codeEl.focus();
+        return;
+    }
+
+    statusEl.style.display = 'block';
+    statusEl.style.background = '#fff3cd';
+    statusEl.style.color = '#856404';
+    statusEl.innerHTML = '🔎 Searching for transaction <b>' + code + '</b>…';
+
+    try {
+        // Backend should look this code up in the M-Pesa callbacks / payments
+        // table AND verify the amount equals currentTotal.
+        const res = await fetch('/mpesa/confirm/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+            body: JSON.stringify({
+                transaction_code: code,
+                expected_amount: currentTotal,
+            }),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            statusEl.style.background = '#d4edda';
+            statusEl.style.color = '#155724';
+            statusEl.innerHTML =
+                '✅ <b>Transaction matched!</b><br>' +
+                'Code: <b>' + data.mpesa_code + '</b><br>' +
+                'Amount: <b>KSh ' + Number(data.amount).toFixed(2) + '</b>';
+
+            amtEl.value = Number(data.amount).toFixed(2);
+
+            // Mirror into the generic reference field so submitCheckout()
+            // sends it to the backend.
+            const refEl = document.getElementById('checkoutReference');
+            if (refEl) refEl.value = data.mpesa_code;
+
+            // Give the cashier a beat to see the success, then auto-submit.
+            setTimeout(() => { submitCheckout(); }, 700);
+
+        } else {
+            statusEl.style.background = '#f8d7da';
+            statusEl.style.color = '#721c24';
+            statusEl.textContent = '❌ ' + (data.error || 'No matching transaction found.');
+        }
+    } catch (err) {
+        statusEl.style.background = '#f8d7da';
+        statusEl.style.color = '#721c24';
+        statusEl.textContent = '❌ ' + err.message;
+    }
 }
 
 function updateCheckoutChange() {
@@ -3089,9 +3449,7 @@ function handleCheckoutEnter(e, currentField) {
     if (!isNamed) { submitCheckout(); return; }
 
     if (currentField === 'name') {
-        if (!document.getElementById('checkoutName').value.trim()) {
-            showCheckoutError('⚠️ Customer name is required.'); return;
-        }
+        // Name is optional — just advance to the phone field
         document.getElementById('checkoutPhone').focus();
         return;
     }
@@ -3128,6 +3486,19 @@ function hideCheckoutError() {
 async function submitCheckout() {
     hideCheckoutError();
 
+    // =====================================================
+    // PENDING MODE — settle an existing pending sale
+    // =====================================================
+    if (checkoutMode === 'pending' && pendingSaleData) {
+        await submitPendingCheckout();
+        return;
+    }
+
+    // =====================================================
+    // NEW SALE MODE
+    // =====================================================
+
+    // ---- Branch validation ----
     const branchId = document.getElementById('checkoutBranch').value;
     if (!branchId) {
         showCheckoutError('⚠️ Please select a branch.');
@@ -3136,49 +3507,93 @@ async function submitCheckout() {
     }
 
     // ---- Payment method validation ----
-    let tendered = null;
+    let tendered  = null;
     let reference = '';
 
     if (currentPaymentMethod === 'cash') {
         tendered = parseFloat(document.getElementById('checkoutTendered').value) || 0;
         if (tendered < currentTotal) {
-            showCheckoutError(`⚠️ Amount tendered (KSh ${tendered.toFixed(2)}) is less than the total (KSh ${currentTotal.toFixed(2)}).`);
+            showCheckoutError(
+                `⚠️ Amount tendered (KSh ${tendered.toFixed(2)}) is less than the total ` +
+                `(KSh ${currentTotal.toFixed(2)}).`
+            );
             document.getElementById('checkoutTendered').focus();
             return;
         }
-    } else {
+
+    } else if (currentPaymentMethod === 'bank') {
         reference = document.getElementById('checkoutReference').value.trim();
-        if (currentPaymentMethod === 'mpesa' && !reference) {
-            showCheckoutError('⚠️ Enter the M-Pesa phone number.');
-            document.getElementById('checkoutReference').focus();
-            return;
-        }
-        if (currentPaymentMethod === 'bank' && !reference) {
+        if (!reference) {
             showCheckoutError('⚠️ Enter the card / transaction reference.');
             document.getElementById('checkoutReference').focus();
             return;
+        }
+
+    } else if (currentPaymentMethod === 'points') {
+        reference = document.getElementById('checkoutReference').value.trim();
+        // points can be empty — allowed
+
+    } else if (currentPaymentMethod === 'mpesa') {
+        reference = (document.getElementById('checkoutReference').value || '').trim();
+
+        if (!reference && window._mpesaStkConfirmed && window._mpesaReceiptCode) {
+            reference = window._mpesaReceiptCode;
+            const refEl = document.getElementById('checkoutReference');
+            if (refEl) refEl.value = reference;
+        }
+
+        // Accept the sale as long as STK was confirmed — the code is
+        // optional. The Sale will record payment_status='paid' regardless.
+        if (!reference && !window._mpesaStkConfirmed) {
+            showCheckoutError(
+                '⚠️ Confirm the M-Pesa transaction first (click "Customer Paid Directly").'
+            );
+            mpesaShowConfirmStep();
+            return;
+        }
+
+        if (!reference) {
+            // STK confirmed but no code — record a placeholder so the receipt
+            // shows something and the sale goes through.
+            reference = 'MPESA-STK';
+            const refEl = document.getElementById('checkoutReference');
+            if (refEl) refEl.value = reference;
         }
     }
 
     // ---- Customer validation ----
     const isNamed = document.getElementById('checkoutNamed').checked;
     let customer;
+
     if (isNamed) {
         const name  = document.getElementById('checkoutName').value.trim();
         const phone = document.getElementById('checkoutPhone').value.trim();
         const email = document.getElementById('checkoutEmail').value.trim();
 
-        if (!name)  { showCheckoutError('⚠️ Customer name is required.');  document.getElementById('checkoutName').focus();  return; }
-        if (!phone) { showCheckoutError('⚠️ Customer phone is required.'); document.getElementById('checkoutPhone').focus(); return; }
+        // Phone is the only hard requirement for a Named Customer
+        if (!phone) {
+            showCheckoutError('⚠️ Customer phone is required.');
+            document.getElementById('checkoutPhone').focus();
+            return;
+        }
         if (!/^[+\d][\d\s\-()]{6,}$/.test(phone)) {
             showCheckoutError('⚠️ Enter a valid customer phone number.');
-            document.getElementById('checkoutPhone').focus(); return;
+            document.getElementById('checkoutPhone').focus();
+            return;
         }
         if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             showCheckoutError('⚠️ Enter a valid email address, or leave blank.');
-            document.getElementById('checkoutEmail').focus(); return;
+            document.getElementById('checkoutEmail').focus();
+            return;
         }
-        customer = { type: 'named', name, phone, email };
+
+        // Name is optional — fall back to a placeholder
+        customer = {
+            type: 'named',
+            name: name || 'M-Pesa Customer',
+            phone,
+            email,
+        };
     } else {
         customer = { type: 'walkin', name: 'Walk-in Customer', phone: '', email: '' };
     }
@@ -3235,6 +3650,125 @@ async function submitCheckout() {
             status.className = 'payment-status error';
             status.textContent = '❌ Sale failed. See alert for details.';
         }
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function submitPendingCheckout() {
+    const status = document.getElementById('checkoutStatus');
+    const btn    = document.getElementById('checkoutSubmitBtn');
+
+    // ---- Payment method validation (same rules as new sale) ----
+    let tendered  = null;
+    let reference = '';
+
+    if (currentPaymentMethod === 'cash') {
+        tendered = parseFloat(document.getElementById('checkoutTendered').value) || 0;
+        if (tendered < currentTotal) {
+            showCheckoutError(
+                `⚠️ Amount tendered (KSh ${tendered.toFixed(2)}) is less than the total ` +
+                `(KSh ${currentTotal.toFixed(2)}).`
+            );
+            document.getElementById('checkoutTendered').focus();
+            return;
+        }
+
+    } else if (currentPaymentMethod === 'bank') {
+        reference = document.getElementById('checkoutReference').value.trim();
+        if (!reference) {
+            showCheckoutError('⚠️ Enter the card / transaction reference.');
+            document.getElementById('checkoutReference').focus();
+            return;
+        }
+
+    } else if (currentPaymentMethod === 'points') {
+        reference = document.getElementById('checkoutReference').value.trim();
+
+    } else if (currentPaymentMethod === 'mpesa') {
+        reference = (document.getElementById('checkoutReference').value || '').trim();
+
+        if (!reference && window._mpesaStkConfirmed && window._mpesaReceiptCode) {
+            reference = window._mpesaReceiptCode;
+            const refEl = document.getElementById('checkoutReference');
+            if (refEl) refEl.value = reference;
+        }
+        if (!reference && !window._mpesaStkConfirmed) {
+            showCheckoutError(
+                '⚠️ Confirm the M-Pesa transaction first (click "Customer Paid Directly").'
+            );
+            mpesaShowConfirmStep();
+            return;
+        }
+        if (!reference) {
+            reference = 'MPESA-STK';
+            const refEl = document.getElementById('checkoutReference');
+            if (refEl) refEl.value = reference;
+        }
+    }
+
+    // ---- Update totals bar ----
+    if (currentPaymentMethod === 'cash') {
+        document.getElementById('paidDisplay').textContent = tendered.toFixed(2);
+    } else {
+        document.getElementById('paidDisplay').textContent = currentTotal.toFixed(2);
+    }
+    document.getElementById('dueDisplay').textContent = '0.00';
+    document.getElementById('typeDisplay').textContent =
+        PAYMENT_LABELS[currentPaymentMethod] || 'DEBIT CARD';
+
+    const rnEl = document.getElementById('refNumberDisplay');
+    if (rnEl) rnEl.textContent = reference || '—';
+
+    // ---- Fire the settle request ----
+    status.className = 'payment-status pending';
+    status.textContent = 'Settling pending sale…';
+    btn.disabled = true;
+
+    try {
+        const res = await fetch(
+            `/epa_shop/sale/${pendingSaleData.id}/complete-json/`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken(),
+                },
+                body: JSON.stringify({
+                    payment_method:  currentPaymentMethod,
+                    amount_tendered: tendered || currentTotal,
+                    payment_reference: reference || null,
+                }),
+            }
+        );
+        const data = await res.json();
+
+        if (data.success) {
+            status.className = 'payment-status success';
+            status.textContent =
+                `✅ Pending sale #${pendingSaleData.company_sale_id} settled.`;
+            showSuccessToast(
+                `✅ Pending sale #${pendingSaleData.company_sale_id} completed`
+            );
+
+            // Refresh both lists
+            loadPendingSalesList();
+            loadPendingPayments();
+
+            const settledId = pendingSaleData.id;
+
+            setTimeout(() => {
+                closeCheckoutModal();
+                if (settledId) openReceiptModal(settledId);
+            }, 900);
+
+        } else {
+            status.className = 'payment-status error';
+            status.textContent = '❌ ' + (data.error || 'Unknown error');
+        }
+    } catch (err) {
+        status.className = 'payment-status error';
+        status.textContent = '❌ ' + err.message;
     } finally {
         btn.disabled = false;
     }
@@ -3338,30 +3872,76 @@ async function loadPendingPayments() {
     } catch (err) { console.error(err); }
 }
 
+function openCheckoutForPendingSale(sale) {
+    checkoutMode = 'pending';
+    pendingSaleData = sale;
 
+    const total = parseFloat(sale.net_amount) || 0;
+    currentTotal = total;   // so cash-change math works
+
+    // Header
+    document.getElementById('checkoutTotalDisplay').textContent =
+        `KSh ${total.toFixed(2)}`;
+
+    // Branch (read-only — sale already has a branch)
+    populateCheckoutBranch();
+    const branchEl = document.getElementById('checkoutBranch');
+    if (branchEl && sale.branch_id) {
+        branchEl.value    = sale.branch_id;
+        branchEl.disabled = true;
+    }
+
+    // Customer — pre-filled from the pending sale
+    const isNamed = !!sale.customer_phone && sale.customer_name !== 'Walk-in Customer';
+    document.getElementById('checkoutWalkin').checked = !isNamed;
+    document.getElementById('checkoutNamed').checked  =  isNamed;
+
+    document.getElementById('checkoutName').value  = sale.customer_name  || '';
+    document.getElementById('checkoutPhone').value = sale.customer_phone || '';
+    document.getElementById('checkoutEmail').value = sale.customer_email || '';
+
+    onCheckoutCustomerTypeChange();
+    hideCheckoutError();
+
+    // Default payment method = cash
+    selectCheckoutPaymentMethod('cash');
+
+    // Update submit button label to reflect what we're doing
+    const submitBtn = document.getElementById('checkoutSubmitBtn');
+    if (submitBtn) {
+        submitBtn.innerHTML =
+            `<i class="fas fa-check"></i> Settle Pending Sale (Enter)`;
+    }
+
+    window._mpesaStkConfirmed = false;
+    document.getElementById('checkoutModal').classList.add('active');
+
+    setTimeout(() => {
+        document.getElementById('checkoutTendered').focus();
+    }, 100);
+}
 
 
 
 // ============================================
-// PENDING SALES (search + pay)
+// PENDING SALES — lookup → redirect to Checkout
 // ============================================
-
 function openPendingSalesModal() {
     pendingSaleData = null;
 
-    document.getElementById('pendingLookupInput').value = '';
-    document.getElementById('pendingLookupError').style.display = 'none';
-    document.getElementById('pendingPayStep').style.display = 'none';
-    document.getElementById('pendingSaleHeader').innerHTML = '';
-    document.getElementById('pendingPayAmount').value = '';
-    document.getElementById('pendingPayStatus').className = 'payment-status';
-    document.getElementById('pendingPayStatus').style.display = 'none';
-    document.getElementById('pendingPaySubmitBtn').disabled = true;
+    const lookupInput = document.getElementById('pendingLookupInput');
+    const errEl       = document.getElementById('pendingLookupError');
+
+    if (lookupInput) lookupInput.value = '';
+    if (errEl) errEl.style.display = 'none';
 
     document.getElementById('pendingSalesModal').classList.add('active');
     loadPendingSalesList();
 
-    setTimeout(() => document.getElementById('pendingLookupInput').focus(), 100);
+    setTimeout(() => {
+        const el = document.getElementById('pendingLookupInput');
+        if (el) el.focus();
+    }, 100);
 }
 
 function closePendingSalesModal() {
@@ -3374,15 +3954,18 @@ async function loadPendingSalesList() {
     list.innerHTML = '<em style="color:#888;">Loading pending sales…</em>';
 
     try {
-        const res = await fetch('/epa_shop/pos/pending/');
+        const res  = await fetch('/epa_shop/pos/pending/');
         const data = await res.json();
+
         if (!data.pending || !data.pending.length) {
             list.innerHTML = '<em style="color:#888;">No pending sales.</em>';
             return;
         }
+
         list.innerHTML = data.pending.map(p => `
             <div class="pending-list-item"
-                 style="padding:6px; border-bottom:1px solid #ccc; cursor:pointer; display:flex; justify-content:space-between;"
+                 style="padding:6px; border-bottom:1px solid #ccc; cursor:pointer;
+                        display:flex; justify-content:space-between;"
                  onclick="selectPendingSale(${p.id})">
                 <span>
                     <b>#${p.company_sale_id}</b> —
@@ -3393,6 +3976,7 @@ async function loadPendingSalesList() {
                     KSh ${p.net_amount.toFixed(2)}
                 </span>
             </div>`).join('');
+
     } catch (err) {
         list.innerHTML = '<em style="color:#cc0000;">Failed to load.</em>';
     }
@@ -3400,24 +3984,30 @@ async function loadPendingSalesList() {
 
 async function selectPendingSale(saleId) {
     try {
-        const res = await fetch(`/epa_shop/sale/${saleId}/return-data/`);
+        const res  = await fetch(`/epa_shop/sale/${saleId}/return-data/`);
         const data = await res.json();
+
         if (!data.success) {
-            document.getElementById('pendingLookupError').textContent =
-                data.error || 'Could not load sale.';
-            document.getElementById('pendingLookupError').style.display = 'block';
+            const errEl = document.getElementById('pendingLookupError');
+            errEl.textContent = data.error || 'Could not load sale.';
+            errEl.style.display = 'block';
             return;
         }
-        showPendingPayStep(data.sale);
+
+        // Save for later use, then hand off to checkout
+        pendingSaleData = data.sale;
+        closePendingSalesModal();
+        openCheckoutForPendingSale(data.sale);
+
     } catch (err) {
-        document.getElementById('pendingLookupError').textContent =
-            'Error: ' + err.message;
-        document.getElementById('pendingLookupError').style.display = 'block';
+        const errEl = document.getElementById('pendingLookupError');
+        errEl.textContent = 'Error: ' + err.message;
+        errEl.style.display = 'block';
     }
 }
 
 async function lookupPendingSale() {
-    const q = document.getElementById('pendingLookupInput').value.trim();
+    const q     = (document.getElementById('pendingLookupInput').value || '').trim();
     const errEl = document.getElementById('pendingLookupError');
     errEl.style.display = 'none';
 
@@ -3427,117 +4017,29 @@ async function lookupPendingSale() {
         return;
     }
 
-    // Reuse the existing sale lookup endpoint (barcode / sale id / phone)
     try {
-        const res = await fetch(`/epa_shop/sale/lookup/?q=${encodeURIComponent(q)}`);
+        const res  = await fetch(`/epa_shop/sale/lookup/?q=${encodeURIComponent(q)}`);
         const data = await res.json();
+
         if (!data.success || !data.sale) {
             errEl.textContent = data.error || `No sale found for "${q}".`;
             errEl.style.display = 'block';
             return;
         }
         if (data.sale.payment_status !== 'pending') {
-            errEl.textContent = `Sale #${data.sale.company_sale_id} is already ${data.sale.payment_status}.`;
+            errEl.textContent =
+                `Sale #${data.sale.company_sale_id} is already ${data.sale.payment_status}.`;
             errEl.style.display = 'block';
             return;
         }
-        // Now fetch full details (items etc.) via selectPendingSale
+
         await selectPendingSale(data.sale.id);
+
     } catch (err) {
         errEl.textContent = 'Lookup failed: ' + err.message;
         errEl.style.display = 'block';
     }
 }
-
-function showPendingPayStep(sale) {
-    pendingSaleData = sale;
-
-    document.getElementById('pendingSaleHeader').innerHTML = `
-        <b>Sale #${sale.company_sale_id}</b> —
-        ${sale.customer_name || 'Walk-in'}
-        ${sale.customer_phone ? '(' + sale.customer_phone + ')' : ''}<br>
-        Date: ${new Date(sale.sale_date).toLocaleString()}<br>
-        Status: <b style="color:#cc8800;">PENDING</b>
-    `;
-
-    const amount = parseFloat(sale.net_amount) || 0;
-    const input = document.getElementById('pendingPayAmount');
-    input.value = amount.toFixed(2);
-    input.max = amount.toFixed(2);
-    document.getElementById('pendingPayHint').textContent =
-        `Total due: KSh ${amount.toFixed(2)}`;
-
-    input.oninput = function () {
-        const v = parseFloat(this.value) || 0;
-        document.getElementById('pendingPaySubmitBtn').disabled = v <= 0;
-    };
-
-    document.getElementById('pendingPayStep').style.display = 'block';
-    document.getElementById('pendingPaySubmitBtn').disabled = false;
-
-    setTimeout(() => input.focus(), 100);
-}
-
-async function submitPendingPayment() {
-    if (!pendingSaleData) return;
-
-    const statusEl = document.getElementById('pendingPayStatus');
-    const amount = parseFloat(document.getElementById('pendingPayAmount').value) || 0;
-    const method = document.getElementById('pendingPayMethod').value;
-    const total  = parseFloat(pendingSaleData.net_amount) || 0;
-
-    if (amount <= 0) {
-        statusEl.className = 'payment-status error';
-        statusEl.textContent = '❌ Amount must be greater than 0.';
-        return;
-    }
-    if (amount < total) {
-        statusEl.className = 'payment-status error';
-        statusEl.textContent = `❌ Amount is less than the total due (KSh ${total.toFixed(2)}).`;
-        return;
-    }
-
-    statusEl.className = 'payment-status pending';
-    statusEl.textContent = 'Processing payment…';
-
-    try {
-        const res = await fetch(`/epa_shop/sale/${pendingSaleData.id}/complete-json/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
-            body: JSON.stringify({
-                payment_method: method,
-                amount_tendered: amount,
-            }),
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            statusEl.className = 'payment-status success';
-            statusEl.textContent = `✅ Paid! Sale #${pendingSaleData.company_sale_id}`;
-            showSuccessToast(`✅ Pending sale #${pendingSaleData.company_sale_id} completed`);
-
-            // Refresh both lists
-            loadPendingSalesList();
-            loadPendingPayments();
-
-            setTimeout(() => {
-                closePendingSalesModal();
-                if (data.redirect_url) openReceiptModal(pendingSaleData.id);
-            }, 1200);
-        } else {
-            statusEl.className = 'payment-status error';
-            statusEl.textContent = '❌ ' + (data.error || 'Unknown error');
-        }
-    } catch (err) {
-        statusEl.className = 'payment-status error';
-        statusEl.textContent = '❌ ' + err.message;
-    }
-}
-
-document.getElementById('pendingSalesModal').addEventListener('click', function (e) {
-    if (e.target === this) closePendingSalesModal();
-});
-
 
 
 // ============================================
@@ -4054,7 +4556,6 @@ function validateCustomer() {
     const walkin = document.getElementById('custTypeWalkin').checked;
     const named  = document.getElementById('custTypeNamed').checked;
 
-    // Nothing selected at all
     if (!walkin && !named) {
         showCustomerError('⚠️ Please choose a Customer type: Walk-in or Named Customer.');
         return null;
@@ -4064,22 +4565,16 @@ function validateCustomer() {
         return { type: 'walkin', name: 'Walk-in Customer', phone: '', email: '' };
     }
 
-    // Named customer — require name + phone
     const name  = (document.getElementById('customerName').value || '').trim();
     const phone = (document.getElementById('customerPhone').value || '').trim();
     const email = (document.getElementById('customerEmail').value || '').trim();
 
-    if (!name) {
-        showCustomerError('⚠️ Customer name is required.');
-        document.getElementById('customerName').focus();
-        return null;
-    }
+    // Phone required; name optional
     if (!phone) {
         showCustomerError('⚠️ Customer phone is required.');
         document.getElementById('customerPhone').focus();
         return null;
     }
-    // Basic phone sanity (digits, +, -, space, min 7 chars)
     if (!/^[+\d][\d\s\-()]{6,}$/.test(phone)) {
         showCustomerError('⚠️ Please enter a valid customer phone number.');
         document.getElementById('customerPhone').focus();
@@ -4092,7 +4587,12 @@ function validateCustomer() {
     }
 
     hideCustomerError();
-    return { type: 'named', name, phone, email };
+    return {
+        type: 'named',
+        name: name || 'M-Pesa Customer',
+        phone,
+        email,
+    };
 }
 
 function resetCustomerBlock() {
@@ -4150,18 +4650,21 @@ document.addEventListener('keydown', function (e) {
     // Enter key → Complete Sale
     // ---------------------------------------------------------
     if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const active = document.activeElement;
+        const tag = (active && active.tagName || '').toLowerCase();
 
-        // Do NOT hijack Enter when the user is typing in an input or
-        // textarea. This prevents accidental sales while filling the
-        // customer name / phone / price / discount fields.
-        const tag = (document.activeElement && document.activeElement.tagName || '').toLowerCase();
+        // Never hijack Enter while typing anywhere
         const isTypingField =
             tag === 'input' ||
             tag === 'textarea' ||
             tag === 'select' ||
-            (document.activeElement && document.activeElement.isContentEditable);
+            (active && active.isContentEditable);
 
-        if (isTypingField) return;   // let the browser handle it
+        if (isTypingField) return;
+
+        // Never hijack Enter while the checkout modal is open
+        if (document.getElementById('checkoutModal').classList.contains('active')) return;
+
 
         // Nothing to sell? Bail out silently.
         if (cart.length === 0) return;

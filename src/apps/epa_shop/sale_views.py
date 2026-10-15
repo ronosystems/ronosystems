@@ -26,6 +26,7 @@ from datetime import timedelta
 from django.db.models import Sum, Q
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_POST
+from apps.mpesa.models import MpesaTransaction
 
 
 
@@ -161,6 +162,7 @@ def process_sale(request):
     items            = data.get('items', []) or []
     payment_method   = data.get('payment_method', 'cash')
     payment_status   = data.get('payment_status', 'paid')
+    payment_reference = (data.get('payment_reference') or '').strip() or None
 
     # ============================================
     # Basic top-level validation (cheap, no DB writes)
@@ -309,6 +311,14 @@ def process_sale(request):
                 sold_by=request.user,
                 sale_date=timezone.now(),
             )
+
+            # 👇 NEW — link the M-Pesa transaction to this sale
+            if payment_method == 'm-pesa' and payment_reference:
+                MpesaTransaction.objects.filter(
+                    company=company,
+                    mpesa_code__iexact=payment_reference,
+                ).update(sale=sale)
+
 
             # Sale items + unit/stock mutations
             for item_data in sale_items_data:
@@ -562,6 +572,7 @@ def sale_process_single(request):
     sale_price_raw       = request.POST.get('sale_price', '0')
     sale_type            = (request.POST.get('sale_type') or 'cash').strip()
     branch_id            = (request.POST.get('branch_id') or '').strip()
+    payment_reference    = (request.POST.get('payment_reference') or '').strip() or None 
 
     if not unit_id:
         return JsonResponse({'error': 'Please scan or enter a unit identifier'}, status=400)
@@ -716,6 +727,14 @@ def sale_process_single(request):
                 sold_by=request.user,
                 sale_date=timezone.now(),
             )
+
+
+            # 👇 NEW — link the M-Pesa transaction to this sale
+            if sale_type in ('m-pesa', 'mpesa') and payment_reference:
+                MpesaTransaction.objects.filter(
+                    company=company,
+                    mpesa_code__iexact=payment_reference,
+                ).update(sale=sale)
 
             # --- Create SaleItem ---
             content_type = ContentType.objects.get_for_model(product)
@@ -1688,6 +1707,7 @@ def sale_complete(request, sale_id):
         try:
             payment_method      = (request.POST.get('payment_method') or '').strip().lower()
             amount_tendered_raw = (request.POST.get('amount_tendered') or '').strip()
+            payment_reference   = (request.POST.get('payment_reference') or '').strip() or None 
 
             allowed_methods = {'cash', 'mpesa', 'card', 'bank_transfer'}
             if payment_method not in allowed_methods:
@@ -1941,6 +1961,7 @@ def sale_complete_json(request, sale_id):
         sale.payment_status = 'paid'
         sale.payment_method = method
         sale.save(update_fields=['payment_status', 'payment_method'])
+        
 
         if sale.customer:
             sale.customer.total_purchases += sale.net_amount

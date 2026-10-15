@@ -12,6 +12,7 @@ from django.http import Http404
 # ============================================
 BYPASS_DOMAIN_PREFIXES = (
     '/payments/',        # KCB / M-Pesa callbacks + payment UI
+    '/mpesa/',           # 👈 NEW — M-Pesa STK push / status / confirm / callback
     '/admin/',           # Django admin
     '/static/',          # static assets
     '/media/',           # user-uploaded media

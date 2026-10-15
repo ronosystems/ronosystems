@@ -130,7 +130,8 @@ INSTALLED_APPS = [
     'apps.settings',
     'apps.losses',
     'apps.analytics',
-    'apps.workshop',  
+    'apps.workshop', 
+    'apps.mpesa',  
 
     # Business Type Apps
     'apps.epa_shop',

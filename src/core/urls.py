@@ -52,6 +52,7 @@ urlpatterns = [
     path('accounts/', include('allauth.urls')),
     path('analytics/', include('apps.analytics.urls')),
     path('workshop/', include('apps.workshop.urls', namespace='workshop')),
+    path('mpesa/', include('apps.mpesa.urls')),
 
     # ============================================
     # API ENDPOINTS
