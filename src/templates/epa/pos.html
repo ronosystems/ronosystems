@@ -1374,10 +1374,14 @@
 
                 <div class="modal-field">
                     <label>Sale ID / Barcode / Customer Phone</label>
-                    <input type="text" id="pendingLookupInput"
-                           placeholder="Scan barcode or type sale id / phone"
-                           autocomplete="off"
-                           onkeydown="if(event.key==='Enter'){event.preventDefault();lookupPendingSale();}">
+                        <input type="text" id="pendingLookupInput"
+                            placeholder="Scan barcode or type sale id / phone"
+                            autocomplete="off"
+                            autocorrect="off"
+                            autocapitalize="off"
+                            spellcheck="false"
+                            inputmode="text"
+                            onkeydown="if(event.key==='Enter'){event.preventDefault();lookupPendingSale();}">
                 </div>
 
                 <button type="button" class="btn-3d"
@@ -1753,8 +1757,9 @@ let usbPrinterDevice = null;
 let usbPrinterEndpoint = null;
 let pendingSaleData = null;   // the sale being paid
 let checkoutMode = 'new';   // 'new' | 'pending'
-
-
+let _lastPendingLookup = '';
+let _lastPendingLookupTime = 0;
+let _pendingErrTimer = null;
 
 
 const CURRENCY = 'KSh ';
@@ -3938,21 +3943,40 @@ function openCheckoutForPendingSale(sale) {
 function openPendingSalesModal() {
     pendingSaleData = null;
 
+    // 🛡️ Reset debounce so a re-scan of the same code works
+    _lastPendingLookup = '';
+    _lastPendingLookupTime = 0;
+
+    const modal       = document.getElementById('pendingSalesModal');
     const lookupInput = document.getElementById('pendingLookupInput');
     const errEl       = document.getElementById('pendingLookupError');
+    const listEl      = document.getElementById('pendingSalesList');
 
-    if (lookupInput) lookupInput.value = '';
-    if (errEl) errEl.style.display = 'none';
+    if (lookupInput) {
+        lookupInput.value = '';
+        lookupInput.disabled = false;
+    }
 
-    document.getElementById('pendingSalesModal').classList.add('active');
+    if (errEl) {
+        errEl.textContent = '';
+        errEl.style.display = 'none';
+    }
+
+    if (listEl) {
+        listEl.innerHTML = '<em style="color:#888;">Loading pending sales…</em>';
+    }
+
+    modal.classList.add('active');
     loadPendingSalesList();
 
-    setTimeout(() => {
-        const el = document.getElementById('pendingLookupInput');
-        if (el) el.focus();
-    }, 100);
+    requestAnimationFrame(() => {
+        if (lookupInput) {
+            lookupInput.value = '';
+            lookupInput.focus();
+        }
+    });
 }
-
+    
 function closePendingSalesModal() {
     document.getElementById('pendingSalesModal').classList.remove('active');
     searchInput.focus();
@@ -4011,41 +4035,6 @@ async function selectPendingSale(saleId) {
     } catch (err) {
         const errEl = document.getElementById('pendingLookupError');
         errEl.textContent = 'Error: ' + err.message;
-        errEl.style.display = 'block';
-    }
-}
-
-async function lookupPendingSale() {
-    const q     = (document.getElementById('pendingLookupInput').value || '').trim();
-    const errEl = document.getElementById('pendingLookupError');
-    errEl.style.display = 'none';
-
-    if (!q) {
-        errEl.textContent = 'Please enter a sale ID, barcode, or phone.';
-        errEl.style.display = 'block';
-        return;
-    }
-
-    try {
-        const res  = await fetch(`/epa_shop/sale/lookup/?q=${encodeURIComponent(q)}`);
-        const data = await res.json();
-
-        if (!data.success || !data.sale) {
-            errEl.textContent = data.error || `No sale found for "${q}".`;
-            errEl.style.display = 'block';
-            return;
-        }
-        if (data.sale.payment_status !== 'pending') {
-            errEl.textContent =
-                `Sale #${data.sale.company_sale_id} is already ${data.sale.payment_status}.`;
-            errEl.style.display = 'block';
-            return;
-        }
-
-        await selectPendingSale(data.sale.id);
-
-    } catch (err) {
-        errEl.textContent = 'Lookup failed: ' + err.message;
         errEl.style.display = 'block';
     }
 }
@@ -4335,6 +4324,106 @@ function printReceiptIframe() {
 document.getElementById('receiptModal').addEventListener('click', function (e) {
     if (e.target === this) closeReceiptModal();
 });
+
+// ────────────────────────────────────────────────────────────
+// Helper: clear the lookup input + reset the debounce guard
+// ────────────────────────────────────────────────────────────
+function resetPendingLookupInput() {
+    const inp = document.getElementById('pendingLookupInput');
+    if (inp) {
+        inp.value = '';
+        inp.focus();
+    }
+    _lastPendingLookup = '';
+    _lastPendingLookupTime = 0;
+}
+
+// ────────────────────────────────────────────────────────────
+// Helper: show the error banner and auto-dismiss it after 3s
+// ────────────────────────────────────────────────────────────
+function showPendingLookupError(msg) {
+    const errEl = document.getElementById('pendingLookupError');
+    if (!errEl) return;
+
+    errEl.textContent = msg;
+    errEl.style.display = 'block';
+
+    clearTimeout(_pendingErrTimer);
+    _pendingErrTimer = setTimeout(() => {
+        errEl.style.display = 'none';
+        errEl.textContent = '';
+    }, 3000);
+}
+
+// ────────────────────────────────────────────────────────────
+// Main: look up a pending sale by barcode / sale id / phone
+// ────────────────────────────────────────────────────────────
+async function lookupPendingSale() {
+    const input = document.getElementById('pendingLookupInput');
+    const raw   = (input.value || '').trim();
+
+    // 🛡️ Ignore identical back-to-back lookups within 800ms
+    //    (kills the barcode-scanner double-fire)
+    const now = Date.now();
+    if (raw === _lastPendingLookup && (now - _lastPendingLookupTime) < 800) {
+        return;
+    }
+    _lastPendingLookup = raw;
+    _lastPendingLookupTime = now;
+
+    const errEl = document.getElementById('pendingLookupError');
+    errEl.style.display = 'none';
+
+    // ── Empty input ─────────────────────────────────────────
+    if (!raw) {
+        showPendingLookupError('Please enter a sale ID, barcode, or phone.');
+        input.focus();
+        return;
+    }
+
+    // 🛡️ De-duplicate scanner double-fire: "BAR-123BAR-123" → "BAR-123"
+    let q = raw;
+    if (raw.length >= 6 && raw.length % 2 === 0) {
+        const half  = raw.length / 2;
+        const left  = raw.slice(0, half);
+        const right = raw.slice(half);
+        if (left === right) {
+            q = left;
+            input.value = q;
+        }
+    }
+
+    // ── Actual lookup ───────────────────────────────────────
+    try {
+        const res  = await fetch(`/epa_shop/sale/lookup/?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+
+        // (a) No match → clear input so the cashier can scan again
+        if (!data.success || !data.sale) {
+            showPendingLookupError(data.error || `No sale found for "${q}".`);
+            resetPendingLookupInput();
+            return;
+        }
+
+        // (b) Already settled → clear input for the next scan
+        if (data.sale.payment_status !== 'pending') {
+            showPendingLookupError(
+                `Sale #${data.sale.company_sale_id} is already ${data.sale.payment_status}.`
+            );
+            resetPendingLookupInput();
+            return;
+        }
+
+        // (c) Found a pending sale → clear input, open checkout
+        resetPendingLookupInput();
+        await selectPendingSale(data.sale.id);
+
+    } catch (err) {
+        showPendingLookupError('Lookup failed: ' + err.message);
+        resetPendingLookupInput();
+    }
+}
+
 
 
 // ============================================
