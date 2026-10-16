@@ -3804,7 +3804,6 @@ function printReceiptDirectly(saleId) {
 async function payLater() {
     if (cart.length === 0) { alert('Ticket is empty.'); return; }
 
-    // Same validation as Complete Sale
     const customer = validateCustomer();
     if (!customer) return;
 
@@ -3823,7 +3822,7 @@ async function payLater() {
         customer_phone: customer.phone,
         customer_email: customer.email,
         payment_method: currentPaymentMethod,
-        payment_status: 'pending',                 // ✅ NEW
+        payment_status: 'pending',
         items: cart.map(item => ({
             product_code: item.product_code,
             quantity: item.quantity,
@@ -3842,11 +3841,21 @@ async function payLater() {
 
         if (data.success) {
             showSuccessToast(`💾 Saved as pending — KSh ${currentTotal.toFixed(2)}`);
+
+            const saleId = data.sale_id;
+
+            // ✅ Clean up POS state — new ticket ready for the next sale
             newTicket();
             resetCustomerBlock();
+
+            // ✅ Refresh product stock + pending list
             await refreshProductsAfterSale();
-            // Optionally reload the pending list from server
             loadPendingPayments();
+
+            // ✅ Open receipt modal with auto-print
+            if (saleId) {
+                setTimeout(() => openReceiptModal(saleId, true), 300);
+            }
         } else {
             alert('Error: ' + (data.error || 'Unknown error'));
         }
@@ -4263,9 +4272,9 @@ function downloadPDF() {
 // ============================================
 // RECEIPT MODAL — embedded iframe, keeps fullscreen alive
 // ============================================
-function openReceiptModal(saleId) {
+function openReceiptModal(saleId, autoPrint = false) {
     const iframe = document.getElementById('receiptIframe');
-    iframe.src = `/epa_shop/sale/receipt/${saleId}/?embed=1`;
+    iframe.src = `/epa_shop/sale/receipt/${saleId}/?embed=1${autoPrint ? '&print=1' : ''}`;
     document.getElementById('receiptModal').classList.add('active');
     searchInput.blur();
 
@@ -4431,7 +4440,7 @@ function updateF8Button() {
         label.textContent = 'Pending Sales';
         icon.className = 'fas fa-list';
     } else {
-        label.textContent = 'Pay Later';
+        label.textContent = 'Pay Later + Print';   // ← was 'Pay Later'
         icon.className = 'fas fa-clock';
     }
 }
@@ -4448,7 +4457,7 @@ const SHORTCUTS = [
     { key: 'F5',  label: 'Download / PDF' },
     { key: 'F6',  label: 'Pay Due (cash)' },
     { key: 'F7',  label: 'Pay / Save (cash)' },
-    { key: 'F8',  label: 'Pay Later / Pending sales' },
+    { key: 'F8',  label: 'Pay Later → save as pending + print receipt' },
     { key: 'F9',  label: 'Process Return' },
     { key: 'F10', label: 'Focus barcode search' },
     { key: 'F11', label: 'Receipt / Customer details' },
