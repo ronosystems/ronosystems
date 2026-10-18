@@ -1187,7 +1187,8 @@ def pending_payments(request):
 def approve_payment(request, sub_id):
     """Approve a pending manual payment → activate subscription."""
     if not _is_super_admin(request.user) and not request.user.is_staff:
-        return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
+        messages.error(request, "You don't have permission to approve payments.")
+        return redirect('companies:pending-payments') # or wherever the list is
 
     sub = get_object_or_404(
         Subscription.objects.select_related('company', 'plan'),
