@@ -158,7 +158,6 @@ EXEMPT_URL_PREFIXES = (
     '/subscription-expired/',
     '/payments/',        # covers /payments/kcb/callback/
     '/plans/',
-    '/companies/',
 )
 
 
@@ -214,6 +213,9 @@ class SubscriptionExpiryMiddleware:
 
         allowed, reason = company.can_access_system()
 
+        # 7. Check if the company is allowed to access the system
+        allowed, reason = company.can_access_system()
+
         if not allowed:
             # Lazy auto-expire: flip status once, so admin list shows reality
             try:
@@ -221,7 +223,12 @@ class SubscriptionExpiryMiddleware:
             except Exception:
                 pass
 
-            messages.error(request, reason)
+            # Show a safe, user-friendly message (do NOT leak `reason`)
+            messages.error(
+                request,
+                "Your subscription has expired. Please renew to regain access."
+            )
+            
             try:
                 return redirect('subscription-expired')
             except NoReverseMatch:
