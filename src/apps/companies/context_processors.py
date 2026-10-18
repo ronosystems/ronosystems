@@ -283,4 +283,39 @@ def pending_feedback_count(request):
 
     return {'pending_feedback_count': count}
 
+
+# ============================================
+# COMPANY FEATURE FLAGS (Treasury, Workshop, etc.)
+# ============================================
+def company_features_context(request):
+    """
+    Strictly evaluates feature flags based on the company's ACTIVE subscription.
+    This prevents the sidebar from showing features (like Mpesa Shop) if the 
+    company's cached `plan` points to a higher tier than their active sub.
+    """
+    company = _get_effective_company(request)
     
+    has_treasury = False
+    has_workshop = False
+
+    if company:
+        # Check active subscription first
+        active_sub = (
+            company.subscriptions
+            .filter(status='active')
+            .order_by('-created_at')
+            .first()
+        )
+        
+        if active_sub and active_sub.is_active_subscription():
+            has_treasury = bool(active_sub.plan.has_treasury)
+            has_workshop = bool(active_sub.plan.has_workshop)
+        elif company.plan:
+            # Fallback to the cached plan (only if there is no active sub row at all)
+            has_treasury = bool(company.plan.has_treasury)
+            has_workshop = bool(company.plan.has_workshop)
+
+    return {
+        'company_has_treasury': has_treasury,
+        'company_has_workshop': has_workshop,
+    }

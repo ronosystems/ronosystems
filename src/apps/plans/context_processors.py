@@ -1,56 +1,69 @@
 # apps/plans/context_processors.py
 
+from django.utils import timezone
+from django.db import models
+
 def plan_features(request):
     """
-    Exposes plan-gated feature flags to every template context.
-
-    Flags:
-      - company_has_treasury   → plan.has_treasury
-      - company_has_workshop   → plan.has_workshop
-      - my_open_jobs_count     → open jobs assigned to the current technician
-
-    Super admins always get True for every plan flag.
+    Strictly evaluates the ACTIVE subscription for the current company.
+    Does NOT fall back to company.plan unless there is no active sub.
     """
     user = getattr(request, 'user', None)
 
-    # Baseline — returned for every early-exit path
     flags = {
         'company_has_treasury': False,
         'company_has_workshop': False,
         'my_open_jobs_count': 0,
+        'current_subscription': None, 
     }
 
     if not user or not user.is_authenticated:
         return flags
 
-    # Super admin sees everything
-    if getattr(user, 'role', None) == 'super_admin':
-        flags['company_has_treasury'] = True
-        flags['company_has_workshop'] = True
-        return flags
-
-    company = getattr(user, 'company', None)
+    # 1. Find the correct company for this request
+    company = getattr(request, 'company', None)
+    
+    if not company and hasattr(request, 'session'):
+        viewing_company_id = request.session.get('viewing_company_id')
+        if viewing_company_id:
+            from apps.companies.models import Company
+            company = Company.objects.filter(id=viewing_company_id).first()
+            
     if not company:
+        company = getattr(user, 'company', None)
+
+    # If there's truly no company (e.g. super_admin on mother site), give them access
+    if not company:
+        if getattr(user, 'role', None) == 'super_admin' or user.is_superuser:
+            flags['company_has_treasury'] = True
+            flags['company_has_workshop'] = True
         return flags
 
-    # Prefer the FK on Company
-    plan = getattr(company, 'plan', None)
-
-    # Fallback: active subscription
-    if plan is None:
-        sub = (
-            company.subscriptions
-            .filter(status='active')
-            .select_related('plan')
-            .order_by('-created_at')
-            .first()
+    # 2. Look ONLY at the ACTIVE subscription
+    active_sub = (
+        company.subscriptions
+        .filter(status='active')
+        .filter(
+            models.Q(end_date__isnull=True) | models.Q(end_date__gt=timezone.now())
         )
-        plan = sub.plan if sub else None
+        .select_related('plan')
+        .order_by('-created_at')
+        .first()
+    )
+
+    plan = None
+    if active_sub:
+        plan = active_sub.plan
+        flags['current_subscription'] = active_sub 
+    else:
+        # 3. ONLY fall back to company.plan if there are no subscription rows at all
+        if not company.subscriptions.exists():
+            plan = getattr(company, 'plan', None)
 
     flags['company_has_treasury'] = bool(plan and plan.has_treasury)
     flags['company_has_workshop'] = bool(plan and plan.has_workshop)
 
-    # Only compute the workshop badge for technicians with workshop access
+    # Workshop badge for technicians
     if user.role == 'company_technician' and flags['company_has_workshop']:
         try:
             from apps.workshop.models import WorkshopJob
@@ -61,11 +74,8 @@ def plan_features(request):
                 .count()
             )
         except Exception:
-            # If the workshop app isn't migrated yet, don't break every page
             flags['my_open_jobs_count'] = 0
 
     return flags
 
-
-# Backward-compat alias — anything still importing treasury_access keeps working.
 treasury_access = plan_features
