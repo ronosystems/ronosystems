@@ -72,3 +72,11 @@ FEATURE_ICONS = {
 def feature_icon(flag_name):
     """`'has_treasury'|feature_icon` → 'vault'."""
     return FEATURE_ICONS.get(flag_name, 'check')
+
+
+@register.filter(name='attr')
+def attr(obj, name):
+    """`plan|attr:'has_treasury'` → plan.has_treasury"""
+    if obj is None:
+        return False
+    return getattr(obj, name, False)
