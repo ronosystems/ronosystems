@@ -88,6 +88,21 @@
     .plan-card.featured {
         border: 3px solid #87CEEB;
     }
+
+    /* NEW: Highlight the current active plan */
+    .plan-card.current-plan {
+        background-color: #87CEEB !important;
+        border: 3px solid #000000;
+    }
+    .plan-card.current-plan .btn-primary {
+        background-color: #ffffff;
+        color: #000000;
+        border: 2px solid #000000;
+    }
+    .plan-card.current-plan .btn-primary:hover {
+        background-color: #f0f0f0;
+    }
+
     .plan-price {
         font-size: 1.6rem;
         font-weight: 700;
@@ -494,8 +509,16 @@
         <div class="row mt-4" id="plansSection">
             {% for plan in plans %}
             <div class="col-md-3 mb-3">
-                <div class="card plan-card h-100 {% if plan.is_featured %}featured{% endif %}">
+                <div class="card plan-card h-100 
+                    {% if plan.is_featured %}featured{% endif %} 
+                    {% if current_subscription and current_subscription.plan == plan and current_subscription.status == 'active' %}current-plan{% endif %}">
+                    
                     <div class="card-body d-flex flex-column">
+                        
+                        {% if current_subscription and current_subscription.plan == plan and current_subscription.status == 'active' %}
+                            <span class="badge bg-dark mb-2 align-self-start"><i class="fas fa-check"></i> Current Plan</span>
+                        {% endif %}
+
                         <h5>{{ plan.display_name }}</h5>
                         <div class="plan-price mb-1">
                             {{ plan.currency }} {{ plan.price }}
@@ -504,7 +527,8 @@
                             per {{ plan.get_billing_cycle_display }}
                         </div>
 
-                        {% if plan.description %}
+                        {# Only show description if it isn't just the plan kind (e.g., "PREMIUM") #}
+                        {% if plan.description and plan.description|upper != plan.name|upper %}
                             <p class="small text-muted">{{ plan.description }}</p>
                         {% endif %}
 
