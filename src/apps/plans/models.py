@@ -83,21 +83,19 @@ class Plan(models.Model):
     max_employees = models.IntegerField(default=5)
     max_companies = models.IntegerField(default=1)
     max_branches = models.IntegerField(default=1)
-    max_storage = models.IntegerField(default=100, help_text="Storage in MB")
+    max_storage = models.IntegerField(default=100, help_text="Storage in GB")
 
     # Feature flags
-    has_api_access = models.BooleanField(default=False)
-    has_advanced_reports = models.BooleanField(default=False)
-    has_custom_branding = models.BooleanField(default=False)
-    has_priority_support = models.BooleanField(default=False)
-    has_bulk_import = models.BooleanField(default=False)
     has_custom_domain = models.BooleanField(default=False)
+    has_custom_branding = models.BooleanField(default=False)
     has_mpesa_integration = models.BooleanField(default=False)
     has_treasury = models.BooleanField(default=False)
-    has_workshop = models.BooleanField(
-        default=False,
-        help_text='Company can access the workshop / technician app.',
-    )
+    has_workshop = models.BooleanField(default=False,)
+    has_advanced_reports = models.BooleanField(default=False)    
+    has_priority_support = models.BooleanField(default=False)
+    has_api_access = models.BooleanField(default=False)
+    has_bulk_import = models.BooleanField(default=False)
+    has_ai_assistant = models.BooleanField(default=False)
 
     # Business type access
     allowed_business_types = models.ManyToManyField(
@@ -118,15 +116,16 @@ class Plan(models.Model):
     # drives forms, serialization, and get_feature_list() — so adding a
     # new feature is a one-line change instead of eight.
     FEATURE_FLAGS = (
-        ('has_api_access',          'API Access'),
-        ('has_advanced_reports',    'Advanced Reports'),
-        ('has_custom_branding',     'Custom Branding'),
-        ('has_priority_support',    'Priority Support'),
-        ('has_bulk_import',         'Bulk Import'),
         ('has_custom_domain',       'Custom Domain'),
+        ('has_custom_branding',     'Custom Branding'),
         ('has_mpesa_integration',   'M-Pesa Integration'),
-        ('has_treasury',            'MpesaShop / Treasury'),
-        ('has_workshop',            'Workshop / Technician App'),
+        ('has_treasury',            'MpesaShop'),
+        ('has_workshop',            'Workshop'),
+        ('has_advanced_reports',    'Advanced Reports'),   
+        ('has_priority_support',    'Priority Support'),
+        ('has_api_access',          'API Access'),
+        ('has_bulk_import',         'Bulk Import'),
+        ('has_ai_assistant',        'Ai Assistant'),
     )
 
     class Meta:

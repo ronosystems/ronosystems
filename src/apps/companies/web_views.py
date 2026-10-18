@@ -1036,7 +1036,6 @@ def company_payments(request, pk):
     }
     return render(request, 'companies/payments.html', context)
 
-
 # ============================================
 # MANUAL / OFFLINE PAYMENT — RECORD
 # ============================================

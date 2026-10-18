@@ -296,6 +296,9 @@ def settings_company(request):
 @login_required
 def settings_payment(request):
     """Payment settings — supports granular M-Pesa STK / Buy Goods / Paybill / Bank"""
+    from django.db import models as _models
+    from django.utils import timezone as _tz
+
     company, is_viewing_company = get_active_company(request)
 
     if not company:
@@ -304,6 +307,35 @@ def settings_payment(request):
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
 
+    # ── Gate: require the active plan to include M-Pesa integration ──
+    has_mpesa = False
+
+    active_sub = (
+        company.subscriptions
+        .filter(status='active')
+        .filter(
+            _models.Q(end_date__isnull=True)
+            | _models.Q(end_date__gt=_tz.now())
+        )
+        .select_related('plan')
+        .first()
+    )
+
+    if active_sub:
+        has_mpesa = bool(active_sub.plan.has_mpesa_integration)
+    elif not company.subscriptions.exists():
+        # No subscription rows at all → fall back to cached plan
+        has_mpesa = bool(company.plan and company.plan.has_mpesa_integration)
+
+    if not has_mpesa:
+        messages.error(
+            request,
+            'Your current plan does not include M-Pesa integration. '
+            'Upgrade your subscription to configure payment settings.',
+        )
+        return redirect('company-settings-company')
+
+    # ── Normal view logic ──
     if request.method == 'POST':
         try:
             payment_settings = {
@@ -393,7 +425,6 @@ def settings_payment(request):
         ],
     }
     return render(request, 'company/settings/dashboard.html', context)
-
 
 # ============================================
 # RECEIPT SETTINGS

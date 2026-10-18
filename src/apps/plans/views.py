@@ -620,6 +620,7 @@ def get_plans_api(request):
             'max_branches': plan.max_branches,
             'max_storage': plan.max_storage,
             'features': plan.enabled_features(),
+            'has_ai_assistant': plan.has_ai_assistant,
         })
     return JsonResponse(data, safe=False)
 
@@ -675,6 +676,7 @@ def get_company_subscription_api(request, company_id):
                 'is_active': sub.is_active_subscription(),
                 'has_workshop': sub.has_workshop_access,
                 'features': sub.plan.enabled_features(),
+                'has_ai_assistant': plan.has_ai_assistant,
             }
         else:
             # No active subscription — return an explicit null plan

@@ -2,25 +2,31 @@
 
 from django.utils import timezone
 from django.db import models
+from apps.plans.models import Plan
 
 def plan_features(request):
     """
-    Strictly evaluates the ACTIVE subscription for the current company.
-    Does NOT fall back to company.plan unless there is no active sub.
+    Dynamically evaluates ALL active features for the current company 
+    based on the Plan.FEATURE_FLAGS list.
     """
     user = getattr(request, 'user', None)
 
+    # 1. Initialize all flags to False dynamically
+    feature_keys = [flag for flag, label in Plan.FEATURE_FLAGS]
+    
     flags = {
-        'company_has_treasury': False,
-        'company_has_workshop': False,
         'my_open_jobs_count': 0,
         'current_subscription': None, 
     }
+    
+    # Populate 'company_has_treasury', 'company_has_workshop', etc.
+    for key in feature_keys:
+        flags[f'company_{key}'] = False
 
     if not user or not user.is_authenticated:
         return flags
 
-    # 1. Find the correct company for this request
+    # 2. Find the correct company
     company = getattr(request, 'company', None)
     
     if not company and hasattr(request, 'session'):
@@ -32,14 +38,14 @@ def plan_features(request):
     if not company:
         company = getattr(user, 'company', None)
 
-    # If there's truly no company (e.g. super_admin on mother site), give them access
+    # 3. Super admins on mother site get everything
     if not company:
         if getattr(user, 'role', None) == 'super_admin' or user.is_superuser:
-            flags['company_has_treasury'] = True
-            flags['company_has_workshop'] = True
+            for key in feature_keys:
+                flags[f'company_{key}'] = True
         return flags
 
-    # 2. Look ONLY at the ACTIVE subscription
+    # 4. Look ONLY at the ACTIVE subscription
     active_sub = (
         company.subscriptions
         .filter(status='active')
@@ -56,15 +62,17 @@ def plan_features(request):
         plan = active_sub.plan
         flags['current_subscription'] = active_sub 
     else:
-        # 3. ONLY fall back to company.plan if there are no subscription rows at all
+        # Fallback to company.plan ONLY if there are no subscription rows at all
         if not company.subscriptions.exists():
             plan = getattr(company, 'plan', None)
 
-    flags['company_has_treasury'] = bool(plan and plan.has_treasury)
-    flags['company_has_workshop'] = bool(plan and plan.has_workshop)
+    # 5. Dynamically set flags based on the resolved plan
+    if plan:
+        for key in feature_keys:
+            flags[f'company_{key}'] = bool(getattr(plan, key, False))
 
-    # Workshop badge for technicians
-    if user.role == 'company_technician' and flags['company_has_workshop']:
+    # 6. Workshop badge logic
+    if user.role == 'company_technician' and flags.get('company_has_workshop'):
         try:
             from apps.workshop.models import WorkshopJob
             flags['my_open_jobs_count'] = (
@@ -78,4 +86,5 @@ def plan_features(request):
 
     return flags
 
+# Backward-compat alias
 treasury_access = plan_features
