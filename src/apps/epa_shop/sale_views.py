@@ -28,7 +28,9 @@ from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_POST
 from apps.mpesa.models import MpesaTransaction
 from django.http import Http404
-
+import openpyxl
+from openpyxl.styles import Font, PatternFill
+from django.http import HttpResponse
 
 
 
@@ -1173,6 +1175,122 @@ def sale_lookup_by_barcode(request):
             'receipt_url': f'/epa_shop/sale/receipt/{sale.id}/',
         },
     })
+
+
+# ============================================
+# SALE EXCELL LIST
+# ============================================
+
+@login_required
+def sale_export_excel(request):
+    """Export the filtered sales list to an Excel (.xlsx) file with Profit."""
+    company, is_viewing_company = get_active_company(request)
+
+    if not company:
+        messages.error(request, 'No company assigned.')
+        return redirect('/dashboard/')
+
+    # Apply the same branch/filter logic used in sale_list
+    is_admin = (
+        is_viewing_company or
+        request.user.is_company_admin or
+        request.user.is_company_manager or
+        request.user.is_super_admin or
+        request.user.is_superuser or
+        request.user.is_staff
+    )
+
+    sales_queryset = Sale.objects.filter(company=company)
+    if not is_admin and request.user.branch:
+        sales_queryset = sales_queryset.filter(branch=request.user.branch)
+
+    # Apply optional filters from the URL (branch, date range)
+    branch_id = request.GET.get('branch', '').strip()
+    if branch_id and branch_id.isdigit():
+        sales_queryset = sales_queryset.filter(branch_id=int(branch_id))
+
+    date_from = request.GET.get('from', '').strip()
+    date_to   = request.GET.get('to', '').strip()
+    if date_from:
+        sales_queryset = sales_queryset.filter(sale_date__date__gte=date_from)
+    if date_to:
+        sales_queryset = sales_queryset.filter(sale_date__date__lte=date_to)
+
+    # Prefetch items and their generic products to avoid N+1 queries
+    sales_queryset = sales_queryset.select_related('branch', 'sold_by').prefetch_related('items__item').order_by('-sale_date')
+
+    # Create an in-memory workbook
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Sales"
+
+    # Define Headers (Added Profit Amount)
+    headers = [
+        'Sale ID', 'Customer Name', 'Customer Phone', 'Items', 
+        'Total Amount', 'Tax', 'Net Amount', 'Profit Amount', 'Payment Method', 
+        'Payment Status', 'Sale Date', 'Sold By', 'Branch'
+    ]
+    ws.append(headers)
+
+    # Style the header row
+    header_font = Font(bold=True)
+    header_fill = PatternFill(start_color="87CEEB", end_color="87CEEB", fill_type="solid")
+    for cell in ws[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+
+    # Write data
+    for sale in sales_queryset:
+        sold_by_name = ""
+        if sale.sold_by:
+            sold_by_name = sale.sold_by.get_full_name() or sale.sold_by.username
+
+        # Calculate Cost of Goods Sold (COGS)
+        total_cost = 0
+        for item in sale.items.all():
+            # item.item is the GenericForeignKey to Phone/Electronic/Accessory
+            if item.item and hasattr(item.item, 'purchase_price'):
+                total_cost += (item.item.purchase_price * item.quantity)
+        
+        # Profit = Revenue - Cost
+        profit = float(sale.net_amount) - float(total_cost)
+
+        ws.append([
+            sale.company_sale_id,
+            sale.customer_name,
+            sale.customer_phone,
+            sale.item_count,
+            float(sale.total_amount),
+            float(sale.tax),
+            float(sale.net_amount),
+            profit,  # <--- Added Profit
+            sale.payment_method.title(),
+            sale.payment_status.title(),
+            sale.sale_date.strftime("%Y-%m-%d %H:%M"),
+            sold_by_name,
+            sale.branch.name if sale.branch else ''
+        ])
+
+    # Auto-adjust column widths
+    for col in ws.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        ws.column_dimensions[column].width = max_length + 2
+
+    # Setup response headers
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="Sales_Export_{timezone.now().strftime("%Y%m%d_%H%M")}.xlsx"'
+    
+    wb.save(response)
+    return response
 
 
 # ============================================

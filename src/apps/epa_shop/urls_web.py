@@ -97,6 +97,7 @@ urlpatterns = [
     # ============================================
     path('sale/<int:sale_id>/return-data/',  sale_views.sale_return_data,     name='sale-return-data'),
     path('sale/process-return/',             sale_views.sale_process_return,  name='sale-process-return'),
+    path('sales/export-excel/',              sale_views.sale_export_excel,    name='epa-sales-export'),
 
     # ============================================
     # COMPLETE SALE — TWO DISTINCT PATHS
