@@ -1163,6 +1163,13 @@
                         {% endif %}
 
                         {% if user.role == 'company_admin' or user.role == 'super_admin' or user.role == 'stock_controller' %}
+                        <a href="{% url 'epa-product-export' %}" class="btn btn-primary">
+                            <i class="fas fa-file-excel"></i>
+                            <span class="d-none d-sm-inline">Export Excell</span>
+                        </a>
+                        {% endif %}
+
+                        {% if user.role == 'company_admin' or user.role == 'super_admin' or user.role == 'stock_controller' %}
                         <a href="/epa_shop/products/add/" class="btn btn-primary">
                             <i class="fas fa-plus"></i>
                             <span class="d-none d-sm-inline">Add Product</span>
@@ -1180,7 +1187,7 @@
                                 <th style="width:6%;" class="text-center" title="Print / view barcode label">
                                     <i class="fas fa-barcode"></i>
                                 </th>
-                                <th style="width:10%;" class="sortable-header" data-sort="sku" onclick="sortTable('sku')">
+                                <th style="width:6%;" class="sortable-header" data-sort="sku" onclick="sortTable('sku')">
                                     SKU <span class="sort-icon"></span>
                                 </th>
                                 <th style="width:14%;" class="sortable-header" data-sort="name" onclick="sortTable('name')">
@@ -1198,8 +1205,11 @@
                                 <th style="width:10%;" class="sortable-header" data-sort="specs" onclick="sortTable('specs')">
                                     Specs <span class="sort-icon"></span>
                                 </th>
-                                <th style="width:10%;" class="sortable-header" data-sort="stock" onclick="sortTable('stock')">
-                                    Stock <span class="sort-icon"></span>
+                                <th style="width:7%;" class="sortable-header" data-sort="stock" onclick="sortTable('stock')">
+                                    Qty <span class="sort-icon"></span>
+                                </th>
+                                <th style="width:7%;" class="sortable-header" data-sort="stock" onclick="sortTable('stock')">
+                                    Status <span class="sort-icon"></span>
                                 </th>
                                 <th style="width:10%;" class="sortable-header" data-sort="selling" onclick="sortTable('selling')">
                                     Selling <span class="sort-icon"></span>
@@ -1460,6 +1470,7 @@ function fmtKsh(n) {
 // ============================================================
 // RENDER ONE ROW
 // ============================================================
+
 function renderRow(p, index) {
     let catBadge = '';
     if (p.type === 'Smartphone') {
@@ -1477,8 +1488,13 @@ function renderRow(p, index) {
     const stock = parseInt(p.stock) || 0;
     let stockBadge = '';
     if (stock > 10)       stockBadge = '<span class="stock-badge stock-in-stock">In Stock</span>';
-    else if (stock > 0)   stockBadge = '<span class="stock-badge stock-low-stock">Low</span>';
-    else                  stockBadge = '<span class="stock-badge stock-out-of-stock">Out</span>';
+    else if (stock > 0)   stockBadge = '<span class="stock-badge stock-low-stock">Low Stock</span>';
+    else                  stockBadge = '<span class="stock-badge stock-out-of-stock">Out Stock</span>';
+
+    // For Accessories, Available = Qty. For Phones/Electronics, it's the available units.
+    // Assuming backend passes `stock` as the total and we display `stock` as Available for now.
+    // If you have a separate `available` field in your JSON, use `p.available` here.
+    const available = stock; 
 
     let actionsCell;
     if (canManage) {
@@ -1520,12 +1536,15 @@ function renderRow(p, index) {
         '<td>' + esc(p.brand) + '</td>' +
         '<td>' + esc(p.model) + '</td>' +
         '<td>' + esc(p.specs) + '</td>' +
-        '<td><div class="stock-cell"><span class="stock-quantity">' + stock + '</span>' + stockBadge + '</div></td>' +
+        '<td><div class="stock-cell"><span class="stock-quantity">' + stock + '</span></div></td>' +
+        '<td><div class="stock-cell">' + stockBadge + '</div></td>' +
         '<td class="price-cell">' + fmtKsh(p.selling_price) + '</td>' +
         '<td class="price-cell">' + fmtKsh(p.best_price) + '</td>' +
         actionsCell +
         '</tr>';
 }
+
+
 
 // ============================================================
 // RENDER TABLE
@@ -1561,7 +1580,7 @@ function renderTable() {
 
     let html = '';
     if (pageSlice.length === 0) {
-        html = '<tr><td colspan="11" class="text-center py-4">' +
+        html = '<tr><td colspan="12" class="text-center py-4">' +
             '<div class="empty-state">' +
             '<span class="empty-icon">🔍</span>' +
             '<h3>No matching products</h3>' +

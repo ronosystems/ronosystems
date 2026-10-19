@@ -27,7 +27,10 @@ import time
 import cloudinary
 import cloudinary.uploader
 from django.conf import settings
-
+import csv
+from django.http import HttpResponse
+import openpyxl
+from openpyxl.styles import Font, PatternFill
 
 
 
@@ -2721,6 +2724,113 @@ def accessory_list(request):
     return render(request, 'epa/accessory_list.html', context)
 
 
+
+# ============================================
+# EXCELL LIST
+# ============================================
+
+
+@login_required
+def product_export_excel(request):
+    """Export the product list to a true Excel (.xlsx) file."""
+    company, is_viewing_company = get_active_company(request)
+    if not company:
+        messages.error(request, 'No company assigned.')
+        return redirect('/dashboard/')
+
+    # Create an in-memory workbook
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Products"
+
+    # Check if user is allowed to see buying price
+    can_see_buying = (
+        is_viewing_company or
+        request.user.is_company_admin or
+        request.user.is_super_admin or
+        request.user.role == 'stock_controller'
+    )
+
+    # Define Headers (Buying Price added)
+    headers = [
+        'SKU', 'Name', 'Category', 'Brand', 'Model', 'Specs', 
+        'Quantity', 'Buying Price', 'Selling Price', 'Best Price', 'Status'
+    ]
+    ws.append(headers)
+
+    # Style the header row (Bold, Light Blue Background)
+    header_font = Font(bold=True)
+    header_fill = PatternFill(start_color="87CEEB", end_color="87CEEB", fill_type="solid")
+    for cell in ws[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+
+    # Helper to get purchase price safely
+    def get_buying_price(item):
+        if not can_see_buying:
+            return "N/A"
+        return float(item.purchase_price) if item.purchase_price else 0
+
+    # --- Fetch Electronics ---
+    electronics = Electronic.objects.filter(company=company)
+    if not is_viewing_company:
+        electronics = filter_by_user_access(electronics, request.user, 'product')
+    for item in electronics:
+        ws.append([
+            item.product_code, item.name, 'Electronic', item.brand, item.model_number,
+            f"{item.ram} {item.storage}".strip(), item.quantity_in_stock,
+            get_buying_price(item),  # <--- Added here
+            float(item.selling_price), float(item.best_price) if item.best_price else 0, 
+            'Active' if item.is_active else 'Inactive'
+        ])
+
+    # --- Fetch Phones ---
+    phones = Phone.objects.filter(company=company)
+    if not is_viewing_company:
+        phones = filter_by_user_access(phones, request.user, 'product')
+    for item in phones:
+        phone_type = 'Feature Phone' if getattr(item, 'phone_type', '') == 'feature' else 'Smartphone'
+        ws.append([
+            item.product_code, item.name, phone_type, item.brand, item.model,
+            f"{item.ram} {item.storage_capacity}".strip(), item.quantity_in_stock,
+            get_buying_price(item),  # <--- Added here
+            float(item.selling_price), float(item.best_price) if item.best_price else 0, 
+            'Active' if item.is_active else 'Inactive'
+        ])
+
+    # --- Fetch Accessories ---
+    accessories = Accessory.objects.filter(company=company)
+    if not is_viewing_company:
+        accessories = filter_by_user_access(accessories, request.user, 'product')
+    for item in accessories:
+        ws.append([
+            item.product_code, item.name, 'Accessory', item.brand, item.model,
+            item.accessory_type, item.quantity_in_stock,
+            get_buying_price(item),  # <--- Added here
+            float(item.selling_price), float(item.best_price) if item.best_price else 0, 
+            'Active' if item.is_active else 'Inactive'
+        ])
+
+    # Auto-adjust column widths for a clean look
+    for col in ws.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        ws.column_dimensions[column].width = max_length + 2
+
+    # Setup response headers
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="Products_Export_{timezone.now().strftime("%Y%m%d_%H%M")}.xlsx"'
+    
+    wb.save(response)
+    return response
 
 
 # ============================================
