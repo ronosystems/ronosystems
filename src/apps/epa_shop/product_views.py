@@ -13,6 +13,8 @@ from apps.company.models import Branch
 from .models import Electronic, Phone, Accessory, Category, Supplier, Unit, Sale, SaleItem, Customer, Owner
 from django.contrib.auth import get_user_model
 from .utils import record_stock_movement
+from django.http import Http404
+from django.db import transaction
 from apps.companies.support_utils import (
     get_active_company,
     is_support_mode,
@@ -553,69 +555,111 @@ def unit_transfer(request, unit_id):
 
 @login_required
 def unit_reverse_sale(request, sale_id):
-    """Reverse a sale and return unit to available"""
+    """Reverse a sale and return items to inventory."""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
-    sale = get_object_or_404(Sale, id=sale_id, company=company)
-    
-    if not is_viewing_company and not is_admin_or_manager(request.user):
-        messages.error(request, 'Only administrators and stock controllers can reverse sales.')
-        return redirect('/epa_shop/products/')
-    
+
+    # --- Resolve sale by pk OR company_sale_id ---
+    sale = None
+    if str(sale_id).isdigit():
+        sale = Sale.objects.filter(id=int(sale_id), company=company).first()
+    if not sale:
+        sale = Sale.objects.filter(company_sale_id=sale_id, company=company).first()
+    if not sale:
+        raise Http404(f'Sale "{sale_id}" not found.')
+
+    is_authorized = (
+        is_viewing_company or
+        request.user.is_company_admin or
+        request.user.is_company_manager or
+        request.user.is_super_admin or
+        request.user.is_superuser or
+        request.user.is_staff
+    )
+
+    if not is_authorized:
+        messages.error(request, 'Only admins and managers can reverse sales.')
+        return redirect('/epa_shop/sales/')
+
     next_url = request.GET.get('next', '/epa_shop/units/phones/')
-    
+
     if request.method == 'POST':
         try:
-            sale_items = SaleItem.objects.filter(sale=sale)
-            reversed_count = 0
-            
-            for sale_item in sale_items:
-                if sale_item.unit:
-                    unit = sale_item.unit
-                    unit.status = 'available'
-                    unit.owner_name = ''
-                    unit.owner_phone = ''
-                    unit.sold_date = None
-                    unit.save()
-                    
-                    if unit.phone:
-                        product = unit.phone
-                    elif unit.electronic:
-                        product = unit.electronic
-                    else:
-                        product = None
-                    
+            with transaction.atomic():
+                # Lock the sale row so double-clicks can't double-restock
+                locked_sale = Sale.objects.select_for_update().get(pk=sale.pk)
+
+                if locked_sale.payment_status == 'refunded':
+                    messages.error(request, 'This sale has already been reversed.')
+                    return redirect(next_url)
+
+                # REMOVED 'item' FROM select_related
+                sale_items = SaleItem.objects.filter(sale=locked_sale).select_related('unit')
+                reversed_count = 0
+
+                for sale_item in sale_items:
+                    # Force qty to be an integer — default to 1 if None or 0
+                    qty = sale_item.quantity
+                    if not qty or qty <= 0:
+                        qty = 1
+
+                    # --- A. Handle Units (Phones/Electronics) ---
+                    if sale_item.unit:
+                        unit = sale_item.unit
+                        unit.status = 'available'
+                        unit.owner_name = ''
+                        unit.owner_phone = ''
+                        unit.sold_date = None
+                        unit.save()
+
+                    # --- B. Restock Product (Phones, Electronics AND Accessories) ---
+                    product = sale_item.item
                     if product:
-                        product.quantity_in_stock += 1
+                        previous_quantity = product.quantity_in_stock
+                        product.quantity_in_stock += qty
                         product.save()
-                    
+
+                        # --- C. Record Stock Movement ---
+                        record_stock_movement(
+                            product=product,
+                            movement_type='return',
+                            quantity=qty,
+                            previous_quantity=previous_quantity,
+                            new_quantity=product.quantity_in_stock,
+                            branch=locked_sale.branch,
+                            unit=sale_item.unit,
+                            notes=f'Sale reversed - returned to inventory (Sale #{locked_sale.company_sale_id})',
+                            performed_by=request.user
+                        )
+
                     reversed_count += 1
-            
-            sale.payment_status = 'refunded'
-            sale.save()
-            
-            messages.success(request, f'Sale #{sale.id} reversed successfully! {reversed_count} unit(s) returned to inventory.')
+
+                # Mark the sale as refunded
+                locked_sale.payment_status = 'refunded'
+                locked_sale.save(update_fields=['payment_status'])
+
+            messages.success(request, f'Sale #{sale.company_sale_id} reversed successfully! {reversed_count} item(s) returned to inventory.')
             return redirect(next_url)
-            
+
         except Exception as e:
-            messages.error(request, f'Error reversing sale: {str(e)}')
+            import traceback
+            traceback.print_exc()
+            messages.error(request, f'ERROR: {str(e)}')
             return redirect(next_url)
-    
+
     context = {
         'sale': sale,
         'sale_items': sale.items.all(),
         'next_url': next_url,
         'page_title': 'Reverse Sale',
-        'page_subtitle': 'Confirm sale reversal',
+        'page_subtitle': f'Confirm reversal of sale #{sale.company_sale_id}',
     }
     return render(request, 'epa/sale_reverse.html', context)
-
 
 # ============================================
 # SALE RECEIPT

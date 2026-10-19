@@ -27,6 +27,7 @@ from django.db.models import Sum, Q
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_POST
 from apps.mpesa.models import MpesaTransaction
+from django.http import Http404
 
 
 
@@ -1674,7 +1675,7 @@ def sale_edit(request, pk):
 # ============================================
 
 @login_required
-def sale_complete(request, sale_id):
+def sale_complete(request, company_sale_id):
     """Mark a sale as completed — with payment method + amount tendered."""
     company, is_viewing_company = get_active_company(request)
 
@@ -1684,7 +1685,14 @@ def sale_complete(request, sale_id):
         messages.error(request, 'No company assigned.')
         return redirect('epa-dashboard')
 
-    sale = get_object_or_404(Sale, id=sale_id, company=company)
+    # --- Resolve sale by pk OR by company_sale_id (e.g. FIE-000081) ---
+    sale = None
+    if str(company_sale_id).isdigit():
+        sale = Sale.objects.filter(id=int(company_sale_id), company=company).first()
+    if not sale:
+        sale = Sale.objects.filter(company_sale_id=company_sale_id, company=company).first()
+    if not sale:
+        raise Http404(f'Sale "{company_sale_id}" not found.')
 
     is_authorized = (
         is_viewing_company or
@@ -1707,7 +1715,7 @@ def sale_complete(request, sale_id):
         try:
             payment_method      = (request.POST.get('payment_method') or '').strip().lower()
             amount_tendered_raw = (request.POST.get('amount_tendered') or '').strip()
-            payment_reference   = (request.POST.get('payment_reference') or '').strip() or None 
+            payment_reference   = (request.POST.get('payment_reference') or '').strip() or None
 
             allowed_methods = {'cash', 'mpesa', 'card', 'bank_transfer'}
             if payment_method not in allowed_methods:
@@ -1806,6 +1814,7 @@ def sale_complete(request, sale_id):
     }
     return render(request, 'epa/sale_verify.html', context)
 
+    
 
 @login_required
 def pos_pending_payments(request):
@@ -1983,91 +1992,6 @@ def sale_complete_json(request, sale_id):
         'sale_id': sale.id,
         'redirect_url': f'/epa_shop/sale/receipt/{sale.id}/',
     })
-
-
-# ============================================
-# UNIT REVERSE SALE - Return to Available
-# ============================================
-
-@login_required
-def unit_reverse_sale(request, sale_id):
-    """Reverse a sale and return unit to available"""
-    company, is_viewing_company = get_active_company(request)
-    
-    if not company:
-        if request.user.role == 'super_admin':
-            return redirect('/api/support/select/')
-        messages.warning(request, 'You are not assigned to any company.')
-        return redirect('/dashboard/')
-    
-    try:
-        if str(sale_id).isdigit():
-            sale = get_object_or_404(Sale, id=int(sale_id), company=company)
-        else:
-            sale = get_object_or_404(Sale, company_sale_id=sale_id, company=company)
-    except (ValueError, TypeError):
-        sale = get_object_or_404(Sale, company_sale_id=sale_id, company=company)
-    
-    is_authorized = (
-        is_viewing_company or
-        request.user.is_company_admin or 
-        request.user.is_company_manager or 
-        request.user.is_super_admin or
-        request.user.is_superuser or
-        request.user.is_staff
-    )
-    
-    if not is_authorized:
-        messages.error(request, 'Only admins and managers can reverse sales.')
-        return redirect('/epa_shop/sales/')
-    
-    next_url = request.GET.get('next', '/epa_shop/units/phones/')
-    
-    if request.method == 'POST':
-        try:
-            sale_items = SaleItem.objects.filter(sale=sale)
-            reversed_count = 0
-            
-            for sale_item in sale_items:
-                if sale_item.unit:
-                    unit = sale_item.unit
-                    unit.status = 'available'
-                    unit.owner_name = ''
-                    unit.owner_phone = ''
-                    unit.sold_date = None
-                    unit.save()
-                    
-                    if unit.phone:
-                        product = unit.phone
-                    elif unit.electronic:
-                        product = unit.electronic
-                    else:
-                        product = None
-                    
-                    if product:
-                        product.quantity_in_stock += 1
-                        product.save()
-                    
-                    reversed_count += 1
-            
-            sale.payment_status = 'refunded'
-            sale.save()
-            
-            messages.success(request, f'Sale #{sale.company_sale_id} reversed successfully! {reversed_count} unit(s) returned to inventory.')
-            return redirect(next_url)
-            
-        except Exception as e:
-            messages.error(request, f'Error reversing sale: {str(e)}')
-            return redirect(next_url)
-    
-    context = {
-        'sale': sale,
-        'sale_items': sale.items.all(),
-        'next_url': next_url,
-        'page_title': 'Reverse Sale',
-        'page_subtitle': f'Confirm reversal of sale #{sale.company_sale_id}',
-    }
-    return render(request, 'epa/sale_reverse.html', context)
 
 
 # ============================================
