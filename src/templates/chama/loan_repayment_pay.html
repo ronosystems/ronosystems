@@ -1,0 +1,63 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}Repay Loan #{{ loan.id }} — Chama Biz{% endblock %}
+{% block page_title %}Pay Loan via M-Pesa{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+    <div class="card" style="border:2px solid #000; border-radius:4px; max-width:600px; margin:0 auto;">
+        <div class="card-header" style="background:#f8f9fa; border-bottom:2px solid #000; padding:14px 24px; font-weight:700;">
+            <i class="fas fa-mobile-alt me-2"></i> M-Pesa Repayment
+        </div>
+        <div class="card-body p-4">
+            
+            <!-- Summary -->
+            <div class="mb-4 p-3" style="background:#eaf2f8; border:2px solid #000; border-radius:4px;">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="small text-muted text-uppercase fw-bold">Total Repayable</div>
+                        <div class="fw-bold">KES {{ loan.total_repayable|floatformat:2 }}</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="small text-muted text-uppercase fw-bold">Balance Remaining</div>
+                        <div class="fw-bold text-danger">KES {{ loan.balance_remaining|floatformat:2 }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Amount to Repay (KES) <span class="text-danger">*</span></label>
+                    <input type="number" name="amount" class="form-control" 
+                           style="border:2px solid #000; padding:10px;" 
+                           value="{{ suggested_amount|floatformat:2 }}" 
+                           step="0.01" min="1" max="{{ loan.balance_remaining }}" required>
+                    <small class="text-muted d-block mt-1">
+                        <i class="fas fa-info-circle"></i> You can pay the full balance or a partial amount.
+                    </small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">M-Pesa Phone Number <span class="text-danger">*</span></label>
+                    <input type="text" name="phone" class="form-control" 
+                           style="border:2px solid #000; padding:10px;" 
+                           value="{{ loan.member.phone }}" 
+                           placeholder="e.g. 0712345678" required>
+                </div>
+
+                <div class="d-flex gap-2 mt-4 pt-3" style="border-top:2px solid #000;">
+                    <button type="submit" class="btn btn-dark fw-bold flex-grow-1" style="border:2px solid #000; padding:10px;">
+                        <i class="fas fa-paper-plane me-1"></i> Send STK Push
+                    </button>
+                    <a href="{% url 'chama:loan_detail' loan.pk %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

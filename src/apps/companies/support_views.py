@@ -129,6 +129,9 @@ def enter_support_mode(request, company_id):
 BUSINESS_TYPE_DASHBOARDS = [
     ('kuku',        '/kuku_biz/dashboard/'),
     ('poultry',     '/kuku_biz/dashboard/'),
+    ('chama',       '/chama/dashboard/'),          # ← ADD THIS
+    ('sacco',       '/chama/dashboard/'),          # ← ADD THIS
+    ('savings',     '/chama/dashboard/'),          # ← ADD THIS
     ('supermarket', '/supermarket/dashboard/'),
     ('grocery',     '/supermarket/dashboard/'),
     ('healthcare',  '/healthcare/dashboard/'),

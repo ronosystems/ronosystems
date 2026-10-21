@@ -38,18 +38,14 @@ def _branch_for_request(request, branch_id):
 def _resolve_customer_name(tx):
     """
     Return the best available name for this transaction:
-
-      1. Name from Safaricom's callback (production only — sandbox
-         usually omits FirstName/MiddleName/LastName).
-      2. Name from a previous purchase on the same phone (local DB).
-      3. Empty string.
+      1. Name from Safaricom's callback (production only)
+      2. Name from a previous purchase on the same phone (local DB)
+      3. Empty string
     """
-    # 1) Direct name from the callback
     name = (tx.customer_name or '').strip()
     if name:
         return name
 
-    # 2) Fall back to the Customer table by phone
     if tx.phone:
         try:
             from apps.epa_shop.models import Customer
@@ -68,6 +64,100 @@ def _resolve_customer_name(tx):
 
 
 # ============================================
+# LINK PAYMENT TO CHAMA CONTRIBUTION / FINE
+# ============================================
+def _link_payment_to_chama(tx):
+    """
+    When an M-Pesa transaction succeeds, mark the matching Chama
+    contribution or fine as paid.
+
+    Account reference formats (Safaricom max 12 chars):
+      C-M00001  → contribution for member M-00001
+      F-M00001  → fine for member M-00001
+
+    Also falls back to the longer formats if used:
+      CONTRIB-<member_number>
+      FINE-<member_number>
+    """
+    if not tx or tx.status != 'success' or not tx.company:
+        return
+
+    try:
+        from apps.chama.models import Contribution, Fine
+        from django.utils import timezone
+
+        # Try stored account_reference first (if field exists), then raw callback
+        reference = (getattr(tx, 'account_reference', '') or '').strip()
+
+        if not reference:
+            raw = tx.raw_callback or {}
+            meta = (
+                ((raw.get('Body') or {}).get('stkCallback') or {})
+                .get('CallbackMetadata') or {}
+            )
+            items = meta.get('Item') or []
+            for item in items:
+                if item.get('Name') == 'AccountReference':
+                    reference = str(item.get('Value') or '').strip()
+                    break
+
+        if not reference:
+            return
+
+        ref_upper = reference.upper()
+
+        # ── CONTRIBUTION (C-M00001 or CONTRIB-M00001) ──
+        if ref_upper.startswith('C-') or ref_upper.startswith('CONTRIB-'):
+            if ref_upper.startswith('CONTRIB-'):
+                member_number = reference[len('CONTRIB-'):].strip()
+            else:
+                member_number = reference[len('C-'):].strip()
+
+            current_month = timezone.localdate().strftime('%Y-%m')
+
+            pending = Contribution.objects.filter(
+                company=tx.company,
+                member__member_number=member_number,
+                period=current_month,
+                paid=False,
+            ).order_by('-created_at').first()
+
+            if pending:
+                pending.paid = True
+                pending.save(update_fields=['paid'])
+                logger.info(
+                    "Chama: contribution #%s marked paid (member=%s, code=%s)",
+                    pending.id, member_number, tx.mpesa_code,
+                )
+
+        # ── FINE (F-M00001 or FINE-M00001) ──
+        elif ref_upper.startswith('F-') or ref_upper.startswith('FINE-'):
+            if ref_upper.startswith('FINE-'):
+                member_number = reference[len('FINE-'):].strip()
+            else:
+                member_number = reference[len('F-'):].strip()
+
+            pending = Fine.objects.filter(
+                company=tx.company,
+                member__member_number=member_number,
+                is_paid=False,
+            ).order_by('-created_at').first()
+
+            if pending:
+                pending.is_paid = True
+                pending.save(update_fields=['is_paid'])
+                logger.info(
+                    "Chama: fine #%s marked paid (member=%s, code=%s)",
+                    pending.id, member_number, tx.mpesa_code,
+                )
+
+    except Exception:
+        logger.warning(
+            'Chama payment linkage failed for tx %s', tx.id, exc_info=True
+        )
+
+
+# ============================================
 # STK PUSH
 # ============================================
 @csrf_exempt
@@ -77,6 +167,8 @@ def mpesa_stk_push(request):
     phone     = str(payload.get('phone', '')).strip()
     amount    = payload.get('amount')
     branch_id = payload.get('branch_id')
+    account_ref = str(payload.get('account_ref', '')).strip()  # 👈 ADD
+    description = str(payload.get('description', '')).strip()  # 👈 ADD
 
     company = _company_for_request(request)
     if not company:
@@ -95,12 +187,15 @@ def mpesa_stk_push(request):
         }, status=400)
 
     try:
-        data = send_stk_push(cfg, phone, amount)
+        data = send_stk_push(
+            cfg, phone, amount,
+            account_reference=account_ref,  # 👈 'account_reference' matches services.py
+            description=description,
+        )
     except Exception as e:
         logger.exception('STK push failed')
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-    # Log the transaction, scoped to this company
     tx = MpesaTransaction.objects.create(
         company=company,
         branch=branch,
@@ -110,6 +205,7 @@ def mpesa_stk_push(request):
         phone=phone,
         amount=amount,
         status='pending',
+        account_reference=account_ref, 
     )
 
     return JsonResponse({
@@ -141,8 +237,6 @@ def mpesa_stk_status(request):
         return JsonResponse({'status': 'pending'})
 
     if tx.status == 'success':
-        # Some sandbox callbacks omit MpesaReceiptNumber. If we have no code
-        # yet, try Daraja's STK query — it usually has it.
         if not tx.mpesa_code and tx.mpesa_config:
             try:
                 daraja = query_stk_status(tx.mpesa_config, request_id)
@@ -169,14 +263,12 @@ def mpesa_stk_status(request):
             'message': tx.result_desc or '',
         })
 
-    # Still pending — ask Daraja directly
     try:
         if tx.mpesa_config:
             daraja = query_stk_status(tx.mpesa_config, request_id)
             code = str(daraja.get('ResultCode', ''))
 
             if code == '0':
-                # Persist so mpesa_confirm can find it later
                 receipt = daraja.get('MpesaReceiptNumber', '') or tx.mpesa_code
                 if receipt and not tx.mpesa_code:
                     tx.mpesa_code = receipt
@@ -190,7 +282,7 @@ def mpesa_stk_status(request):
                     'status': 'success',
                     'mpesa_code': tx.mpesa_code,
                     'amount': float(tx.amount or 0),
-                    'customer_name': _resolve_customer_name(tx),   # 👈
+                    'customer_name': _resolve_customer_name(tx),
                     'customer_phone': tx.phone,
                 })
 
@@ -243,6 +335,9 @@ def mpesa_confirm(request):
             'success': False,
             'error': f'Transaction {code} is {tx.status}, not completed.'
         }, status=400)
+
+    # ✅ FIXED: This is now correctly INSIDE the function
+    _link_payment_to_chama(tx)
 
     if abs(float(tx.amount) - expected) > 0.01:
         return JsonResponse({
@@ -320,7 +415,6 @@ def mpesa_callback(request):
             tx.amount     = meta.get('Amount', tx.amount or 0)
             tx.phone      = meta.get('PhoneNumber', tx.phone)
 
-            # 👇 Production only — Safaricom sandbox usually omits these.
             tx.customer_first_name  = meta.get('FirstName',  '') or ''
             tx.customer_middle_name = meta.get('MiddleName', '') or ''
             tx.customer_last_name   = meta.get('LastName',   '') or ''
@@ -328,6 +422,9 @@ def mpesa_callback(request):
             tx.status = 'failed'
 
         tx.save()
+
+        # ✅ Only call after the transaction is fully saved
+        _link_payment_to_chama(tx)
 
     except Exception:
         logger.exception('Callback processing failed')

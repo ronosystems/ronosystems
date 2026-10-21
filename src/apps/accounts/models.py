@@ -7,20 +7,40 @@ from django.conf import settings as django_settings
 
 class User(AbstractUser):
     ROLE_CHOICES = (
+        # ─────────────────────────────────────────
+        # Platform / System Roles
+        # ─────────────────────────────────────────
         ('guest', 'Guest'),
         ('super_admin', 'Super Admin'),
+        ('site_manager', 'Site Manager'),
+
+        # ─────────────────────────────────────────
+        # Business Roles (EPA Shop, Kuku, etc.)
+        # ─────────────────────────────────────────
         ('company_admin', 'Company Admin'),
         ('company_manager', 'Company Manager'),
         ('company_cashier', 'Company Cashier'),
         ('stock_controller', 'Stock Controller'),
         ('company_agent', 'Company Agent'),
         ('mpesa_agent', 'Mpesa Agent'),
-        ('company_technician', 'Company Technician'), 
-        ('customer_care', 'Customer Care'),         
+        ('company_technician', 'Company Technician'),
+        ('customer_care', 'Customer Care'),
         ('company_staff', 'Company Staff'),
+
+        # ─────────────────────────────────────────
+        # Chama Specific Roles
+        # ─────────────────────────────────────────
+        ('chairperson', 'Chairperson'),
+        ('vice_chairperson', 'Vice Chairperson'),
+        ('secretary', 'Secretary'),
+        ('vice_secretary', 'Vice Secretary'),
+        ('treasurer', 'Treasurer'),
+        ('loan_officer', 'Loan Officer'),
+        ('coopted_member', 'Co-opted Member'),
+        ('member', 'Regular Member'),
     )
 
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='company_staff')
+    role = models.CharField(max_length=30, choices=ROLE_CHOICES, default='company_staff')
     company = models.ForeignKey(
         'companies.Company', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='users',
@@ -60,7 +80,7 @@ class User(AbstractUser):
         return f"{self.email} ({self.role})"
 
     # ============================================================
-    # ROLE HELPERS
+    # ROLE HELPERS (Platform)
     # ============================================================
     @property
     def is_guest(self):
@@ -69,6 +89,10 @@ class User(AbstractUser):
     @property
     def is_super_admin(self):
         return self.role == 'super_admin'
+
+    @property
+    def is_site_manager(self):
+        return self.role == 'site_manager'
 
     @property
     def is_company_admin(self):
@@ -110,11 +134,61 @@ class User(AbstractUser):
     def is_admin_or_manager(self):
         return self.role in ['super_admin', 'company_admin', 'company_manager']
 
+    # ============================================================
+    # ROLE HELPERS (Chama)
+    # ============================================================
+    @property
+    def is_chairperson(self):
+        return self.role == 'chairperson'
+
+    @property
+    def is_vice_chairperson(self):
+        return self.role == 'vice_chairperson'
+
+    @property
+    def is_secretary(self):
+        return self.role == 'secretary'
+
+    @property
+    def is_vice_secretary(self):
+        return self.role == 'vice_secretary'
+
+    @property
+    def is_treasurer(self):
+        return self.role == 'treasurer'
+
+    @property
+    def is_loan_officer(self):
+        return self.role == 'loan_officer'
+
+    @property
+    def is_coopted_member(self):
+        return self.role == 'coopted_member'
+
+    @property
+    def is_member(self):
+        return self.role == 'member'
+
+    @property
+    def is_chama_role(self):
+        """Any role that belongs to the Chama app."""
+        return self.role in {
+            'chairperson', 'vice_chairperson',
+            'secretary', 'vice_secretary',
+            'treasurer', 'loan_officer',
+            'coopted_member', 'member',
+        }
+
+    # ============================================================
+    # ROLE FLAGS DICTIONARY
+    # ============================================================
     @property
     def role_flags(self):
         """Serializable dict of role flags for the frontend."""
         return {
+            # Platform
             'is_super_admin': self.is_super_admin,
+            'is_site_manager': self.is_site_manager,
             'is_company_admin': self.is_company_admin,
             'is_company_manager': self.is_company_manager,
             'is_company_cashier': self.is_company_cashier,
@@ -125,6 +199,17 @@ class User(AbstractUser):
             'is_company_technician': self.is_company_technician,
             'is_customer_care': self.is_customer_care,
             'is_guest': self.is_guest,
+
+            # Chama
+            'is_chairperson': self.is_chairperson,
+            'is_vice_chairperson': self.is_vice_chairperson,
+            'is_secretary': self.is_secretary,
+            'is_vice_secretary': self.is_vice_secretary,
+            'is_treasurer': self.is_treasurer,
+            'is_loan_officer': self.is_loan_officer,
+            'is_coopted_member': self.is_coopted_member,
+            'is_member': self.is_member,
+            'is_chama_role': self.is_chama_role,
         }
 
     # ============================================================
@@ -145,13 +230,6 @@ class User(AbstractUser):
     def profile_picture_url(self):
         """
         Fully-formed Cloudinary URL for the profile picture.
-
-        The view uploads to Cloudinary via cloudinary.uploader.upload() with
-        a UNIQUE public_id per upload (profiles/user_<id>_<timestamp>). This
-        guarantees the URL changes every time, so the browser and Cloudinary's
-        CDN always serve the freshest image — no stale cache.
-
-        Returns None if no picture is set.
         """
         if not self.profile_picture:
             return None
@@ -162,7 +240,6 @@ class User(AbstractUser):
         if not key:
             return None
 
-        # Strip any legacy /media/ prefix
         if key.startswith('media/'):
             key = key[len('media/'):]
 

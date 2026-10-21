@@ -1,0 +1,62 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}Record Attendance{% endblock %}
+{% block page_title %}Record Attendance{% endblock %}
+{% block page_subtitle %}For {{ meeting.title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+    <div class="card" style="border:2px solid #000; border-radius:4px; max-width:600px; margin:0 auto;">
+        
+        <div class="card-header" style="background:#f8f9fa; border-bottom:2px solid #000; padding:14px 24px; font-weight:700;">
+            <i class="fas fa-clipboard-check me-2"></i> Add Attendance Record
+        </div>
+        
+        <div class="card-body p-4">
+            
+            <!-- Meeting Summary Box -->
+            <div class="mb-4 p-3" style="background:#eaf2f8; border:2px solid #000; border-radius:4px;">
+                <h6 class="fw-bold mb-1">{{ meeting.title }}</h6>
+                <div class="small text-muted">
+                    <i class="fas fa-calendar-alt me-1"></i> {{ meeting.scheduled_for|date:"F d, Y — H:i A" }}<br>
+                    <i class="fas fa-map-marker-alt me-1"></i> {{ meeting.location|default:"Main Hall" }}
+                </div>
+            </div>
+
+            {% if form.errors %}
+            <div class="alert alert-danger" style="border:2px solid #000;">
+                <ul class="mb-0">
+                    {% for field in form %}{% for err in field.errors %}
+                    <li><strong>{{ field.label }}:</strong> {{ err }}</li>
+                    {% endfor %}{% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Select Member <span class="text-danger">*</span></label>
+                    {{ form.member }}
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Attendance Status <span class="text-danger">*</span></label>
+                    {{ form.status }}
+                </div>
+
+                <div class="d-flex gap-2 mt-4 pt-3" style="border-top:2px solid #000;">
+                    <button type="submit" class="btn btn-dark fw-bold flex-grow-1" style="border:2px solid #000;">
+                        <i class="fas fa-save me-1"></i> Save Attendance
+                    </button>
+                    <a href="{% url 'chama:meeting_detail' meeting.pk %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

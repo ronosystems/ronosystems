@@ -19,6 +19,7 @@ class UserSerializer(serializers.ModelSerializer):
     company_name = serializers.SerializerMethodField()
     branch_name = serializers.SerializerMethodField()
     role_flags = serializers.SerializerMethodField()
+    profile_picture_url = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -28,7 +29,7 @@ class UserSerializer(serializers.ModelSerializer):
             'company', 'company_name', 'branch', 'branch_name',
             'phone', 'staff_id', 'department', 'position', 'hire_date',
             'is_verified', 'two_factor_enabled',
-            'profile_picture', 'address', 'is_active',
+            'profile_picture', 'profile_picture_url', 'address', 'is_active',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'is_verified', 'two_factor_enabled']
@@ -45,6 +46,9 @@ class UserSerializer(serializers.ModelSerializer):
     def get_branch_name(self, obj):
         return obj.branch.name if obj.branch else None
 
+    def get_profile_picture_url(self, obj):
+        return obj.profile_picture_url
+
     def get_role_flags(self, obj):
         """
         Return the model's role_flags dict if present.
@@ -54,8 +58,12 @@ class UserSerializer(serializers.ModelSerializer):
         flags = getattr(obj, 'role_flags', None)
         if flags:
             return flags
+
+        # Fallback — includes both platform and Chama roles
         return {
+            # Platform
             'is_super_admin': obj.role == 'super_admin',
+            'is_site_manager': obj.role == 'site_manager',
             'is_company_admin': obj.role == 'company_admin',
             'is_company_manager': obj.role == 'company_manager',
             'is_company_cashier': obj.role == 'company_cashier',
@@ -66,6 +74,15 @@ class UserSerializer(serializers.ModelSerializer):
             'is_customer_care': obj.role == 'customer_care',
             'is_company_staff': obj.role == 'company_staff',
             'is_guest': obj.role == 'guest',
+            # Chama
+            'is_chairperson': obj.role == 'chairperson',
+            'is_vice_chairperson': obj.role == 'vice_chairperson',
+            'is_secretary': obj.role == 'secretary',
+            'is_vice_secretary': obj.role == 'vice_secretary',
+            'is_treasurer': obj.role == 'treasurer',
+            'is_loan_officer': obj.role == 'loan_officer',
+            'is_coopted_member': obj.role == 'coopted_member',
+            'is_member': obj.role == 'member',
         }
 
 
@@ -86,7 +103,6 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 # ============================================================
 # REGISTRATION
 # ============================================================
-
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
     confirm_password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
@@ -109,19 +125,26 @@ class RegisterSerializer(serializers.ModelSerializer):
         except ValidationError as e:
             raise serializers.ValidationError({"password": list(e.messages)})
 
-        # Role whitelist — public self-registration should never allow
-        # super_admin, stock_controller, mpesa_agent, guest, etc.
-        # Only the "entry-level" company roles are allowed here.
+        # ─────────────────────────────────────────
+        # ROLE WHITELIST — WHERE TO RESTRICT
+        # ─────────────────────────────────────────
         allowed_roles = [
+            # Platform staff
             'company_admin',
             'company_manager',
             'company_cashier',
             'company_agent',
-            'company_technician',   # NEW
-            'customer_care',        # NEW
+            'company_technician',
+            'customer_care',
             'company_staff',
+            'stock_controller',
+            'mpesa_agent',
+
+            # Chama — only allow 'member' self-registration.
+            # Chairperson, Treasurer, etc. should be assigned by an admin.
+            'member',
         ]
-        if attrs.get('role') not in allowed_roles:
+        if attrs.get('role') and attrs['role'] not in allowed_roles:
             raise serializers.ValidationError({"role": "Invalid role selected"})
 
         return attrs
@@ -132,6 +155,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 
+        
 # ============================================================
 # LOGIN
 # ============================================================
@@ -153,6 +177,9 @@ class LoginSerializer(serializers.Serializer):
 
             if not user:
                 raise serializers.ValidationError({"error": "Invalid email or password"})
+
+            if not user.is_active:
+                raise serializers.ValidationError({"error": "Account is deactivated"})
 
             attrs['user'] = user
         else:
@@ -177,7 +204,7 @@ class UserCompanyUpdateSerializer(serializers.Serializer):
     """
     Assign a user to a company, optionally updating their role.
 
-    Note: 'guest' and 'super_admin' are intentionally NOT offered here —
+    Note: 'super_admin' and 'guest' are intentionally NOT offered here —
     those are managed through different flows. Extend the whitelist below
     only if that policy changes.
     """

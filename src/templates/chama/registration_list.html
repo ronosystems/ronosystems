@@ -1,0 +1,309 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}Registrations — Chama Biz{% endblock %}
+{% block page_title %}Pending Registrations{% endblock %}
+{% block page_subtitle %}Review and approve new member applications{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dash-panel {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 4px;
+        display: flex;
+        flex-direction: column;
+    }
+    .dash-panel-header {
+        background: #f8f9fa;
+        border-bottom: 2px solid #000;
+        padding: 12px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 700;
+        color: #000;
+        border-radius: 4px 4px 0 0;
+    }
+    
+    .table-custom {
+        margin-bottom: 0;
+    }
+    .table-custom th {
+        border-bottom: 2px solid #000 !important;
+        background: #f8f9fa;
+        font-weight: 700;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 12px 20px;
+        color: #333;
+    }
+    .table-custom td {
+        padding: 12px 20px;
+        vertical-align: middle;
+        font-size: 0.9rem;
+        border-bottom: 1px solid #dee2e6;
+    }
+    .table-custom tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    /* Badges */
+    .badge-status {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 50px;
+        font-weight: 700;
+        font-size: 0.7rem;
+        border: 1px solid #000;
+        text-transform: uppercase;
+    }
+    .badge-pending { background: #fff3cd; color: #856404; }
+    .badge-approved { background: #d4edda; color: #155724; }
+    .badge-rejected { background: #f8d7da; color: #721c24; }
+
+    /* Avatar */
+    .avatar-circle {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: #fff3cd;
+        color: #856404;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.9rem;
+        border: 2px solid #000;
+    }
+
+    /* Filter Bar */
+    .filter-bar {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 4px;
+        padding: 10px 15px;
+        margin-bottom: 15px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    .filter-bar input, .filter-bar select {
+        border: 2px solid #ccc;
+        border-radius: 4px;
+        padding: 6px 10px;
+        font-size: 0.85rem;
+        outline: none;
+    }
+    .filter-bar input:focus, .filter-bar select:focus {
+        border-color: var(--primary-color);
+    }
+    .btn-custom {
+        border: 2px solid #000;
+        border-radius: 4px;
+        font-weight: 700;
+        font-size: 0.85rem;
+        padding: 6px 15px;
+        transition: all 0.2s;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .btn-primary-custom {
+        background: var(--primary-color);
+        color: #fff;
+    }
+    .btn-primary-custom:hover {
+        background: color-mix(in srgb, var(--primary-color) 85%, #000);
+        color: #fff;
+    }
+    .btn-outline-custom {
+        background: #fff;
+        color: #000;
+    }
+    .btn-outline-custom:hover {
+        background: #f0f2f5;
+    }
+    .btn-success-custom {
+        background: #28a745;
+        color: #fff;
+        border-color: #000;
+    }
+    .btn-success-custom:hover {
+        background: #218838;
+        color: #fff;
+    }
+    .btn-danger-custom {
+        background: #dc3545;
+        color: #fff;
+        border-color: #000;
+    }
+    .btn-danger-custom:hover {
+        background: #c82333;
+        color: #fff;
+    }
+
+    /* Info Box */
+    .info-box {
+        background: #fff3cd;
+        border-left: 4px solid #856404;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 0 4px 4px 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+
+    <!-- Info Box -->
+    {% if pending_count > 0 %}
+    <div class="info-box">
+        <h6 class="fw-bold mb-1"><i class="fas fa-exclamation-triangle"></i> Action Required</h6>
+        <p class="mb-0 small text-muted">
+            You have <strong>{{ pending_count }}</strong> pending registration{{ pending_count|pluralize }} waiting for review. 
+            Please approve or reject them to allow new members to start using Chama.
+        </p>
+    </div>
+    {% endif %}
+
+    <!-- Header Actions -->
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <h5 class="fw-bold mb-0"><i class="fas fa-user-plus text-primary"></i> Registration Applications</h5>
+            <small class="text-muted">{{ registrations|length }} total application{{ registrations|length|pluralize }}</small>
+        </div>
+        <div>
+            <a href="{% url 'chama:member_list' %}" class="btn-custom btn-outline-custom">
+                <i class="fas fa-users"></i> View All Members
+            </a>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <form method="get" class="filter-bar">
+        <div class="flex-grow-1" style="min-width: 200px;">
+            <input type="text" name="q" class="w-100" placeholder="Search by name, email, or phone..." value="{{ request.GET.q|default:'' }}">
+        </div>
+        <div>
+            <select name="status">
+                <option value="">All Statuses</option>
+                <option value="pending" {% if request.GET.status == 'pending' %}selected{% endif %}>Pending</option>
+                <option value="approved" {% if request.GET.status == 'approved' %}selected{% endif %}>Approved</option>
+                <option value="rejected" {% if request.GET.status == 'rejected' %}selected{% endif %}>Rejected</option>
+            </select>
+        </div>
+        <div>
+            <button type="submit" class="btn-custom btn-primary-custom">
+                <i class="fas fa-search"></i> Filter
+            </button>
+            {% if request.GET.q or request.GET.status %}
+            <a href="{% url 'chama:registration_list' %}" class="btn-custom btn-outline-custom ms-1">
+                <i class="fas fa-times"></i> Clear
+            </a>
+            {% endif %}
+        </div>
+    </form>
+
+    <!-- Registrations Table -->
+    <div class="dash-panel">
+        <div class="table-responsive">
+            <table class="table table-hover table-custom">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">#</th>
+                        <th>Applicant</th>
+                        <th>Contact</th>
+                        <th>Requested Type</th>
+                        <th>Status</th>
+                        <th>Applied On</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in registrations %}
+                    <tr>
+                        <td>
+                            <div class="avatar-circle">
+                                {{ r.full_name|default:"?"|make_list|first|upper }}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="fw-bold text-dark">{{ r.full_name }}</div>
+                            {% if r.national_id %}
+                            <small class="text-muted">ID: {{ r.national_id }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div>{{ r.phone|default:"—" }}</div>
+                            <small class="text-muted">{{ r.email|default:"" }}</small>
+                        </td>
+                        <td>
+                            {% if r.membership_type %}
+                                <span class="badge-status" style="background:#eaf2f8; color:#2d5f7c; border-color:#2d5f7c;">
+                                    {{ r.membership_type.name }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted small">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if r.status == 'pending' %}
+                                <span class="badge-status badge-pending">Pending</span>
+                            {% elif r.status == 'approved' %}
+                                <span class="badge-status badge-approved">Approved</span>
+                            {% elif r.status == 'rejected' %}
+                                <span class="badge-status badge-rejected">Rejected</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="small">{{ r.created_at|date:"M d, Y" }}</span><br>
+                            <small class="text-muted">{{ r.created_at|date:"H:i" }}</small>
+                        </td>
+                        <td class="text-end">
+                            {% if r.status == 'pending' %}
+                                <form method="post" action="{% url 'chama:registration_approve' r.pk %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn-custom btn-success-custom btn-sm" title="Approve">
+                                        <i class="fas fa-check"></i> Approve
+                                    </button>
+                                </form>
+                                <form method="post" action="{% url 'chama:registration_reject' r.pk %}" class="d-inline" onsubmit="return confirm('Reject this application?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn-custom btn-danger-custom btn-sm" title="Reject">
+                                        <i class="fas fa-times"></i> Reject
+                                    </button>
+                                </form>
+                            {% else %}
+                                <a href="#" class="btn-custom btn-outline-custom btn-sm">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3" style="opacity:0.3;"></i>
+                            <h6 class="fw-bold text-muted">No registration applications</h6>
+                            <p class="small text-muted mb-0">
+                                {% if request.GET.q or request.GET.status %}
+                                    Try adjusting your search or filters.
+                                {% else %}
+                                    New member applications will appear here once submitted.
+                                {% endif %}
+                            </p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

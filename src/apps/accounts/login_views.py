@@ -97,6 +97,8 @@ def redirect_dashboard(request, user):
             return HttpResponseRedirect('/supermarket/dashboard/')
         if 'kuku' in business_name or 'poultry' in business_name:
             return HttpResponseRedirect('/kuku_biz/dashboard/')
+        if 'chama' in business_name or 'sacco' in business_name or 'savings' in business_name:
+            return HttpResponseRedirect('/chama/dashboard/')
         if 'healthcare' in business_name or 'medical' in business_name:
             return HttpResponseRedirect('/healthcare/dashboard/')
         if 'education' in business_name or 'school' in business_name:
@@ -132,7 +134,6 @@ def redirect_dashboard(request, user):
     )
     return HttpResponseRedirect('/no-access/')
 
-    
 
 # ============================================================
 # LOGOUT
@@ -343,6 +344,7 @@ def register_page(request):
             return render(request, 'accounts/register.html', {'form_data': request.POST})
 
     return render(request, 'accounts/register.html')
+
 
 # ============================================================
 # FORGOT PASSWORD

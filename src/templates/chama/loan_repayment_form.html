@@ -1,0 +1,84 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}Record Repayment{% endblock %}
+{% block page_title %}Record Repayment{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+    <div class="card" style="border:2px solid #000; border-radius:4px; max-width:600px; margin:0 auto;">
+        <div class="card-header" style="background:#f8f9fa; border-bottom:2px solid #000; padding:14px 24px; font-weight:700;">
+            <i class="fas fa-receipt me-2"></i> Loan #{{ loan.id }} — Manual Repayment
+        </div>
+        <div class="card-body p-4">
+            
+            <!-- SUMMARY BOX -->
+            <div class="mb-4 p-3" style="background:#eaf2f8; border:2px solid #000; border-radius:4px;">
+                <div class="row text-center mb-2">
+                    <div class="col-4">
+                        <small class="text-muted text-uppercase fw-bold d-block">Loan + Interest</small>
+                        <strong style="font-size:1.1rem;">KES {{ loan.total_repayable|floatformat:2 }}</strong>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted text-uppercase fw-bold d-block">Already Repaid</small>
+                        <strong class="text-success" style="font-size:1.1rem;">KES {{ loan.total_repaid|floatformat:2 }}</strong>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted text-uppercase fw-bold d-block">Remaining</small>
+                        <strong class="text-danger" style="font-size:1.1rem;">KES {{ loan.balance_remaining|floatformat:2 }}</strong>
+                    </div>
+                </div>
+                <hr style="border-top:1px dashed #000; margin: 8px 0;">
+                <div class="small text-muted text-center">
+                    <i class="fas fa-info-circle"></i> This loan includes a {{ loan.interest_rate }}% flat interest rate.
+                </div>
+            </div>
+
+            <form method="post">
+                {% csrf_token %}
+                
+                {% if form.errors %}
+                <div class="alert alert-danger" style="border:2px solid #000;">
+                    <strong><i class="fas fa-exclamation-triangle"></i> Please fix the errors:</strong>
+                    <ul class="mb-0 mt-2">
+                        {% for field in form %}
+                            {% for error in field.errors %}
+                            <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                            {% endfor %}
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Amount to Pay (KES) <span class="text-danger">*</span></label>
+                        {{ form.amount }}
+                        <small class="text-muted d-block mt-1" style="font-size:0.7rem;">
+                            Enter amount to deduct from the balance.
+                        </small>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Date</label>
+                        {{ form.date }}
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Reference (Optional)</label>
+                    {{ form.reference }}
+                </div>
+                
+                <div class="d-flex gap-2 mt-4 pt-3" style="border-top:2px solid #000;">
+                    <button type="submit" class="btn btn-dark fw-bold flex-grow-1" style="border:2px solid #000;">
+                        <i class="fas fa-save me-1"></i> Record Repayment
+                    </button>
+                    <a href="{% url 'chama:loan_detail' loan.pk %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

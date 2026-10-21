@@ -6,9 +6,10 @@ This ensures consistent naming and proper integration mapping
 from django.db import models
 from enum import Enum
 
+
 class BusinessTypeEnum(Enum):
     """Official Business Types with their exact spelling and integrations"""
-    
+
     EPA_SHOP = {
         'id': 1,
         'name': 'EPA Shop',
@@ -19,11 +20,14 @@ class BusinessTypeEnum(Enum):
         'is_active': True,
         'integration': {
             'module': 'epa_shop',
-            'models': ['Category', 'Electronic', 'Phone', 'Accessory', 'Sale', 'SaleItem', 'Customer'],
-            'dashboard': 'EPADashboardView'
-        }
+            'models': [
+                'Category', 'Electronic', 'Phone', 'Accessory',
+                'Sale', 'SaleItem', 'Customer',
+            ],
+            'dashboard': 'EPADashboardView',
+        },
     }
-    
+
     HEALTHCARE = {
         'id': 2,
         'name': 'Healthcare',
@@ -35,10 +39,10 @@ class BusinessTypeEnum(Enum):
         'integration': {
             'module': 'healthcare',
             'models': ['Patient', 'Appointment', 'MedicalRecord', 'Prescription'],
-            'dashboard': 'HealthcareDashboardView'
-        }
+            'dashboard': 'HealthcareDashboardView',
+        },
     }
-    
+
     EDUCATION = {
         'id': 3,
         'name': 'Education',
@@ -50,10 +54,10 @@ class BusinessTypeEnum(Enum):
         'integration': {
             'module': 'education',
             'models': ['Student', 'Course', 'Enrollment', 'Grade'],
-            'dashboard': 'EducationDashboardView'
-        }
+            'dashboard': 'EducationDashboardView',
+        },
     }
-    
+
     RETAIL = {
         'id': 4,
         'name': 'Retail',
@@ -65,10 +69,10 @@ class BusinessTypeEnum(Enum):
         'integration': {
             'module': 'retail',
             'models': ['Product', 'Category', 'Sale', 'SaleItem'],
-            'dashboard': 'RetailDashboardView'
-        }
+            'dashboard': 'RetailDashboardView',
+        },
     }
-    
+
     RESTAURANT = {
         'id': 5,
         'name': 'Restaurant',
@@ -80,10 +84,10 @@ class BusinessTypeEnum(Enum):
         'integration': {
             'module': 'restaurant',
             'models': ['Menu', 'Order', 'OrderItem', 'Table'],
-            'dashboard': 'RestaurantDashboardView'
-        }
+            'dashboard': 'RestaurantDashboardView',
+        },
     }
-    
+
     SUPERMARKET = {
         'id': 6,
         'name': 'Supermarket',
@@ -106,10 +110,10 @@ class BusinessTypeEnum(Enum):
                 'Customer',
                 'PriceHistory',
                 'Discount',
-                'ShelfLocation'
+                'ShelfLocation',
             ],
-            'dashboard': 'SupermarketDashboardView'
-        }
+            'dashboard': 'SupermarketDashboardView',
+        },
     }
 
     KUKU_BIZ = {
@@ -140,7 +144,37 @@ class BusinessTypeEnum(Enum):
             'dashboard': 'KukuBizDashboardView',
         },
     }
-    
+
+    CHAMA = {
+        'id': 8,
+        'name': 'Chama',
+        'slug': 'chama',
+        'description': 'Chama / Savings Group / SACCO — savings, loans, meetings, welfare',
+        'icon': 'fa-hand-holding-usd',
+        'app': 'apps.chama',
+        'is_active': True,
+        'integration': {
+            'module': 'chama',
+            'models': [
+                'MembershipType',       # Tier / class (monthly contribution, joining fee)
+                'Member',               # Individual chama member
+                'Registration',         # Pending / approved applications
+                'Savings',              # Member deposit records
+                'Contribution',         # Periodic member contributions
+                'Fine',                 # Penalties / fines
+                'LoanType',             # Loan product definitions
+                'Loan',                 # Loan applications & disbursements
+                'LoanRepayment',        # Repayment records per loan
+                'Account',              # Cash / bank / M-Pesa account
+                'Transaction',          # Cashbook entries
+                'Expense',              # Chama expenses
+                'Meeting',              # Scheduled meetings
+                'Attendance',           # Meeting attendance
+            ],
+            'dashboard': 'ChamaDashboardView',
+        },
+    }
+
     @classmethod
     def get_by_name(cls, name):
         """Get business type by exact name"""
@@ -148,7 +182,7 @@ class BusinessTypeEnum(Enum):
             if member.value['name'].lower() == name.lower():
                 return member
         return None
-    
+
     @classmethod
     def get_by_id(cls, type_id):
         """Get business type by ID"""
@@ -156,7 +190,7 @@ class BusinessTypeEnum(Enum):
             if member.value['id'] == type_id:
                 return member
         return None
-    
+
     @classmethod
     def get_by_slug(cls, slug):
         """Get business type by slug"""
@@ -164,22 +198,22 @@ class BusinessTypeEnum(Enum):
             if member.value['slug'] == slug:
                 return member
         return None
-    
+
     @classmethod
     def get_all_active(cls):
         """Get all active business types"""
         return [member.value for member in cls if member.value['is_active']]
-    
+
     @classmethod
     def get_all_names(cls):
         """Get all business type names (for validation)"""
         return [member.value['name'] for member in cls if member.value['is_active']]
-    
+
     @classmethod
     def validate_name(cls, name):
         """Validate if a business type name exists"""
         return name in cls.get_all_names()
-    
+
     @classmethod
     def get_integration(cls, name):
         """Get integration details for a business type"""
@@ -187,6 +221,7 @@ class BusinessTypeEnum(Enum):
         if business_type:
             return business_type.value.get('integration')
         return None
+
 
 # ============================================
 # Business Type Constants (For use in models)

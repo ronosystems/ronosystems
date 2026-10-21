@@ -1,0 +1,45 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}{{ meeting.title }}{% endblock %}
+{% block page_title %}{{ meeting.title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card" style="border:2px solid #000; border-radius:4px;">
+                <div class="card-header" style="background:#f8f9fa; border-bottom:2px solid #000;">
+                    <strong>Meeting Details</strong>
+                </div>
+                <div class="card-body">
+                    <p><strong>Date:</strong> {{ meeting.scheduled_for|date:"F d, Y H:i" }}</p>
+                    <p><strong>Location:</strong> {{ meeting.location|default:"—" }}</p>
+                    <p><strong>Agenda:</strong></p>
+                    <div class="p-2" style="background:#f8f9fa; border:1px solid #ccc;">{{ meeting.agenda|default:"—"|linebreaks }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card" style="border:2px solid #000; border-radius:4px;">
+                <div class="card-header d-flex justify-content-between align-items-center" style="background:#f8f9fa; border-bottom:2px solid #000;">
+                    <strong>Attendance</strong>
+                    {% if is_officer %}
+                    <a href="{% url 'chama:attendance_create' meeting.pk %}" class="btn btn-sm btn-dark" style="border:2px solid #000;">+ Add</a>
+                    {% endif %}
+                </div>
+                <ul class="list-group list-group-flush">
+                    {% for a in attendance %}
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>{{ a.member.full_name }}</span>
+                        <span class="badge bg-{% if a.status == 'present' %}success{% elif a.status == 'absent' %}danger{% else %}warning{% endif %}">{{ a.get_status_display }}</span>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item text-center text-muted">No attendance recorded.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

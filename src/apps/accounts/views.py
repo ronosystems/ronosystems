@@ -352,12 +352,13 @@ class UserRoleInfoView(APIView):
     def get(self, request):
         user = request.user
 
-        # Safely resolve role flags — uses the model property if available,
-        # otherwise falls back to a manual build (so this view never breaks).
+        # Use model property if available, otherwise fall back
         role_flags = getattr(user, 'role_flags', None)
         if not role_flags:
             role_flags = {
+                # Platform
                 'is_super_admin': user.role == 'super_admin',
+                'is_site_manager': user.role == 'site_manager',
                 'is_company_admin': user.role == 'company_admin',
                 'is_company_manager': user.role == 'company_manager',
                 'is_company_cashier': user.role == 'company_cashier',
@@ -368,9 +369,20 @@ class UserRoleInfoView(APIView):
                 'is_customer_care': user.role == 'customer_care',
                 'is_company_staff': user.role == 'company_staff',
                 'is_guest': user.role == 'guest',
+                # Chama
+                'is_chairperson': user.role == 'chairperson',
+                'is_vice_chairperson': user.role == 'vice_chairperson',
+                'is_secretary': user.role == 'secretary',
+                'is_vice_secretary': user.role == 'vice_secretary',
+                'is_treasurer': user.role == 'treasurer',
+                'is_loan_officer': user.role == 'loan_officer',
+                'is_coopted_member': user.role == 'coopted_member',
+                'is_member': user.role == 'member',
             }
 
+        # Capability flags — now including Chama roles
         capability_flags = {
+            # Platform
             'can_manage_users':   user.role in ['super_admin', 'company_admin'],
             'can_manage_sales':   user.role in ['super_admin', 'company_admin', 'company_manager', 'company_cashier'],
             'can_view_reports':   user.role in ['super_admin', 'company_admin', 'company_manager'],
@@ -378,6 +390,16 @@ class UserRoleInfoView(APIView):
             'can_process_sales':  user.role in ['super_admin', 'company_admin', 'company_manager', 'company_cashier', 'company_agent'],
             'can_handle_tickets': user.role in ['super_admin', 'company_admin', 'company_manager', 'customer_care'],
             'can_perform_jobs':   user.role in ['super_admin', 'company_admin', 'company_manager', 'company_technician'],
+
+            # ───── Chama capabilities ─────
+            'can_manage_members':       user.role in ['super_admin', 'company_admin', 'company_manager', 'chairperson', 'vice_chairperson', 'secretary', 'vice_secretary'],
+            'can_manage_savings':       user.role in ['super_admin', 'company_admin', 'company_manager', 'chairperson', 'vice_chairperson', 'treasurer'],
+            'can_manage_loans':         user.role in ['super_admin', 'company_admin', 'company_manager', 'chairperson', 'vice_chairperson', 'treasurer', 'loan_officer'],
+            'can_manage_cashbook':      user.role in ['super_admin', 'company_admin', 'company_manager', 'chairperson', 'treasurer'],
+            'can_manage_meetings':      user.role in ['super_admin', 'company_admin', 'company_manager', 'chairperson', 'vice_chairperson', 'secretary', 'vice_secretary', 'treasurer', 'loan_officer', 'coopted_member', 'member'],
+            'can_manage_committees':    user.role in ['super_admin', 'company_admin', 'chairperson', 'secretary'],
+            'can_view_chama_reports':   user.role in ['super_admin', 'company_admin', 'company_manager', 'chairperson', 'treasurer', 'loan_officer'],
+            'can_view_own_savings':     user.role in ['chairperson', 'vice_chairperson', 'secretary', 'vice_secretary', 'treasurer', 'loan_officer', 'coopted_member', 'member'],
         }
 
         return Response({

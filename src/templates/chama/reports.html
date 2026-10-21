@@ -1,0 +1,109 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+{% block title %}Chama Reports{% endblock %}
+{% block page_title %}Chama Reports{% endblock %}
+{% block page_subtitle %}Financial and operational analytics{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+
+    <!-- Top Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card p-3 text-center" style="border:2px solid #000; background:#eaf2f8;">
+                <h6 class="text-uppercase text-muted fw-bold" style="font-size:0.75rem;">Total Savings</h6>
+                <h4 class="fw-bold mb-0">KES {{ total_savings|floatformat:2 }}</h4>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3 text-center" style="border:2px solid #000; background:#d4edda;">
+                <h6 class="text-uppercase text-muted fw-bold" style="font-size:0.75rem;">Total Contributions</h6>
+                <h4 class="fw-bold mb-0">KES {{ total_contributions|floatformat:2 }}</h4>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3 text-center" style="border:2px solid #000; background:#fff3cd;">
+                <h6 class="text-uppercase text-muted fw-bold" style="font-size:0.75rem;">Loans Disbursed</h6>
+                <h4 class="fw-bold mb-0">KES {{ total_loans_disbursed|floatformat:2 }}</h4>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card p-3 text-center" style="border:2px solid #000; background:#f8d7da;">
+                <h6 class="text-uppercase text-muted fw-bold" style="font-size:0.75rem;">Loans Outstanding</h6>
+                <h4 class="fw-bold mb-0 text-danger">KES {{ total_loans_outstanding|floatformat:2 }}</h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <!-- Top Savers -->
+        <div class="col-lg-6">
+            <div class="card" style="border:2px solid #000; height:100%;">
+                <div class="card-header" style="background:#f8f9fa; border-bottom:2px solid #000;"><strong>Top Savers</strong></div>
+                <ul class="list-group list-group-flush">
+                    {% for s in savings_by_member %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>{{ s.member__full_name }}</span>
+                        <strong>KES {{ s.total|floatformat:2 }}</strong>
+                    </li>
+                    {% empty %}<li class="list-group-item text-muted">No data available.</li>{% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <!-- Top Borrowers -->
+        <div class="col-lg-6">
+            <div class="card" style="border:2px solid #000; height:100%;">
+                <div class="card-header" style="background:#f8f9fa; border-bottom:2px solid #000;"><strong>Top Borrowers</strong></div>
+                <ul class="list-group list-group-flush">
+                    {% for b in top_borrowers %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>{{ b.member__full_name }}</span>
+                        <strong class="text-warning">KES {{ b.total_borrowed|floatformat:2 }}</strong>
+                    </li>
+                    {% empty %}<li class="list-group-item text-muted">No data available.</li>{% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Loans by Status -->
+        <div class="col-lg-6">
+            <div class="card" style="border:2px solid #000;">
+                <div class="card-header" style="background:#f8f9fa; border-bottom:2px solid #000;"><strong>Loans by Status</strong></div>
+                <table class="table mb-0">
+                    <thead><tr><th>Status</th><th>Count</th><th class="text-end">Total Principal</th></tr></thead>
+                    <tbody>
+                        {% for l in loans_by_status %}
+                        <tr>
+                            <td><span class="text-capitalize badge bg-secondary">{{ l.status }}</span></td>
+                            <td>{{ l.count }}</td>
+                            <td class="text-end fw-bold">KES {{ l.total|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Fines Summary -->
+        <div class="col-lg-6">
+            <div class="card" style="border:2px solid #000;">
+                <div class="card-header" style="background:#f8f9fa; border-bottom:2px solid #000;"><strong>Fines Summary</strong></div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
+                        <span class="text-muted">Fines Paid</span>
+                        <strong class="text-success">KES {{ fines_summary.paid|floatformat:2 }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Fines Unpaid</span>
+                        <strong class="text-danger">KES {{ fines_summary.unpaid|floatformat:2 }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}{% if mode == 'create' %}New Membership Type{% else %}Edit Membership Type{% endif %}{% endblock %}
+{% block page_title %}{% if mode == 'create' %}New Membership Type{% else %}Edit: {{ membership_type.name }}{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+    <div class="card" style="border: 2px solid #000; border-radius: 4px; max-width: 700px; margin: 0 auto;">
+        <div class="card-header" style="background: #f8f9fa; border-bottom: 2px solid #000; padding: 12px 20px;">
+            <strong>
+                <i class="fas fa-id-card me-2"></i>
+                {% if mode == 'create' %}Create New Membership Tier{% else %}Update Membership Tier{% endif %}
+            </strong>
+        </div>
+        <div class="card-body p-4">
+            <form method="post">
+                {% csrf_token %}
+                {% if form.errors %}
+                <div class="alert alert-danger" style="border: 2px solid #000;">
+                    <strong>Please fix the errors below:</strong>
+                    <ul class="mb-0 mt-2">
+                        {% for field in form %}{% for error in field.errors %}
+                        <li>{{ field.label }}: {{ error }}</li>
+                        {% endfor %}{% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Type Name <span class="text-danger">*</span></label>
+                    {{ form.name }}
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Description</label>
+                    {{ form.description }}
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Registration Fee (KES)</label>
+                        {{ form.registration_fee }}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Monthly Contribution (KES)</label>
+                        {{ form.monthly_contribution }}
+                    </div>
+                </div>
+
+                <div class="form-check mb-4">
+                    {{ form.is_active }}
+                    <label class="form-check-label fw-bold" for="{{ form.is_active.id_for_label }}">
+                        Active (visible to members when they register)
+                    </label>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-dark fw-bold" style="border:2px solid #000;">
+                        <i class="fas fa-save me-1"></i>
+                        {% if mode == 'create' %}Create Type{% else %}Save Changes{% endif %}
+                    </button>
+                    <a href="{% url 'chama:membership_type_list' %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

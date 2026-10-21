@@ -1,0 +1,275 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}{% if mode == 'create' %}Add Member{% else %}Edit Member{% endif %} — Chama Biz{% endblock %}
+{% block page_title %}{% if mode == 'create' %}Add New Member{% else %}Edit: {{ member.full_name }}{% endif %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 4px;
+        max-width: 1500px;
+        margin: 0 auto;
+    }
+    .form-card-header {
+        background: #0080ff;
+        border-bottom: 2px solid #000;
+        padding: 14px 24px;
+        font-weight: 900;
+        border-radius: 4px 4px 0 0;
+    }
+    .form-card-body {
+        padding: 24px;
+    }
+    .form-label {
+        font-weight: 600;
+        color: #000;
+        font-size: 0.85rem;
+        margin-bottom: 4px;
+    }
+    .form-control, select.form-control {
+        border: 2px solid #ccc;
+        border-radius: 4px;
+        padding: 8px 12px;
+        font-size: 0.9rem;
+    }
+    .form-control:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 20%, transparent);
+    }
+    /* File input styling */
+    .form-control[type="file"] {
+        padding: 6px 12px;
+    }
+    .form-control[type="file"]::file-selector-button {
+        background: #000;
+        color: #fff;
+        border: none;
+        padding: 5px 12px;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 0.8rem;
+        margin-right: 10px;
+        cursor: pointer;
+    }
+    .doc-preview {
+        margin-top: 6px;
+        font-size: 0.75rem;
+        color: #666;
+    }
+    .doc-preview a {
+        color: var(--primary-color);
+        font-weight: 600;
+        text-decoration: none;
+    }
+    .doc-preview a:hover { text-decoration: underline; }
+    .btn-custom {
+        border: 2px solid #000;
+        border-radius: 4px;
+        font-weight: 700;
+        font-size: 0.9rem;
+        padding: 8px 20px;
+    }
+    .btn-primary-custom { background: var(--primary-color); color: #fff; }
+    .btn-primary-custom:hover { background: color-mix(in srgb, var(--primary-color) 85%, #000); color: #fff; }
+    .btn-outline-custom { background: #fff; color: #000; }
+    .btn-outline-custom:hover { background: #f0f2f5; }
+    .section-divider {
+        border-top: 2px dashed #ccc;
+        margin: 24px 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+    <div class="form-card">
+        <div class="form-card-header">
+            <i class="fas fa-user-plus me-2"></i>
+            {% if mode == 'create' %}
+                Register New Member
+            {% else %}
+                Update Member Details
+            {% endif %}
+        </div>
+        <div class="form-card-body">
+
+            {% if form.errors %}
+            <div class="alert alert-danger" style="border: 2px solid #000;">
+                <strong><i class="fas fa-exclamation-triangle me-1"></i> Please fix the errors below:</strong>
+                <ul class="mb-0 mt-2">
+                    {% for field in form %}
+                        {% for error in field.errors %}
+                        <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                        {% endfor %}
+                    {% endfor %}
+                    {% for error in form.non_field_errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            <!-- IMPORTANT: enctype for file uploads -->
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+
+                <!-- ============================================ -->
+                <!-- SECTION 1: PERSONAL INFORMATION             -->
+                <!-- ============================================ -->
+                <h6 class="fw-bold text-uppercase mb-3" style="font-size: 0.75rem; letter-spacing: 1px; color: #666;">
+                    <i class="fas fa-user me-1"></i> Personal Information
+                </h6>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Full Name <span class="text-danger">*</span></label>
+                        {{ form.full_name }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">National ID</label>
+                        {{ form.national_id }}
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Phone Number <span class="text-danger">*</span></label>
+                        {{ form.phone }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Email Address</label>
+                        {{ form.email }}
+                    </div>
+                </div>
+
+                <div class="section-divider"></div>
+
+                <!-- ============================================ -->
+                <!-- SECTION 2: CHAMA DETAILS & ROLE             -->
+                <!-- ============================================ -->
+                <h6 class="fw-bold text-uppercase mb-3" style="font-size: 0.75rem; letter-spacing: 1px; color: #666;">
+                    <i class="fas fa-id-card me-1"></i> Chama Details & Role
+                </h6>
+
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Membership Type</label>
+                        {{ form.membership_type }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Status</label>
+                        {{ form.status }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Joined On</label>
+                        {{ form.joined_on }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Chama Role</label>
+                        {{ form.role }}
+                        <small class="text-muted d-block mt-1">
+                            <i class="fas fa-info-circle"></i>
+                            Member can access
+                            {% if mode == 'edit' and not member.user %}
+                            <br><span class="text-warning"><i class="fas fa-exclamation-triangle"></i> No user account linked. Role will apply once a user account is created.</span>
+                            {% endif %}
+                        </small>
+                    </div>
+                </div>
+
+                <div class="section-divider"></div>
+
+                <!-- ============================================ -->
+                <!-- SECTION 3: KYC DOCUMENTS                    -->
+                <!-- ============================================ -->
+                <h6 class="fw-bold text-uppercase mb-3" style="font-size: 0.75rem; letter-spacing: 1px; color: #666;">
+                    <i class="fas fa-folder-open me-1"></i> KYC Documents
+                </h6>
+
+                <div class="row mb-3">
+                    <!-- Passport Photo -->
+                    <div class="col-md-2">
+                        <label class="form-label"><i class="fas fa-user-circle me-1"></i>Passport Photo</label>
+                        {{ form.passport_photo }}
+                        {% if mode == 'edit' and member.passport_photo_url %}
+                        <div class="doc-preview">
+                            <a href="{{ member.passport_photo_url }}">
+                                <i class="fas fa-eye"></i> View Current Photo
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- ID Front -->
+                    <div class="col-md-2">
+                        <label class="form-label"><i class="fas fa-id-card me-1"></i> ID (Front)</label>
+                        {{ form.id_front }}
+                        {% if mode == 'edit' and member.id_front_url %}
+                        <div class="doc-preview">
+                            <a href="{{ member.id_front_url }}">
+                                <i class="fas fa-eye"></i> View Current ID (Front)
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- ID Back -->
+                    <div class="col-md-2">
+                        <label class="form-label"><i class="fas fa-id-card me-1"></i> ID (Back)</label>
+                        {{ form.id_back }}
+                        {% if mode == 'edit' and member.id_back_url %}
+                        <div class="doc-preview">
+                            <a href="{{ member.id_back_url }}">
+                                <i class="fas fa-eye"></i> View Current ID (Back)
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- KRA Certificate -->
+                    <div class="col-md-3">
+                        <label class="form-label"><i class="fas fa-file-invoice me-1"></i>KRA Certificate</label>
+                        {{ form.kra_certificate }}
+                        {% if mode == 'edit' and member.kra_certificate_url %}
+                        <div class="doc-preview">
+                            <a href="{{ member.kra_certificate_url }}">
+                                <i class="fas fa-file-pdf"></i> View Current KRA Certificate
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Good Conduct -->
+                    <div class="col-md-3">
+                        <label class="form-label"><i class="fas fa-file-shield me-1"></i> Good Conduct</label>
+                        {{ form.good_conduct }}
+                        {% if mode == 'edit' and member.good_conduct_url %}
+                        <div class="doc-preview">
+                            <a href="{{ member.good_conduct_url }}">
+                                <i class="fas fa-file-pdf"></i> View Current Good Conduct
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- ============================================ -->
+                <!-- ACTIONS                                     -->
+                <!-- ============================================ -->
+                <div class="d-flex gap-2 mt-4 pt-3" style="border-top: 2px solid #000;">
+                    <button type="submit" class="btn-custom btn-primary-custom">
+                        <i class="fas fa-save me-1"></i>
+                        {% if mode == 'create' %}Create Member{% else %}Save Changes{% endif %}
+                    </button>
+                    <a href="{% url 'chama:member_list' %}" class="btn-custom btn-outline-custom">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

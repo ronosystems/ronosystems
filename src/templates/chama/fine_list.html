@@ -1,0 +1,273 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}Fines — Chama Biz{% endblock %}
+{% block page_title %}Fines{% endblock %}
+{% block page_subtitle %}Track and manage member penalties{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dash-panel {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 4px;
+    }
+    .table-custom th {
+        border-bottom: 2px solid #000 !important;
+        background: #f8f9fa;
+        font-weight: 700;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        padding: 12px 20px;
+    }
+    .table-custom td {
+        padding: 12px 20px;
+        font-size: 0.9rem;
+        border-bottom: 1px solid #dee2e6;
+        vertical-align: middle;
+    }
+    .table-custom tbody tr:hover { background: #f8f9fa; }
+
+    .filter-bar {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 4px;
+        padding: 10px 15px;
+        margin-bottom: 15px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    .filter-bar input, .filter-bar select {
+        border: 2px solid #ccc;
+        border-radius: 4px;
+        padding: 6px 10px;
+        font-size: 0.85rem;
+    }
+    .filter-bar input:focus, .filter-bar select:focus {
+        border-color: var(--primary-color);
+        outline: none;
+    }
+
+    .btn-custom {
+        border: 2px solid #000;
+        border-radius: 4px;
+        font-weight: 700;
+        font-size: 0.85rem;
+        padding: 6px 15px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .btn-primary-custom { background: var(--primary-color); color: #fff; }
+    .btn-primary-custom:hover { background: color-mix(in srgb, var(--primary-color) 85%, #000); color: #fff; }
+    .btn-outline-custom { background: #fff; color: #000; }
+    .btn-outline-custom:hover { background: #f0f2f5; }
+
+    .stat-box {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 4px;
+        padding: 15px;
+        text-align: center;
+    }
+    .stat-box .stat-value {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #000;
+    }
+    .stat-box .stat-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        color: #666;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+
+    .badge-status {
+        padding: 4px 10px;
+        border-radius: 50px;
+        font-weight: 700;
+        font-size: 0.7rem;
+        border: 1px solid #000;
+        text-transform: uppercase;
+        display: inline-block;
+    }
+    .badge-paid { background: #d4edda; color: #155724; }
+    .badge-unpaid { background: #f8d7da; color: #721c24; }
+
+    .action-icon {
+        color: #000;
+        font-size: 1rem;
+        margin: 0 4px;
+        text-decoration: none;
+    }
+    .action-icon:hover { color: var(--primary-color); }
+    .action-icon.danger:hover { color: #dc3545; }
+
+    .btn-pay {
+        border: 2px solid #000;
+        border-radius: 4px;
+        background: #000;
+        color: #fff;
+        font-weight: 700;
+        font-size: 0.75rem;
+        padding: 4px 10px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+    }
+    .btn-pay:hover { background: #333; color: #fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+
+    {% if is_officer %}
+    <!-- ── OFFICER VIEW: totals for all members + add button ── -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="stat-box" style="background:#d4edda;">
+                <div class="stat-label">Total Paid</div>
+                <div class="stat-value">KES {{ total_paid|floatformat:2 }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-box" style="background:#f8d7da;">
+                <div class="stat-label">Total Unpaid</div>
+                <div class="stat-value">KES {{ total_unpaid|floatformat:2 }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-box" style="background:#f8f9fa;">
+                <div class="stat-label">Records</div>
+                <div class="stat-value">{{ total_count }}</div>
+            </div>
+        </div>
+        <div class="col-md-3 d-flex align-items-center">
+            <a href="{% url 'chama:fine_create' %}" class="btn-custom btn-primary-custom w-100 justify-content-center py-2">
+                <i class="fas fa-plus"></i> Add Fine
+            </a>
+        </div>
+    </div>
+
+    <form method="get" class="filter-bar">
+        <div class="flex-grow-1" style="min-width:200px;">
+            <input type="text" name="q" class="w-100" placeholder="Search by member or reason..." value="{{ request.GET.q|default:'' }}">
+        </div>
+        <div>
+            <select name="paid">
+                <option value="">All</option>
+                <option value="yes" {% if request.GET.paid == 'yes' %}selected{% endif %}>Paid Only</option>
+                <option value="no" {% if request.GET.paid == 'no' %}selected{% endif %}>Unpaid Only</option>
+            </select>
+        </div>
+        <button type="submit" class="btn-custom btn-primary-custom">
+            <i class="fas fa-search"></i> Filter
+        </button>
+        {% if request.GET.q or request.GET.paid %}
+        <a href="{% url 'chama:fine_list' %}" class="btn-custom btn-outline-custom">
+            <i class="fas fa-times"></i> Clear
+        </a>
+        {% endif %}
+    </form>
+
+    {% else %}
+    <!-- ── MEMBER VIEW: my personal totals only ── -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="stat-box" style="background:#d4edda;">
+                <div class="stat-label">My Total Paid</div>
+                <div class="stat-value">KES {{ total_paid|floatformat:2 }}</div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="stat-box" style="background:#f8d7da;">
+                <div class="stat-label">My Unpaid Balance</div>
+                <div class="stat-value">KES {{ total_unpaid|floatformat:2 }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ── FINES TABLE ── -->
+    <div class="dash-panel">
+        <div class="table-responsive">
+            <table class="table table-hover table-custom mb-0">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        {% if is_officer %}<th>Member</th>{% endif %}
+                        <th>Reason</th>
+                        <th class="text-end">Amount</th>
+                        <th>Status</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in fines %}
+                    <tr>
+                        <td>{{ f.date|date:"M d, Y" }}</td>
+                        {% if is_officer %}
+                        <td>
+                            <div class="fw-bold">{{ f.member.full_name }}</div>
+                            <small class="text-muted">{{ f.member.member_number }}</small>
+                        </td>
+                        {% endif %}
+                        <td>
+                            <div>{{ f.reason }}</div>
+                        </td>
+                        <td class="text-end fw-bold">KES {{ f.amount|floatformat:2 }}</td>
+                        <td>
+                            {% if f.is_paid %}
+                                <span class="badge-status badge-paid">Paid</span>
+                            {% else %}
+                                <span class="badge-status badge-unpaid">Unpaid</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            {% if not f.is_paid %}
+                                <a href="{% url 'chama:fine_pay' f.pk %}" class="btn-pay">
+                                    <i class="fas fa-mobile-alt"></i> Pay Now
+                                </a>
+                            {% endif %}
+                            {% if is_officer %}
+                                <a href="{% url 'chama:fine_edit' f.pk %}" class="action-icon" title="Edit"><i class="fas fa-edit"></i></a>
+                                <a href="{% url 'chama:fine_delete' f.pk %}" class="action-icon danger" title="Delete" onclick="return confirm('Delete this fine?');"><i class="fas fa-trash"></i></a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="{% if is_officer %}6{% else %}5{% endif %}" class="text-center py-5">
+                            <i class="fas fa-gavel fa-3x text-muted mb-3" style="opacity:0.3;"></i>
+                            <h6 class="fw-bold text-muted">
+                                {% if is_officer %}
+                                    No fines recorded yet
+                                {% else %}
+                                    You have no fines
+                                {% endif %}
+                            </h6>
+                            {% if is_officer %}
+                            <p class="small text-muted mb-3">Add a fine to record a member's penalty.</p>
+                            <a href="{% url 'chama:fine_create' %}" class="btn-custom btn-primary-custom btn-sm">
+                                <i class="fas fa-plus"></i> Add First Fine
+                            </a>
+                            {% else %}
+                            <p class="small text-muted mb-0">You're all clear! 🎉</p>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

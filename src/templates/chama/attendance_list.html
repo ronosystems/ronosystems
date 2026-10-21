@@ -1,0 +1,127 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}Attendance Register — Chama Biz{% endblock %}
+{% block page_title %}Attendance Register{% endblock %}
+{% block page_subtitle %}Track meeting attendance across the Chama{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dash-panel { background:#fff; border:2px solid #000; border-radius:4px; }
+    .table-custom th {
+        border-bottom:2px solid #000 !important;
+        background:#f8f9fa; font-weight:700; font-size:0.75rem;
+        text-transform:uppercase; padding:12px 16px;
+    }
+    .table-custom td {
+        padding:12px 16px; font-size:0.85rem;
+        border-bottom:1px solid #dee2e6; vertical-align:middle;
+    }
+    .table-custom tbody tr:hover { background:#f8f9fa; }
+    
+    .badge-status {
+        padding:4px 10px; border-radius:50px; font-weight:700;
+        font-size:0.7rem; border:1px solid #000;
+        text-transform:uppercase; display:inline-block;
+    }
+    .badge-present { background:#d4edda; color:#155724; }
+    .badge-absent  { background:#f8d7da; color:#721c24; }
+    .badge-excused { background:#fff3cd; color:#856404; }
+    
+    .action-icon {
+        color:#000; font-size:1rem; margin:0 4px; text-decoration:none;
+    }
+    .action-icon:hover { color:var(--primary-color); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+
+    <!-- Header Actions -->
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <h5 class="fw-bold mb-0">
+                <i class="fas fa-clipboard-check text-primary"></i> 
+                {% if is_officer %}All Attendance Records{% else %}My Attendance History{% endif %}
+            </h5>
+            <small class="text-muted">
+                {{ attendance|length }} record{{ attendance|length|pluralize }} found
+            </small>
+        </div>
+        {% if is_officer %}
+        <div>
+            <a href="{% url 'chama:meeting_list' %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;">
+                <i class="fas fa-calendar-alt"></i> Go to Meetings
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Main Table -->
+    <div class="dash-panel">
+        <div class="table-responsive">
+            <table class="table table-hover table-custom mb-0">
+                <thead>
+                    <tr>
+                        <th>Meeting Date</th>
+                        <th>Meeting Title</th>
+                        {% if is_officer %}<th>Member</th>{% endif %}
+                        <th>Status</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in attendance %}
+                    <tr>
+                        <td>
+                            <strong>{{ a.meeting.scheduled_for|date:"M d, Y" }}</strong><br>
+                            <small class="text-muted">{{ a.meeting.scheduled_for|date:"H:i A" }}</small>
+                        </td>
+                        <td>{{ a.meeting.title }}</td>
+                        
+                        {% if is_officer %}
+                        <td>
+                            <div class="fw-bold">{{ a.member.full_name }}</div>
+                            <small class="text-muted">{{ a.member.member_number }}</small>
+                        </td>
+                        {% endif %}
+                        
+                        <td>
+                            {% if a.status == 'present' %}
+                                <span class="badge-status badge-present">Present</span>
+                            {% elif a.status == 'absent' %}
+                                <span class="badge-status badge-absent">Absent</span>
+                            {% elif a.status == 'excused' %}
+                                <span class="badge-status badge-excused">Excused</span>
+                            {% endif %}
+                        </td>
+                        
+                        <td class="text-end">
+                            <a href="{% url 'chama:meeting_detail' a.meeting.pk %}" class="action-icon" title="View Meeting">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="{% if is_officer %}5{% else %}4{% endif %}" class="text-center py-5">
+                            <i class="fas fa-clipboard-list fa-3x text-muted mb-3" style="opacity:0.3;"></i>
+                            <h6 class="fw-bold text-muted">No attendance records found</h6>
+                            <p class="small text-muted mb-0">
+                                {% if is_officer %}
+                                    Attendance will appear here once recorded for a meeting.
+                                {% else %}
+                                    You have no attendance history yet.
+                                {% endif %}
+                            </p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

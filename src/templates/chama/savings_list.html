@@ -1,0 +1,135 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}Savings — Chama Biz{% endblock %}
+{% block page_title %}Savings Records{% endblock %}
+{% block page_subtitle %}Track all member deposits{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dash-panel { background:#fff; border:2px solid #000; border-radius:4px; }
+    .table-custom th { border-bottom:2px solid #000 !important; background:#f8f9fa; font-weight:700; font-size:0.8rem; text-transform:uppercase; padding:12px 20px; }
+    .table-custom td { padding:12px 20px; font-size:0.9rem; border-bottom:1px solid #dee2e6; vertical-align:middle; }
+    .table-custom tbody tr:hover { background:#f8f9fa; }
+    .filter-bar { background:#fff; border:2px solid #000; border-radius:4px; padding:10px 15px; margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .filter-bar input { border:2px solid #ccc; border-radius:4px; padding:6px 10px; font-size:0.85rem; }
+    .btn-custom { border:2px solid #000; border-radius:4px; font-weight:700; font-size:0.85rem; padding:6px 15px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+    .btn-primary-custom { background:var(--primary-color); color:#fff; }
+    .btn-primary-custom:hover { background:color-mix(in srgb, var(--primary-color) 85%, #000); color:#fff; }
+    .btn-outline-custom { background:#fff; color:#000; }
+    .btn-outline-custom:hover { background:#f0f2f5; }
+    .stat-box { background:#fff; border:2px solid #000; border-radius:4px; padding:15px; text-align:center; }
+    .stat-box .stat-value { font-size:1.5rem; font-weight:800; color:#000; }
+    .stat-box .stat-label { font-size:0.75rem; text-transform:uppercase; color:#666; font-weight:700; margin-bottom:5px; }
+    .action-icon { color:#000; font-size:1rem; margin:0 4px; text-decoration:none; }
+    .action-icon:hover { color:var(--primary-color); }
+    .action-icon.danger:hover { color:#dc3545; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+
+    <!-- Show only for officers -->
+    {% if is_officer %}
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="stat-box" style="background:#eaf2f8;">
+                <div class="stat-label">Total Savings (All Members)</div>
+                <div class="stat-value">KES {{ total_savings|floatformat:2 }}</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-box" style="background:#f8f9fa;">
+                <div class="stat-label">Total Records</div>
+                <div class="stat-value">{{ total_count }}</div>
+            </div>
+        </div>
+        <div class="col-md-4 d-flex align-items-center">
+            <a href="{% url 'chama:savings_create' %}" class="btn-custom btn-primary-custom w-100 justify-content-center py-2">
+                <i class="fas fa-plus"></i> Record Savings
+            </a>
+        </div>
+    </div>
+    {% else %}
+    <!-- Member view -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="stat-box" style="background:#eaf2f8;">
+                <div class="stat-label">My Total Savings</div>
+                <div class="stat-value">KES {{ total_savings|floatformat:2 }}</div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="stat-box" style="background:#f8f9fa;">
+                <div class="stat-label">My Records</div>
+                <div class="stat-value">{{ total_count }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Search only for officers -->
+    {% if is_officer %}
+    <form method="get" class="filter-bar">
+        <div class="flex-grow-1" style="min-width:200px;">
+            <input type="text" name="q" class="w-100" placeholder="Search by member name or reference..." value="{{ request.GET.q|default:'' }}">
+        </div>
+        <button type="submit" class="btn-custom btn-primary-custom">
+            <i class="fas fa-search"></i> Filter
+        </button>
+        {% if request.GET.q %}
+        <a href="{% url 'chama:savings_list' %}" class="btn-custom btn-outline-custom">
+            <i class="fas fa-times"></i> Clear
+        </a>
+        {% endif %}
+    </form>
+    {% endif %}
+
+    <div class="dash-panel">
+        <div class="table-responsive">
+            <table class="table table-hover table-custom mb-0">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        {% if is_officer %}<th>Member</th>{% endif %}
+                        <th>Reference</th>
+                        <th class="text-end">Amount</th>
+                        {% if is_officer %}<th class="text-end">Actions</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in savings %}
+                    <tr>
+                        <td>{{ s.date|date:"M d, Y" }}</td>
+                        {% if is_officer %}
+                        <td>
+                            <div class="fw-bold">{{ s.member.full_name }}</div>
+                            <small class="text-muted">{{ s.member.member_number }}</small>
+                        </td>
+                        {% endif %}
+                        <td>{{ s.reference|default:"—" }}</td>
+                        <td class="text-end fw-bold text-success">+ KES {{ s.amount|floatformat:2 }}</td>
+                        {% if is_officer %}
+                        <td class="text-end">
+                            <a href="{% url 'chama:savings_edit' s.pk %}" class="action-icon" title="Edit"><i class="fas fa-edit"></i></a>
+                            <a href="{% url 'chama:savings_delete' s.pk %}" class="action-icon danger" title="Delete" onclick="return confirm('Delete this savings record?');"><i class="fas fa-trash"></i></a>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="{% if is_officer %}5{% else %}3{% endif %}" class="text-center py-5">
+                            <i class="fas fa-piggy-bank fa-3x text-muted mb-3" style="opacity:0.3;"></i>
+                            <h6 class="fw-bold text-muted">
+                                {% if is_officer %}No savings records yet{% else %}You have no savings records yet{% endif %}
+                            </h6>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

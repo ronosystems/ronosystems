@@ -1,0 +1,441 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}Loan #{{ loan.id }} — Chama Biz{% endblock %}
+{% block page_title %}Loan #{{ loan.id }}{% endblock %}
+{% block page_subtitle %}{{ loan.member.full_name }} — {{ loan.get_status_display }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .detail-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+    .detail-card-header {
+        background: #f8f9fa;
+        border-bottom: 2px solid #000;
+        padding: 14px 24px;
+        font-weight: 700;
+        color: #000;
+    }
+    .info-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #666;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+    .info-value {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #000;
+    }
+    .stat-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px dashed #eee;
+        font-size: 0.9rem;
+    }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-row.total {
+        border-top: 2px solid #000;
+        border-bottom: none;
+        margin-top: 6px;
+        padding-top: 12px;
+        font-size: 1.05rem;
+        font-weight: 800;
+    }
+    .badge-status {
+        padding: 6px 14px;
+        border-radius: 50px;
+        font-weight: 700;
+        font-size: 0.75rem;
+        border: 2px solid #000;
+        text-transform: uppercase;
+        display: inline-block;
+    }
+    .badge-pending { background: #fff3cd; color: #856404; }
+    .badge-approved { background: #cce5ff; color: #004085; }
+    .badge-disbursed { background: #d1ecf1; color: #0c5460; }
+    .badge-closed { background: #d4edda; color: #155724; }
+    .badge-rejected { background: #f8d7da; color: #721c24; }
+
+    .eligibility-box {
+        background: #eaf2f8;
+        border: 2px solid #000;
+        border-radius: 4px;
+        padding: 16px;
+        margin-bottom: 20px;
+    }
+    .eligibility-col {
+        text-align: center;
+        padding: 4px;
+    }
+    .eligibility-label {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        color: #666;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+    }
+    .eligibility-value {
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: #000;
+        margin-top: 2px;
+    }
+    .eligibility-value.danger { color: #721c24; }
+    .eligibility-value.success { color: #155724; }
+
+    .progress-bar-custom {
+        height: 14px;
+        background: #e9ecef;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-top: 8px;
+    }
+    .progress-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #28a745, #20c997);
+        transition: width 0.4s ease;
+    }
+
+    .action-btn {
+        border: 2px solid #000;
+        border-radius: 4px;
+        font-weight: 700;
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        margin-bottom: 8px;
+        text-decoration: none;
+        transition: all 0.15s;
+    }
+    .action-btn:hover { transform: translateY(-1px); }
+    .action-btn.approve { background: #28a745; color: #fff; }
+    .action-btn.approve:hover { background: #218838; color: #fff; }
+    .action-btn.reject { background: #dc3545; color: #fff; }
+    .action-btn.reject:hover { background: #c82333; color: #fff; }
+    .action-btn.disburse { background: #0d6efd; color: #fff; }
+    .action-btn.disburse:hover { background: #0b5ed7; color: #fff; }
+    .action-btn.repay { background: #000; color: #fff; }
+    .action-btn.repay:hover { background: #333; color: #fff; }
+    .action-btn.outline { background: #fff; color: #000; }
+    .action-btn.outline:hover { background: #f0f2f5; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+
+    <!-- Back link -->
+    <a href="{% url 'chama:loan_list' %}" style="display:inline-flex; align-items:center; gap:6px; color:#000; font-weight:700; text-decoration:none; margin-bottom:16px;">
+        <i class="fas fa-arrow-left"></i> Back to Loans
+    </a>
+
+    <!-- MEMBER ELIGIBILITY SNAPSHOT -->
+    <div class="eligibility-box">
+        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap">
+            <h6 class="fw-bold mb-0" style="color:#2d5f7c;">
+                <i class="fas fa-calculator me-2"></i> {{ loan.member.full_name }}'s Eligibility
+            </h6>
+            <span class="badge-status badge-{{ loan.status }}">{{ loan.get_status_display }}</span>
+        </div>
+        <div class="row">
+            <div class="col-6 col-md-3 eligibility-col">
+                <div class="eligibility-label">Contributions</div>
+                <div class="eligibility-value">KES {{ loan.member.total_contributions_paid|floatformat:2 }}</div>
+            </div>
+            <div class="col-6 col-md-3 eligibility-col">
+                <div class="eligibility-label">3× Limit</div>
+                <div class="eligibility-value">KES {{ loan.member.eligible_loan_limit|floatformat:2 }}</div>
+            </div>
+            <div class="col-6 col-md-3 eligibility-col">
+                <div class="eligibility-label">Active Loans</div>
+                <div class="eligibility-value danger">KES {{ loan.member.active_loans_total|floatformat:2 }}</div>
+            </div>
+            <div class="col-6 col-md-3 eligibility-col">
+                <div class="eligibility-label">Available</div>
+                <div class="eligibility-value success">KES {{ loan.member.available_borrowing_power|floatformat:2 }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+
+        <!-- LEFT COLUMN: Loan Details -->
+        <div class="col-lg-8">
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <i class="fas fa-file-invoice-dollar me-2"></i> Loan Details
+                </div>
+                <div class="card-body p-4">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="info-label">Member</div>
+                            <div class="info-value">{{ loan.member.full_name }}</div>
+                            <small class="text-muted">{{ loan.member.member_number }}</small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="info-label">Loan Type</div>
+                            <div class="info-value">{{ loan.loan_type.name|default:"—" }}</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="info-label">Principal</div>
+                            <div class="info-value">KES {{ loan.principal|floatformat:2 }}</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="info-label">Interest Rate</div>
+                            <div class="info-value">{{ loan.interest_rate }}% flat</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="info-label">Term</div>
+                            <div class="info-value">{{ loan.term_months }} months</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="info-label">Status</div>
+                            <div class="info-value">
+                                <span class="badge-status badge-{{ loan.status }}">{{ loan.get_status_display }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="info-label">Requested On</div>
+                            <div class="info-value">{{ loan.requested_on|date:"F d, Y" }}</div>
+                        </div>
+                        {% if loan.approved_on %}
+                        <div class="col-md-6 mb-3">
+                            <div class="info-label">Approved On</div>
+                            <div class="info-value">{{ loan.approved_on|date:"F d, Y" }}</div>
+                        </div>
+                        {% endif %}
+                        {% if loan.disbursed_on %}
+                        <div class="col-md-6 mb-3">
+                            <div class="info-label">Disbursed On</div>
+                            <div class="info-value">{{ loan.disbursed_on|date:"F d, Y" }}</div>
+                        </div>
+                        {% endif %}
+                        <div class="col-12 mb-3">
+                            <div class="info-label">Purpose</div>
+                            <div class="info-value">{{ loan.purpose|default:"—" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- REPAYMENT HISTORY -->
+            <div class="detail-card">
+                <div class="detail-card-header d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-history me-2"></i> Repayment History</span>
+                    <span class="small text-muted">{{ repayments|length }} record{{ repayments|length|pluralize }}</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead style="background:#f8f9fa;">
+                            <tr>
+                                <th style="border-bottom:2px solid #000; padding:10px 20px;">Date</th>
+                                <th style="border-bottom:2px solid #000; padding:10px 20px;">Reference</th>
+                                <th class="text-end" style="border-bottom:2px solid #000; padding:10px 20px;">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in repayments %}
+                            <tr>
+                                <td style="padding:10px 20px;">{{ r.date|date:"M d, Y" }}</td>
+                                <td style="padding:10px 20px;">{{ r.reference|default:"—" }}</td>
+                                <td class="text-end fw-bold" style="padding:10px 20px;">KES {{ r.amount|floatformat:2 }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center py-4 text-muted">
+                                    <i class="fas fa-inbox fa-2x mb-2" style="opacity:0.3;"></i>
+                                    <div>No repayments recorded yet</div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: Financials & Actions -->
+        <div class="col-lg-4">
+
+            <!-- BREAKDOWN -->
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <i class="fas fa-chart-pie me-2"></i> Financial Breakdown
+                </div>
+                <div class="card-body p-4">
+
+                    <!-- 👇 PENDING DISBURSEMENT NOTICE -->
+                    {% if loan.status == 'approved' %}
+                    <div class="alert alert-info mb-3" style="border:2px solid #000; background:#e8f4fd;">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-hourglass-half me-2" style="font-size:1.3rem; color:#0d6efd;"></i>
+                            <div>
+                                <strong style="color:#0d6efd;">Pending Disbursement</strong>
+                                <div class="small" style="color:#000;">
+                                    Awaiting release of <strong>KES {{ loan.principal|floatformat:2 }}</strong> from the Chama account.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="stat-row">
+                        <span class="text-muted">Principal</span>
+                        <span class="fw-bold">KES {{ loan.principal|floatformat:2 }}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="text-muted">Interest ({{ loan.interest_rate }}% flat)</span>
+                        <span class="fw-bold text-warning">+ KES {{ loan.total_interest|floatformat:2 }}</span>
+                    </div>
+                    <div class="stat-row total">
+                        <span>Total Repayable</span>
+                        <span>KES {{ loan.total_repayable|floatformat:2 }}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="text-muted">Monthly Installment</span>
+                        <span class="fw-bold">KES {{ loan.monthly_installment|floatformat:2 }}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="text-muted">Already Repaid</span>
+                        <span class="fw-bold text-success">KES {{ loan.total_repaid|floatformat:2 }}</span>
+                    </div>
+                    <div class="stat-row" style="border-top:2px solid #000; padding-top:12px; margin-top:4px;">
+                        <span class="fw-bold">Balance Remaining</span>
+                        <span class="fw-bold {% if loan.balance_remaining > 0 %}text-danger{% else %}text-success{% endif %}" style="font-size:1.1rem;">
+                            KES {{ loan.balance_remaining|floatformat:2 }}
+                        </span>
+                    </div>
+
+                    <!-- Progress bar -->
+                    <div class="mt-3">
+                        <div class="d-flex justify-content-between small text-muted mb-1">
+                            <span>Repayment Progress</span>
+                            <strong>{{ loan.repayment_progress_pct|floatformat:1 }}%</strong>
+                        </div>
+                        <div class="progress-bar-custom">
+                            <div class="progress-bar-fill" style="width: {{ loan.repayment_progress_pct|floatformat:0 }}%;"></div>
+                        </div>
+                    </div>
+
+                    {% if loan.is_fully_repaid and loan.status == 'disbursed' %}
+                    <div class="alert alert-success mt-3 mb-0" style="border:2px solid #000;">
+                        <i class="fas fa-check-circle me-1"></i> <strong>Fully repaid!</strong>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- ACTIONS -->
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <i class="fas fa-bolt me-2"></i> Actions
+                </div>
+                <div class="card-body p-3">
+
+                    <!-- ───────────────────────────────────────────────────────── -->
+                    <!-- 1. PENDING STATE (Officers only)                          -->
+                    <!-- ───────────────────────────────────────────────────────── -->
+                    {% if loan.status == 'pending' %}
+                        {% if is_officer %}
+                            <form method="post" action="{% url 'chama:loan_approve' loan.pk %}" style="margin-bottom:8px;">
+                                {% csrf_token %}
+                                <button type="submit" class="action-btn approve">
+                                    <i class="fas fa-check-circle"></i> Approve Loan
+                                </button>
+                            </form>
+                            <form method="post" action="{% url 'chama:loan_reject' loan.pk %}">
+                                {% csrf_token %}
+                                <button type="submit" class="action-btn reject" onclick="return confirm('Reject this loan?');">
+                                    <i class="fas fa-times-circle"></i> Reject Loan
+                                </button>
+                            </form>
+                        {% else %}
+                            <div class="alert alert-warning mb-0" style="border:2px solid #000;">
+                                <i class="fas fa-clock me-1"></i> Awaiting officer approval
+                            </div>
+                        {% endif %}
+                    {% endif %}
+
+                    <!-- ───────────────────────────────────────────────────────── -->
+                    <!-- 2. APPROVED STATE (Officers release, members wait)        -->
+                    <!-- ───────────────────────────────────────────────────────── -->
+                    {% if loan.status == 'approved' %}
+                        {% if is_officer %}
+                            <form method="post" action="{% url 'chama:loan_disburse' loan.pk %}" style="margin-bottom:8px;">
+                                {% csrf_token %}
+                                <button type="submit" class="action-btn disburse" onclick="return confirm('Release KES {{ loan.principal }} from the Chama account to {{ loan.member.full_name }}?');">
+                                    <i class="fas fa-money-bill-wave"></i> Release Funds
+                                </button>
+                            </form>
+                            <div class="small text-muted text-center mb-2" style="font-size:0.7rem;">
+                                <i class="fas fa-info-circle"></i> Releases KES {{ loan.principal|floatformat:2 }} from the Chama account
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info mb-0" style="border:2px solid #000; background:#e8f4fd;">
+                                <i class="fas fa-hourglass-half me-1"></i> Approved — awaiting disbursement
+                            </div>
+                        {% endif %}
+                    {% endif %}
+
+                    <!-- ───────────────────────────────────────────────────────── -->
+                    <!-- 3. DISBURSED STATE (Both officers and borrower can repay) -->
+                    <!-- ───────────────────────────────────────────────────────── -->
+                    {% if loan.status == 'disbursed' %}
+                        {% if is_officer or loan.member == current_member %}
+                            {% if loan.balance_remaining > 0 %}
+                            <a href="{% url 'chama:loan_repayment_pay' loan.pk %}" class="action-btn repay" style="margin-bottom:8px;">
+                                <i class="fas fa-mobile-alt"></i> Pay via M-Pesa
+                            </a>
+                            {% else %}
+                            <div class="alert alert-success mb-2" style="border:2px solid #000;">
+                                <i class="fas fa-check-circle me-1"></i> Loan fully paid
+                            </div>
+                            {% endif %}
+                        {% endif %}
+                    {% endif %}
+
+                    <!-- ───────────────────────────────────────────────────────── -->
+                    <!-- 4. TREASURER MANUAL ENTRY                                 -->
+                    <!-- ───────────────────────────────────────────────────────── -->
+                    {% if user.role == 'treasurer' or user.role == 'company_admin' or user.role == 'super_admin' %}
+                        {% if loan.status == 'disbursed' or loan.status == 'approved' %}
+                            <a href="{% url 'chama:loan_repayment_create' loan.pk %}" class="action-btn outline" style="margin-bottom:8px;">
+                                <i class="fas fa-receipt"></i> Record Manual Repayment
+                            </a>
+                        {% endif %}
+                    {% endif %}
+
+                    <!-- ───────────────────────────────────────────────────────── -->
+                    <!-- 5. TERMINAL STATES (Closed / Rejected)                    -->
+                    <!-- ───────────────────────────────────────────────────────── -->
+                    {% if loan.status == 'closed' %}
+                        <div class="alert alert-success mb-0" style="border:2px solid #000;">
+                            <i class="fas fa-check-double me-1"></i> Loan is closed
+                        </div>
+                    {% endif %}
+
+                    {% if loan.status == 'rejected' %}
+                        <div class="alert alert-danger mb-0" style="border:2px solid #000;">
+                            <i class="fas fa-times me-1"></i> Loan was rejected
+                        </div>
+                    {% endif %}
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

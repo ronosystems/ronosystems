@@ -1,0 +1,152 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}
+    {% if mode == 'pay' %}Pay Contribution
+    {% elif mode == 'create' %}New Contribution
+    {% else %}Edit Contribution{% endif %}
+{% endblock %}
+
+{% block page_title %}
+    {% if mode == 'pay' %}Contribute to Chama
+    {% elif mode == 'create' %}New Contribution
+    {% else %}Edit Contribution{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+    <div class="card" style="border:2px solid #000; border-radius:4px; max-width:700px; margin:0 auto;">
+        <div class="card-header" style="background:{% if mode == 'pay' %}#eaf2f8{% else %}#f8f9fa{% endif %}; border-bottom:2px solid #000; padding:14px 24px; font-weight:700;">
+            <i class="fas fa-hand-holding-usd me-2"></i>
+            {% if mode == 'pay' %}
+                Pay Your Contribution
+            {% elif mode == 'create' %}
+                Record Contribution
+            {% else %}
+                Update Contribution
+            {% endif %}
+        </div>
+        <div class="card-body p-4">
+
+            {% if form.errors %}
+            <div class="alert alert-danger" style="border:2px solid #000;">
+                <ul class="mb-0">
+                    {% for field in form %}{% for err in field.errors %}
+                    <li><strong>{{ field.label }}:</strong> {{ err }}</li>
+                    {% endfor %}{% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% if mode == 'pay' %}
+            <!-- ═══════════════════════════════════════════ -->
+            <!-- MEMBER SELF-SERVICE VIEW                    -->
+            <!-- ═══════════════════════════════════════════ -->
+
+            <!-- Summary Box -->
+            <div class="mb-4 p-3" style="background:#eaf2f8; border:2px solid #000; border-radius:4px;">
+                <div class="row text-center">
+                    <div class="col-4">
+                        <div class="small text-muted text-uppercase fw-bold">Required</div>
+                        <div class="fw-bold" style="font-size:1.2rem;">KES {{ required|floatformat:2 }}</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="small text-muted text-uppercase fw-bold">Paid</div>
+                        <div class="fw-bold text-success" style="font-size:1.2rem;">KES {{ contributed|floatformat:2 }}</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="small text-muted text-uppercase fw-bold">Remaining</div>
+                        <div class="fw-bold {% if remaining > 0 %}text-danger{% else %}text-success{% endif %}" style="font-size:1.2rem;">
+                            KES {{ remaining|floatformat:2 }}
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-2 text-center small text-muted">
+                    <i class="fas fa-calendar-alt"></i> Period: <strong>{{ current_month }}</strong>
+                </div>
+            </div>
+
+            <form method="post">
+                {% csrf_token %}
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Amount (KES) <span class="text-danger">*</span></label>
+                    {{ form.amount }}
+                    <small class="text-muted d-block mt-1">
+                        <i class="fas fa-info-circle"></i>
+                        Suggested: KES {{ remaining|floatformat:2 }} (the remaining balance for {{ current_month }})
+                    </small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">M-Pesa Phone Number <span class="text-danger">*</span></label>
+                    {{ form.phone }}
+                    <small class="text-muted d-block mt-1">
+                        <i class="fas fa-mobile-alt"></i> You will receive an STK Push prompt to enter your PIN.
+                    </small>
+                </div>
+
+                <div class="d-flex gap-2 mt-4 pt-3" style="border-top:2px solid #000;">
+                    <button type="submit" class="btn btn-dark fw-bold flex-grow-1" style="border:2px solid #000; padding:10px;">
+                        <i class="fas fa-paper-plane me-1"></i> Pay Now via M-Pesa
+                    </button>
+                    <a href="{% url 'chama:contribution_list' %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+
+            {% else %}
+            <!-- ═══════════════════════════════════════════ -->
+            <!-- TREASURER / OFFICER MANUAL VIEW            -->
+            <!-- ═══════════════════════════════════════════ -->
+            <form method="post">
+                {% csrf_token %}
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Member <span class="text-danger">*</span></label>
+                        {{ form.member }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Membership Type</label>
+                        {{ form.membership_type }}
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Amount (KES) <span class="text-danger">*</span></label>
+                        {{ form.amount }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Period</label>
+                        {{ form.period }}
+                        <small class="text-muted d-block" style="font-size:0.7rem;">e.g. 2026-10</small>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Date</label>
+                        {{ form.date }}
+                    </div>
+                </div>
+
+                <div class="form-check mb-3">
+                    {{ form.paid }}
+                    <label class="form-check-label fw-bold" for="{{ form.paid.id_for_label }}">
+                        Mark as Paid
+                    </label>
+                </div>
+
+                <div class="d-flex gap-2 mt-4 pt-3" style="border-top:2px solid #000;">
+                    <button type="submit" class="btn btn-dark fw-bold" style="border:2px solid #000;">
+                        <i class="fas fa-save me-1"></i>
+                        {% if mode == 'create' %}Save Contribution{% else %}Save Changes{% endif %}
+                    </button>
+                    <a href="{% url 'chama:contribution_list' %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;">Cancel</a>
+                </div>
+            </form>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -135,6 +135,12 @@ class MpesaTransaction(models.Model):
     merchant_request_id = models.CharField(max_length=100, blank=True)
     mpesa_code          = models.CharField(max_length=50, blank=True, db_index=True)
 
+    # ── NEW FIELD ──
+    account_reference   = models.CharField(
+        max_length=100, blank=True, db_index=True,
+        help_text="Reference sent to Safaricom (e.g. C-M00001, POS-SALE)"
+    )
+    
     phone  = models.CharField(max_length=20, blank=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 

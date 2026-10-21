@@ -1,0 +1,314 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}Dashboard — Chama Biz{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}Overview of your Chama{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── REDUCED SIZES ── */
+    .stat-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 4px;
+        padding: 15px; /* Was 20px */
+        position: relative;
+        overflow: hidden;
+        transition: transform 0.2s, box-shadow 0.2s;
+        height: 100%;
+    }
+    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    .stat-icon { position: absolute; top: 10px; right: 10px; font-size: 1.5rem; opacity: 0.15; color: var(--sidebar-bg); }
+    .stat-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; color: #555; margin-bottom: 5px; }
+    .stat-value { font-size: 1.5rem; font-weight: 800; color: #000; margin-bottom: 0; line-height: 1.2; }
+    .stat-sub { font-size: 0.7rem; color: #666; margin-top: 5px; font-weight: 500; }
+
+    .dash-panel { background: #fff; border: 2px solid #000; border-radius: 4px; height: 100%; display: flex; flex-direction: column; }
+    .dash-panel-header { background: #f8f9fa; border-bottom: 2px solid #000; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; font-weight: 700; color: #000; border-radius: 4px 4px 0 0; font-size: 0.9rem; }
+    .dash-panel-body { padding: 0; flex: 1; overflow-y: auto; }
+
+    .dash-list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; border-bottom: 1px solid #e9ecef; transition: background 0.15s; }
+    .dash-list-item:last-child { border-bottom: none; }
+    .dash-list-item:hover { background: #f8f9fa; }
+    .item-title { font-weight: 600; color: #000; font-size: 0.85rem; margin: 0; }
+    .item-sub { font-size: 0.7rem; color: #666; margin: 0; }
+
+    /* ── SMALLER QUICK ACTIONS ── */
+    .quick-action-btn { 
+        display: flex; flex-direction: column; align-items: center; justify-content: center; 
+        padding: 10px; /* Was 15px */
+        background: #fff; border: 2px solid #000; border-radius: 4px; 
+        color: #000; text-decoration: none; font-weight: 700; font-size: 0.75rem; 
+        transition: all 0.2s; height: 100%; 
+    }
+    .quick-action-btn:hover { background: var(--soft-tint-hover); border-color: var(--primary-color); color: #000; transform: translateY(-1px); }
+    .quick-action-btn i { font-size: 1.2rem; margin-bottom: 5px; color: var(--primary-color); }
+
+    .badge-custom { padding: 3px 8px; border-radius: 50px; font-size: 0.65rem; font-weight: 700; border: 1px solid #000; display: inline-block; }
+    .badge-success { background: #d4edda; color: #155724; }
+    .badge-warning { background: #fff3cd; color: #856404; }
+    .badge-danger  { background: #f8d7da; color: #721c24; }
+    .badge-info    { background: #cce5ff; color: #004085; }
+
+    /* ── CHART CONTAINER ── */
+    .chart-container {
+        position: relative;
+        height: 250px; /* Was taking up the whole screen */
+        width: 100%;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="container-fluid py-2">
+
+    <!-- ============================================ -->
+    <!-- 1. GLOBAL VIEW (Admin & Chairperson)         -->
+    <!-- ============================================ -->
+    {% if user.role == 'company_admin' or user.role == 'chairperson' or user.role == 'treasurer' or user.role == 'secretary' or user.role == 'super_admin' %}
+    
+    <div class="row g-3 mb-3">
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card">
+                <i class="fas fa-users stat-icon"></i>
+                <div class="stat-title">Active Members</div>
+                <div class="stat-value">{{ members_count|default:0 }}</div>
+                <div class="stat-sub">Total registered</div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card">
+                <i class="fas fa-piggy-bank stat-icon"></i>
+                <div class="stat-title">Total Savings</div>
+                <div class="stat-value">KES {{ savings_total|floatformat:2 }}</div>
+                <div class="stat-sub">Pool available</div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card">
+                <i class="fas fa-file-invoice-dollar stat-icon"></i>
+                <div class="stat-title">Active Loans</div>
+                <div class="stat-value">{{ loans_active|default:0 }}</div>
+                <div class="stat-sub">Disbursed & Approved</div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card">
+                <i class="fas fa-hand-holding-usd stat-icon"></i>
+                <div class="stat-title">Loans Outstanding</div>
+                <div class="stat-value">KES {{ loans_outstanding|floatformat:2 }}</div>
+                <div class="stat-sub text-danger fw-bold">Remaining balance</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <!-- FINANCIAL CHART -->
+        <div class="col-lg-8">
+            <div class="dash-panel">
+                <div class="dash-panel-header">
+                    <span><i class="fas fa-chart-pie me-2"></i> Financial Overview</span>
+                </div>
+                <div class="dash-panel-body p-3">
+                    <div class="chart-container">
+                        <canvas id="adminChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- UPCOMING MEETINGS -->
+        <div class="col-lg-4">
+            <div class="dash-panel">
+                <div class="dash-panel-header">
+                    <span><i class="fas fa-calendar-alt me-2"></i> Upcoming Meetings</span>
+                </div>
+                <div class="dash-panel-body">
+                    {% for m in meetings_upcoming %}
+                    <div class="dash-list-item">
+                        <div>
+                            <p class="item-title">{{ m.title }}</p>
+                            <p class="item-sub"><i class="fas fa-map-marker-alt me-1"></i> {{ m.location|default:"Main Hall" }}</p>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge-custom badge-info mb-1 d-block">{{ m.scheduled_for|date:"M d" }}</span>
+                            <small class="text-muted fw-bold" style="font-size:0.65rem;">{{ m.scheduled_for|date:"H:i A" }}</small>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="p-4 text-center text-muted">
+                        <i class="fas fa-calendar-times fa-2x mb-2 d-block" style="opacity: 0.5;"></i>
+                        <h6 class="fw-bold mb-1">No Upcoming Meetings</h6>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const ctx = document.getElementById('adminChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Total Savings', 'Total Contributions', 'Fines Collected', 'Loans Outstanding'],
+                    datasets: [{
+                        label: 'Amount (KES)',
+                        data: [
+                            {{ savings_total|default:0 }}, 
+                            {{ contributions_total|default:0 }}, 
+                            {{ fines_total|default:0 }}, 
+                            {{ loans_outstanding|default:0 }}
+                        ],
+                        backgroundColor: [
+                            'rgba(75, 192, 192, 0.7)',
+                            'rgba(54, 162, 235, 0.7)',
+                            'rgba(255, 206, 86, 0.7)',
+                            'rgba(255, 99, 132, 0.7)'
+                        ],
+                        borderColor: '#000',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false, /* 👈 Forces chart to respect container height */
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        });
+    </script>
+
+    <!-- ============================================ -->
+    <!-- 2. INDIVIDUAL VIEW (Members, Treasurer, Etc) -->
+    <!-- ============================================ -->
+    {% else %}
+
+    <div class="row g-3 mb-3">
+        <div class="col-xl-4 col-md-6">
+            <div class="stat-card">
+                <i class="fas fa-wallet stat-icon"></i>
+                <div class="stat-title">My Savings</div>
+                <div class="stat-value">KES {{ member_profile.savings_balance|default:0|floatformat:2 }}</div>
+                <div class="stat-sub"><a href="{% url 'chama:savings_list' %}">View my savings &rarr;</a></div>
+            </div>
+        </div>
+        <div class="col-xl-4 col-md-6">
+            <div class="stat-card">
+                <i class="fas fa-hand-holding-usd stat-icon"></i>
+                <div class="stat-title">My Contributions</div>
+                <div class="stat-value">KES {{ my_contributions|default:0|floatformat:2 }}</div>
+                <div class="stat-sub">
+                    {% if my_required_contribution %}
+                        Required: KES {{ my_required_contribution|floatformat:2 }}
+                    {% else %}
+                        <a href="{% url 'chama:contribution_list' %}">View contributions &rarr;</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-4 col-md-6">
+            <div class="stat-card">
+                <i class="fas fa-file-invoice-dollar stat-icon"></i>
+                <div class="stat-title">My Loan Balance</div>
+                <div class="stat-value">KES {{ my_loan_balance|default:0|floatformat:2 }}</div>
+                <div class="stat-sub">
+                    {% if my_loan_balance > 0 %}
+                        <a href="{% url 'chama:loan_list' %}" class="text-danger fw-bold">Repay Loan &rarr;</a>
+                    {% else %}
+                        No active loans
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <!-- PERSONAL CHART -->
+        <div class="col-lg-7">
+            <div class="dash-panel">
+                <div class="dash-panel-header">
+                    <span><i class="fas fa-chart-pie me-2"></i> My Financial Portfolio</span>
+                </div>
+                <div class="dash-panel-body p-3">
+                    <div class="chart-container">
+                        <canvas id="memberChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Personal Quick Actions -->
+        <div class="col-lg-5">
+            <div class="dash-panel">
+                <div class="dash-panel-header">
+                    <span><i class="fas fa-bolt me-2"></i> Quick Actions</span>
+                </div>
+                <div class="dash-panel-body p-2">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <a href="{% url 'chama:contribution_create' %}" class="quick-action-btn">
+                                <i class="fas fa-hand-holding-usd"></i> Pay Contribution
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'chama:loan_create' %}" class="quick-action-btn">
+                                <i class="fas fa-file-signature"></i> Request Loan
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'chama:fine_list' %}" class="quick-action-btn" style="border-color: #dc3545;">
+                                <i class="fas fa-gavel text-danger"></i> View Fines
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'chama:meeting_list' %}" class="quick-action-btn">
+                                <i class="fas fa-calendar-alt"></i> View Meetings
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const ctx = document.getElementById('memberChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Savings', 'Contributions', 'Loan Balance'],
+                    datasets: [{
+                        data: [
+                            {{ member_profile.savings_balance|default:0 }}, 
+                            {{ my_contributions|default:0 }}, 
+                            {{ my_loan_balance|default:0 }}
+                        ],
+                        backgroundColor: [
+                            'rgba(75, 192, 192, 0.8)',
+                            'rgba(54, 162, 235, 0.8)',
+                            'rgba(255, 99, 132, 0.8)'
+                        ],
+                        borderColor: '#000',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false, /* 👈 Forces chart to respect container height */
+                    plugins: { legend: { position: 'right' } } /* Moved legend to right to save vertical space */
+                }
+            });
+        });
+    </script>
+
+    {% endif %}
+
+</div>
+{% endblock %}

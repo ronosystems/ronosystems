@@ -103,6 +103,10 @@ def send_stk_push(cfg: MpesaConfig, phone: str, amount, account_reference: str =
 
     url = f'{cfg.base_url}/mpesa/stkpush/v1/processrequest'
 
+    # Safaricom limits: AccountReference max 12 chars, TransactionDesc max 13 chars
+    ref = (account_reference or cfg.account_reference or 'POS-SALE')[:12]
+    desc = (description or 'POS Payment')[:13]
+
     body = {
         'BusinessShortCode': cfg.shortcode,
         'Password':          pw,
@@ -113,8 +117,8 @@ def send_stk_push(cfg: MpesaConfig, phone: str, amount, account_reference: str =
         'PartyB':            cfg.shortcode,
         'PhoneNumber':       phone,
         'CallBackURL':       cfg.callback_url,
-        'AccountReference':  account_reference or cfg.account_reference or 'POS-SALE',
-        'TransactionDesc':   description,
+        'AccountReference':  ref,
+        'TransactionDesc':   desc,
     }
 
     resp = requests.post(

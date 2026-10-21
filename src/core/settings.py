@@ -137,6 +137,7 @@ INSTALLED_APPS = [
     'apps.epa_shop',
     'apps.supermarket',
     'apps.kuku_biz',
+    'apps.chama', 
 ]
 
 # Required by django.contrib.sites / allauth
@@ -183,6 +184,7 @@ TEMPLATES = [
                 'apps.settings.context_processors.system_settings',
                 'apps.epa_shop.context_processors.user_context',
                 'apps.company.context_processors.company_context',
+                'apps.companies.context_processors.active_base_template',
                 'apps.companies.context_processors.support_mode_context',
                 'apps.companies.context_processors.pending_join_requests',
                 'apps.companies.context_processors.company_branding_context', 

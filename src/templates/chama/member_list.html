@@ -1,0 +1,305 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}Members — Chama Biz{% endblock %}
+{% block page_title %}Members Directory{% endblock %}
+{% block page_subtitle %}Manage all registered members{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dash-panel {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 4px;
+        display: flex;
+        flex-direction: column;
+    }
+    .dash-panel-header {
+        background: #f8f9fa;
+        border-bottom: 2px solid #000;
+        padding: 12px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 700;
+        color: #000;
+        border-radius: 4px 4px 0 0;
+    }
+    
+    .table-custom {
+        margin-bottom: 0;
+    }
+    .table-custom th {
+        border-bottom: 2px solid #000 !important;
+        background: #f8f9fa;
+        font-weight: 700;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 12px 20px;
+        color: #333;
+    }
+    .table-custom td {
+        padding: 12px 20px;
+        vertical-align: middle;
+        font-size: 0.9rem;
+        border-bottom: 1px solid #dee2e6;
+    }
+    .table-custom tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    /* Status Badges */
+    .badge-status {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 50px;
+        font-weight: 700;
+        font-size: 0.7rem;
+        border: 1px solid #000;
+        text-transform: uppercase;
+    }
+    .badge-active { background: #d4edda; color: #155724; }
+    .badge-pending { background: #fff3cd; color: #856404; }
+    .badge-suspended { background: #f8d7da; color: #721c24; }
+    .badge-exited { background: #e2e3e5; color: #383d41; }
+
+    /* Chama Role Badges */
+    .role-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-weight: 700;
+        font-size: 0.7rem;
+        border: 1px solid #000;
+        text-transform: capitalize;
+        white-space: nowrap;
+    }
+    .role-chairperson { background: #fff3cd; color: #856404; }
+    .role-vice_chairperson { background: #d4edda; color: #155724; }
+    .role-secretary { background: #cce5ff; color: #004085; }
+    .role-vice_secretary { background: #e2e3e5; color: #383d41; }
+    .role-treasurer { background: #d1ecf1; color: #0c5460; }
+    .role-loan_officer { background: #f8d7da; color: #721c24; }
+    .role-coopted_member { background: #e2e3e5; color: #383d41; }
+    .role-member { background: #f8f9fa; color: #000; }
+    .role-none { background: #f8f9fa; color: #999; font-style: italic; text-transform: none; }
+
+    /* Avatar */
+    .avatar-circle {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--primary-color);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.9rem;
+        border: 2px solid #000;
+    }
+
+    /* Search & Filter Bar */
+    .filter-bar {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 4px;
+        padding: 10px 15px;
+        margin-bottom: 15px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    .filter-bar input, .filter-bar select {
+        border: 2px solid #ccc;
+        border-radius: 4px;
+        padding: 6px 10px;
+        font-size: 0.85rem;
+        outline: none;
+    }
+    .filter-bar input:focus, .filter-bar select:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 20%, transparent);
+    }
+    .btn-custom {
+        border: 2px solid #000;
+        border-radius: 4px;
+        font-weight: 700;
+        font-size: 0.85rem;
+        padding: 6px 15px;
+        transition: all 0.2s;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .btn-primary-custom {
+        background: var(--primary-color);
+        color: #fff;
+    }
+    .btn-primary-custom:hover {
+        background: color-mix(in srgb, var(--primary-color) 85%, #000);
+        color: #fff;
+    }
+    .btn-outline-custom {
+        background: #fff;
+        color: #000;
+    }
+    .btn-outline-custom:hover {
+        background: #f0f2f5;
+    }
+
+    .action-icon {
+        color: #000;
+        font-size: 1rem;
+        margin: 0 4px;
+        transition: color 0.15s;
+    }
+    .action-icon:hover { color: var(--primary-color); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+
+    <!-- Header Actions -->
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <h5 class="fw-bold mb-0"><i class="fas fa-users text-primary"></i> Members Directory</h5>
+            <small class="text-muted">{{ members|length }} total member{{ members|length|pluralize }} registered</small>
+        </div>
+        {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'chairperson' or user.role == 'secretary' %}
+        <div>
+            <a href="{% url 'chama:registration_list' %}" class="btn-custom btn-outline-custom me-2">
+                <i class="fas fa-user-plus"></i> Pending Approvals
+            </a>
+            <a href="{% url 'chama:member_create' %}" class="btn-custom btn-primary-custom">
+                <i class="fas fa-plus"></i> Add Member
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Search & Filter Bar -->
+    <form method="get" class="filter-bar">
+        <div class="flex-grow-1" style="min-width: 200px;">
+            <input type="text" name="q" class="w-100" placeholder="Search by name, phone, or ID..." value="{{ request.GET.q|default:'' }}">
+        </div>
+        <div>
+            <select name="status">
+                <option value="">All Statuses</option>
+                <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>Active</option>
+                <option value="pending" {% if request.GET.status == 'pending' %}selected{% endif %}>Pending</option>
+                <option value="suspended" {% if request.GET.status == 'suspended' %}selected{% endif %}>Suspended</option>
+                <option value="exited" {% if request.GET.status == 'exited' %}selected{% endif %}>Exited</option>
+            </select>
+        </div>
+        <div>
+            <button type="submit" class="btn-custom btn-primary-custom">
+                <i class="fas fa-search"></i> Filter
+            </button>
+            {% if request.GET.q or request.GET.status %}
+            <a href="{% url 'chama:member_list' %}" class="btn-custom btn-outline-custom ms-1">
+                <i class="fas fa-times"></i> Clear
+            </a>
+            {% endif %}
+        </div>
+    </form>
+
+    <!-- Members Table -->
+    <div class="dash-panel">
+        <div class="table-responsive">
+            <table class="table table-hover table-custom">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">Member</th>
+                        <th>Name / ID</th>
+                        <th>Contact</th>
+                        <th>Membership Type</th>
+                        <th>Chama Role</th>
+                        <th>Status</th>
+                        <th>Joined</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in members %}
+                    <tr>
+                        <td>
+                            <div class="avatar-circle">
+                                {{ m.full_name|default:m.member_number|make_list|first|upper }}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="fw-bold text-dark">{{ m.full_name }}</div>
+                            <small class="text-muted">{{ m.member_number }}</small>
+                        </td>
+                        <td>
+                            <div>{{ m.phone|default:"—" }}</div>
+                            <small class="text-muted">{{ m.email|default:"" }}</small>
+                        </td>
+                        <td>
+                            {% if m.membership_type %}
+                                <span class="badge-status" style="background:#eaf2f8; color:#2d5f7c; border-color:#2d5f7c; text-transform:none;">
+                                    {{ m.membership_type.name }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted small">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if m.user and m.user.role %}
+                                <span class="role-badge role-{{ m.user.role }}">
+                                    {{ m.user.get_role_display }}
+                                </span>
+                            {% else %}
+                                <span class="role-badge role-none">No role assigned</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if m.status == 'active' %}
+                                <span class="badge-status badge-active">Active</span>
+                            {% elif m.status == 'pending' %}
+                                <span class="badge-status badge-pending">Pending</span>
+                            {% elif m.status == 'suspended' %}
+                                <span class="badge-status badge-suspended">Suspended</span>
+                            {% elif m.status == 'exited' %}
+                                <span class="badge-status badge-exited">Exited</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="small">{{ m.joined_on|date:"M d, Y" }}</span>
+                        </td>
+                        <td class="text-end">
+                            <a href="{% url 'chama:member_detail' m.pk %}"  class="action-icon" title="View Profile"><i class="fas fa-eye"></i></a>
+                            
+                            {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'chairperson' or user.role == 'secretary' %}
+                            <a href="{% url 'chama:member_edit' m.pk %}" class="action-icon" title="Edit"><i class="fas fa-edit"></i></a>
+                            <a href="#" class="action-icon" title="View Statement"><i class="fas fa-file-invoice-dollar"></i></a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center py-5">
+                            <i class="fas fa-users fa-3x text-muted mb-3" style="opacity:0.3;"></i>
+                            <h6 class="fw-bold text-muted">No members found</h6>
+                            <p class="small text-muted mb-0">
+                                {% if request.GET.q or request.GET.status %}
+                                    Try adjusting your search or filters.
+                                {% else %}
+                                    Get started by adding your first member.
+                                {% endif %}
+                            </p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

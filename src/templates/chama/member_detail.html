@@ -1,0 +1,346 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}{{ member.full_name }}{% endblock %}
+{% block page_title %}Member Profile{% endblock %}
+{% block page_subtitle %}Details & KYC documents for {{ member.full_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .profile-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+    .profile-header {
+        background: var(--primary-color);
+        color: #fff;
+        padding: 30px 20px;
+        text-align: center;
+        border-bottom: 2px solid #000;
+        border-radius: 4px 4px 0 0;
+    }
+    .profile-avatar-large {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        background: #fff;
+        color: var(--primary-color);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 2.5rem;
+        border: 4px solid #000;
+        margin-bottom: 10px;
+        object-fit: cover;
+    }
+    .profile-header h4 {
+        font-weight: 700;
+        margin: 0;
+    }
+    .profile-header small {
+        color: rgba(255,255,255,0.8);
+    }
+    .profile-body {
+        padding: 20px;
+    }
+
+    .info-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #666;
+        font-weight: 700;
+        margin-bottom: 2px;
+    }
+    .info-value {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #000;
+        margin-bottom: 15px;
+    }
+
+    /* KYC Documents — all in one row on desktop */
+    .kyc-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+    }
+    .kyc-item {
+        border: 2px dashed #ccc;
+        border-radius: 4px;
+        padding: 10px;
+        text-align: center;
+        background: #f8f9fa;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-height: 180px;
+    }
+    .kyc-item img {
+        width: 100%;
+        height: 100px;
+        object-fit: cover;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+    }
+    .kyc-item .file-icon {
+        font-size: 2rem;
+        color: var(--primary-color);
+        margin: auto 0;
+    }
+    .kyc-item .kyc-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        margin-top: 8px;
+        color: #333;
+        line-height: 1.2;
+    }
+    .kyc-item .kyc-missing {
+        font-size: 0.65rem;
+        color: #dc3545;
+        font-weight: 700;
+        margin-top: 5px;
+    }
+    .kyc-item .btn-view-doc {
+        margin-top: 6px;
+        font-size: 0.7rem;
+        padding: 4px 8px;
+    }
+
+    /* Financial Summary */
+    .stat-box {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 4px;
+        padding: 15px;
+        text-align: center;
+        margin-bottom: 15px;
+    }
+    .stat-box .stat-value {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #000;
+    }
+    .stat-box .stat-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        color: #666;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+
+    /* Back Button */
+    .btn-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        text-decoration: none;
+        color: #000;
+        font-weight: 700;
+        font-size: 0.9rem;
+        margin-bottom: 15px;
+    }
+    .btn-back:hover { color: var(--primary-color); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+
+    <a href="{% url 'chama:member_list' %}" class="btn-back">
+        <i class="fas fa-arrow-left"></i> Back to Members Directory
+    </a>
+
+    <div class="row">
+        <!-- LEFT COLUMN: PROFILE & KYC -->
+        <div class="col-lg-8">
+            
+            <!-- Profile Info -->
+            <div class="profile-card">
+                <div class="profile-header">
+                    {% if member.passport_photo_url %}
+                        <img src="{{ member.passport_photo_url }}" alt="{{ member.full_name }}" class="profile-avatar-large">
+                    {% else %}
+                        <div class="profile-avatar-large">
+                            {{ member.full_name|default:member.member_number|make_list|first|upper }}
+                        </div>
+                    {% endif %}
+                    <h4>{{ member.full_name }}</h4>
+                    <small><i class="fas fa-id-badge me-1"></i> {{ member.member_number }}</small>
+                </div>
+                <div class="profile-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="info-label">Phone Number</div>
+                            <div class="info-value">{{ member.phone|default:"—" }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-label">Email Address</div>
+                            <div class="info-value">{{ member.email|default:"—" }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-label">National ID</div>
+                            <div class="info-value">{{ member.national_id|default:"—" }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-label">Membership Type</div>
+                            <div class="info-value">
+                                {% if member.membership_type %}
+                                    {{ member.membership_type.name }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-label">Status</div>
+                            <div class="info-value">
+                                {% if member.status == 'active' %}
+                                    <span class="badge bg-success">Active</span>
+                                {% elif member.status == 'pending' %}
+                                    <span class="badge bg-warning text-dark">Pending</span>
+                                {% elif member.status == 'suspended' %}
+                                    <span class="badge bg-danger">Suspended</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ member.get_status_display }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-label">Date Joined</div>
+                            <div class="info-value">{{ member.joined_on|date:"F d, Y" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KYC Documents -->
+            <div class="profile-card">
+                <div class="card-header" style="background:#f8f9fa; border-bottom:2px solid #000; padding:12px 20px;">
+                    <h6 class="fw-bold mb-0"><i class="fas fa-folder-open me-2"></i> KYC Documents</h6>
+                </div>
+                <div class="profile-body">
+                    <div class="kyc-grid">
+                        
+                        <!-- Passport Photo -->
+                        <div class="kyc-item">
+                            {% if member.passport_photo_url %}
+                                <a href="{{ member.passport_photo_url }}" target="_blank">
+                                    <img src="{{ member.passport_photo_url }}" alt="Passport Photo">
+                                </a>
+                            {% else %}
+                                <div class="file-icon"><i class="fas fa-user-circle"></i></div>
+                                <div class="kyc-missing">Not Uploaded</div>
+                            {% endif %}
+                            <div class="kyc-label">Passport Photo</div>
+                        </div>
+
+                        <!-- ID Front -->
+                        <div class="kyc-item">
+                            {% if member.id_front_url %}
+                                <a href="{{ member.id_front_url }}" target="_blank">
+                                    <img src="{{ member.id_front_url }}" alt="ID Front">
+                                </a>
+                            {% else %}
+                                <div class="file-icon"><i class="fas fa-id-card"></i></div>
+                                <div class="kyc-missing">Not Uploaded</div>
+                            {% endif %}
+                            <div class="kyc-label">ID (Front)</div>
+                        </div>
+
+                        <!-- ID Back -->
+                        <div class="kyc-item">
+                            {% if member.id_back_url %}
+                                <a href="{{ member.id_back_url }}" target="_blank">
+                                    <img src="{{ member.id_back_url }}" alt="ID Back">
+                                </a>
+                            {% else %}
+                                <div class="file-icon"><i class="fas fa-id-card"></i></div>
+                                <div class="kyc-missing">Not Uploaded</div>
+                            {% endif %}
+                            <div class="kyc-label">ID (Back)</div>
+                        </div>
+
+                        <!-- KRA Certificate -->
+                        <div class="kyc-item">
+                            {% if member.kra_certificate_url %}
+                                <div class="file-icon"><i class="fas fa-file-invoice text-success"></i></div>
+                                <a href="{{ member.kra_certificate_url }}" target="_blank" class="btn btn-sm btn-outline-dark btn-view-doc">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                            {% else %}
+                                <div class="file-icon"><i class="fas fa-file-invoice"></i></div>
+                                <div class="kyc-missing">Not Uploaded</div>
+                            {% endif %}
+                            <div class="kyc-label">KRA Certificate</div>
+                        </div>
+
+                        <!-- Good Conduct -->
+                        <div class="kyc-item">
+                            {% if member.good_conduct_url %}
+                                <div class="file-icon"><i class="fas fa-file-shield text-success"></i></div>
+                                <a href="{{ member.good_conduct_url }}" target="_blank" class="btn btn-sm btn-outline-dark btn-view-doc">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                            {% else %}
+                                <div class="file-icon"><i class="fas fa-file-shield"></i></div>
+                                <div class="kyc-missing">Not Uploaded</div>
+                            {% endif %}
+                            <div class="kyc-label">Certificate of Good Conduct</div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN: FINANCIALS -->
+        <div class="col-lg-4">
+            
+            <div class="profile-card p-3">
+                <h6 class="fw-bold text-uppercase mb-3" style="font-size: 0.8rem; letter-spacing: 1px; color: #666;">
+                    <i class="fas fa-chart-pie me-1"></i> Financial Summary
+                </h6>
+
+                <!-- Total Savings -->
+                <div class="stat-box" style="background: #eaf2f8; border-color: #2d5f7c;">
+                    <div class="stat-label">Total Savings</div>
+                    <div class="stat-value">KES {{ total_savings|floatformat:2 }}</div>
+                </div>
+
+                <!-- Active Loans -->
+                <div class="stat-box" style="background: #fff3cd; border-color: #856404;">
+                    <div class="stat-label">Active Loans</div>
+                    <div class="stat-value">{{ active_loans_count }}</div>
+                    <small class="text-muted">Outstanding: KES {{ active_loans_outstanding|floatformat:2 }}</small>
+                </div>
+
+                <!-- Contributions -->
+                <div class="stat-box" style="background: #d4edda; border-color: #155724;">
+                    <div class="stat-label">Total Contributions</div>
+                    <div class="stat-value">KES {{ total_contributions|floatformat:2 }}</div>
+                </div>
+
+                <hr style="border-top: 2px dashed #ccc;">
+
+                <div class="d-grid gap-2 mt-3">
+                    <a href="{% url 'chama:member_edit' member.pk %}" class="btn btn-dark fw-bold" style="border:2px solid #000;">
+                        <i class="fas fa-edit me-1"></i> Edit Member Details
+                    </a>
+                    <a href="#" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;">
+                        <i class="fas fa-file-invoice-dollar me-1"></i> View Full Statement
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}

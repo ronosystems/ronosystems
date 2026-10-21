@@ -32,6 +32,10 @@ def dashboard_router(request):
         if 'kuku' in name or 'poultry' in name or 'chicken' in name:
             return redirect('/kuku_biz/dashboard/')
 
+        # Chama / SACCO / Savings ← ADD THIS
+        if 'chama' in name or 'sacco' in name or 'savings' in name:
+            return redirect('/chama/dashboard/')
+            
         # Supermarket / Grocery
         if 'supermarket' in name or 'grocery' in name:
             return redirect('/supermarket/dashboard/')

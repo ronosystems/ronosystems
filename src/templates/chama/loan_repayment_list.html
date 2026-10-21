@@ -1,0 +1,44 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}Loan Repayments{% endblock %}
+{% block page_title %}Loan Repayments{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+    <div class="dash-panel" style="background:#fff; border:2px solid #000; border-radius:4px;">
+        <div class="table-responsive">
+            <table class="table table-hover table-custom mb-0">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Loan</th>
+                        {% if is_officer %}<th>Member</th>{% endif %}
+                        <th>Reference</th>
+                        <th class="text-end">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in repayments %}
+                    <tr>
+                        <td>{{ r.date|date:"M d, Y" }}</td>
+                        <td><a href="{% url 'chama:loan_detail' r.loan.pk %}">#{{ r.loan.id }}</a></td>
+                        {% if is_officer %}
+                        <td>{{ r.loan.member.full_name }}</td>
+                        {% endif %}
+                        <td>{{ r.reference|default:"—" }}</td>
+                        <td class="text-end fw-bold">KES {{ r.amount|floatformat:2 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="{% if is_officer %}5{% else %}4{% endif %}" class="text-center py-5 text-muted">
+                            No repayments recorded yet.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

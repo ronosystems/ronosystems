@@ -1,0 +1,59 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}{% if mode == 'create' %}New Committee{% else %}Edit Committee{% endif %}{% endblock %}
+{% block page_title %}{% if mode == 'create' %}Create Committee{% else %}Edit: {{ committee.name }}{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+    <div class="card" style="border:2px solid #000; border-radius:4px; max-width:600px; margin:0 auto;">
+        <div class="card-header" style="background:#f8f9fa; border-bottom:2px solid #000; padding:14px 24px; font-weight:700;">
+            <i class="fas fa-users-cog me-2"></i> 
+            {% if mode == 'create' %}Committee Details{% else %}Update Committee{% endif %}
+        </div>
+        <div class="card-body p-4">
+            
+            {% if form.errors %}
+            <div class="alert alert-danger" style="border:2px solid #000;">
+                <ul class="mb-0">
+                    {% for field in form %}{% for err in field.errors %}
+                    <li><strong>{{ field.label }}:</strong> {{ err }}</li>
+                    {% endfor %}{% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Committee Name <span class="text-danger">*</span></label>
+                    {{ form.name }}
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Description</label>
+                    {{ form.description }}
+                    <small class="text-muted d-block mt-1">Briefly explain the committee's purpose (e.g. "Oversees all loans and financial decisions").</small>
+                </div>
+
+                <div class="form-check mb-3">
+                    {{ form.is_active }}
+                    <label class="form-check-label fw-bold" for="{{ form.is_active.id_for_label }}">
+                        Make this committee active
+                    </label>
+                </div>
+
+                <div class="d-flex gap-2 mt-4 pt-3" style="border-top:2px solid #000;">
+                    <button type="submit" class="btn btn-dark fw-bold" style="border:2px solid #000;">
+                        <i class="fas fa-save me-1"></i> Save Committee
+                    </button>
+                    <a href="{% url 'chama:committee_list' %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
