@@ -70,6 +70,16 @@ class MemberForm(forms.ModelForm):
         help_text="Assigns the Chama role to this member's linked user account.",
     )
 
+    # Virtual field — sets the password for the linked User account
+    default_password = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Leave blank to use default password'
+        }),
+        help_text="Sets the password for this member's linked user account.",
+    )
+
     class Meta:
         model = Member
         fields = [
@@ -93,7 +103,7 @@ class MemberForm(forms.ModelForm):
             'good_conduct': forms.FileInput(attrs={'class': 'form-control', 'accept': '.pdf,image/*'}),
         }
 
-    def __init__(self, *args, company=None, **kwargs):
+    def __init__(self, *args, company=None, fallback_password=None, **kwargs):
         super().__init__(*args, **kwargs)
 
         # Filter membership types to this company
@@ -109,6 +119,21 @@ class MemberForm(forms.ModelForm):
         # Pre-select the current role if editing an existing member with a user
         if self.instance and self.instance.pk and self.instance.user:
             self.fields['role'].initial = self.instance.user.role
+
+            # If the user has a usable password, show a placeholder hint
+            if self.instance.user.has_usable_password():
+                self.fields['default_password'].widget.attrs['placeholder'] = (
+                    'Leave blank to keep current password'
+                )
+                self.fields['default_password'].help_text = (
+                    'Type a new password to override the current one. Leave blank to keep it.'
+                )
+        else:
+            # Create mode: Show the actual dynamic default password
+            if fallback_password:
+                self.fields['default_password'].widget.attrs['placeholder'] = (
+                    f'Leave blank to use default ({fallback_password})'
+                )
 
 
 # ============================================================

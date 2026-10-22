@@ -386,14 +386,23 @@ def member_create(request):
         messages.error(request, 'No company assigned.')
         return redirect('chama:member_list')
 
-    # Generate the default password for this company
-    default_password = _generate_default_password(company)
+    # Fallback password if left blank
+    fallback_password = _generate_default_password(company)
 
     if request.method == 'POST':
-        form = MemberForm(request.POST, request.FILES, company=company)
+        form = MemberForm(
+            request.POST,
+            request.FILES,
+            company=company,
+            fallback_password=fallback_password,   # 👈 pass dynamic default
+        )
         if form.is_valid():
             member = form.save(commit=False)
             member.company = company
+
+            # 1. Get the custom password (or fall back)
+            custom_password = form.cleaned_data.get('default_password', '').strip()
+            final_password = custom_password if custom_password else fallback_password
 
             # Auto-generate member number
             if not getattr(member, 'member_number', None):
@@ -411,7 +420,7 @@ def member_create(request):
             if request.FILES.get('good_conduct'):
                 member.good_conduct = _upload_to_cloudinary(request.FILES.get('good_conduct'))
 
-            # Link or create a User account
+            # 2. Link or create a User account
             if not member.user:
                 existing_user = None
                 if member.email:
@@ -436,15 +445,15 @@ def member_create(request):
                         role='member',
                         is_active=True,
                     )
-                    # ✅ SET COMPANY-BASED DEFAULT PASSWORD
-                    existing_user.set_password(default_password)
+                    # ✅ SET THE FINAL PASSWORD
+                    existing_user.set_password(final_password)
                     existing_user.save()
 
                 member.user = existing_user
 
             member.save()
 
-            # Save the role
+            # 3. Save the role to the User
             role = form.cleaned_data.get('role')
             if role and member.user:
                 member.user.role = role
@@ -455,29 +464,45 @@ def member_create(request):
                 request,
                 f'✅ Member "{member.full_name}" created (No. {member.member_number}). '
                 f'Login Email: {member.user.email or member.user.username} | '
-                f'Password: {default_password}'
+                f'Password: {final_password}'
             )
             return redirect('chama:member_list')
     else:
-        form = MemberForm(company=company, initial={'joined_on': timezone.localdate()})
+        form = MemberForm(
+            company=company,
+            initial={'joined_on': timezone.localdate()},
+            fallback_password=fallback_password,   # 👈 pass dynamic default
+        )
 
     return render(request, 'chama/member_form.html', {
         'form': form,
         'mode': 'create',
-        'default_password': default_password,
+        'default_password': fallback_password,
     })
 
-    
+
 @login_required
 @transaction.atomic
 def member_edit(request, pk):
     company = _get_company(request)
     member = get_object_or_404(Member.objects.select_related('user'), pk=pk, company=company)
 
+    # Fallback password (used only when creating a new linked user with no typed password)
+    fallback_password = _generate_default_password(company)
+
     if request.method == 'POST':
-        form = MemberForm(request.POST, request.FILES, instance=member, company=company)
+        form = MemberForm(
+            request.POST,
+            request.FILES,
+            instance=member,
+            company=company,
+            fallback_password=fallback_password,   # 👈 pass (form ignores it when user has usable password)
+        )
         if form.is_valid():
             m = form.save(commit=False)
+
+            # 1. Get the custom password (if provided)
+            custom_password = form.cleaned_data.get('default_password', '').strip()
 
             # ── Cloudinary uploads ──
             if request.FILES.get('passport_photo'):
@@ -491,7 +516,7 @@ def member_edit(request, pk):
             if request.FILES.get('good_conduct'):
                 m.good_conduct = _upload_to_cloudinary(request.FILES.get('good_conduct'))
 
-            # ── Ensure the member has a linked User account ──
+            # 2. Ensure the member has a linked User account
             if not m.user:
                 existing_user = None
                 if m.email:
@@ -516,30 +541,55 @@ def member_edit(request, pk):
                         role='member',
                         is_active=True,
                     )
-                    existing_user.set_unusable_password()
+
+                    # ✅ If a custom password was provided, use it. Otherwise, unusable.
+                    if custom_password:
+                        existing_user.set_password(custom_password)
+                    else:
+                        existing_user.set_unusable_password()
                     existing_user.save()
 
                 m.user = existing_user
 
             m.save()
 
-            # ── Save the role to the User ──
-            role = form.cleaned_data.get('role')
-            if role and m.user:
-                m.user.role = role
-                m.user.company = company
-                m.user.save(update_fields=['role', 'company'])
+            # 3. Update User Role & Password (if provided)
+            if m.user:
+                update_fields = []
+                role = form.cleaned_data.get('role')
+
+                if role and m.user.role != role:
+                    m.user.role = role
+                    update_fields.append('role')
+
+                if m.user.company != company:
+                    m.user.company = company
+                    update_fields.append('company')
+
+                # ✅ Override password if a new one was typed
+                if custom_password:
+                    m.user.set_password(custom_password)
+                    update_fields.append('password')
+
+                if update_fields:
+                    m.user.save(update_fields=update_fields)
 
             messages.success(request, f'✅ Member "{m.full_name}" updated.')
             return redirect('chama:member_list')
     else:
-        form = MemberForm(instance=member, company=company)
+        form = MemberForm(
+            instance=member,
+            company=company,
+            fallback_password=fallback_password,   # 👈 pass (placeholder logic self-selects on edit)
+        )
 
     return render(request, 'chama/member_form.html', {
         'form': form,
         'mode': 'edit',
         'member': member,
     })
+
+
 
 # ============================================================
 # MEMBERSHIP TYPES
