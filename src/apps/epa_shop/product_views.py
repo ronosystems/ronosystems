@@ -1104,10 +1104,17 @@ def product_list(request):
         electronics = filter_by_user_access(electronics, request.user, 'product')
 
     for item in electronics:
+        # Count only AVAILABLE units
+        available_stock = Unit.objects.filter(
+            electronic=item, status='available'
+        ).count()
+        # Count ALL units (for reference / optional display)
+        total_units = Unit.objects.filter(electronic=item).count()
+
         all_products.append({
             'id': item.id,
-            'pk': item.id,                       # 👈 ADD
-            'kind': 'electronic',                # 👈 ADD
+            'pk': item.id,
+            'kind': 'electronic',
             'product_code': item.product_code or '-',
             'display_id': item.product_code or f"E{item.id}",
             'name': item.name,
@@ -1115,7 +1122,8 @@ def product_list(request):
             'brand': item.brand or '-',
             'model': item.model_number or '-',
             'specs': f"{item.ram} {item.storage}".strip() or '-',
-            'stock': item.quantity_in_stock,
+            'stock': available_stock,          # AVAILABLE units only
+            'all_units': total_units,          # ALL units
             'purchase_price': float(item.purchase_price),
             'selling_price': float(item.selling_price),
             'best_price': float(item.best_price) if item.best_price else 0,
@@ -1139,10 +1147,17 @@ def product_list(request):
             rom_empty = not item.storage_capacity or item.storage_capacity in ('N/A', '')
             phone_type = 'Feature Phone' if (ram_empty and rom_empty) else 'Smartphone'
 
+        # Count only AVAILABLE units
+        available_stock = Unit.objects.filter(
+            phone=item, status='available'
+        ).count()
+        # Count ALL units
+        total_units = Unit.objects.filter(phone=item).count()
+
         all_products.append({
             'id': item.id,
-            'pk': item.id,                       # 👈 ADD
-            'kind': 'phone',                     # 👈 ADD
+            'pk': item.id,
+            'kind': 'phone',
             'product_code': item.product_code or '-',
             'display_id': item.product_code or f"P{item.id}",
             'name': item.name,
@@ -1150,7 +1165,8 @@ def product_list(request):
             'brand': item.brand or '-',
             'model': item.model or '-',
             'specs': f"{item.ram} {item.storage_capacity}".strip() or '-',
-            'stock': item.quantity_in_stock,
+            'stock': available_stock,          # AVAILABLE units only
+            'all_units': total_units,          # ALL units
             'purchase_price': float(item.purchase_price),
             'selling_price': float(item.selling_price),
             'best_price': float(item.best_price) if item.best_price else 0,
@@ -1168,8 +1184,8 @@ def product_list(request):
     for item in accessories:
         all_products.append({
             'id': item.id,
-            'pk': item.id,                       # 👈 ADD
-            'kind': 'accessory',                 # 👈 ADD
+            'pk': item.id,
+            'kind': 'accessory',
             'product_code': item.product_code or '-',
             'display_id': item.product_code or f"A{item.id}",
             'name': item.name,
@@ -1177,7 +1193,8 @@ def product_list(request):
             'brand': item.brand or '-',
             'model': item.model or '-',
             'specs': item.accessory_type or '-',
-            'stock': item.quantity_in_stock,
+            'stock': item.quantity_in_stock,   # Accessories: stock = quantity_in_stock
+            'all_units': item.quantity_in_stock,
             'purchase_price': float(item.purchase_price),
             'selling_price': float(item.selling_price),
             'best_price': float(item.best_price) if item.best_price else 0,
@@ -1203,11 +1220,16 @@ def product_list(request):
         if p['type'] == 'Electronic'
     ]
 
+    # Available units only
     total_unit_items = 0
     if phone_ids:
-        total_unit_items += Unit.objects.filter(phone_id__in=phone_ids).count()
+        total_unit_items += Unit.objects.filter(
+            phone_id__in=phone_ids, status='available'
+        ).count()
     if electronic_ids:
-        total_unit_items += Unit.objects.filter(electronic_id__in=electronic_ids).count()
+        total_unit_items += Unit.objects.filter(
+            electronic_id__in=electronic_ids, status='available'
+        ).count()
 
     total_stock_items = sum(int(p.get('stock') or 0) for p in all_products)
     total_products_value = sum(
@@ -1241,6 +1263,8 @@ def product_list(request):
         'page_subtitle':      'Manage your products',
     }
     return render(request, 'epa/products.html', context)
+
+
 
 # ============================================
 # PRODUCT DETAIL
