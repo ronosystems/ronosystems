@@ -1,0 +1,360 @@
+{% extends base_template|default:"base.html" %}
+{% load static %}
+
+{% block title %}All M-Pesa Commissions - {{ company.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       STATS GRID — 3 IN ONE ROW
+    ============================================ */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+
+    .stat-box {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 15px;
+        background: #ffffff;
+        text-align: center;
+        transition: transform 0.2s;
+    }
+    .stat-box:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .stat-box .label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #555;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+    .stat-box .value {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #000000;
+    }
+
+    /* ============================================
+       FILTER ROW — HORIZONTAL
+    ============================================ */
+    .filter-row {
+        display: flex;
+        gap: 15px;
+        align-items: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .filter-field {
+        flex: 1;
+        min-width: 200px;
+    }
+
+    .filter-field label {
+        font-size: 12px;
+        font-weight: 700;
+        color: #000000;
+        margin-bottom: 5px;
+        display: block;
+    }
+
+    .filter-field .form-select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 13px;
+        padding: 6px 10px;
+        width: 100%;
+    }
+
+    /* ============================================
+       TABLE STYLING
+    ============================================ */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin-bottom: 0;
+    }
+    .table-excel th, .table-excel td {
+        border: 1px solid #000000 !important;
+        padding: 10px 12px;
+        vertical-align: middle;
+    }
+    .table-excel thead th {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+    .table-excel tbody tr:hover td {
+        background-color: #f0f0f0;
+    }
+
+    /* ============================================
+       CARDS & BADGES
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+    }
+    .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+    }
+    .card-header h5 {
+        color: #000000 !important;
+        font-weight: 700;
+        margin: 0;
+    }
+
+    .badge {
+        padding: 5px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 700;
+        border: 1px solid #000000;
+    }
+    .badge.bg-info { background: #cce5ff !important; color: #004085 !important; }
+    .badge.bg-success { background: #d4edda !important; color: #155724 !important; }
+
+    .actions-cell {
+        display: flex;
+        gap: 6px;
+        justify-content: center;
+    }
+
+    /* Mobile tweaks */
+    @media (max-width: 768px) {
+        .stats-grid { grid-template-columns: 1fr; gap: 10px; }
+        .filter-row { flex-direction: column; }
+        .filter-field { width: 100%; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+
+    <!-- HEADER -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="mb-0 fw-bold"><i class="fas fa-hand-holding-usd"></i>{{ company.name }}</h4>
+        </div>
+        
+        <a href="{% url 'treasury:dashboard' company.id %}" class="btn btn-primary" style="border: 2px solid #000; font-weight: 600;">
+            <i class="fas fa-arrow-left"></i> Treasury Dashboard
+        </a>
+
+        <a href="{% url 'finance-dashboard' %}" class="btn btn-primary" style="border: 2px solid #000; font-weight: 600;">
+            <i class="fas fa-arrow-left"></i> Finance Dashboard
+        </a>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats-grid">
+        <div class="stat-box">
+            <div class="label">Total All Branches</div>
+            <div class="value">KES {{ total_commission|floatformat:2 }}</div>
+        </div>
+        <div class="stat-box">
+            <div class="label">{{ current_year }} Total</div>
+            <div class="value">KES {{ year_total|floatformat:2 }}</div>
+        </div>
+        <div class="stat-box">
+            <div class="label">Records</div>
+            <div class="value">{{ commissions.paginator.count }}</div>
+        </div>
+    </div>
+
+    <!-- FILTERS -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="filter-row">
+                <div class="filter-field">
+                    <label for="branch">Branch</label>
+                    <select name="branch" id="branch" class="form-select">
+                        <option value="">All Branches</option>
+                        {% for b in branches %}
+                        <option value="{{ b.id }}" {% if selected_branch == b.id|stringformat:"s" %}selected{% endif %}>
+                            {{ b.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filter-field">
+                    <label for="year">Year</label>
+                    <select name="year" id="year" class="form-select">
+                        <option value="">All Years</option>
+                        {% for y in year_list %}
+                        <option value="{{ y }}" {% if selected_year == y|stringformat:"s" %}selected{% endif %}>
+                            {{ y }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <button type="submit" class="btn btn-primary" style="border: 2px solid #000; font-weight: 600; padding: 6px 20px;">
+                        <i class="fas fa-filter"></i> Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="card">
+        <div class="card-header">
+            <h5><i class="fas fa-list"></i> Commission Records (All Branches)</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+
+                <table class="table-excel">
+                    <thead>
+                        <tr>
+                            <th style="width: 18%;">Date Recorded</th>
+                            <th style="width: 12%;">Month</th>
+                            <th style="width: 8%;" class="text-center">Year</th>
+                            <th style="width: 15%;">Branch</th>
+                            <th style="width: 15%;" class="text-end">Commission Amount</th>
+                            <th style="width: 20%;">Recorded By</th>
+                            <th style="width: 12%;" class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in commissions %}
+                        <tr>
+                            <!-- 1. Date Recorded -->
+                            <td>{{ c.created_at|date:"M d, Y H:i" }}</td>
+                            
+                            <!-- 2. Month -->
+                            <td><strong>{{ c.month|date:"F" }}</strong></td>
+                            
+                            <!-- 3. Year -->
+                            <td class="text-center">
+                                <span class="badge bg-secondary">{{ c.month|date:"Y" }}</span>
+                            </td>
+                            
+                            <!-- 4. Branch -->
+                            <td>
+                                <span class="badge bg-info">{{ c.branch.name }}</span>
+                            </td>
+                            
+                            <!-- 5. Commission Amount -->
+                            <td class="text-end">
+                                <span class="badge bg-success">KES {{ c.amount|floatformat:2 }}</span>
+                            </td>
+                            
+                            <!-- 6. Recorded By -->
+                            <td>
+                                {% if c.recorded_by %}
+                                    <strong>{{ c.recorded_by.get_full_name|default:c.recorded_by.username }}</strong>
+                                    {% if c.recorded_by.role %}
+                                        <br><small class="text-muted">{{ c.recorded_by.get_role_display }}</small>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            
+                            <!-- 7. Actions -->
+                            <td>
+                                <div class="actions-cell">
+                                    <a href="{% url 'treasury:commission_edit' company.id c.branch.id c.id %}" class="btn btn-sm btn-primary" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'treasury:commission_delete' company.id c.branch.id c.id %}" class="btn btn-sm btn-danger" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-4">
+                                <i class="fas fa-info-circle"></i> No commissions recorded yet.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+            </div>
+        </div>
+
+        <!-- PAGINATION -->
+        {% if commissions.has_other_pages %}
+        <div class="card-footer bg-white" style="border-top: 2px solid #000000;">
+            <nav>
+                <ul class="pagination mb-0 justify-content-center" style="gap: 4px;">
+                    {% if commissions.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ commissions.previous_page_number }}{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}"
+                           style="border: 2px solid #000000; color: #000000; font-weight: 600;">
+                            &laquo; Prev
+                        </a>
+                    </li>
+                    {% endif %}
+                    <li class="page-item active">
+                        <span class="page-link" style="background: #87CEEB; border: 2px solid #000000; color: #000000; font-weight: 700;">
+                            Page {{ commissions.number }} of {{ commissions.paginator.num_pages }}
+                        </span>
+                    </li>
+                    {% if commissions.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ commissions.next_page_number }}{% if selected_branch %}&branch={{ selected_branch }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}"
+                           style="border: 2px solid #000000; color: #000000; font-weight: 600;">
+                            Next &raquo;
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- PER-BRANCH TOTALS -->
+    {% if per_branch_totals %}
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5><i class="fas fa-store"></i> Per-Branch Totals</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table-excel">
+                    <thead>
+                        <tr>
+                            <th>Branch</th>
+                            <th class="text-end">Total Commissions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in per_branch_totals %}
+                        <tr>
+                            <td><strong>{{ row.branch__name|default:"—" }}</strong></td>
+                            <td class="text-end">
+                                <span class="badge bg-success">KES {{ row.total|floatformat:2 }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

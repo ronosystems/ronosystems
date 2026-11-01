@@ -172,7 +172,7 @@ urlpatterns = [
     # ============================================
     # FINANCE — ALL TRANSACTIONS
     # ============================================
-    path('finance/transactions/', finance_views.all_transactions, name='all-teansactions-records'),
+    path('finance/transactions/', finance_views.all_transactions, name='all-transactions-records'),
 
     # ============================================
     # FINANCE — COGS Detail Views

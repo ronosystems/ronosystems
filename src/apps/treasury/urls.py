@@ -163,6 +163,13 @@ urlpatterns = [
         views.commissions_list,
         name='commissions_list'
     ),
+
+    path(
+        '<int:company_id>/commissions/',
+        views.company_commissions_list,
+        name='company_commissions_list'
+    ),
+
     path(
         '<int:company_id>/branch/<int:branch_id>/commission/<int:commission_id>/edit/',
         views.commission_edit,

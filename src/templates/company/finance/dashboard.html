@@ -781,7 +781,7 @@
             <h5>
                 <i class="fas fa-history"></i> Recent Transactions
             </h5>
-            <a href="{% url 'all-teansactions-records' %}" class="recent-tx-link">
+            <a href="{% url 'all-transactions-records' %}" class="recent-tx-link">
                 View all <i class="fas fa-arrow-right"></i>
             </a>
         </div>
@@ -850,12 +850,30 @@
     ============================================ -->
     <div class="bottom-quick-links">
         <a href="{% url 'company-expenses-all' %}" class="btn btn-outline-secondary btn-sm">
-            <i class="fas fa-list"></i> All Expenses
+            <i class="fas fa-list"></i> All Expenses History
         </a>
 
         <a href="{% url 'finance-purchase-records' %}" class="btn btn-outline-secondary btn-sm">
-            <i class="fas fa-list"></i> All Purchases
+            <i class="fas fa-list"></i> All Purchases History
         </a>
+        
+        {# Commissions — admins go company-wide, others go branch-scoped #}
+        {% if request.user.role == 'super_admin' or request.user.role == 'company_admin' %}
+        <a href="{% url 'treasury:company_commissions_list' company.id %}"
+        class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-list"></i> All Commissions History
+        </a>
+        {% elif treasury_branch %}
+        <a href="{% url 'treasury:commissions_list' company.id treasury_branch.id %}"
+        class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-list"></i> Branch Commissions History
+        </a>
+        {% else %}
+        <button class="btn btn-outline-secondary btn-sm" disabled
+                title="No branch available">
+            <i class="fas fa-list"></i> Commissions History
+        </button>
+        {% endif %}
     </div>
 
 </div>

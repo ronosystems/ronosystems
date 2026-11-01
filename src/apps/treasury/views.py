@@ -2502,6 +2502,101 @@ def commissions_list(request, company_id=None, branch_id=None):
     return render(request, 'treasury/commissions_list.html', context)
 
 
+@login_required
+def company_commissions_list(request, company_id=None):
+    """Company-wide commissions list — admins only (no branch required)."""
+    company = get_user_company(request, company_id)
+    if not company:
+        return redirect('dashboard')
+
+    # Only admins can see the company-wide list
+    if request.user.role not in ['super_admin', 'company_admin']:
+        messages.error(
+            request,
+            'Only company admins can view company-wide commissions. '
+            'Please open your branch commissions instead.'
+        )
+        # Send them to their branch-scoped list
+        user_branch = get_user_branch(request.user)
+        if user_branch:
+            return redirect(
+                'treasury:commissions_list',
+                company_id=company.id,
+                branch_id=user_branch.id,
+            )
+        return redirect('treasury:dashboard', company_id=company.id)
+
+    # Optional filters
+    branch_filter = request.GET.get('branch')  # branch id
+    year = request.GET.get('year')
+
+    commissions = (
+        MpesaCommission.objects
+        .filter(company=company)
+        .select_related('branch', 'mpesa_account', 'recorded_by')
+    )
+
+    if branch_filter:
+        commissions = commissions.filter(branch_id=branch_filter)
+
+    if year:
+        try:
+            commissions = commissions.filter(month__year=int(year))
+        except ValueError:
+            pass
+
+    commissions = commissions.order_by('-month', 'branch__name')
+
+    # Pagination
+    paginator = Paginator(commissions, 25)
+    page = request.GET.get('page', 1)
+    commissions_page = paginator.get_page(page)
+
+    # Summary
+    total_commission = commissions.aggregate(total=Sum('amount'))['total'] or 0
+
+    current_year = timezone.now().year
+    year_total = (
+        MpesaCommission.objects
+        .filter(company=company, month__year=current_year)
+        .aggregate(total=Sum('amount'))['total'] or 0
+    )
+
+    # Per-branch totals (nice summary card)
+    per_branch_totals = (
+        MpesaCommission.objects
+        .filter(company=company)
+        .values('branch__id', 'branch__name')
+        .annotate(total=Sum('amount'))
+        .order_by('-total')
+    )
+
+    branches = Branch.objects.filter(company=company, is_active=True)
+
+    available_years = (
+        MpesaCommission.objects
+        .filter(company=company)
+        .dates('month', 'year')
+    )
+    year_list = sorted({d.year for d in available_years}, reverse=True)
+
+    context = {
+        'company': company,
+        'branches': branches,
+        'commissions': commissions_page,
+        'total_commission': total_commission,
+        'year_total': year_total,
+        'current_year': current_year,
+        'selected_year': year,
+        'selected_branch': branch_filter,
+        'year_list': year_list,
+        'per_branch_totals': per_branch_totals,
+        'is_company_wide': True,
+        'is_admin': True,
+    }
+    return render(request, 'treasury/commissions_company_list.html', context)
+
+
 # ============================================
 # MPESA COMMISSION - EDIT
 # ============================================
