@@ -104,7 +104,7 @@ def pos_dashboard(request):
         # ---- Tax settings (used by the POS cart JS) ----
         'enable_tax': enable_tax,
         'tax_rate': tax_rate,
-        'auto_print': receipt_settings.get('auto_print', False), 
+        'auto_print': receipt_settings.get('auto_print', False),
     }
     return render(request, 'epa/pos.html', context)
 
@@ -165,7 +165,7 @@ def pos_search_products(request):
                 'price': float(phone.selling_price),
                 'stock': units.count(),
                 'units': [{'identifier': u.identifier, 'status': u.status} for u in units],
-                'image': phone.image_url,           # ✅ FIXED
+                'image': phone.image_url,
                 'ram': phone.ram or '',
                 'storage_capacity': phone.storage_capacity or '',
                 'screen_size': phone.screen_size or '',
@@ -204,7 +204,7 @@ def pos_search_products(request):
                 'price': float(item.selling_price),
                 'stock': units.count(),
                 'units': [{'identifier': u.identifier, 'status': u.status} for u in units],
-                'image': item.image_url,            # ✅ correct (`item` is the loop var here)
+                'image': item.image_url,
                 'ram': item.ram or '',
                 'storage': item.storage or '',
                 'processor': item.processor or '',
@@ -242,7 +242,7 @@ def pos_search_products(request):
                 'price': float(item.selling_price),
                 'stock': item.quantity_in_stock,
                 'units': [],
-                'image': item.image_url,            # ✅ correct
+                'image': item.image_url,
                 'accessory_type': item.accessory_type or 'other',
                 'compatible_phone_models': item.compatible_phone_models or '',
             })
@@ -327,6 +327,7 @@ def pos_search_barcode(request):
                 'brand': p.brand,
                 'model': p.model,
                 'price': float(p.selling_price),
+                'best_price': float(p.best_price) if p.best_price else None,
                 'stock': Unit.objects.filter(phone=p, status='available').count(),
                 'branch_id': p.branch_id,
                 'specs': {
@@ -337,7 +338,7 @@ def pos_search_barcode(request):
                     'condition': p.condition or 'new',
                     'battery_capacity': p.battery_capacity or '',
                 },
-                'image': p.image_url,           # ✅ p is a Phone here
+                'image': p.image_url,
             })
 
         # (b) Match on Phone.barcode (exact)
@@ -355,6 +356,7 @@ def pos_search_barcode(request):
                 'brand': p.brand,
                 'model': p.model,
                 'price': float(p.selling_price),
+                'best_price': float(p.best_price) if p.best_price else None,
                 'stock': Unit.objects.filter(phone=p, status='available').count(),
                 'branch_id': p.branch_id,
                 'specs': {
@@ -365,7 +367,36 @@ def pos_search_barcode(request):
                     'condition': p.condition or 'new',
                     'battery_capacity': p.battery_capacity or '',
                 },
-                'image': p.image_url,           # ✅ p is a Phone here
+                'image': p.image_url,
+            })
+
+        # (c) Fallback: partial match on Phone.product_code (for typing)
+        phone_code_matches = phones_qs.filter(product_code__icontains=q)
+        for p in phone_code_matches:
+            if p.product_code in seen_phone_codes:
+                continue
+            seen_phone_codes.add(p.product_code)
+            units_payload.append({
+                'identifier': p.product_code,
+                'unit_type': 'SKU',
+                'category': 'Phone',
+                'product_code': p.product_code,
+                'name': p.name,
+                'brand': p.brand,
+                'model': p.model,
+                'price': float(p.selling_price),
+                'best_price': float(p.best_price) if p.best_price else None,
+                'stock': Unit.objects.filter(phone=p, status='available').count(),
+                'branch_id': p.branch_id,
+                'specs': {
+                    'ram': p.ram or '',
+                    'storage_capacity': p.storage_capacity or '',
+                    'screen_size': p.screen_size or '',
+                    'color': p.color or '',
+                    'condition': p.condition or 'new',
+                    'battery_capacity': p.battery_capacity or '',
+                },
+                'image': p.image_url,
             })
 
         # ============================================================
@@ -401,6 +432,7 @@ def pos_search_barcode(request):
                 'brand': p.brand,
                 'model': p.model_number,
                 'price': float(p.selling_price),
+                'best_price': float(p.best_price) if p.best_price else None,
                 'stock': Unit.objects.filter(electronic=p, status='available').count(),
                 'branch_id': p.branch_id,
                 'specs': {
@@ -411,7 +443,7 @@ def pos_search_barcode(request):
                     'screen_size': p.screen_size or '',
                     'color': p.color or '',
                 },
-                'image': p.image_url,           # ✅ p is an Electronic here
+                'image': p.image_url,
             })
 
         # (b) Match on Electronic.barcode (exact)
@@ -429,6 +461,7 @@ def pos_search_barcode(request):
                 'brand': p.brand,
                 'model': p.model_number,
                 'price': float(p.selling_price),
+                'best_price': float(p.best_price) if p.best_price else None,
                 'stock': Unit.objects.filter(electronic=p, status='available').count(),
                 'branch_id': p.branch_id,
                 'specs': {
@@ -439,7 +472,36 @@ def pos_search_barcode(request):
                     'screen_size': p.screen_size or '',
                     'color': p.color or '',
                 },
-                'image': p.image_url,           # ✅ p is an Electronic here
+                'image': p.image_url,
+            })
+
+        # (c) Fallback: partial match on Electronic.product_code (for typing)
+        elec_code_matches = electronics_qs.filter(product_code__icontains=q)
+        for p in elec_code_matches:
+            if p.product_code in seen_elec_codes:
+                continue
+            seen_elec_codes.add(p.product_code)
+            units_payload.append({
+                'identifier': p.product_code,
+                'unit_type': 'SKU',
+                'category': 'Electronics',
+                'product_code': p.product_code,
+                'name': p.name,
+                'brand': p.brand,
+                'model': p.model_number,
+                'price': float(p.selling_price),
+                'best_price': float(p.best_price) if p.best_price else None,
+                'stock': Unit.objects.filter(electronic=p, status='available').count(),
+                'branch_id': p.branch_id,
+                'specs': {
+                    'ram': p.ram or '',
+                    'storage': p.storage or '',
+                    'processor': p.processor or '',
+                    'device_type': p.device_type or 'other',
+                    'screen_size': p.screen_size or '',
+                    'color': p.color or '',
+                },
+                'image': p.image_url,
             })
 
         # ============================================================
@@ -484,17 +546,36 @@ def pos_search_barcode(request):
                 'brand': a.brand,
                 'model': a.model,
                 'price': float(a.selling_price),
+                'best_price': float(a.best_price) if a.best_price else None,
                 'stock': a.quantity_in_stock,
                 'branch_id': a.branch_id,
                 'specs': {
                     'accessory_type': a.accessory_type or 'other',
                     'compatible_phone_models': a.compatible_phone_models or '',
                 },
-                'image': a.image_url,           # ✅ FIXED — `a` is the loop var
+                'image': a.image_url,
             })
 
-        # Sort: exact identifier matches first, then alphabetical
-        units_payload.sort(key=lambda x: (x['identifier'] != q, x['identifier']))
+        # ------------------------------------------------------------
+        # Sort: exact identifier first, then exact product_code,
+        #       then partial (contains), then alphabetical.
+        # This prevents a generic accessory whose product_code merely
+        # *contains* the scanned digits from outranking the exact phone
+        # IMEI the cashier actually scanned.
+        # ------------------------------------------------------------
+        def _match_rank(u):
+            ident = (u.get('identifier') or '').lower()
+            code  = (u.get('product_code') or '').lower()
+            qt    = q.lower()
+            if ident == qt:
+                return (0, ident)              # exact identifier (IMEI / barcode / code)
+            if code == qt:
+                return (1, ident)              # exact product_code match
+            if qt in ident or qt in code:
+                return (2, ident)              # partial (contains)
+            return (3, ident)
+
+        units_payload.sort(key=_match_rank)
 
         match = units_payload[0] if units_payload else None
 
@@ -639,6 +720,7 @@ def pos_get_branches(request):
 
     except Exception as e:
         return JsonResponse({'error': str(e), 'branches': []}, status=500)
+
 
 # ============================================
 # TAX PREVIEW — live calculation for POS UI
