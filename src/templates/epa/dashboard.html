@@ -686,6 +686,142 @@
 
     .csr-price-box.best .csr-price-value { color: #155724; }
 
+    /* ============================================
+       BEST PRICE — LOCKED STATE + PIN MODAL
+    ============================================ */
+    .csr-price-box.best.locked {
+        background: #333333;
+        border-color: #000000;
+        cursor: pointer;
+        position: relative;
+        transition: all 0.2s ease;
+        user-select: none;
+    }
+    .csr-price-box.best.locked:hover {
+        background: #444444;
+        transform: translateY(-1px);
+    }
+    .csr-price-box.best.locked .csr-price-label { color: #ffcc00; }
+    .csr-price-box.best.locked .csr-price-value {
+        color: #ffcc00;
+        font-size: 1rem;
+        letter-spacing: 1px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .csr-price-box.best.locked .csr-price-value i { font-size: 1rem; }
+    .csr-price-box.best.locked .csr-price-hint {
+        display: block;
+        font-size: 0.6rem;
+        color: #cccccc;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-top: 4px;
+        font-weight: 600;
+    }
+
+    /* PIN Modal */
+    .pin-modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.75);
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+    .pin-modal-overlay.show { display: flex; }
+
+    .pin-modal {
+        background: #ffffff;
+        border: 3px solid #000000;
+        border-radius: 12px;
+        box-shadow: 0 12px 0 rgba(0,0,0,0.4);
+        width: 100%;
+        max-width: 360px;
+        overflow: hidden;
+        animation: pinPop 0.18s ease-out;
+    }
+    @keyframes pinPop {
+        from { transform: scale(0.92); opacity: 0; }
+        to   { transform: scale(1); opacity: 1; }
+    }
+    .pin-modal-head {
+        background: #fc5c00;
+        border-bottom: 3px solid #000000;
+        color: #ffffff;
+        padding: 12px 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-size: 0.85rem;
+    }
+    .pin-modal-close {
+        cursor: pointer;
+        padding: 2px 8px;
+        border-radius: 4px;
+    }
+    .pin-modal-close:hover { background: rgba(0,0,0,0.2); }
+
+    .pin-modal-body { padding: 20px 18px; text-align: center; }
+    .pin-modal-body p {
+        margin: 0 0 14px;
+        color: #333;
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+
+    .pin-input {
+        width: 100%;
+        border: 3px solid #000000;
+        border-radius: 8px;
+        padding: 12px 14px;
+        font-size: 1.5rem;
+        font-weight: 900;
+        letter-spacing: 12px;
+        text-align: center;
+        font-family: 'Courier New', monospace;
+        outline: none;
+        background: #f0faff;
+        color: #000000;
+    }
+    .pin-input:focus { background: #e1f4fc; border-color: #036a77; }
+
+    .pin-error {
+        display: none;
+        color: #721c24;
+        font-size: 0.8rem;
+        font-weight: 700;
+        margin-top: 8px;
+    }
+    .pin-error.show { display: block; }
+
+    .pin-modal-actions {
+        padding: 0 18px 18px;
+        display: flex;
+        gap: 8px;
+    }
+    .pin-modal-actions .btn {
+        flex: 1;
+        padding: 10px;
+        border-radius: 8px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        border: 2px solid #000000;
+    }
+    .pin-btn-cancel { background: #f8f9fa; color: #000000; }
+    .pin-btn-cancel:hover { background: #e2e6ea; }
+    .pin-btn-submit { background: #28a745; color: #ffffff; }
+    .pin-btn-submit:hover { background: #1e7e34; }
+
     .csr-meta {
         margin-top: 14px;
         font-size: 0.78rem;
@@ -1745,6 +1881,31 @@
                 </div>
             </div>
 
+            {# ============================================ #}
+            {# PIN MODAL — unlock best price                #}
+            {# ============================================ #}
+            <div id="pinModalOverlay" class="pin-modal-overlay">
+                <div class="pin-modal">
+                    <div class="pin-modal-head">
+                        <span><i class="fas fa-lock"></i> Enter PIN</span>
+                        <span class="pin-modal-close" id="pinModalClose"><i class="fas fa-times"></i></span>
+                    </div>
+                    <div class="pin-modal-body">
+                        <p>Enter PIN to reveal the <strong>Best Price</strong></p>
+                        <input type="password" id="pinInput" class="pin-input"
+                               inputmode="numeric" maxlength="4" autocomplete="off"
+                               placeholder="••••">
+                        <div class="pin-error" id="pinError">
+                            <i class="fas fa-times-circle"></i> Incorrect PIN. Try again.
+                        </div>
+                    </div>
+                    <div class="pin-modal-actions">
+                        <button type="button" class="pin-btn-cancel" id="pinCancelBtn">Cancel</button>
+                        <button type="button" class="pin-btn-submit" id="pinSubmitBtn">Unlock</button>
+                    </div>
+                </div>
+            </div>
+
         {% elif user.role == 'company_agent' %}
             <div class="agent-banner">
                 <div class="agent-banner-inner">
@@ -2203,6 +2364,20 @@ document.addEventListener('DOMContentLoaded', function () {
     let lastValue = '';
     let inFlight  = false;
 
+    // ============================================
+    // BEST PRICE PIN GATE
+    // ============================================
+    const BEST_PRICE_PIN = '1234';
+
+    const pinOverlay = document.getElementById('pinModalOverlay');
+    const pinInput   = document.getElementById('pinInput');
+    const pinError   = document.getElementById('pinError');
+    const pinClose   = document.getElementById('pinModalClose');
+    const pinCancel  = document.getElementById('pinCancelBtn');
+    const pinSubmit  = document.getElementById('pinSubmitBtn');
+
+    let pendingBox = null;   // the locked best-price box awaiting reveal
+
     function esc(s) {
         return String(s == null ? '' : s)
             .replace(/&/g, '&amp;')
@@ -2218,6 +2393,60 @@ document.addEventListener('DOMContentLoaded', function () {
             maximumFractionDigits: 2,
         });
     }
+
+    function openPinModal(box) {
+        pendingBox = box;
+        pinInput.value = '';
+        pinError.classList.remove('show');
+        pinOverlay.classList.add('show');
+        setTimeout(function () { pinInput.focus(); }, 60);
+    }
+
+    function closePinModal() {
+        pinOverlay.classList.remove('show');
+        pendingBox = null;
+    }
+
+    function revealBestPrice(box) {
+        const raw = box.getAttribute('data-reveal-price');
+        const val = parseFloat(raw);
+        box.classList.remove('locked');
+        box.innerHTML =
+            '<div class="csr-price-label">Best Price</div>' +
+            '<div class="csr-price-value">' + esc(fmtMoney(val)) + '</div>';
+    }
+
+    function submitPin() {
+        const entered = (pinInput.value || '').trim();
+        if (entered === BEST_PRICE_PIN) {
+            if (pendingBox) revealBestPrice(pendingBox);
+            closePinModal();
+        } else {
+            pinError.classList.add('show');
+            pinInput.value = '';
+            pinInput.focus();
+            // subtle shake
+            pinInput.style.transition = 'transform 0.08s';
+            pinInput.style.transform = 'translateX(-4px)';
+            setTimeout(function () { pinInput.style.transform = 'translateX(4px)'; }, 80);
+            setTimeout(function () { pinInput.style.transform = 'translateX(0)'; }, 160);
+        }
+    }
+
+    if (pinSubmit)  pinSubmit.addEventListener('click', submitPin);
+    if (pinCancel)  pinCancel.addEventListener('click', closePinModal);
+    if (pinClose)   pinClose.addEventListener('click', closePinModal);
+    if (pinOverlay) pinOverlay.addEventListener('click', function (e) {
+        if (e.target === pinOverlay) closePinModal();
+    });
+    if (pinInput)   pinInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter')  { e.preventDefault(); submitPin(); }
+        if (e.key === 'Escape') { e.preventDefault(); closePinModal(); }
+    });
+
+    // ============================================
+    // SCANNER
+    // ============================================
 
     function hideResult() {
         resultBox.classList.remove('show', 'not-found');
@@ -2269,11 +2498,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 : '<span class="stock-out"><i class="fas fa-times-circle"></i> Out of stock</span>')
             : '';
 
-        // Best price only renders if present (see note in docs)
+        // Best price — locked by default, click to reveal with PIN
         const bestBox = (typeof m.best_price === 'number' && m.best_price > 0)
-            ? '<div class="csr-price-box best">' +
+            ? '<div class="csr-price-box best locked" data-reveal-price="' + esc(m.best_price) + '">' +
                   '<div class="csr-price-label">Best Price</div>' +
-                  '<div class="csr-price-value">' + esc(fmtMoney(m.best_price)) + '</div>' +
+                  '<div class="csr-price-value"><i class="fas fa-lock"></i> LOCKED</div>' +
+                  '<span class="csr-price-hint">Tap to reveal</span>' +
               '</div>'
             : '';
 
@@ -2297,6 +2527,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     stockLine +
                 '</div>' +
             '</div>';
+
+        // Attach unlock handler to the locked best-price box
+        const lockedBox = body.querySelector('.csr-price-box.best.locked');
+        if (lockedBox) {
+            lockedBox.addEventListener('click', function () { openPinModal(lockedBox); });
+        }
 
         // Multiple matches list (e.g. generic barcode matched several items)
         if (showAllMatches && Array.isArray(m.__allMatches) && m.__allMatches.length > 1) {
