@@ -1,6 +1,7 @@
 import os
 import time
 import json
+import logging
 import cloudinary
 import cloudinary.uploader
 
@@ -19,6 +20,8 @@ from apps.companies.support_utils import (
     get_effective_branch,
 )
 from apps.companies.models import Company
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================
@@ -357,6 +360,7 @@ def settings_payment(request):
 
                 # ---------- M-Pesa STK Push ----------
                 'enable_mpesa_stk': request.POST.get('enable_mpesa_stk') == 'on',
+                'mpesa_provider':   (request.POST.get('mpesa_provider') or 'daraja').strip(),
                 'mpesa_stk_shortcode': request.POST.get('mpesa_stk_shortcode', ''),
                 'mpesa_stk_passkey': request.POST.get('mpesa_stk_passkey', ''),
 
@@ -367,6 +371,13 @@ def settings_payment(request):
                 'mpesa_callback_url':       request.POST.get('mpesa_callback_url', '').strip(),
                 'mpesa_shortcode_type':     request.POST.get('mpesa_shortcode_type', 'paybill'),
                 'mpesa_account_reference':  request.POST.get('mpesa_account_reference', '').strip(),
+
+                # ---------- M-Pesa STK Push: Kopokopo credentials (per company) ----------
+                'kopokopo_client_id':       request.POST.get('kopokopo_client_id', '').strip(),
+                'kopokopo_client_secret':   request.POST.get('kopokopo_client_secret', '').strip(),
+                'kopokopo_till_number':     request.POST.get('kopokopo_till_number', '').strip(),
+                'kopokopo_webhook_secret':  request.POST.get('kopokopo_webhook_secret', '').strip(),
+                'kopokopo_callback_url':    request.POST.get('kopokopo_callback_url', '').strip(),
 
                 # ---------- M-Pesa Buy Goods (Till) ----------
                 'enable_buy_goods': request.POST.get('enable_buy_goods') == 'on',
@@ -400,7 +411,8 @@ def settings_payment(request):
             save_company_settings(company, payment_settings, 'payment')
 
             # Mirror the saved settings into an MpesaConfig row (per company)
-            _sync_mpesa_config(company, payment_settings)
+            # 👈 CHANGE: pass request so validation errors surface in the UI
+            _sync_mpesa_config(company, payment_settings, request=request)
 
             messages.success(request, 'Payment settings updated successfully!')
             return redirect('company-settings-payment')
@@ -625,6 +637,7 @@ def get_company_settings(company):
 
             # ---------- M-Pesa STK Push ----------
             'enable_mpesa_stk': False,
+            'mpesa_provider':   'daraja',
             'mpesa_stk_shortcode': '',
             'mpesa_stk_passkey': '',
 
@@ -635,6 +648,13 @@ def get_company_settings(company):
             'mpesa_callback_url':       '',
             'mpesa_shortcode_type':     'paybill',
             'mpesa_account_reference':  '',
+
+            # ---------- M-Pesa STK Push: Kopokopo credentials (per company) ----------
+            'kopokopo_client_id':       '',
+            'kopokopo_client_secret':   '',
+            'kopokopo_till_number':     '',
+            'kopokopo_webhook_secret':  '',
+            'kopokopo_callback_url':    '',
 
             # ---------- M-Pesa Buy Goods (Till) ----------
             'enable_buy_goods': False,
@@ -740,15 +760,20 @@ def save_company_settings(company, settings_data, section=None):
     company.save(update_fields=['company_settings'])
 
 
-def _sync_mpesa_config(company, payment_settings):
+def _sync_mpesa_config(company, payment_settings, request=None):
     """
     Mirror the per-company payment settings into an MpesaConfig row.
 
     Rules:
       - Only creates / updates when the company has enabled STK push AND
-        provided at least a shortcode, consumer_key and consumer_secret.
+        the required fields for the selected provider are filled.
       - If STK is disabled, deactivates the existing row (does not delete —
         so historical MpesaTransaction rows keep their FK).
+      - Handles both Daraja and Kopokopo providers.
+
+    NOTE: MpesaConfig.save() calls full_clean(), which enforces per-provider
+    required fields and the (company, branch, provider, is_active=True)
+    uniqueness constraint. ValidationError is caught and logged as a message.
     """
     try:
         from apps.mpesa.models import MpesaConfig
@@ -756,55 +781,107 @@ def _sync_mpesa_config(company, payment_settings):
         # mpesa app not installed yet — silently skip
         return
 
-    enabled = bool(payment_settings.get('enable_mpesa_stk'))
-    shortcode        = (payment_settings.get('mpesa_stk_shortcode') or '').strip()
-    consumer_key     = (payment_settings.get('mpesa_consumer_key') or '').strip()
-    consumer_secret  = (payment_settings.get('mpesa_consumer_secret') or '').strip()
-    passkey          = (payment_settings.get('mpesa_stk_passkey') or '').strip()
-    callback         = (payment_settings.get('mpesa_callback_url') or '').strip()
-    environment      = (payment_settings.get('mpesa_environment') or 'sandbox').strip()
-    shortcode_type   = (payment_settings.get('mpesa_shortcode_type') or 'paybill').strip()
-    account_ref      = (payment_settings.get('mpesa_account_reference') or '').strip()
+    from django.core.exceptions import ValidationError
+    from django.contrib import messages
 
-    existing = MpesaConfig.objects.filter(
-        company=company, branch__isnull=True
-    ).first()
+    enabled         = bool(payment_settings.get('enable_mpesa_stk'))
+    provider        = (payment_settings.get('mpesa_provider') or 'daraja').strip() or 'daraja'
 
+    # Daraja fields
+    shortcode       = (payment_settings.get('mpesa_stk_shortcode') or '').strip()
+    consumer_key    = (payment_settings.get('mpesa_consumer_key') or '').strip()
+    consumer_secret = (payment_settings.get('mpesa_consumer_secret') or '').strip()
+    passkey         = (payment_settings.get('mpesa_stk_passkey') or '').strip()
+    daraja_callback = (payment_settings.get('mpesa_callback_url') or '').strip()
+    environment     = (payment_settings.get('mpesa_environment') or 'sandbox').strip()
+    shortcode_type  = (payment_settings.get('mpesa_shortcode_type') or 'paybill').strip()
+    account_ref     = (payment_settings.get('mpesa_account_reference') or '').strip()
+
+    # Kopokopo fields
+    kk_client_id     = (payment_settings.get('kopokopo_client_id') or '').strip()
+    kk_client_secret = (payment_settings.get('kopokopo_client_secret') or '').strip()
+    kk_till          = (payment_settings.get('kopokopo_till_number') or '').strip()
+    kk_webhook_secret= (payment_settings.get('kopokopo_webhook_secret') or '').strip()
+    kk_callback      = (payment_settings.get('kopokopo_callback_url') or '').strip()
+
+    existing_qs = MpesaConfig.objects.filter(
+        company=company, branch__isnull=True, provider=provider
+    )
+    existing = existing_qs.first()
+
+    # ---------- Deactivate if STK is off ----------
     if not enabled:
         if existing and existing.is_active:
             existing.is_active = False
-            existing.save(update_fields=['is_active', 'updated_at'])
+            try:
+                existing.save(update_fields=['is_active', 'updated_at'])
+            except ValidationError:
+                # Existing row may be incomplete (legacy). Force-deactivate via .update().
+                MpesaConfig.objects.filter(pk=existing.pk).update(
+                    is_active=False
+                )
         return
 
-    # Enabled — require the minimum fields
-    if not (shortcode and consumer_key and consumer_secret and passkey and callback):
-        # Incomplete: leave whatever exists untouched
-        return
+    # ---------- Per-provider required fields ----------
+    if provider == 'kopokopo':
+        if not (kk_client_id and kk_client_secret and kk_till and kk_callback):
+            # Incomplete: leave whatever exists untouched
+            return
+    else:  # daraja
+        if not (shortcode and consumer_key and consumer_secret and passkey and daraja_callback):
+            return
 
-    if existing is None:
-        MpesaConfig.objects.create(
-            company=company,
-            branch=None,
-            label='Company-wide M-Pesa',
-            environment=environment,
-            consumer_key=consumer_key,
-            consumer_secret=consumer_secret,
-            shortcode=shortcode,
-            passkey=passkey,
-            callback_url=callback,
-            shortcode_type=shortcode_type,
-            account_reference=account_ref,
-            is_active=True,
-        )
-    else:
-        existing.environment       = environment
-        existing.consumer_key      = consumer_key
-        existing.consumer_secret   = consumer_secret
-        existing.shortcode         = shortcode
-        existing.passkey           = passkey
-        existing.callback_url      = callback
-        existing.shortcode_type    = shortcode_type
-        existing.account_reference = account_ref
-        existing.is_active         = True
-        existing.save()
-
+    # ---------- Create or update ----------
+    try:
+        if existing is None:
+            cfg = MpesaConfig(
+                company=company,
+                branch=None,
+                provider=provider,
+                label='Company-wide M-Pesa',
+                environment=environment,
+                consumer_key=consumer_key,
+                consumer_secret=consumer_secret,
+                shortcode=shortcode,
+                passkey=passkey,
+                callback_url=(daraja_callback if provider == 'daraja' else kk_callback),
+                shortcode_type=shortcode_type,
+                account_reference=account_ref,
+                kopokopo_client_id=kk_client_id,
+                kopokopo_client_secret=kk_client_secret,
+                kopokopo_till_number=kk_till,
+                kopokopo_webhook_secret=kk_webhook_secret,
+                is_active=True,
+            )
+            cfg.save()
+        else:
+            existing.provider              = provider
+            existing.environment           = environment
+            existing.consumer_key          = consumer_key
+            existing.consumer_secret       = consumer_secret
+            existing.shortcode             = shortcode
+            existing.passkey               = passkey
+            existing.callback_url          = (daraja_callback if provider == 'daraja' else kk_callback)
+            existing.shortcode_type        = shortcode_type
+            existing.account_reference     = account_ref
+            existing.kopokopo_client_id    = kk_client_id
+            existing.kopokopo_client_secret= kk_client_secret
+            existing.kopokopo_till_number  = kk_till
+            existing.kopokopo_webhook_secret = kk_webhook_secret
+            existing.is_active             = True
+            existing.save()
+    except ValidationError as e:
+        # Surface to the UI, but don't crash the settings save.
+        if request is not None:
+            try:
+                for field, errs in (e.message_dict or {}).items():
+                    for err in errs:
+                        messages.error(request, f'M-Pesa config: {field}: {err}')
+            except Exception:
+                pass
+        else:
+            logger.warning(
+                'MpesaConfig validation failed for %s: %s',
+                company.name, getattr(e, 'message_dict', e),
+                exc_info=True,
+            )

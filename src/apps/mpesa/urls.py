@@ -8,4 +8,5 @@ urlpatterns = [
     path('stk-status/', views.mpesa_stk_status, name='stk_status'),
     path('confirm/',    views.mpesa_confirm,    name='confirm'),
     path('callback/',   views.mpesa_callback,   name='callback'),
+    path('kopokopo/callback/', views.kopokopo_callback, name='kopokopo_callback'),
 ]
