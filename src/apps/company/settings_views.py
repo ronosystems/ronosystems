@@ -20,6 +20,7 @@ from apps.companies.support_utils import (
     get_effective_branch,
 )
 from apps.companies.models import Company
+from apps.company.models import Branch
 
 logger = logging.getLogger(__name__)
 
@@ -150,12 +151,14 @@ def settings_dashboard(request):
         return redirect('/dashboard/')
 
     settings_data = get_company_settings(company)
+    branches = Branch.objects.filter(company=company) 
 
     context = {
         'company': company,
         'settings': settings_data,
         'is_settings': True,
         'is_viewing_company': is_viewing_company,
+        'branches': branches,  # 👈 Pass the variable explicitly
     }
     return render(request, 'company/settings/dashboard.html', context)
 
@@ -360,6 +363,7 @@ def settings_payment(request):
 
                 # ---------- M-Pesa STK Push ----------
                 'enable_mpesa_stk': request.POST.get('enable_mpesa_stk') == 'on',
+                'mpesa_branch':     (request.POST.get('mpesa_branch') or '').strip(),
                 'mpesa_provider':   (request.POST.get('mpesa_provider') or 'daraja').strip(),
                 'mpesa_stk_shortcode': request.POST.get('mpesa_stk_shortcode', ''),
                 'mpesa_stk_passkey': request.POST.get('mpesa_stk_passkey', ''),
@@ -411,7 +415,7 @@ def settings_payment(request):
             save_company_settings(company, payment_settings, 'payment')
 
             # Mirror the saved settings into an MpesaConfig row (per company)
-            # 👈 CHANGE: pass request so validation errors surface in the UI
+            # 👈 pass request so validation errors surface in the UI
             _sync_mpesa_config(company, payment_settings, request=request)
 
             messages.success(request, 'Payment settings updated successfully!')
@@ -421,6 +425,7 @@ def settings_payment(request):
             messages.error(request, f'Error updating payment settings: {str(e)}')
 
     settings_data = get_company_settings(company)
+    branches = Branch.objects.filter(company=company)
 
     context = {
         'company': company,
@@ -435,6 +440,7 @@ def settings_payment(request):
             ('card', 'Card'),
             ('credit', 'Credit'),
         ],
+        'branches': branches,  # 👈 Pass the variable explicitly
     }
     return render(request, 'company/settings/dashboard.html', context)
 
@@ -637,6 +643,7 @@ def get_company_settings(company):
 
             # ---------- M-Pesa STK Push ----------
             'enable_mpesa_stk': False,
+            'mpesa_branch':     '',   # 👈 ADDED
             'mpesa_provider':   'daraja',
             'mpesa_stk_shortcode': '',
             'mpesa_stk_passkey': '',
@@ -770,10 +777,6 @@ def _sync_mpesa_config(company, payment_settings, request=None):
       - If STK is disabled, deactivates the existing row (does not delete —
         so historical MpesaTransaction rows keep their FK).
       - Handles both Daraja and Kopokopo providers.
-
-    NOTE: MpesaConfig.save() calls full_clean(), which enforces per-provider
-    required fields and the (company, branch, provider, is_active=True)
-    uniqueness constraint. ValidationError is caught and logged as a message.
     """
     try:
         from apps.mpesa.models import MpesaConfig
@@ -786,6 +789,12 @@ def _sync_mpesa_config(company, payment_settings, request=None):
 
     enabled         = bool(payment_settings.get('enable_mpesa_stk'))
     provider        = (payment_settings.get('mpesa_provider') or 'daraja').strip() or 'daraja'
+
+    # 👈 GET THE BRANCH
+    branch_id       = payment_settings.get('mpesa_branch')
+    branch          = None
+    if branch_id:
+        branch = Branch.objects.filter(id=branch_id, company=company).first()
 
     # Daraja fields
     shortcode       = (payment_settings.get('mpesa_stk_shortcode') or '').strip()
@@ -804,8 +813,11 @@ def _sync_mpesa_config(company, payment_settings, request=None):
     kk_webhook_secret= (payment_settings.get('kopokopo_webhook_secret') or '').strip()
     kk_callback      = (payment_settings.get('kopokopo_callback_url') or '').strip()
 
+    # 👈 FILTER BY BRANCH
     existing_qs = MpesaConfig.objects.filter(
-        company=company, branch__isnull=True, provider=provider
+        company=company, 
+        branch=branch, 
+        provider=provider
     )
     existing = existing_qs.first()
 
@@ -816,16 +828,12 @@ def _sync_mpesa_config(company, payment_settings, request=None):
             try:
                 existing.save(update_fields=['is_active', 'updated_at'])
             except ValidationError:
-                # Existing row may be incomplete (legacy). Force-deactivate via .update().
-                MpesaConfig.objects.filter(pk=existing.pk).update(
-                    is_active=False
-                )
+                MpesaConfig.objects.filter(pk=existing.pk).update(is_active=False)
         return
 
     # ---------- Per-provider required fields ----------
     if provider == 'kopokopo':
         if not (kk_client_id and kk_client_secret and kk_till and kk_callback):
-            # Incomplete: leave whatever exists untouched
             return
     else:  # daraja
         if not (shortcode and consumer_key and consumer_secret and passkey and daraja_callback):
@@ -836,9 +844,9 @@ def _sync_mpesa_config(company, payment_settings, request=None):
         if existing is None:
             cfg = MpesaConfig(
                 company=company,
-                branch=None,
+                branch=branch,  # 👈 ASSIGN BRANCH
                 provider=provider,
-                label='Company-wide M-Pesa',
+                label=f"{branch.name if branch else 'Company-wide'} M-Pesa", # 👈 Dynamic Label
                 environment=environment,
                 consumer_key=consumer_key,
                 consumer_secret=consumer_secret,
@@ -855,6 +863,7 @@ def _sync_mpesa_config(company, payment_settings, request=None):
             )
             cfg.save()
         else:
+            existing.branch                = branch
             existing.provider              = provider
             existing.environment           = environment
             existing.consumer_key          = consumer_key
@@ -885,3 +894,56 @@ def _sync_mpesa_config(company, payment_settings, request=None):
                 company.name, getattr(e, 'message_dict', e),
                 exc_info=True,
             )
+
+from django.http import JsonResponse
+
+@login_required
+def api_get_branch_mpesa_config(request):
+    """Fetch the saved M-Pesa config for a specific branch to populate the UI."""
+    company, _ = get_active_company(request)
+    branch_id = request.GET.get('branch_id')
+    
+    data = {
+        'provider': 'daraja',
+        'mpesa_stk_shortcode': '',
+        'mpesa_stk_passkey': '',
+        'mpesa_consumer_key': '',
+        'mpesa_consumer_secret': '',
+        'mpesa_environment': 'sandbox',
+        'mpesa_callback_url': '',
+        'mpesa_shortcode_type': 'paybill',
+        'mpesa_account_reference': '',
+        'kopokopo_client_id': '',
+        'kopokopo_client_secret': '',
+        'kopokopo_till_number': '',
+        'kopokopo_webhook_secret': '',
+        'kopokopo_callback_url': '',
+        'is_configured': False,
+    }
+
+    if company and branch_id:
+        from apps.mpesa.models import MpesaConfig
+        cfg = MpesaConfig.objects.filter(company=company, branch_id=branch_id).first()
+        
+        if cfg:
+            data.update({
+                'provider': cfg.provider,
+                'mpesa_stk_shortcode': cfg.shortcode,
+                'mpesa_stk_passkey': cfg.passkey,
+                'mpesa_consumer_key': cfg.consumer_key,
+                'mpesa_consumer_secret': cfg.consumer_secret,
+                'mpesa_environment': cfg.environment,
+                'mpesa_callback_url': cfg.callback_url if cfg.provider == 'daraja' else '',
+                'mpesa_shortcode_type': cfg.shortcode_type,
+                'mpesa_account_reference': cfg.account_reference,
+                'kopokopo_client_id': cfg.kopokopo_client_id,
+                'kopokopo_client_secret': cfg.kopokopo_client_secret,
+                'kopokopo_till_number': cfg.kopokopo_till_number,
+                'kopokopo_webhook_secret': cfg.kopokopo_webhook_secret,
+                'kopokopo_callback_url': cfg.callback_url if cfg.provider == 'kopokopo' else '',
+                'is_configured': True,
+            })
+            
+    return JsonResponse(data)
+
+    

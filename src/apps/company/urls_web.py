@@ -86,5 +86,6 @@ urlpatterns = [
     path('settings/receipt/', settings_views.settings_receipt, name='company-settings-receipt'),
     path('settings/preview-receipt/', settings_views.settings_preview_receipt, name='company-settings-preview-receipt'),
     path('settings/kuku/', kuku_settings_views.settings_kuku, name='company-settings-kuku'),
+    path('settings/api/branch-mpesa/', settings_views.api_get_branch_mpesa_config, name='api_branch_mpesa'),
     
 ]
