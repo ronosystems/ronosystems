@@ -155,7 +155,11 @@ def _link_payment_to_chama(tx):
 @csrf_exempt
 @require_POST
 def mpesa_stk_push(request):
-    payload   = json.loads(request.body.decode('utf-8') or '{}')
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON payload.'}, status=400)
+
     phone     = str(payload.get('phone', '')).strip()
     amount    = payload.get('amount')
     branch_id = payload.get('branch_id')
@@ -171,12 +175,13 @@ def mpesa_stk_push(request):
 
     branch = _branch_for_request(request, branch_id)
     cfg = MpesaConfig.for_branch(company, branch)
+    
     if not cfg:
+        # Return 200 so the frontend JS doesn't crash with a parse error
         return JsonResponse({
             'success': False,
-            'error': 'No M-Pesa configuration found for this company/branch. '
-                     'Ask your administrator to set one up.'
-        }, status=400)
+            'error': 'No M-Pesa configuration found for this company/branch. Ask your admin to set it up.'
+        }, status=200) 
 
     try:
         # Factory routes to Daraja or Kopokopo automatically
@@ -189,7 +194,8 @@ def mpesa_stk_push(request):
         )
     except Exception as e:
         logger.exception('Payment initiation failed')
-        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+        # Return 200 so the frontend JS displays the error text gracefully
+        return JsonResponse({'success': False, 'error': str(e)}, status=200)
 
     tx = MpesaTransaction.objects.create(
         company=company,
@@ -432,15 +438,12 @@ def kopokopo_callback(request):
             logger.warning('Kopokopo webhook received but no active config found.')
             return JsonResponse({'status': 'ignored'})
 
-        # 👈 Parse the webhook
         parsed = parse_webhook(cfg, request)
         
-        # 👈 ADD THIS LOG LINE
         logger.info(f"Kopokopo webhook parsed: {parsed}")
 
         tx = MpesaTransaction.objects.filter(provider_ref=parsed['provider_ref']).first()
         if not tx:
-            # 👈 ADD THIS LOG LINE
             logger.warning(f"Kopokopo webhook for unknown payment ID: {parsed['provider_ref']}")
             return JsonResponse({'status': 'ignored'})
 
@@ -465,7 +468,6 @@ def kopokopo_callback(request):
             _link_payment_to_chama(tx)
 
     except Exception as e:
-        # 👈 ADD THIS LOG LINE
         logger.exception('Kopokopo callback processing failed')
         return JsonResponse({'error': str(e)}, status=400)
 
