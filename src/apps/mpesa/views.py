@@ -196,7 +196,7 @@ def mpesa_stk_status(request):
         return JsonResponse({'status': tx.status, 'message': tx.result_desc or ''})
 
     try:
-        if tx.mpesa_config:
+        if tx.mpesa_config and not request_id.startswith("pending_"):
             parsed = query_payment(tx.mpesa_config, provider_ref=request_id)
             status = parsed.get('status')
 

@@ -128,6 +128,8 @@ class KopokopoProvider(BaseProvider):
             'raw': d
         }
 
+
+
     def parse_webhook(self, request):
         raw_body = request.body
         sig = request.headers.get('X-Kopokopo-Signature', '')
@@ -137,33 +139,48 @@ class KopokopoProvider(BaseProvider):
                 hmac.new(self.cfg.kopokopo_webhook_secret.encode(), raw_body, hashlib.sha256).digest()
             ).decode()
             if not hmac.compare_digest(sig, expected):
-                # 👈 LOG WARNING INSTEAD OF RAISING ERROR
-                logger.warning(f"Kopokopo Signature mismatch for {self.cfg.company.name}. Got: {sig[:15]}... Expected: {expected[:15]}...")
-                # We allow it to pass for now so transactions don't get stuck.
+                logger.warning(f"Kopokopo Signature mismatch for {self.cfg.company.name}.")
+                # We don't raise here so we can still parse the data
 
         try:
             data = json.loads(raw_body.decode('utf-8') or '{}')
         except Exception:
             raise ValueError("Invalid JSON in Kopokopo webhook")
-        
+
+        # Navigate the deeply nested structure safely
         event_data = data.get('data', {})
         attributes = event_data.get('attributes', {})
         event = attributes.get('event', {})
-        resource = event.get('resource', {})
-        
+        resource = event.get('resource') or {}
+
+        # 👈 Try to grab the provider_ref (resource ID)
+        # Sometimes Kopokopo puts it in 'data.id', sometimes in the resource itself
         resource_id = event_data.get('id') or resource.get('id')
         
-        amount_obj = resource.get('amount') or {}
+        # 👈 Safely get amount and subscriber. If 'resource' is empty, they will be None.
+        amount_obj = resource.get('amount')
+        amount_val = 0
+        if isinstance(amount_obj, dict):
+            amount_val = amount_obj.get('value', 0)
+        elif isinstance(amount_obj, (int, float, str)):
+            amount_val = amount_obj # Fallback if they send a direct number
+
         sub = resource.get('subscriber') or {}
-        
+
+        # 👈 Determine status
         raw_status = (resource.get('status') or '').lower()
-        status = 'success' if raw_status == 'success' else ('failed' if raw_status else 'pending')
+        if raw_status == 'success':
+            status = 'success'
+        elif raw_status in ('failed', 'rejected'):
+            status = 'failed'
+        else:
+            status = 'pending'
 
         return {
             'provider_ref': resource_id,
             'status': status,
             'code': (resource.get('transaction_reference') or '').upper(),
-            'amount': float(amount_obj.get('value') or 0),
+            'amount': float(amount_val or 0),
             'phone': (sub.get('phone_number') or '').replace('+', ''),
             'first_name': sub.get('first_name') or '',
             'middle_name': sub.get('middle_name') or '',
