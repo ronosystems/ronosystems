@@ -129,7 +129,6 @@ class KopokopoProvider(BaseProvider):
         }
 
 
-
     def parse_webhook(self, request):
         raw_body = request.body
         sig = request.headers.get('X-Kopokopo-Signature', '')
@@ -143,50 +142,46 @@ class KopokopoProvider(BaseProvider):
 
         try:
             data = json.loads(raw_body.decode('utf-8') or '{}')
-            logger.info(f"RAW KOPOKOPO WEBHOOK: {json.dumps(data)}")  # 👈 VERY IMPORTANT LOG
         except Exception:
             raise ValueError("Invalid JSON in Kopokopo webhook")
 
-        # Detect event type
-        event_type = data.get('topic', '') or data.get('event', {}).get('type', '')
+        # 👈 Get the type from the 'data' object, not the root
+        event_data = data.get('data', {})
+        event_type = event_data.get('type', '') 
+        attributes = event_data.get('attributes', {})
+        
+        resource = (attributes.get('event') or {}).get('resource') or {}
+        status = attributes.get('status', '').lower()
 
-        # Format 1: Incoming Payment (STK Push)
-        if 'incoming_payment' in event_type:
-            event_data = data.get('data', {})
-            attributes = event_data.get('attributes', {})
-            event = attributes.get('event', {})
-            resource = event.get('resource') or {}
-            
+        # Handle Incoming Payment (STK Push)
+        if event_type == 'incoming_payment':
             amount_obj = resource.get('amount')
             amount_val = amount_obj.get('value', 0) if isinstance(amount_obj, dict) else (amount_obj or 0)
-            sub = resource.get('subscriber') or {}
+            
+            # If status is Success, Kopokopo uses "Received" inside the resource
+            is_success = status == 'success' or (resource.get('status') or '').lower() == 'received'
 
             return {
                 'provider_ref': event_data.get('id') or resource.get('id'),
-                'status': 'success' if 'success' in event_type else 'failed',
-                'code': (resource.get('transaction_reference') or '').upper(),
+                'status': 'success' if is_success else 'failed',
+                'code': (resource.get('reference') or '').upper(),
                 'amount': float(amount_val),
-                'phone': (sub.get('phone_number') or '').replace('+', ''),
-                'first_name': sub.get('first_name') or '',
-                'middle_name': sub.get('middle_name') or '',
-                'last_name': sub.get('last_name') or '',
+                'phone': (resource.get('sender_phone_number') or '').replace('+', ''),
+                'first_name': resource.get('sender_first_name') or '',
+                'middle_name': resource.get('sender_middle_name') or '',
+                'last_name': resource.get('sender_last_name') or '',
                 'raw': data
             }
 
-        # Format 2: Buy Goods (Till)
-        elif 'buygoods_transaction' in event_type:
-            event_data = data.get('data', {})
-            attributes = event_data.get('attributes', {})
-            event = attributes.get('event', {})
-            resource = event.get('resource') or {}
-            
+        # Handle Buy Goods (Till)
+        elif event_type == 'buygoods_transaction':
             amount_val = resource.get('amount', 0)
             if isinstance(amount_val, dict):
                 amount_val = amount_val.get('value', 0)
                 
             return {
                 'provider_ref': resource.get('system_reference') or event_data.get('id'),
-                'status': 'success' if 'succeeded' in event_type else 'failed',
+                'status': 'success' if status == 'success' else 'failed',
                 'code': (resource.get('transaction_reference') or '').upper(),
                 'amount': float(amount_val),
                 'phone': (resource.get('sender_phone_number') or '').replace('+', ''),
@@ -210,6 +205,5 @@ class KopokopoProvider(BaseProvider):
                 'last_name': '',
                 'raw': data
             }
-
 
             
