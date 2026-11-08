@@ -151,6 +151,36 @@
     }
 
     /* ============================================
+       PAYMENT CORE GRID (3:3:3:1.5:1.5)
+    ============================================ */
+    .payment-core-grid {
+        display: grid;
+        grid-template-columns: 3fr 3fr 3fr 1.5fr 1.5fr;
+        gap: 15px;
+        align-items: start;
+        margin-bottom: 20px;
+    }
+
+    .payment-core-grid .form-check {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 38px;
+        margin: 0;
+    }
+
+    @media (max-width: 992px) {
+        .payment-core-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+    @media (max-width: 768px) {
+        .payment-core-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* ============================================
        PAYMENT GROUPS (collapsible)
     ============================================ */
     .pay-group {
@@ -263,7 +293,7 @@
         border-top: 0 solid #000;
     }
     .pay-group.is-open .pay-group-body {
-        max-height: 1000px;
+        max-height: 2000px;
         border-top: 2px dashed #ccc;
     }
     .pay-group-body-inner {
@@ -788,50 +818,52 @@
                                 {# ============================================ #}
                                 {% if cat_key == 'payment' %}
 
-                                    {# --- Core payment settings (currency, tax, discount) --- #}
-                                    {% for field in items %}
-                                        {% if field.key == 'CURRENCY' or field.key == 'CURRENCY_SYMBOL' or field.key == 'TAX_RATE' or field.key == 'ENABLE_DISCOUNT' or field.key == 'ENABLE_TAX' %}
-                                        <div class="form-group">
-                                            <label for="{{ field.key }}">
-                                                {{ field.label }}
-                                                {% if field.required %}<span class="required">*</span>{% endif %}
-                                            </label>
+                                    {# --- Core payment settings (Currency, Tax, Discounts) --- #}
+                                    <div class="payment-core-grid">
+                                        {% for field in items %}
+                                            {% if field.key == 'CURRENCY' or field.key == 'CURRENCY_SYMBOL' or field.key == 'TAX_RATE' or field.key == 'ENABLE_DISCOUNT' or field.key == 'ENABLE_TAX' %}
+                                            <div class="form-group">
+                                                <label for="{{ field.key }}">
+                                                    {{ field.label }}
+                                                    {% if field.required %}<span class="required">*</span>{% endif %}
+                                                </label>
 
-                                            {% if field.type == 'boolean' %}
-                                                <div class="form-check form-switch">
-                                                    <input class="form-check-input" type="checkbox"
+                                                {% if field.type == 'boolean' %}
+                                                    <div class="form-check form-switch">
+                                                        <input class="form-check-input" type="checkbox"
+                                                               id="{{ field.key }}" name="{{ field.key }}"
+                                                               {% if field.value == 'true' %}checked{% endif %}>
+                                                        <label class="form-check-label" for="{{ field.key }}">
+                                                            {{ field.label }}
+                                                        </label>
+                                                    </div>
+                                                {% elif field.type == 'select' %}
+                                                    <select class="form-select" id="{{ field.key }}" name="{{ field.key }}">
+                                                        {% for opt in field.options %}
+                                                            <option value="{{ opt.value }}"
+                                                                {% if field.value == opt.value %}selected{% endif %}>
+                                                                {{ opt.label }}
+                                                            </option>
+                                                        {% endfor %}
+                                                    </select>
+                                                {% elif field.type == 'integer' or field.type == 'float' %}
+                                                    <input type="number" class="form-control"
                                                            id="{{ field.key }}" name="{{ field.key }}"
-                                                           {% if field.value == 'true' %}checked{% endif %}>
-                                                    <label class="form-check-label" for="{{ field.key }}">
-                                                        {{ field.label }}
-                                                    </label>
-                                                </div>
-                                            {% elif field.type == 'select' %}
-                                                <select class="form-select" id="{{ field.key }}" name="{{ field.key }}">
-                                                    {% for opt in field.options %}
-                                                        <option value="{{ opt.value }}"
-                                                            {% if field.value == opt.value %}selected{% endif %}>
-                                                            {{ opt.label }}
-                                                        </option>
-                                                    {% endfor %}
-                                                </select>
-                                            {% elif field.type == 'integer' or field.type == 'float' %}
-                                                <input type="number" class="form-control"
-                                                       id="{{ field.key }}" name="{{ field.key }}"
-                                                       value="{{ field.value }}"
-                                                       {% if field.type == 'float' %}step="0.01"{% endif %}>
-                                            {% else %}
-                                                <input type="{{ field.type|default:'text' }}" class="form-control"
-                                                       id="{{ field.key }}" name="{{ field.key }}"
-                                                       value="{{ field.value|default:'' }}">
-                                            {% endif %}
+                                                           value="{{ field.value }}"
+                                                           {% if field.type == 'float' %}step="0.01"{% endif %}>
+                                                {% else %}
+                                                    <input type="{{ field.type|default:'text' }}" class="form-control"
+                                                           id="{{ field.key }}" name="{{ field.key }}"
+                                                           value="{{ field.value|default:'' }}">
+                                                {% endif %}
 
-                                            {% if field.help_text %}
-                                                <small class="help-text">{{ field.help_text }}</small>
+                                                {% if field.help_text %}
+                                                    <small class="help-text">{{ field.help_text }}</small>
+                                                {% endif %}
+                                            </div>
                                             {% endif %}
-                                        </div>
-                                        {% endif %}
-                                    {% endfor %}
+                                        {% endfor %}
+                                    </div>
 
                                     <hr style="border-top: 2px dashed #ccc; margin: 20px 0;">
 
@@ -839,41 +871,111 @@
                                         <i class="fas fa-sliders-h"></i> Payment Methods
                                     </h6>
 
-                                    {# --- M-Pesa STK Push group --- #}
-                                    {% for field in items %}
-                                        {% if field.key == 'PAYMENT_MPESA_STK_ENABLED' %}
-                                        <div class="pay-group {% if field.value == 'true' %}is-enabled{% endif %}"
-                                             data-pay-group="stk">
-                                            <div class="pay-group-header" data-pay-toggle="stk">
-                                                <div class="pay-group-title">
-                                                    <i class="fas fa-bolt group-icon"></i>
-                                                    <span>{{ field.label }}</span>
-                                                </div>
-                                                <div class="pay-group-actions">
-                                                    <input type="checkbox"
-                                                           class="pay-group-toggle"
-                                                           id="{{ field.key }}"
-                                                           name="{{ field.key }}"
-                                                           {% if field.value == 'true' %}checked{% endif %}>
-                                                    <i class="fas fa-chevron-right pay-group-chevron"></i>
-                                                </div>
+                                    {# --- M-Pesa API Integration (Super Admin) --- #}
+                                    <div class="pay-group {% if settings.PAYMENT_MPESA_API_ENABLED %}is-enabled{% endif %}" data-pay-group="mpesa_api">
+                                        <div class="pay-group-header" data-pay-toggle="mpesa_api">
+                                            <div class="pay-group-title">
+                                                <i class="fas fa-bolt group-icon"></i>
+                                                <span>M-Pesa API Integration (Daraja / Kopokopo)</span>
                                             </div>
-                                            <div class="pay-group-body">
-                                                <div class="pay-group-body-inner">
-                                                    {% if field.help_text %}
-                                                        <small class="help-text" style="display:block; margin-bottom:10px;">
-                                                            {{ field.help_text }}
-                                                        </small>
-                                                    {% endif %}
-                                                    <p class="text-muted small mb-0">
-                                                        <i class="fas fa-info-circle"></i>
-                                                        Customers will get a prompt on their phone to enter their M-Pesa PIN.
-                                                    </p>
-                                                </div>
+                                            <div class="pay-group-actions">
+                                                <input type="checkbox" class="pay-group-toggle"
+                                                       id="PAYMENT_MPESA_API_ENABLED" name="PAYMENT_MPESA_API_ENABLED"
+                                                       {% if settings.PAYMENT_MPESA_API_ENABLED %}checked{% endif %}>
+                                                <i class="fas fa-chevron-right pay-group-chevron"></i>
                                             </div>
                                         </div>
-                                        {% endif %}
-                                    {% endfor %}
+                                        <div class="pay-group-body">
+                                            <div class="pay-group-body-inner">
+                                                <p class="text-muted small mb-3">
+                                                    <i class="fas fa-info-circle"></i>
+                                                    Configure platform-wide M-Pesa STK Push. Companies can override these settings in their own dashboards.
+                                                </p>
+
+                                                <!-- Provider Selector -->
+                                                <div class="form-group">
+                                                    <label for="PAYMENT_MPESA_PROVIDER">Provider</label>
+                                                    <select class="form-select" id="PAYMENT_MPESA_PROVIDER" name="PAYMENT_MPESA_PROVIDER">
+                                                        <option value="daraja" {% if settings.PAYMENT_MPESA_PROVIDER == 'daraja' or not settings.PAYMENT_MPESA_PROVIDER %}selected{% endif %}>Safaricom Daraja</option>
+                                                        <option value="kopokopo" {% if settings.PAYMENT_MPESA_PROVIDER == 'kopokopo' %}selected{% endif %}>Kopokopo</option>
+                                                    </select>
+                                                </div>
+
+                                                <!-- DARAJA FIELDS -->
+                                                <div class="provider-fields" data-provider="daraja">
+                                                    <div class="form-row">
+                                                        <div class="form-group">
+                                                            <label for="PAYMENT_MPESA_SHORTCODE">Business Shortcode</label>
+                                                            <input type="text" class="form-control" id="PAYMENT_MPESA_SHORTCODE" name="PAYMENT_MPESA_SHORTCODE" value="{{ settings.PAYMENT_MPESA_SHORTCODE|default:'' }}" placeholder="e.g. 174379">
+                                                        </div>
+                                                        <div class="form-group">
+                                                            <label for="PAYMENT_MPESA_PASSKEY">Passkey</label>
+                                                            <input type="password" class="form-control" id="PAYMENT_MPESA_PASSKEY" name="PAYMENT_MPESA_PASSKEY" value="{{ settings.PAYMENT_MPESA_PASSKEY|default:'' }}" placeholder="Lipa na M-Pesa passkey">
+                                                        </div>
+                                                    </div>
+                                                    <div class="form-row">
+                                                        <div class="form-group">
+                                                            <label for="PAYMENT_MPESA_CONSUMER_KEY">Consumer Key</label>
+                                                            <input type="text" class="form-control" id="PAYMENT_MPESA_CONSUMER_KEY" name="PAYMENT_MPESA_CONSUMER_KEY" value="{{ settings.PAYMENT_MPESA_CONSUMER_KEY|default:'' }}">
+                                                        </div>
+                                                        <div class="form-group">
+                                                            <label for="PAYMENT_MPESA_CONSUMER_SECRET">Consumer Secret</label>
+                                                            <input type="password" class="form-control" id="PAYMENT_MPESA_CONSUMER_SECRET" name="PAYMENT_MPESA_CONSUMER_SECRET" value="{{ settings.PAYMENT_MPESA_CONSUMER_SECRET|default:'' }}">
+                                                        </div>
+                                                    </div>
+                                                    <div class="form-row">
+                                                        <div class="form-group">
+                                                            <label for="PAYMENT_MPESA_ENVIRONMENT">Environment</label>
+                                                            <select class="form-select" id="PAYMENT_MPESA_ENVIRONMENT" name="PAYMENT_MPESA_ENVIRONMENT">
+                                                                <option value="sandbox" {% if settings.PAYMENT_MPESA_ENVIRONMENT == 'sandbox' %}selected{% endif %}>Sandbox</option>
+                                                                <option value="production" {% if settings.PAYMENT_MPESA_ENVIRONMENT == 'production' %}selected{% endif %}>Production</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="form-group">
+                                                            <label for="PAYMENT_MPESA_SHORTCODE_TYPE">Shortcode Type</label>
+                                                            <select class="form-select" id="PAYMENT_MPESA_SHORTCODE_TYPE" name="PAYMENT_MPESA_SHORTCODE_TYPE">
+                                                                <option value="paybill" {% if settings.PAYMENT_MPESA_SHORTCODE_TYPE == 'paybill' %}selected{% endif %}>Paybill</option>
+                                                                <option value="till" {% if settings.PAYMENT_MPESA_SHORTCODE_TYPE == 'till' %}selected{% endif %}>Buy Goods (Till)</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="PAYMENT_MPESA_CALLBACK_URL">Callback URL</label>
+                                                        <input type="url" class="form-control" id="PAYMENT_MPESA_CALLBACK_URL" name="PAYMENT_MPESA_CALLBACK_URL" value="{{ settings.PAYMENT_MPESA_CALLBACK_URL|default:'' }}" placeholder="https://yourdomain.com/mpesa/callback/">
+                                                    </div>
+                                                </div>
+
+                                                <!-- KOPOKOPO FIELDS -->
+                                                <div class="provider-fields" data-provider="kopokopo" style="display:none;">
+                                                    <div class="form-row">
+                                                        <div class="form-group">
+                                                            <label for="PAYMENT_KOPOKOPO_CLIENT_ID">Kopokopo Client ID</label>
+                                                            <input type="text" class="form-control" id="PAYMENT_KOPOKOPO_CLIENT_ID" name="PAYMENT_KOPOKOPO_CLIENT_ID" value="{{ settings.PAYMENT_KOPOKOPO_CLIENT_ID|default:'' }}">
+                                                        </div>
+                                                        <div class="form-group">
+                                                            <label for="PAYMENT_KOPOKOPO_CLIENT_SECRET">Kopokopo Client Secret</label>
+                                                            <input type="password" class="form-control" id="PAYMENT_KOPOKOPO_CLIENT_SECRET" name="PAYMENT_KOPOKOPO_CLIENT_SECRET" value="{{ settings.PAYMENT_KOPOKOPO_CLIENT_SECRET|default:'' }}">
+                                                        </div>
+                                                    </div>
+                                                    <div class="form-row">
+                                                        <div class="form-group">
+                                                            <label for="PAYMENT_KOPOKOPO_TILL">Kopokopo Till Number</label>
+                                                            <input type="text" class="form-control" id="PAYMENT_KOPOKOPO_TILL" name="PAYMENT_KOPOKOPO_TILL" value="{{ settings.PAYMENT_KOPOKOPO_TILL|default:'' }}">
+                                                        </div>
+                                                        <div class="form-group">
+                                                            <label for="PAYMENT_KOPOKOPO_WEBHOOK_SECRET">Webhook Secret</label>
+                                                            <input type="password" class="form-control" id="PAYMENT_KOPOKOPO_WEBHOOK_SECRET" name="PAYMENT_KOPOKOPO_WEBHOOK_SECRET" value="{{ settings.PAYMENT_KOPOKOPO_WEBHOOK_SECRET|default:'' }}">
+                                                        </div>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="PAYMENT_KOPOKOPO_CALLBACK_URL">Webhook URL</label>
+                                                        <input type="url" class="form-control" id="PAYMENT_KOPOKOPO_CALLBACK_URL" name="PAYMENT_KOPOKOPO_CALLBACK_URL" value="{{ settings.PAYMENT_KOPOKOPO_CALLBACK_URL|default:'' }}" placeholder="https://yourdomain.com/mpesa/kopokopo/callback/">
+                                                    </div>
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                    </div>
 
                                     {# --- Buy Goods group --- #}
                                     {% for field in items %}
@@ -1374,6 +1476,21 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
+
+    // ============================================
+    // M-Pesa Provider Toggle (Super Admin)
+    // ============================================
+    const provSelect = document.getElementById('PAYMENT_MPESA_PROVIDER');
+    if (provSelect) {
+        function toggleProviderFields() {
+            const currentProv = provSelect.value;
+            document.querySelectorAll('.provider-fields').forEach(el => {
+                el.style.display = (el.dataset.provider === currentProv) ? 'block' : 'none';
+            });
+        }
+        provSelect.addEventListener('change', toggleProviderFields);
+        toggleProviderFields(); // Run on load
+    }
 });
 </script>
 {% endblock %}

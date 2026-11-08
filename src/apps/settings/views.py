@@ -108,59 +108,105 @@ SETTINGS_SCHEMA = [
     {'key': 'ENABLE_TAX', 'type': 'boolean', 'category': 'payment',
      'label': 'Enable Tax', 'default': False, 'order': 5},
 
+    # --- Payment: M-Pesa API Integration (Super Admin) ---
+    {'key': 'PAYMENT_MPESA_API_ENABLED', 'type': 'boolean', 'category': 'payment',
+     'label': 'Enable Platform-Wide M-Pesa API', 'default': False, 'order': 6},
+    {'key': 'PAYMENT_MPESA_PROVIDER', 'type': 'select', 'category': 'payment',
+     'label': 'M-Pesa Provider', 'default': 'daraja', 'order': 7,
+     'options': [
+         {'value': 'daraja', 'label': 'Safaricom Daraja'},
+         {'value': 'kopokopo', 'label': 'Kopokopo'},
+     ]},
+    
+    # Daraja credentials
+    {'key': 'PAYMENT_MPESA_SHORTCODE', 'type': 'text', 'category': 'payment',
+     'label': 'Business Shortcode (Daraja)', 'default': '', 'order': 8},
+    {'key': 'PAYMENT_MPESA_PASSKEY', 'type': 'password', 'category': 'payment',
+     'label': 'Passkey (Daraja)', 'default': '', 'order': 9},
+    {'key': 'PAYMENT_MPESA_CONSUMER_KEY', 'type': 'text', 'category': 'payment',
+     'label': 'Consumer Key (Daraja)', 'default': '', 'order': 10},
+    {'key': 'PAYMENT_MPESA_CONSUMER_SECRET', 'type': 'password', 'category': 'payment',
+     'label': 'Consumer Secret (Daraja)', 'default': '', 'order': 11},
+    {'key': 'PAYMENT_MPESA_ENVIRONMENT', 'type': 'select', 'category': 'payment',
+     'label': 'Environment (Daraja)', 'default': 'sandbox', 'order': 12,
+     'options': [
+         {'value': 'sandbox', 'label': 'Sandbox'},
+         {'value': 'production', 'label': 'Production'},
+     ]},
+    {'key': 'PAYMENT_MPESA_SHORTCODE_TYPE', 'type': 'select', 'category': 'payment',
+     'label': 'Shortcode Type (Daraja)', 'default': 'paybill', 'order': 13,
+     'options': [
+         {'value': 'paybill', 'label': 'Paybill'},
+         {'value': 'till', 'label': 'Buy Goods (Till)'},
+     ]},
+    {'key': 'PAYMENT_MPESA_CALLBACK_URL', 'type': 'url', 'category': 'payment',
+     'label': 'Callback URL (Daraja)', 'default': '', 'order': 14},
+
+    # Kopokopo credentials
+    {'key': 'PAYMENT_KOPOKOPO_CLIENT_ID', 'type': 'text', 'category': 'payment',
+     'label': 'Kopokopo Client ID', 'default': '', 'order': 15},
+    {'key': 'PAYMENT_KOPOKOPO_CLIENT_SECRET', 'type': 'password', 'category': 'payment',
+     'label': 'Kopokopo Client Secret', 'default': '', 'order': 16},
+    {'key': 'PAYMENT_KOPOKOPO_TILL', 'type': 'text', 'category': 'payment',
+     'label': 'Kopokopo Till Number', 'default': '', 'order': 17},
+    {'key': 'PAYMENT_KOPOKOPO_WEBHOOK_SECRET', 'type': 'password', 'category': 'payment',
+     'label': 'Kopokopo Webhook Secret', 'default': '', 'order': 18},
+    {'key': 'PAYMENT_KOPOKOPO_CALLBACK_URL', 'type': 'url', 'category': 'payment',
+     'label': 'Kopokopo Webhook URL', 'default': '', 'order': 19},
+
     # --- Payment: M-Pesa STK ---
     {'key': 'PAYMENT_MPESA_STK_ENABLED', 'type': 'boolean', 'category': 'payment',
-     'label': 'Enable M-Pesa STK Push', 'default': True, 'order': 10,
+     'label': 'Enable M-Pesa STK Push', 'default': True, 'order': 20,
      'help_text': 'Automatic STK push. Disable if KCB/STK is not live yet.'},
 
     # --- Payment: Buy Goods (Till) ---
     {'key': 'PAYMENT_BUY_GOODS_ENABLED', 'type': 'boolean', 'category': 'payment',
-     'label': 'Enable Buy Goods (Till)', 'default': False, 'order': 11},
+     'label': 'Enable Buy Goods (Till)', 'default': False, 'order': 21},
     {'key': 'PAYMENT_BUY_GOODS_TILL', 'type': 'text', 'category': 'payment',
-     'label': 'Buy Goods Till Number', 'default': '', 'order': 12,
+     'label': 'Buy Goods Till Number', 'default': '', 'order': 22,
      'help_text': 'e.g. 123456'},
     {'key': 'PAYMENT_BUY_GOODS_NAME', 'type': 'text', 'category': 'payment',
-     'label': 'Buy Goods Business Name', 'default': '', 'order': 13,
+     'label': 'Buy Goods Business Name', 'default': '', 'order': 23,
      'help_text': 'Shown to the customer so they know who they are paying.'},
 
     # --- Payment: Paybill ---
     {'key': 'PAYMENT_PAYBILL_ENABLED', 'type': 'boolean', 'category': 'payment',
-     'label': 'Enable Paybill', 'default': False, 'order': 14},
+     'label': 'Enable Paybill', 'default': False, 'order': 24},
     {'key': 'PAYMENT_PAYBILL_NUMBER', 'type': 'text', 'category': 'payment',
-     'label': 'Paybill Number', 'default': '', 'order': 15,
+     'label': 'Paybill Number', 'default': '', 'order': 25,
      'help_text': 'e.g. 522522'},
     {'key': 'PAYMENT_PAYBILL_ACCOUNT', 'type': 'text', 'category': 'payment',
-     'label': 'Paybill Account Number', 'default': '', 'order': 16,
+     'label': 'Paybill Account Number', 'default': '', 'order': 26,
      'help_text': 'Usually the company ID / invoice number. Use {company_id} to auto-fill.'},
     {'key': 'PAYMENT_PAYBILL_NAME', 'type': 'text', 'category': 'payment',
-     'label': 'Paybill Business Name', 'default': '', 'order': 17},
+     'label': 'Paybill Business Name', 'default': '', 'order': 27},
 
     # --- Payment: Send Money ---
     {'key': 'PAYMENT_SEND_MONEY_ENABLED', 'type': 'boolean', 'category': 'payment',
-     'label': 'Enable Send Money (Phone)', 'default': False, 'order': 18},
+     'label': 'Enable Send Money (Phone)', 'default': False, 'order': 28},
     {'key': 'PAYMENT_SEND_MONEY_PHONE', 'type': 'text', 'category': 'payment',
-     'label': 'Send Money Phone Number', 'default': '', 'order': 19,
+     'label': 'Send Money Phone Number', 'default': '', 'order': 29,
      'help_text': 'e.g. 0712345678'},
     {'key': 'PAYMENT_SEND_MONEY_NAME', 'type': 'text', 'category': 'payment',
-     'label': 'Send Money Recipient Name', 'default': '', 'order': 20},
+     'label': 'Send Money Recipient Name', 'default': '', 'order': 30},
 
     # --- Payment: Bank Transfer ---
     {'key': 'PAYMENT_BANK_ENABLED', 'type': 'boolean', 'category': 'payment',
-     'label': 'Enable Bank Transfer', 'default': False, 'order': 21},
+     'label': 'Enable Bank Transfer', 'default': False, 'order': 31},
     {'key': 'PAYMENT_BANK_NAME', 'type': 'text', 'category': 'payment',
-     'label': 'Bank Name', 'default': '', 'order': 22},
+     'label': 'Bank Name', 'default': '', 'order': 32},
     {'key': 'PAYMENT_BANK_ACCOUNT_NAME', 'type': 'text', 'category': 'payment',
-     'label': 'Bank Account Name', 'default': '', 'order': 23},
+     'label': 'Bank Account Name', 'default': '', 'order': 33},
     {'key': 'PAYMENT_BANK_ACCOUNT_NUMBER', 'type': 'text', 'category': 'payment',
-     'label': 'Bank Account Number', 'default': '', 'order': 24},
+     'label': 'Bank Account Number', 'default': '', 'order': 34},
     {'key': 'PAYMENT_BANK_BRANCH', 'type': 'text', 'category': 'payment',
-     'label': 'Bank Branch', 'default': '', 'order': 25},
+     'label': 'Bank Branch', 'default': '', 'order': 35},
     {'key': 'PAYMENT_BANK_SWIFT', 'type': 'text', 'category': 'payment',
-     'label': 'SWIFT / Bank Code', 'default': '', 'order': 26},
+     'label': 'SWIFT / Bank Code', 'default': '', 'order': 36},
 
     # --- Payment: instructions ---
     {'key': 'PAYMENT_MANUAL_INSTRUCTIONS', 'type': 'textarea', 'category': 'payment',
-     'label': 'Manual Payment Instructions', 'default': '', 'order': 27,
+     'label': 'Manual Payment Instructions', 'default': '', 'order': 37,
      'help_text': 'Shown below the manual payment options.'},
 
     # --- Preferences ---
@@ -402,13 +448,6 @@ def settings_dashboard(request):
 def settings_update(request):
     """
     Save changes to SystemSetting rows.
-
-    Important nuance:
-    - A ticked HTML checkbox posts `name=on`.
-    - An UNticked checkbox posts NOTHING.
-
-    So boolean keys must be handled by iterating over the SCHEMA — not over
-    `request.POST` — otherwise unticking a box is a silent no-op.
     """
     _ensure_schema_rows()
 
@@ -468,17 +507,12 @@ def settings_update(request):
         updated += 1
 
     # ---------- 3) Booleans: iterate over SCHEMA, not over POST ----------
-    # This is the key fix: an unticked checkbox is missing from request.POST,
-    # so we must ask the schema which boolean keys to check and write 'false'
-    # for any that are not present as 'on' in the request.
     for spec in SETTINGS_SCHEMA:
         if spec['type'] != 'boolean':
             continue
 
         key = spec['key']
 
-        # Skip if this key had a file upload this round (unlikely for booleans
-        # but harmless to guard)
         if key in uploaded_keys or key in request.FILES:
             continue
 
@@ -487,7 +521,6 @@ def settings_update(request):
         except SystemSetting.DoesNotExist:
             continue
 
-        # The browser sends `key=on` when ticked, nothing when unticked.
         new_val = 'true' if request.POST.get(key) == 'on' else 'false'
 
         if obj.value != new_val:
