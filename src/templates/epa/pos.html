@@ -2258,20 +2258,62 @@ function sendMpesaStkPush() {
     }).catch(err => { statusEl.style.background = '#f8d7da'; statusEl.style.color = '#721c24'; statusEl.textContent = '❌ ' + err.message; });
 }
 
+
 function pollMpesaStkStatus(requestId, attemptsLeft) {
-    if (!requestId || attemptsLeft <= 0) return;
-    fetch(`/mpesa/stk-status/?request_id=${encodeURIComponent(requestId)}`).then(res => res.json()).then(data => {
+    if (!requestId || attemptsLeft <= 0) {
         const statusEl = document.getElementById('mpesaStkStatus');
-        if (data.status === 'success') {
-            window._mpesaStkConfirmed = true; window._mpesaReceiptCode = data.mpesa_code || ''; statusEl.style.background = '#d4edda'; statusEl.style.color = '#155724';
-            statusEl.innerHTML = '✅ <b>Payment received!</b><br>Code: <b>' + window._mpesaReceiptCode + '</b>';
-            const refEl = document.getElementById('checkoutReference'); if (refEl) refEl.value = window._mpesaReceiptCode;
-            setTimeout(() => { submitCheckout(); }, 500); return;
+        if (statusEl) {
+            statusEl.style.background = '#f8d7da';
+            statusEl.style.color = '#721c24';
+            statusEl.textContent = '❌ Payment timed out. Please try again.';
         }
-        if (data.status === 'failed' || data.status === 'cancelled') { statusEl.style.background = '#f8d7da'; statusEl.style.color = '#721c24'; statusEl.textContent = '❌ Payment ' + data.status + ': ' + (data.message || ''); return; }
+        return;
+    }
+    
+    fetch(`/mpesa/stk-status/?request_id=${encodeURIComponent(requestId)}`)
+    .then(res => res.json())
+    .then(data => {
+        const statusEl = document.getElementById('mpesaStkStatus');
+        
+        if (data.status === 'success') {
+            // 1. Mark the STK as confirmed
+            window._mpesaStkConfirmed = true;
+            window._mpesaReceiptCode = data.mpesa_code || '';
+            
+            // 2. Update the UI to show green success
+            statusEl.style.background = '#d4edda';
+            statusEl.style.color = '#155724';
+            statusEl.innerHTML = '✅ <b>Payment received!</b><br>Code: <b>' + window._mpesaReceiptCode + '</b>';
+            
+            // 3. Auto-fill the Reference field so submitCheckout() doesn't fail
+            const refEl = document.getElementById('checkoutReference');
+            if (refEl) refEl.value = window._mpesaReceiptCode;
+            
+            // 4. Auto-submit the checkout so the sale is saved and receipt opens
+            setTimeout(() => {
+                showSuccessToast('✅ Payment received via M-Pesa!');
+                submitCheckout();
+            }, 800);
+            
+            return;
+        }
+        
+        if (data.status === 'failed' || data.status === 'cancelled') {
+            statusEl.style.background = '#f8d7da';
+            statusEl.style.color = '#721c24';
+            statusEl.textContent = '❌ Payment ' + data.status + ': ' + (data.message || '');
+            return;
+        }
+        
+        // Still pending — keep polling
         setTimeout(() => pollMpesaStkStatus(requestId, attemptsLeft - 1), 4000);
-    }).catch(() => { setTimeout(() => pollMpesaStkStatus(requestId, attemptsLeft - 1), 5000); });
+    })
+    .catch(err => {
+        console.warn('Polling error:', err);
+        setTimeout(() => pollMpesaStkStatus(requestId, attemptsLeft - 1), 5000);
+    });
 }
+
 
 function confirmMpesaMessage() {
     const codeEl = document.getElementById('mpesaConfirmCode'); const statusEl = document.getElementById('mpesaConfirmStatus'); const code = (codeEl.value || '').trim().toUpperCase();
@@ -2330,56 +2372,146 @@ function handleCheckoutEnter(e, currentField) {
 function showCheckoutError(msg) { const el = document.getElementById('checkoutError'); el.textContent = msg; el.style.display = 'block'; }
 function hideCheckoutError() { const el = document.getElementById('checkoutError'); el.style.display = 'none'; el.textContent = ''; }
 
+
 async function submitCheckout() {
     hideCheckoutError();
     if (checkoutMode === 'pending' && pendingSaleData) { return submitPendingCheckout(); }
+    
+    // Validate branch
     const branchId = document.getElementById('checkoutBranch').value;
-    if (!branchId) { showCheckoutError('⚠️ Please select a branch.'); document.getElementById('checkoutBranch').focus(); return; }
-    let tendered = null; let reference = '';
+    if (!branchId) { 
+        showCheckoutError('⚠️ Please select a branch.'); 
+        document.getElementById('checkoutBranch').focus(); 
+        return; 
+    }
+    
+    let tendered = null; 
+    let reference = '';
 
+    // Handle Payment Methods
     if (currentPaymentMethod === 'cash') {
         tendered = parseFloat(document.getElementById('checkoutTendered').value) || 0;
-        if (tendered < currentTotal) { showCheckoutError(`⚠️ Amount tendered (KSh ${tendered.toFixed(2)}) is less than the total (KSh ${currentTotal.toFixed(2)}).`); document.getElementById('checkoutTendered').focus(); return; }
+        if (tendered < currentTotal) { 
+            showCheckoutError(`⚠️ Amount tendered (KSh ${tendered.toFixed(2)}) is less than the total (KSh ${currentTotal.toFixed(2)}).`); 
+            document.getElementById('checkoutTendered').focus(); 
+            return; 
+        }
     } else if (currentPaymentMethod === 'bank') {
         reference = document.getElementById('checkoutReference').value.trim();
-        if (!reference) { showCheckoutError('⚠️ Enter the card / transaction reference.'); document.getElementById('checkoutReference').focus(); return; }
+        if (!reference) { 
+            showCheckoutError('⚠️ Enter the card / transaction reference.'); 
+            document.getElementById('checkoutReference').focus(); 
+            return; 
+        }
     } else if (currentPaymentMethod === 'points') {
         reference = document.getElementById('checkoutReference').value.trim();
     } else if (currentPaymentMethod === 'mpesa') {
         reference = (document.getElementById('checkoutReference').value || '').trim();
-        if (!reference && window._mpesaStkConfirmed && window._mpesaReceiptCode) { reference = window._mpesaReceiptCode; document.getElementById('checkoutReference').value = reference; }
-        if (!reference && !window._mpesaStkConfirmed) { showCheckoutError('⚠️ Confirm the M-Pesa transaction first.'); mpesaShowConfirmStep(); return; }
-        if (!reference) { reference = 'MPESA-STK'; document.getElementById('checkoutReference').value = reference; }
+        
+        // STK Confirmation Fallback
+        if (!reference && window._mpesaStkConfirmed && window._mpesaReceiptCode) { 
+            reference = window._mpesaReceiptCode; 
+            document.getElementById('checkoutReference').value = reference; 
+        }
+        
+        if (!reference && !window._mpesaStkConfirmed) { 
+            showCheckoutError('⚠️ Confirm the M-Pesa transaction first.'); 
+            mpesaShowConfirmStep(); 
+            return; 
+        }
+        
+        if (!reference) { 
+            reference = 'MPESA-STK'; 
+            document.getElementById('checkoutReference').value = reference; 
+        }
     }
 
-    const isNamed = document.getElementById('checkoutNamed').checked; let customer;
+    // Validate Customer
+    const isNamed = document.getElementById('checkoutNamed').checked; 
+    let customer;
+    
     if (isNamed) {
-        const name = document.getElementById('checkoutName').value.trim(); const phone = document.getElementById('checkoutPhone').value.trim(); const email = document.getElementById('checkoutEmail').value.trim();
-        if (!phone) { showCheckoutError('⚠️ Customer phone is required.'); document.getElementById('checkoutPhone').focus(); return; }
-        if (!/^[+\d][\d\s\-()]{6,}$/.test(phone)) { showCheckoutError('⚠️ Enter a valid customer phone number.'); document.getElementById('checkoutPhone').focus(); return; }
-        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showCheckoutError('⚠️ Enter a valid email address, or leave blank.'); document.getElementById('checkoutEmail').focus(); return; }
+        const name = document.getElementById('checkoutName').value.trim(); 
+        const phone = document.getElementById('checkoutPhone').value.trim(); 
+        const email = document.getElementById('checkoutEmail').value.trim();
+        
+        if (!phone) { 
+            showCheckoutError('⚠️ Customer phone is required.'); 
+            document.getElementById('checkoutPhone').focus(); 
+            return; 
+        }
+        if (!/^[+\d][\d\s\-()]{6,}$/.test(phone)) { 
+            showCheckoutError('⚠️ Enter a valid customer phone number.'); 
+            document.getElementById('checkoutPhone').focus(); 
+            return; 
+        }
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { 
+            showCheckoutError('⚠️ Enter a valid email address, or leave blank.'); 
+            document.getElementById('checkoutEmail').focus(); 
+            return; 
+        }
         customer = { type: 'named', name: name || 'M-Pesa Customer', phone, email };
-    } else { customer = { type: 'walkin', name: 'Walk-in Customer', phone: '', email: '' }; }
+    } else { 
+        customer = { type: 'walkin', name: 'Walk-in Customer', phone: '', email: '' }; 
+    }
 
-    if (isNamed) { document.getElementById('custTypeNamed').checked = true; document.getElementById('custTypeWalkin').checked = false; document.getElementById('customerName').value = customer.name; document.getElementById('customerPhone').value = customer.phone; document.getElementById('customerEmail').value = customer.email; }
-    else { document.getElementById('custTypeWalkin').checked = true; document.getElementById('custTypeNamed').checked = false; }
+    // Update the hidden POS fields to match the modal
+    if (isNamed) { 
+        document.getElementById('custTypeNamed').checked = true; 
+        document.getElementById('custTypeWalkin').checked = false; 
+        document.getElementById('customerName').value = customer.name; 
+        document.getElementById('customerPhone').value = customer.phone; 
+        document.getElementById('customerEmail').value = customer.email; 
+    } else { 
+        document.getElementById('custTypeWalkin').checked = true; 
+        document.getElementById('custTypeNamed').checked = false; 
+    }
 
-    const mainBranch = document.getElementById('branchSelect'); if (mainBranch && mainBranch.tagName === 'SELECT') mainBranch.value = branchId;
+    const mainBranch = document.getElementById('branchSelect'); 
+    if (mainBranch && mainBranch.tagName === 'SELECT') mainBranch.value = branchId;
 
-    if (currentPaymentMethod === 'cash') { document.getElementById('paidDisplay').textContent = tendered.toFixed(2); document.getElementById('dueDisplay').textContent = '0.00'; }
-    else { document.getElementById('paidDisplay').textContent = currentTotal.toFixed(2); document.getElementById('dueDisplay').textContent = '0.00'; }
+    // Update Bottom Bar
+    if (currentPaymentMethod === 'cash') { 
+        document.getElementById('paidDisplay').textContent = tendered.toFixed(2); 
+        document.getElementById('dueDisplay').textContent = '0.00'; 
+    } else { 
+        document.getElementById('paidDisplay').textContent = currentTotal.toFixed(2); 
+        document.getElementById('dueDisplay').textContent = '0.00'; 
+    }
     document.getElementById('typeDisplay').textContent = PAYMENT_LABELS[currentPaymentMethod] || 'DEBIT CARD';
-    const rnEl = document.getElementById('refNumberDisplay'); if (rnEl) rnEl.textContent = reference || '—';
+    
+    const rnEl = document.getElementById('refNumberDisplay'); 
+    if (rnEl) rnEl.textContent = reference || '—';
 
-    const status = document.getElementById('checkoutStatus'); status.className = 'payment-status pending'; status.textContent = 'Processing sale…';
-    const btn = document.getElementById('checkoutSubmitBtn'); btn.disabled = true;
+    // Show Processing Status
+    const status = document.getElementById('checkoutStatus'); 
+    status.className = 'payment-status pending'; 
+    status.textContent = 'Processing sale…';
+    
+    const btn = document.getElementById('checkoutSubmitBtn'); 
+    btn.disabled = true;
 
+    // Call Backend
     try {
         const ok = await completeSaleInternal(customer);
-        if (ok) { status.className = 'payment-status success'; status.textContent = '✅ Sale completed.'; setTimeout(() => { closeCheckoutModal(); status.className = 'payment-status'; status.textContent = ''; }, 700); }
-        else { status.className = 'payment-status error'; status.textContent = '❌ Sale failed. See alert for details.'; }
-    } finally { btn.disabled = false; }
+        if (ok) { 
+            status.className = 'payment-status success'; 
+            status.textContent = '✅ Sale completed.'; 
+            setTimeout(() => { 
+                closeCheckoutModal(); 
+                status.className = 'payment-status'; 
+                status.textContent = ''; 
+            }, 700); 
+        } else { 
+            status.className = 'payment-status error'; 
+            status.textContent = '❌ Sale failed. See alert for details.'; 
+        }
+    } finally { 
+        btn.disabled = false; 
+    }
 }
+
+
 
 function submitPendingCheckout() {}
 function printReceiptDirectly(saleId) {
