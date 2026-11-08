@@ -79,15 +79,17 @@ class KopokopoProvider(BaseProvider):
         
         r = requests.post(f'{KOPOKOPO_BASE}/api/v1/incoming_payments', json=body, headers=headers, timeout=20)
         
-        # 👈 Handle non-JSON responses safely (FIXES THE CRASH)
+        # 👈 LOG EXACTLY WHAT WE SENT IF IT FAILS
+        if not r.text:
+            logger.error(f"KOPOKOPO EMPTY RESPONSE. Status: {r.status_code}")
+            logger.error(f"Payload sent: {json.dumps(body, indent=2)}")
+            raise RuntimeError(f"Kopokopo API error ({r.status_code}): Empty response. Check server logs for payload details.")
+        
         try:
             data = r.json()
         except Exception:
             logger.error(f"Kopokopo returned non-JSON: {r.status_code} - {r.text[:500]}")
-            raise RuntimeError(
-                f"Kopokopo API error ({r.status_code}): "
-                f"{r.text[:200] if r.text else 'Empty response'}"
-            )
+            raise RuntimeError(f"Kopokopo API error ({r.status_code}): {r.text[:200]}")
         
         if r.status_code not in (200, 201):
             logger.error(f"Kopokopo rejected request: {r.status_code} - {data}")
@@ -98,6 +100,7 @@ class KopokopoProvider(BaseProvider):
             'provider_ref': data.get('id') or data.get('resourceId'),
             'raw': data
         }
+
 
     def query_payment(self, *, provider_ref):
         r = requests.get(
