@@ -145,26 +145,31 @@ class KopokopoProvider(BaseProvider):
         except Exception:
             raise ValueError("Invalid JSON in Kopokopo webhook")
 
-        # 👈 Get the type from the 'data' object, not the root
         event_data = data.get('data', {})
-        event_type = event_data.get('type', '') 
         attributes = event_data.get('attributes', {})
         
-        resource = (attributes.get('event') or {}).get('resource') or {}
-        status = attributes.get('status', '').lower()
+        # 👈 Kopokopo puts the status at the top of attributes
+        overall_status = (attributes.get('status') or '').lower()
+        
+        event = attributes.get('event', {})
+        event_type = event.get('type', '')
+        
+        # 👈 The resource holds all the payment details
+        resource = event.get('resource') or {}
+        
+        amount_obj = resource.get('amount')
+        amount_val = amount_obj.get('value', 0) if isinstance(amount_obj, dict) else (amount_obj or 0)
+        
+        # "Received" means the payment was successful
+        resource_status = (resource.get('status') or '').lower()
+        is_success = overall_status == 'success' or resource_status == 'received'
 
-        # Handle Incoming Payment (STK Push)
-        if event_type == 'incoming_payment':
-            amount_obj = resource.get('amount')
-            amount_val = amount_obj.get('value', 0) if isinstance(amount_obj, dict) else (amount_obj or 0)
-            
-            # If status is Success, Kopokopo uses "Received" inside the resource
-            is_success = status == 'success' or (resource.get('status') or '').lower() == 'received'
-
+        # Handle the payload structure
+        if 'incoming_payment' in event_data.get('type', ''):
             return {
                 'provider_ref': event_data.get('id') or resource.get('id'),
                 'status': 'success' if is_success else 'failed',
-                'code': (resource.get('reference') or '').upper(),
+                'code': (resource.get('reference') or '').upper(),  # 👈 UK8611ORJ2
                 'amount': float(amount_val),
                 'phone': (resource.get('sender_phone_number') or '').replace('+', ''),
                 'first_name': resource.get('sender_first_name') or '',
@@ -172,38 +177,18 @@ class KopokopoProvider(BaseProvider):
                 'last_name': resource.get('sender_last_name') or '',
                 'raw': data
             }
-
-        # Handle Buy Goods (Till)
-        elif event_type == 'buygoods_transaction':
-            amount_val = resource.get('amount', 0)
-            if isinstance(amount_val, dict):
-                amount_val = amount_val.get('value', 0)
-                
-            return {
-                'provider_ref': resource.get('system_reference') or event_data.get('id'),
-                'status': 'success' if status == 'success' else 'failed',
-                'code': (resource.get('transaction_reference') or '').upper(),
-                'amount': float(amount_val),
-                'phone': (resource.get('sender_phone_number') or '').replace('+', ''),
-                'first_name': resource.get('sender_first_name') or '',
-                'middle_name': '',
-                'last_name': resource.get('sender_last_name') or '',
-                'raw': data
-            }
-
-        # Unknown format
-        else:
-            logger.error(f"Unknown Kopokopo Webhook format: {event_type}")
-            return {
-                'provider_ref': None,
-                'status': 'pending',
-                'code': '',
-                'amount': 0,
-                'phone': '',
-                'first_name': '',
-                'middle_name': '',
-                'last_name': '',
-                'raw': data
-            }
-
             
+        # Fallback for other formats (just in case)
+        return {
+            'provider_ref': event_data.get('id'),
+            'status': 'success' if is_success else 'pending',
+            'code': (resource.get('reference') or '').upper(),
+            'amount': float(amount_val),
+            'phone': (resource.get('sender_phone_number') or '').replace('+', ''),
+            'first_name': resource.get('sender_first_name') or '',
+            'middle_name': '',
+            'last_name': resource.get('sender_last_name') or '',
+            'raw': data
+        }
+
+        
