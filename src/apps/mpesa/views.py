@@ -313,6 +313,7 @@ def mpesa_callback(request):
 # ============================================
 # KOPOKOPO CALLBACK (WEBHOOK)
 # ============================================
+
 @csrf_exempt
 @require_POST
 def kopokopo_callback(request):
@@ -331,22 +332,24 @@ def kopokopo_callback(request):
         parsed = parse_webhook(cfg, request)
         logger.info(f"Kopokopo webhook parsed: {parsed}")
 
-        # 👈 Try to find transaction by provider_ref first
+        # 1. Try exact provider_ref match
         tx = MpesaTransaction.objects.filter(provider_ref=parsed['provider_ref']).first()
 
-        # 👈 If not found, match by company, phone, amount, and 'pending' status
+        # 2. Fallback: match by company, phone, and status 'pending'
         if not tx:
-            logger.warning(f"No exact match for {parsed['provider_ref']}. Searching for pending transaction.")
+            logger.warning(f"No exact match for {parsed['provider_ref']}. Searching for pending transaction by phone.")
+            # Clean phone number for comparison (just in case)
+            clean_phone = parsed['phone'].replace('+', '').strip()
+            
             tx = MpesaTransaction.objects.filter(
                 company=cfg.company,
-                phone=parsed['phone'],
-                amount=parsed['amount'],
+                phone__contains=clean_phone[-9:], # Match the last 9 digits
                 status='pending'
             ).order_by('-created_at').first()
             
             if tx:
+                logger.info(f"Found pending transaction #{tx.id}. Updating provider_ref to {parsed['provider_ref']}.")
                 tx.provider_ref = parsed['provider_ref']
-                tx.save(update_fields=['provider_ref'])
 
         if not tx:
             logger.warning(f"Kopokopo webhook for unknown payment: {parsed['provider_ref']}")
@@ -371,9 +374,14 @@ def kopokopo_callback(request):
 
         if tx.status == 'success':
             _link_payment_to_chama(tx)
+            
+            # 👈 WAKE UP THE POS
+            # We don't need to do anything else here; the POS polling loop will find it.
 
     except Exception as e:
         logger.exception('Kopokopo callback processing failed')
         return JsonResponse({'error': str(e)}, status=400)
 
     return JsonResponse({'status': 'ok'})
+
+    
