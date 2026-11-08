@@ -32,9 +32,18 @@ class KopokopoProvider(BaseProvider):
             data={'grant_type': 'client_credentials'},
             timeout=15,
         )
+        
+        # 👈 Handle non-JSON responses safely
+        try:
+            data = r.json()
+        except Exception:
+            raise RuntimeError(f"Kopokopo Auth failed ({r.status_code}): {r.text[:200]}")
+            
         r.raise_for_status()
-        data = r.json()
-        tok = data['access_token']
+        tok = data.get('access_token')
+        if not tok:
+            raise RuntimeError(f"Kopokopo Auth returned no token: {data}")
+            
         cache.set(key, tok, max(int(data.get('expires_in', 3600)) - 60, 60))
         return tok
 
@@ -53,7 +62,6 @@ class KopokopoProvider(BaseProvider):
                 'first_name': 'Customer',
                 'last_name': 'Payment',
                 'phone_number': phone,
-                # 👈 SAFE FALLBACK: Use a valid generic email, guaranteed not to fail API validation
                 'email': 'customer@kopokopo.com'
             },
             'amount': {
@@ -70,13 +78,19 @@ class KopokopoProvider(BaseProvider):
         }
         
         r = requests.post(f'{KOPOKOPO_BASE}/api/v1/incoming_payments', json=body, headers=headers, timeout=20)
-        data = r.json()
+        
+        # 👈 Handle non-JSON responses safely (FIXES THE CRASH)
+        try:
+            data = r.json()
+        except Exception:
+            logger.error(f"Kopokopo returned non-JSON: {r.status_code} - {r.text[:500]}")
+            raise RuntimeError(
+                f"Kopokopo API error ({r.status_code}): "
+                f"{r.text[:200] if r.text else 'Empty response'}"
+            )
         
         if r.status_code not in (200, 201):
-            # 👈 LOG THE EXACT ERROR: This will print in your terminal if it fails
             logger.error(f"Kopokopo rejected request: {r.status_code} - {data}")
-            
-            # Extract useful error text if possible
             error_msg = data.get('error') or data.get('message') or str(data)
             raise RuntimeError(f"Kopokopo rejected request: {error_msg}")
             
@@ -91,7 +105,14 @@ class KopokopoProvider(BaseProvider):
             headers={'Authorization': f'Bearer {self._get_token()}', 'Accept': 'application/json'},
             timeout=20,
         )
-        d = r.json()
+        
+        # 👈 Handle non-JSON responses safely
+        try:
+            d = r.json()
+        except Exception:
+            logger.warning(f"Kopokopo query returned non-JSON: {r.status_code}")
+            return {'status': 'pending', 'code': '', 'amount': 0, 'phone': '', 'raw': {}}
+
         raw_status = (d.get('status') or '').lower()
         status = 'success' if raw_status == 'success' else ('failed' if raw_status == 'failed' else 'pending')
         
@@ -104,7 +125,6 @@ class KopokopoProvider(BaseProvider):
         }
 
     def parse_webhook(self, request):
-        # Signature Verification
         raw_body = request.body
         sig = request.headers.get('X-Kopokopo-Signature', '')
         if self.cfg.kopokopo_webhook_secret and sig:
@@ -114,16 +134,16 @@ class KopokopoProvider(BaseProvider):
             if not hmac.compare_digest(sig, expected):
                 raise PermissionError('Invalid Kopokopo webhook signature')
 
-        data = json.loads(raw_body.decode('utf-8') or '{}')
+        try:
+            data = json.loads(raw_body.decode('utf-8') or '{}')
+        except Exception:
+            raise ValueError("Invalid JSON in Kopokopo webhook")
         
-        # Kopokopo webhook payloads can be nested in different ways
-        # Try to find the resource object
         event_data = data.get('data', {})
         attributes = event_data.get('attributes', {})
         event = attributes.get('event', {})
         resource = event.get('resource', {})
         
-        # 👈 Get the ID from top-level 'id', or nested resource 'id', or metadata
         resource_id = event_data.get('id') or resource.get('id')
         
         amount_obj = resource.get('amount') or {}
@@ -143,5 +163,3 @@ class KopokopoProvider(BaseProvider):
             'last_name': sub.get('last_name') or '',
             'raw': data
         }
-
-
