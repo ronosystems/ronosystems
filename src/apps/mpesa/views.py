@@ -158,6 +158,10 @@ def mpesa_stk_push(request):
 # ============================================
 # STK STATUS (POLL PAYMENT STATUS)
 # ============================================
+
+# ============================================
+# STK STATUS (POLL PAYMENT STATUS)
+# ============================================
 @require_GET
 def mpesa_stk_status(request):
     request_id = request.GET.get('request_id', '').strip()
@@ -170,13 +174,36 @@ def mpesa_stk_status(request):
         qs = qs.filter(company=company)
 
     tx = qs.first()
+
+    # 👈 FALLBACK: If not found by request_id, and it starts with 'pending_', 
+    # extract the phone number from the ID and find the most recently updated transaction.
+    if not tx and request_id.startswith("pending_"):
+        try:
+            # Extract phone: "pending_254722527955_12345" -> "254722527955"
+            parts = request_id.split('_')
+            if len(parts) >= 2:
+                phone_from_id = parts[1]
+                qs2 = MpesaTransaction.objects.filter(
+                    company=company,
+                    phone__contains=phone_from_id[-9:]
+                ).order_by('-updated_at')
+                
+                # Only use it if it was updated in the last 5 minutes
+                from django.utils import timezone
+                from datetime import timedelta
+                cutoff = timezone.now() - timedelta(minutes=5)
+                tx = qs2.filter(updated_at__gte=cutoff).first()
+        except Exception:
+            pass
+
     if not tx:
         return JsonResponse({'status': 'pending'})
 
+    # ---- The rest is unchanged ----
     if tx.status == 'success':
-        if not tx.mpesa_code and tx.mpesa_config:
+        if not tx.mpesa_code and tx.mpesa_config and not tx.provider_ref.startswith("pending_"):
             try:
-                parsed = query_payment(tx.mpesa_config, provider_ref=request_id)
+                parsed = query_payment(tx.mpesa_config, provider_ref=tx.provider_ref)
                 receipt = parsed.get('code', '')
                 if receipt:
                     tx.mpesa_code = receipt
@@ -195,9 +222,10 @@ def mpesa_stk_status(request):
     if tx.status in ('failed', 'cancelled', 'timeout'):
         return JsonResponse({'status': tx.status, 'message': tx.result_desc or ''})
 
+    # Skip API query if it's still using a placeholder
     try:
-        if tx.mpesa_config and not request_id.startswith("pending_"):
-            parsed = query_payment(tx.mpesa_config, provider_ref=request_id)
+        if tx.mpesa_config and not tx.provider_ref.startswith("pending_"):
+            parsed = query_payment(tx.mpesa_config, provider_ref=tx.provider_ref)
             status = parsed.get('status')
 
             if status == 'success':
@@ -226,6 +254,7 @@ def mpesa_stk_status(request):
 
     return JsonResponse({'status': 'pending'})
 
+    
 
 # ============================================
 # CONFIRM (MANUAL CODE ENTRY)
