@@ -313,7 +313,6 @@ def mpesa_callback(request):
 # ============================================
 # KOPOKOPO CALLBACK (WEBHOOK)
 # ============================================
-
 @csrf_exempt
 @require_POST
 def kopokopo_callback(request):
@@ -330,25 +329,30 @@ def kopokopo_callback(request):
             return JsonResponse({'status': 'ignored'})
 
         parsed = parse_webhook(cfg, request)
+        
+        # 👈 LOG THE RAW PARSED PAYLOAD
         logger.info(f"Kopokopo webhook parsed: {parsed}")
+
+        if not parsed.get('provider_ref'):
+             logger.error("Webhook missing provider_ref. Skipping.")
+             return JsonResponse({'status': 'ignored'})
 
         # 1. Try exact provider_ref match
         tx = MpesaTransaction.objects.filter(provider_ref=parsed['provider_ref']).first()
 
         # 2. Fallback: match by company, phone, and status 'pending'
-        if not tx:
-            logger.warning(f"No exact match for {parsed['provider_ref']}. Searching for pending transaction by phone.")
-            # Clean phone number for comparison (just in case)
+        if not tx and parsed.get('phone'):
+            logger.warning(f"No exact match for {parsed['provider_ref']}. Searching by phone.")
             clean_phone = parsed['phone'].replace('+', '').strip()
             
             tx = MpesaTransaction.objects.filter(
                 company=cfg.company,
-                phone__contains=clean_phone[-9:], # Match the last 9 digits
+                phone__contains=clean_phone[-9:], 
                 status='pending'
             ).order_by('-created_at').first()
             
             if tx:
-                logger.info(f"Found pending transaction #{tx.id}. Updating provider_ref to {parsed['provider_ref']}.")
+                logger.info(f"Found pending transaction #{tx.id}. Updating provider_ref.")
                 tx.provider_ref = parsed['provider_ref']
 
         if not tx:
@@ -358,6 +362,7 @@ def kopokopo_callback(request):
         tx.result_desc = 'Kopokopo Webhook Received'
         tx.raw_callback = parsed['raw']
 
+        # Handle status
         if parsed['status'] == 'success':
             tx.status = 'success'
             tx.mpesa_code = parsed['code']
@@ -374,14 +379,9 @@ def kopokopo_callback(request):
 
         if tx.status == 'success':
             _link_payment_to_chama(tx)
-            
-            # 👈 WAKE UP THE POS
-            # We don't need to do anything else here; the POS polling loop will find it.
 
     except Exception as e:
         logger.exception('Kopokopo callback processing failed')
         return JsonResponse({'error': str(e)}, status=400)
 
     return JsonResponse({'status': 'ok'})
-
-    

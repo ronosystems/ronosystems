@@ -140,50 +140,76 @@ class KopokopoProvider(BaseProvider):
             ).decode()
             if not hmac.compare_digest(sig, expected):
                 logger.warning(f"Kopokopo Signature mismatch for {self.cfg.company.name}.")
-                # We don't raise here so we can still parse the data
 
         try:
             data = json.loads(raw_body.decode('utf-8') or '{}')
+            logger.info(f"RAW KOPOKOPO WEBHOOK: {json.dumps(data)}")  # 👈 VERY IMPORTANT LOG
         except Exception:
             raise ValueError("Invalid JSON in Kopokopo webhook")
 
-        # Navigate the deeply nested structure safely
-        event_data = data.get('data', {})
-        attributes = event_data.get('attributes', {})
-        event = attributes.get('event', {})
-        resource = event.get('resource') or {}
+        # Detect event type
+        event_type = data.get('topic', '') or data.get('event', {}).get('type', '')
 
-        # 👈 Try to grab the provider_ref (resource ID)
-        # Sometimes Kopokopo puts it in 'data.id', sometimes in the resource itself
-        resource_id = event_data.get('id') or resource.get('id')
-        
-        # 👈 Safely get amount and subscriber. If 'resource' is empty, they will be None.
-        amount_obj = resource.get('amount')
-        amount_val = 0
-        if isinstance(amount_obj, dict):
-            amount_val = amount_obj.get('value', 0)
-        elif isinstance(amount_obj, (int, float, str)):
-            amount_val = amount_obj # Fallback if they send a direct number
+        # Format 1: Incoming Payment (STK Push)
+        if 'incoming_payment' in event_type:
+            event_data = data.get('data', {})
+            attributes = event_data.get('attributes', {})
+            event = attributes.get('event', {})
+            resource = event.get('resource') or {}
+            
+            amount_obj = resource.get('amount')
+            amount_val = amount_obj.get('value', 0) if isinstance(amount_obj, dict) else (amount_obj or 0)
+            sub = resource.get('subscriber') or {}
 
-        sub = resource.get('subscriber') or {}
+            return {
+                'provider_ref': event_data.get('id') or resource.get('id'),
+                'status': 'success' if 'success' in event_type else 'failed',
+                'code': (resource.get('transaction_reference') or '').upper(),
+                'amount': float(amount_val),
+                'phone': (sub.get('phone_number') or '').replace('+', ''),
+                'first_name': sub.get('first_name') or '',
+                'middle_name': sub.get('middle_name') or '',
+                'last_name': sub.get('last_name') or '',
+                'raw': data
+            }
 
-        # 👈 Determine status
-        raw_status = (resource.get('status') or '').lower()
-        if raw_status == 'success':
-            status = 'success'
-        elif raw_status in ('failed', 'rejected'):
-            status = 'failed'
+        # Format 2: Buy Goods (Till)
+        elif 'buygoods_transaction' in event_type:
+            event_data = data.get('data', {})
+            attributes = event_data.get('attributes', {})
+            event = attributes.get('event', {})
+            resource = event.get('resource') or {}
+            
+            amount_val = resource.get('amount', 0)
+            if isinstance(amount_val, dict):
+                amount_val = amount_val.get('value', 0)
+                
+            return {
+                'provider_ref': resource.get('system_reference') or event_data.get('id'),
+                'status': 'success' if 'succeeded' in event_type else 'failed',
+                'code': (resource.get('transaction_reference') or '').upper(),
+                'amount': float(amount_val),
+                'phone': (resource.get('sender_phone_number') or '').replace('+', ''),
+                'first_name': resource.get('sender_first_name') or '',
+                'middle_name': '',
+                'last_name': resource.get('sender_last_name') or '',
+                'raw': data
+            }
+
+        # Unknown format
         else:
-            status = 'pending'
+            logger.error(f"Unknown Kopokopo Webhook format: {event_type}")
+            return {
+                'provider_ref': None,
+                'status': 'pending',
+                'code': '',
+                'amount': 0,
+                'phone': '',
+                'first_name': '',
+                'middle_name': '',
+                'last_name': '',
+                'raw': data
+            }
 
-        return {
-            'provider_ref': resource_id,
-            'status': status,
-            'code': (resource.get('transaction_reference') or '').upper(),
-            'amount': float(amount_val or 0),
-            'phone': (sub.get('phone_number') or '').replace('+', ''),
-            'first_name': sub.get('first_name') or '',
-            'middle_name': sub.get('middle_name') or '',
-            'last_name': sub.get('last_name') or '',
-            'raw': data
-        }
+
+            
