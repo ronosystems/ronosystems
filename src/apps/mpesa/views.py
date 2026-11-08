@@ -1,4 +1,5 @@
 import json
+import time
 import logging
 from decimal import Decimal
 
@@ -16,10 +17,6 @@ logger = logging.getLogger(__name__)
 # Helpers
 # --------------------------------------------
 def _company_for_request(request):
-    """
-    Resolve the tenant company for the current request.
-    Prefer the user's company, fall back to request.company (middleware).
-    """
     user = getattr(request, 'user', None)
     if user and user.is_authenticated and getattr(user, 'company', None):
         return user.company
@@ -37,30 +34,17 @@ def _branch_for_request(request, branch_id):
 
 
 def _resolve_customer_name(tx):
-    """
-    Return the best available name for this transaction:
-      1. Name from callback (production only)
-      2. Name from a previous purchase on the same phone (local DB)
-      3. Empty string
-    """
     name = (tx.customer_name or '').strip()
     if name:
         return name
-
     if tx.phone:
         try:
             from apps.epa_shop.models import Customer
-            cust = Customer.objects.filter(
-                company=tx.company,
-                phone=tx.phone,
-            ).first()
+            cust = Customer.objects.filter(company=tx.company, phone=tx.phone).first()
             if cust and cust.name:
                 return cust.name.strip()
         except Exception:
-            logger.warning(
-                'Customer lookup failed for %s', tx.phone, exc_info=True
-            )
-
+            logger.warning('Customer lookup failed for %s', tx.phone, exc_info=True)
     return ''
 
 
@@ -68,85 +52,54 @@ def _resolve_customer_name(tx):
 # LINK PAYMENT TO CHAMA CONTRIBUTION / FINE
 # ============================================
 def _link_payment_to_chama(tx):
-    """
-    When an M-Pesa transaction succeeds, mark the matching Chama
-    contribution or fine as paid.
-    """
     if not tx or tx.status != 'success' or not tx.company:
         return
-
     try:
         from apps.chama.models import Contribution, Fine
         from django.utils import timezone
 
         reference = (getattr(tx, 'account_reference', '') or '').strip()
-
         if not reference:
             raw = tx.raw_callback or {}
-            meta = (
-                ((raw.get('Body') or {}).get('stkCallback') or {})
-                .get('CallbackMetadata') or {}
-            )
+            meta = (((raw.get('Body') or {}).get('stkCallback') or {}).get('CallbackMetadata') or {})
             items = meta.get('Item') or []
             for item in items:
                 if item.get('Name') == 'AccountReference':
                     reference = str(item.get('Value') or '').strip()
                     break
-
         if not reference:
             return
 
         ref_upper = reference.upper()
-
-        # ── CONTRIBUTION (C-M00001 or CONTRIB-M00001) ──
         if ref_upper.startswith('C-') or ref_upper.startswith('CONTRIB-'):
             if ref_upper.startswith('CONTRIB-'):
                 member_number = reference[len('CONTRIB-'):].strip()
             else:
                 member_number = reference[len('C-'):].strip()
-
             current_month = timezone.localdate().strftime('%Y-%m')
-
             pending = Contribution.objects.filter(
-                company=tx.company,
-                member__member_number=member_number,
-                period=current_month,
-                paid=False,
+                company=tx.company, member__member_number=member_number, period=current_month, paid=False
             ).order_by('-created_at').first()
-
             if pending:
                 pending.paid = True
                 pending.save(update_fields=['paid'])
-                logger.info(
-                    "Chama: contribution #%s marked paid (member=%s, code=%s)",
-                    pending.id, member_number, tx.mpesa_code,
-                )
+                logger.info("Chama: contribution #%s marked paid (member=%s, code=%s)", pending.id, member_number, tx.mpesa_code)
 
-        # ── FINE (F-M00001 or FINE-M00001) ──
         elif ref_upper.startswith('F-') or ref_upper.startswith('FINE-'):
             if ref_upper.startswith('FINE-'):
                 member_number = reference[len('FINE-'):].strip()
             else:
                 member_number = reference[len('F-'):].strip()
-
             pending = Fine.objects.filter(
-                company=tx.company,
-                member__member_number=member_number,
-                is_paid=False,
+                company=tx.company, member__member_number=member_number, is_paid=False
             ).order_by('-created_at').first()
-
             if pending:
                 pending.is_paid = True
                 pending.save(update_fields=['is_paid'])
-                logger.info(
-                    "Chama: fine #%s marked paid (member=%s, code=%s)",
-                    pending.id, member_number, tx.mpesa_code,
-                )
+                logger.info("Chama: fine #%s marked paid (member=%s, code=%s)", pending.id, member_number, tx.mpesa_code)
 
     except Exception:
-        logger.warning(
-            'Chama payment linkage failed for tx %s', tx.id, exc_info=True
-        )
+        logger.warning('Chama payment linkage failed for tx %s', tx.id, exc_info=True)
 
 
 # ============================================
@@ -168,33 +121,18 @@ def mpesa_stk_push(request):
 
     company = _company_for_request(request)
     if not company:
-        return JsonResponse(
-            {'success': False, 'error': 'No company in session.'},
-            status=400,
-        )
+        return JsonResponse({'success': False, 'error': 'No company in session.'}, status=400)
 
     branch = _branch_for_request(request, branch_id)
     cfg = MpesaConfig.for_branch(company, branch)
     
     if not cfg:
-        # Return 200 so the frontend JS doesn't crash with a parse error
-        return JsonResponse({
-            'success': False,
-            'error': 'No M-Pesa configuration found for this company/branch. Ask your admin to set it up.'
-        }, status=200) 
+        return JsonResponse({'success': False, 'error': 'No M-Pesa configuration found for this company/branch.'}, status=200) 
 
     try:
-        # Factory routes to Daraja or Kopokopo automatically
-        data = initiate_payment(
-            cfg, 
-            phone=phone, 
-            amount=amount,
-            account_reference=account_ref,
-            description=description,
-        )
+        data = initiate_payment(cfg, phone=phone, amount=amount, account_reference=account_ref, description=description)
     except Exception as e:
         logger.exception('Payment initiation failed')
-        # Return 200 so the frontend JS displays the error text gracefully
         return JsonResponse({'success': False, 'error': str(e)}, status=200)
 
     tx = MpesaTransaction.objects.create(
@@ -224,10 +162,7 @@ def mpesa_stk_push(request):
 def mpesa_stk_status(request):
     request_id = request.GET.get('request_id', '').strip()
     if not request_id:
-        return JsonResponse(
-            {'status': 'failed', 'message': 'request_id is required.'},
-            status=400,
-        )
+        return JsonResponse({'status': 'failed', 'message': 'request_id is required.'}, status=400)
 
     company = _company_for_request(request)
     qs = MpesaTransaction.objects.filter(provider_ref=request_id)
@@ -247,9 +182,7 @@ def mpesa_stk_status(request):
                     tx.mpesa_code = receipt
                     tx.save(update_fields=['mpesa_code', 'updated_at'])
             except Exception:
-                logger.warning(
-                    'Receipt recovery failed for %s', request_id, exc_info=True
-                )
+                logger.warning('Receipt recovery failed for %s', request_id, exc_info=True)
 
         return JsonResponse({
             'status': 'success',
@@ -260,10 +193,7 @@ def mpesa_stk_status(request):
         })
 
     if tx.status in ('failed', 'cancelled', 'timeout'):
-        return JsonResponse({
-            'status': tx.status,
-            'message': tx.result_desc or '',
-        })
+        return JsonResponse({'status': tx.status, 'message': tx.result_desc or ''})
 
     try:
         if tx.mpesa_config:
@@ -274,9 +204,7 @@ def mpesa_stk_status(request):
                 tx.status = 'success'
                 tx.mpesa_code = parsed.get('code', '') or tx.mpesa_code
                 tx.result_desc = 'Success'
-                tx.save(update_fields=[
-                    'status', 'mpesa_code', 'result_desc', 'updated_at',
-                ])
+                tx.save(update_fields=['status', 'mpesa_code', 'result_desc', 'updated_at'])
                 _link_payment_to_chama(tx)
 
                 return JsonResponse({
@@ -291,10 +219,7 @@ def mpesa_stk_status(request):
                 tx.status = 'failed'
                 tx.result_desc = 'Payment failed'
                 tx.save(update_fields=['status', 'result_desc', 'updated_at'])
-                return JsonResponse({
-                    'status': 'failed',
-                    'message': tx.result_desc,
-                })
+                return JsonResponse({'status': 'failed', 'message': tx.result_desc})
 
     except Exception:
         logger.warning('Provider query failed for %s', request_id, exc_info=True)
@@ -313,47 +238,26 @@ def mpesa_confirm(request):
     expected = float(payload.get('expected_amount') or 0)
 
     if not code:
-        return JsonResponse(
-            {'success': False, 'error': 'Transaction code is required.'},
-            status=400,
-        )
+        return JsonResponse({'success': False, 'error': 'Transaction code is required.'}, status=400)
 
     company = _company_for_request(request)
-
     qs = MpesaTransaction.objects.filter(mpesa_code__iexact=code)
     if company:
         qs = qs.filter(company=company)
 
     tx = qs.first()
     if not tx:
-        return JsonResponse({
-            'success': False,
-            'error': f'No transaction found for code {code}.'
-        }, status=404)
+        return JsonResponse({'success': False, 'error': f'No transaction found for code {code}.'}, status=404)
 
     if tx.status != 'success':
-        return JsonResponse({
-            'success': False,
-            'error': f'Transaction {code} is {tx.status}, not completed.'
-        }, status=400)
+        return JsonResponse({'success': False, 'error': f'Transaction {code} is {tx.status}, not completed.'}, status=400)
 
     _link_payment_to_chama(tx)
 
     if abs(float(tx.amount) - expected) > 0.01:
-        return JsonResponse({
-            'success': False,
-            'error': (
-                f'Amount mismatch: received KSh {tx.amount}, '
-                f'expected KSh {expected:.2f}.'
-            )
-        }, status=400)
+        return JsonResponse({'success': False, 'error': f'Amount mismatch: received KSh {tx.amount}, expected KSh {expected:.2f}.'}, status=400)
 
-    return JsonResponse({
-        'success': True,
-        'mpesa_code': tx.mpesa_code,
-        'amount': float(tx.amount),
-        'transaction_id': tx.id,
-    })
+    return JsonResponse({'success': True, 'mpesa_code': tx.mpesa_code, 'amount': float(tx.amount), 'transaction_id': tx.id})
 
 
 # ============================================
@@ -362,9 +266,6 @@ def mpesa_confirm(request):
 @csrf_exempt
 @require_POST
 def mpesa_callback(request):
-    """
-    Safaricom POSTs the STK result here.
-    """
     try:
         data = json.loads(request.body.decode('utf-8') or '{}')
         stk  = data['Body']['stkCallback']
@@ -377,24 +278,15 @@ def mpesa_callback(request):
             cfg = MpesaConfig.objects.filter(shortcode=str(shortcode)).first()
             if cfg:
                 tx = MpesaTransaction.objects.create(
-                    company=cfg.company,
-                    branch=cfg.branch,
-                    mpesa_config=cfg,
-                    provider=cfg.provider,
-                    provider_ref=req_id,
-                    merchant_request_id=stk.get('MerchantRequestID', ''),
-                    status='pending',
+                    company=cfg.company, branch=cfg.branch, mpesa_config=cfg, provider=cfg.provider, provider_ref=req_id,
+                    merchant_request_id=stk.get('MerchantRequestID', ''), status='pending',
                 )
 
         if tx is None:
             logger.warning('Callback for unknown CheckoutRequestID: %s', req_id)
             return JsonResponse({'ResultCode': 0, 'ResultDesc': 'Ignored'})
 
-        meta = {
-            i['Name']: i.get('Value')
-            for i in (stk.get('CallbackMetadata') or {}).get('Item', [])
-        }
-
+        meta = {i['Name']: i.get('Value') for i in (stk.get('CallbackMetadata') or {}).get('Item', [])}
         tx.result_desc  = stk.get('ResultDesc', '')
         tx.raw_callback = data
 
@@ -403,7 +295,6 @@ def mpesa_callback(request):
             tx.mpesa_code = meta.get('MpesaReceiptNumber', '')
             tx.amount     = meta.get('Amount', tx.amount or 0)
             tx.phone      = meta.get('PhoneNumber', tx.phone)
-
             tx.customer_first_name  = meta.get('FirstName',  '') or ''
             tx.customer_middle_name = meta.get('MiddleName', '') or ''
             tx.customer_last_name   = meta.get('LastName',   '') or ''
@@ -411,7 +302,6 @@ def mpesa_callback(request):
             tx.status = 'failed'
 
         tx.save()
-
         _link_payment_to_chama(tx)
 
     except Exception:
@@ -439,12 +329,27 @@ def kopokopo_callback(request):
             return JsonResponse({'status': 'ignored'})
 
         parsed = parse_webhook(cfg, request)
-        
         logger.info(f"Kopokopo webhook parsed: {parsed}")
 
+        # 👈 Try to find transaction by provider_ref first
         tx = MpesaTransaction.objects.filter(provider_ref=parsed['provider_ref']).first()
+
+        # 👈 If not found, match by company, phone, amount, and 'pending' status
         if not tx:
-            logger.warning(f"Kopokopo webhook for unknown payment ID: {parsed['provider_ref']}")
+            logger.warning(f"No exact match for {parsed['provider_ref']}. Searching for pending transaction.")
+            tx = MpesaTransaction.objects.filter(
+                company=cfg.company,
+                phone=parsed['phone'],
+                amount=parsed['amount'],
+                status='pending'
+            ).order_by('-created_at').first()
+            
+            if tx:
+                tx.provider_ref = parsed['provider_ref']
+                tx.save(update_fields=['provider_ref'])
+
+        if not tx:
+            logger.warning(f"Kopokopo webhook for unknown payment: {parsed['provider_ref']}")
             return JsonResponse({'status': 'ignored'})
 
         tx.result_desc = 'Kopokopo Webhook Received'
