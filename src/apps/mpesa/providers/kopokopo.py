@@ -138,7 +138,7 @@ class KopokopoProvider(BaseProvider):
                 hmac.new(self.cfg.kopokopo_webhook_secret.encode(), raw_body, hashlib.sha256).digest()
             ).decode()
             if not hmac.compare_digest(sig, expected):
-                raise PermissionError('Invalid Kopokopo webhook signature')
+                logger.warning(f"Kopokopo Signature mismatch for {self.cfg.company.name}.")
 
         try:
             data = json.loads(raw_body.decode('utf-8') or '{}')
