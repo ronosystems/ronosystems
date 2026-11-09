@@ -2225,16 +2225,47 @@ function onCheckoutCustomerTypeChange() {
     hideCheckoutError();
 }
 
+
 function selectCheckoutPaymentMethod(method) {
     currentPaymentMethod = method;
     document.querySelectorAll('#checkoutModal .checkout-pm').forEach(b => { b.classList.toggle('active', b.dataset.pm === method); });
-    const cashPanel = document.getElementById('checkoutCashPanel'); const refPanel = document.getElementById('checkoutRefPanel'); const refLabel = document.getElementById('checkoutRefLabel'); const mpesaPanel = document.getElementById('checkoutMpesaPanel');
+    const cashPanel = document.getElementById('checkoutCashPanel'); 
+    const refPanel = document.getElementById('checkoutRefPanel'); 
+    const refLabel = document.getElementById('checkoutRefLabel'); 
+    const mpesaPanel = document.getElementById('checkoutMpesaPanel');
+    
     cashPanel.style.display = 'none'; refPanel.style.display = 'none'; if (mpesaPanel) mpesaPanel.style.display = 'none';
-    if (method === 'cash') { cashPanel.style.display = 'block'; document.getElementById('checkoutChange').textContent = 'KSh 0.00'; document.getElementById('checkoutTendered').value = ''; }
-    else if (method === 'mpesa') { document.getElementById('checkoutMpesaPanel').style.display = 'block'; document.getElementById('mpesaStkStep').style.display = 'block'; document.getElementById('mpesaConfirmStep').style.display = 'none'; document.getElementById('mpesaConfirmAmount').value = currentTotal.toFixed(2); document.getElementById('mpesaExpectedAmount').textContent = 'KSh ' + currentTotal.toFixed(2); }
-    else { refPanel.style.display = 'block'; if (method === 'bank') { refLabel.textContent = 'Card / Txn Ref'; document.getElementById('checkoutReference').placeholder = 'e.g. auth code'; } else if (method === 'points') { refLabel.textContent = 'Customer Phone (loyalty)'; document.getElementById('checkoutReference').placeholder = '07XX XXX XXX'; } }
+
+    if (method === 'cash') { 
+        cashPanel.style.display = 'block'; 
+        document.getElementById('checkoutChange').textContent = 'KSh 0.00'; 
+        document.getElementById('checkoutTendered').value = ''; 
+    }
+    else if (method === 'mpesa') { 
+        document.getElementById('checkoutMpesaPanel').style.display = 'block'; 
+        document.getElementById('mpesaStkStep').style.display = 'block'; 
+        document.getElementById('mpesaConfirmStep').style.display = 'none'; 
+        document.getElementById('mpesaConfirmAmount').value = currentTotal.toFixed(2); 
+        document.getElementById('mpesaExpectedAmount').textContent = 'KSh ' + currentTotal.toFixed(2); 
+        
+        // 👈 FORCE NAMED CUSTOMER for M-Pesa
+        document.getElementById('checkoutNamed').checked = true;
+        document.getElementById('checkoutWalkin').checked = false;
+        onCheckoutCustomerTypeChange(); 
+    }
+    else { 
+        refPanel.style.display = 'block'; 
+        if (method === 'bank') { 
+            refLabel.textContent = 'Card / Txn Ref'; 
+            document.getElementById('checkoutReference').placeholder = 'e.g. auth code'; 
+        } else if (method === 'points') { 
+            refLabel.textContent = 'Customer Phone (loyalty)'; 
+            document.getElementById('checkoutReference').placeholder = '07XX XXX XXX'; 
+        } 
+    }
     hideCheckoutError();
 }
+
 
 function mpesaShowConfirmStep() {
     document.getElementById('mpesaStkStep').style.display = 'none'; document.getElementById('mpesaConfirmStep').style.display = 'block';
@@ -2247,16 +2278,53 @@ function mpesaShowStkStep() {
     setTimeout(() => document.getElementById('mpesaStkPhone').focus(), 80);
 }
 
+
 function sendMpesaStkPush() {
-    const phoneEl = document.getElementById('mpesaStkPhone'); const statusEl = document.getElementById('mpesaStkStatus'); const phone = (phoneEl.value || '').trim();
-    if (!/^[+\d][\d\s\-()]{6,}$/.test(phone)) { statusEl.style.display = 'block'; statusEl.style.background = '#f8d7da'; statusEl.style.color = '#721c24'; statusEl.textContent = '⚠️ Enter a valid M-Pesa phone number.'; phoneEl.focus(); return; }
-    statusEl.style.display = 'block'; statusEl.style.background = '#fff3cd'; statusEl.style.color = '#856404'; statusEl.innerHTML = '⏳ Sending STK push…';
-    fetch('/mpesa/stk-push/', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() }, body: JSON.stringify({ phone: phone, amount: currentTotal, account_reference: 'POS-SALE', description: 'POS Payment', branch_id: document.getElementById('checkoutBranch').value || (document.getElementById('branchSelect') || {}).value || null }) })
+    const phoneEl = document.getElementById('mpesaStkPhone'); 
+    const statusEl = document.getElementById('mpesaStkStatus'); 
+    const phone = (phoneEl.value || '').trim();
+    
+    if (!/^[+\d][\d\s\-()]{6,}$/.test(phone)) { 
+        statusEl.style.display = 'block'; 
+        statusEl.style.background = '#f8d7da'; 
+        statusEl.style.color = '#721c24'; 
+        statusEl.textContent = '⚠️ Enter a valid M-Pesa phone number.'; 
+        phoneEl.focus(); 
+        return; 
+    }
+    
+    // 👈 Copy the phone number to the checkout customer phone field
+    document.getElementById('checkoutPhone').value = phone;
+
+    statusEl.style.display = 'block'; 
+    statusEl.style.background = '#fff3cd'; 
+    statusEl.style.color = '#856404'; 
+    statusEl.innerHTML = '⏳ Sending STK push…';
+    
+    fetch('/mpesa/stk-push/', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() }, 
+        body: JSON.stringify({ phone: phone, amount: currentTotal, account_reference: 'POS-SALE', description: 'POS Payment', branch_id: document.getElementById('checkoutBranch').value || (document.getElementById('branchSelect') || {}).value || null }) 
+    })
     .then(res => res.json()).then(data => {
-        if (data.success) { statusEl.style.background = '#d4edda'; statusEl.style.color = '#155724'; statusEl.innerHTML = '✅ STK push sent to <b>' + phone + '</b>.<br><span style="display:inline-block;margin-top:4px;">⏳ <b>Waiting for payment…</b></span>'; pollMpesaStkStatus(data.checkout_request_id || data.request_id, 30); }
-        else { statusEl.style.background = '#f8d7da'; statusEl.style.color = '#721c24'; statusEl.textContent = '❌ ' + (data.error || 'STK push failed.'); }
-    }).catch(err => { statusEl.style.background = '#f8d7da'; statusEl.style.color = '#721c24'; statusEl.textContent = '❌ ' + err.message; });
+        if (data.success) { 
+            statusEl.style.background = '#d4edda'; 
+            statusEl.style.color = '#155724'; 
+            statusEl.innerHTML = '✅ STK push sent to <b>' + phone + '</b>.<br><span style="display:inline-block;margin-top:4px;">⏳ <b>Waiting for payment…</b></span>'; 
+            pollMpesaStkStatus(data.checkout_request_id || data.request_id, 30); 
+        }
+        else { 
+            statusEl.style.background = '#f8d7da'; 
+            statusEl.style.color = '#721c24'; 
+            statusEl.textContent = '❌ ' + (data.error || 'STK push failed.'); 
+        }
+    }).catch(err => { 
+        statusEl.style.background = '#f8d7da'; 
+        statusEl.style.color = '#721c24'; 
+        statusEl.textContent = '❌ ' + err.message; 
+    });
 }
+
 
 
 function pollMpesaStkStatus(requestId, attemptsLeft) {
@@ -2381,6 +2449,7 @@ function showCheckoutError(msg) { const el = document.getElementById('checkoutEr
 function hideCheckoutError() { const el = document.getElementById('checkoutError'); el.style.display = 'none'; el.textContent = ''; }
 
 
+
 async function submitCheckout() {
     hideCheckoutError();
     if (checkoutMode === 'pending' && pendingSaleData) { return submitPendingCheckout(); }
@@ -2443,22 +2512,38 @@ async function submitCheckout() {
         const phone = document.getElementById('checkoutPhone').value.trim(); 
         const email = document.getElementById('checkoutEmail').value.trim();
         
-        if (!phone) { 
-            showCheckoutError('⚠️ Customer phone is required.'); 
-            document.getElementById('checkoutPhone').focus(); 
-            return; 
+        // If M-Pesa, we require the phone, but allow the name to be optional
+        if (currentPaymentMethod === 'mpesa') {
+            if (!phone) { 
+                showCheckoutError('⚠️ Customer phone is required.'); 
+                document.getElementById('checkoutPhone').focus(); 
+                return; 
+            }
+            // Default to a generic name if left blank
+            customer = { 
+                type: 'named', 
+                name: name || 'M-Pesa Customer', 
+                phone, 
+                email 
+            };
+        } else {
+            if (!phone) { 
+                showCheckoutError('⚠️ Customer phone is required.'); 
+                document.getElementById('checkoutPhone').focus(); 
+                return; 
+            }
+            if (!/^[+\d][\d\s\-()]{6,}$/.test(phone)) { 
+                showCheckoutError('⚠️ Enter a valid customer phone number.'); 
+                document.getElementById('checkoutPhone').focus(); 
+                return; 
+            }
+            if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { 
+                showCheckoutError('⚠️ Enter a valid email address, or leave blank.'); 
+                document.getElementById('checkoutEmail').focus(); 
+                return; 
+            }
+            customer = { type: 'named', name: name || 'Walk-in', phone, email };
         }
-        if (!/^[+\d][\d\s\-()]{6,}$/.test(phone)) { 
-            showCheckoutError('⚠️ Enter a valid customer phone number.'); 
-            document.getElementById('checkoutPhone').focus(); 
-            return; 
-        }
-        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { 
-            showCheckoutError('⚠️ Enter a valid email address, or leave blank.'); 
-            document.getElementById('checkoutEmail').focus(); 
-            return; 
-        }
-        customer = { type: 'named', name: name || 'M-Pesa Customer', phone, email };
     } else { 
         customer = { type: 'walkin', name: 'Walk-in Customer', phone: '', email: '' }; 
     }
