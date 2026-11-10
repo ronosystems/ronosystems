@@ -209,7 +209,9 @@ def get_all_transactions(company, branch=None,
 
     # ── Purchases ──
     if not tx_type or tx_type == 'purchase':
-        purchases_qs = PurchaseRecord.objects.filter(company=company, status='completed')
+        purchases_qs = PurchaseRecord.objects.filter(
+            company=company, status='completed'
+        ).exclude(description='HIDDEN_ADJUSTMENT')
         if branch:
             purchases_qs = purchases_qs.filter(branch_id=branch)
         if date_from:
@@ -237,7 +239,9 @@ def get_all_transactions(company, branch=None,
 
     # ── Expenses ──
     if not tx_type or tx_type == 'expense':
-        expenses_qs = Expense.objects.filter(company=company)
+        expenses_qs = Expense.objects.filter(
+            company=company
+        ).exclude(description='HIDDEN_ADJUSTMENT')
         if branch:
             expenses_qs = expenses_qs.filter(branch_id=branch)
         if date_from:
@@ -331,7 +335,9 @@ def get_recent_transactions(company, branch=None, limit=5):
         })
 
     # ── Purchases ──
-    purchases_qs = PurchaseRecord.objects.filter(company=company, status='completed')
+    purchases_qs = PurchaseRecord.objects.filter(
+        company=company, status='completed'
+    ).exclude(description='HIDDEN_ADJUSTMENT')
     if branch:
         purchases_qs = purchases_qs.filter(branch_id=branch)
     for p in purchases_qs.order_by('-purchase_date', '-created_at')[:limit]:
@@ -349,7 +355,9 @@ def get_recent_transactions(company, branch=None, limit=5):
         })
 
     # ── Expenses ──
-    expenses_qs = Expense.objects.filter(company=company)
+    expenses_qs = Expense.objects.filter(
+        company=company
+    ).exclude(description='HIDDEN_ADJUSTMENT')
     if branch:
         expenses_qs = expenses_qs.filter(branch_id=branch)
     for e in expenses_qs.order_by('-created_at')[:limit]:
