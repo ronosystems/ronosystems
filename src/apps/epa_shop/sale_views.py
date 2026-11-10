@@ -47,6 +47,7 @@ def get_user_branch(user):
     """Get the user's branch"""
     return user.branch if user else None
 
+
 def calculate_tax(company, subtotal):
     """
     Return (tax_amount, net_amount) based on the company's Payment Settings.
@@ -85,6 +86,23 @@ def calculate_tax(company, subtotal):
     )
     net = subtotal   # ← customer pays exactly what's on the shelf
     return tax, net
+
+
+def _snapshot_cogs(product, unit_price, quantity):
+    """
+    Return (unit_cost, line_cogs) for a sale line — frozen at sale time.
+
+    Used by every sale-creation path so historical COGS is immutable.
+    Never called at report-time (that would re-introduce the bug).
+    """
+    if getattr(product, 'purchase_price', None):
+        unit_cost = Decimal(str(product.purchase_price))
+    else:
+        unit_cost = Decimal(str(unit_price)) * Decimal('0.7')
+    unit_cost = unit_cost.quantize(Decimal('0.01'))
+    line_cogs = (unit_cost * Decimal(quantity)).quantize(Decimal('0.01'))
+    return unit_cost, line_cogs
+
 
 # ============================================
 # PROCESS SALE
@@ -315,15 +333,15 @@ def process_sale(request):
                 sale_date=timezone.now(),
             )
 
-            # 👇 NEW — link the M-Pesa transaction to this sale
+            # Link the M-Pesa transaction to this sale
             if payment_method == 'm-pesa' and payment_reference:
                 MpesaTransaction.objects.filter(
                     company=company,
                     mpesa_code__iexact=payment_reference,
                 ).update(sale=sale)
 
-
             # Sale items + unit/stock mutations
+            running_cogs = Decimal('0.00')
             for item_data in sale_items_data:
                 product = item_data['product']
                 unit    = item_data['unit']
@@ -343,6 +361,11 @@ def process_sale(request):
                 product.quantity_in_stock -= qty
                 product.save()
 
+                # Snapshot historical COGS for this line
+                unit_cost, line_cogs = _snapshot_cogs(
+                    product, item_data['unit_price'], qty
+                )
+
                 # Create SaleItem
                 SaleItem.objects.create(
                     sale=sale,
@@ -355,7 +378,11 @@ def process_sale(request):
                     unit_price=item_data['unit_price'],
                     total_price=item_data['total_price'],
                     unit=unit,
+                    unit_cost=unit_cost,        # ← NEW
+                    cogs_amount=line_cogs,      # ← NEW
                 )
+
+                running_cogs += line_cogs
 
                 # Stock movement
                 record_stock_movement(
@@ -369,6 +396,10 @@ def process_sale(request):
                     notes=f"Sale ({payment_status}) - {customer_name}",
                     performed_by=request.user,
                 )
+
+            # ── Roll up the frozen COGS total on the sale ──
+            sale.cogs_amount = running_cogs
+            sale.save(update_fields=['cogs_amount'])
 
             # Customer stats — only count PAID sales toward purchases
             if customer and payment_status == 'paid':
@@ -416,16 +447,16 @@ def process_sale(request):
 def sale_create_single(request):
     """Create a single item sale page"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     branches = Branch.objects.filter(company=company, is_active=True)
     customers = Customer.objects.filter(company=company, is_active=True).order_by('name')[:50]
-    
+
     context = {
         'company': company,
         'branches': branches,
@@ -445,32 +476,32 @@ def sale_create_single(request):
 def sale_search_units(request):
     """Search for units by identifier (IMEI/Serial) - Autocomplete"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         return JsonResponse({'error': 'No company assigned'}, status=400)
-    
+
     query = request.GET.get('q', '').strip()
-    
+
     if len(query) < 2:
         return JsonResponse({'results': []})
-    
+
     # In support mode, super admin sees all branches
     is_admin = (
         is_viewing_company or
-        request.user.is_company_admin or 
-        request.user.is_company_manager or 
+        request.user.is_company_admin or
+        request.user.is_company_manager or
         request.user.is_super_admin or
         request.user.is_superuser or
         request.user.is_staff
     )
-    
+
     results = []
-    
+
     base_filter = {
         'identifier__icontains': query,
         'status': 'available'
     }
-    
+
     # Filter by branch only if not admin AND not in support mode
     if not is_admin and request.user.branch:
         units = Unit.objects.filter(
@@ -479,7 +510,7 @@ def sale_search_units(request):
             models.Q(phone__branch=request.user.branch) |
             models.Q(electronic__branch=request.user.branch)
         ).select_related(
-            'phone', 'phone__branch', 
+            'phone', 'phone__branch',
             'electronic', 'electronic__branch'
         )[:20]
     else:
@@ -487,26 +518,26 @@ def sale_search_units(request):
             **base_filter,
             phone__company=company
         ).select_related(
-            'phone', 'phone__branch', 
+            'phone', 'phone__branch',
             'electronic', 'electronic__branch'
         )[:20]
-        
+
         electronic_units = Unit.objects.filter(
             **base_filter,
             electronic__company=company
         ).select_related(
             'electronic', 'electronic__branch'
         )[:20]
-        
+
         units = list(units) + list(electronic_units)
         seen = set()
         units = [u for u in units if u.id not in seen and not seen.add(u.id)]
-    
+
     for unit in units:
         product = None
         product_type = None
         product_info = {}
-        
+
         if unit.phone:
             product = unit.phone
             product_type = 'Phone'
@@ -533,7 +564,7 @@ def sale_search_units(request):
             }
         else:
             continue
-        
+
         results.append({
             'unit_id': unit.id,
             'identifier': unit.identifier,
@@ -543,7 +574,7 @@ def sale_search_units(request):
             'display': f"{unit.identifier} - {product_info['brand']} {product_info['name']}",
             'status': unit.status,
         })
-    
+
     return JsonResponse({'results': results})
 
 
@@ -575,7 +606,7 @@ def sale_process_single(request):
     sale_price_raw       = request.POST.get('sale_price', '0')
     sale_type            = (request.POST.get('sale_type') or 'cash').strip()
     branch_id            = (request.POST.get('branch_id') or '').strip()
-    payment_reference    = (request.POST.get('payment_reference') or '').strip() or None 
+    payment_reference    = (request.POST.get('payment_reference') or '').strip() or None
 
     if not unit_id:
         return JsonResponse({'error': 'Please scan or enter a unit identifier'}, status=400)
@@ -731,13 +762,15 @@ def sale_process_single(request):
                 sale_date=timezone.now(),
             )
 
-
-            # 👇 NEW — link the M-Pesa transaction to this sale
+            # Link the M-Pesa transaction to this sale
             if sale_type in ('m-pesa', 'mpesa') and payment_reference:
                 MpesaTransaction.objects.filter(
                     company=company,
                     mpesa_code__iexact=payment_reference,
                 ).update(sale=sale)
+
+            # --- Snapshot historical COGS for this line ---
+            unit_cost, line_cogs = _snapshot_cogs(product, sale_price, 1)
 
             # --- Create SaleItem ---
             content_type = ContentType.objects.get_for_model(product)
@@ -752,7 +785,13 @@ def sale_process_single(request):
                 unit_price=sale_price,
                 total_price=sale_price,
                 unit=unit,
+                unit_cost=unit_cost,        # ← NEW
+                cogs_amount=line_cogs,      # ← NEW
             )
+
+            # ── Freeze the sale's COGS total ──
+            sale.cogs_amount = line_cogs
+            sale.save(update_fields=['cogs_amount'])
 
             # --- Mark unit as sold ---
             unit.status = 'sold'
@@ -821,11 +860,9 @@ def sale_process_single(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-
-
 # ============================================
-# SALE RECEIPT 
-# ============================================     
+# SALE RECEIPT
+# ============================================
 @login_required
 @xframe_options_sameorigin
 def sale_receipt(request, pk):
@@ -855,10 +892,8 @@ def sale_receipt(request, pk):
 
     items = sale.items.all()
 
-    # ------------------------------------------------------------
     # Load receipt settings (merged with defaults) so the template
     # can honour every toggle from the Receipt Settings page.
-    # ------------------------------------------------------------
     from apps.company.settings_views import get_company_settings
     company_settings = get_company_settings(company)
     receipt_settings = company_settings.get('receipt', {})
@@ -868,17 +903,17 @@ def sale_receipt(request, pk):
         'sale': sale,
         'items': items,
         'is_viewing_company': is_viewing_company,
-        'receipt_settings': receipt_settings,   # ✅ NEW
+        'receipt_settings': receipt_settings,
         'page_title': f'Receipt #{sale.company_sale_id}',
         'page_subtitle': 'Sale receipt',
-        'is_embed': request.GET.get('embed') == '1', 
+        'is_embed': request.GET.get('embed') == '1',
         'is_receipt': True,
     }
     return render(request, 'epa/sale_receipt.html', context)
 
 
 # ============================================
-# SALE RECEIPT BY  ID
+# SALE RECEIPT BY ID
 # ============================================
 
 @login_required
@@ -904,10 +939,7 @@ def sale_receipt_by_id(request, company_sale_id):
 
     items = sale.items.all()
 
-    # ------------------------------------------------------------
-    # Load receipt settings (merged with defaults) so the template
-    # can honour every toggle from the Receipt Settings page.
-    # ------------------------------------------------------------
+    # Load receipt settings (merged with defaults)
     from apps.company.settings_views import get_company_settings
     company_settings = get_company_settings(company)
     receipt_settings = company_settings.get('receipt', {})
@@ -917,7 +949,7 @@ def sale_receipt_by_id(request, company_sale_id):
         'sale': sale,
         'items': items,
         'is_viewing_company': is_viewing_company,
-        'receipt_settings': receipt_settings,   # ✅ NEW
+        'receipt_settings': receipt_settings,
         'page_title': f'Receipt #{sale.company_sale_id}',
         'page_subtitle': 'Sale receipt',
         'is_embed': request.GET.get('embed') == '1',
@@ -934,10 +966,10 @@ def sale_receipt_by_id(request, company_sale_id):
 def get_branches(request):
     """Get branches for POS dropdown"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         return JsonResponse({'error': 'No company assigned'}, status=400)
-    
+
     branches = Branch.objects.filter(company=company, is_active=True)
     data = []
     for branch in branches:
@@ -949,7 +981,7 @@ def get_branches(request):
             'country': branch.country,
             'currency': branch.currency_symbol or 'KSh'
         })
-    
+
     return JsonResponse({'branches': data})
 
 
@@ -961,15 +993,15 @@ def get_branches(request):
 def sale_history(request):
     """View sale history"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     sales = Sale.objects.filter(company=company).order_by('-sale_date')
-    
+
     context = {
         'sales': sales,
         'total_count': sales.count(),
@@ -1052,7 +1084,6 @@ def sale_list(request):
         )
 
     # ---------- Stats (computed on filtered queryset) ----------
-    # ---------- Stats (computed on filtered queryset) ----------
     # IMPORTANT: use timezone.localdate() so "today" matches the
     # company's local calendar day — timezone.now().date() returns
     # the UTC date which is one day behind in EAT (UTC+3).
@@ -1114,13 +1145,13 @@ def sale_list(request):
         'is_admin_or_manager': is_admin,
         'is_viewing_company': is_viewing_company,
         'can_view_all_sales': can_view_all,
-        'stats': stats,                        # ✅ NEW
-        'branches': branches,                  # ✅ NEW
-        'selected_branch': selected_branch,    # ✅ NEW
-        'branch_id': branch_id,                # ✅ NEW
-        'date_from': date_from,                # ✅ NEW
-        'date_to': date_to,                    # ✅ NEW
-        'querystring': querystring,            # ✅ NEW
+        'stats': stats,
+        'branches': branches,
+        'selected_branch': selected_branch,
+        'branch_id': branch_id,
+        'date_from': date_from,
+        'date_to': date_to,
+        'querystring': querystring,
         'page_title': 'Sales',
         'page_subtitle': 'Sales history',
     }
@@ -1178,7 +1209,7 @@ def sale_lookup_by_barcode(request):
 
 
 # ============================================
-# SALE EXCELL LIST
+# SALE EXCEL EXPORT
 # ============================================
 
 @login_required
@@ -1217,7 +1248,7 @@ def sale_export_excel(request):
         sales_queryset = sales_queryset.filter(sale_date__date__lte=date_to)
 
     # Prefetch items and their generic products to avoid N+1 queries
-    sales_queryset = sales_queryset.select_related('branch', 'sold_by').prefetch_related('items__item').order_by('-sale_date')
+    sales_queryset = sales_queryset.select_related('branch', 'sold_by').prefetch_related('items').order_by('-sale_date')
 
     # Create an in-memory workbook
     wb = openpyxl.Workbook()
@@ -1226,8 +1257,8 @@ def sale_export_excel(request):
 
     # Define Headers (Added Profit Amount)
     headers = [
-        'Sale ID', 'Customer Name', 'Customer Phone', 'Items', 
-        'Total Amount', 'Tax', 'Net Amount', 'Profit Amount', 'Payment Method', 
+        'Sale ID', 'Customer Name', 'Customer Phone', 'Items',
+        'Total Amount', 'Tax', 'Net Amount', 'Profit Amount', 'Payment Method',
         'Payment Status', 'Sale Date', 'Sold By', 'Branch'
     ]
     ws.append(headers)
@@ -1245,14 +1276,22 @@ def sale_export_excel(request):
         if sale.sold_by:
             sold_by_name = sale.sold_by.get_full_name() or sale.sold_by.username
 
-        # Calculate Cost of Goods Sold (COGS)
-        total_cost = 0
-        for item in sale.items.all():
-            # item.item is the GenericForeignKey to Phone/Electronic/Accessory
-            if item.item and hasattr(item.item, 'purchase_price'):
-                total_cost += (item.item.purchase_price * item.quantity)
-        
-        # Profit = Revenue - Cost
+        # ── Use the FROZEN per-sale COGS (price-change-proof) ──
+        total_cost = sale.cogs_amount or Decimal('0.00')
+
+        # Legacy safety: if frozen value is somehow zero, sum per-item snapshots
+        if total_cost == 0:
+            for item in sale.items.all():
+                line_cogs = getattr(item, 'cogs_amount', None)
+                if line_cogs is not None and line_cogs > 0:
+                    total_cost += line_cogs
+                else:
+                    # Final fallback — never reads purchase_price
+                    total_cost += (
+                        item.unit_price * Decimal('0.7') * item.quantity
+                    ).quantize(Decimal('0.01'))
+
+        # Profit = Revenue - Cost (both frozen values)
         profit = float(sale.net_amount) - float(total_cost)
 
         ws.append([
@@ -1263,7 +1302,7 @@ def sale_export_excel(request):
             float(sale.total_amount),
             float(sale.tax),
             float(sale.net_amount),
-            profit,  # <--- Added Profit
+            profit,
             sale.payment_method.title(),
             sale.payment_status.title(),
             sale.sale_date.strftime("%Y-%m-%d %H:%M"),
@@ -1288,7 +1327,7 @@ def sale_export_excel(request):
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
     response['Content-Disposition'] = f'attachment; filename="Sales_Export_{timezone.now().strftime("%Y%m%d_%H%M")}.xlsx"'
-    
+
     wb.save(response)
     return response
 
@@ -1301,16 +1340,16 @@ def sale_export_excel(request):
 def sale_detail(request, pk):
     """View sale details"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     sale = get_object_or_404(Sale, pk=pk, company=company)
     items = sale.items.all()
-    
+
     context = {
         'sale': sale,
         'items': items,
@@ -1328,37 +1367,37 @@ def sale_detail(request, pk):
 def sale_get_unit_by_identifier(request):
     """Get unit details by identifier (IMEI/Serial) - Quick lookup"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         return JsonResponse({'error': 'No company assigned'}, status=400)
-    
+
     identifier = request.GET.get('identifier', '').strip()
-    
+
     if not identifier:
         return JsonResponse({'error': 'Identifier is required'}, status=400)
-    
+
     try:
         is_admin = (
             is_viewing_company or
-            request.user.is_company_admin or 
-            request.user.is_company_manager or 
+            request.user.is_company_admin or
+            request.user.is_company_manager or
             request.user.is_super_admin or
             request.user.is_superuser or
             request.user.is_staff
         )
-        
+
         unit = Unit.objects.filter(
             identifier=identifier
         ).select_related(
             'phone', 'phone__branch', 'electronic', 'electronic__branch'
         ).first()
-        
+
         if not unit:
             return JsonResponse({'error': f'Unit "{identifier}" not found'}, status=404)
-        
+
         unit_company = None
         unit_branch = None
-        
+
         if unit.phone:
             unit_company = unit.phone.company
             unit_branch = unit.phone.branch
@@ -1367,10 +1406,10 @@ def sale_get_unit_by_identifier(request):
             unit_branch = unit.electronic.branch
         else:
             return JsonResponse({'error': 'Invalid product type'}, status=400)
-        
+
         if not unit_company or unit_company.id != company.id:
             return JsonResponse({'error': 'Unit not found in your company'}, status=404)
-        
+
         # Branch check (skip in support mode)
         if not is_admin:
             user_branch = request.user.branch
@@ -1379,17 +1418,17 @@ def sale_get_unit_by_identifier(request):
                     return JsonResponse({
                         'error': 'You do not have access to units from other branches'
                     }, status=403)
-        
+
         if unit.status != 'available':
             return JsonResponse({
                 'error': f'Unit "{identifier}" is already {unit.status}',
                 'status': unit.status
             }, status=400)
-        
+
         product = None
         product_type = None
         product_data = {}
-        
+
         if unit.phone:
             product = unit.phone
             product_type = 'Phone'
@@ -1426,7 +1465,7 @@ def sale_get_unit_by_identifier(request):
             }
         else:
             return JsonResponse({'error': 'Invalid product type'}, status=400)
-        
+
         owner_history = None
         if unit.owner:
             owner_history = {
@@ -1436,7 +1475,7 @@ def sale_get_unit_by_identifier(request):
                 'total_purchases': float(unit.owner.total_purchases) if unit.owner.total_purchases else 0,
                 'purchase_count': unit.owner.purchase_count,
             }
-        
+
         return JsonResponse({
             'success': True,
             'unit': {
@@ -1451,7 +1490,7 @@ def sale_get_unit_by_identifier(request):
             'product_type': product_type,
             'owner_history': owner_history,
         })
-        
+
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -1466,20 +1505,20 @@ def sale_get_unit_by_identifier(request):
 def sale_create(request):
     """Create a new sale from a unit (IMEI/Serial) - Legacy method"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     unit_id = request.GET.get('unit')
     product_code = request.GET.get('product')
-    
+
     unit = None
     product = None
     product_type = None
-    
+
     if unit_id:
         unit = get_object_or_404(Unit, id=unit_id)
         if unit.phone:
@@ -1488,29 +1527,29 @@ def sale_create(request):
         elif unit.electronic:
             product = unit.electronic
             product_type = 'Electronic'
-    
+
     if not product and product_code:
         from .product_views import get_product_by_code
         product, product_type = get_product_by_code(company, product_code)
-    
+
     if not product:
         messages.error(request, 'Product not found.')
         return redirect('/epa_shop/products/')
-    
+
     branches = Branch.objects.filter(company=company, is_active=True)
-    
+
     is_admin = (
         is_viewing_company or
-        request.user.is_company_admin or 
-        request.user.is_company_manager or 
+        request.user.is_company_admin or
+        request.user.is_company_manager or
         request.user.is_super_admin or
         request.user.is_superuser or
         request.user.is_staff
     )
-    
+
     if not is_admin and request.user.branch:
         branches = branches.filter(id=request.user.branch.id)
-    
+
     if request.method == 'POST':
         try:
             branch_id = request.POST.get('branch_id')
@@ -1520,7 +1559,7 @@ def sale_create(request):
             payment_method = request.POST.get('payment_method', 'cash')
             selling_price = float(request.POST.get('selling_price', 0))
             unit_id = request.POST.get('unit_id')
-            
+
             if not branch_id:
                 messages.error(request, 'Please select a branch.')
                 return render(request, 'epa/sale_form.html', {
@@ -1532,7 +1571,7 @@ def sale_create(request):
                     'page_subtitle': 'Sell a unit',
                     'default_price': product.selling_price if product else 0,
                 })
-            
+
             if selling_price <= 0:
                 messages.error(request, 'Please enter a valid selling price.')
                 return render(request, 'epa/sale_form.html', {
@@ -1544,9 +1583,9 @@ def sale_create(request):
                     'page_subtitle': 'Sell a unit',
                     'default_price': product.selling_price if product else 0,
                 })
-            
+
             branch = get_object_or_404(Branch, id=branch_id, company=company)
-            
+
             if unit_id:
                 unit_to_sell = get_object_or_404(Unit, id=unit_id)
             elif unit:
@@ -1562,7 +1601,7 @@ def sale_create(request):
                     'page_subtitle': 'Sell a unit',
                     'default_price': product.selling_price if product else 0,
                 })
-            
+
             customer = None
             if customer_phone:
                 customer = Customer.objects.filter(phone=customer_phone, company=company).first()
@@ -1574,7 +1613,7 @@ def sale_create(request):
                         email=customer_email,
                         is_active=True
                     )
-            
+
             with transaction.atomic():
                 sale = Sale.objects.create(
                     company=company,
@@ -1592,17 +1631,17 @@ def sale_create(request):
                     sold_by=request.user,
                     sale_date=timezone.now()
                 )
-                
+
                 unit_to_sell.status = 'sold'
                 unit_to_sell.sold_date = timezone.now()
                 unit_to_sell.owner_name = customer_name
                 unit_to_sell.owner_phone = customer_phone
                 unit_to_sell.save()
-                
+
                 previous_quantity = product.quantity_in_stock
                 product.quantity_in_stock -= 1
                 product.save()
-                
+
                 record_stock_movement(
                     product=product,
                     movement_type='sale',
@@ -1614,9 +1653,12 @@ def sale_create(request):
                     notes=f"Sale - {customer_name}",
                     performed_by=request.user
                 )
-                
+
+                # ── Snapshot historical COGS ──
+                unit_cost, line_cogs = _snapshot_cogs(product, selling_price, 1)
+
                 content_type = ContentType.objects.get_for_model(product)
-                sale_item = SaleItem.objects.create(
+                SaleItem.objects.create(
                     sale=sale,
                     content_type=content_type,
                     object_id=product.id,
@@ -1624,25 +1666,29 @@ def sale_create(request):
                     item_name=product.name,
                     item_sku=product.product_code,
                     quantity=1,
-                    unit_price=selling_price,
-                    total_price=selling_price
+                    unit_price=Decimal(str(selling_price)),
+                    total_price=Decimal(str(selling_price)),
+                    unit=unit_to_sell,
+                    unit_cost=unit_cost,        # ← NEW
+                    cogs_amount=line_cogs,      # ← NEW
                 )
-                
-                sale_item.unit = unit_to_sell
-                sale_item.save()
-                
+
+                # ── Freeze the sale's COGS total ──
+                sale.cogs_amount = line_cogs
+                sale.save(update_fields=['cogs_amount'])
+
                 if customer:
                     customer.total_purchases += selling_price
                     customer.visit_count += 1
                     customer.last_visit = timezone.now()
                     customer.save()
-                
+
                 messages.success(request, f'Sale completed successfully! Receipt #{sale.company_sale_id}')
                 return redirect(f'/epa_shop/sale/receipt/{sale.id}/')
-                
+
         except Exception as e:
             messages.error(request, f'Error processing sale: {str(e)}')
-    
+
     context = {
         'product': product,
         'product_type': product_type,
@@ -1663,35 +1709,35 @@ def sale_create(request):
 def sale_edit(request, pk):
     """Edit sale details (Admin & Manager only)"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     is_authorized = (
         is_viewing_company or
-        request.user.is_company_admin or 
-        request.user.is_company_manager or 
+        request.user.is_company_admin or
+        request.user.is_company_manager or
         request.user.is_super_admin or
         request.user.is_superuser or
         request.user.is_staff
     )
-    
+
     if not is_authorized:
         messages.error(request, 'You do not have permission to edit sales.')
         return redirect('epa-sales')
-    
+
     sale = get_object_or_404(Sale, pk=pk, company=company)
-    
+
     branches = Branch.objects.filter(company=company, is_active=True)
-    
+
     if not is_authorized and request.user.branch:
         branches = branches.filter(id=request.user.branch.id)
-    
+
     sale_items = sale.items.all()
-    
+
     if request.method == 'POST':
         try:
             branch_id = request.POST.get('branch_id')
@@ -1701,7 +1747,7 @@ def sale_edit(request, pk):
             payment_method = request.POST.get('payment_method', 'cash')
             payment_status = request.POST.get('payment_status', 'pending')
             selling_price = request.POST.get('selling_price', 0)
-            
+
             if not branch_id:
                 messages.error(request, 'Please select a branch.')
                 return render(request, 'epa/sale_form.html', {
@@ -1711,7 +1757,7 @@ def sale_edit(request, pk):
                     'page_title': f'Edit Sale #{sale.company_sale_id}',
                     'page_subtitle': 'Update sale details',
                 })
-            
+
             try:
                 selling_price = float(selling_price)
                 if selling_price <= 0:
@@ -1732,7 +1778,7 @@ def sale_edit(request, pk):
                     'page_title': f'Edit Sale #{sale.company_sale_id}',
                     'page_subtitle': 'Update sale details',
                 })
-            
+
             if not customer_name:
                 messages.error(request, 'Customer name is required.')
                 return render(request, 'epa/sale_form.html', {
@@ -1742,9 +1788,9 @@ def sale_edit(request, pk):
                     'page_title': f'Edit Sale #{sale.company_sale_id}',
                     'page_subtitle': 'Update sale details',
                 })
-            
+
             branch = get_object_or_404(Branch, id=branch_id, company=company)
-            
+
             sale.branch = branch
             sale.customer_name = customer_name
             sale.customer_phone = customer_phone
@@ -1754,29 +1800,29 @@ def sale_edit(request, pk):
             sale.total_amount = Decimal(str(selling_price))
             sale.net_amount = Decimal(str(selling_price))
             sale.save()
-            
+
             for item in sale_items:
                 item.unit_price = Decimal(str(selling_price))
                 item.total_price = Decimal(str(selling_price))
                 item.save()
-            
+
             if sale.customer:
                 sale.customer.name = customer_name
                 sale.customer.phone = customer_phone
                 if customer_email:
                     sale.customer.email = customer_email
                 sale.customer.save()
-            
+
             messages.success(request, f'Sale #{sale.company_sale_id} updated successfully!')
             return redirect(f'/epa_shop/sale/receipt/{sale.id}/')
-            
+
         except Exception as e:
             messages.error(request, f'Error updating sale: {str(e)}')
             import traceback
             print(traceback.format_exc())
-    
+
     default_price = sale.net_amount
-    
+
     context = {
         'sale': sale,
         'sale_items': sale_items,
@@ -1932,7 +1978,6 @@ def sale_complete(request, company_sale_id):
     }
     return render(request, 'epa/sale_verify.html', context)
 
-    
 
 @login_required
 def pos_pending_payments(request):
@@ -1963,6 +2008,7 @@ def pos_pending_payments(request):
         'receipt_url': f'/epa_shop/sale/receipt/{s.id}/',
     } for s in qs]})
 
+
 # ============================================
 # PENDING SALES LIST
 # ============================================
@@ -1971,37 +2017,37 @@ def pos_pending_payments(request):
 def sale_pending_list(request):
     """List all pending sales"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     is_admin = (
         is_viewing_company or
-        request.user.is_company_admin or 
-        request.user.is_company_manager or 
+        request.user.is_company_admin or
+        request.user.is_company_manager or
         request.user.is_super_admin or
         request.user.is_superuser or
         request.user.is_staff
     )
-    
+
     pending_sales = Sale.objects.filter(
         company=company,
         payment_status='pending'
     ).select_related('customer', 'sold_by', 'branch').prefetch_related('items', 'items__unit')
-    
+
     if not is_admin and request.user.branch:
         pending_sales = pending_sales.filter(branch=request.user.branch)
-    
+
     pending_sales = pending_sales.order_by('-sale_date')
-    
+
     all_sales = Sale.objects.filter(company=company)
     total_sales = all_sales.count()
     total_pending = pending_sales.count()
     total_completed = all_sales.filter(payment_status='paid').count()
-    
+
     context = {
         'sales': pending_sales,
         'total_pending': total_pending,
@@ -2022,7 +2068,6 @@ def sale_pending_list(request):
 @require_POST
 def sale_complete_json(request, sale_id):
     """JSON version of sale_complete for POS pending-sales flow."""
-    from django.views.decorators.http import require_POST  # if not already imported top-level
     company, is_viewing_company = get_active_company(request)
     if not company:
         return JsonResponse({'success': False, 'error': 'No company assigned'}, status=400)
@@ -2088,7 +2133,6 @@ def sale_complete_json(request, sale_id):
         sale.payment_status = 'paid'
         sale.payment_method = method
         sale.save(update_fields=['payment_status', 'payment_method'])
-        
 
         if sale.customer:
             sale.customer.total_purchases += sale.net_amount
@@ -2120,32 +2164,32 @@ def sale_complete_json(request, sale_id):
 def sale_delete(request, pk):
     """Delete a refunded sale (Admin & Manager only)"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     is_authorized = (
         is_viewing_company or
-        request.user.is_company_admin or 
-        request.user.is_company_manager or 
+        request.user.is_company_admin or
+        request.user.is_company_manager or
         request.user.is_super_admin or
         request.user.is_superuser or
         request.user.is_staff
     )
-    
+
     if not is_authorized:
         messages.error(request, 'You do not have permission to delete sales.')
         return redirect('epa-sales')
-    
+
     sale = get_object_or_404(Sale, pk=pk, company=company)
-    
+
     if sale.payment_status != 'refunded':
         messages.error(request, 'Only refunded sales can be deleted.')
         return redirect('epa-sales')
-    
+
     if request.method == 'POST':
         try:
             sale_id = sale.company_sale_id
@@ -2155,7 +2199,7 @@ def sale_delete(request, pk):
         except Exception as e:
             messages.error(request, f'Error deleting sale: {str(e)}')
             return redirect('epa-sales')
-    
+
     context = {
         'sale': sale,
         'page_title': 'Delete Sale',

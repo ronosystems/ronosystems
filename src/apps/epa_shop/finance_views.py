@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
 from django.conf import settings as django_settings
 from datetime import datetime, timedelta, date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation   # ← added InvalidOperation
 from django.core.paginator import Paginator
 from django.db import transaction
 
@@ -84,32 +84,38 @@ def _delete_cloudinary_asset(public_id):
 # ============================================
 # COGS CALCULATION HELPERS
 # ============================================
-
 def get_cogs_from_sale(sale, use_cache=True):
     """
-    Calculate COGS for a single sale.
-    Caches the result on the Sale instance so repeated calls are free.
+    Return the HISTORICAL COGS for a sale.
+
+    Priority:
+      1. sale.cogs_amount              (frozen at sale time — fast path)
+      2. Sum of SaleItem.cogs_amount   (per-line snapshots)
+      3. Legacy fallback: 70% of line price (safety net only)
+
+    Never reads product.purchase_price. Prices may change freely without
+    corrupting historical COGS.
     """
     if use_cache and hasattr(sale, '_cached_cogs'):
         return sale._cached_cogs
 
+    frozen = getattr(sale, 'cogs_amount', None)
+    if frozen is not None and frozen > 0:
+        sale._cached_cogs = frozen
+        return frozen
+
     total_cogs = Decimal('0.00')
     for item in sale.items.all():
-        if item.content_type_id:
-            try:
-                product = item.content_type.get_object_for_this_type(id=item.object_id)
-                if hasattr(product, 'purchase_price') and product.purchase_price:
-                    total_cogs += product.purchase_price * item.quantity
-                else:
-                    total_cogs += item.unit_price * Decimal('0.7') * item.quantity
-            except Exception:
-                total_cogs += item.unit_price * Decimal('0.7') * item.quantity
+        line_cogs = getattr(item, 'cogs_amount', None)
+        if line_cogs is not None and line_cogs > 0:
+            total_cogs += line_cogs
         else:
-            total_cogs += item.unit_price * Decimal('0.7') * item.quantity
+            total_cogs += (
+                item.unit_price * Decimal('0.7') * item.quantity
+            ).quantize(Decimal('0.01'))
 
     sale._cached_cogs = total_cogs
     return total_cogs
-
 
 def calculate_total_cogs_from_sales(company, branch=None):
     """Calculate total COGS from ALL sales — with prefetched items"""
@@ -130,7 +136,7 @@ def calculate_total_cogs_from_sales(company, branch=None):
     for sale in sales:
         total_cogs += get_cogs_from_sale(sale)
     return total_cogs
-  
+
 
 def get_total_revenue(company, branch=None):
     """Get total revenue from sales"""
@@ -156,8 +162,8 @@ def get_total_expenses(company, branch=None):
     return expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
 
-def get_all_transactions(company, branch=None, 
-                          tx_type=None, date_from=None, date_to=None, 
+def get_all_transactions(company, branch=None,
+                          tx_type=None, date_from=None, date_to=None,
                           search=None):
     """
     Build a unified list of every financial event:
@@ -772,7 +778,6 @@ def all_transactions(request):
     return render(request, 'company/finance/all_transactions.html', context)
 
 
-
 # ============================================
 # API COGS BALANCE - For Sidebar Badge
 # ============================================
@@ -1331,7 +1336,13 @@ def purchase_records(request):
 
 @login_required
 def purchase_create(request):
-    """Create a new purchase record with optional Cloudinary receipt upload"""
+    """Create a new purchase record with optional Cloudinary receipt upload.
+
+    NOTE: The COGS balance is allowed to go negative. Purchases can exceed
+    the current available balance; the shortfall will be recovered by future
+    sales (which credit COGS). A warning is surfaced to the user, but the
+    purchase is still recorded.
+    """
     company, is_viewing_company = get_active_company(request)
 
     if not company:
@@ -1379,17 +1390,26 @@ def purchase_create(request):
 
         if errors:
             messages.error(request, "\n".join(errors))
-            return render(request, 'company/finance/purchase_create.html', _form_context())
+            return render(request, 'company/finance/purchase_form.html', _form_context())
 
         try:
             amount = Decimal(amount)
 
-            if current_balance < amount:
-                messages.error(
+            # ── Negative-balance allowance ──
+            # The COGS ledger accepts purchases of any amount. If the purchase
+            # exceeds the current available balance, warn the user but still
+            # create the record — the balance will become negative and will
+            # recover as future sales credit COGS.
+            if amount > current_balance:
+                projected_balance = current_balance - amount
+                messages.warning(
                     request,
-                    f"Insufficient COGS balance. Available: {current_balance:,.2f}, Required: {amount:,.2f}"
+                    f"⚠️ This purchase will push the COGS balance negative. "
+                    f"Current balance: KSh {current_balance:,.2f}, "
+                    f"Purchase: KSh {amount:,.2f}, "
+                    f"Projected balance: KSh {projected_balance:,.2f}. "
+                    f"Future sales will credit COGS and recover the balance."
                 )
-                return render(request, 'company/finance/purchase_create.html', _form_context())
 
             # ── Upload receipt to Cloudinary (only if a file was provided) ──
             receipt_image_key = ''
@@ -1401,10 +1421,10 @@ def purchase_create(request):
                     )
                 except ValueError as e:
                     messages.error(request, str(e))
-                    return render(request, 'company/finance/purchase_create.html', _form_context())
+                    return render(request, 'company/finance/purchase_form.html', _form_context())
                 except Exception as e:
                     messages.error(request, f"Receipt upload failed: {e}")
-                    return render(request, 'company/finance/purchase_create.html', _form_context())
+                    return render(request, 'company/finance/purchase_form.html', _form_context())
 
             with transaction.atomic():
                 purchase = PurchaseRecord.objects.create(
@@ -1435,8 +1455,7 @@ def purchase_create(request):
         except Exception as e:
             messages.error(request, f"Error creating purchase: {str(e)}")
 
-    return render(request, 'company/finance/purchase_create.html', _form_context())
-
+    return render(request, 'company/finance/purchase_form.html', _form_context())
 
 
 # ============================================
@@ -1451,10 +1470,13 @@ def purchase_edit(request, pk):
     Handles three receipt scenarios:
       1. User uploads a new file   → upload to Cloudinary, delete old asset
       2. User checks "remove"      → delete old asset, clear field
-      3. Neither                    → keep existing public_id untouched
+      3. Neither                   → keep existing public_id untouched
 
     The COGS balance shown on the form is adjusted back by this purchase's
     amount, so the user sees the true "available" figure when editing.
+
+    NOTE: The COGS balance is allowed to go negative. If the edit pushes the
+    balance below zero, a warning is surfaced but the change is still saved.
     """
     company, is_viewing_company = get_active_company(request)
 
@@ -1517,7 +1539,7 @@ def purchase_edit(request, pk):
         if errors:
             for err in errors:
                 messages.error(request, err)
-            return render(request, 'company/finance/purchase_edit.html', _form_context())
+            return render(request, 'company/finance/purchase_form.html', _form_context())
 
         # ── Parse amount ──
         try:
@@ -1526,23 +1548,26 @@ def purchase_edit(request, pk):
                 raise ValueError("Amount must be greater than zero.")
         except (InvalidOperation, ValueError, TypeError):
             messages.error(request, "Invalid amount. Please enter a positive number.")
-            return render(request, 'company/finance/purchase_edit.html', _form_context())
+            return render(request, 'company/finance/purchase_form.html', _form_context())
 
-        # ── Balance check (adjusted) ──
-        if current_balance < amount:
-            messages.error(
+        # ── Negative-balance allowance (warn only, never block) ──
+        if amount > current_balance:
+            projected_balance = current_balance - amount
+            messages.warning(
                 request,
-                f"Insufficient COGS balance. "
-                f"Available: {current_balance:,.2f}, Required: {amount:,.2f}"
+                f"⚠️ This edit will push the COGS balance negative. "
+                f"Current balance (before this purchase): KSh {current_balance:,.2f}, "
+                f"New purchase amount: KSh {amount:,.2f}, "
+                f"Projected balance: KSh {projected_balance:,.2f}. "
+                f"Future sales will credit COGS and recover the balance."
             )
-            return render(request, 'company/finance/purchase_edit.html', _form_context())
 
         # ── Verify branch belongs to this company ──
         try:
             branch_obj = Branch.objects.get(id=branch_id, company=company)
         except Branch.DoesNotExist:
             messages.error(request, "Selected branch does not exist.")
-            return render(request, 'company/finance/purchase_edit.html', _form_context())
+            return render(request, 'company/finance/purchase_form.html', _form_context())
 
         # ─────────────────────────────────────────────
         # Cloudinary receipt handling
@@ -1558,10 +1583,10 @@ def purchase_edit(request, pk):
                 )
             except ValueError as e:
                 messages.error(request, str(e))
-                return render(request, 'company/finance/purchase_edit.html', _form_context())
+                return render(request, 'company/finance/purchase_form.html', _form_context())
             except Exception as e:
                 messages.error(request, f"Receipt upload failed: {e}")
-                return render(request, 'company/finance/purchase_edit.html', _form_context())
+                return render(request, 'company/finance/purchase_form.html', _form_context())
 
             # Delete the old asset only AFTER a successful new upload
             if old_public_id and old_public_id != new_public_id:
@@ -1604,13 +1629,12 @@ def purchase_edit(request, pk):
             if receipt_image_file and new_public_id and new_public_id != old_public_id:
                 _delete_cloudinary_asset(new_public_id)
             messages.error(request, f"❌ Error updating purchase: {str(e)}")
-            return render(request, 'company/finance/purchase_edit.html', _form_context())
+            return render(request, 'company/finance/purchase_form.html', _form_context())
 
     # ─────────────────────────────────────────────
     # GET — render the form
     # ─────────────────────────────────────────────
-    return render(request, 'company/finance/purchase_edit.html', _form_context())
-
+    return render(request, 'company/finance/purchase_form.html', _form_context())
 
 
 @login_required
@@ -1634,6 +1658,7 @@ def purchase_delete(request, pk):
         'purchase': purchase,
         'is_finance': True,
     })
+
 
 # ============================================
 # PURCHASE DETAIL VIEW

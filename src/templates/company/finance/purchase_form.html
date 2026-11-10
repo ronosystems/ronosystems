@@ -1,6 +1,8 @@
 {% extends base_template|default:"base.html" %}
 
-{% block title %}Edit Purchase {{ purchase.purchase_number }}{% endblock %}
+{% block title %}
+  {% if is_edit %}Edit Purchase {{ purchase.purchase_number }}{% else %}Create Purchase{% endif %}
+{% endblock %}
 
 
 {% block extra_css %}
@@ -49,6 +51,9 @@
         font-size: 2rem;
         font-weight: 700;
         color: #007bff;
+    }
+    .balance-display .amount.negative {
+        color: #dc3545;
     }
     .btn-primary {
         background-color: #87CEEB;
@@ -116,7 +121,7 @@
         display: block;
     }
 
-    /* Current receipt preview block */
+    /* Current receipt preview block (edit only) */
     .current-receipt {
         margin-top: 10px;
         padding: 12px;
@@ -155,16 +160,43 @@
         margin: 0;
         cursor: pointer;
     }
+
+    /* Live projected-balance hint under the amount field */
+    .balance-hint {
+        display: none;
+        margin-top: 6px;
+        padding: 6px 10px;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        border: 1px solid transparent;
+    }
+    .balance-hint.visible {
+        display: block;
+    }
+    .balance-hint.ok {
+        background: #d1fae5;
+        border-color: #059669;
+        color: #065f46;
+    }
+    .balance-hint.negative {
+        background: #fef3c7;
+        border-color: #d97706;
+        color: #92400e;
+    }
 </style>
 {% endblock %}
+
 
 {% block content %}
 <div class="container">
     <!-- Navigation -->
     <div class="mb-3">
-        <a href="{% url 'finance-purchase-detail' purchase.pk %}" class="btn btn-secondary btn-sm">
-            <i class="fas fa-arrow-left"></i> Back to Purchase
-        </a>
+        {% if is_edit %}
+            <a href="{% url 'finance-purchase-detail' purchase.pk %}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Back to Purchase
+            </a>
+        {% endif %}
         <a href="{% url 'finance-dashboard' %}" class="btn btn-secondary btn-sm">
             <i class="fas fa-home"></i> Back to Dashboard
         </a>
@@ -172,20 +204,33 @@
 
     <!-- Header -->
     <h1 class="text-center mb-3" style="font-weight: 700;">
-        <i class="fas fa-edit"></i> Edit Purchase #{{ purchase.purchase_number }}
+        {% if is_edit %}
+            <i class="fas fa-edit"></i> Edit Purchase #{{ purchase.purchase_number }}
+        {% else %}
+            <i class="fas fa-plus-circle"></i> Create Purchase
+        {% endif %}
     </h1>
 
     <!-- Current Balance -->
     <div class="balance-display mb-4">
         <h6>Available COGS Balance</h6>
-        <div class="amount">KSh {{ current_balance|floatformat:2|default:"0.00" }}</div>
-        <small class="text-muted">(Balance shown before this purchase)</small>
+        <div class="amount {% if current_balance < 0 %}negative{% endif %}">
+            KSh {{ current_balance|floatformat:2|default:"0.00" }}
+        </div>
+        {% if is_edit %}
+            <small class="text-muted">(Balance shown before this purchase)</small>
+        {% else %}
+            <small class="text-muted">
+                A purchase can exceed this balance — it will simply push it negative
+                and recover as future sales are made.
+            </small>
+        {% endif %}
     </div>
 
-    <!-- Messages -->
+    <!-- Messages (backend warnings, e.g. negative-balance notice) -->
     {% if messages %}
         {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} max-width-600" style="max-width:600px; margin:0 auto 15px auto;">
+            <div class="alert alert-{{ message.tags }}" style="max-width:600px; margin:0 auto 15px auto;">
                 {{ message }}
             </div>
         {% endfor %}
@@ -193,7 +238,8 @@
 
     <!-- Purchase Form -->
     <div class="form-card">
-        <form method="post" enctype="multipart/form-data" id="purchaseForm">
+        <form method="post" enctype="multipart/form-data" id="purchaseForm"
+              action="{% if is_edit %}{% url 'finance-purchase-edit' purchase.pk %}{% else %}{% url 'finance-purchase-create' %}{% endif %}">
             {% csrf_token %}
 
             <!-- Branch -->
@@ -203,7 +249,7 @@
                     <option value="">Select Branch</option>
                     {% for branch in branches %}
                     <option value="{{ branch.id }}"
-                        {% if purchase.branch_id == branch.id %}selected{% endif %}>
+                        {% if is_edit and purchase.branch_id == branch.id %}selected{% endif %}>
                         {{ branch.name }}
                     </option>
                     {% endfor %}
@@ -217,7 +263,7 @@
                     <option value="">Select Type</option>
                     {% for type in purchase_types %}
                     <option value="{{ type.0 }}"
-                        {% if purchase.purchase_type == type.0 %}selected{% endif %}>
+                        {% if is_edit and purchase.purchase_type == type.0 %}selected{% endif %}>
                         {{ type.1 }}
                     </option>
                     {% endfor %}
@@ -229,12 +275,14 @@
                 <label class="form-label required-field">Amount (KSh)</label>
                 <input type="number"
                        name="amount"
+                       id="amountInput"
                        class="form-control"
                        step="0.01"
                        min="0.01"
                        placeholder="0.00"
-                       value="{{ purchase.amount }}"
+                       value="{% if is_edit %}{{ purchase.amount }}{% endif %}"
                        required>
+                <div class="balance-hint" id="balanceHint"></div>
             </div>
 
             <!-- Reference -->
@@ -245,7 +293,7 @@
                        class="form-control"
                        placeholder="Receipt/Invoice Number"
                        maxlength="100"
-                       value="{{ purchase.payment_reference }}"
+                       value="{% if is_edit %}{{ purchase.payment_reference }}{% endif %}"
                        required>
             </div>
 
@@ -257,52 +305,55 @@
                           rows="2"
                           placeholder="Brief description"
                           maxlength="500"
-                          required>{{ purchase.description }}</textarea>
+                          required>{% if is_edit %}{{ purchase.description }}{% endif %}</textarea>
             </div>
 
             <!-- Receipt Upload (OPTIONAL) -->
             <div class="mb-3">
                 <label class="form-label">Receipt Image</label>
 
-                {% if purchase.receipt_image_url %}
-                <!-- Current receipt preview -->
-                <div class="current-receipt">
-                    <p class="mb-2" style="font-weight:600;">Current receipt:</p>
-                    <img src="{{ purchase.receipt_image_url }}"
-                         alt="Current receipt for Purchase #{{ purchase.purchase_number }}"
-                         onerror="this.style.display='none'; this.nextElementSibling.style.display='none';">
-                    <a href="{{ purchase.receipt_image_url }}" target="_blank" rel="noopener" class="receipt-link">
-                        <i class="fas fa-external-link-alt"></i> Open in new tab
-                    </a>
-                    <div class="remove-row">
-                        <input class="form-check-input" type="checkbox"
-                               name="remove_receipt" value="1" id="removeReceipt">
-                        <label class="form-check-label" for="removeReceipt">
-                            <i class="fas fa-trash"></i> Remove current receipt
-                        </label>
+                {% if is_edit and purchase.receipt_image_url %}
+                    <!-- Current receipt preview (edit only) -->
+                    <div class="current-receipt">
+                        <p class="mb-2" style="font-weight:600;">Current receipt:</p>
+                        <img src="{{ purchase.receipt_image_url }}"
+                             alt="Current receipt for Purchase #{{ purchase.purchase_number }}"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='none';">
+                        <a href="{{ purchase.receipt_image_url }}" target="_blank" rel="noopener" class="receipt-link">
+                            <i class="fas fa-external-link-alt"></i> Open in new tab
+                        </a>
+                        <div class="remove-row">
+                            <input class="form-check-input" type="checkbox"
+                                   name="remove_receipt" value="1" id="removeReceipt">
+                            <label class="form-check-label" for="removeReceipt">
+                                <i class="fas fa-trash"></i> Remove current receipt
+                            </label>
+                        </div>
                     </div>
-                </div>
-                <small class="text-muted d-block mt-2">
-                    <i class="fas fa-info-circle"></i>
-                    Upload a new file below to <strong>replace</strong> the current receipt.
-                </small>
-                {% else %}
-                <small class="text-muted d-block mb-2">
-                    <i class="fas fa-info-circle"></i>
-                    No receipt currently attached. Upload one below if you have it.
-                </small>
+                    <small class="text-muted d-block mt-2">
+                        <i class="fas fa-info-circle"></i>
+                        Upload a new file below to <strong>replace</strong> the current receipt.
+                    </small>
+                {% elif is_edit %}
+                    <small class="text-muted d-block mb-2">
+                        <i class="fas fa-info-circle"></i>
+                        No receipt currently attached. Upload one below if you have it.
+                    </small>
                 {% endif %}
 
                 <input type="file"
                        name="receipt_image"
                        id="receiptInput"
-                       class="form-control-file mt-2"
+                       class="form-control-file {% if is_edit %}mt-2{% endif %}"
                        accept="image/jpeg,image/png,image/gif,image/webp"
                        onchange="previewImage(this)">
 
                 <small class="text-muted">
                     <i class="fas fa-info-circle"></i>
                     Optional. JPG, PNG, GIF, WEBP — max 5MB.
+                    {% if not is_edit %}
+                        If you have the receipt handy, upload it. Otherwise leave blank.
+                    {% endif %}
                 </small>
 
                 <div class="field-error" id="receiptError"></div>
@@ -313,18 +364,26 @@
                 </div>
             </div>
 
-            <!-- Hidden fields (parity with create form) -->
+            <!-- Hidden fields -->
             <input type="hidden" name="cogs_account" value="{{ cogs_accounts.first.id }}">
-            <input type="hidden" name="purchase_date" value="{{ purchase.purchase_date|date:'Y-m-d' }}">
+            <input type="hidden" name="purchase_date"
+                   value="{% if is_edit %}{{ purchase.purchase_date|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}">
             <input type="hidden" name="tax" value="0">
             <input type="hidden" name="total_amount" value="0">
-            <input type="hidden" name="payment_method" value="{{ purchase.payment_method }}">
+            <input type="hidden" name="payment_method"
+                   value="{% if is_edit %}{{ purchase.payment_method }}{% else %}cash{% endif %}">
+            {% if not is_edit %}
+                <input type="hidden" name="supplier_name" value="Walk-in Supplier">
+                <input type="hidden" name="notes" value="">
+            {% endif %}
 
             <!-- Buttons -->
             <button type="submit" class="btn btn-primary w-100">
-                <i class="fas fa-save"></i> Save Changes
+                <i class="fas fa-save"></i>
+                {% if is_edit %}Save Changes{% else %}Create Purchase{% endif %}
             </button>
-            <a href="{% url 'finance-purchase-detail' purchase.pk %}" class="btn btn-secondary w-100 mt-2">
+            <a href="{% if is_edit %}{% url 'finance-purchase-detail' purchase.pk %}{% else %}{% url 'finance-dashboard' %}{% endif %}"
+               class="btn btn-secondary w-100 mt-2">
                 <i class="fas fa-times"></i> Cancel
             </a>
         </form>
@@ -333,28 +392,42 @@
 
 <script>
 (function () {
-    // Match the view's validation limits
+    /* ============================================================
+       Shared config — matches backend validation limits
+       ============================================================ */
     const MAX_BYTES = 5 * 1024 * 1024;  // 5 MB
     const MAX_BYTES_LABEL = '5MB';
     const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
-    const input = document.getElementById('receiptInput');
-    const preview = document.getElementById('filePreview');
-    const img = document.getElementById('previewImg');
-    const fileName = document.getElementById('fileName');
-    const errorBox = document.getElementById('receiptError');
-    const removeCheckbox = document.getElementById('removeReceipt');
+    // Current COGS balance (create: live balance; edit: balance before this purchase)
+    const CURRENT_BALANCE = parseFloat(
+        "{{ current_balance|floatformat:2|default:'0.00' }}".replace(/,/g, '')
+    ) || 0;
 
+    /* ============================================================
+       DOM references
+       ============================================================ */
+    const input          = document.getElementById('receiptInput');
+    const preview        = document.getElementById('filePreview');
+    const img            = document.getElementById('previewImg');
+    const fileName       = document.getElementById('fileName');
+    const errorBox       = document.getElementById('receiptError');
+    const removeCheckbox = document.getElementById('removeReceipt'); // edit-only
+    const amountInput    = document.getElementById('amountInput');
+    const balanceHint    = document.getElementById('balanceHint');
+    const form           = document.getElementById('purchaseForm');
+
+    /* ============================================================
+       Receipt preview helpers
+       ============================================================ */
     function showError(message) {
         errorBox.textContent = message;
         errorBox.classList.add('visible');
     }
-
     function clearError() {
         errorBox.textContent = '';
         errorBox.classList.remove('visible');
     }
-
     function resetPreview() {
         preview.style.display = 'none';
         img.src = '#';
@@ -368,7 +441,7 @@
         const file = inputEl.files && inputEl.files[0];
         if (!file) return;
 
-        // If the user picks a new file, uncheck "remove current receipt"
+        // If a new file is picked, uncheck "remove current receipt"
         // (a new upload replaces the old one — remove + upload conflict)
         if (removeCheckbox) {
             removeCheckbox.checked = false;
@@ -404,7 +477,9 @@
         reader.readAsDataURL(file);
     };
 
-    // Mutual exclusion: checking "remove" clears the file input
+    /* ============================================================
+       Mutual exclusion: "remove current receipt" clears the file input
+       ============================================================ */
     if (removeCheckbox) {
         removeCheckbox.addEventListener('change', function () {
             if (this.checked && input) {
@@ -415,28 +490,78 @@
         });
     }
 
-    // Belt-and-braces: validate again on submit in case the file was set
-    // programmatically or the browser skipped the change event.
-    document.getElementById('purchaseForm').addEventListener('submit', function (e) {
-        if (!input.files || !input.files[0]) return;  // optional — OK to skip
+    /* ============================================================
+       Live projected-balance hint
+       ============================================================ */
+    function formatMoney(n) {
+        return 'KSh ' + Number(n).toLocaleString('en-KE', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+    }
 
-        const file = input.files[0];
+    function updateBalanceHint() {
+        const raw = amountInput.value;
+        const amt = parseFloat(raw);
 
-        if (ALLOWED_TYPES.indexOf(file.type) === -1) {
-            e.preventDefault();
-            showError('Unsupported file type. Please upload a JPG, PNG, GIF, or WEBP image.');
-            input.focus();
+        if (!raw || isNaN(amt) || amt <= 0) {
+            balanceHint.classList.remove('visible', 'ok', 'negative');
+            balanceHint.textContent = '';
             return;
         }
 
-        if (file.size > MAX_BYTES) {
-            e.preventDefault();
-            const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
-            showError('File is too large (' + sizeMB + ' MB). Maximum is ' + MAX_BYTES_LABEL + '.');
-            input.focus();
-            return;
+        const projected = CURRENT_BALANCE - amt;
+        balanceHint.classList.add('visible');
+
+        if (projected < 0) {
+            balanceHint.classList.remove('ok');
+            balanceHint.classList.add('negative');
+            balanceHint.innerHTML =
+                '<i class="fas fa-exclamation-triangle"></i> ' +
+                '⚠️ This will push the COGS balance negative. ' +
+                'Projected balance: <strong>' + formatMoney(projected) + '</strong> ' +
+                '(will recover as future sales are made).';
+        } else {
+            balanceHint.classList.remove('negative');
+            balanceHint.classList.add('ok');
+            balanceHint.innerHTML =
+                '<i class="fas fa-check-circle"></i> ' +
+                'Remaining balance after this purchase: <strong>' +
+                formatMoney(projected) + '</strong>';
         }
-    });
+    }
+
+    if (amountInput) {
+        amountInput.addEventListener('input', updateBalanceHint);
+        amountInput.addEventListener('change', updateBalanceHint);
+        updateBalanceHint();  // run once on load (useful in edit mode)
+    }
+
+    /* ============================================================
+       Belt-and-braces receipt validation on submit
+       ============================================================ */
+    if (form) {
+        form.addEventListener('submit', function (e) {
+            if (!input.files || !input.files[0]) return;  // optional — OK to skip
+
+            const file = input.files[0];
+
+            if (ALLOWED_TYPES.indexOf(file.type) === -1) {
+                e.preventDefault();
+                showError('Unsupported file type. Please upload a JPG, PNG, GIF, or WEBP image.');
+                input.focus();
+                return;
+            }
+
+            if (file.size > MAX_BYTES) {
+                e.preventDefault();
+                const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                showError('File is too large (' + sizeMB + ' MB). Maximum is ' + MAX_BYTES_LABEL + '.');
+                input.focus();
+                return;
+            }
+        });
+    }
 })();
 </script>
 {% endblock %}

@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.contenttypes.models import ContentType
 from apps.company.models import Branch
 from .models import (
-    Category, Electronic, Phone, Accessory, 
+    Category, Electronic, Phone, Accessory,
     Sale, SaleItem, Customer, Supplier,
     StockMovement, PurchaseOrder, PurchaseOrderItem,
     Warranty, Repair
@@ -15,18 +15,20 @@ from .models import (
 class BranchSerializer(serializers.ModelSerializer):
     class Meta:
         model = Branch
-        fields = ['id', 'company', 'name', 'code', 'address', 'phone', 
+        fields = ['id', 'company', 'name', 'code', 'address', 'phone',
                   'email', 'manager', 'is_active', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
 
+
 class BranchDetailSerializer(serializers.ModelSerializer):
     manager_name = serializers.CharField(source='manager.get_full_name', read_only=True)
-    
+
     class Meta:
         model = Branch
-        fields = ['id', 'company', 'name', 'code', 'address', 'phone', 
-                  'email', 'manager', 'manager_name', 'is_active', 
+        fields = ['id', 'company', 'name', 'code', 'address', 'phone',
+                  'email', 'manager', 'manager_name', 'is_active',
                   'created_at', 'updated_at']
+
 
 # ============================================
 # SUPPLIER SERIALIZERS
@@ -35,10 +37,11 @@ class BranchDetailSerializer(serializers.ModelSerializer):
 class SupplierSerializer(serializers.ModelSerializer):
     class Meta:
         model = Supplier
-        fields = ['id', 'company', 'name', 'contact_person', 'phone', 
-                  'email', 'address', 'tax_id', 'website', 'is_active', 
+        fields = ['id', 'company', 'name', 'contact_person', 'phone',
+                  'email', 'address', 'tax_id', 'website', 'is_active',
                   'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
+
 
 # ============================================
 # CATEGORY SERIALIZERS
@@ -47,9 +50,10 @@ class SupplierSerializer(serializers.ModelSerializer):
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        fields = ['id', 'company', 'branch', 'name', 'category_type', 
+        fields = ['id', 'company', 'branch', 'name', 'category_type',
                   'description', 'is_active', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
+
 
 # ============================================
 # PRODUCT SERIALIZERS
@@ -59,7 +63,7 @@ class ElectronicSerializer(serializers.ModelSerializer):
     profit_margin = serializers.ReadOnlyField()
     profit_margin_percentage = serializers.ReadOnlyField()
     is_in_stock = serializers.ReadOnlyField()
-    
+
     class Meta:
         model = Electronic
         fields = [
@@ -74,10 +78,11 @@ class ElectronicSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at', 'updated_at']
 
+
 class PhoneSerializer(serializers.ModelSerializer):
     is_in_stock = serializers.ReadOnlyField()
     profit_margin_percentage = serializers.ReadOnlyField()
-    
+
     class Meta:
         model = Phone
         fields = [
@@ -92,9 +97,10 @@ class PhoneSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at', 'updated_at']
 
+
 class AccessorySerializer(serializers.ModelSerializer):
     is_in_stock = serializers.ReadOnlyField()
-    
+
     class Meta:
         model = Accessory
         fields = [
@@ -108,38 +114,61 @@ class AccessorySerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at', 'updated_at']
 
+
 # ============================================
 # SALE SERIALIZERS
 # ============================================
 
 class SaleItemSerializer(serializers.ModelSerializer):
+    """
+    Serializes individual sale lines.
+
+    `unit_cost` and `cogs_amount` are READ-ONLY:
+      • Exposed on GET so reports/API consumers can see frozen historical COGS
+      • Rejected on POST/PUT so clients cannot forge or override COGS
+      • Server-side creation (SaleCreateSerializer.create) computes them
+    """
     class Meta:
         model = SaleItem
-        fields = ['id', 'sale', 'content_type', 'object_id', 
-                  'item_name', 'item_sku', 'quantity', 'unit_price', 'total_price']
-        read_only_fields = ['total_price']
+        fields = [
+            'id', 'sale', 'content_type', 'object_id',
+            'item_name', 'item_sku', 'quantity', 'unit_price', 'total_price',
+            'unit_cost', 'cogs_amount',
+        ]
+        read_only_fields = ['total_price', 'unit_cost', 'cogs_amount']
+
 
 class SaleSerializer(serializers.ModelSerializer):
     items = SaleItemSerializer(many=True, read_only=True)
     item_count = serializers.ReadOnlyField()
     customer_name_display = serializers.CharField(source='customer_name', read_only=True)
-    
+
     class Meta:
         model = Sale
         fields = [
             'id', 'company', 'branch', 'customer',
             'customer_name', 'customer_phone', 'customer_email',
             'total_amount', 'discount', 'tax', 'net_amount',
+            'cogs_amount',
             'payment_status', 'payment_method',
             'sold_by', 'sale_date',
             'created_at', 'updated_at',
             'items', 'item_count', 'customer_name_display'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'net_amount']
+        read_only_fields = ['created_at', 'updated_at', 'net_amount', 'cogs_amount']
+
 
 class SaleCreateSerializer(serializers.ModelSerializer):
+    """
+    Creates a Sale with nested SaleItems.
+
+    IMPORTANT: This serializer is the API-equivalent of the POS / single-sale
+    flows in `sale_views.py`. It MUST snapshot historical COGS for every line
+    (unit_cost + cogs_amount on SaleItem, plus cogs_amount on Sale). Otherwise
+    API-created sales would silently corrupt COGS reporting.
+    """
     items = SaleItemSerializer(many=True)
-    
+
     class Meta:
         model = Sale
         fields = [
@@ -148,23 +177,58 @@ class SaleCreateSerializer(serializers.ModelSerializer):
             'discount', 'tax', 'payment_method',
             'items'
         ]
-    
+
     def create(self, validated_data):
+        from decimal import Decimal
+
         items_data = validated_data.pop('items')
         sale = Sale.objects.create(**validated_data)
-        
-        total_amount = 0
+
+        total_amount = Decimal('0.00')
+        running_cogs = Decimal('0.00')
+
         for item_data in items_data:
             item_data['sale'] = sale
-            item_data['total_price'] = item_data['quantity'] * item_data['unit_price']
-            SaleItem.objects.create(**item_data)
+            item_data['total_price'] = (
+                Decimal(str(item_data['quantity'])) *
+                Decimal(str(item_data['unit_price']))
+            )
             total_amount += item_data['total_price']
-        
+
+            # ── Snapshot historical COGS for this line ──
+            product = None
+            if item_data.get('content_type') and item_data.get('object_id'):
+                try:
+                    product = item_data['content_type'].get_object_for_this_type(
+                        id=item_data['object_id']
+                    )
+                except Exception:
+                    product = None
+
+            if product and getattr(product, 'purchase_price', None):
+                unit_cost = Decimal(str(product.purchase_price))
+            else:
+                # Fallback: 70% of the line's unit_price (consistent with
+                # get_cogs_from_sale() and the migration backfill)
+                unit_cost = Decimal(str(item_data['unit_price'])) * Decimal('0.7')
+
+            unit_cost = unit_cost.quantize(Decimal('0.01'))
+            line_cogs = (
+                unit_cost * Decimal(str(item_data['quantity']))
+            ).quantize(Decimal('0.01'))
+
+            item_data['unit_cost'] = unit_cost
+            item_data['cogs_amount'] = line_cogs
+            running_cogs += line_cogs
+
+            SaleItem.objects.create(**item_data)
+
         sale.total_amount = total_amount
         sale.net_amount = total_amount - sale.discount + sale.tax
+        sale.cogs_amount = running_cogs
         sale.save()
-        
         return sale
+
 
 # ============================================
 # CUSTOMER SERIALIZERS
@@ -180,13 +244,14 @@ class CustomerSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at', 'updated_at', 'total_purchases', 'visit_count']
 
+
 # ============================================
 # STOCK MOVEMENT SERIALIZERS
 # ============================================
 
 class StockMovementSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product', read_only=True)
-    
+
     class Meta:
         model = StockMovement
         fields = [
@@ -198,35 +263,43 @@ class StockMovementSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at', 'previous_quantity', 'new_quantity']
 
+
 class StockMovementCreateSerializer(serializers.ModelSerializer):
+    """
+    Creates a StockMovement AND atomically adjusts the product's stock.
+
+    Wrapped in transaction.atomic() with select_for_update() so two
+    concurrent API calls cannot corrupt quantity_in_stock.
+    """
     class Meta:
         model = StockMovement
         fields = [
             'company', 'branch', 'content_type', 'object_id',
             'movement_type', 'quantity', 'reference_id', 'reference_model', 'notes'
         ]
-    
+
     def create(self, validated_data):
-        # Get the product and update its stock
+        from django.db import transaction
+
         content_type = validated_data['content_type']
         object_id = validated_data['object_id']
         quantity = validated_data['quantity']
-        
-        # Get the product model
+
         model_class = content_type.model_class()
-        product = model_class.objects.get(id=object_id)
-        
-        # Store previous quantity
-        validated_data['previous_quantity'] = product.quantity_in_stock
-        
-        # Update product stock
-        product.quantity_in_stock += quantity
-        product.save()
-        
-        # Store new quantity
-        validated_data['new_quantity'] = product.quantity_in_stock
-        
-        return super().create(validated_data)
+
+        with transaction.atomic():
+            # Lock the row so two concurrent calls can't corrupt stock
+            product = model_class.objects.select_for_update().get(id=object_id)
+
+            validated_data['previous_quantity'] = product.quantity_in_stock
+
+            product.quantity_in_stock += quantity
+            product.save(update_fields=['quantity_in_stock'])
+
+            validated_data['new_quantity'] = product.quantity_in_stock
+
+            return super().create(validated_data)
+
 
 # ============================================
 # PURCHASE ORDER SERIALIZERS
@@ -234,7 +307,7 @@ class StockMovementCreateSerializer(serializers.ModelSerializer):
 
 class PurchaseOrderItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product', read_only=True)
-    
+
     class Meta:
         model = PurchaseOrderItem
         fields = [
@@ -244,11 +317,12 @@ class PurchaseOrderItemSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at', 'updated_at']
 
+
 class PurchaseOrderSerializer(serializers.ModelSerializer):
     items = PurchaseOrderItemSerializer(many=True, read_only=True)
     supplier_name = serializers.CharField(source='supplier.name', read_only=True)
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
-    
+
     class Meta:
         model = PurchaseOrder
         fields = [
@@ -260,6 +334,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at', 'updated_at']
 
+
 # ============================================
 # WARRANTY SERIALIZERS
 # ============================================
@@ -268,7 +343,7 @@ class WarrantySerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product', read_only=True)
     customer_name = serializers.CharField(source='customer.name', read_only=True)
     is_expired = serializers.ReadOnlyField()
-    
+
     class Meta:
         model = Warranty
         fields = [
@@ -280,6 +355,7 @@ class WarrantySerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at', 'updated_at', 'warranty_number']
 
+
 # ============================================
 # REPAIR SERIALIZERS
 # ============================================
@@ -289,7 +365,7 @@ class RepairSerializer(serializers.ModelSerializer):
     customer_name = serializers.CharField(source='customer.name', read_only=True)
     assigned_to_name = serializers.CharField(source='assigned_to.get_full_name', read_only=True)
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
-    
+
     class Meta:
         model = Repair
         fields = [

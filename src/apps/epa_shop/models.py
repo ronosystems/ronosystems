@@ -701,6 +701,14 @@ class Sale(models.Model):
     tax = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     net_amount = models.DecimalField(max_digits=10, decimal_places=2)
 
+    # ── NEW: Frozen COGS total for this sale ──
+    cogs_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        help_text="Total COGS snapshot for this sale. Frozen at sale time."
+    )
+
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS, default='pending')
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD)
 
@@ -839,6 +847,20 @@ class SaleItem(models.Model):
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
 
+    # ── NEW: Historical COGS snapshot (frozen at sale time) ──
+    unit_cost = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        help_text="Buying/cost price per unit at the time of sale. Frozen."
+    )
+    cogs_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        help_text="COGS captured at the time of sale. Never recalculated."
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -850,6 +872,7 @@ class SaleItem(models.Model):
 
     def __str__(self):
         return f"{self.quantity}x {self.item_name}"
+
 
 class ReturnItem(models.Model):
     sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name='returns')
