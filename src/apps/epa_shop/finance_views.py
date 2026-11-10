@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
 from django.conf import settings as django_settings
 from datetime import datetime, timedelta, date
-from decimal import Decimal, InvalidOperation   # ← added InvalidOperation
+from decimal import Decimal, InvalidOperation
 from django.core.paginator import Paginator
 from django.db import transaction
 
@@ -49,9 +49,6 @@ def _cloudinary_configure():
 def _upload_purchase_receipt(file_obj, company_id):
     """
     Upload a receipt image to Cloudinary with a unique public_id.
-
-    Returns the public_id, e.g. 'finance/purchases/2_1789754321'.
-    Raises on upload failure — caller should catch and message the user.
     """
     if not file_obj:
         return ''
@@ -87,14 +84,6 @@ def _delete_cloudinary_asset(public_id):
 def get_cogs_from_sale(sale, use_cache=True):
     """
     Return the HISTORICAL COGS for a sale.
-
-    Priority:
-      1. sale.cogs_amount              (frozen at sale time — fast path)
-      2. Sum of SaleItem.cogs_amount   (per-line snapshots)
-      3. Legacy fallback: 70% of line price (safety net only)
-
-    Never reads product.purchase_price. Prices may change freely without
-    corrupting historical COGS.
     """
     if use_cache and hasattr(sale, '_cached_cogs'):
         return sale._cached_cogs
@@ -124,12 +113,11 @@ def calculate_total_cogs_from_sales(company, branch=None):
     sales = (
         Sale.objects
         .filter(company=company, payment_status='paid')
-        .prefetch_related('items')     # ← kills the per-sale item query
+        .prefetch_related('items')
     )
     if branch:
         sales = sales.filter(branch=branch)
 
-    # Preload content types in one query
     ct_map = {ct.id: ct for ct in ContentType.objects.all()}
 
     total_cogs = Decimal('0.00')
@@ -147,16 +135,20 @@ def get_total_revenue(company, branch=None):
 
 
 def get_total_purchases(company, branch=None):
-    """Get total purchases amount"""
-    purchases = PurchaseRecord.objects.filter(company=company, status='completed')
+    """Get total purchases amount (excluding manual adjustments)"""
+    purchases = PurchaseRecord.objects.filter(
+        company=company, status='completed'
+    ).exclude(description='HIDDEN_ADJUSTMENT')
     if branch:
         purchases = purchases.filter(branch=branch)
     return purchases.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
 
 
 def get_total_expenses(company, branch=None):
-    """Get total expenses amount"""
-    expenses = Expense.objects.filter(company=company)
+    """Get total expenses amount (excluding manual adjustments)"""
+    expenses = Expense.objects.filter(
+        company=company
+    ).exclude(description='HIDDEN_ADJUSTMENT')
     if branch:
         expenses = expenses.filter(branch=branch)
     return expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
@@ -166,14 +158,7 @@ def get_all_transactions(company, branch=None,
                           tx_type=None, date_from=None, date_to=None,
                           search=None):
     """
-    Build a unified list of every financial event:
-      • Sales (revenue +)
-      • Purchases (COGS -)
-      • Expenses (-)
-      • M-Pesa Commissions (income +, from treasury app)
-
-    Returns a sorted list of dicts (newest first).
-    Filtering is done in Python so all four sources apply the same rules.
+    Build a unified list of every financial event.
     """
     from apps.company.models import Expense
 
@@ -305,14 +290,9 @@ def get_all_transactions(company, branch=None,
 
 def get_recent_transactions(company, branch=None, limit=5):
     """
-    Return the most recent financial events across:
-      • Sales (revenue +)
-      • Purchases (COGS -)
-      • Commissions (income +)
-
-    Returns a list of dicts sorted by datetime descending, capped at `limit`.
+    Return the most recent financial events.
     """
-    from apps.company.models import Expense  # already imported elsewhere
+    from apps.company.models import Expense
 
     events = []
 
@@ -374,7 +354,7 @@ def get_recent_transactions(company, branch=None, limit=5):
             'user': getattr(e, 'created_by', None),
         })
 
-    # ── M-Pesa Commissions (from treasury app) ──
+    # ── M-Pesa Commissions ──
     commissions_qs = MpesaCommission.objects.filter(company=company)
     if branch:
         commissions_qs = commissions_qs.filter(branch_id=branch)
@@ -392,13 +372,12 @@ def get_recent_transactions(company, branch=None, limit=5):
             'user': c.recorded_by,
         })
 
-    # Sort all events newest-first, return top N
     events.sort(key=lambda x: x['date'], reverse=True)
     return events[:limit]
 
 
 def get_total_commissions(company, branch=None):
-    """Get total M-Pesa commission income (source of truth: treasury app)."""
+    """Get total M-Pesa commission income."""
     commissions = MpesaCommission.objects.filter(company=company)
     if branch:
         commissions = commissions.filter(branch_id=branch)
@@ -413,11 +392,7 @@ def get_effective_cogs_balance(company, branch=None):
 
 
 def get_effective_profit_balance(company, branch=None):
-    """
-    Profit Balance = (Revenue + M-Pesa Commissions) - COGS - Expenses
-
-    Commissions from the treasury app count as income.
-    """
+    """Profit Balance = (Revenue + M-Pesa Commissions) - COGS - Expenses"""
     total_revenue = get_total_revenue(company, branch)
     total_commissions = get_total_commissions(company, branch)
     total_cogs = calculate_total_cogs_from_sales(company, branch)
@@ -458,7 +433,8 @@ def get_cogs_summary(company, start_date, end_date, branch=None):
         status='completed',
         purchase_date__gte=start_date,
         purchase_date__lte=end_date
-    )
+    ).exclude(description='HIDDEN_ADJUSTMENT')
+    
     if branch:
         purchases = purchases.filter(branch=branch)
 
@@ -482,7 +458,8 @@ def get_cogs_summary(company, start_date, end_date, branch=None):
         company=company,
         status='completed',
         purchase_date__lt=start_date
-    )
+    ).exclude(description='HIDDEN_ADJUSTMENT')
+    
     if branch:
         opening_purchases = opening_purchases.filter(branch=branch)
 
@@ -506,12 +483,10 @@ def get_cogs_summary(company, start_date, end_date, branch=None):
 
 
 def update_cogs_from_sale(sale, user=None):
-    """Record COGS from sale (for future use)"""
     pass
 
 
 def update_cogs_from_purchase(purchase_record, user=None):
-    """Just mark the purchase as completed - no COGSAccount update needed"""
     pass
 
 
@@ -552,7 +527,10 @@ def debug_cogs_balance(request):
                 'date': sale.sale_date.strftime('%Y-%m-%d'),
             })
 
-    purchases = PurchaseRecord.objects.filter(company=company, status='completed')
+    purchases = PurchaseRecord.objects.filter(
+        company=company, status='completed'
+    ).exclude(description='HIDDEN_ADJUSTMENT')
+    
     if branch_id:
         purchases = purchases.filter(branch_id=branch_id)
 
@@ -590,7 +568,6 @@ def finance_dashboard(request):
     branches = Branch.objects.filter(company=company, is_active=True)
     today = timezone.now().date()
 
-    # ── Compute all date boundaries ONCE ──
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
     month_start = today.replace(day=1)
@@ -606,7 +583,6 @@ def finance_dashboard(request):
         last_month_start = today.replace(month=today.month - 1, day=1)
         last_month_end = month_start - timedelta(days=1)
 
-    # ── SINGLE PASS over all paid sales ──
     all_sales = (
         Sale.objects
         .filter(company=company, payment_status='paid')
@@ -645,10 +621,9 @@ def finance_dashboard(request):
         if last_month_start <= sale_date <= last_month_end:
             last_month_cogs += sale_cogs
 
-    # ── Now compute the balances using the already-computed total_cogs_all ──
-    total_purchases = get_total_purchases(company, branch_id)   # 1 query
-    total_commissions = get_total_commissions(company, branch_id)  # 1 query
-    total_expenses = get_total_expenses(company, branch_id)     # 1 query
+    total_purchases = get_total_purchases(company, branch_id)
+    total_commissions = get_total_commissions(company, branch_id)
+    total_expenses = get_total_expenses(company, branch_id)
 
     current_balance = total_cogs_all - total_purchases
 
@@ -656,17 +631,16 @@ def finance_dashboard(request):
     gross_profit = total_income - total_cogs_all
     current_profit_balance = gross_profit - total_expenses
 
-    # ── Today's purchases ──
     today_purchases = PurchaseRecord.objects.filter(
         company=company, status='completed', purchase_date=today
-    )
+    ).exclude(description='HIDDEN_ADJUSTMENT')
+    
     if branch_id:
         today_purchases = today_purchases.filter(branch_id=branch_id)
     today_purchases_value = today_purchases.aggregate(
         total=Sum('total_amount')
     )['total'] or Decimal('0.00')
 
-    # ── Recent transactions ──
     recent_transactions = get_recent_transactions(company, branch_id, limit=5)
 
     context = {
@@ -703,14 +677,12 @@ def all_transactions(request):
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
 
-    # ── Filters ──
     branch_id = request.GET.get('branch') or None
     tx_type = request.GET.get('type') or None
     date_from_str = request.GET.get('date_from') or None
     date_to_str = request.GET.get('date_to') or None
     search = (request.GET.get('search') or '').strip() or None
 
-    # Parse dates
     date_from = None
     date_to = None
     if date_from_str:
@@ -724,7 +696,6 @@ def all_transactions(request):
         except ValueError:
             pass
 
-    # ── Fetch all matching events ──
     events = get_all_transactions(
         company,
         branch=branch_id,
@@ -734,7 +705,6 @@ def all_transactions(request):
         search=search,
     )
 
-    # ── Summary stats (over the full filtered set, not just the page) ──
     total_income = sum(
         (e['amount'] for e in events if e['sign'] == '+'),
         Decimal('0.00'),
@@ -745,7 +715,6 @@ def all_transactions(request):
     )
     net_total = total_income - total_outflow
 
-    # ── Pagination ──
     try:
         per_page = int(request.GET.get('per_page', 25))
     except (TypeError, ValueError):
@@ -756,10 +725,8 @@ def all_transactions(request):
     paginator = Paginator(events, per_page)
     page_obj = paginator.get_page(request.GET.get('page', 1))
 
-    # ── Extra filter data for the template ──
     branches = Branch.objects.filter(company=company, is_active=True)
 
-    # Preserve filters across pagination links
     query_params = request.GET.copy()
     query_params.pop('page', None)
     querystring = query_params.urlencode()
@@ -860,11 +827,13 @@ def cogs_report(request):
     if branch_id:
         sales_qs = sales_qs.filter(branch_id=branch_id)
 
-    purchases_qs = PurchaseRecord.objects.filter(company=company, status='completed')
+    purchases_qs = PurchaseRecord.objects.filter(
+        company=company, status='completed'
+    ).exclude(description='HIDDEN_ADJUSTMENT')
+    
     if branch_id:
         purchases_qs = purchases_qs.filter(branch_id=branch_id)
 
-    # DAILY COGS RECORDS
     daily_records = []
     week_start = today - timedelta(days=today.weekday())
     current_date = week_start
@@ -903,7 +872,6 @@ def cogs_report(request):
         'closing_balance': daily_records[-1]['closing_balance'] if daily_records else Decimal('0.00'),
     }
 
-    # WEEKLY COGS RECORDS
     weekly_records = []
     month_start = today.replace(day=1)
     if today.month == 12:
@@ -963,7 +931,6 @@ def cogs_report(request):
         'closing_balance': weekly_records[-1]['closing_balance'] if weekly_records else Decimal('0.00'),
     }
 
-    # MONTHLY COGS RECORDS
     monthly_records = []
     current_year = today.year
     running_balance = Decimal('0.00')
@@ -1063,7 +1030,7 @@ def cogs_daily_detail(request, date_str):
         company=company,
         status='completed',
         purchase_date=report_date
-    ).order_by('-purchase_date')
+    ).exclude(description='HIDDEN_ADJUSTMENT').order_by('-purchase_date')
 
     if branch_id:
         purchases = purchases.filter(branch_id=branch_id)
@@ -1116,7 +1083,7 @@ def cogs_weekly_detail(request, year, week):
         status='completed',
         purchase_date__gte=week_start,
         purchase_date__lte=week_end
-    ).order_by('-purchase_date')
+    ).exclude(description='HIDDEN_ADJUSTMENT').order_by('-purchase_date')
 
     if branch_id:
         purchases = purchases.filter(branch_id=branch_id)
@@ -1171,7 +1138,7 @@ def cogs_monthly_detail(request, year, month):
         status='completed',
         purchase_date__gte=month_start,
         purchase_date__lte=month_end
-    ).order_by('-purchase_date')
+    ).exclude(description='HIDDEN_ADJUSTMENT').order_by('-purchase_date')
 
     if branch_id:
         purchases = purchases.filter(branch_id=branch_id)
@@ -1345,11 +1312,6 @@ def purchase_records(request):
 @login_required
 def purchase_create(request):
     """Create a new purchase record with optional Cloudinary receipt upload.
-
-    NOTE: The COGS balance is allowed to go negative. Purchases can exceed
-    the current available balance; the shortfall will be recovered by future
-    sales (which credit COGS). A warning is surfaced to the user, but the
-    purchase is still recorded.
     """
     company, is_viewing_company = get_active_company(request)
 
@@ -1361,7 +1323,6 @@ def purchase_create(request):
 
     current_balance = get_effective_cogs_balance(company)
 
-    # Helper to build the render context consistently
     def _form_context():
         return {
             'company': company,
@@ -1403,11 +1364,6 @@ def purchase_create(request):
         try:
             amount = Decimal(amount)
 
-            # ── Negative-balance allowance ──
-            # The COGS ledger accepts purchases of any amount. If the purchase
-            # exceeds the current available balance, warn the user but still
-            # create the record — the balance will become negative and will
-            # recover as future sales credit COGS.
             if amount > current_balance:
                 projected_balance = current_balance - amount
                 messages.warning(
@@ -1419,7 +1375,6 @@ def purchase_create(request):
                     f"Future sales will credit COGS and recover the balance."
                 )
 
-            # ── Upload receipt to Cloudinary (only if a file was provided) ──
             receipt_image_key = ''
             if receipt_image_file:
                 try:
@@ -1453,7 +1408,7 @@ def purchase_create(request):
                     notes=f"Reference: {reference}",
                     status='completed',
                     created_by=request.user,
-                    receipt_image=receipt_image_key,   # ← Cloudinary public_id
+                    receipt_image=receipt_image_key,
                     receipt_number=reference,
                 )
 
@@ -1474,17 +1429,6 @@ def purchase_create(request):
 def purchase_edit(request, pk):
     """
     Edit an existing PurchaseRecord.
-
-    Handles three receipt scenarios:
-      1. User uploads a new file   → upload to Cloudinary, delete old asset
-      2. User checks "remove"      → delete old asset, clear field
-      3. Neither                   → keep existing public_id untouched
-
-    The COGS balance shown on the form is adjusted back by this purchase's
-    amount, so the user sees the true "available" figure when editing.
-
-    NOTE: The COGS balance is allowed to go negative. If the edit pushes the
-    balance below zero, a warning is surfaced but the change is still saved.
     """
     company, is_viewing_company = get_active_company(request)
 
@@ -1494,16 +1438,12 @@ def purchase_edit(request, pk):
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
 
-    # ── Fetch the purchase (company-scoped, 404 if cross-tenant) ──
     purchase = get_object_or_404(PurchaseRecord, company=company, pk=pk)
 
-    # Capture the current Cloudinary public_id (or None)
     old_public_id = purchase.receipt_image.name if purchase.receipt_image else None
 
-    # Balance BEFORE this purchase (add it back for display purposes)
     current_balance = get_effective_cogs_balance(company) + purchase.total_amount
 
-    # ── Context builder (used for every render) ──
     def _form_context():
         return {
             'company': company,
@@ -1519,9 +1459,6 @@ def purchase_edit(request, pk):
             'is_edit': True,
         }
 
-    # ─────────────────────────────────────────────
-    # POST — process the edit
-    # ─────────────────────────────────────────────
     if request.method == 'POST':
         branch_id = request.POST.get('branch')
         purchase_type = request.POST.get('purchase_type')
@@ -1531,7 +1468,6 @@ def purchase_edit(request, pk):
         receipt_image_file = request.FILES.get('receipt_image')
         remove_receipt = request.POST.get('remove_receipt') == '1'
 
-        # ── Basic validation ──
         errors = []
         if not branch_id:
             errors.append("Branch is required.")
@@ -1549,7 +1485,6 @@ def purchase_edit(request, pk):
                 messages.error(request, err)
             return render(request, 'company/finance/purchase_form.html', _form_context())
 
-        # ── Parse amount ──
         try:
             amount = Decimal(amount_raw)
             if amount <= 0:
@@ -1558,7 +1493,6 @@ def purchase_edit(request, pk):
             messages.error(request, "Invalid amount. Please enter a positive number.")
             return render(request, 'company/finance/purchase_form.html', _form_context())
 
-        # ── Negative-balance allowance (warn only, never block) ──
         if amount > current_balance:
             projected_balance = current_balance - amount
             messages.warning(
@@ -1570,20 +1504,15 @@ def purchase_edit(request, pk):
                 f"Future sales will credit COGS and recover the balance."
             )
 
-        # ── Verify branch belongs to this company ──
         try:
             branch_obj = Branch.objects.get(id=branch_id, company=company)
         except Branch.DoesNotExist:
             messages.error(request, "Selected branch does not exist.")
             return render(request, 'company/finance/purchase_form.html', _form_context())
 
-        # ─────────────────────────────────────────────
-        # Cloudinary receipt handling
-        # ─────────────────────────────────────────────
-        new_public_id = old_public_id  # default: keep existing
+        new_public_id = old_public_id
 
         if receipt_image_file:
-            # Scenario 1: new upload → replace
             try:
                 new_public_id = _upload_purchase_receipt(
                     receipt_image_file,
@@ -1596,20 +1525,13 @@ def purchase_edit(request, pk):
                 messages.error(request, f"Receipt upload failed: {e}")
                 return render(request, 'company/finance/purchase_form.html', _form_context())
 
-            # Delete the old asset only AFTER a successful new upload
             if old_public_id and old_public_id != new_public_id:
                 _delete_cloudinary_asset(old_public_id)
 
         elif remove_receipt and old_public_id:
-            # Scenario 2: remove → delete asset, clear field
             _delete_cloudinary_asset(old_public_id)
             new_public_id = ''
 
-        # Scenario 3: neither → new_public_id stays == old_public_id
-
-        # ─────────────────────────────────────────────
-        # Save inside a transaction
-        # ─────────────────────────────────────────────
         try:
             with transaction.atomic():
                 purchase.branch = branch_obj
@@ -1622,8 +1544,6 @@ def purchase_edit(request, pk):
                 purchase.description = description
                 purchase.notes = f"Reference: {reference}"
                 purchase.receipt_image = new_public_id
-                # purchase_date and payment_method are intentionally NOT changed
-                # (preserve the original transaction metadata)
                 purchase.save()
 
             messages.success(
@@ -1633,15 +1553,11 @@ def purchase_edit(request, pk):
             return redirect('finance-purchase-detail', pk=purchase.pk)
 
         except Exception as e:
-            # If the DB write fails, attempt to roll back the Cloudinary change
             if receipt_image_file and new_public_id and new_public_id != old_public_id:
                 _delete_cloudinary_asset(new_public_id)
             messages.error(request, f"❌ Error updating purchase: {str(e)}")
             return render(request, 'company/finance/purchase_form.html', _form_context())
 
-    # ─────────────────────────────────────────────
-    # GET — render the form
-    # ─────────────────────────────────────────────
     return render(request, 'company/finance/purchase_form.html', _form_context())
 
 
@@ -1654,7 +1570,6 @@ def purchase_delete(request, pk):
     purchase = get_object_or_404(PurchaseRecord, company=company, pk=pk)
 
     if request.method == 'POST':
-        # Delete Cloudinary asset before the row
         if purchase.receipt_image:
             _delete_cloudinary_asset(purchase.receipt_image.name)
         purchase.delete()
