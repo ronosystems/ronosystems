@@ -1289,7 +1289,7 @@ def purchase_records(request):
     date_to = request.GET.get('date_to')
     search = request.GET.get('search')
 
-    purchases = PurchaseRecord.objects.filter(company=company)
+    purchases = PurchaseRecord.objects.filter(company=company).exclude(description='HIDDEN_ADJUSTMENT')
 
     if branch_id:
         purchases = purchases.filter(branch_id=branch_id)
