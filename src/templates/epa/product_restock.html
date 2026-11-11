@@ -9,7 +9,7 @@
         padding: 20px;
         border-radius: 12px;
         margin-bottom: 20px;
-        border: 1px solid #e9ecef;
+        border: 3px solid #000000;
     }
     .form-section-title {
         font-weight: 600;
@@ -22,6 +22,11 @@
     .form-section-title i {
         margin-right: 8px;
         color: #667eea;
+    }
+    .form-section-title small {
+        text-transform: none;
+        letter-spacing: 0;
+        font-weight: 400;
     }
     .required:after {
         content: " *";
@@ -67,6 +72,37 @@
         font-family: 'Courier New', monospace;
         font-size: 13px;
         resize: vertical;
+    }
+
+    /* --- RIGHT SIDE PREVIEW PANEL CSS --- */
+    .preview-panel {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 8px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        max-height: 800px;
+    }
+    .preview-header {
+        background: #f8f9fa;
+        padding: 15px 20px;
+        border-bottom: 2px solid #000;
+        border-radius: 6px 6px 0 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .preview-header h5 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+    .preview-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 15px;
     }
     
     .unit-item {
@@ -127,15 +163,44 @@
     
     .no-units {
         text-align: center;
-        padding: 20px;
+        padding: 40px 20px;
         color: #6c757d;
     }
     .no-units i { 
-        font-size: 2rem; 
+        font-size: 2.5rem; 
         display: block; 
         margin-bottom: 10px;
         opacity: 0.4;
     }
+
+    /* Price update styling */
+    .price-hint {
+        font-size: 12px;
+        color: #6c757d;
+        margin-top: 4px;
+    }
+    .price-hint strong {
+        color: #2d3436;
+    }
+    .clear-price-label {
+        cursor: pointer;
+        font-size: 12px;
+        color: #dc3545;
+        margin-left: 8px;
+    }
+    .price-input-group .input-group-text {
+        background: #eef1ff;
+        border-color: #dfe4ff;
+        color: #4b5cbd;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    /* Scrollbar styling for preview */
+    .preview-body::-webkit-scrollbar { width: 6px; }
+    .preview-body::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+    .preview-body::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+    .preview-body::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
 </style>
 {% endblock %}
 
@@ -150,44 +215,58 @@
         </a>
     </div>
 
-    <div class="row">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="fas fa-info-circle"></i> Product Information</h6>
-                </div>
-                <div class="card-body">
+    <!-- Grid Layout -->
+    <div class="row g-4">
+        
+        <!-- LEFT COLUMN: Form and Inputs -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4">
                     <form method="post">
                         {% csrf_token %}
-                        
-                        <!-- Product Info -->
+
+                        <!-- Product Info (Divided into 3 columns) -->
                         <div class="form-section">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <p><strong>Product Code:</strong> {{ product.product_code }}</p>
-                                    <p><strong>Brand:</strong> {{ product.brand }}</p>
-                                    <p><strong>Model:</strong> 
+                            <div class="row align-items-center">
+                                
+                                <!-- Column 1: Product Image -->
+                                <div class="col-md-3 text-center mb-3 mb-md-0">
+                                    {% if product.image_url %}
+                                        <img src="{{ product.image_url }}" alt="{{ product.name }}" class="img-fluid rounded" style="max-height: 120px; border: 2px solid #000; padding: 4px; background: #fff;">
+                                    {% else %}
+                                        <div style="height: 120px; width: 120px; margin: 0 auto; background: #e9ecef; border: 2px solid #000; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #6c757d;">
+                                            <i class="fas fa-image fa-3x"></i>
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Column 2: Identification -->
+                                <div class="col-md-4 border-md-start">
+                                    <p class="mb-2"><strong>Product Code:</strong> {{ product.product_code }}</p>
+                                    <p class="mb-2"><strong>Brand:</strong> {{ product.brand }}</p>
+                                    <p class="mb-2"><strong>Model:</strong> 
                                         {% if product_type == 'Phone' %}{{ product.model }}
                                         {% elif product_type == 'Electronic' %}{{ product.model_number }}
                                         {% else %}{{ product.model }}{% endif %}
                                     </p>
-                                    <p><strong>Category:</strong> {{ product_type }}</p>
+                                    <p class="mb-0"><strong>Category:</strong> {{ product_type }}</p>
                                 </div>
-                                <div class="col-md-6">
-                                    <p><strong>Current Stock:</strong> <span class="badge bg-primary">{{ product.quantity_in_stock }}</span></p>
-                                    <p><strong>Branch:</strong> {{ product.branch.name }}</p>
-                                    <p><strong>Type:</strong> 
+
+                                <!-- Column 3: Stock & Details -->
+                                <div class="col-md-5">
+                                    <p class="mb-2"><strong>Current Stock:</strong> <span class="badge bg-primary fs-6">{{ product.quantity_in_stock }}</span></p>
+                                    <p class="mb-2"><strong>Branch:</strong> {{ product.branch.name }}</p>
+                                    <p class="mb-0"><strong>Type:</strong> 
                                         {% if product_type == 'Phone' %}📱 Smartphone
                                         {% elif product_type == 'Electronic' %}💻 Electronics
                                         {% else %}🎧 Accessory{% endif %}
                                     </p>
                                 </div>
+
                             </div>
                         </div>
 
-                        <!-- ============================================
-                        PHONES & ELECTRONICS - Add Units
-                        ============================================ -->
+                        <!-- PHONES & ELECTRONICS - Add Units -->
                         {% if product_type == 'Phone' or product_type == 'Electronic' %}
                         <div class="form-section">
                             <h6 class="form-section-title"><i class="fas fa-qrcode"></i> 
@@ -195,7 +274,7 @@
                             </h6>
                             
                             <div class="add-unit-form">
-                                <input type="text" class="form-control" id="unitInput" 
+                                <input type="text" class="form-control form-control-lg" id="unitInput" 
                                     placeholder="Enter {% if product_type == 'Phone' %}IMEI{% else %}Serial{% endif %} number">
                                 <select class="form-select" id="unitStatus" style="width:130px;">
                                     <option value="available">Available</option>
@@ -225,50 +304,81 @@
                             
                             <input type="hidden" name="units" id="unitsData" value="[]">
                         </div>
-
-                        <!-- Current Units List -->
-                        <div class="form-section">
-                            <h6 class="form-section-title"><i class="fas fa-list-ul"></i> 
-                                Current {% if product_type == 'Phone' %}IMEI{% else %}Serial{% endif %} Numbers
-                                <span class="badge bg-primary ms-2">{{ existing_units|length }}</span>
-                            </h6>
-                            <div id="unitsList">
-                                {% if existing_units %}
-                                    {% for unit in existing_units %}
-                                    <div class="unit-item">
-                                        <span class="unit-identifier">{{ unit.identifier }}</span>
-                                        <span class="unit-status-badge {{ unit.status }}">{{ unit.status }}</span>
-                                    </div>
-                                    {% endfor %}
-                                {% else %}
-                                    <div class="no-units">
-                                        <i class="fas fa-qrcode"></i>
-                                        <p>No {% if product_type == 'Phone' %}IMEI{% else %}Serial{% endif %} numbers added yet.</p>
-                                    </div>
-                                {% endif %}
-                            </div>
-                        </div>
                         {% endif %}
 
-                        <!-- ============================================
-                        ACCESSORIES - Add Quantity
-                        ============================================ -->
+                        <!-- ACCESSORIES - Add Quantity -->
                         {% if product_type == 'Accessory' %}
                         <div class="form-section">
                             <h6 class="form-section-title"><i class="fas fa-box"></i> Add Stock Quantity</h6>
                             <div class="row">
                                 <div class="col-md-6">
                                     <label class="form-label required">Quantity to Add</label>
-                                    <input type="number" class="form-control" name="quantity" required min="1" placeholder="Enter quantity" value="1">
+                                    <input type="number" class="form-control form-control-lg" name="quantity" required min="1" placeholder="Enter quantity" value="1">
                                     <small class="text-muted">Current stock: {{ product.quantity_in_stock }} units</small>
                                 </div>
                             </div>
                         </div>
                         {% endif %}
 
+                        <!-- PRICE UPDATE (Optional) -->
+                        <div class="form-section">
+                            <h6 class="form-section-title">
+                                <i class="fas fa-tags"></i> Update Prices
+                                <small class="text-muted">(leave blank to keep current price)</small>
+                            </h6>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Buying Price</label>
+                                    <div class="input-group price-input-group">
+                                        <span class="input-group-text">KSh</span>
+                                        <input type="number" step="0.01" min="0" class="form-control"
+                                               name="purchase_price"
+                                               placeholder="{{ product.purchase_price }}"
+                                               value="">
+                                    </div>
+                                    <div class="price-hint">
+                                        Current: <strong>{{ product.purchase_price }}</strong>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Selling Price</label>
+                                    <div class="input-group price-input-group">
+                                        <span class="input-group-text">KSh</span>
+                                        <input type="number" step="0.01" min="0" class="form-control"
+                                               name="selling_price"
+                                               placeholder="{{ product.selling_price }}"
+                                               value="">
+                                    </div>
+                                    <div class="price-hint">
+                                        Current: <strong>{{ product.selling_price }}</strong>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Best Price</label>
+                                    <div class="input-group price-input-group">
+                                        <span class="input-group-text">KSh</span>
+                                        <input type="number" step="0.01" min="0" class="form-control"
+                                               name="best_price"
+                                               placeholder="{% if product.best_price %}{{ product.best_price }}{% else %}—{% endif %}"
+                                               value="">
+                                    </div>
+                                    <div class="price-hint">
+                                        Current:
+                                        <strong>{% if product.best_price %}{{ product.best_price }}{% else %}—{% endif %}</strong>
+                                        {% if product.best_price %}
+                                        <label class="clear-price-label">
+                                            <input type="checkbox" name="best_price_cleared" value="1">
+                                            Clear
+                                        </label>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Form Actions -->
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-success btn-lg">
+                            <button type="submit" class="btn btn-success btn-lg px-4">
                                 <i class="fas fa-save"></i> 
                                 {% if product_type == 'Accessory' %}Add Stock{% else %}Add Units{% endif %}
                             </button>
@@ -280,6 +390,38 @@
                 </div>
             </div>
         </div>
+
+        <!-- RIGHT COLUMN: Preview Panel (IMEIs) -->
+        <div class="col-lg-4">
+            {% if product_type == 'Phone' or product_type == 'Electronic' %}
+            <div class="preview-panel shadow-sm">
+                <div class="preview-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list-ul text-primary"></i> 
+                        Current {% if product_type == 'Phone' %}IMEIs{% else %}Serials{% endif %}
+                    </h5>
+                    <span class="badge bg-primary rounded-pill">{{ existing_units|length }}</span>
+                </div>
+                
+                <div class="preview-body" id="unitsList">
+                    {% if existing_units %}
+                        {% for unit in existing_units %}
+                        <div class="unit-item">
+                            <span class="unit-identifier">{{ unit.identifier }}</span>
+                            <span class="unit-status-badge {{ unit.status }}">{{ unit.status }}</span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="no-units">
+                            <i class="fas fa-qrcode"></i>
+                            <p class="mb-0">No {% if product_type == 'Phone' %}IMEI{% else %}Serial{% endif %} numbers added yet.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
     </div>
 </div>
 
@@ -363,42 +505,40 @@ function renderUnits() {
     
     if (hidden) hidden.value = JSON.stringify(units);
     
-    // Check if there are existing units from the server
-    const hasExistingUnits = list.querySelectorAll('.unit-item:not(.new-unit)').length > 0;
-    
-    // Clear only the new units section
-    const newUnitsContainer = document.getElementById('newUnitsList');
+    // Find or create the new units container inside the right column
+    let newUnitsContainer = document.getElementById('newUnitsList');
     if (!newUnitsContainer) {
-        // Create a container for new units if it doesn't exist
         const container = document.createElement('div');
         container.id = 'newUnitsList';
-        container.innerHTML = '<h6 class="mt-3">New Units to Add:</h6>';
+        container.className = 'mt-3 pt-3 border-top';
+        container.style.borderTopStyle = 'dashed';
         list.appendChild(container);
+        newUnitsContainer = container;
     }
     
-    const container = document.getElementById('newUnitsList');
-    
     if (units.length === 0) {
-        container.innerHTML = '<h6 class="mt-3">New Units to Add:</h6><p class="text-muted">No new units added yet.</p>';
+        newUnitsContainer.innerHTML = '';
         return;
     }
     
-    let html = '<h6 class="mt-3">New Units to Add:</h6>';
+    let html = '<h6 class="mb-2 text-success" style="font-size:12px; font-weight:700; text-transform:uppercase;">New Units to Add:</h6>';
     units.forEach((unit, index) => {
-        html += `<div class="unit-item new-unit">
+        html += `<div class="unit-item new-unit" style="border-color:#28a745; background:#f4fbf6;">
             <span class="unit-identifier">${unit.identifier}</span>
-            <span class="unit-status-badge ${unit.status}">${unit.status}</span>
-            <div class="unit-actions">
-                <button onclick="removeUnit(${index})" title="Remove">
-                    <i class="fas fa-trash-alt"></i>
-                </button>
+            <div class="d-flex align-items-center gap-2">
+                <span class="unit-status-badge ${unit.status}">${unit.status}</span>
+                <div class="unit-actions">
+                    <button onclick="removeUnit(${index})" title="Remove">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
             </div>
         </div>`;
     });
-    container.innerHTML = html;
+    newUnitsContainer.innerHTML = html;
 }
 
-// Enter key support
+// Enter key support for IMEI input
 document.addEventListener('DOMContentLoaded', function() {
     const input = document.getElementById('unitInput');
     if (input) {
@@ -411,7 +551,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Load existing units if editing
+// Load existing units if editing (for JS array)
 document.addEventListener('DOMContentLoaded', function() {
     const unitsData = document.getElementById('unitsData');
     if (unitsData && unitsData.value && unitsData.value !== '[]') {
@@ -421,6 +561,27 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch(e) {
             units = [];
         }
+    }
+});
+
+// ============================================
+// PRICE CLEAR CHECKBOX HANDLING
+// ============================================
+document.addEventListener('DOMContentLoaded', function() {
+    const clearCheckbox = document.querySelector('input[name="best_price_cleared"]');
+    const bestPriceInput = document.querySelector('input[name="best_price"]');
+    
+    if (clearCheckbox && bestPriceInput) {
+        clearCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                bestPriceInput.value = '';
+                bestPriceInput.disabled = true;
+                bestPriceInput.placeholder = 'Will be cleared';
+            } else {
+                bestPriceInput.disabled = false;
+                bestPriceInput.placeholder = '{% if product.best_price %}{{ product.best_price }}{% else %}—{% endif %}';
+            }
+        });
     }
 });
 </script>

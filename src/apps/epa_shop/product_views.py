@@ -15,6 +15,7 @@ from django.contrib.auth import get_user_model
 from .utils import record_stock_movement
 from django.http import Http404
 from django.db import transaction
+from django.views.decorators.http import require_POST
 from apps.companies.support_utils import (
     get_active_company,
     is_support_mode,
@@ -1265,6 +1266,36 @@ def product_list(request):
     return render(request, 'epa/products.html', context)
 
 
+@login_required
+@require_POST
+def update_product_prices(request, product_code):
+    """AJAX endpoint to update prices directly from the product detail page."""
+    company, is_viewing_company = get_active_company(request)
+    if not company:
+        return JsonResponse({'success': False, 'error': 'No active company'})
+
+    product, _ = get_product_by_code(company, product_code)
+    if not product:
+        return JsonResponse({'success': False, 'error': 'Product not found'})
+
+    try:
+        purchase_price = request.POST.get('purchase_price')
+        selling_price = request.POST.get('selling_price')
+        best_price = request.POST.get('best_price')
+
+        if purchase_price:
+            product.purchase_price = Decimal(purchase_price)
+        if selling_price:
+            product.selling_price = Decimal(selling_price)
+        if best_price:
+            product.best_price = Decimal(best_price)
+        elif best_price == '':
+            product.best_price = None
+
+        product.save()
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
 
 # ============================================
 # PRODUCT DETAIL
@@ -2386,6 +2417,232 @@ def product_delete(request, product_code):
     return render(request, 'epa/product_delete_confirm.html', context)
 
 
+
+# ============================================
+# STOCK RESTOCK SCANNER (landing page)
+# ============================================
+
+@login_required
+def stock_restock_scanner(request):
+    """
+    Scanner landing page for restocking.
+    - User scans a barcode / types a product code / types a name
+    - On match, redirect straight to the product_restock page
+    """
+    company, is_viewing_company = get_active_company(request)
+
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+
+    # Only admins / managers / stock controllers can restock
+    if not is_admin_or_manager(request.user) and not is_viewing_company \
+            and not is_cashier(request.user):
+        messages.error(request, 'You do not have permission to restock products.')
+        return redirect('/epa_shop/products/')
+
+    query = (request.GET.get('q') or '').strip()
+    results = []
+    direct_product = None
+
+    if query:
+        # ---------- 1. Exact match on barcode ----------
+        for model_cls in (Phone, Electronic, Accessory):
+            if hasattr(model_cls, 'barcode'):
+                obj = model_cls.objects.filter(
+                    company=company, barcode__iexact=query
+                ).first()
+                if obj:
+                    direct_product = obj
+                    break
+
+        # ---------- 2. Exact match on product_code ----------
+        if not direct_product:
+            prod, _ = get_product_by_code(company, query)
+            if prod:
+                direct_product = prod
+
+        # 1 & 2 → single hit, redirect straight to restock
+        if direct_product:
+            return redirect(f'/epa_shop/products/{direct_product.product_code}/restock/')
+
+        # ---------- 3. Fallback: fuzzy search on name / brand / model ----------
+        phone_qs = (
+            Phone.objects
+            .filter(company=company, is_active=True)
+            .filter(
+                Q(name__icontains=query) |
+                Q(brand__icontains=query) |
+                Q(model__icontains=query) |
+                Q(product_code__icontains=query)
+            )[:15]
+        )
+        for p in phone_qs:
+            results.append({
+                'pk': p.pk,
+                'kind': 'phone',
+                'product_code': p.product_code,
+                'name': p.name,
+                'brand': p.brand,
+                'model': p.model,
+                'type_label': 'Smartphone' if getattr(p, 'phone_type', '') != 'feature' else 'Feature Phone',
+                'stock': p.quantity_in_stock,
+                'branch': p.branch.name if p.branch else '-',
+            })
+
+        elec_qs = (
+            Electronic.objects
+            .filter(company=company, is_active=True)
+            .filter(
+                Q(name__icontains=query) |
+                Q(brand__icontains=query) |
+                Q(model_number__icontains=query) |
+                Q(product_code__icontains=query)
+            )[:15]
+        )
+        for p in elec_qs:
+            results.append({
+                'pk': p.pk,
+                'kind': 'electronic',
+                'product_code': p.product_code,
+                'name': p.name,
+                'brand': p.brand,
+                'model': p.model_number,
+                'type_label': 'Electronic',
+                'stock': p.quantity_in_stock,
+                'branch': p.branch.name if p.branch else '-',
+            })
+
+        acc_qs = (
+            Accessory.objects
+            .filter(company=company, is_active=True)
+            .filter(
+                Q(name__icontains=query) |
+                Q(brand__icontains=query) |
+                Q(model__icontains=query) |
+                Q(product_code__icontains=query)
+            )[:15]
+        )
+        for p in acc_qs:
+            results.append({
+                'pk': p.pk,
+                'kind': 'accessory',
+                'product_code': p.product_code,
+                'name': p.name,
+                'brand': p.brand,
+                'model': p.model,
+                'type_label': 'Accessory',
+                'stock': p.quantity_in_stock,
+                'branch': p.branch.name if p.branch else '-',
+            })
+
+    context = {
+        'query': query,
+        'results': results,
+        'result_count': len(results),
+        'page_title': 'Stock Restock',
+        'page_subtitle': 'Scan a barcode or search for a product to restock',
+    }
+    return render(request, 'epa/stock_restock_scanner.html', context)
+
+
+# ============================================
+# LIVE SEARCH SUGGESTIONS (JSON API)
+# ============================================
+
+@login_required
+def stock_restock_suggestions(request):
+    """AJAX endpoint for live product suggestions."""
+    company, _ = get_active_company(request)
+    if not company:
+        return JsonResponse({'results': []})
+
+    query = (request.GET.get('q') or '').strip()
+    if not query:
+        return JsonResponse({'results': []})
+
+    results = []
+
+    # 1. Phones
+    phones = (
+        Phone.objects
+        .filter(company=company, is_active=True)
+        .filter(
+            Q(name__icontains=query) |
+            Q(brand__icontains=query) |
+            Q(model__icontains=query) |
+            Q(product_code__icontains=query) |
+            Q(barcode__icontains=query)
+        )[:5]
+    )
+    for p in phones:
+        results.append({
+            'kind': 'phone',
+            'type_label': 'Smartphone' if getattr(p, 'phone_type', '') != 'feature' else 'Feature Phone',
+            'name': p.name,
+            'brand': p.brand,
+            'model': p.model or '',
+            'product_code': p.product_code,
+            'stock': p.quantity_in_stock,
+            'restock_url': f'/epa_shop/products/{p.product_code}/restock/'
+        })
+
+    # 2. Electronics
+    electronics = (
+        Electronic.objects
+        .filter(company=company, is_active=True)
+        .filter(
+            Q(name__icontains=query) |
+            Q(brand__icontains=query) |
+            Q(model_number__icontains=query) |
+            Q(product_code__icontains=query) |
+            Q(barcode__icontains=query)
+        )[:5]
+    )
+    for p in electronics:
+        results.append({
+            'kind': 'electronic',
+            'type_label': 'Electronic',
+            'name': p.name,
+            'brand': p.brand,
+            'model': p.model_number or '',
+            'product_code': p.product_code,
+            'stock': p.quantity_in_stock,
+            'restock_url': f'/epa_shop/products/{p.product_code}/restock/'
+        })
+
+    # 3. Accessories
+    accessories = (
+        Accessory.objects
+        .filter(company=company, is_active=True)
+        .filter(
+            Q(name__icontains=query) |
+            Q(brand__icontains=query) |
+            Q(model__icontains=query) |
+            Q(product_code__icontains=query) |
+            Q(barcode__icontains=query)
+        )[:5]
+    )
+    for p in accessories:
+        results.append({
+            'kind': 'accessory',
+            'type_label': 'Accessory',
+            'name': p.name,
+            'brand': p.brand,
+            'model': p.model or '',
+            'product_code': p.product_code,
+            'stock': p.quantity_in_stock,
+            'restock_url': f'/epa_shop/products/{p.product_code}/restock/'
+        })
+
+    # Sort and limit to top 5 overall
+    results = results[:5]
+
+    return JsonResponse({'results': results})
+
+
 # ============================================
 # PRODUCT RESTOCK
 # ============================================
@@ -2394,61 +2651,63 @@ def product_delete(request, product_code):
 def product_restock(request, product_code):
     """Restock a product using product code"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     product, product_type = get_product_by_code(company, product_code)
     if not product:
         messages.error(request, f'Product with code "{product_code}" not found.')
         return redirect('/epa_shop/products/')
-    
-    if not is_viewing_company:
-        if is_agent(request.user):
-            owner = Owner.objects.filter(company=company, phone=request.user.phone).first()
-            if not owner:
-                messages.error(request, 'You do not have an owner profile.')
-                return redirect('/epa_shop/products/')
-            if product.owner != owner:
-                messages.error(request, 'You can only restock products you own.')
-                return redirect('/epa_shop/products/')
-        elif not is_admin_or_manager(request.user):
-            messages.error(request, 'You do not have permission to restock products.')
-            return redirect('/epa_shop/products/')
-    
-    if not is_viewing_company and not is_admin_or_manager(request.user) and not is_cashier(request.user):
-        user_branch = get_user_branch(request.user)
-        product_branch = product.branch if product else None
-        if user_branch and product_branch and product_branch.id != user_branch.id:
-            messages.error(request, 'You do not have permission to restock products from other branches.')
-            return redirect('/epa_shop/products/')
-    
+
     existing_units = []
     if product_type in ['Phone', 'Electronic']:
         if product_type == 'Phone':
             existing_units = Unit.objects.filter(phone=product).order_by('-created_at')
         else:
             existing_units = Unit.objects.filter(electronic=product).order_by('-created_at')
-    
+
     form_units = []
     form_units_json = '[]'
     submitted_quantity = 0
-    
+
+    # ── Helper to parse optional decimal ──
+    def _parse_optional_decimal(raw):
+        """Return Decimal if a value was provided, else None (meaning 'no change')."""
+        raw = (raw or '').strip()
+        if raw == '':
+            return None
+        try:
+            value = Decimal(raw)
+        except (ValueError, TypeError, Exception):
+            return None
+        if value <= 0:
+            return None
+        return value
+
     if request.method == 'POST':
         try:
+            # ── Read optional price inputs (blank = leave unchanged) ──
+            new_purchase_price = _parse_optional_decimal(request.POST.get('purchase_price'))
+            new_selling_price  = _parse_optional_decimal(request.POST.get('selling_price'))
+            new_best_price     = _parse_optional_decimal(request.POST.get('best_price'))
+            best_price_cleared = request.POST.get('best_price_cleared') == '1'
+
+            price_changes = []
+
             if product_type in ['Phone', 'Electronic']:
                 units_data = request.POST.get('units', '[]')
                 try:
                     new_units = json.loads(units_data)
                 except:
                     new_units = []
-                
+
                 form_units = new_units
                 form_units_json = units_data
-                
+
                 if not new_units:
                     messages.error(request, 'Please add at least one IMEI/Serial number.')
                     return render(request, 'epa/product_restock.html', {
@@ -2459,37 +2718,37 @@ def product_restock(request, product_code):
                         'page_subtitle': f'Code: {product.product_code}',
                         'unit_label': 'IMEI' if product_type == 'Phone' else 'Serial',
                     })
-                
+
                 owner = get_or_create_owner_from_user(request.user, company=company)
                 added_count = 0
                 skipped_count = 0
                 duplicate_identifiers = []
-                
+
                 for unit_data in new_units:
                     identifier = unit_data.get('identifier', '').strip()
                     status = unit_data.get('status', 'available')
-                    
+
                     if not identifier:
                         continue
-                    
+
                     if Unit.objects.filter(identifier=identifier).exists():
                         skipped_count += 1
                         duplicate_identifiers.append(identifier)
                         continue
-                    
+
                     if product_type == 'Phone':
                         Unit.objects.create(phone=product, identifier=identifier, unit_type='imei', status=status, owner=owner)
                     else:
                         Unit.objects.create(electronic=product, identifier=identifier, unit_type='serial', status=status, owner=owner)
                     added_count += 1
-                
+
                 if added_count == 0:
                     error_msg = 'No new units were added. '
                     if duplicate_identifiers:
                         error_msg += f'Already exist: {", ".join(duplicate_identifiers[:5])}'
                     else:
                         error_msg += 'All identifiers were invalid.'
-                    
+
                     messages.error(request, error_msg)
                     return render(request, 'epa/product_restock.html', {
                         'product': product, 'product_type': product_type,
@@ -2499,26 +2758,43 @@ def product_restock(request, product_code):
                         'page_subtitle': f'Code: {product.product_code}',
                         'unit_label': 'IMEI' if product_type == 'Phone' else 'Serial',
                     })
-                
+
+                # ── Apply price changes (only when provided) ──
+                if new_purchase_price is not None:
+                    product.purchase_price = new_purchase_price
+                    price_changes.append(f'buying → {new_purchase_price}')
+                if new_selling_price is not None:
+                    product.selling_price = new_selling_price
+                    price_changes.append(f'selling → {new_selling_price}')
+                if new_best_price is not None:
+                    product.best_price = new_best_price
+                    price_changes.append(f'best → {new_best_price}')
+                elif best_price_cleared:
+                    product.best_price = None
+                    price_changes.append('best cleared')
+
                 if product_type == 'Phone':
                     total_units = Unit.objects.filter(phone=product).count()
                 else:
                     total_units = Unit.objects.filter(electronic=product).count()
-                
+
                 product.quantity_in_stock = total_units
                 product.save()
-                
+
+                msg = f'✅ Added {added_count} unit(s) to {product.name}. New stock: {total_units}.'
                 if skipped_count > 0:
-                    messages.warning(request, f'Added {added_count} units. {skipped_count} skipped. New stock: {total_units}')
-                else:
-                    messages.success(request, f'Added {added_count} units. New stock: {total_units}')
-                
-                return redirect('/epa_shop/products/')
-            
+                    msg += f' {skipped_count} skipped (duplicate identifier).'
+                if price_changes:
+                    msg += ' Prices updated: ' + ', '.join(price_changes) + '.'
+                messages.success(request, msg)
+
+                # 🚀 REDIRECT TO SCANNER FOR NEXT ITEM
+                return redirect('/epa_shop/inventory/stock-restock/')
+
             elif product_type == 'Accessory':
                 quantity = int(request.POST.get('quantity', 0))
                 submitted_quantity = quantity
-                
+
                 if quantity <= 0:
                     messages.error(request, 'Quantity must be greater than 0.')
                     return render(request, 'epa/product_restock.html', {
@@ -2529,17 +2805,37 @@ def product_restock(request, product_code):
                         'page_subtitle': f'Code: {product.product_code}',
                         'unit_label': 'IMEI' if product_type == 'Phone' else 'Serial',
                     })
-                
+
                 product.quantity_in_stock += quantity
+
+                # ── Apply price changes (only when provided) ──
+                if new_purchase_price is not None:
+                    product.purchase_price = new_purchase_price
+                    price_changes.append(f'buying → {new_purchase_price}')
+                if new_selling_price is not None:
+                    product.selling_price = new_selling_price
+                    price_changes.append(f'selling → {new_selling_price}')
+                if new_best_price is not None:
+                    product.best_price = new_best_price
+                    price_changes.append(f'best → {new_best_price}')
+                elif best_price_cleared:
+                    product.best_price = None
+                    price_changes.append('best cleared')
+
                 product.save()
+
+                msg = f'✅ Added {quantity} unit(s) to {product.name}. New stock: {product.quantity_in_stock}.'
+                if price_changes:
+                    msg += ' Prices updated: ' + ', '.join(price_changes) + '.'
+                messages.success(request, msg)
                 
-                messages.success(request, f'Added {quantity} units. New stock: {product.quantity_in_stock}')
-                return redirect('/epa_shop/products/')
-            
+                # 🚀 REDIRECT TO SCANNER FOR NEXT ITEM
+                return redirect('/epa_shop/inventory/stock-restock/')
+
             else:
                 messages.error(request, 'Unknown product type.')
                 return redirect('/epa_shop/products/')
-            
+
         except Exception as e:
             messages.error(request, f'Error restocking product: {str(e)}')
             import traceback
@@ -2552,7 +2848,7 @@ def product_restock(request, product_code):
                 'page_subtitle': f'Code: {product.product_code}',
                 'unit_label': 'IMEI' if product_type == 'Phone' else 'Serial',
             })
-    
+
     context = {
         'product': product,
         'product_type': product_type,
@@ -2565,6 +2861,7 @@ def product_restock(request, product_code):
         'unit_label': 'IMEI' if product_type == 'Phone' else 'Serial',
     }
     return render(request, 'epa/product_restock.html', context)
+    
 
 
 # ============================================

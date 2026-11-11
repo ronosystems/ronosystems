@@ -1,0 +1,343 @@
+{% extends 'base.html' %}
+
+{% block title %}Stock Restock{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ... [Keep all existing CSS exactly as it is] ... */
+    .scanner-wrap { max-width: 960px; margin: 0 auto; }
+    .scanner-card { background: #fff; border: 2px solid #000; border-radius: 8px; padding: 30px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08); margin-bottom: 20px; }
+    .scanner-header { text-align: center; margin-bottom: 24px; }
+    .scanner-header .icon-wrap { width: 84px; height: 84px; border-radius: 50%; background: #eef1ff; border: 2px solid #d5dbff; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+    .scanner-header .icon-wrap i { font-size: 2.2rem; color: #2d5f7c; }
+    .scanner-header h3 { font-weight: 700; color: #2d3436; margin: 0 0 4px; font-size: 1.3rem; }
+    .scanner-header p { color: #6c757d; margin: 0; font-size: 0.92rem; }
+    
+    .scan-input-wrap { position: relative; margin-bottom: 14px; }
+    .scan-input-wrap i.scan-icon { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); font-size: 1.4rem; color: #2d5f7c; pointer-events: none; z-index: 2; }
+    .scan-input { width: 100%; padding: 18px 18px 18px 60px; font-size: 1.15rem; border: 3px solid #000; border-radius: 8px; font-family: 'Courier New', monospace; letter-spacing: 1px; transition: border-color 0.2s, box-shadow 0.2s; background: #fff; }
+    .scan-input:focus { outline: none; border-color: #2d5f7c; box-shadow: 0 0 0 4px rgba(45, 95, 124, 0.2); }
+    .scan-input::placeholder { color: #adb5bd; font-family: 'Segoe UI', sans-serif; letter-spacing: 0; }
+    
+    .scan-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+    .scan-actions .btn { padding: 12px 24px; font-weight: 600; border: 2px solid #000; }
+    .scan-actions .btn-primary { background: #2d5f7c; border-color: #000; }
+    .scan-actions .btn-primary:hover { background: #1e4e6d; }
+    
+    .scan-tips { background: #f8f9fa; border: 1px dashed #ced4da; border-radius: 8px; padding: 14px 18px; font-size: 0.86rem; color: #495057; margin-bottom: 20px; }
+    .scan-tips strong { color: #2d3436; }
+    .scan-tips ul { padding-left: 1.1rem; margin: 6px 0 0; }
+    .scan-tips li { margin-bottom: 3px; }
+    .scan-tips kbd { background: #2d3436; color: #fff; padding: 2px 6px; border-radius: 3px; font-size: 0.75rem; font-family: 'Courier New', monospace; }
+    
+    .results-heading { font-weight: 700; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6c757d; margin: 22px 0 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .results-heading .query-chip { background: #eef1ff; color: #2d5f7c; padding: 2px 10px; border-radius: 50px; font-size: 0.75rem; font-weight: 600; text-transform: none; letter-spacing: 0; }
+    
+    .result-item { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border: 2px solid #e9ecef; border-radius: 8px; margin-bottom: 8px; text-decoration: none; color: inherit; transition: all 0.2s ease; background: #fff; }
+    .result-item:hover { border-color: #2d5f7c; background: #f0f3ff; transform: translateX(3px); color: inherit; text-decoration: none; }
+    .result-info { flex: 1; min-width: 0; }
+    .result-info .name { font-weight: 700; color: #2d3436; font-size: 0.98rem; margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .result-info .meta { font-size: 0.82rem; color: #6c757d; display: flex; flex-wrap: wrap; gap: 4px; }
+    .result-info .meta span { display: inline-flex; align-items: center; }
+    .result-info .meta span + span:before { content: "·"; color: #adb5bd; margin-right: 4px; }
+    .result-info .kind-badge { display: inline-block; padding: 1px 8px; border-radius: 50px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; margin-right: 6px; vertical-align: middle; }
+    .kind-badge.phone { background: #d4edda; color: #155724; }
+    .kind-badge.electronic { background: #cce5ff; color: #004085; }
+    .kind-badge.accessory { background: #fff3cd; color: #856404; }
+    .result-right { text-align: right; flex-shrink: 0; margin-left: 12px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+    .stock-badge { display: inline-block; padding: 3px 10px; border-radius: 50px; font-size: 0.75rem; font-weight: 700; white-space: nowrap; }
+    .stock-badge.ok   { background: #d4edda; color: #155724; }
+    .stock-badge.low  { background: #fff3cd; color: #856404; }
+    .stock-badge.zero { background: #f8d7da; color: #721c24; }
+    .btn-restock { display: inline-flex; align-items: center; gap: 4px; padding: 4px 14px; font-size: 0.78rem; font-weight: 700; border: 2px solid #000; border-radius: 4px; background: #2d5f7c; color: #fff; white-space: nowrap; transition: background 0.2s; }
+    .result-item:hover .btn-restock { background: #1e4e6d; }
+    
+    .no-results { text-align: center; padding: 44px 20px; color: #6c757d; }
+    .no-results i { font-size: 3rem; color: #ced4da; margin-bottom: 14px; display: block; }
+    .no-results p { margin: 0 0 4px; }
+    .no-results .small { font-size: 0.85rem; }
+    
+    /* NEW: Live suggestions dropdown */
+    .suggestions-box {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: #fff;
+        border: 2px solid #000;
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+        z-index: 1000;
+        box-shadow: 0 10px 15px rgba(0,0,0,0.1);
+        display: none;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    .suggestions-box.show {
+        display: block;
+    }
+    .suggestion-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 16px;
+        border-bottom: 1px solid #e9ecef;
+        text-decoration: none;
+        color: inherit;
+        transition: background 0.15s;
+    }
+    .suggestion-item:last-child {
+        border-bottom: none;
+    }
+    .suggestion-item:hover, .suggestion-item.active {
+        background: #f0f3ff;
+        color: inherit;
+    }
+    .suggestion-item .s-name {
+        font-weight: 600;
+        font-size: 0.92rem;
+        color: #2d3436;
+    }
+    .suggestion-item .s-meta {
+        font-size: 0.75rem;
+        color: #6c757d;
+    }
+    .suggestion-item .s-stock {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #155724;
+        background: #d4edda;
+        padding: 2px 8px;
+        border-radius: 10px;
+    }
+
+    @media (max-width: 576px) {
+        .scanner-card { padding: 20px 16px; }
+        .scan-input { padding: 16px 16px 16px 52px; font-size: 1rem; }
+        .scan-input-wrap i.scan-icon { left: 14px; font-size: 1.2rem; }
+        .scan-actions .btn { padding: 10px 18px; flex: 1; }
+        .result-item { flex-direction: column; align-items: flex-start; gap: 8px; }
+        .result-right { align-items: flex-start; margin-left: 0; }
+        .result-info .name { white-space: normal; }
+        .suggestion-item { padding: 10px 12px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="scanner-wrap">
+
+        {# SCANNER CARD #}
+        <div class="scanner-card">
+
+            <div class="scanner-header">
+                <div class="icon-wrap">
+                    <i class="fas fa-barcode"></i>
+                </div>
+                <h3>Stock Restock</h3>
+                <p>Scan a barcode or enter a product code</p>
+            </div>
+
+            <form method="get" action="" id="scanForm" autocomplete="off">
+                <div class="scan-input-wrap">
+                    <i class="fas fa-search scan-icon"></i>
+                    <input
+                        type="text"
+                        id="scanInput"
+                        name="q"
+                        class="scan-input"
+                        placeholder="Scan or type here…"
+                        value="{{ query }}"
+                        autocomplete="off"
+                        autocorrect="off"
+                        autocapitalize="off"
+                        spellcheck="false"
+                        autofocus
+                    >
+                    <!-- Suggestion Dropdown -->
+                    <div id="suggestionsBox" class="suggestions-box"></div>
+                </div>
+                <div class="scan-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                    {% if query %}
+                    <a href="/epa_shop/inventory/stock-restock/" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Clear
+                    </a>
+                    {% endif %}
+                </div>
+            </form>
+
+            <div class="scan-tips">
+                <strong><i class="fas fa-lightbulb" style="color:#f0b429;"></i> Tips:</strong>
+                <ul>
+                    <li>Scan a <strong>barcode</strong> or type a <strong>product code</strong> — the product opens instantly.</li>
+                    <li>Or type any part of the <strong>name, brand, or model</strong> to see suggestions.</li>
+                    <li>Press <kbd>Enter</kbd> to submit.</li>
+                </ul>
+            </div>
+
+            {# FULL SEARCH RESULTS #}
+            {% if query %}
+                {% if results %}
+                    <div class="results-heading">
+                        <span>
+                            {{ result_count }} result{{ result_count|pluralize }} found
+                        </span>
+                        <span class="query-chip">
+                            <i class="fas fa-search" style="font-size:0.65rem;"></i>
+                            {{ query }}
+                        </span>
+                    </div>
+
+                    {% for r in results %}
+                    <a href="/epa_shop/products/{{ r.product_code }}/restock/" class="result-item">
+                        <div class="result-info">
+                            <div class="name">
+                                <span class="kind-badge {{ r.kind }}">{{ r.type_label }}</span>
+                                {{ r.name }}
+                            </div>
+                            <div class="meta">
+                                <span>{{ r.brand }}</span>
+                                <span>{{ r.model|default:"—" }}</span>
+                                <span>Code: {{ r.product_code }}</span>
+                                <span>Branch: {{ r.branch }}</span>
+                            </div>
+                        </div>
+                        <div class="result-right">
+                            <span class="stock-badge {% if r.stock > 5 %}ok{% elif r.stock > 0 %}low{% else %}zero{% endif %}">
+                                <i class="fas fa-cubes" style="font-size:0.7rem;"></i>
+                                Stock: {{ r.stock }}
+                            </span>
+                            <span class="btn-restock">
+                                <i class="fas fa-plus"></i> Restock
+                            </span>
+                        </div>
+                    </a>
+                    {% endfor %}
+
+                {% else %}
+                    <div class="no-results">
+                        <i class="fas fa-search-minus"></i>
+                        <p><strong>No products found for "{{ query }}".</strong></p>
+                        <p class="small mb-0">Try scanning again, or search with a shorter keyword.</p>
+                    </div>
+                {% endif %}
+            {% endif %}
+
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        const form = document.getElementById('scanForm');
+        const input = document.getElementById('scanInput');
+        const suggestionsBox = document.getElementById('suggestionsBox');
+        
+        if (!form || !input) return;
+
+        // 1. Don't submit if input is empty
+        form.addEventListener('submit', function (e) {
+            if (!input.value.trim()) {
+                e.preventDefault();
+                input.focus();
+            }
+            // Hide dropdown on submit
+            suggestionsBox.classList.remove('show');
+        });
+
+        // 2. Focus input on load
+        window.addEventListener('load', function () {
+            input.focus();
+            if (input.value) {
+                const len = input.value.length;
+                input.setSelectionRange(len, len);
+            }
+        });
+
+        // 3. AUTO-CLEAR ON NO RESULTS
+        const hasQuery = "{{ query|escapejs }}" !== "";
+        const hasResults = {{ result_count }} > 0;
+
+        if (hasQuery && !hasResults) {
+            input.value = '';
+            const url = new URL(window.location);
+            url.searchParams.delete('q');
+            window.history.replaceState({}, '', url);
+            input.focus();
+        }
+
+        // 4. Keep focus in input if clicking blank areas
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('a, button, input, textarea, select, .suggestions-box')) {
+                input.focus();
+            }
+            // Close dropdown if clicking outside
+            if (!e.target.closest('.scan-input-wrap')) {
+                suggestionsBox.classList.remove('show');
+            }
+        });
+
+        // ==========================================
+        // 5. LIVE SUGGESTIONS (AJAX DEBOUNCE)
+        // ==========================================
+        let debounceTimer;
+
+        input.addEventListener('input', function() {
+            const q = this.value.trim();
+            
+            clearTimeout(debounceTimer);
+            
+            if (q.length < 1) {
+                suggestionsBox.classList.remove('show');
+                return;
+            }
+
+            debounceTimer = setTimeout(() => {
+                fetch(`/epa_shop/inventory/stock-restock/suggest/?q=${encodeURIComponent(q)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        suggestionsBox.innerHTML = '';
+                        
+                        if (data.results && data.results.length > 0) {
+                            data.results.forEach(item => {
+                                const a = document.createElement('a');
+                                a.href = item.restock_url;
+                                a.className = 'suggestion-item';
+                                a.innerHTML = `
+                                    <div>
+                                        <div class="s-name">${item.name}</div>
+                                        <div class="s-meta">
+                                            <span class="kind-badge ${item.kind}" style="font-size:0.6rem; padding:0 4px;">${item.type_label}</span>
+                                            ${item.brand} ${item.model ? '· ' + item.model : ''} · ${item.product_code}
+                                        </div>
+                                    </div>
+                                    <div class="s-stock">Stock: ${item.stock}</div>
+                                `;
+                                suggestionsBox.appendChild(a);
+                            });
+                            suggestionsBox.classList.add('show');
+                        } else {
+                            suggestionsBox.classList.remove('show');
+                        }
+                    })
+                    .catch(err => console.error('Suggestion error:', err));
+            }, 250); // 250ms debounce
+        });
+
+        // Hide suggestions when pressing Escape
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                suggestionsBox.classList.remove('show');
+            }
+        });
+
+    })();
+</script>
+{% endblock %}

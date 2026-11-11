@@ -22,6 +22,8 @@ urlpatterns = [
     path('inventory/movement/',              inventory_views.stock_movement,      name='epa-stock-movement'),
     path('inventory/bulk-transfer/',         inventory_views.bulk_transfer,       name='bulk-transfer'),
     path('inventory/bulk-transfer/check/',   inventory_views.bulk_transfer_check, name='bulk-transfer-check'),
+    path('inventory/stock-restock/',         product_views.stock_restock_scanner, name='epa-stock-restock-scanner'),
+    path('inventory/stock-restock/suggest/', product_views.stock_restock_suggestions, name='epa-stock-restock-suggest'),
 
     # ============================================
     # PRODUCTS — Full CRUD (Using Product Code)
@@ -40,6 +42,7 @@ urlpatterns = [
     path('products/<str:product_code>/delete/',           product_views.product_delete,  name='epa-product-delete'),
     path('products/<str:product_code>/restock/',          product_views.product_restock, name='epa-product-restock'),
     path('products/<str:product_code>/units/',            product_views.product_units,   name='epa-product-units'),
+    path('products/<str:product_code>/update-prices/',    product_views.update_product_prices, name='epa-product-update-prices'),
 
     # ============================================
     # UNIT MANAGEMENT
