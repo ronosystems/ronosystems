@@ -1737,8 +1737,9 @@ function getCsrfToken() {
     return '';
 }
 
+
 // ============================================
-// NEW: PRODUCT PREVIEW LOGIC (WITH IMEI/SN SEARCH)
+// PRODUCT PREVIEW LOGIC (WITH IMEI/SN SEARCH)
 // ============================================
 function showPreviewPanel(product, unitIdentifier = null) {
     currentProduct = product;
@@ -1797,11 +1798,27 @@ function showPreviewPanel(product, unitIdentifier = null) {
         identifierLabel.textContent = labelText;
         
         btnAdd.disabled = true;
-        setTimeout(() => identifierInput.focus(), 50);
+        
+        // --- FIX START ---
+        // If an identifier was passed (e.g., from a barcode scan), auto-select it
+        if (unitIdentifier) {
+            selectedUnit = unitIdentifier;
+            identifierInput.value = unitIdentifier;
+            btnAdd.disabled = false;
+            updatePreviewSubtotal();
+        } else {
+            // Otherwise, clear and focus for manual input
+            identifierInput.value = '';
+            setTimeout(() => identifierInput.focus(), 50);
+        }
+        // --- FIX END ---
 
         identifierInput.oninput = function() {
             const q = this.value.trim();
+            
+            // If the user clears the input, reset the selection
             if (q.length < 2) {
+                selectedUnit = null;
                 identifierResults.classList.remove('active');
                 btnAdd.disabled = true;
                 return;
@@ -1824,6 +1841,12 @@ function showPreviewPanel(product, unitIdentifier = null) {
                     </div>
                 `).join('');
                 identifierResults.classList.add('active');
+                
+                // If the user typed an exact match manually, auto-select it
+                const exactMatch = matches.find(m => m.identifier === q);
+                if (exactMatch) {
+                    selectAvailableUnit(exactMatch.identifier);
+                }
             } else {
                 identifierResults.innerHTML = `<div class="unit-result-item text-danger">No available ${product.category === 'Phone' ? 'IMEI' : 'Serial'} found for "${q}" (May be already in cart or Sold Out)</div>`;
                 identifierResults.classList.add('active');
@@ -1837,6 +1860,7 @@ function showPreviewPanel(product, unitIdentifier = null) {
     updatePreviewSubtotal();
     previewPanel.classList.add('active');
 }
+
 
 // Function to select an available unit from the dropdown
 function selectAvailableUnit(identifier) {
