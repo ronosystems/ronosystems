@@ -31,9 +31,8 @@
     }
 
     /* ============================================
-       RIGHT SIDE PREVIEW PANEL (MATCHES LEFT HEIGHT)
+       RIGHT SIDE PREVIEW PANEL
     ============================================ */
-    /* Make the right column a flex container that stretches */
     .right-col-flex {
         display: flex;
         flex-direction: column;
@@ -46,7 +45,7 @@
         border-radius: 12px;
         display: flex;
         flex-direction: column;
-        flex: 1; /* This forces it to fill the remaining height */
+        flex: 1;
         overflow: hidden;
     }
     .preview-header {
@@ -65,12 +64,11 @@
         text-transform: uppercase;
     }
     
-    /* The body now scrolls internally to fit the height */
     .preview-body {
         flex: 1;
         padding: 12px;
         overflow-y: auto;
-        min-height: 150px; /* prevents crushing if left side is very short */
+        min-height: 150px;
     }
 
     /* ============================================
@@ -171,6 +169,19 @@
         overflow-y: auto;
         padding-right: 4px;
     }
+    
+    /* Barcode box */
+    .barcode-box {
+        background: #fff;
+        border: 2px dashed #000;
+        border-radius: 8px;
+        padding: 12px;
+        text-align: center;
+        font-family: 'Courier New', monospace;
+        font-size: 16px;
+        letter-spacing: 2px;
+        color: #2d3436;
+    }
 </style>
 {% endblock %}
 
@@ -186,7 +197,6 @@
         </a>
     </div>
 
-    <!-- Add align-items-stretch to the row -->
     <div class="row g-3 align-items-stretch">
         
         <!-- ============================================
@@ -347,28 +357,6 @@
                 </div>
             </div>
 
-            <!-- 4. ACCESSORY SPECIFICS (Only if accessory) -->
-            {% if product_type == 'Accessory' %}
-            <div class="form-section mt-3">
-                <h6 class="form-section-title"><i class="fas fa-box-open"></i> Accessory Details</h6>
-                <div class="d-flex justify-content-between align-items-center">
-                    <div class="barcode-display bg-white border border-dark px-4 py-2 font-monospace fs-5">
-                        <i class="fas fa-barcode text-primary me-2"></i> {{ product.compatible_phone_models|default:"No barcode" }}
-                    </div>
-                    <div class="d-flex gap-4 text-center">
-                        <div>
-                            <div class="fs-5 fw-bold text-primary">{{ product.quantity_in_stock }}</div>
-                            <div class="small text-muted">In Stock</div>
-                        </div>
-                        <div>
-                            <div class="fs-5 fw-bold text-warning">{{ product.minimum_stock_level|default:10 }}</div>
-                            <div class="small text-muted">Min Level</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-
         </div>
 
         <!-- ============================================
@@ -393,9 +381,39 @@
                     </div>
                 </div>
 
+                <!-- Accessory Details (Moved here) -->
+                {% if product_type == 'Accessory' %}
+                <div class="form-section">
+                    <h6 class="form-section-title"><i class="fas fa-barcode"></i> Accessory Details</h6>
+                    
+                    <!-- Row 1: Barcode -->
+                    <div class="mb-3">
+                        <div class="price-label mb-1 text-start">Barcode</div>
+                        <div class="barcode-box">
+                            <i class="fas fa-barcode text-primary me-2"></i> 
+                            {{ product.barcode|default:"No barcode assigned" }}
+                        </div>
+                    </div>
+                    
+                    <!-- Row 2: Stock Limits -->
+                    <div>
+                        <div class="price-label mb-1 text-start">Stock Levels</div>
+                        <div class="d-flex justify-content-between bg-white border border-dark rounded p-2 text-center">
+                            <div class="w-50 border-end border-dark">
+                                <div class="fs-5 fw-bold text-primary">{{ product.quantity_in_stock }}</div>
+                                <div class="small text-muted" style="font-size:10px;">In Stock</div>
+                            </div>
+                            <div class="w-50">
+                                <div class="fs-5 fw-bold text-warning">{{ product.minimum_stock_level|default:10 }}</div>
+                                <div class="small text-muted" style="font-size:10px;">Min Level</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
                 <!-- Units Panel (If Phone or Electronic) -->
                 {% if product_type == 'Phone' or product_type == 'Electronic' %}
-                {% if units %}
                 <div class="preview-panel">
                     <div class="preview-header">
                         <h5><i class="fas fa-list-ul text-primary"></i> Stock Units</h5>
@@ -448,7 +466,6 @@
                         </a>
                     </div>
                 </div>
-                {% endif %}
                 {% endif %}
 
             </div>
