@@ -4,12 +4,9 @@ from django.contrib import messages
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
 from .models import (
-    Electronic, Phone, Accessory, Category, 
-    Sale, SaleItem, Customer, StockMovement, Supplier
-)
-from .models import (
     Electronic, Phone, Accessory, Category,
-    Sale, SaleItem, Customer, StockMovement, Supplier, Unit, StockTransfer
+    Sale, SaleItem, Customer, StockMovement, Supplier,
+    Unit, StockTransfer
 )
 from apps.companies.support_utils import (
     get_active_company,
@@ -17,7 +14,6 @@ from apps.companies.support_utils import (
     is_effective_admin,
     get_effective_branch,
 )
-
 from apps.company.models import Branch
 from django.contrib.auth import get_user_model
 from .product_views import get_or_create_owner_from_user
@@ -31,193 +27,250 @@ import json
 User = get_user_model()
 
 
+# ============================================
+# LIVE STOCK HELPERS
+# ============================================
+def _available_phone_count(phone):
+    return Unit.objects.filter(phone=phone, status='available').count()
+
+def _available_electronic_count(electronic):
+    return Unit.objects.filter(electronic=electronic, status='available').count()
+
+def _available_unit_count(product, product_type):
+    if product_type == 'Phone':
+        return _available_phone_count(product)
+    elif product_type == 'Electronic':
+        return _available_electronic_count(product)
+    else:
+        return product.total_quantity_in_stock  # Accessories use cache
+
+
 @login_required
 def inventory_list(request):
-    """Main inventory page showing all products"""
+    """Main inventory page showing all products — using live Unit counts."""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
-    # Get all products
+
     electronics = Electronic.objects.filter(company=company, is_active=True)
     phones = Phone.objects.filter(company=company, is_active=True)
     accessories = Accessory.objects.filter(company=company, is_active=True)
-    
-    # Calculate stock counts
-    electronics_stock = electronics.aggregate(total=Sum('total_quantity_in_stock'))['total'] or 0
-    phones_stock = phones.aggregate(total=Sum('total_quantity_in_stock'))['total'] or 0
-    accessories_stock = accessories.aggregate(total=Sum('total_quantity_in_stock'))['total'] or 0
-    
-    electronics_count = electronics.count()
-    phones_count = phones.count()
-    accessories_count = accessories.count()
-    
-    # Unit counts
+
+    # ── Live unit counts per product ──
+    electronics_data = [
+        {
+            'obj': e,
+            'stock': _available_electronic_count(e),
+            'units': Unit.objects.filter(electronic=e).count(),
+        }
+        for e in electronics
+    ]
+    phones_data = [
+        {
+            'obj': p,
+            'stock': _available_phone_count(p),
+            'units': Unit.objects.filter(phone=p).count(),
+        }
+        for p in phones
+    ]
+    accessories_data = [
+        {
+            'obj': a,
+            'stock': a.total_quantity_in_stock,
+            'units': a.total_quantity_in_stock,
+        }
+        for a in accessories
+    ]
+
+    # ── Stock totals (live, available only) ──
+    electronics_stock = sum(d['stock'] for d in electronics_data)
+    phones_stock = sum(d['stock'] for d in phones_data)
+    accessories_stock = sum(d['stock'] for d in accessories_data)
+
+    electronics_count = len(electronics_data)
+    phones_count = len(phones_data)
+    accessories_count = len(accessories_data)
+
     electronics_unit_count = Unit.objects.filter(
         electronic__company=company, electronic__is_active=True,
+        status='available',
     ).count()
-
     phones_unit_count = Unit.objects.filter(
         phone__company=company, phone__is_active=True,
+        status='available',
     ).count()
-
     accessories_unit_count = accessories_stock
 
     total_products = electronics_count + phones_count + accessories_count
     total_stock = electronics_stock + phones_stock + accessories_stock
-    
-    # Financial statistics
-    electronics_purchase_value = sum(
-        item.purchase_price * item.total_quantity_in_stock for item in electronics
-    )
-    phones_purchase_value = sum(
-        item.purchase_price * item.total_quantity_in_stock for item in phones
-    )
-    accessories_purchase_value = sum(
-        item.purchase_price * item.total_quantity_in_stock for item in accessories
-    )
-    total_purchase_value = (
-        electronics_purchase_value + phones_purchase_value + accessories_purchase_value
-    )
-    
-    electronics_selling_value = sum(
-        item.selling_price * item.total_quantity_in_stock for item in electronics
-    )
-    phones_selling_value = sum(
-        item.selling_price * item.total_quantity_in_stock for item in phones
-    )
-    accessories_selling_value = sum(
-        item.selling_price * item.total_quantity_in_stock for item in accessories
-    )
-    total_selling_value = (
-        electronics_selling_value + phones_selling_value + accessories_selling_value
-    )
-    
+
+    # ── Financial stats — computed from live stock ──
+    electronics_purchase_value = sum(d['obj'].purchase_price * d['stock'] for d in electronics_data)
+    phones_purchase_value = sum(d['obj'].purchase_price * d['stock'] for d in phones_data)
+    accessories_purchase_value = sum(d['obj'].purchase_price * d['stock'] for d in accessories_data)
+    total_purchase_value = electronics_purchase_value + phones_purchase_value + accessories_purchase_value
+
+    electronics_selling_value = sum(d['obj'].selling_price * d['stock'] for d in electronics_data)
+    phones_selling_value = sum(d['obj'].selling_price * d['stock'] for d in phones_data)
+    accessories_selling_value = sum(d['obj'].selling_price * d['stock'] for d in accessories_data)
+    total_selling_value = electronics_selling_value + phones_selling_value + accessories_selling_value
+
     expected_profit = total_selling_value - total_purchase_value
     expected_profit_margin = (
         (expected_profit / total_purchase_value * 100) if total_purchase_value > 0 else 0
     )
-    
+
     electronics_best_value = sum(
-        (item.best_price if item.best_price else item.selling_price) * item.total_quantity_in_stock for item in electronics
+        (d['obj'].best_price if d['obj'].best_price else d['obj'].selling_price) * d['stock']
+        for d in electronics_data
     )
     phones_best_value = sum(
-        (item.best_price if item.best_price else item.selling_price) * item.total_quantity_in_stock for item in phones
+        (d['obj'].best_price if d['obj'].best_price else d['obj'].selling_price) * d['stock']
+        for d in phones_data
     )
     accessories_best_value = sum(
-        (item.best_price if item.best_price else item.selling_price) * item.total_quantity_in_stock for item in accessories
+        (d['obj'].best_price if d['obj'].best_price else d['obj'].selling_price) * d['stock']
+        for d in accessories_data
     )
-    total_best_value = (
-        electronics_best_value + phones_best_value + accessories_best_value
-    )
-    
+    total_best_value = electronics_best_value + phones_best_value + accessories_best_value
     best_price_profit = total_best_value - total_purchase_value
-    
-    # Low stock items
+
+    # ── Low stock items (live) ──
     low_stock_items = []
-    
-    for item in electronics.filter(total_quantity_in_stock__lte=5):
-        low_stock_items.append({
-            'id': item.id, 'name': f"{item.name}", 'brand': f"{item.brand}",
-            'specs': f"{item.ram} {item.storage}".strip() or '-', 'model': f"{item.model_number}",
-            'type': 'Electronic', 'quantity': item.total_quantity_in_stock, 'min_stock': 5,
-            'price': item.selling_price, 'purchase_price': item.purchase_price, 'product_code': item.product_code or '-'
-        })
-    
-    for item in phones.filter(total_quantity_in_stock__lte=5):
-        low_stock_items.append({
-            'id': item.id, 'name': f"{item.name}", 'brand': f"{item.brand}",
-            'model': f"{item.model}", 'specs': f"{item.ram} {item.storage_capacity}".strip() or '-',
-            'type': 'Phone', 'quantity': item.total_quantity_in_stock, 'min_stock': 5,
-            'price': item.selling_price, 'purchase_price': item.purchase_price, 'product_code': item.product_code or '-'
-        })
-    
-    for item in accessories.filter(total_quantity_in_stock__lte=10):
-        low_stock_items.append({
-            'id': item.id, 'name': f"{item.name}", 'brand': f"{item.brand}",
-            'model': f"{item.model}", 'specs': item.accessory_type or '-',
-            'type': 'Accessory', 'quantity': item.total_quantity_in_stock, 'min_stock': 5,
-            'price': item.selling_price, 'purchase_price': item.purchase_price, 'product_code': item.product_code or '-'
-        })
-    
+
+    for d in electronics_data:
+        if d['stock'] <= 5:
+            item = d['obj']
+            low_stock_items.append({
+                'id': item.id, 'name': f"{item.name}", 'brand': f"{item.brand}",
+                'specs': f"{item.ram} {item.storage}".strip() or '-',
+                'model': f"{item.model_number}",
+                'type': 'Electronic', 'quantity': d['stock'], 'min_stock': 5,
+                'price': item.selling_price, 'purchase_price': item.purchase_price,
+                'product_code': item.product_code or '-',
+            })
+
+    for d in phones_data:
+        if d['stock'] <= 5:
+            item = d['obj']
+            low_stock_items.append({
+                'id': item.id, 'name': f"{item.name}", 'brand': f"{item.brand}",
+                'model': f"{item.model}", 'specs': f"{item.ram} {item.storage_capacity}".strip() or '-',
+                'type': 'Phone', 'quantity': d['stock'], 'min_stock': 5,
+                'price': item.selling_price, 'purchase_price': item.purchase_price,
+                'product_code': item.product_code or '-',
+            })
+
+    for d in accessories_data:
+        if d['stock'] <= 10:
+            item = d['obj']
+            low_stock_items.append({
+                'id': item.id, 'name': f"{item.name}", 'brand': f"{item.brand}",
+                'model': f"{item.model}", 'specs': item.accessory_type or '-',
+                'type': 'Accessory', 'quantity': d['stock'], 'min_stock': 5,
+                'price': item.selling_price, 'purchase_price': item.purchase_price,
+                'product_code': item.product_code or '-',
+            })
+
     low_stock_items.sort(key=lambda x: x['quantity'])
-    
+
     context = {
         'company': company, 'total_products': total_products, 'total_stock': total_stock,
-        'electronics_count': electronics_count, 'phones_count': phones_count, 'accessories_count': accessories_count,
+        'electronics_count': electronics_count, 'phones_count': phones_count,
+        'accessories_count': accessories_count,
         'low_stock_count': len(low_stock_items), 'low_stock_items': low_stock_items[:10],
-        'is_viewing_company': is_viewing_company, 'electronics_unit_count': electronics_unit_count,
-        'phones_unit_count': phones_unit_count, 'accessories_unit_count': accessories_unit_count,
-        'total_purchase_value': total_purchase_value, 'total_selling_value': total_selling_value,
-        'total_best_value': total_best_value, 'expected_profit': expected_profit,
-        'expected_profit_margin': expected_profit_margin, 'best_price_profit': best_price_profit,
-        'page_title': 'Inventory', 'page_subtitle': 'Manage your stock',
+        'is_viewing_company': is_viewing_company,
+        'electronics_unit_count': electronics_unit_count,
+        'phones_unit_count': phones_unit_count,
+        'accessories_unit_count': accessories_unit_count,
+        'total_purchase_value': total_purchase_value,
+        'total_selling_value': total_selling_value,
+        'total_best_value': total_best_value,
+        'expected_profit': expected_profit,
+        'expected_profit_margin': expected_profit_margin,
+        'best_price_profit': best_price_profit,
+        'page_title': 'Inventory',
+        'page_subtitle': 'Manage your stock',
     }
     return render(request, 'epa/inventory.html', context)
 
 
 @login_required
 def low_stock(request):
-    """View all low stock items with filters and pagination"""
+    """View all low stock items — using live Unit counts."""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-    
+
     low_stock_items = []
-    
+
     for item in Electronic.objects.filter(company=company, is_active=True):
-        if item.total_quantity_in_stock <= 5:
+        live = _available_electronic_count(item)
+        if live <= 5:
             low_stock_items.append({
-                'id': item.id, 'product_code': item.product_code or '-', 'name': item.name,
-                'type': 'Electronic', 'brand': item.brand or '-', 'model': item.model_number or '-',
-                'specs': f"{item.ram} {item.storage}".strip() or '-', 'quantity': item.total_quantity_in_stock,
-                'min_stock': 5, 'price': item.selling_price, 'purchase_price': item.purchase_price,
-                'sku': item.model_number or '-', 'is_active': item.is_active, 'created_at': item.created_at,
+                'id': item.id, 'product_code': item.product_code or '-',
+                'name': item.name, 'type': 'Electronic',
+                'brand': item.brand or '-', 'model': item.model_number or '-',
+                'specs': f"{item.ram} {item.storage}".strip() or '-',
+                'quantity': live, 'min_stock': 5,
+                'price': item.selling_price, 'purchase_price': item.purchase_price,
+                'sku': item.model_number or '-', 'is_active': item.is_active,
+                'created_at': item.created_at,
             })
-    
+
     for item in Phone.objects.filter(company=company, is_active=True):
-        if item.total_quantity_in_stock <= 5:
+        live = _available_phone_count(item)
+        if live <= 5:
             low_stock_items.append({
-                'id': item.id, 'product_code': item.product_code or '-', 'name': item.name,
-                'type': 'Phone', 'brand': item.brand or '-', 'model': item.model or '-',
-                'specs': f"{item.ram} {item.storage_capacity}".strip() or '-', 'quantity': item.total_quantity_in_stock,
-                'min_stock': 5, 'price': item.selling_price, 'purchase_price': item.purchase_price,
-                'sku': item.imei or '-', 'is_active': item.is_active, 'created_at': item.created_at,
+                'id': item.id, 'product_code': item.product_code or '-',
+                'name': item.name, 'type': 'Phone',
+                'brand': item.brand or '-', 'model': item.model or '-',
+                'specs': f"{item.ram} {item.storage_capacity}".strip() or '-',
+                'quantity': live, 'min_stock': 5,
+                'price': item.selling_price, 'purchase_price': item.purchase_price,
+                'sku': item.imei or '-', 'is_active': item.is_active,
+                'created_at': item.created_at,
             })
-    
+
     for item in Accessory.objects.filter(company=company, is_active=True):
-        if item.total_quantity_in_stock <= 5:
+        live = item.total_quantity_in_stock
+        if live <= 5:
             low_stock_items.append({
-                'id': item.id, 'product_code': item.product_code or '-', 'name': item.name,
-                'type': 'Accessory', 'brand': item.brand or '-', 'model': item.model or '-',
-                'specs': item.accessory_type or '-', 'quantity': item.total_quantity_in_stock,
-                'min_stock': 5, 'price': item.selling_price, 'purchase_price': item.purchase_price,
-                'sku': item.model or '-', 'is_active': item.is_active, 'created_at': item.created_at,
+                'id': item.id, 'product_code': item.product_code or '-',
+                'name': item.name, 'type': 'Accessory',
+                'brand': item.brand or '-', 'model': item.model or '-',
+                'specs': item.accessory_type or '-',
+                'quantity': live, 'min_stock': 5,
+                'price': item.selling_price, 'purchase_price': item.purchase_price,
+                'sku': item.model or '-', 'is_active': item.is_active,
+                'created_at': item.created_at,
             })
-    
+
     search_query = request.GET.get('search', '')
     if search_query:
         search_lower = search_query.lower()
-        low_stock_items = [i for i in low_stock_items if 
-                          search_lower in i['name'].lower() or 
-                          search_lower in i['brand'].lower() or
-                          search_lower in i['model'].lower() or
-                          search_lower in i['product_code'].lower()]
-    
+        low_stock_items = [
+            i for i in low_stock_items
+            if search_lower in i['name'].lower()
+            or search_lower in i['brand'].lower()
+            or search_lower in i['model'].lower()
+            or search_lower in i['product_code'].lower()
+        ]
+
     category_filter = request.GET.get('category', '')
     if category_filter:
         low_stock_items = [i for i in low_stock_items if i['type'] == category_filter]
-    
+
     stock_filter = request.GET.get('stock', '')
     if stock_filter:
         if stock_filter == 'critical':
@@ -226,90 +279,88 @@ def low_stock(request):
             low_stock_items = [i for i in low_stock_items if 1 <= i['quantity'] <= 5]
         elif stock_filter == 'medium':
             low_stock_items = [i for i in low_stock_items if 6 <= i['quantity'] <= 10]
-    
+
     low_stock_items.sort(key=lambda x: x['quantity'])
-    
+
     per_page = int(request.GET.get('per_page', 10))
     paginator = Paginator(low_stock_items, per_page)
     page = request.GET.get('page', 1)
-    
+
     try:
         page_obj = paginator.page(page)
     except PageNotAnInteger:
         page_obj = paginator.page(1)
     except EmptyPage:
         page_obj = paginator.page(paginator.num_pages)
-    
+
     context = {
         'company': company, 'page_obj': page_obj, 'total_count': len(low_stock_items),
-        'search_query': search_query, 'category_filter': category_filter, 'stock_filter': stock_filter,
-        'per_page': per_page, 'is_viewing_company': is_viewing_company,
-        'page_title': 'Low Stock Items', 'page_subtitle': 'Items that need restocking',
+        'search_query': search_query, 'category_filter': category_filter,
+        'stock_filter': stock_filter, 'per_page': per_page,
+        'is_viewing_company': is_viewing_company,
+        'page_title': 'Low Stock Items',
+        'page_subtitle': 'Items that need restocking',
     }
     return render(request, 'epa/low_stock.html', context)
 
 
 @login_required
 def stock_movement(request):
-    """View stock movement history with pagination and filters"""
+    """View stock movement history — unchanged, movements are already immutable records."""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
     from django.db.models import Q
-    
+
     movements = StockMovement.objects.filter(company=company).prefetch_related(
         'product'
     ).select_related('performed_by').order_by('-created_at')
-    
-    # --- Filter by movement type ---
+
     movement_type = request.GET.get('type', '')
     if movement_type:
         movements = movements.filter(movement_type=movement_type)
-    
-    # --- Filter by search query ---
+
     search_query = request.GET.get('search', '').strip()
     if search_query:
-        # 1. Filter DB columns
         movements = movements.filter(
             Q(notes__icontains=search_query) |
             Q(reference_id__icontains=search_query)
         )
-        
-        # 2. Filter by product name in Python
-        all_movements = StockMovement.objects.filter(company=company).select_related('performed_by', 'content_type').order_by('-created_at')
+
+        all_movements = StockMovement.objects.filter(
+            company=company
+        ).select_related('performed_by', 'content_type').order_by('-created_at')
         if movement_type:
             all_movements = all_movements.filter(movement_type=movement_type)
-            
+
         movement_list = [
-            m for m in all_movements 
-            if (search_query.lower() in (m.notes or '').lower() or
-                search_query.lower() in (m.reference_id or '').lower() or
-                (m.content_object and search_query.lower() in m.content_object.name.lower()))
+            m for m in all_movements
+            if (search_query.lower() in (m.notes or '').lower()
+                or search_query.lower() in (m.reference_id or '').lower()
+                or (m.content_object and search_query.lower() in m.content_object.name.lower()))
         ]
-        
+
         try:
             per_page = int(request.GET.get('per_page', 20))
         except (ValueError, TypeError):
             per_page = 20
-            
+
         paginator = Paginator(movement_list, per_page)
         page = request.GET.get('page', 1)
-        
+
         try:
             page_obj = paginator.page(page)
         except PageNotAnInteger:
             page_obj = paginator.page(1)
         except EmptyPage:
             page_obj = paginator.page(paginator.num_pages)
-            
     else:
-        # --- Normal Pagination (no search) ---
         try:
             per_page = int(request.GET.get('per_page', 20))
         except (ValueError, TypeError):
@@ -317,14 +368,14 @@ def stock_movement(request):
 
         paginator = Paginator(movements, per_page)
         page = request.GET.get('page', 1)
-        
+
         try:
             page_obj = paginator.page(page)
         except PageNotAnInteger:
             page_obj = paginator.page(1)
         except EmptyPage:
             page_obj = paginator.page(paginator.num_pages)
-    
+
     context = {
         'company': company,
         'page_obj': page_obj,
@@ -339,19 +390,20 @@ def stock_movement(request):
     }
     return render(request, 'epa/stock_movement.html', context)
 
+
 @login_required
 def customer_list(request):
     """List all customers"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     customers = Customer.objects.filter(company=company).order_by('-created_at')[:50]
-    
+
     context = {
         'company': company, 'customers': customers, 'total_count': customers.count(),
         'is_viewing_company': is_viewing_company,
@@ -364,13 +416,13 @@ def customer_list(request):
 def customer_create(request):
     """Create a new customer"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     messages.info(request, 'Customer creation coming soon.')
     return redirect('/epa/customers/')
 
@@ -380,15 +432,6 @@ def customer_create(request):
 # ============================================
 @login_required
 def bulk_transfer(request):
-    """
-    Bulk-transfer units (IMEI / Serial) between:
-      - Branch A  →  Branch B
-      - User X    →  User Y
-
-    The user pastes one identifier per line (IMEI or Serial).
-    Each identifier is matched against the Unit model; only units
-    belonging to the active company are affected.
-    """
     from apps.epa_shop.product_views import get_or_create_owner_from_user
 
     company, is_viewing_company = get_active_company(request)
@@ -408,7 +451,6 @@ def bulk_transfer(request):
         return redirect('/epa_shop/inventory/')
 
     branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
-
     users = (
         User.objects
         .filter(company=company, is_active=True)
@@ -416,9 +458,8 @@ def bulk_transfer(request):
         .order_by('first_name', 'last_name', 'username')
     )
 
-    # Fixed: Remove 'product' from select_related because it's a GenericForeignKey
     pending_transfers = StockTransfer.objects.filter(
-        company=company, 
+        company=company,
         status='in_transit'
     ).select_related('from_branch', 'to_branch').order_by('-created_at')
 
@@ -429,10 +470,9 @@ def bulk_transfer(request):
         from_mode = request.POST.get('from_mode', 'specific')
 
         from_branch_id = request.POST.get('from_branch', '').strip()
-        to_branch_id   = request.POST.get('to_branch', '').strip()
-
+        to_branch_id = request.POST.get('to_branch', '').strip()
         from_user_id = request.POST.get('from_user', '').strip()
-        to_user_id   = request.POST.get('to_user', '').strip()
+        to_user_id = request.POST.get('to_user', '').strip()
 
         raw = request.POST.get('identifiers', '')
         identifiers = [
@@ -467,8 +507,8 @@ def bulk_transfer(request):
                 messages.error(request, e)
         else:
             from_branch = to_branch = None
-            from_user   = to_user   = None
-            to_owner                = None
+            from_user = to_user = None
+            to_owner = None
 
             if transfer_type == 'branch':
                 to_branch = Branch.objects.filter(id=to_branch_id, company=company).first()
@@ -495,8 +535,8 @@ def bulk_transfer(request):
 
                 to_owner = get_or_create_owner_from_user(to_user, company=company)
 
-            moved     = []
-            skipped   = []
+            moved = []
+            skipped = []
             not_found = []
 
             with transaction.atomic():
@@ -522,21 +562,20 @@ def bulk_transfer(request):
                         continue
 
                     if transfer_type == 'branch':
-                        current_branch = None 
-
+                        current_branch = unit.branch
                         if from_mode == 'specific' and current_branch:
                             if current_branch.id != from_branch.id:
                                 skipped.append((ident, f'Currently in "{current_branch.name}", not "{from_branch.name}"'))
                                 continue
 
-                        unit.save(update_fields=['updated_at'])
+                        unit.branch = to_branch
+                        unit.save(update_fields=['branch', 'updated_at'])
 
                         moved.append({
                             'identifier': ident,
                             'from': current_branch.name if current_branch else '-',
-                            'to':   to_branch.name,
+                            'to': to_branch.name,
                         })
-
                     else:
                         current_owner_name = ''
                         current_phone = ''
@@ -569,7 +608,7 @@ def bulk_transfer(request):
                         moved.append({
                             'identifier': ident,
                             'from': current_owner_name or 'unassigned',
-                            'to':   to_owner.name if to_owner else '-',
+                            'to': to_owner.name if to_owner else '-',
                         })
 
             summary = {
@@ -584,10 +623,10 @@ def bulk_transfer(request):
                     to_branch.name if transfer_type == 'branch'
                     else (to_user.get_full_name() or to_user.username)
                 ),
-                'moved':     moved,
-                'skipped':   skipped,
+                'moved': moved,
+                'skipped': skipped,
                 'not_found': not_found,
-                'total':     len(identifiers),
+                'total': len(identifiers),
             }
 
             if moved:
@@ -615,9 +654,6 @@ def bulk_transfer(request):
 @login_required
 @require_POST
 def bulk_transfer_check(request):
-    """
-    JSON endpoint: given a list of identifiers, return the status of each.
-    """
     company, is_viewing_company = get_active_company(request)
     if not company:
         return JsonResponse({'error': 'No company'}, status=400)
@@ -643,7 +679,7 @@ def bulk_transfer_check(request):
         unit = (
             Unit.objects
             .filter(identifier=ident)
-            .select_related('phone', 'phone__company', 'electronic', 'electronic__company', 'owner')
+            .select_related('phone', 'electronic', 'branch', 'owner')
             .first()
         )
 
@@ -667,7 +703,8 @@ def bulk_transfer_check(request):
         if product.company_id != company.id:
             results.append({
                 'identifier': ident, 'status': 'another_company',
-                'product_code': product.product_code or '', 'product_name': getattr(product, 'name', '') or '',
+                'product_code': product.product_code or '',
+                'product_name': getattr(product, 'name', '') or '',
                 'branch': '', 'owner': '',
             })
             seen_in_results.add(ident)
@@ -676,8 +713,10 @@ def bulk_transfer_check(request):
         if unit.status == 'sold':
             results.append({
                 'identifier': ident, 'status': 'sold',
-                'product_code': product.product_code or '', 'product_name': getattr(product, 'name', '') or '',
-                'branch': '', 'owner': unit.owner.name if unit.owner else (unit.owner_name or ''),
+                'product_code': product.product_code or '',
+                'product_name': getattr(product, 'name', '') or '',
+                'branch': unit.branch.name if unit.branch else '',
+                'owner': unit.owner.name if unit.owner else (unit.owner_name or ''),
             })
             seen_in_results.add(ident)
             continue
@@ -690,8 +729,10 @@ def bulk_transfer_check(request):
 
         results.append({
             'identifier': ident, 'status': 'found',
-            'product_code': product.product_code or '', 'product_name': getattr(product, 'name', '') or '',
-            'branch': '', 'owner': owner_label,
+            'product_code': product.product_code or '',
+            'product_name': getattr(product, 'name', '') or '',
+            'branch': unit.branch.name if unit.branch else '',
+            'owner': owner_label,
         })
         seen_in_results.add(ident)
 
@@ -705,11 +746,10 @@ def bulk_transfer_check(request):
 @login_required
 def receive_transfer_view(request, transfer_id):
     from apps.epa_shop.services.stock import receive_transfer
-    
+
     company, _ = get_active_company(request)
     transfer = get_object_or_404(StockTransfer, id=transfer_id, company=company)
 
-    # Check if the user is a super_admin (they can receive for any branch)
     is_super_admin = request.user.role == 'super_admin' or request.user.is_superuser
     user_branch = get_effective_branch(request)
 
