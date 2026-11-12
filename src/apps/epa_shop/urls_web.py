@@ -24,6 +24,7 @@ urlpatterns = [
     path('inventory/bulk-transfer/check/',   inventory_views.bulk_transfer_check, name='bulk-transfer-check'),
     path('inventory/stock-restock/',         product_views.stock_restock_scanner, name='epa-stock-restock-scanner'),
     path('inventory/stock-restock/suggest/', product_views.stock_restock_suggestions, name='epa-stock-restock-suggest'),
+    path('inventory/transfer/<int:transfer_id>/receive/', inventory_views.receive_transfer_view, name='receive-transfer'),
 
     # ============================================
     # PRODUCTS — Full CRUD (Using Product Code)
@@ -37,16 +38,20 @@ urlpatterns = [
     path('products/export-excel/',                 product_views.product_export_excel,   name='epa-product-export'),
     path('products/',                                     product_views.product_list,    name='epa-products'),
     path('products/add/',                                 product_views.product_create,  name='epa-product-create'),
+    path('products/search-units/',                        product_views.product_search_units, name='product-search-units'),
     path('products/<str:product_code>/',                  product_views.product_detail,  name='epa-product-detail'),
     path('products/<str:product_code>/edit/',             product_views.product_edit,    name='epa-product-edit'),
     path('products/<str:product_code>/delete/',           product_views.product_delete,  name='epa-product-delete'),
     path('products/<str:product_code>/restock/',          product_views.product_restock, name='epa-product-restock'),
     path('products/<str:product_code>/units/',            product_views.product_units,   name='epa-product-units'),
     path('products/<str:product_code>/update-prices/',    product_views.update_product_prices, name='epa-product-update-prices'),
+    path('products/<str:product_code>/transfer/',        product_views.product_transfer, name='epa-product-transfer'),
+
 
     # ============================================
     # UNIT MANAGEMENT
     # ============================================
+    path('units/',             product_views.all_units_combined,    name='epa-all-units'),
     path('unit/<int:unit_id>/edit/',      product_views.unit_edit,     name='epa-unit-edit'),
     path('unit/<int:unit_id>/transfer/',  product_views.unit_transfer, name='epa-unit-transfer'),
     path('products/<str:product_code>/unit/<str:identifier>/delete/',

@@ -188,13 +188,28 @@
 {% block content %}
 <div class="container-fluid">
     <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <h1 class="mb-0 fs-3">
             <i class="fas fa-box text-primary"></i> {{ product.name }}
         </h1>
-        <a href="/epa_shop/products/" class="btn btn-secondary border-dark border-2 fw-bold btn-sm">
-            <i class="fas fa-arrow-left"></i> Back to Products
-        </a>
+        
+        <!-- Branch Selector -->
+        <div class="d-flex align-items-center gap-2">
+            {% if branches %}
+            <label class="fw-bold mb-0 text-muted me-1">Branch:</label>
+            <select class="form-select border-dark border-2 fw-bold text-dark" style="width: auto; min-width: 150px;" onchange="location = '?branch=' + this.value;">
+                {% for b in branches %}
+                    <option value="{{ b.id }}" {% if b.id == selected_branch_id %}selected{% endif %}>
+                        {{ b.name }}
+                    </option>
+                {% endfor %}
+            </select>
+            {% endif %}
+            
+            <a href="/epa_shop/products/" class="btn btn-secondary border-dark border-2 fw-bold btn-sm ms-2">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
     </div>
 
     <div class="row g-3 align-items-stretch">
@@ -234,9 +249,9 @@
 
                     <!-- Status -->
                     <div class="col-md-5">
-                        <p class="mb-1 fs-6"><strong>Total Stock:</strong> <span class="badge bg-primary fs-6">{{ product.quantity_in_stock }}</span></p>
-                        <p class="mb-1 fs-6"><strong>Available:</strong> <span class="badge bg-success fs-6">{{ total_available_units }}</span></p>
-                        <p class="mb-1 fs-6"><strong>Branch:</strong> {{ product.branch.name }}</p>
+                        <!-- 👇 CHANGED: Now shows selected branch stock and company-wide total separately -->
+                        <p class="mb-1 fs-6"><strong>Branch Stock:</strong> <span class="badge bg-primary fs-6">{{ current_branch_stock }}</span></p>
+                        <p class="mb-1 fs-6"><strong>Company Total:</strong> <span class="badge bg-secondary fs-6">{{ actual_total_stock }}</span></p>
                         <p class="mb-0 fs-6"><strong>Status:</strong> 
                             {% if product.is_active %}
                                 <span class="badge bg-success">Active</span>
@@ -326,7 +341,7 @@
                         <div class="scrollable-list">
                             {% if branches %}
                                 {% for branch in branches %}
-                                <div class="branch-stock-item" style="border-left-color: {% if branch.unit_count > 0 %}#28a745{% else %}#dc3545{% endif %};">
+                                <div class="branch-stock-item" style="border-left-color: {% if branch.unit_count > 0 %}#28a745{% else %}#dc3545{% endif %}; {% if branch.id == selected_branch_id %}background: #f0f8ff;{% endif %}">
                                     <div>
                                         <div class="branch-name">{{ branch.name }}</div>
                                     </div>
@@ -349,9 +364,6 @@
                         <div class="fs-6">
                             <div class="d-flex justify-content-between mb-1"><span>Created:</span> <strong>{{ product.created_at|date:"Y-m-d" }}</strong></div>
                             <div class="d-flex justify-content-between mb-1"><span>Updated:</span> <strong>{{ product.updated_at|date:"Y-m-d" }}</strong></div>
-                            {% if product.owner %}
-                            <div class="d-flex justify-content-between"><span>Owner:</span> <strong>{{ product.owner.name }}</strong></div>
-                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -369,11 +381,14 @@
                 <div class="form-section">
                     <h6 class="form-section-title"><i class="fas fa-bolt"></i> Actions</h6>
                     <div class="d-grid gap-2">
-                        <a href="/epa_shop/products/{{ product.product_code }}/edit/" class="btn btn-primary border-dark border-2 fw-bold btn-sm">
+                        <a href="/epa_shop/products/{{ product.product_code }}/edit/?branch={{ selected_branch_id }}" class="btn btn-primary border-dark border-2 fw-bold btn-sm">
                             <i class="fas fa-edit"></i> Edit Details
                         </a>
                         <a href="/epa_shop/products/{{ product.product_code }}/restock/" class="btn btn-warning border-dark border-2 fw-bold btn-sm">
                             <i class="fas fa-boxes"></i> Restock
+                        </a>
+                        <a href="/epa_shop/products/{{ product.product_code }}/transfer/" class="btn btn-info border-dark border-2 fw-bold btn-sm text-white">
+                            <i class="fas fa-exchange-alt"></i> Transfer Stock
                         </a>
                         <a href="/epa_shop/products/{{ product.product_code }}/delete/" class="btn btn-danger border-dark border-2 fw-bold btn-sm">
                             <i class="fas fa-trash"></i> Delete
@@ -397,10 +412,10 @@
                     
                     <!-- Row 2: Stock Limits -->
                     <div>
-                        <div class="price-label mb-1 text-start">Stock Levels</div>
+                        <div class="price-label mb-1 text-start">Stock Levels (Selected Branch)</div>
                         <div class="d-flex justify-content-between bg-white border border-dark rounded p-2 text-center">
                             <div class="w-50 border-end border-dark">
-                                <div class="fs-5 fw-bold text-primary">{{ product.quantity_in_stock }}</div>
+                                <div class="fs-5 fw-bold text-primary">{{ current_branch_stock }}</div>
                                 <div class="small text-muted" style="font-size:10px;">In Stock</div>
                             </div>
                             <div class="w-50">
@@ -416,7 +431,7 @@
                 {% if product_type == 'Phone' or product_type == 'Electronic' %}
                 <div class="preview-panel">
                     <div class="preview-header">
-                        <h5><i class="fas fa-list-ul text-primary"></i> Stock Units</h5>
+                        <h5><i class="fas fa-list-ul text-primary"></i> Units</h5>
                         <span class="badge bg-primary rounded-pill">{{ unit_count }} Total</span>
                     </div>
                     <div class="preview-body" style="max-height: none;">
@@ -455,13 +470,13 @@
                         {% else %}
                             <div class="text-center text-muted py-4">
                                 <i class="fas fa-qrcode fa-2x mb-2 opacity-50"></i>
-                                <p class="mb-0 fs-6">No units yet.</p>
+                                <p class="mb-0 fs-6">No units yet in this branch.</p>
                             </div>
                         {% endif %}
                     </div>
                     
                     <div class="card-footer bg-white border-top border-dark p-2 text-center flex-shrink-0">
-                        <a href="/epa_shop/products/{{ product.product_code }}/units/" class="btn btn-outline-primary w-100 fw-bold border-dark border-2 btn-sm">
+                        <a href="/epa_shop/products/{{ product.product_code }}/units/?branch={{ selected_branch_id }}" class="btn btn-outline-primary w-100 fw-bold border-dark border-2 btn-sm">
                             View All Units <i class="fas fa-arrow-right ms-1"></i>
                         </a>
                     </div>

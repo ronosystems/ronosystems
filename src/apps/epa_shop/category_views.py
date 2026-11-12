@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Q, Sum, Count
-from .models import Category, Electronic, Phone, Accessory
+from .models import Category, Electronic, Phone, Accessory, Unit
 from apps.companies.utils import get_current_company
 
 
@@ -196,42 +196,53 @@ def category_products(request, pk):
     if category.category_type == 'phones':
         items = Phone.objects.filter(company=company, category=category, is_active=True)
         for item in items:
+            # 👇 FIX: Count actual units in the database
+            stock = Unit.objects.filter(phone=item, status='available').count()
             products.append({
                 'id': item.id,
                 'name': item.name,
                 'brand': item.brand,
                 'model': item.model,
-                'stock': item.quantity_in_stock,
+                'stock': stock,
                 'price': item.selling_price,
                 'type': 'Phone',
                 'product_code': item.product_code if item.product_code else f"P{item.id}",
                 'has_units': True,
                 'has_code': bool(item.product_code),
             })
+            
     elif category.category_type == 'electronics':
         items = Electronic.objects.filter(company=company, category=category, is_active=True)
         for item in items:
+            # 👇 FIX: Count actual units in the database
+            stock = Unit.objects.filter(electronic=item, status='available').count()
             products.append({
                 'id': item.id,
                 'name': item.name,
                 'brand': item.brand,
                 'model': item.model_number,
-                'stock': item.quantity_in_stock,
+                'stock': stock,
                 'price': item.selling_price,
                 'type': 'Electronic',
                 'product_code': item.product_code if item.product_code else f"E{item.id}",
                 'has_units': True,
                 'has_code': bool(item.product_code),
             })
+            
     elif category.category_type == 'accessories':
         items = Accessory.objects.filter(company=company, category=category, is_active=True)
         for item in items:
+            # 👇 FIX: Sum stock from branch records (accessories don't have units)
+            total_stock = 0
+            for stock_obj in item.branch_stocks.all():
+                total_stock += stock_obj.quantity_in_stock
+                
             products.append({
                 'id': item.id,
                 'name': item.name,
                 'brand': item.brand,
                 'model': item.model,
-                'stock': item.quantity_in_stock,
+                'stock': total_stock,
                 'price': item.selling_price,
                 'type': 'Accessory',
                 'product_code': item.product_code if item.product_code else f"A{item.id}",

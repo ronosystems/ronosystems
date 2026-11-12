@@ -103,7 +103,6 @@ def _snapshot_cogs(product, unit_price, quantity):
     line_cogs = (unit_cost * Decimal(quantity)).quantize(Decimal('0.01'))
     return unit_cost, line_cogs
 
-
 # ============================================
 # PROCESS SALE
 # ============================================
@@ -147,7 +146,6 @@ def _content_type_for(product):
     if isinstance(product, Accessory):
         return ContentType.objects.get_for_model(Accessory)
     return None
-
 
 @login_required
 def process_sale(request):
@@ -238,45 +236,32 @@ def process_sale(request):
 
                 # ---- Resolve & validate unit for tracked products ----
                 unit = None
-                if category_type == 'Phone':
+                
+                if category_type in ['Phone', 'Electronic']:
                     if unit_identifier:
-                        unit = Unit.objects.filter(
-                            phone=product,
-                            identifier=unit_identifier,
-                            status='available',
-                        ).first()
-                        if not unit:
-                            raise SaleError(
-                                f'IMEI "{unit_identifier}" is not available.'
-                            )
-                    if product.quantity_in_stock < quantity:
-                        raise SaleError(
-                            f'Insufficient stock for "{product.name}". '
-                            f'Available: {product.quantity_in_stock}'
-                        )
+                        filter_kwargs = {'identifier': unit_identifier, 'status': 'available'}
+                        if category_type == 'Phone':
+                            filter_kwargs['phone'] = product
+                        else:
+                            filter_kwargs['electronic'] = product
 
-                elif category_type == 'Electronic':
-                    if unit_identifier:
-                        unit = Unit.objects.filter(
-                            electronic=product,
-                            identifier=unit_identifier,
-                            status='available',
-                        ).first()
+                        unit = Unit.objects.filter(**filter_kwargs).first()
                         if not unit:
                             raise SaleError(
-                                f'Serial "{unit_identifier}" is not available.'
+                                f'{"IMEI" if category_type == "Phone" else "Serial"} "{unit_identifier}" is not available.'
                             )
-                    if product.quantity_in_stock < quantity:
+                    
+                    # Count available units
+                    available_stock = product.units.filter(status='available').count()
+                    if available_stock < quantity:
                         raise SaleError(
-                            f'Insufficient stock for "{product.name}". '
-                            f'Available: {product.quantity_in_stock}'
+                            f'Insufficient stock for "{product.name}". Available: {available_stock}'
                         )
 
                 elif category_type == 'Accessory':
-                    if product.quantity_in_stock < quantity:
+                    if product.total_quantity_in_stock < quantity:
                         raise SaleError(
-                            f'Insufficient stock for "{product.name}". '
-                            f'Available: {product.quantity_in_stock}'
+                            f'Insufficient stock for "{product.name}". Available: {product.total_quantity_in_stock}'
                         )
 
                 subtotal += price * quantity
@@ -289,7 +274,7 @@ def process_sale(request):
                     'quantity':        quantity,
                     'unit_price':      price,
                     'total_price':     price * quantity,
-                    'unit':            unit,            # ← already resolved
+                    'unit':            unit,
                     'unit_identifier': unit_identifier,
                 })
 
@@ -323,10 +308,10 @@ def process_sale(request):
                 customer_name=customer_name,
                 customer_phone=customer_phone,
                 customer_email=customer_email,
-                total_amount=subtotal,       # pre-tax subtotal
+                total_amount=subtotal,
                 discount=0,
                 tax=tax_amount,
-                net_amount=net_amount,       # what customer pays
+                net_amount=net_amount,
                 payment_status=payment_status,
                 payment_method=payment_method,
                 sold_by=request.user,
@@ -343,11 +328,16 @@ def process_sale(request):
             # Sale items + unit/stock mutations
             running_cogs = Decimal('0.00')
             for item_data in sale_items_data:
-                product = item_data['product']
-                unit    = item_data['unit']
-                qty     = item_data['quantity']
+                product  = item_data['product']
+                unit     = item_data['unit']
+                qty      = item_data['quantity']
+                cat_type = item_data['category_type']
 
-                previous_quantity = product.quantity_in_stock
+                # Get previous quantity
+                if cat_type in ['Phone', 'Electronic']:
+                    previous_quantity = product.units.filter(status='available').count()
+                else:
+                    previous_quantity = product.total_quantity_in_stock
 
                 # Mark unit as sold (Phone / Electronic)
                 if unit is not None:
@@ -357,9 +347,31 @@ def process_sale(request):
                     unit.owner_phone = customer_phone
                     unit.save()
 
-                # Decrement stock
-                product.quantity_in_stock -= qty
+                # Decrement stock on the product
+                if cat_type in ['Phone', 'Electronic']:
+                    product.total_quantity_in_stock = product.units.filter(status='available').count()
+                else:
+                    product.total_quantity_in_stock -= qty
+                
                 product.save()
+
+                # ─────────────────────────────────────────────
+                # 👇 NEW: Decrement the branch-specific stock record
+                # This is what the Product Details page reads
+                # ─────────────────────────────────────────────
+                from apps.epa_shop.models import BranchStock
+                from django.contrib.contenttypes.models import ContentType
+
+                ct = ContentType.objects.get_for_model(product.__class__)
+                branch_stock, _ = BranchStock.objects.get_or_create(
+                    company=company,
+                    branch=branch,
+                    content_type=ct,
+                    object_id=product.id,
+                    defaults={'quantity_in_stock': 0},
+                )
+                branch_stock.quantity_in_stock = max(0, branch_stock.quantity_in_stock - qty)
+                branch_stock.save()
 
                 # Snapshot historical COGS for this line
                 unit_cost, line_cogs = _snapshot_cogs(
@@ -378,8 +390,8 @@ def process_sale(request):
                     unit_price=item_data['unit_price'],
                     total_price=item_data['total_price'],
                     unit=unit,
-                    unit_cost=unit_cost,        # ← NEW
-                    cogs_amount=line_cogs,      # ← NEW
+                    unit_cost=unit_cost,
+                    cogs_amount=line_cogs,
                 )
 
                 running_cogs += line_cogs
@@ -390,7 +402,7 @@ def process_sale(request):
                     movement_type='sale',
                     quantity=-qty,
                     previous_quantity=previous_quantity,
-                    new_quantity=product.quantity_in_stock,
+                    new_quantity=product.total_quantity_in_stock,
                     branch=branch,
                     unit=unit,
                     notes=f"Sale ({payment_status}) - {customer_name}",
@@ -429,14 +441,13 @@ def process_sale(request):
             })
 
     except SaleError as e:
-        # Expected validation failure — atomic block already rolled back
         return JsonResponse({'error': e.message}, status=e.status)
 
     except Exception as e:
-        # Unexpected — print and return 500
         import traceback
         traceback.print_exc()
         return JsonResponse({'error': str(e)}, status=500)
+
 
 
 # ============================================

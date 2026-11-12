@@ -185,7 +185,7 @@ def filter_by_user_access(queryset, user, model_type='product'):
     
     if is_cashier(user):
         if user_branch:
-            return queryset.filter(branch=user_branch)
+            return queryset
         return queryset
     
     if is_agent(user):
@@ -196,11 +196,10 @@ def filter_by_user_access(queryset, user, model_type='product'):
     
     if is_staff(user):
         if user_branch:
-            return queryset.filter(branch=user_branch)
+            return queryset
         return queryset
     
     return queryset
-
 
 def filter_units_by_user_access(units_queryset, user):
     """Filter units based on user's role"""
@@ -212,11 +211,10 @@ def filter_units_by_user_access(units_queryset, user):
     
     user_branch = get_user_branch(user)
     
-    if is_cashier(user):
+    if is_cashier(user) or is_staff(user):
         if user_branch:
-            return units_queryset.filter(
-                Q(phone__branch=user_branch) | Q(electronic__branch=user_branch)
-            )
+            # 👇 CHANGED: Filter by the Unit's branch, not the Phone's branch
+            return units_queryset.filter(branch=user_branch)
         return units_queryset
     
     if is_agent(user):
@@ -225,15 +223,7 @@ def filter_units_by_user_access(units_queryset, user):
             return units_queryset.filter(owner=owner, status='available')
         return units_queryset.none()
     
-    if is_staff(user):
-        if user_branch:
-            return units_queryset.filter(
-                Q(phone__branch=user_branch) | Q(electronic__branch=user_branch)
-            )
-        return units_queryset
-    
     return units_queryset
-
 
 def filter_sales_by_user_access(sales_queryset, user):
     """Filter sales based on user's role"""
@@ -308,6 +298,73 @@ def get_or_create_owner_from_user(user, company=None):
     except Exception as e:
         print(f"❌ Failed to create Owner: {e}")
         return None
+
+
+# ============================================
+# ALL UNITS VIEW - Phones + Electronics
+# ============================================
+
+@login_required
+def all_units_combined(request):
+    """View all units (both phones and electronics) in one page."""
+    company, is_viewing_company = get_active_company(request)
+    
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+    
+    # 1. Fetch BOTH phones and electronics
+    units = Unit.objects.filter(
+        Q(phone__company=company) | Q(electronic__company=company)
+    ).select_related('phone', 'electronic', 'branch').order_by('-created_at')
+    
+    if not is_viewing_company:
+        if is_agent(request.user):
+            owner = Owner.objects.filter(company=company, phone=request.user.phone).first()
+            if owner:
+                units = units.filter(owner=owner, status='available')
+            else:
+                units = units.none()
+        else:
+            units = filter_units_by_user_access(units, request.user)
+    
+    for unit in units:
+        if unit.updated_at:
+            delta = timezone.now() - unit.updated_at
+            unit.days_since_update = delta.days
+        else:
+            unit.days_since_update = 0
+
+        # Attach sale if it exists (for the Sold tab)
+        sale_item = SaleItem.objects.filter(unit=unit).select_related('sale').first()
+        unit.sale = sale_item.sale if sale_item else None
+    
+    total_units = units.count()
+    available_units = units.filter(status='available').count()
+    sold_units = units.filter(status='sold').count()
+    reserved_units = units.filter(status='reserved').count()
+    repair_units = units.filter(status='repair').count()
+    
+    # 👇 FETCH BRANCHES FOR THE DROPDOWN
+    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+    
+    context = {
+        'units': units,
+        'branches': branches,       # 👈 Added this line
+        'unit_type': 'Combined',
+        'unit_label': 'Identifier',
+        'total_units': total_units,
+        'available_units': available_units,
+        'sold_units': sold_units,
+        'reserved_units': reserved_units,
+        'repair_units': repair_units,
+        'is_agent': is_agent(request.user) and not is_viewing_company,
+        'page_title': 'All Units',
+        'page_subtitle': 'All IMEIs and Serial numbers combined',
+    }
+    return render(request, 'epa/all_units.html', context)
 
 # ============================================
 # UNIT EDIT - Inline Edit
@@ -418,11 +475,11 @@ def unit_edit(request, unit_id):
             if status == 'available':
                 if unit.phone:
                     available_count = Unit.objects.filter(phone=product, status='available').count()
-                    product.quantity_in_stock = available_count
+                    product.total_quantity_in_stock = available_count
                     product.save()
                 elif unit.electronic:
                     available_count = Unit.objects.filter(electronic=product, status='available').count()
-                    product.quantity_in_stock = available_count
+                    product.total_quantity_in_stock = available_count
                     product.save()
             
             messages.success(request, 'Unit updated successfully!')
@@ -624,8 +681,8 @@ def unit_reverse_sale(request, sale_id):
                     # --- B. Restock Product (Phones, Electronics AND Accessories) ---
                     product = sale_item.item
                     if product:
-                        previous_quantity = product.quantity_in_stock
-                        product.quantity_in_stock += qty
+                        previous_quantity = product.total_quantity_in_stock
+                        product.total_quantity_in_stock += qty
                         product.save()
 
                         # --- C. Record Stock Movement ---
@@ -634,7 +691,7 @@ def unit_reverse_sale(request, sale_id):
                             movement_type='return',
                             quantity=qty,
                             previous_quantity=previous_quantity,
-                            new_quantity=product.quantity_in_stock,
+                            new_quantity=product.total_quantity_in_stock,
                             branch=locked_sale.branch,
                             unit=sale_item.unit,
                             notes=f'Sale reversed - returned to inventory (Sale #{locked_sale.company_sale_id})',
@@ -722,7 +779,7 @@ def all_phone_units(request):
     units = Unit.objects.filter(
         phone__company=company,
         phone__is_active=True
-    ).select_related('phone', 'phone__branch').order_by('-created_at')
+    ).select_related('phone', 'branch').order_by('-created_at')
     
     if not is_viewing_company:
         if is_agent(request.user):
@@ -740,6 +797,10 @@ def all_phone_units(request):
             unit.days_since_update = delta.days
         else:
             unit.days_since_update = 0
+
+        # Attach sale data
+        sale_item = SaleItem.objects.filter(unit=unit).select_related('sale').first()
+        unit.sale = sale_item.sale if sale_item else None
     
     total_units = units.count()
     available_units = units.filter(status='available').count()
@@ -747,8 +808,12 @@ def all_phone_units(request):
     reserved_units = units.filter(status='reserved').count()
     repair_units = units.filter(status='repair').count()
     
+    # 👇 FETCH BRANCHES FOR THE DROPDOWN
+    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+    
     context = {
         'units': units,
+        'branches': branches,       # 👈 Added
         'unit_type': 'Phone',
         'unit_label': 'IMEI',
         'total_units': total_units,
@@ -781,7 +846,7 @@ def all_electronic_units(request):
     units = Unit.objects.filter(
         electronic__company=company,
         electronic__is_active=True
-    ).select_related('electronic', 'electronic__branch').order_by('-created_at')
+    ).select_related('electronic', 'branch').order_by('-created_at')
     
     if not is_viewing_company:
         if is_agent(request.user):
@@ -799,6 +864,10 @@ def all_electronic_units(request):
             unit.days_since_update = delta.days
         else:
             unit.days_since_update = 0
+
+        # Attach sale data
+        sale_item = SaleItem.objects.filter(unit=unit).select_related('sale').first()
+        unit.sale = sale_item.sale if sale_item else None
     
     total_units = units.count()
     available_units = units.filter(status='available').count()
@@ -806,8 +875,12 @@ def all_electronic_units(request):
     reserved_units = units.filter(status='reserved').count()
     repair_units = units.filter(status='repair').count()
     
+    # 👇 FETCH BRANCHES FOR THE DROPDOWN
+    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
+    
     context = {
         'units': units,
+        'branches': branches,       # 👈 Added
         'unit_type': 'Electronic',
         'unit_label': 'Serial',
         'total_units': total_units,
@@ -876,8 +949,8 @@ def unit_delete(request, product_code, identifier):
         
         unit.delete()
         
-        if product.quantity_in_stock > 0:
-            product.quantity_in_stock -= 1
+        if product.total_quantity_in_stock > 0:
+            product.total_quantity_in_stock -= 1
             product.save()
         
         messages.success(request, f'Unit "{identifier_value}" removed successfully!')
@@ -898,8 +971,6 @@ def unit_delete(request, product_code, identifier):
         'page_subtitle': f'Confirm deletion of {identifier}',
     }
     return render(request, 'epa/unit_delete_confirm.html', context)
-
-
 
 
 # ============================================
@@ -979,7 +1050,7 @@ def scanner_lookup(request):
                     'brand': getattr(product, 'brand', ''),
                     'model': getattr(product, 'model', None) or getattr(product, 'model_number', ''),
                     'type': product_type,
-                    'stock': product.quantity_in_stock,
+                    'stock': product.total_quantity_in_stock,
                     'selling_price': float(product.selling_price),
                     'best_price': float(product.best_price) if product.best_price else 0,
                     'purchase_price': float(product.purchase_price),
@@ -1050,7 +1121,7 @@ def scanner_lookup(request):
                 'brand': getattr(product, 'brand', ''),
                 'model': getattr(product, 'model', None) or getattr(product, 'model_number', ''),
                 'type': product_type,
-                'stock': product.quantity_in_stock,
+                'stock': product.total_quantity_in_stock,
                 'selling_price': float(product.selling_price),
                 'best_price': float(product.best_price) if product.best_price else 0,
                 'purchase_price': float(product.purchase_price),
@@ -1069,10 +1140,10 @@ def scanner_lookup(request):
     }, status=404)
 
 
-
 # ============================================
 # PRODUCT LIST WITH PAGINATION
 # ============================================
+
 @login_required
 def product_list(request):
     """List all products with proper data from database."""
@@ -1086,30 +1157,48 @@ def product_list(request):
 
     # ---------- Role flags ----------
     is_admin = is_admin_or_manager(request.user) or is_viewing_company
+    user_branch = get_user_branch(request.user)
 
-    # ---------- Branch filter ----------
+    # ---------- Branch Filter Logic ----------
     branch_id = request.GET.get('branch', '').strip()
     selected_branch = None
     if branch_id and branch_id.isdigit():
-        selected_branch = Branch.objects.filter(
-            id=int(branch_id), company=company
-        ).first()
+        selected_branch = Branch.objects.filter(id=int(branch_id), company=company).first()
+
+    # If no specific branch selected, but user is restricted (cashier/staff), force their branch
+    if not selected_branch and not is_admin and user_branch:
+        selected_branch = user_branch
 
     all_products = []
 
+    # Helper to get AVAILABLE stock for the selected branch (or company-wide if none)
+    def get_stock(product, product_type):
+        if selected_branch:
+            if product_type in ['Phone', 'Electronic']:
+                if product_type == 'Phone':
+                    return Unit.objects.filter(
+                        phone=product, branch=selected_branch, status='available'
+                    ).count()
+                else:
+                    return Unit.objects.filter(
+                        electronic=product, branch=selected_branch, status='available'
+                    ).count()
+            else:
+                stock_obj = product.stock_at(selected_branch)
+                return stock_obj.quantity_in_stock if stock_obj else 0
+        else:
+            if product_type in ['Phone', 'Electronic']:
+                if product_type == 'Phone':
+                    return Unit.objects.filter(phone=product, status='available').count()
+                else:
+                    return Unit.objects.filter(electronic=product, status='available').count()
+            else:
+                return product.total_quantity_in_stock
+
     # ---------- Electronics ----------
     electronics = Electronic.objects.filter(company=company)
-    if selected_branch:
-        electronics = electronics.filter(branch=selected_branch)
-    if not is_viewing_company:
-        electronics = filter_by_user_access(electronics, request.user, 'product')
-
     for item in electronics:
-        # Count only AVAILABLE units
-        available_stock = Unit.objects.filter(
-            electronic=item, status='available'
-        ).count()
-        # Count ALL units (for reference / optional display)
+        stock = get_stock(item, 'Electronic')
         total_units = Unit.objects.filter(electronic=item).count()
 
         all_products.append({
@@ -1123,8 +1212,8 @@ def product_list(request):
             'brand': item.brand or '-',
             'model': item.model_number or '-',
             'specs': f"{item.ram} {item.storage}".strip() or '-',
-            'stock': available_stock,          # AVAILABLE units only
-            'all_units': total_units,          # ALL units
+            'stock': stock,
+            'all_units': total_units,
             'purchase_price': float(item.purchase_price),
             'selling_price': float(item.selling_price),
             'best_price': float(item.best_price) if item.best_price else 0,
@@ -1134,12 +1223,9 @@ def product_list(request):
 
     # ---------- Phones ----------
     phones = Phone.objects.filter(company=company)
-    if selected_branch:
-        phones = phones.filter(branch=selected_branch)
-    if not is_viewing_company:
-        phones = filter_by_user_access(phones, request.user, 'product')
-
     for item in phones:
+        stock = get_stock(item, 'Phone')
+        
         phone_type = 'Smartphone'
         if hasattr(item, 'phone_type'):
             phone_type = 'Feature Phone' if item.phone_type == 'feature' else 'Smartphone'
@@ -1148,11 +1234,6 @@ def product_list(request):
             rom_empty = not item.storage_capacity or item.storage_capacity in ('N/A', '')
             phone_type = 'Feature Phone' if (ram_empty and rom_empty) else 'Smartphone'
 
-        # Count only AVAILABLE units
-        available_stock = Unit.objects.filter(
-            phone=item, status='available'
-        ).count()
-        # Count ALL units
         total_units = Unit.objects.filter(phone=item).count()
 
         all_products.append({
@@ -1166,8 +1247,8 @@ def product_list(request):
             'brand': item.brand or '-',
             'model': item.model or '-',
             'specs': f"{item.ram} {item.storage_capacity}".strip() or '-',
-            'stock': available_stock,          # AVAILABLE units only
-            'all_units': total_units,          # ALL units
+            'stock': stock,
+            'all_units': total_units,
             'purchase_price': float(item.purchase_price),
             'selling_price': float(item.selling_price),
             'best_price': float(item.best_price) if item.best_price else 0,
@@ -1177,12 +1258,9 @@ def product_list(request):
 
     # ---------- Accessories ----------
     accessories = Accessory.objects.filter(company=company)
-    if selected_branch:
-        accessories = accessories.filter(branch=selected_branch)
-    if not is_viewing_company:
-        accessories = filter_by_user_access(accessories, request.user, 'product')
-
     for item in accessories:
+        stock = get_stock(item, 'Accessory')
+
         all_products.append({
             'id': item.id,
             'pk': item.id,
@@ -1194,8 +1272,8 @@ def product_list(request):
             'brand': item.brand or '-',
             'model': item.model or '-',
             'specs': item.accessory_type or '-',
-            'stock': item.quantity_in_stock,   # Accessories: stock = quantity_in_stock
-            'all_units': item.quantity_in_stock,
+            'stock': stock,
+            'all_units': stock,
             'purchase_price': float(item.purchase_price),
             'selling_price': float(item.selling_price),
             'best_price': float(item.best_price) if item.best_price else 0,
@@ -1207,30 +1285,18 @@ def product_list(request):
     all_products.sort(key=lambda x: x['created_at'] or '', reverse=True)
 
     # ============================================================
-    # STATS — computed from `all_products` so they respect
-    # both the branch filter and the user's role/branch access.
+    # STATS
     # ============================================================
     total_products = len(all_products)
 
-    phone_ids = [
-        p['id'] for p in all_products
-        if p['type'] in ('Smartphone', 'Feature Phone')
-    ]
-    electronic_ids = [
-        p['id'] for p in all_products
-        if p['type'] == 'Electronic'
-    ]
+    phone_ids = [p['id'] for p in all_products if p['type'] in ('Smartphone', 'Feature Phone')]
+    electronic_ids = [p['id'] for p in all_products if p['type'] == 'Electronic']
 
-    # Available units only
     total_unit_items = 0
     if phone_ids:
-        total_unit_items += Unit.objects.filter(
-            phone_id__in=phone_ids, status='available'
-        ).count()
+        total_unit_items += Unit.objects.filter(phone_id__in=phone_ids, status='available').count()
     if electronic_ids:
-        total_unit_items += Unit.objects.filter(
-            electronic_id__in=electronic_ids, status='available'
-        ).count()
+        total_unit_items += Unit.objects.filter(electronic_id__in=electronic_ids, status='available').count()
 
     total_stock_items = sum(int(p.get('stock') or 0) for p in all_products)
     total_products_value = sum(
@@ -1245,10 +1311,7 @@ def product_list(request):
         'total_products_value': total_products_value,
     }
 
-    # ---------- Branch dropdown options ----------
-    branches = Branch.objects.filter(
-        company=company, is_active=True
-    ).order_by('name')
+    branches = Branch.objects.filter(company=company, is_active=True).order_by('name')
 
     context = {
         'all_products_json':  all_products,
@@ -1259,13 +1322,13 @@ def product_list(request):
         'is_viewing_company': is_viewing_company,
         'branches':           branches,
         'selected_branch':    selected_branch,
-        'branch_id':          branch_id,
+        'branch_id':          str(selected_branch.id) if selected_branch else '',
         'page_title':         'Products',
         'page_subtitle':      'Manage your products',
     }
     return render(request, 'epa/products.html', context)
 
-
+    
 @login_required
 @require_POST
 def update_product_prices(request, product_code):
@@ -1305,69 +1368,80 @@ def update_product_prices(request, product_code):
 def product_detail(request, product_code):
     """View product details using product code"""
     company, is_viewing_company = get_active_company(request)
-    
+
     if not company:
         if request.user.role == 'super_admin':
             return redirect('/api/support/select/')
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
-    
+
     product, product_type = get_product_by_code(company, product_code)
-    
+
     if not product:
         messages.error(request, f'Product with code "{product_code}" not found.')
         return redirect('/epa_shop/products/')
-    
+
     if not is_viewing_company:
         if is_agent(request.user):
             owner = Owner.objects.filter(company=company, phone=request.user.phone).first()
-            if not owner or product.owner != owner:
+            if not owner or getattr(product, 'owner', None) != owner:
                 messages.error(request, 'You do not have permission to view this product.')
                 return redirect('/epa_shop/products/')
         elif not is_admin_or_manager(request.user):
             user_branch = get_user_branch(request.user)
-            product_branch = product.branch if product else None
-            if user_branch and product_branch and product_branch.id != user_branch.id:
-                messages.error(request, 'You do not have permission to view products from other branches.')
-                return redirect('/epa_shop/products/')
-    
+            if user_branch:
+                if not product.branch_stocks.filter(branch=user_branch).exists():
+                    messages.error(request, 'You do not have permission to view products from other branches.')
+                    return redirect('/epa_shop/products/')
+
+    # 1. Determine the selected branch
+    all_branches_qs = Branch.objects.filter(company=company, is_active=True)
+    branch_id = request.GET.get('branch')
+    selected_branch = None
+    if branch_id and branch_id.isdigit():
+        selected_branch = all_branches_qs.filter(id=int(branch_id)).first()
+    if not selected_branch and all_branches_qs.exists():
+        selected_branch = all_branches_qs.first()
+
+    # 2. Load units for the selected branch
     units = []
     total_units = 0
-    
-    if product_type == 'Phone':
-        units = Unit.objects.filter(phone=product).order_by('-created_at')
+    available_count = 0
+    reserved_count = 0
+    repair_count = 0
+    sold_count = 0
+
+    if selected_branch and product_type in ['Phone', 'Electronic']:
+        if product_type == 'Phone':
+            units = Unit.objects.filter(phone=product, branch=selected_branch).order_by('-created_at')
+        else:
+            units = Unit.objects.filter(electronic=product, branch=selected_branch).order_by('-created_at')
+
         if is_agent(request.user) and not is_viewing_company:
             owner = Owner.objects.filter(company=company, phone=request.user.phone).first()
             if owner:
                 units = units.filter(owner=owner)
             else:
                 units = units.none()
+
+        # Counts for the summary cards at the top
         total_units = units.count()
-        
+        available_count = units.filter(status='available').count()
+        reserved_count = units.filter(status='reserved').count()
+        repair_count = units.filter(status='repair').count()
+        sold_count = units.filter(status='sold').count()
+
         for unit in units:
             sale_item = SaleItem.objects.filter(unit=unit).select_related('sale').first()
             unit.sale = sale_item.sale if sale_item else None
-            
-    elif product_type == 'Electronic':
-        units = Unit.objects.filter(electronic=product).order_by('-created_at')
-        if is_agent(request.user) and not is_viewing_company:
-            owner = Owner.objects.filter(company=company, phone=request.user.phone).first()
-            if owner:
-                units = units.filter(owner=owner)
-            else:
-                units = units.none()
-        total_units = units.count()
-        
-        for unit in units:
-            sale_item = SaleItem.objects.filter(unit=unit).select_related('sale').first()
-            unit.sale = sale_item.sale if sale_item else None
-            
-    elif product_type == 'Accessory':
-        total_units = product.quantity_in_stock
-    
-    # Branch stock
-    branches = Branch.objects.filter(company=company, is_active=True)
-    
+
+    # Accessories use the BranchStock record for the count
+    if product_type == 'Accessory' and selected_branch:
+        stock_obj = product.stock_at(selected_branch)
+        total_units = stock_obj.quantity_in_stock if stock_obj else 0
+
+    # 3. Branch stock data — always compute live for phones/electronics
+    branches = all_branches_qs
     if is_agent(request.user) and not is_viewing_company:
         user_branch = get_user_branch(request.user)
         if user_branch:
@@ -1376,82 +1450,69 @@ def product_detail(request, product_code):
         user_branch = get_user_branch(request.user)
         if user_branch:
             branches = branches.filter(id=user_branch.id)
-    
+
     branch_stock_data = []
-    
+    actual_total_stock = 0
+
     for branch in branches:
-        unit_count = 0
-        
-        if product_type == 'Phone':
-            unit_count = Unit.objects.filter(
-                phone=product,
-                phone__branch=branch,
-                status='available'
-            ).count()
-            if is_agent(request.user) and not is_viewing_company:
-                owner = Owner.objects.filter(company=company, phone=request.user.phone).first()
-                if owner:
-                    unit_count = Unit.objects.filter(
-                        phone=product,
-                        phone__branch=branch,
-                        status='available',
-                        owner=owner
-                    ).count()
-                else:
-                    unit_count = 0
-            
-        elif product_type == 'Electronic':
-            unit_count = Unit.objects.filter(
-                electronic=product,
-                electronic__branch=branch,
-                status='available'
-            ).count()
-            if is_agent(request.user) and not is_viewing_company:
-                owner = Owner.objects.filter(company=company, phone=request.user.phone).first()
-                if owner:
-                    unit_count = Unit.objects.filter(
-                        electronic=product,
-                        electronic__branch=branch,
-                        status='available',
-                        owner=owner
-                    ).count()
-                else:
-                    unit_count = 0
-            
-        elif product_type == 'Accessory':
-            if product.branch_id == branch.id:
-                unit_count = product.quantity_in_stock
+        if product_type in ['Phone', 'Electronic']:
+            # ✅ Count live available units per branch — not the cached total
+            if product_type == 'Phone':
+                live_count = Unit.objects.filter(
+                    phone=product, branch=branch, status='available'
+                ).count()
             else:
-                unit_count = 0
-        
+                live_count = Unit.objects.filter(
+                    electronic=product, branch=branch, status='available'
+                ).count()
+        else:
+            # Accessories still use BranchStock
+            stock_obj = product.stock_at(branch)
+            live_count = stock_obj.quantity_in_stock if stock_obj else 0
+
+        actual_total_stock += live_count
+
         branch_stock_data.append({
             'id': branch.id,
             'name': branch.name,
             'code': branch.code,
-            'unit_count': unit_count,
+            'unit_count': live_count,
             'address': branch.address,
             'phone': branch.phone,
-            'has_units': unit_count > 0,
-            'is_primary': product.branch_id == branch.id if product_type == 'Accessory' else False,
+            'has_units': live_count > 0,
+            'is_primary': live_count > 0,
         })
-    
+
     branch_stock_data.sort(key=lambda x: (not x['is_primary'], -x['unit_count']))
-    total_available_units = sum(b['unit_count'] for b in branch_stock_data)
-    
+
+    # Current branch stock — pull from the live branch data
+    current_branch_stock = 0
+    if selected_branch:
+        for b in branch_stock_data:
+            if b['id'] == selected_branch.id:
+                current_branch_stock = b['unit_count']
+                break
+
     context = {
         'product': product,
         'product_type': product_type,
         'units': units,
         'unit_count': total_units,
+        'available_count': available_count,
+        'reserved_count': reserved_count,
+        'repair_count': repair_count,
+        'sold_count': sold_count,
         'branches': branch_stock_data,
-        'total_available_units': total_available_units,
+        'total_available_units': actual_total_stock,
+        'actual_total_stock': actual_total_stock,
+        'current_branch_stock': current_branch_stock,
         'product_code': product.product_code,
         'is_viewing_company': is_viewing_company,
+        'selected_branch_id': selected_branch.id if selected_branch else None,
         'page_title': f'Product: {product.name}',
         'page_subtitle': f'Code: {product.product_code}',
     }
     return render(request, 'epa/product_detail.html', context)
-
 
 
 # ============================================
@@ -1489,31 +1550,20 @@ def product_create(request):
     if request.method == 'POST':
         try:
             category_type = request.POST.get('category', '').strip()
-            branch_id = request.POST.get('branch')
+            branch_id = request.POST.get('branch')  # Now read from Section 4
             name = request.POST.get('name', '').strip()
             brand = request.POST.get('brand', '').strip()
             model = request.POST.get('model', '').strip()
 
+            # --- Handle list fields safely (RAM, ROM, etc.) ---
             ram_list = request.POST.getlist('ram')
-            ram = ''
-            for val in ram_list:
-                if val and val.strip():
-                    ram = val.strip()
-                    break
+            ram = next((val.strip() for val in ram_list if val and val.strip()), '')
 
             rom_list = request.POST.getlist('rom')
-            rom = ''
-            for val in rom_list:
-                if val and val.strip():
-                    rom = val.strip()
-                    break
+            rom = next((val.strip() for val in rom_list if val and val.strip()), '')
 
             storage_list = request.POST.getlist('storage')
-            storage = ''
-            for val in storage_list:
-                if val and val.strip():
-                    storage = val.strip()
-                    break
+            storage = next((val.strip() for val in storage_list if val and val.strip()), '')
 
             if category_type == 'electronics' and not storage:
                 for val in rom_list:
@@ -1521,26 +1571,9 @@ def product_create(request):
                         storage = val.strip()
                         break
 
-            screen_size_list = request.POST.getlist('screen_size')
-            screen_size = ''
-            for val in screen_size_list:
-                if val and val.strip():
-                    screen_size = val.strip()
-                    break
-
-            color_list = request.POST.getlist('color')
-            color = ''
-            for val in color_list:
-                if val and val.strip():
-                    color = val.strip()
-                    break
-
-            battery_capacity_list = request.POST.getlist('battery_capacity')
-            battery_capacity = ''
-            for val in battery_capacity_list:
-                if val and val.strip():
-                    battery_capacity = val.strip()
-                    break
+            screen_size = next((val.strip() for val in request.POST.getlist('screen_size') if val and val.strip()), '')
+            color = next((val.strip() for val in request.POST.getlist('color') if val and val.strip()), '')
+            battery_capacity = next((val.strip() for val in request.POST.getlist('battery_capacity') if val and val.strip()), '')
 
             condition = request.POST.get('condition', 'new')
             network_type = request.POST.get('network_type', '').strip()
@@ -1548,18 +1581,13 @@ def product_create(request):
             features = request.POST.get('features', '').strip()
             device_type = request.POST.get('device_type', 'other')
             processor = request.POST.get('processor', '').strip()
-            specs = request.POST.get('specs', '').strip()
             accessory_type = request.POST.get('accessory_type', 'other')
-
-            # Barcode — read from form (used for all three product types)
+            
             barcode = request.POST.get('barcode', '').strip() or None
-
-            size = request.POST.get('size', '').strip()
 
             image = request.FILES.get('product_image')
 
-            # --- Upload to Cloudinary explicitly ---
-            # Pick the right folder based on category
+            # --- Upload to Cloudinary ---
             if category_type in ('smartphone', 'feature_phone'):
                 _folder_root = 'epa/phones'
             elif category_type == 'electronics':
@@ -1574,7 +1602,6 @@ def product_create(request):
                 folder=f"{_folder_root}/{timezone.now().strftime('%Y/%m')}",
             )
 
-            # If the user uploaded a file but the upload failed → abort
             if image and not image_public_id:
                 messages.error(request, 'Image upload failed. Please try again or check Cloudinary credentials.')
                 return render(request, 'epa/product_form.html', {
@@ -1639,7 +1666,7 @@ def product_create(request):
                 })
 
             if not branch_id:
-                messages.error(request, 'Please select a branch.')
+                messages.error(request, 'Please select a branch in the Stock section to assign this inventory.')
                 return render(request, 'epa/product_form.html', {
                     'branches': branches, 'form_data': request.POST,
                     'category_value': category_type, 'units': units,
@@ -1680,64 +1707,29 @@ def product_create(request):
             if category_type == 'smartphone':
                 if not ram:
                     messages.error(request, 'RAM is required for smartphones.')
-                    return render(request, 'epa/product_form.html', {
-                        'branches': branches, 'form_data': request.POST,
-                        'category_value': category_type, 'units': units,
-                        'units_json': '[]', 'is_edit': False,
-                        'page_title': 'Add Product', 'page_subtitle': 'Create a new product',
-                    })
+                    return render(request, 'epa/product_form.html', {'branches': branches, 'form_data': request.POST, 'category_value': category_type, 'units': units, 'units_json': '[]', 'is_edit': False, 'page_title': 'Add Product', 'page_subtitle': 'Create a new product'})
                 if not rom:
                     messages.error(request, 'Storage (ROM) is required for smartphones.')
-                    return render(request, 'epa/product_form.html', {
-                        'branches': branches, 'form_data': request.POST,
-                        'category_value': category_type, 'units': units,
-                        'units_json': '[]', 'is_edit': False,
-                        'page_title': 'Add Product', 'page_subtitle': 'Create a new product',
-                    })
+                    return render(request, 'epa/product_form.html', {'branches': branches, 'form_data': request.POST, 'category_value': category_type, 'units': units, 'units_json': '[]', 'is_edit': False, 'page_title': 'Add Product', 'page_subtitle': 'Create a new product'})
 
             elif category_type == 'electronics':
                 if not ram:
                     messages.error(request, 'RAM is required for electronics.')
-                    return render(request, 'epa/product_form.html', {
-                        'branches': branches, 'form_data': request.POST,
-                        'category_value': category_type, 'units': units,
-                        'units_json': '[]', 'is_edit': False,
-                        'page_title': 'Add Product', 'page_subtitle': 'Create a new product',
-                    })
+                    return render(request, 'epa/product_form.html', {'branches': branches, 'form_data': request.POST, 'category_value': category_type, 'units': units, 'units_json': '[]', 'is_edit': False, 'page_title': 'Add Product', 'page_subtitle': 'Create a new product'})
                 if not storage:
                     messages.error(request, 'Storage is required for electronics.')
-                    return render(request, 'epa/product_form.html', {
-                        'branches': branches, 'form_data': request.POST,
-                        'category_value': category_type, 'units': units,
-                        'units_json': '[]', 'is_edit': False,
-                        'page_title': 'Add Product', 'page_subtitle': 'Create a new product',
-                    })
+                    return render(request, 'epa/product_form.html', {'branches': branches, 'form_data': request.POST, 'category_value': category_type, 'units': units, 'units_json': '[]', 'is_edit': False, 'page_title': 'Add Product', 'page_subtitle': 'Create a new product'})
                 if not processor:
                     messages.error(request, 'Processor is required for electronics.')
-                    return render(request, 'epa/product_form.html', {
-                        'branches': branches, 'form_data': request.POST,
-                        'category_value': category_type, 'units': units,
-                        'units_json': '[]', 'is_edit': False,
-                        'page_title': 'Add Product', 'page_subtitle': 'Create a new product',
-                    })
+                    return render(request, 'epa/product_form.html', {'branches': branches, 'form_data': request.POST, 'category_value': category_type, 'units': units, 'units_json': '[]', 'is_edit': False, 'page_title': 'Add Product', 'page_subtitle': 'Create a new product'})
 
             elif category_type == 'accessory':
                 if not accessory_type or accessory_type == '':
                     messages.error(request, 'Accessory type is required.')
-                    return render(request, 'epa/product_form.html', {
-                        'branches': branches, 'form_data': request.POST,
-                        'category_value': category_type, 'units': units,
-                        'units_json': '[]', 'is_edit': False,
-                        'page_title': 'Add Product', 'page_subtitle': 'Create a new product',
-                    })
+                    return render(request, 'epa/product_form.html', {'branches': branches, 'form_data': request.POST, 'category_value': category_type, 'units': units, 'units_json': '[]', 'is_edit': False, 'page_title': 'Add Product', 'page_subtitle': 'Create a new product'})
                 if quantity <= 0:
                     messages.error(request, 'Quantity must be greater than 0 for accessories.')
-                    return render(request, 'epa/product_form.html', {
-                        'branches': branches, 'form_data': request.POST,
-                        'category_value': category_type, 'units': units,
-                        'units_json': '[]', 'is_edit': False,
-                        'page_title': 'Add Product', 'page_subtitle': 'Create a new product',
-                    })
+                    return render(request, 'epa/product_form.html', {'branches': branches, 'form_data': request.POST, 'category_value': category_type, 'units': units, 'units_json': '[]', 'is_edit': False, 'page_title': 'Add Product', 'page_subtitle': 'Create a new product'})
 
             units_data = request.POST.get('units', '[]')
             try:
@@ -1754,7 +1746,7 @@ def product_create(request):
             if category_type in ['smartphone', 'feature_phone']:
                 existing_phones = Phone.objects.filter(
                     company=company, brand__iexact=brand, model__iexact=model,
-                    ram=ram, storage_capacity=rom, branch=branch, is_active=True
+                    ram=ram, storage_capacity=rom, is_active=True
                 )
                 if existing_phones.exists():
                     existing_product = existing_phones.first()
@@ -1763,7 +1755,7 @@ def product_create(request):
             elif category_type == 'electronics':
                 existing_electronics = Electronic.objects.filter(
                     company=company, brand__iexact=brand, model_number__iexact=model,
-                    ram=ram, storage=storage, processor=processor, branch=branch, is_active=True
+                    ram=ram, storage=storage, processor=processor, is_active=True
                 )
                 if existing_electronics.exists():
                     existing_product = existing_electronics.first()
@@ -1772,15 +1764,16 @@ def product_create(request):
             elif category_type == 'accessory':
                 existing_accessories = Accessory.objects.filter(
                     company=company, brand__iexact=brand, model__iexact=model,
-                    accessory_type=accessory_type, branch=branch, is_active=True
+                    accessory_type=accessory_type, is_active=True
                 )
                 if existing_accessories.exists():
                     existing_product = existing_accessories.first()
                     existing_product_type = 'Accessory'
 
-            # If existing, add units only
+            # If existing, add stock to this specific branch via services
             if existing_product and existing_product_type:
-                owner = get_or_create_owner_from_user(request.user, company=company)
+                from apps.epa_shop.services.stock import receive_stock
+                
                 added_count = 0
                 skipped_count = 0
 
@@ -1793,33 +1786,24 @@ def product_create(request):
                         if Unit.objects.filter(identifier=identifier).exists():
                             skipped_count += 1
                             continue
+                        
                         if existing_product_type == 'Phone':
-                            Unit.objects.create(phone=existing_product, identifier=identifier, unit_type='imei', status=status, owner=owner)
+                            Unit.objects.create(phone=existing_product, identifier=identifier, unit_type='imei', status=status, branch=branch)
                         else:
-                            Unit.objects.create(electronic=existing_product, identifier=identifier, unit_type='serial', status=status, owner=owner)
+                            Unit.objects.create(electronic=existing_product, identifier=identifier, unit_type='serial', status=status, branch=branch)
                         added_count += 1
 
-                    if existing_product_type == 'Phone':
-                        total_units = Unit.objects.filter(phone=existing_product).count()
-                    else:
-                        total_units = Unit.objects.filter(electronic=existing_product).count()
-                    existing_product.quantity_in_stock = total_units
-                    existing_product.save()
+                    if added_count > 0:
+                        receive_stock(existing_product, branch, added_count, request.user, notes="Added via Product Form")
 
                 elif existing_product_type == 'Accessory':
-                    existing_product.quantity_in_stock += quantity
-                    # Also update barcode if a new one was provided
-                    if barcode:
-                        existing_product.barcode = barcode
-                    # Also update image if a new one was uploaded
-                    if image_public_id:
-                        existing_product.image = image_public_id
-                    existing_product.save()
+                    if quantity > 0:
+                        receive_stock(existing_product, branch, quantity, request.user, notes="Added via Product Form")
                     added_count = quantity
 
                 if added_count > 0:
                     msg = f'✅ Product "{existing_product.name}" already exists (Code: {existing_product.product_code}). '
-                    msg += f'Added {added_count} new unit(s) to stock.'
+                    msg += f'Added {added_count} new unit(s) to {branch.name} branch.'
                     if skipped_count > 0:
                         msg += f' {skipped_count} identifier(s) already existed and were skipped.'
                     messages.success(request, msg)
@@ -1831,7 +1815,9 @@ def product_create(request):
 
                 return redirect('/epa_shop/products/')
 
-            # Auto-generate name
+            # ------------------------------------------------------------
+            # Create NEW product
+            # ------------------------------------------------------------
             if not name or name.strip() == '':
                 if category_type == 'smartphone':
                     name = f"{brand} {model} {rom} {ram}".strip()
@@ -1846,7 +1832,6 @@ def product_create(request):
                 else:
                     name = f"{brand} {model}".strip()
 
-            # Get or create category
             category_map = {
                 'smartphone': 'phones',
                 'feature_phone': 'phones',
@@ -1865,10 +1850,10 @@ def product_create(request):
                 )
 
             owner = get_or_create_owner_from_user(request.user, company=company)
+            
+            # Import here to avoid circular issues
+            from apps.epa_shop.services.stock import receive_stock
 
-            # ------------------------------------------------------------
-            # Create new product
-            # ------------------------------------------------------------
             if category_type in ['smartphone', 'feature_phone']:
                 if category_type == 'feature_phone':
                     ram_value = ram or 'N/A'
@@ -1886,16 +1871,14 @@ def product_create(request):
                     features_value = None
 
                 product = Phone.objects.create(
-                    company=company, branch=branch, category=category,
+                    company=company, category=category,
                     name=name, brand=brand, model=model, imei=None,
                     barcode=barcode,
                     color=color or '', storage_capacity=rom_value, ram=ram_value,
                     screen_size=screen_size or '', battery_capacity=battery_capacity or '',
                     condition=condition, purchase_price=purchase_price,
                     selling_price=selling_price, best_price=best_price,
-                    quantity_in_stock=len(units),
-                    image=image_public_id,      # ✅ Cloudinary public_id
-                    owner=owner,
+                    image=image_public_id, owner=owner,
                     phone_type=phone_type_value, network_type=network_type_value,
                     memory_card=memory_card_value, features=features_value
                 )
@@ -1904,46 +1887,50 @@ def product_create(request):
                     Unit.objects.create(
                         phone=product, identifier=unit_data['identifier'],
                         unit_type='imei', status=unit_data.get('status', 'available'),
-                        owner=owner
+                        owner=owner, branch=branch
                     )
+                
+                if len(units) > 0:
+                    receive_stock(product, branch, len(units), request.user, notes="Initial Stock")
 
                 product_type_label = "Feature Phone" if category_type == 'feature_phone' else "Smartphone"
-                messages.success(request, f'✅ New {product_type_label} "{product.name}" created! Code: {product.product_code}')
+                messages.success(request, f'✅ New {product_type_label} "{product.name}" created in {branch.name}! Code: {product.product_code}')
 
             elif category_type == 'electronics':
                 product = Electronic.objects.create(
-                    company=company, branch=branch, category=category,
+                    company=company, category=category,
                     name=name, brand=brand, model_number=model, serial_number=None,
-                    barcode=barcode,
-                    device_type=device_type, processor=processor, ram=ram, storage=storage,
+                    barcode=barcode, device_type=device_type, processor=processor, ram=ram, storage=storage,
                     screen_size=screen_size or '', color=color or '',
                     purchase_price=purchase_price, selling_price=selling_price,
-                    best_price=best_price, quantity_in_stock=len(units),
-                    image=image_public_id,      # ✅ Cloudinary public_id
-                    owner=owner
+                    best_price=best_price, image=image_public_id, owner=owner
                 )
 
                 for unit_data in units:
                     Unit.objects.create(
                         electronic=product, identifier=unit_data['identifier'],
                         unit_type='serial', status=unit_data.get('status', 'available'),
-                        owner=owner
+                        owner=owner, branch=branch
                     )
-                messages.success(request, f'✅ New Electronics "{product.name}" created! Code: {product.product_code}')
+
+                if len(units) > 0:
+                    receive_stock(product, branch, len(units), request.user, notes="Initial Stock")
+
+                messages.success(request, f'✅ New Electronics "{product.name}" created in {branch.name}! Code: {product.product_code}')
 
             elif category_type == 'accessory':
                 product = Accessory.objects.create(
-                    company=company, branch=branch, category=category,
+                    company=company, category=category,
                     name=name, brand=brand, accessory_type=accessory_type,
-                    model=model or '',
-                    compatible_phone_models='',   # left for its original purpose (compatibility list)
-                    barcode=barcode,              # barcode goes here now
+                    model=model or '', compatible_phone_models='', barcode=barcode,
                     purchase_price=purchase_price, selling_price=selling_price,
-                    best_price=best_price, quantity_in_stock=quantity,
-                    image=image_public_id,        # ✅ Cloudinary public_id
-                    owner=owner
+                    best_price=best_price, image=image_public_id, owner=owner
                 )
-                messages.success(request, f'✅ New Accessory "{product.name}" created! Code: {product.product_code}')
+
+                if quantity > 0:
+                    receive_stock(product, branch, quantity, request.user, notes="Initial Stock")
+
+                messages.success(request, f'✅ New Accessory "{product.name}" created in {branch.name}! Code: {product.product_code}')
 
             else:
                 messages.error(request, f'Unknown category: {category_type}')
@@ -1961,8 +1948,6 @@ def product_create(request):
             import traceback
             traceback.print_exc()
 
-            form_data = request.POST
-            category_value = request.POST.get('category', '')
             units_data = request.POST.get('units', '[]')
             try:
                 units = json.loads(units_data)
@@ -1971,8 +1956,8 @@ def product_create(request):
             units_json = json.dumps(units)
 
             return render(request, 'epa/product_form.html', {
-                'branches': branches, 'form_data': form_data,
-                'category_value': category_value, 'units': units,
+                'branches': branches, 'form_data': request.POST,
+                'category_value': request.POST.get('category', ''), 'units': units,
                 'units_json': units_json, 'is_edit': False,
                 'page_title': 'Add Product', 'page_subtitle': 'Create a new product',
             })
@@ -1989,7 +1974,7 @@ def product_create(request):
     }
     return render(request, 'epa/product_form.html', context)
 
-
+    
 # ============================================
 # PRODUCT EDIT
 # ============================================
@@ -2015,39 +2000,45 @@ def product_edit(request, product_code):
         messages.error(request, f'Product with code "{product_code}" not found.')
         return redirect('/epa_shop/products/')
 
-    if not is_admin_or_manager(request.user) and not is_viewing_company:
-        user_branch = get_user_branch(request.user)
-        product_branch = product.branch if product else None
-        if user_branch and product_branch and product_branch.id != user_branch.id:
-            messages.error(request, 'You do not have permission to edit products from other branches.')
-            return redirect('/epa_shop/products/')
-
-    units = []
-    units_json = '[]'
-
-    if product_type == 'Phone':
-        units = Unit.objects.filter(phone=product).order_by('-created_at')
-        units_json = json.dumps([{'identifier': u.identifier, 'status': u.status} for u in units])
-    elif product_type == 'Electronic':
-        units = Unit.objects.filter(electronic=product).order_by('-created_at')
-        units_json = json.dumps([{'identifier': u.identifier, 'status': u.status} for u in units])
-
     branches = Branch.objects.filter(company=company, is_active=True)
     if not is_viewing_company and not request.user.is_super_admin and not request.user.is_company_admin:
         user_branch = get_user_branch(request.user)
         if user_branch:
             branches = branches.filter(id=user_branch.id)
 
+    # 1. Determine which branch we are editing
+    branch_id = request.GET.get('branch')
+    if not branch_id and branches.exists():
+        branch_id = str(branches.first().id)
+    
+    current_branch = None
+    if branch_id:
+        current_branch = branches.filter(id=branch_id).first()
+
+    # 2. Load stock specific to the current branch
+    units = []
+    units_json = '[]'
+    current_quantity = 0
+
+    if current_branch:
+        stock_record = product.stock_at(current_branch)
+        current_quantity = stock_record.quantity_in_stock if stock_record else 0
+
+        if product_type == 'Phone':
+            units = Unit.objects.filter(phone=product, branch=current_branch).order_by('-created_at')
+        elif product_type == 'Electronic':
+            units = Unit.objects.filter(electronic=product, branch=current_branch).order_by('-created_at')
+        
+        units_json = json.dumps([{'identifier': u.identifier, 'status': u.status} for u in units])
+
+    # 3. Determine category_value based on product type
     if product_type == 'Phone':
         if hasattr(product, 'phone_type') and product.phone_type == 'feature':
             category_value = 'feature_phone'
         else:
-            ram_empty = not product.ram or product.ram == 'N/A' or product.ram == ''
-            rom_empty = not product.storage_capacity or product.storage_capacity == 'N/A' or product.storage_capacity == ''
-            if ram_empty and rom_empty:
-                category_value = 'feature_phone'
-            else:
-                category_value = 'smartphone'
+            ram_empty = not product.ram or product.ram in ('N/A', '')
+            rom_empty = not product.storage_capacity or product.storage_capacity in ('N/A', '')
+            category_value = 'feature_phone' if (ram_empty and rom_empty) else 'smartphone'
     elif product_type == 'Electronic':
         category_value = 'electronics'
     elif product_type == 'Accessory':
@@ -2058,7 +2049,6 @@ def product_edit(request, product_code):
     if request.method == 'POST':
         try:
             category_type = request.POST.get('category', '').strip()
-            branch_id = request.POST.get('branch')
             name = request.POST.get('name', '').strip()
             brand = request.POST.get('brand', '').strip()
             model = request.POST.get('model', '').strip()
@@ -2076,24 +2066,18 @@ def product_edit(request, product_code):
             processor = request.POST.get('processor', '').strip()
             storage = request.POST.get('storage', '').strip()
             accessory_type = request.POST.get('accessory_type', 'other')
-
-            # Barcode — used for all three product types
             barcode = request.POST.get('barcode', '').strip() or None
-
-            size = request.POST.get('size', '').strip()
 
             image = request.FILES.get('product_image')
 
-            # --- Upload new image to Cloudinary (if provided) ---
+            # --- Cloudinary Image Handling ---
             if image:
                 new_public_id = _upload_product_image_to_cloudinary(
-                    image,
-                    folder=f"epa/{product_type.lower()}s/{timezone.now().strftime('%Y/%m')}",
+                    image, folder=f"epa/{product_type.lower()}s/{timezone.now().strftime('%Y/%m')}",
                 )
                 if not new_public_id:
                     messages.error(request, 'Image upload failed. Keeping the previous image.')
                 else:
-                    # Delete old Cloudinary asset if there was one
                     if product.image:
                         try:
                             _cloudinary_configure()
@@ -2127,53 +2111,19 @@ def product_edit(request, product_code):
             except:
                 min_stock = 5
 
-            # ------------------------------------------------------------
-            # VALIDATIONS
-            # ------------------------------------------------------------
-            if not branch_id:
-                messages.error(request, 'Please select a branch.')
-                return render(request, 'epa/product_form.html', {
-                    'branches': branches, 'product': product, 'product_type': product_type,
-                    'units': units, 'units_json': units_json, 'category_value': category_value,
-                    'is_edit': True, 'page_title': f'Edit {product.name}',
-                    'page_subtitle': f'Code: {product.product_code}',
-                })
-
+            # --- VALIDATIONS ---
             if not brand:
                 messages.error(request, 'Brand is required.')
-                return render(request, 'epa/product_form.html', {
-                    'branches': branches, 'product': product, 'product_type': product_type,
-                    'units': units, 'units_json': units_json, 'category_value': category_value,
-                    'is_edit': True, 'page_title': f'Edit {product.name}',
-                    'page_subtitle': f'Code: {product.product_code}',
-                })
-
+                return redirect(request.path + f'?branch={branch_id}')
             if not model:
                 messages.error(request, 'Model is required.')
-                return render(request, 'epa/product_form.html', {
-                    'branches': branches, 'product': product, 'product_type': product_type,
-                    'units': units, 'units_json': units_json, 'category_value': category_value,
-                    'is_edit': True, 'page_title': f'Edit {product.name}',
-                    'page_subtitle': f'Code: {product.product_code}',
-                })
-
+                return redirect(request.path + f'?branch={branch_id}')
             if purchase_price <= 0:
                 messages.error(request, 'Buying price must be greater than 0.')
-                return render(request, 'epa/product_form.html', {
-                    'branches': branches, 'product': product, 'product_type': product_type,
-                    'units': units, 'units_json': units_json, 'category_value': category_value,
-                    'is_edit': True, 'page_title': f'Edit {product.name}',
-                    'page_subtitle': f'Code: {product.product_code}',
-                })
-
+                return redirect(request.path + f'?branch={branch_id}')
             if selling_price <= 0:
                 messages.error(request, 'Selling price must be greater than 0.')
-                return render(request, 'epa/product_form.html', {
-                    'branches': branches, 'product': product, 'product_type': product_type,
-                    'units': units, 'units_json': units_json, 'category_value': category_value,
-                    'is_edit': True, 'page_title': f'Edit {product.name}',
-                    'page_subtitle': f'Code: {product.product_code}',
-                })
+                return redirect(request.path + f'?branch={branch_id}')
 
             if not name:
                 if product_type == 'Phone':
@@ -2185,7 +2135,7 @@ def product_edit(request, product_code):
 
             owner = get_or_create_owner_from_user(request.user, company=company)
 
-            # Common fields
+            # --- Update Basic Product Fields (Branch independent) ---
             product.name = name
             product.brand = brand
             product.purchase_price = purchase_price
@@ -2193,17 +2143,8 @@ def product_edit(request, product_code):
 
             if hasattr(product, 'best_price'):
                 product.best_price = best_price
-
-            # Barcode (all three models have this field)
             if hasattr(product, 'barcode'):
                 product.barcode = barcode
-
-            if branch_id:
-                product.branch_id = branch_id
-
-            # NOTE: image was already set above if a new one was uploaded.
-            # Do NOT re-assign product.image here — that would clobber the
-            # Cloudinary public_id with the raw UploadedFile.
 
             if product_type == 'Phone':
                 product.model = model
@@ -2224,47 +2165,7 @@ def product_edit(request, product_code):
                     product.network_type = None
                     product.memory_card = 'no'
                     product.features = None
-
                 product.save()
-
-                units_data = request.POST.get('units', '[]')
-                try:
-                    new_units = json.loads(units_data)
-                except:
-                    new_units = []
-
-                existing_units = Unit.objects.filter(phone=product)
-                existing_identifiers = set(existing_units.values_list('identifier', flat=True))
-                new_identifiers = set()
-
-                for unit_data in new_units:
-                    if 'identifier' in unit_data:
-                        new_identifiers.add(unit_data['identifier'])
-
-                units_to_delete = existing_identifiers - new_identifiers
-                if units_to_delete:
-                    Unit.objects.filter(phone=product, identifier__in=units_to_delete).delete()
-
-                for unit_data in new_units:
-                    identifier = unit_data.get('identifier')
-                    status = unit_data.get('status', 'available')
-
-                    if not identifier:
-                        continue
-
-                    existing_unit = Unit.objects.filter(phone=product, identifier=identifier).first()
-                    if existing_unit:
-                        existing_unit.status = status
-                        existing_unit.save()
-                    else:
-                        Unit.objects.create(phone=product, identifier=identifier, unit_type='imei', status=status, owner=owner)
-
-                total_units = Unit.objects.filter(phone=product).count()
-                product.quantity_in_stock = total_units
-                product.save()
-
-                phone_type_label = "Feature Phone" if category_type == 'feature_phone' else "Smartphone"
-                messages.success(request, f'{phone_type_label} "{product.name}" updated! Code: {product.product_code}')
 
             elif product_type == 'Electronic':
                 product.model_number = model
@@ -2276,67 +2177,77 @@ def product_edit(request, product_code):
                 product.color = color or ''
                 product.save()
 
-                units_data = request.POST.get('units', '[]')
-                try:
-                    new_units = json.loads(units_data)
-                except:
-                    new_units = []
-
-                existing_units = Unit.objects.filter(electronic=product)
-                existing_identifiers = set(existing_units.values_list('identifier', flat=True))
-                new_identifiers = set()
-
-                for unit_data in new_units:
-                    if 'identifier' in unit_data:
-                        new_identifiers.add(unit_data['identifier'])
-
-                units_to_delete = existing_identifiers - new_identifiers
-                if units_to_delete:
-                    Unit.objects.filter(electronic=product, identifier__in=units_to_delete).delete()
-
-                for unit_data in new_units:
-                    identifier = unit_data.get('identifier')
-                    status = unit_data.get('status', 'available')
-
-                    if not identifier:
-                        continue
-
-                    existing_unit = Unit.objects.filter(electronic=product, identifier=identifier).first()
-                    if existing_unit:
-                        existing_unit.status = status
-                        existing_unit.save()
-                    else:
-                        Unit.objects.create(electronic=product, identifier=identifier, unit_type='serial', status=status, owner=owner)
-
-                total_units = Unit.objects.filter(electronic=product).count()
-                product.quantity_in_stock = total_units
-                product.save()
-
-                messages.success(request, f'Electronics "{product.name}" updated! Code: {product.product_code}')
-
             elif product_type == 'Accessory':
                 product.model = model or ''
                 product.accessory_type = accessory_type
-                # Do NOT touch compatible_phone_models here — it's a separate field.
-                product.quantity_in_stock = quantity
-                product.minimum_stock_level = min_stock
                 product.save()
 
-                messages.success(request, f'Accessory "{product.name}" updated! Code: {product.product_code}')
+            # --- Update Branch Specific Stock ---
+            if current_branch:
+                from apps.epa_shop.services.stock import adjust_stock
 
-            return redirect('/epa_shop/products/')
+                if product_type in ['Phone', 'Electronic']:
+                    units_data = request.POST.get('units', '[]')
+                    try:
+                        new_units = json.loads(units_data)
+                    except:
+                        new_units = []
+
+                    if product_type == 'Phone':
+                        existing_units = Unit.objects.filter(phone=product, branch=current_branch)
+                    else:
+                        existing_units = Unit.objects.filter(electronic=product, branch=current_branch)
+
+                    existing_identifiers = set(existing_units.values_list('identifier', flat=True))
+                    new_identifiers = set([u.get('identifier') for u in new_units if u.get('identifier')])
+
+                    # Delete removed units
+                    units_to_delete = existing_identifiers - new_identifiers
+                    if units_to_delete:
+                        units_to_delete_qs = existing_units.filter(identifier__in=units_to_delete)
+                        deleted_count = units_to_delete_qs.count()
+                        units_to_delete_qs.delete()
+                        # Adjust stock down
+                        if deleted_count > 0:
+                            adjust_stock(product, current_branch, -deleted_count, request.user, movement_type='adjustment', notes="Removed via Edit Form")
+
+                    # Add or update new units
+                    added_count = 0
+                    for unit_data in new_units:
+                        identifier = unit_data.get('identifier')
+                        status = unit_data.get('status', 'available')
+
+                        if not identifier: continue
+
+                        existing_unit = existing_units.filter(identifier=identifier).first()
+                        if existing_unit:
+                            existing_unit.status = status
+                            existing_unit.save()
+                        else:
+                            if product_type == 'Phone':
+                                Unit.objects.create(phone=product, identifier=identifier, unit_type='imei', status=status, owner=owner, branch=current_branch)
+                            else:
+                                Unit.objects.create(electronic=product, identifier=identifier, unit_type='serial', status=status, owner=owner, branch=current_branch)
+                            added_count += 1
+                    
+                    # Adjust stock up
+                    if added_count > 0:
+                        adjust_stock(product, current_branch, added_count, request.user, movement_type='adjustment', notes="Added via Edit Form")
+
+                elif product_type == 'Accessory':
+                    # Adjust accessory stock difference
+                    diff = quantity - current_quantity
+                    if diff != 0:
+                        adjust_stock(product, current_branch, diff, request.user, movement_type='adjustment', notes="Adjusted via Edit Form", min_level=min_stock)
+
+            messages.success(request, f'Product "{product.name}" updated successfully for {current_branch.name}!')
+            return redirect(f'/epa_shop/products/?branch={current_branch.id}')
 
         except Exception as e:
             messages.error(request, f'Error updating product: {str(e)}')
             import traceback
             traceback.print_exc()
-            return render(request, 'epa/product_form.html', {
-                'branches': branches, 'product': product, 'product_type': product_type,
-                'units': units, 'units_json': units_json, 'category_value': category_value,
-                'is_edit': True, 'form_data': request.POST,
-                'page_title': f'Edit {product.name}',
-                'page_subtitle': f'Code: {product.product_code}',
-            })
+            return redirect(request.path + f'?branch={branch_id}')
 
     context = {
         'branches': branches,
@@ -2346,6 +2257,8 @@ def product_edit(request, product_code):
         'units_json': units_json,
         'category_value': category_value,
         'is_edit': True,
+        'current_branch_id': int(branch_id) if branch_id else None,
+        'current_quantity': current_quantity,
         'page_title': f'Edit {product.name}',
         'page_subtitle': f'Code: {product.product_code}',
         'form_data': {
@@ -2356,7 +2269,6 @@ def product_edit(request, product_code):
         }
     }
     return render(request, 'epa/product_form.html', context)
-
 
     
 # ============================================
@@ -2415,6 +2327,201 @@ def product_delete(request, product_code):
         'page_subtitle': f'Code: {product.product_code}',
     }
     return render(request, 'epa/product_delete_confirm.html', context)
+
+
+# ============================================
+# PRODUCT TRANSFER
+# ============================================
+
+@login_required
+def product_transfer(request, product_code):
+    """Transfer stock of a specific product between branches"""
+    company, is_viewing_company = get_active_company(request)
+
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+
+    if not is_admin_or_manager(request.user) and not is_viewing_company:
+        messages.error(request, 'You do not have permission to transfer stock.')
+        return redirect('/epa_shop/products/')
+
+    product, product_type = get_product_by_code(company, product_code)
+    if not product:
+        messages.error(request, f'Product with code "{product_code}" not found.')
+        return redirect('/epa_shop/products/')
+
+    # ───────────────────────────────────────────────────────
+    # Compute branch stock from Unit records
+    # (phones/electronics) or BranchStock (accessories)
+    # ───────────────────────────────────────────────────────
+    branches_with_stock = []
+    all_branches = Branch.objects.filter(company=company, is_active=True)
+
+    for b in all_branches:
+        if product_type == 'Phone':
+            available_qty = Unit.objects.filter(
+                phone=product, branch=b, status='available'
+            ).count()
+        elif product_type == 'Electronic':
+            available_qty = Unit.objects.filter(
+                electronic=product, branch=b, status='available'
+            ).count()
+        else:  # Accessory
+            stock_record = product.stock_at(b)
+            available_qty = stock_record.quantity_in_stock if stock_record else 0
+
+        if available_qty > 0:
+            branches_with_stock.append({
+                'branch': b,
+                'quantity': available_qty,
+            })
+
+    # 👇 Compute total AFTER the list has been populated
+    total_branch_stock = sum(item['quantity'] for item in branches_with_stock)
+
+    if request.method == 'POST':
+        from_branch_id = request.POST.get('from_branch')
+        to_branch_id = request.POST.get('to_branch')
+
+        if not from_branch_id or not to_branch_id:
+            messages.error(request, 'Please select both source and destination branches.')
+        elif from_branch_id == to_branch_id:
+            messages.error(request, 'Source and destination branches cannot be the same.')
+        else:
+            from_branch = Branch.objects.filter(id=from_branch_id, company=company).first()
+            to_branch = Branch.objects.filter(id=to_branch_id, company=company).first()
+
+            if not from_branch or not to_branch:
+                messages.error(request, 'Invalid branch selected.')
+            else:
+                from apps.epa_shop.services.stock import initiate_transfer
+
+                if product_type == 'Accessory':
+                    try:
+                        qty = int(request.POST.get('quantity', 0))
+                        if qty <= 0:
+                            raise ValueError("Quantity must be greater than 0.")
+
+                        initiate_transfer(
+                            product=product, from_branch=from_branch, to_branch=to_branch,
+                            quantity=qty, user=request.user, notes="Initiated via Product Actions"
+                        )
+                        messages.success(request, f'Transfer of {qty} unit(s) initiated.')
+                        return redirect(f'/epa_shop/products/{product_code}/')
+                    except ValueError as e:
+                        messages.error(request, str(e))
+                else:
+                    # Handle IMEI/Serial scanning
+                    units_json = request.POST.get('selected_units', '[]')
+                    try:
+                        unit_identifiers = json.loads(units_json)
+                    except:
+                        unit_identifiers = []
+
+                    if not unit_identifiers:
+                        messages.error(request, 'Please scan at least one IMEI/Serial to transfer.')
+                    else:
+                        success_count = 0
+                        for ident in unit_identifiers:
+                            # Only query the correct FK field for this product type
+                            if product_type == 'Phone':
+                                unit = Unit.objects.filter(
+                                    phone=product,
+                                    identifier=ident,
+                                ).first()
+                            else:  # Electronic
+                                unit = Unit.objects.filter(
+                                    electronic=product,
+                                    identifier=ident,
+                                ).first()
+
+                            if not unit:
+                                messages.warning(request, f'Unit {ident} not found.')
+                                continue
+
+                            # Ensure it's in the source branch
+                            if unit.branch != from_branch:
+                                messages.warning(request, f'Unit {ident} is not in {from_branch.name}.')
+                                continue
+
+                            # Move the unit to the destination branch
+                            unit.branch = to_branch
+                            unit.save(update_fields=['branch', 'updated_at'])
+                            success_count += 1
+
+                        if success_count > 0:
+                            # Deduct from source and mark as in-transit
+                            initiate_transfer(
+                                product=product, from_branch=from_branch, to_branch=to_branch,
+                                quantity=success_count, user=request.user, notes="Transferred via Product Actions"
+                            )
+                            messages.success(request, f'Successfully transferred {success_count} unit(s) to {to_branch.name}.')
+                            return redirect(f'/epa_shop/products/{product_code}/')
+                        else:
+                            messages.error(request, 'No valid units were transferred.')
+
+    context = {
+        'product': product,
+        'product_type': product_type,
+        'branches_with_stock': branches_with_stock,
+        'total_branch_stock': total_branch_stock,
+        'all_branches': all_branches,
+        'page_title': f'Transfer Stock - {product.name}',
+        'page_subtitle': f'Code: {product.product_code}',
+    }
+    return render(request, 'epa/product_transfer.html', context)
+
+    
+# ============================================
+# SEARCH UNITS FOR TRANSFER
+# ============================================
+
+@login_required
+def product_search_units(request):
+    """Search for available units (IMEI/Serial) in a specific branch for transfers."""
+    company, is_viewing_company = get_active_company(request)
+
+    if not company:
+        return JsonResponse({'error': 'No company assigned'}, status=400)
+
+    query = request.GET.get('q', '').strip()
+    product_id = request.GET.get('product_id')
+    branch_id = request.GET.get('branch_id')
+
+    # 👇 CHANGED THIS LINE FROM 2 TO 1
+    if len(query) < 1 or not branch_id:
+        return JsonResponse({'units': []})
+
+    results = []
+
+    # Find available units for this product in this specific branch
+    units = Unit.objects.filter(
+        status='available',
+        identifier__icontains=query,
+        branch_id=branch_id
+    ).select_related('phone', 'electronic', 'branch')
+
+    if product_id:
+        units = units.filter(Q(phone_id=product_id) | Q(electronic_id=product_id))
+
+    units = units.filter(
+        Q(phone__company=company) | Q(electronic__company=company)
+    )
+
+    for unit in units[:20]:
+        product = unit.phone or unit.electronic
+        if not product:
+            continue
+
+        results.append({
+            'identifier': unit.identifier,
+            'status': unit.status,
+        })
+
+    return JsonResponse({'units': results})
 
 
 
@@ -2488,7 +2595,7 @@ def stock_restock_scanner(request):
                 'brand': p.brand,
                 'model': p.model,
                 'type_label': 'Smartphone' if getattr(p, 'phone_type', '') != 'feature' else 'Feature Phone',
-                'stock': p.quantity_in_stock,
+                'stock': p.total_quantity_in_stock,
                 'branch': p.branch.name if p.branch else '-',
             })
 
@@ -2511,7 +2618,7 @@ def stock_restock_scanner(request):
                 'brand': p.brand,
                 'model': p.model_number,
                 'type_label': 'Electronic',
-                'stock': p.quantity_in_stock,
+                'stock': p.total_quantity_in_stock,
                 'branch': p.branch.name if p.branch else '-',
             })
 
@@ -2534,7 +2641,7 @@ def stock_restock_scanner(request):
                 'brand': p.brand,
                 'model': p.model,
                 'type_label': 'Accessory',
-                'stock': p.quantity_in_stock,
+                'stock': p.total_quantity_in_stock,
                 'branch': p.branch.name if p.branch else '-',
             })
 
@@ -2585,7 +2692,7 @@ def stock_restock_suggestions(request):
             'brand': p.brand,
             'model': p.model or '',
             'product_code': p.product_code,
-            'stock': p.quantity_in_stock,
+            'stock': p.total_quantity_in_stock,
             'restock_url': f'/epa_shop/products/{p.product_code}/restock/'
         })
 
@@ -2609,7 +2716,7 @@ def stock_restock_suggestions(request):
             'brand': p.brand,
             'model': p.model_number or '',
             'product_code': p.product_code,
-            'stock': p.quantity_in_stock,
+            'stock': p.total_quantity_in_stock,
             'restock_url': f'/epa_shop/products/{p.product_code}/restock/'
         })
 
@@ -2633,7 +2740,7 @@ def stock_restock_suggestions(request):
             'brand': p.brand,
             'model': p.model or '',
             'product_code': p.product_code,
-            'stock': p.quantity_in_stock,
+            'stock': p.total_quantity_in_stock,
             'restock_url': f'/epa_shop/products/{p.product_code}/restock/'
         })
 
@@ -2778,7 +2885,7 @@ def product_restock(request, product_code):
                 else:
                     total_units = Unit.objects.filter(electronic=product).count()
 
-                product.quantity_in_stock = total_units
+                product.total_quantity_in_stock = total_units
                 product.save()
 
                 msg = f'✅ Added {added_count} unit(s) to {product.name}. New stock: {total_units}.'
@@ -2806,7 +2913,7 @@ def product_restock(request, product_code):
                         'unit_label': 'IMEI' if product_type == 'Phone' else 'Serial',
                     })
 
-                product.quantity_in_stock += quantity
+                product.total_quantity_in_stock += quantity
 
                 # ── Apply price changes (only when provided) ──
                 if new_purchase_price is not None:
@@ -2824,7 +2931,7 @@ def product_restock(request, product_code):
 
                 product.save()
 
-                msg = f'✅ Added {quantity} unit(s) to {product.name}. New stock: {product.quantity_in_stock}.'
+                msg = f'✅ Added {quantity} unit(s) to {product.name}. New stock: {product.total_quantity_in_stock}.'
                 if price_changes:
                     msg += ' Prices updated: ' + ', '.join(price_changes) + '.'
                 messages.success(request, msg)
@@ -2893,10 +3000,11 @@ def product_units(request, product_code):
                 return redirect('/epa_shop/products/')
         elif not is_admin_or_manager(request.user):
             user_branch = get_user_branch(request.user)
-            product_branch = product.branch if product else None
-            if user_branch and product_branch and product_branch.id != user_branch.id:
-                messages.error(request, 'You do not have permission to view units from other branches.')
-                return redirect('/epa_shop/products/')
+            if user_branch:
+                # Option B: Check if this product exists in the user's branch
+                if not product.branch_stocks.filter(branch=user_branch).exists():
+                    messages.error(request, 'You do not have permission to view units from other branches.')
+                    return redirect('/epa_shop/products/')
     
     units = []
     unit_count = 0
@@ -2906,7 +3014,8 @@ def product_units(request, product_code):
     repair_count = 0
     
     if product_type == 'Phone':
-        units = Unit.objects.filter(phone=product).select_related('phone', 'phone__branch').order_by('-created_at')
+        # 👇 CHANGED: select_related('branch') instead of 'phone__branch'
+        units = Unit.objects.filter(phone=product).select_related('branch').order_by('-created_at')
         
         if is_agent(request.user) and not is_viewing_company:
             owner = Owner.objects.filter(company=company, phone=request.user.phone).first()
@@ -2933,7 +3042,8 @@ def product_units(request, product_code):
         repair_count = units.filter(status='repair').count()
         
     elif product_type == 'Electronic':
-        units = Unit.objects.filter(electronic=product).select_related('electronic', 'electronic__branch').order_by('-created_at')
+        # 👇 CHANGED: select_related('branch') instead of 'electronic__branch'
+        units = Unit.objects.filter(electronic=product).select_related('branch').order_by('-created_at')
         
         if is_agent(request.user) and not is_viewing_company:
             owner = Owner.objects.filter(company=company, phone=request.user.phone).first()
@@ -2978,7 +3088,6 @@ def product_units(request, product_code):
         'page_subtitle': f'Code: {product.product_code}',
     }
     return render(request, 'epa/product_units.html', context)
-
 
 # ============================================
 # ACCESSORY LIST
@@ -3099,7 +3208,7 @@ def product_export_excel(request):
     for item in electronics:
         ws.append([
             item.product_code, item.name, 'Electronic', item.brand, item.model_number,
-            f"{item.ram} {item.storage}".strip(), item.quantity_in_stock,
+            f"{item.ram} {item.storage}".strip(), item.total_quantity_in_stock,
             get_buying_price(item),  # <--- Added here
             float(item.selling_price), float(item.best_price) if item.best_price else 0, 
             'Active' if item.is_active else 'Inactive'
@@ -3113,7 +3222,7 @@ def product_export_excel(request):
         phone_type = 'Feature Phone' if getattr(item, 'phone_type', '') == 'feature' else 'Smartphone'
         ws.append([
             item.product_code, item.name, phone_type, item.brand, item.model,
-            f"{item.ram} {item.storage_capacity}".strip(), item.quantity_in_stock,
+            f"{item.ram} {item.storage_capacity}".strip(), item.total_quantity_in_stock,
             get_buying_price(item),  # <--- Added here
             float(item.selling_price), float(item.best_price) if item.best_price else 0, 
             'Active' if item.is_active else 'Inactive'
@@ -3126,7 +3235,7 @@ def product_export_excel(request):
     for item in accessories:
         ws.append([
             item.product_code, item.name, 'Accessory', item.brand, item.model,
-            item.accessory_type, item.quantity_in_stock,
+            item.accessory_type, item.total_quantity_in_stock,
             get_buying_price(item),  # <--- Added here
             float(item.selling_price), float(item.best_price) if item.best_price else 0, 
             'Active' if item.is_active else 'Inactive'

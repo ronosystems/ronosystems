@@ -2,42 +2,43 @@
 
 {% block title %}{{ page_title }}{% endblock %}
 
-
 {% block extra_css %}
 <style>
-    .stat-card {
-        background: white;
-        border-radius: 10px;
-        padding: 15px 18px;
-        text-align: center;
-        border: 1px solid #e9ecef;
-        transition: all 0.3s;
+    /* ============================================
+       EXCEL-LIKE TABLE
+    ============================================ */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        table-layout: auto;
     }
-    .stat-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    .table-excel th,
+    .table-excel td {
+        border: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+        white-space: nowrap;
     }
-    .stat-card .stat-number {
-        font-size: 24px;
-        font-weight: 700;
-    }
-    .stat-card .stat-label {
-        font-size: 12px;
-        color: #6c757d;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+    .table-excel thead th {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
         font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: relative;
+        z-index: 1;
     }
-    .stat-card .stat-icon {
-        font-size: 20px;
-        display: block;
-        margin-bottom: 4px;
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
     }
-    .stat-card .stat-number.available { color: #28a745; }
-    .stat-card .stat-number.sold { color: #004085; }
-    .stat-card .stat-number.reserved { color: #856404; }
-    .stat-card .stat-number.repair { color: #721c24; }
-    
+    .table-excel tbody tr:hover td { background-color: #f5f5f5; }
+    .table-excel tbody tr:nth-child(even) td { background-color: #f9f9f9; }
+    .table-excel tbody tr:nth-child(even):hover td { background-color: #f0f0f0; }
+
+    /* ============================================
+       STATUS BADGES
+    ============================================ */
     .unit-status-badge {
         padding: 3px 14px;
         border-radius: 50px;
@@ -45,204 +46,318 @@
         font-weight: 600;
         text-transform: capitalize;
         display: inline-block;
+        border: 1px solid #000000;
     }
     .unit-status-badge.available { background: #d4edda; color: #155724; }
-    .unit-status-badge.sold { background: #cce5ff; color: #004085; }
-    .unit-status-badge.reserved { background: #fff3cd; color: #856404; }
-    .unit-status-badge.repair { background: #f8d7da; color: #721c24; }
-    
+    .unit-status-badge.sold      { background: #cce5ff; color: #004085; }
+    .unit-status-badge.reserved  { background: #fff3cd; color: #856404; }
+    .unit-status-badge.repair    { background: #f8d7da; color: #721c24; }
+
     .unit-identifier {
         font-family: 'Courier New', monospace;
         font-weight: 600;
         font-size: 13px;
-        color: #2d3436;
+        color: #000000;
     }
-    
-    .copy-tooltip {
-        position: fixed;
-        background: #2d3748;
-        color: white;
-        padding: 6px 12px;
-        border-radius: 6px;
-        font-size: 12px;
-        z-index: 9999;
-        pointer-events: none;
-        opacity: 0;
-        transition: opacity 0.3s;
-    }
-    .copy-tooltip.show {
-        opacity: 1;
-    }
-    
-    .product-code-badge {
-        font-family: 'Courier New', monospace;
-        background: #f0f2f5;
-        padding: 2px 10px;
-        border-radius: 4px;
-        font-size: 12px;
-    }
-    
-    .search-box {
-        padding: 8px 14px;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        font-size: 14px;
-        min-width: 250px;
-    }
-    .search-box:focus {
-        outline: none;
-        border-color: #667eea;
-        box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
-    }
-    
-    .product-link {
-        color: #2d3436;
-        text-decoration: none;
-        font-weight: 600;
-    }
-    .product-link:hover {
-        color: #667eea;
-        text-decoration: underline;
-    }
-    
-    .unit-owner-info .owner-name {
-        font-weight: 600;
-        color: #2d3436;
-    }
-    .unit-owner-info .owner-phone {
-        font-size: 12px;
-        color: #6c757d;
-    }
-    
-    /* Days Since Update */
+
+    /* ============================================
+       DAYS BADGE
+    ============================================ */
     .days-badge {
         display: inline-block;
         padding: 2px 10px;
         border-radius: 50px;
         font-size: 11px;
         font-weight: 600;
+        border: 1px solid #000000;
     }
-    .days-badge.recent {
-        background: #d4edda;
-        color: #155724;
-    }
-    .days-badge.medium {
-        background: #fff3cd;
-        color: #856404;
-    }
-    .days-badge.old {
-        background: #f8d7da;
-        color: #721c24;
-    }
-    
-    /* Unit Action Buttons */
-    .unit-action-btn {
-        padding: 4px 12px;
-        font-size: 12px;
-        border-radius: 4px;
-        margin: 0 2px;
-        text-decoration: none;
-        display: inline-block;
-        transition: all 0.2s;
-        border: none;
-        cursor: pointer;
-        font-weight: 600;
-    }
-    .unit-action-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    }
-    .unit-action-btn.btn-sell {
-        background: #28a745;
-        color: white;
-    }
-    .unit-action-btn.btn-sell:hover {
-        background: #218838;
-    }
-    .unit-action-btn.btn-edit {
-        background: #ffc107;
-        color: #212529;
-    }
-    .unit-action-btn.btn-edit:hover {
-        background: #e0a800;
-    }
-    .unit-action-btn.btn-transfer {
-        background: #17a2b8;
-        color: white;
-    }
-    .unit-action-btn.btn-transfer:hover {
-        background: #138496;
-    }
-    .unit-action-btn.btn-receipt {
-        background: #28a745;
-        color: white;
-    }
-    .unit-action-btn.btn-receipt:hover {
-        background: #218838;
-    }
-    .unit-action-btn.btn-reverse {
-        background: #fd7e14;
-        color: white;
-    }
-    .unit-action-btn.btn-reverse:hover {
-        background: #e06b0a;
-    }
-    .unit-action-btn.btn-delete {
-        background: #dc3545;
-        color: white;
-    }
-    .unit-action-btn.btn-delete:hover {
-        background: #c82333;
-    }
-    
+    .days-badge.recent { background: #d4edda; color: #155724; }
+    .days-badge.medium { background: #fff3cd; color: #856404; }
+    .days-badge.old    { background: #f8d7da; color: #721c24; }
+
+    /* ============================================
+       ACTION BUTTONS - HORIZONTAL ICON ROW
+    ============================================ */
     .action-group {
         display: flex;
-        flex-wrap: wrap;
-        gap: 3px;
+        flex-direction: row;
+        align-items: center;
         justify-content: center;
+        gap: 6px;
+        width: 100%;
     }
-    
-    .unit-info-box {
-        background: #f8f9fa;
-        padding: 15px;
-        border-radius: 8px;
-        border: 1px solid #e9ecef;
-        margin-bottom: 15px;
+
+    .unit-action-btn {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        border: 2px solid #000000;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-decoration: none;
+        background: #ffffff;
+        color: #000000;
     }
-    .unit-info-box .info-row {
+
+    /* Hide the text labels inside the buttons so only icons show */
+    .unit-action-btn span {
+        display: none;
+    }
+
+    .unit-action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+
+    /* Color coding for the icons */
+    .unit-action-btn.btn-sell        { background: #d4edda; color: #155724; border-color: #155724; }
+    .unit-action-btn.btn-edit        { background: #fff3cd; color: #856404; border-color: #856404; }
+    .unit-action-btn.btn-transfer    { background: #d1ecf1; color: #0c5460; border-color: #0c5460; }
+    .unit-action-btn.btn-receipt     { background: #d4edda; color: #155724; border-color: #155724; }
+    .unit-action-btn.btn-reverse     { background: #fde8d7; color: #e06b0a; border-color: #e06b0a; }
+    .unit-action-btn.btn-delete      { background: #f8d7da; color: #721c24; border-color: #721c24; }
+
+    /* ============================================
+       CARD / TABLE CONTAINER
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    .card-footer {
+        border-top: 2px solid #000000;
+        background-color: #f8f9fa;
+    }
+    .table-responsive {
+        overflow-x: auto;
+        border: 2px solid #000000;
+    }
+
+    /* ============================================
+       STATS GRID — 4 IN ONE ROW
+    ============================================ */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+    .stats-grid .stat-card {
+        padding: 18px 12px;
+        border-radius: 4px;
+        border: 2px solid #000000;
+        height: 100%;
+        position: relative;
+    }
+    .stats-grid .stat-card .card-body {
+        padding: 0;
         display: flex;
         justify-content: space-between;
-        padding: 4px 0;
-        border-bottom: 1px solid #f1f2f6;
+        align-items: center;
+        gap: 10px;
     }
-    .unit-info-box .info-row:last-child {
-        border-bottom: none;
+    .stats-grid .stat-card h2 {
+        font-size: 1.35rem;
+        font-weight: 800;
+        margin: 0 0 4px;
+        line-height: 1.15;
+        word-break: break-word;
     }
-    .unit-info-box .info-label {
-        color: #6c757d;
-        font-weight: 500;
-    }
-    .unit-info-box .info-value {
+    .stats-grid .stat-card small {
+        font-size: 0.7rem;
         font-weight: 600;
-        color: #2d3436;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        opacity: 0.9;
     }
-    
+    .stats-grid .stat-card .stat-icon {
+        font-size: 1.8rem;
+        opacity: 0.55;
+        flex-shrink: 0;
+    }
+    .stat-card.bg-primary   { background: #87CEEB !important; color: #000000 !important; }
+    .stat-card.bg-info      { background: #cce5ff !important; color: #004085 !important; }
+    .stat-card.bg-secondary { background: #f8f9fa !important; color: #000000 !important; }
+    .stat-card.bg-success   { background: #d4edda !important; color: #155724 !important; }
+
+    /* ============================================
+       FILTER BAR
+    ============================================ */
+    .filter-bar {
+        display: grid;
+        grid-template-columns: 2fr auto;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 20px;
+        background: #f8f9fa;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 10px 14px;
+    }
+    .filter-bar .filter-field {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+    .filter-bar .filter-field label {
+        font-size: 10px;
+        font-weight: 700;
+        color: #000000;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 3px;
+        white-space: nowrap;
+    }
+    .search-input {
+        padding: 6px 12px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 13px;
+        width: 100%;
+        min-width: 0;
+        background: #ffffff;
+        color: #000000;
+    }
+    .search-input:focus {
+        outline: none;
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .btn-refresh {
+        padding: 6px 12px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: #ffffff;
+        cursor: pointer;
+        transition: all 0.3s;
+        font-weight: 700;
+        color: #000000;
+        font-size: 13px;
+        white-space: nowrap;
+        width: 100%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+    .btn-refresh:hover { background: #87CEEB; }
+
+    /* ============================================
+       PAGINATION CONTAINER
+    ============================================ */
+    .pagination-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 16px;
+        background: #f8f9fa;
+        border-top: 2px solid #000000;
+        flex-wrap: nowrap;
+    }
+    .entries-left {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+    }
+    .entries-left .pagination-label {
+        font-size: 12px;
+        color: #000000;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .entries-left .per-page-select {
+        padding: 4px 6px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        font-size: 12px;
+        background: white;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .entries-info {
+        font-size: 12px;
+        color: #000000;
+        flex: 1 1 auto;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+    }
+    .pagination-controls {
+        display: flex;
+        gap: 4px;
+        flex-wrap: nowrap;
+        flex-shrink: 0;
+    }
+    .pagination-controls .page-link {
+        padding: 4px 10px;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        color: #000000;
+        background: #ffffff;
+        font-weight: 600;
+        font-size: 12px;
+        text-decoration: none;
+        cursor: pointer;
+        display: inline-block;
+        transition: all 0.3s;
+    }
+    .pagination-controls .page-link:hover { background: #87CEEB; }
+    .pagination-controls .page-link.active { background: #87CEEB; cursor: default; }
+    .pagination-controls .page-link.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+    .pagination-controls .page-link.ellipsis { border: none; background: transparent; cursor: default; }
+
+    /* ============================================
+       RESPONSIVE — MOBILE
+    ============================================ */
     @media (max-width: 768px) {
-        .stat-card .stat-number {
-            font-size: 20px;
+        .table-excel th, .table-excel td {
+            padding: 6px 8px;
+            font-size: 11px;
         }
-        .action-group {
-            flex-direction: column;
-            align-items: center;
+        .table-excel th { font-size: 10px; }
+        .unit-identifier { font-size: 10px; }
+        .unit-status-badge { font-size: 9px; padding: 2px 6px; }
+        .days-badge { font-size: 9px; padding: 2px 6px; }
+
+        /* Stats */
+        .stats-grid { gap: 6px; margin-bottom: 14px; }
+        .stats-grid .stat-card { padding: 10px 6px; }
+        .stats-grid .stat-card h2 { font-size: 0.9rem; }
+        .stats-grid .stat-card small { font-size: 0.55rem; letter-spacing: 0.2px; }
+        .stats-grid .stat-card .stat-icon { font-size: 1rem; position: absolute; top: 6px; right: 6px; opacity: 0.4; }
+        .stats-grid .stat-card .card-body { flex-direction: column; align-items: flex-start; }
+
+        /* Filter Bar */
+        .filter-bar {
+            grid-template-columns: 1fr;
+            gap: 6px;
+            padding: 8px 10px;
+            margin-bottom: 14px;
         }
-        .unit-action-btn {
-            width: 100%;
-            text-align: center;
-        }
-        .days-badge {
-            font-size: 10px;
-            padding: 2px 8px;
-        }
+        .filter-bar .filter-field label { font-size: 9px; margin-bottom: 2px; }
+        .search-input { font-size: 11px; padding: 5px 8px; }
+        .btn-refresh { font-size: 11px; padding: 5px 8px; }
+
+        /* Action Buttons Mobile Adjustment */
+        .action-group { gap: 3px; }
+        .unit-action-btn { width: 26px; height: 26px; font-size: 11px; }
+        
+        /* Pagination */
+        .pagination-container { padding: 8px 10px; gap: 6px; }
+        .entries-left .pagination-label { font-size: 10px; }
+        .entries-left .per-page-select { font-size: 10px; padding: 3px 5px; }
+        .entries-info { font-size: 10px; }
+        .pagination-controls .page-link { padding: 3px 7px; font-size: 10px; }
     }
 </style>
 {% endblock %}
@@ -250,6 +365,7 @@
 {% block content %}
 <div class="row">
     <div class="col-12">
+
         <!-- Header -->
         <div class="d-flex justify-content-between align-items-center flex-wrap mb-4">
             <div>
@@ -259,219 +375,386 @@
                 </h4>
                 <p class="text-muted small mb-0">
                     {{ product.name }} 
-                    <span class="product-code-badge">{{ product.product_code }}</span>
+                    <span class="badge bg-secondary" style="font-family: monospace; border: 1px solid #000;">{{ product.product_code }}</span>
                 </p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a href="/epa_shop/products/{{ product.product_code }}/" class="btn btn-secondary btn-sm">
+                <a href="/epa_shop/products/{{ product.product_code }}/" class="btn btn-secondary btn-sm" style="border: 2px solid #000; font-weight: 600;">
                     <i class="fas fa-arrow-left"></i> Back to Product
                 </a>
-                <a href="/epa_shop/products/{{ product.product_code }}/restock/" class="btn btn-primary btn-sm">
+                <a href="/epa_shop/products/{{ product.product_code }}/restock/" class="btn btn-primary btn-sm" style="border: 2px solid #000; font-weight: 600;">
                     <i class="fas fa-plus"></i> Add {% if product_type == 'Phone' %}IMEI{% else %}Serial{% endif %}
                 </a>
             </div>
         </div>
 
         <!-- Stats -->
-        <div class="row g-3 mb-4">
-            <div class="col-md-3 col-6">
-                <div class="stat-card">
-                    <span class="stat-icon">📊</span>
-                    <div class="stat-number">{{ unit_count }}</div>
-                    <div class="stat-label">Total Units</div>
+        <div class="stats-grid">
+            <div class="stat-card bg-primary">
+                <div class="card-body">
+                    <div>
+                        <h2>{{ unit_count }}</h2>
+                        <small>Total Units</small>
+                    </div>
+                    <i class="fas fa-boxes stat-icon"></i>
                 </div>
             </div>
-            <div class="col-md-3 col-6">
-                <div class="stat-card">
-                    <span class="stat-icon">✅</span>
-                    <div class="stat-number available">{{ available_count }}</div>
-                    <div class="stat-label">Available</div>
+            <div class="stat-card bg-success">
+                <div class="card-body">
+                    <div>
+                        <h2>{{ available_count }}</h2>
+                        <small>Available</small>
+                    </div>
+                    <i class="fas fa-check-circle stat-icon"></i>
                 </div>
             </div>
-            <div class="col-md-3 col-6">
-                <div class="stat-card">
-                    <span class="stat-icon">💰</span>
-                    <div class="stat-number sold">{{ sold_count }}</div>
-                    <div class="stat-label">Sold</div>
+            <div class="stat-card bg-info">
+                <div class="card-body">
+                    <div>
+                        <h2>{{ sold_count }}</h2>
+                        <small>Sold</small>
+                    </div>
+                    <i class="fas fa-shopping-bag stat-icon"></i>
                 </div>
             </div>
-            <div class="col-md-3 col-6">
-                <div class="stat-card">
-                    <span class="stat-icon">🔧</span>
-                    <div class="stat-number repair">{{ repair_count }}</div>
-                    <div class="stat-label">In Repair</div>
+            <div class="stat-card bg-secondary">
+                <div class="card-body">
+                    <div>
+                        <h2>{{ repair_count }}</h2>
+                        <small>In Repair</small>
+                    </div>
+                    <i class="fas fa-wrench stat-icon"></i>
                 </div>
             </div>
         </div>
 
-        <!-- Search -->
-        <div class="mb-3">
-            <input type="text" class="search-box" id="searchUnits" placeholder="Search by identifier, owner, or days..." oninput="filterUnits()">
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+            <div class="filter-field">
+                <label>Search Units</label>
+                <input type="text" class="search-input" id="searchUnits" placeholder="Search by identifier, owner..." autocomplete="off">
+            </div>
+            <div class="filter-field">
+                <label>&nbsp;</label>
+                <button class="btn-refresh" onclick="location.reload()">
+                    <i class="fas fa-sync"></i> Refresh
+                </button>
+            </div>
         </div>
 
         <!-- Units Table -->
         <div class="card">
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover mb-0" id="unitsTable">
-                        <thead class="table-light">
+                    <table class="table table-excel table-hover mb-0" id="unitsTable">
+                        <thead>
                             <tr>
                                 <th style="width:4%;">#</th>
-                                <th style="width:16%;">
-                                    {% if product_type == 'Phone' %}IMEI Number{% else %}Serial Number{% endif %}
-                                </th>
+                                <th style="width:14%;">{% if product_type == 'Phone' %}IMEI Number{% else %}Serial Number{% endif %}</th>
                                 <th style="width:10%;">Branch</th>
-                                <th style="width:10%;">Status</th>
-                                <th style="width:15%;">Owner</th>
-                                <th style="width:10%;">Added</th>
-                                <th style="width:10%;">Days Since</th>
-                                <th style="width:20%;" class="text-center">Actions</th>
+                                <th style="width:8%;">Status</th>
+                                <th style="width:16%;">Current Owner</th>
+                                <th style="width:10%;">Last Updated</th>
+                                <th style="width:10%;">Since Update</th>
+                                <th style="width:28%;" class="text-center">Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {% for unit in units %}
-                            <tr data-unit-id="{{ unit.id }}" data-identifier="{{ unit.identifier }}" data-owner="{{ unit.owner_name|default:'' }}" data-days="{{ unit.days_since_update|default:0 }}">
-                                <td>{{ forloop.counter }}</td>
-                                <td>
-                                    <span class="unit-identifier" onclick="copyToClipboard('{{ unit.identifier }}')" style="cursor:pointer;" title="Click to copy">
-                                        {{ unit.identifier }}
-                                    </span>
-                                </td>
-                                <td>
-                                    {% if unit.phone %}
-                                        {{ unit.phone.branch.name|default:"-" }}
-                                    {% elif unit.electronic %}
-                                        {{ unit.electronic.branch.name|default:"-" }}
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <span class="unit-status-badge {{ unit.status }}">
-                                        {{ unit.status|title }}
-                                    </span>
-                                </td>
-                                <td>
-                                    <div class="unit-owner-info">
-                                        {% if unit.owner_name %}
-                                            <div class="owner-name">{{ unit.owner_name }}</div>
-                                            {% if unit.owner_phone %}
-                                            <div class="owner-phone"><i class="fas fa-phone"></i> {{ unit.owner_phone }}</div>
-                                            {% endif %}
-                                        {% else %}
-                                            <span class="text-muted">Not assigned</span>
-                                        {% endif %}
-                                    </div>
-                                </td>
-                                <td>{{ unit.created_at|date:"Y-m-d" }}</td>
-                                <td>
-                                    {% if unit.days_since_update %}
-                                        <span class="days-badge 
-                                            {% if unit.days_since_update <= 7 %}recent
-                                            {% elif unit.days_since_update <= 30 %}medium
-                                            {% else %}old{% endif %}">
-                                            {{ unit.days_since_update }} day{% if unit.days_since_update > 1 %}s{% endif %}
-                                        </span>
-                                    {% else %}
-                                        <span class="text-muted">-</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <div class="action-group">
-                                        {% if unit.status == 'available' %}
-                                            <!-- Available: Sell, Edit, Transfer, Delete -->
-                                            <a href="/epa_shop/sales/add/?unit={{ unit.id }}&product={{ product.product_code }}" 
-                                               class="unit-action-btn btn-sell" title="Sell Unit">
-                                                <i class="fas fa-shopping-cart"></i> Sell
-                                            </a>
-                                            <a href="/epa_shop/unit/{{ unit.id }}/edit/?next={{ request.path }}" class="unit-action-btn btn-edit" title="Edit Unit">
-                                                <i class="fas fa-edit"></i> Edit
-                                            </a>
-                                            <a href="/epa_shop/unit/{{ unit.id }}/transfer/?next={{ request.path }}" class="unit-action-btn btn-transfer" title="Transfer Ownership">
-                                                <i class="fas fa-exchange-alt"></i> Transfer
-                                            </a>
-                                            <a href="/epa_shop/products/{{ product.product_code }}/unit/{{ unit.identifier }}/delete/" 
-                                               class="unit-action-btn btn-delete" 
-                                               title="Delete Unit"
-                                               onclick="return confirm('Are you sure you want to delete this unit?')">
-                                                <i class="fas fa-trash"></i> Delete
-                                            </a>
-                                            
-                                        {% elif unit.status == 'sold' %}
-                                            <!-- Sold: Receipt, Reverse, Delete -->
-                                            {% if unit.sale %}
-                                                <a href="/epa_shop/sale/receipt/{{ unit.sale.id }}/"  class="unit-action-btn btn-receipt" title="View Receipt">
-                                                    <i class="fas fa-receipt"></i> Receipt
-                                                </a>
-                                                <a href="/epa_shop/sale/{{ unit.sale.id }}/reverse/" class="unit-action-btn btn-reverse" title="Reverse Sale (Return to Available)" 
-                                                   onclick="return confirm('Are you sure you want to reverse this sale? This will return the unit to inventory.')">
-                                                    <i class="fas fa-undo"></i> Reverse
-                                                </a>
-                                            {% else %}
-                                                <span class="text-muted">No sale record</span>
-                                            {% endif %}
-                                            <a href="/epa_shop/products/{{ product.product_code }}/unit/{{ unit.identifier }}/delete/" 
-                                               class="unit-action-btn btn-delete" 
-                                               title="Delete Unit"
-                                               onclick="return confirm('Are you sure you want to delete this unit?')">
-                                                <i class="fas fa-trash"></i> Delete
-                                            </a>
-                                            
-                                        {% else %}
-                                            <!-- Other statuses: Edit, Delete -->
-                                            <a href="/epa_shop/unit/{{ unit.id }}/edit/?next={{ request.path }}" class="unit-action-btn btn-edit" title="Edit Unit">
-                                                <i class="fas fa-edit"></i> Edit
-                                            </a>
-                                            <a href="/epa_shop/products/{{ product.product_code }}/unit/{{ unit.identifier }}/delete/" 
-                                               class="unit-action-btn btn-delete" 
-                                               title="Delete Unit"
-                                               onclick="return confirm('Are you sure you want to delete this unit?')">
-                                                <i class="fas fa-trash"></i> Delete
-                                            </a>
-                                        {% endif %}
-                                    </div>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="8" class="text-center py-5">
-                                    <i class="fas fa-qrcode fa-3x text-muted d-block mb-3"></i>
-                                    <h5 class="text-muted">No Units Found</h5>
-                                    <p class="text-muted">No {% if product_type == 'Phone' %}IMEI numbers{% else %}serial numbers{% endif %} have been added yet.</p>
-                                    <a href="/epa_shop/products/{{ product.product_code }}/restock/" class="btn btn-primary btn-sm">
-                                        <i class="fas fa-plus"></i> Add First Unit
-                                    </a>
-                                </td>
-                            </tr>
-                            {% endfor %}
+                        <tbody id="unitsTbody">
+                            <!-- Rows injected via JS for pagination -->
                         </tbody>
                     </table>
                 </div>
             </div>
-            <div class="card-footer text-muted">
-                <small>Showing {{ units|length }} {% if product_type == 'Phone' %}IMEI numbers{% else %}serial numbers{% endif %}</small>
-                <span class="float-end">
-                    <a href="/epa_shop/products/{{ product.product_code }}/" class="btn btn-sm btn-outline-secondary">
-                        <i class="fas fa-arrow-left"></i> Back to Product
-                    </a>
-                </span>
+            
+            <!-- Pagination Container -->
+            <div class="pagination-container">
+                <div class="entries-left">
+                    <span class="pagination-label">Show</span>
+                    <select class="per-page-select" id="perPageSelect">
+                        <option value="10">10</option>
+                        <option value="25" selected>25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="all">All</option>
+                    </select>
+                </div>
+                <div class="entries-info">
+                    <span id="visibleCount">0</span> / <span id="filteredCount">0</span>
+                </div>
+                <div class="pagination-controls" id="paginationControls"></div>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Hidden Row Templates for JS Pagination -->
+<div id="rowTemplates" style="display:none;">
+    {% for unit in units %}
+    <template class="unit-row-template">
+        <tr data-unit-id="{{ unit.id }}" data-identifier="{{ unit.identifier }}" data-owner="{{ unit.owner_name|default:'' }}" data-days="{{ unit.days_since_update|default:0 }}" data-search-text="{{ unit.identifier|lower }} {{ unit.owner_name|lower|default:'' }} {{ unit.owner_phone|default:'' }} {{ unit.branch.name|lower|default:'' }} {{ unit.status|lower }}">
+            <td class="col-index"></td>
+            <td>
+                <span class="unit-identifier" onclick="copyToClipboard('{{ unit.identifier }}')" style="cursor:pointer;" title="Click to copy">
+                    {{ unit.identifier }}
+                </span>
+            </td>
+            <td>
+                {% if unit.branch %}
+                    {{ unit.branch.name }}
+                {% else %}
+                    -
+                {% endif %}
+            </td>
+            <td>
+                <span class="unit-status-badge {{ unit.status }}">
+                    {{ unit.status|title }}
+                </span>
+            </td>
+            <td>
+                <div class="unit-owner-info">
+                    {% if unit.owner_name %}
+                        <div style="font-weight: 600;">{{ unit.owner_name }}</div>
+                        {% if unit.owner_phone %}
+                        <div style="font-size: 11px; color: #555;"><i class="fas fa-phone"></i> {{ unit.owner_phone }}</div>
+                        {% endif %}
+                    {% else %}
+                        <span class="text-muted" style="font-size: 12px;">This Device Still Under Shop</span>
+                    {% endif %}
+                </div>
+            </td>
+            <td>{{ unit.updated_at|default:unit.created_at|date:"Y-m-d" }}</td>
+            <td>
+                {% if unit.days_since_update %}
+                    <span class="days-badge 
+                        {% if unit.days_since_update <= 7 %}recent
+                        {% elif unit.days_since_update <= 30 %}medium
+                        {% else %}old{% endif %}">
+                        {{ unit.days_since_update }} day{% if unit.days_since_update > 1 %}s{% endif %}
+                    </span>
+                {% else %}
+                    <span class="text-muted">-</span>
+                {% endif %}
+            </td>
+            <td>
+                <div class="action-group">
+                    {% if unit.status == 'available' %}
+                        <a href="/epa_shop/sales/add/?unit={{ unit.id }}&product={{ product.product_code }}" class="unit-action-btn btn-sell" title="Sell Unit">
+                            <i class="fas fa-shopping-cart"></i> <span>Sell</span>
+                        </a>
+                        <a href="/epa_shop/unit/{{ unit.id }}/edit/?next={{ request.path }}" class="unit-action-btn btn-edit" title="Edit Unit">
+                            <i class="fas fa-edit"></i> <span>Edit</span>
+                        </a>
+                        <a href="/epa_shop/unit/{{ unit.id }}/transfer/?next={{ request.path }}" class="unit-action-btn btn-transfer" title="Transfer Ownership">
+                            <i class="fas fa-exchange-alt"></i> <span>Transfer</span>
+                        </a>
+                        <a href="/epa_shop/products/{{ product.product_code }}/unit/{{ unit.identifier }}/delete/" class="unit-action-btn btn-delete" title="Delete Unit" onclick="return confirm('Are you sure you want to delete this unit?')">
+                            <i class="fas fa-trash"></i> <span>Delete</span>
+                        </a>
+                        
+                    {% elif unit.status == 'sold' %}
+                        {% if unit.sale %}
+                            <a href="/epa_shop/sale/receipt/{{ unit.sale.id }}/"  class="unit-action-btn btn-receipt" title="View Receipt">
+                                <i class="fas fa-receipt"></i> <span>Receipt</span>
+                            </a>
+                            <a href="/epa_shop/sale/{{ unit.sale.id }}/reverse/" class="unit-action-btn btn-reverse" title="Reverse Sale (Return to Available)" onclick="return confirm('Are you sure you want to reverse this sale? This will return the unit to inventory.')">
+                                <i class="fas fa-undo"></i> <span>Reverse</span>
+                            </a>
+                        {% else %}
+                            <span class="text-muted" style="font-size: 11px;">No sale record</span>
+                        {% endif %}
+                        <a href="/epa_shop/products/{{ product.product_code }}/unit/{{ unit.identifier }}/delete/" class="unit-action-btn btn-delete" title="Delete Unit" onclick="return confirm('Are you sure you want to delete this unit?')">
+                            <i class="fas fa-trash"></i> <span>Delete</span>
+                        </a>
+                        
+                    {% else %}
+                        <a href="/epa_shop/unit/{{ unit.id }}/edit/?next={{ request.path }}" class="unit-action-btn btn-edit" title="Edit Unit">
+                            <i class="fas fa-edit"></i> <span>Edit</span>
+                        </a>
+                        <a href="/epa_shop/products/{{ product.product_code }}/unit/{{ unit.identifier }}/delete/" class="unit-action-btn btn-delete" title="Delete Unit" onclick="return confirm('Are you sure you want to delete this unit?')">
+                            <i class="fas fa-trash"></i> <span>Delete</span>
+                        </a>
+                    {% endif %}
+                </div>
+            </td>
+        </tr>
+    </template>
+    {% endfor %}
+</div>
+
 <!-- Copy Tooltip -->
-<div class="copy-tooltip" id="copyTooltip">Copied!</div>
+<div class="copy-tooltip" id="copyTooltip" style="position: fixed; background: #000; color: #fff; padding: 5px 10px; border-radius: 4px; font-size: 12px; z-index: 9999; opacity: 0; transition: opacity 0.3s;">Copied!</div>
 
 <script>
-// Copy to clipboard
+// ============================================================
+// STATE & TEMPLATES
+// ============================================================
+let allRows = [];
+let filteredRows = [];
+let currentPage = 1;
+let perPage = 25;
+let searchTerm = '';
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Load rows from templates
+    const templates = document.querySelectorAll('#rowTemplates .unit-row-template');
+    templates.forEach(tpl => {
+        const tr = tpl.content.firstElementChild.cloneNode(true);
+        allRows.push(tr);
+    });
+    
+    filteredRows = [...allRows];
+    
+    // Bind events
+    document.getElementById('searchUnits').addEventListener('input', (e) => {
+        searchTerm = e.target.value.toLowerCase().trim();
+        currentPage = 1;
+        applyFilter();
+    });
+    
+    document.getElementById('perPageSelect').addEventListener('change', (e) => {
+        perPage = e.target.value === 'all' ? 'all' : parseInt(e.target.value);
+        currentPage = 1;
+        renderTable();
+    });
+    
+    // Initial render
+    renderTable();
+});
+
+// ============================================================
+// FILTER LOGIC
+// ============================================================
+function applyFilter() {
+    if (!searchTerm) {
+        filteredRows = [...allRows];
+    } else {
+        filteredRows = allRows.filter(tr => {
+            const searchData = tr.dataset.searchText || '';
+            return searchData.includes(searchTerm);
+        });
+    }
+    renderTable();
+}
+
+// ============================================================
+// RENDER TABLE & PAGINATION
+// ============================================================
+function renderTable() {
+    const tbody = document.getElementById('unitsTbody');
+    tbody.innerHTML = '';
+    
+    const totalFiltered = filteredRows.length;
+    const totalPages = perPage === 'all' ? 1 : Math.max(1, Math.ceil(totalFiltered / perPage));
+    
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+    
+    let start = 0;
+    let end = totalFiltered;
+    if (perPage !== 'all') {
+        start = (currentPage - 1) * perPage;
+        end = Math.min(start + perPage, totalFiltered);
+    }
+    
+    const pageSlice = filteredRows.slice(start, end);
+    
+    if (pageSlice.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center py-5">
+                    <i class="fas fa-search fa-3x text-muted d-block mb-3"></i>
+                    <h5 class="text-muted">No Units Found</h5>
+                    <p class="text-muted">${searchTerm ? 'Try a different search term.' : 'No units have been added yet.'}</p>
+                </td>
+            </tr>
+        `;
+    } else {
+        pageSlice.forEach((tr, i) => {
+            tr.querySelector('.col-index').textContent = start + i + 1;
+            tbody.appendChild(tr);
+        });
+    }
+    
+    // Update counts
+    document.getElementById('visibleCount').textContent = pageSlice.length;
+    document.getElementById('filteredCount').textContent = totalFiltered;
+    
+    renderPagination(totalPages);
+}
+
+// ============================================================
+// PAGINATION CONTROLS
+// ============================================================
+function renderPagination(totalPages) {
+    const container = document.getElementById('paginationControls');
+    container.innerHTML = '';
+    
+    if (totalPages <= 1) return;
+    
+    // Previous Button
+    container.appendChild(makePageLink('<i class="fas fa-angle-left"></i>', currentPage > 1, () => {
+        currentPage--;
+        renderTable();
+    }));
+    
+    // Page Numbers
+    getPageRange(currentPage, totalPages).forEach(p => {
+        if (p === '...') {
+            const el = document.createElement('span');
+            el.className = 'page-link ellipsis';
+            el.textContent = '…';
+            container.appendChild(el);
+        } else {
+            const el = document.createElement('a');
+            el.className = 'page-link' + (p === currentPage ? ' active' : '');
+            el.textContent = p;
+            if (p !== currentPage) {
+                el.addEventListener('click', () => {
+                    currentPage = p;
+                    renderTable();
+                });
+            }
+            container.appendChild(el);
+        }
+    });
+    
+    // Next Button
+    container.appendChild(makePageLink('<i class="fas fa-angle-right"></i>', currentPage < totalPages, () => {
+        currentPage++;
+        renderTable();
+    }));
+}
+
+function makePageLink(html, enabled, onClick) {
+    const el = document.createElement('a');
+    el.className = 'page-link' + (enabled ? '' : ' disabled');
+    el.innerHTML = html;
+    if (enabled) el.addEventListener('click', onClick);
+    return el;
+}
+
+function getPageRange(current, total) {
+    if (total <= 7) {
+        return Array.from({ length: total }, (_, i) => i + 1);
+    }
+    const range = [1];
+    if (current > 4) range.push('...');
+    const start = Math.max(2, current - 1);
+    const end = Math.min(total - 1, current + 1);
+    for (let i = start; i <= end; i++) range.push(i);
+    if (current < total - 3) range.push('...');
+    range.push(total);
+    return range;
+}
+
+// ============================================================
+// COPY TO CLIPBOARD
+// ============================================================
 function copyToClipboard(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(() => {
             showCopyTooltip('Copied: ' + text);
-        }).catch(() => {
-            fallbackCopy(text);
-        });
+        }).catch(() => fallbackCopy(text));
     } else {
         fallbackCopy(text);
     }
@@ -494,45 +777,26 @@ function fallbackCopy(text) {
 function showCopyTooltip(message) {
     const tooltip = document.getElementById('copyTooltip');
     tooltip.textContent = message;
-    tooltip.classList.add('show');
+    tooltip.style.opacity = '1';
     tooltip.style.left = '50%';
     tooltip.style.top = '50%';
     tooltip.style.transform = 'translate(-50%, -50%)';
     
     clearTimeout(tooltip._timeout);
     tooltip._timeout = setTimeout(() => {
-        tooltip.classList.remove('show');
+        tooltip.style.opacity = '0';
     }, 2000);
 }
 
-// Filter units by search
-function filterUnits() {
-    const search = document.getElementById('searchUnits').value.toLowerCase().trim();
-    const rows = document.querySelectorAll('#unitsTable tbody tr');
-    
-    rows.forEach(row => {
-        const identifier = row.dataset.identifier || '';
-        const owner = row.dataset.owner || '';
-        const days = row.dataset.days || '';
-        const text = row.textContent.toLowerCase();
-        
-        if (search === '') {
-            row.style.display = '';
-        } else if (identifier.includes(search) || owner.includes(search) || days.includes(search) || text.includes(search)) {
-            row.style.display = '';
-        } else {
-            row.style.display = 'none';
-        }
-    });
-}
-
-// Keyboard shortcut: Escape to clear search
+// Clear search on Escape
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         const searchInput = document.getElementById('searchUnits');
         if (searchInput) {
             searchInput.value = '';
-            filterUnits();
+            searchTerm = '';
+            currentPage = 1;
+            applyFilter();
         }
     }
 });

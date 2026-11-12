@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from apps.company.models import Branch
-from .models import Phone, Electronic, Accessory, Unit
+from .models import Phone, Electronic, Accessory, Unit, BranchStock
 from django.db.models import Q
 from django.http import JsonResponse
 from apps.company.settings_views import get_company_settings
@@ -20,14 +20,7 @@ import json
 # ============================================
 
 def get_pos_tax_config(company):
-    """
-    Return (enable_tax: bool, tax_rate: float) from the company's
-    Payment Settings. Used by the POS UI to display tax live.
-
-    Falls back to (False, 0.0) on any error so the POS never breaks.
-    """
     try:
-        from apps.company.settings_views import get_company_settings
         company_settings = get_company_settings(company)
         payment = company_settings.get('payment', {})
         enable_tax = bool(payment.get('enable_tax', False))
@@ -43,10 +36,6 @@ def get_pos_tax_config(company):
 @login_required
 def pos_dashboard(request):
     """Point of Sale Dashboard"""
-
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
 
     if not company:
@@ -56,15 +45,10 @@ def pos_dashboard(request):
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
 
-    # ============================================
-    # Filter branches based on user role
-    # ============================================
     if is_viewing_company:
-        # Support mode: Show all branches of the viewed company
         branches = Branch.objects.filter(company=company, is_active=True)
         user_branch = None
     elif request.user.role == 'company_cashier':
-        # Cashiers only see their assigned branch
         if request.user.branch:
             branches = Branch.objects.filter(
                 company=company,
@@ -76,18 +60,10 @@ def pos_dashboard(request):
             messages.warning(request, 'You are not assigned to any branch. Please contact admin.')
             return redirect('/dashboard/')
     else:
-        # Admins/Managers see all branches
         branches = Branch.objects.filter(company=company, is_active=True)
         user_branch = None
 
-    # ============================================
-    # Load tax config from Payment Settings
-    # ============================================
     enable_tax, tax_rate = get_pos_tax_config(company)
-
-    # ============================================
-    # Load receipt settings for auto_print
-    # ============================================
     company_settings = get_company_settings(company)
     receipt_settings = company_settings.get('receipt', {})
 
@@ -100,8 +76,6 @@ def pos_dashboard(request):
         'user_branch': user_branch,
         'is_viewing_company': is_viewing_company,
         'support_mode': is_viewing_company,
-
-        # ---- Tax settings (used by the POS cart JS) ----
         'enable_tax': enable_tax,
         'tax_rate': tax_rate,
         'auto_print': receipt_settings.get('auto_print', False),
@@ -111,13 +85,9 @@ def pos_dashboard(request):
 
 @login_required
 def pos_search_products(request):
-    """Search products for POS - Returns all product details including specs"""
+    """Search products for POS - Cashiers see only their own branch stock."""
     try:
-        # ============================================
-        # SUPPORT MODE: Get active company
-        # ============================================
         company, is_viewing_company = get_active_company(request)
-
         if not company:
             return JsonResponse({'error': 'No company assigned'}, status=400)
 
@@ -126,23 +96,23 @@ def pos_search_products(request):
         products = []
 
         # ============================================
-        # Branch filter (skip in support mode & for admins)
+        # BRANCH SCOPE
+        # Cashiers only see their own branch.
+        # Admins / super admins / support mode see all.
         # ============================================
         if is_viewing_company:
-            user_branch = None
+            cashier_branch = None
         elif request.user.role == 'company_cashier':
-            user_branch = request.user.branch
+            cashier_branch = request.user.branch
+            if not cashier_branch:
+                return JsonResponse({'products': []})  # no branch = nothing to sell
         else:
-            user_branch = None
+            cashier_branch = None
 
         # ============================================
-        # 1. SEARCH PHONES - FILTER BY BRANCH FOR CASHIERS
+        # 1. SEARCH PHONES
         # ============================================
         phones = Phone.objects.filter(company=company, is_active=True)
-
-        # Apply branch filter for cashiers
-        if user_branch:
-            phones = phones.filter(branch=user_branch)
 
         if search_term:
             phones = phones.filter(
@@ -155,7 +125,17 @@ def pos_search_products(request):
             phones = phones.none()
 
         for phone in phones:
-            units = Unit.objects.filter(phone=phone, status='available')
+            # 👇 Only count available units in the cashier's branch
+            units_qs = Unit.objects.filter(phone=phone, status='available')
+            if cashier_branch:
+                units_qs = units_qs.filter(branch=cashier_branch)
+
+            units_list = list(units_qs)
+
+            # Cashiers should only see products they can actually sell
+            if cashier_branch and not units_list:
+                continue
+
             products.append({
                 'product_code': phone.product_code,
                 'name': phone.name,
@@ -163,8 +143,8 @@ def pos_search_products(request):
                 'model': phone.model,
                 'category': 'Phone',
                 'price': float(phone.selling_price),
-                'stock': units.count(),
-                'units': [{'identifier': u.identifier, 'status': u.status} for u in units],
+                'stock': len(units_list),
+                'units': [{'identifier': u.identifier, 'status': u.status} for u in units_list],
                 'image': phone.image_url,
                 'ram': phone.ram or '',
                 'storage_capacity': phone.storage_capacity or '',
@@ -175,13 +155,9 @@ def pos_search_products(request):
             })
 
         # ============================================
-        # 2. SEARCH ELECTRONICS - FILTER BY BRANCH FOR CASHIERS
+        # 2. SEARCH ELECTRONICS
         # ============================================
         electronics = Electronic.objects.filter(company=company, is_active=True)
-
-        # Apply branch filter for cashiers
-        if user_branch:
-            electronics = electronics.filter(branch=user_branch)
 
         if search_term:
             electronics = electronics.filter(
@@ -194,7 +170,15 @@ def pos_search_products(request):
             electronics = electronics.none()
 
         for item in electronics:
-            units = Unit.objects.filter(electronic=item, status='available')
+            units_qs = Unit.objects.filter(electronic=item, status='available')
+            if cashier_branch:
+                units_qs = units_qs.filter(branch=cashier_branch)
+
+            units_list = list(units_qs)
+
+            if cashier_branch and not units_list:
+                continue
+
             products.append({
                 'product_code': item.product_code,
                 'name': item.name,
@@ -202,8 +186,8 @@ def pos_search_products(request):
                 'model': item.model_number,
                 'category': 'Electronics',
                 'price': float(item.selling_price),
-                'stock': units.count(),
-                'units': [{'identifier': u.identifier, 'status': u.status} for u in units],
+                'stock': len(units_list),
+                'units': [{'identifier': u.identifier, 'status': u.status} for u in units_list],
                 'image': item.image_url,
                 'ram': item.ram or '',
                 'storage': item.storage or '',
@@ -214,13 +198,10 @@ def pos_search_products(request):
             })
 
         # ============================================
-        # 3. SEARCH ACCESSORIES - FILTER BY BRANCH FOR CASHIERS
+        # 3. SEARCH ACCESSORIES
+        # Accessories don't have Units — use BranchStock.
         # ============================================
         accessories = Accessory.objects.filter(company=company, is_active=True)
-
-        # Apply branch filter for cashiers
-        if user_branch:
-            accessories = accessories.filter(branch=user_branch)
 
         if search_term:
             accessories = accessories.filter(
@@ -233,6 +214,19 @@ def pos_search_products(request):
             accessories = accessories.none()
 
         for item in accessories:
+            if cashier_branch:
+                # 👇 Only show the cashier's branch stock count
+                stock_obj = item.stock_at(cashier_branch)
+                branch_qty = stock_obj.quantity_in_stock if stock_obj else 0
+
+                # Hide accessories the cashier's branch has none of
+                if branch_qty <= 0:
+                    continue
+
+                display_stock = branch_qty
+            else:
+                display_stock = item.total_quantity_in_stock
+
             products.append({
                 'product_code': item.product_code,
                 'name': item.name,
@@ -240,7 +234,7 @@ def pos_search_products(request):
                 'model': item.model,
                 'category': 'Accessories',
                 'price': float(item.selling_price),
-                'stock': item.quantity_in_stock,
+                'stock': display_stock,
                 'units': [],
                 'image': item.image_url,
                 'accessory_type': item.accessory_type or 'other',
@@ -260,16 +254,7 @@ def pos_search_products(request):
 def pos_search_barcode(request):
     """
     Unified barcode / IMEI / serial / product_code lookup for POS.
-
-    Search order (per product type):
-      1. Exact match on Unit.identifier (IMEI / Serial) — for Phone/Electronic
-      2. Exact match on product.barcode
-      3. Partial match on product_code (fallback for typing)
-
-    Query params:
-        q — the scanned/typed code
-    Returns:
-        {"match": {...}|null, "units": [{...}, ...]}
+    Cashiers can only match units in their own branch.
     """
     try:
         company, is_viewing_company = get_active_company(request)
@@ -283,41 +268,43 @@ def pos_search_barcode(request):
         if len(q) < 3:
             return JsonResponse({'match': None, 'units': []})
 
-        # Branch scoping (cashiers only see their branch)
+        # 👇 Branch scope
         if is_viewing_company:
-            user_branch = None
+            cashier_branch = None
         elif request.user.role == 'company_cashier':
-            user_branch = request.user.branch
+            cashier_branch = request.user.branch
+            if not cashier_branch:
+                return JsonResponse({'match': None, 'units': []})
         else:
-            user_branch = None
+            cashier_branch = None
 
         units_payload = []
 
         # ============================================================
         # 1. PHONES
-        #    Match: Unit.identifier EXACT, OR barcode EXACT, OR code partial
         # ============================================================
         phones_qs = Phone.objects.filter(company=company, is_active=True)
-        if user_branch:
-            phones_qs = phones_qs.filter(branch=user_branch)
+        seen_phone_codes = set()
 
-        # (a) Exact match on Unit.identifier
+        # (a) Exact match on Unit.identifier — only in cashier's branch
         phone_units = (
             Unit.objects
             .filter(
                 phone__company=company,
                 status='available',
-                identifier__iexact=q,   # ← exact, not icontains
+                identifier__iexact=q,
             )
-            .select_related('phone', 'phone__branch')
+            .select_related('phone')
         )
-        if user_branch:
-            phone_units = phone_units.filter(phone__branch=user_branch)
+        if cashier_branch:
+            phone_units = phone_units.filter(branch=cashier_branch)
 
-        seen_phone_codes = set()
         for u in phone_units:
             p = u.phone
             seen_phone_codes.add(p.product_code)
+            stock_qs = Unit.objects.filter(phone=p, status='available')
+            if cashier_branch:
+                stock_qs = stock_qs.filter(branch=cashier_branch)
             units_payload.append({
                 'identifier': u.identifier,
                 'unit_type': 'IMEI',
@@ -328,8 +315,8 @@ def pos_search_barcode(request):
                 'model': p.model,
                 'price': float(p.selling_price),
                 'best_price': float(p.best_price) if p.best_price else None,
-                'stock': Unit.objects.filter(phone=p, status='available').count(),
-                'branch_id': p.branch_id,
+                'stock': stock_qs.count(),
+                'branch_id': u.branch_id,
                 'specs': {
                     'ram': p.ram or '',
                     'storage_capacity': p.storage_capacity or '',
@@ -341,11 +328,17 @@ def pos_search_barcode(request):
                 'image': p.image_url,
             })
 
-        # (b) Match on Phone.barcode (exact)
+        # (b) Match on Phone.barcode
         phone_barcode_matches = phones_qs.filter(barcode__iexact=q)
         for p in phone_barcode_matches:
             if p.product_code in seen_phone_codes:
                 continue
+            stock_qs = Unit.objects.filter(phone=p, status='available')
+            if cashier_branch:
+                stock_qs = stock_qs.filter(branch=cashier_branch)
+            branch_stock = stock_qs.count()
+            if cashier_branch and branch_stock == 0:
+                continue  # skip barcode for products not stocked here
             seen_phone_codes.add(p.product_code)
             units_payload.append({
                 'identifier': p.barcode,
@@ -357,8 +350,8 @@ def pos_search_barcode(request):
                 'model': p.model,
                 'price': float(p.selling_price),
                 'best_price': float(p.best_price) if p.best_price else None,
-                'stock': Unit.objects.filter(phone=p, status='available').count(),
-                'branch_id': p.branch_id,
+                'stock': branch_stock,
+                'branch_id': None,
                 'specs': {
                     'ram': p.ram or '',
                     'storage_capacity': p.storage_capacity or '',
@@ -370,10 +363,16 @@ def pos_search_barcode(request):
                 'image': p.image_url,
             })
 
-        # (c) Fallback: partial match on Phone.product_code (for typing)
+        # (c) Fallback: partial match on Phone.product_code
         phone_code_matches = phones_qs.filter(product_code__icontains=q)
         for p in phone_code_matches:
             if p.product_code in seen_phone_codes:
+                continue
+            stock_qs = Unit.objects.filter(phone=p, status='available')
+            if cashier_branch:
+                stock_qs = stock_qs.filter(branch=cashier_branch)
+            branch_stock = stock_qs.count()
+            if cashier_branch and branch_stock == 0:
                 continue
             seen_phone_codes.add(p.product_code)
             units_payload.append({
@@ -386,8 +385,8 @@ def pos_search_barcode(request):
                 'model': p.model,
                 'price': float(p.selling_price),
                 'best_price': float(p.best_price) if p.best_price else None,
-                'stock': Unit.objects.filter(phone=p, status='available').count(),
-                'branch_id': p.branch_id,
+                'stock': branch_stock,
+                'branch_id': None,
                 'specs': {
                     'ram': p.ram or '',
                     'storage_capacity': p.storage_capacity or '',
@@ -403,10 +402,8 @@ def pos_search_barcode(request):
         # 2. ELECTRONICS
         # ============================================================
         electronics_qs = Electronic.objects.filter(company=company, is_active=True)
-        if user_branch:
-            electronics_qs = electronics_qs.filter(branch=user_branch)
+        seen_elec_codes = set()
 
-        # (a) Exact match on Unit.identifier
         electronic_units = (
             Unit.objects
             .filter(
@@ -414,15 +411,17 @@ def pos_search_barcode(request):
                 status='available',
                 identifier__iexact=q,
             )
-            .select_related('electronic', 'electronic__branch')
+            .select_related('electronic')
         )
-        if user_branch:
-            electronic_units = electronic_units.filter(electronic__branch=user_branch)
+        if cashier_branch:
+            electronic_units = electronic_units.filter(branch=cashier_branch)
 
-        seen_elec_codes = set()
         for u in electronic_units:
             p = u.electronic
             seen_elec_codes.add(p.product_code)
+            stock_qs = Unit.objects.filter(electronic=p, status='available')
+            if cashier_branch:
+                stock_qs = stock_qs.filter(branch=cashier_branch)
             units_payload.append({
                 'identifier': u.identifier,
                 'unit_type': 'Serial',
@@ -433,8 +432,8 @@ def pos_search_barcode(request):
                 'model': p.model_number,
                 'price': float(p.selling_price),
                 'best_price': float(p.best_price) if p.best_price else None,
-                'stock': Unit.objects.filter(electronic=p, status='available').count(),
-                'branch_id': p.branch_id,
+                'stock': stock_qs.count(),
+                'branch_id': u.branch_id,
                 'specs': {
                     'ram': p.ram or '',
                     'storage': p.storage or '',
@@ -446,10 +445,15 @@ def pos_search_barcode(request):
                 'image': p.image_url,
             })
 
-        # (b) Match on Electronic.barcode (exact)
         elec_barcode_matches = electronics_qs.filter(barcode__iexact=q)
         for p in elec_barcode_matches:
             if p.product_code in seen_elec_codes:
+                continue
+            stock_qs = Unit.objects.filter(electronic=p, status='available')
+            if cashier_branch:
+                stock_qs = stock_qs.filter(branch=cashier_branch)
+            branch_stock = stock_qs.count()
+            if cashier_branch and branch_stock == 0:
                 continue
             seen_elec_codes.add(p.product_code)
             units_payload.append({
@@ -462,8 +466,8 @@ def pos_search_barcode(request):
                 'model': p.model_number,
                 'price': float(p.selling_price),
                 'best_price': float(p.best_price) if p.best_price else None,
-                'stock': Unit.objects.filter(electronic=p, status='available').count(),
-                'branch_id': p.branch_id,
+                'stock': branch_stock,
+                'branch_id': None,
                 'specs': {
                     'ram': p.ram or '',
                     'storage': p.storage or '',
@@ -475,10 +479,15 @@ def pos_search_barcode(request):
                 'image': p.image_url,
             })
 
-        # (c) Fallback: partial match on Electronic.product_code (for typing)
         elec_code_matches = electronics_qs.filter(product_code__icontains=q)
         for p in elec_code_matches:
             if p.product_code in seen_elec_codes:
+                continue
+            stock_qs = Unit.objects.filter(electronic=p, status='available')
+            if cashier_branch:
+                stock_qs = stock_qs.filter(branch=cashier_branch)
+            branch_stock = stock_qs.count()
+            if cashier_branch and branch_stock == 0:
                 continue
             seen_elec_codes.add(p.product_code)
             units_payload.append({
@@ -491,8 +500,8 @@ def pos_search_barcode(request):
                 'model': p.model_number,
                 'price': float(p.selling_price),
                 'best_price': float(p.best_price) if p.best_price else None,
-                'stock': Unit.objects.filter(electronic=p, status='available').count(),
-                'branch_id': p.branch_id,
+                'stock': branch_stock,
+                'branch_id': None,
                 'specs': {
                     'ram': p.ram or '',
                     'storage': p.storage or '',
@@ -505,21 +514,14 @@ def pos_search_barcode(request):
             })
 
         # ============================================================
-        # 3. ACCESSORIES
-        #    Match: barcode EXACT, OR product_code EXACT/partial
+        # 3. ACCESSORIES — branch-aware via BranchStock
         # ============================================================
         accessories_qs = Accessory.objects.filter(company=company, is_active=True)
-        if user_branch:
-            accessories_qs = accessories_qs.filter(branch=user_branch)
 
-        # (a) Exact barcode
         acc_barcode_matches = accessories_qs.filter(barcode__iexact=q)
-        # (b) Exact product_code
         acc_code_matches = accessories_qs.filter(product_code__iexact=q)
-        # (c) Partial product_code (for typing, not scanning)
         acc_partial_matches = accessories_qs.filter(product_code__icontains=q)
 
-        # Merge, dedupe, exact matches first
         acc_seen = set()
         acc_combined = []
         for a in list(acc_barcode_matches) + list(acc_code_matches) + list(acc_partial_matches):
@@ -529,7 +531,15 @@ def pos_search_barcode(request):
             acc_combined.append(a)
 
         for a in acc_combined:
-            # Pick the best identifier label
+            if cashier_branch:
+                stock_obj = a.stock_at(cashier_branch)
+                branch_qty = stock_obj.quantity_in_stock if stock_obj else 0
+                if branch_qty <= 0:
+                    continue
+                display_stock = branch_qty
+            else:
+                display_stock = a.total_quantity_in_stock
+
             if a.barcode and a.barcode.lower() == q.lower():
                 identifier = a.barcode
                 unit_type_label = 'Barcode'
@@ -547,8 +557,8 @@ def pos_search_barcode(request):
                 'model': a.model,
                 'price': float(a.selling_price),
                 'best_price': float(a.best_price) if a.best_price else None,
-                'stock': a.quantity_in_stock,
-                'branch_id': a.branch_id,
+                'stock': display_stock,
+                'branch_id': None,
                 'specs': {
                     'accessory_type': a.accessory_type or 'other',
                     'compatible_phone_models': a.compatible_phone_models or '',
@@ -556,27 +566,16 @@ def pos_search_barcode(request):
                 'image': a.image_url,
             })
 
-        # ------------------------------------------------------------
-        # Sort: exact identifier first, then exact product_code,
-        #       then partial (contains), then alphabetical.
-        # This prevents a generic accessory whose product_code merely
-        # *contains* the scanned digits from outranking the exact phone
-        # IMEI the cashier actually scanned.
-        # ------------------------------------------------------------
         def _match_rank(u):
             ident = (u.get('identifier') or '').lower()
             code  = (u.get('product_code') or '').lower()
             qt    = q.lower()
-            if ident == qt:
-                return (0, ident)              # exact identifier (IMEI / barcode / code)
-            if code == qt:
-                return (1, ident)              # exact product_code match
-            if qt in ident or qt in code:
-                return (2, ident)              # partial (contains)
+            if ident == qt: return (0, ident)
+            if code == qt: return (1, ident)
+            if qt in ident or qt in code: return (2, ident)
             return (3, ident)
 
         units_payload.sort(key=_match_rank)
-
         match = units_payload[0] if units_payload else None
 
         return JsonResponse({
@@ -595,43 +594,35 @@ def pos_search_barcode(request):
 
 @login_required
 def pos_search_imei(request):
-    """Search IMEI/Serial for POS"""
+    """Search IMEI/Serial for POS — cashiers only see their branch."""
     try:
-        # ============================================
-        # SUPPORT MODE: Get active company
-        # ============================================
         company, is_viewing_company = get_active_company(request)
-
         if not company:
             return JsonResponse({'error': 'No company assigned'}, status=400)
 
         search_term = request.GET.get('q', '').strip()
-
         if len(search_term) < 3:
             return JsonResponse({'units': []})
 
+        # Branch scope
+        if is_viewing_company:
+            cashier_branch = None
+        elif request.user.role == 'company_cashier':
+            cashier_branch = request.user.branch
+            if not cashier_branch:
+                return JsonResponse({'units': []})
+        else:
+            cashier_branch = None
+
         results = []
 
-        # ============================================
-        # Branch filter (skip in support mode & for admins)
-        # ============================================
-        if is_viewing_company:
-            user_branch = None
-        elif request.user.role == 'company_cashier':
-            user_branch = request.user.branch
-        else:
-            user_branch = None
-
-        # Search phone units with branch filtering
         phone_units = Unit.objects.filter(
             phone__company=company,
             identifier__icontains=search_term,
             status='available'
-        ).select_related('phone', 'phone__branch')
-
-        # Apply branch filter for cashiers
-        if user_branch:
-            phone_units = phone_units.filter(phone__branch=user_branch)
+        ).select_related('phone')
+        if cashier_branch:
+            phone_units = phone_units.filter(branch=cashier_branch)
 
         for unit in phone_units:
             results.append({
@@ -646,16 +637,13 @@ def pos_search_imei(request):
                 'specs': f"RAM: {unit.phone.ram} | ROM: {unit.phone.storage_capacity}" if unit.phone.ram and unit.phone.storage_capacity else ''
             })
 
-        # Search electronic units with branch filtering
         electronic_units = Unit.objects.filter(
             electronic__company=company,
             identifier__icontains=search_term,
             status='available'
-        ).select_related('electronic', 'electronic__branch')
-
-        # Apply branch filter for cashiers
-        if user_branch:
-            electronic_units = electronic_units.filter(electronic__branch=user_branch)
+        ).select_related('electronic')
+        if cashier_branch:
+            electronic_units = electronic_units.filter(branch=cashier_branch)
 
         for unit in electronic_units:
             results.append({
@@ -681,22 +669,13 @@ def pos_search_imei(request):
 def pos_get_branches(request):
     """Get branches for POS - filtered by user role"""
     try:
-        # ============================================
-        # SUPPORT MODE: Get active company
-        # ============================================
         company, is_viewing_company = get_active_company(request)
-
         if not company:
             return JsonResponse({'error': 'No company assigned'}, status=400)
 
-        # ============================================
-        # Filter branches based on user role
-        # ============================================
         if is_viewing_company:
-            # Support mode: Show all branches
             branches = Branch.objects.filter(company=company, is_active=True)
         elif request.user.role == 'company_cashier':
-            # Cashiers only see their assigned branch
             if request.user.branch:
                 branches = Branch.objects.filter(
                     company=company,
@@ -706,7 +685,6 @@ def pos_get_branches(request):
             else:
                 branches = Branch.objects.none()
         else:
-            # Admins/Managers see all branches
             branches = Branch.objects.filter(company=company, is_active=True)
 
         branch_data = [{
@@ -722,28 +700,8 @@ def pos_get_branches(request):
         return JsonResponse({'error': str(e), 'branches': []}, status=500)
 
 
-# ============================================
-# TAX PREVIEW — live calculation for POS UI
-# ============================================
-
 @login_required
 def pos_tax_preview(request):
-    """
-    Return the company's current tax configuration so the POS UI can
-    recalculate on the fly.
-
-    Query params:
-        subtotal — optional. If provided, returns tax and total for that amount.
-
-    Response:
-        {
-          "enable_tax": bool,
-          "tax_rate": float,
-          "subtotal": float | null,
-          "tax": float | null,
-          "total": float | null
-        }
-    """
     try:
         company, _ = get_active_company(request)
         if not company:

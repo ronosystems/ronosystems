@@ -17,38 +17,18 @@ User = get_user_model()
 # ============================================
 
 def _build_cloudinary_url(field_value, resource_type='image'):
-    """
-    Return a fully-formed Cloudinary URL from an ImageField/FileField value,
-    or None if empty.
-
-    The view is expected to have uploaded the file manually via
-    cloudinary.uploader.upload() and stored the returned public_id in the
-    field. This helper only builds the delivery URL:
-
-        https://res.cloudinary.com/<cloud_name>/<resource>/upload/<public_id>
-
-    Falls back to MEDIA_URL when Cloudinary is not configured (dev).
-    """
     if not field_value:
         return None
-
     key = getattr(field_value, 'name', None) or str(field_value)
     key = key.strip().lstrip('/')
-
     if not key:
         return None
-
-    # Strip legacy /media/ prefix
     if key.startswith('media/'):
         key = key[len('media/'):]
-
     cfg = getattr(django_settings, 'CLOUDINARY_STORAGE', {})
     cloud_name = cfg.get('CLOUD_NAME', '')
-
     if cloud_name:
         return f"https://res.cloudinary.com/{cloud_name}/{resource_type}/upload/{key}"
-
-    # Local fallback for dev without Cloudinary
     media_url = getattr(django_settings, 'MEDIA_URL', '/media/')
     if not media_url.endswith('/'):
         media_url += '/'
@@ -60,14 +40,12 @@ def _build_cloudinary_url(field_value, resource_type='image'):
 # ============================================
 
 class Category(models.Model):
-    """Product categories like Electronics, Phones, Accessories"""
     CATEGORY_TYPES = (
         ('electronics', 'Electronics'),
         ('phones', 'Phones'),
         ('accessories', 'Accessories'),
         ('parts', 'Parts & Components'),
     )
-
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='epa_categories')
     branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='categories', null=True, blank=True)
     name = models.CharField(max_length=100)
@@ -87,11 +65,10 @@ class Category(models.Model):
 
 
 # ============================================
-# SUPPLIER MODEL
+# SUPPLIER
 # ============================================
 
 class Supplier(models.Model):
-    """Product suppliers/vendors"""
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='epa_suppliers')
     name = models.CharField(max_length=200)
     contact_person = models.CharField(max_length=100, blank=True)
@@ -113,33 +90,22 @@ class Supplier(models.Model):
 
 
 # ============================================
-# OWNER MODEL (For tracking product ownership)
+# OWNER
 # ============================================
 
 class Owner(models.Model):
-    """Product owner/customer who purchased the product"""
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='epa_owners')
     branch = models.ForeignKey('company.Branch', on_delete=models.SET_NULL, null=True, blank=True, related_name='owners')
-
     name = models.CharField(max_length=200)
     phone = models.CharField(max_length=20, db_index=True)
     email = models.EmailField(blank=True)
     address = models.TextField(blank=True)
-
-    # Owner details
     id_number = models.CharField(max_length=50, blank=True, verbose_name="ID Number")
     date_of_birth = models.DateField(null=True, blank=True)
-    gender = models.CharField(max_length=10, choices=(
-        ('male', 'Male'),
-        ('female', 'Female'),
-        ('other', 'Other'),
-    ), blank=True)
-
-    # Purchase history
+    gender = models.CharField(max_length=10, choices=(('male', 'Male'), ('female', 'Female'), ('other', 'Other')), blank=True)
     total_purchases = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     purchase_count = models.IntegerField(default=0)
     last_purchase_date = models.DateTimeField(null=True, blank=True)
-
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -157,26 +123,13 @@ class Owner(models.Model):
 
 
 # ============================================
-# BASE PRODUCT MODEL WITH COMPANY-WIDE UNIQUE CODES
+# BASE PRODUCT
 # ============================================
 
 class BaseProduct(models.Model):
     company = models.ForeignKey(Company, on_delete=models.CASCADE)
-    product_code = models.CharField(
-        max_length=20,
-        db_index=True,
-        unique=False,
-        null=True,
-        blank=True,
-        help_text="Unique product code within the company (auto-generated)"
-    )
-    barcode = models.CharField(
-        max_length=100,
-        blank=True,
-        null=True,
-        db_index=True,
-        help_text="Barcode/UPC/EAN for scanner lookup"
-    )
+    product_code = models.CharField(max_length=20, db_index=True, unique=False, null=True, blank=True)
+    barcode = models.CharField(max_length=100, blank=True, null=True, db_index=True)
 
     class Meta:
         abstract = True
@@ -188,22 +141,11 @@ class BaseProduct(models.Model):
 
     def generate_unique_product_code(self):
         from .models import Phone, Electronic, Accessory
-
         prefix = self.get_company_prefix()
-
-        # Get ALL existing product codes for this company across ALL models
         all_existing_codes = set()
         for model in [Phone, Electronic, Accessory]:
-            codes = model.objects.filter(
-                company=self.company
-            ).exclude(
-                product_code__isnull=True
-            ).exclude(
-                product_code=''
-            ).values_list('product_code', flat=True)
+            codes = model.objects.filter(company=self.company).exclude(product_code__isnull=True).exclude(product_code='').values_list('product_code', flat=True)
             all_existing_codes.update(codes)
-
-        # Extract numbers from existing codes
         existing_numbers = []
         for code in all_existing_codes:
             if code and code.startswith(prefix):
@@ -213,8 +155,6 @@ class BaseProduct(models.Model):
                         existing_numbers.append(int(num_str))
                 except (ValueError, TypeError):
                     pass
-
-        # Find the next available number (fill gaps)
         if existing_numbers:
             existing_numbers.sort()
             next_number = 1
@@ -225,31 +165,22 @@ class BaseProduct(models.Model):
                     break
         else:
             next_number = 1
-
         return f"{prefix}{str(next_number).zfill(6)}"
 
     def save(self, *args, **kwargs):
-        # Check if we should skip auto-generation
         skip_auto_generate = kwargs.pop('skip_auto_generate', False)
-
         if skip_auto_generate:
             super().save(*args, **kwargs)
             return
-
         if not self.product_code:
-            for attempt in range(20):
+            for _ in range(20):
                 new_code = self.generate_unique_product_code()
-
                 from .models import Phone, Electronic, Accessory
                 code_exists = False
                 for model in [Phone, Electronic, Accessory]:
-                    if model.objects.filter(
-                        company=self.company,
-                        product_code=new_code
-                    ).exclude(pk=self.pk).exists():
+                    if model.objects.filter(company=self.company, product_code=new_code).exclude(pk=self.pk).exists():
                         code_exists = True
                         break
-
                 if not code_exists:
                     self.product_code = new_code
                     break
@@ -257,98 +188,206 @@ class BaseProduct(models.Model):
                 import time
                 timestamp = int(time.time() * 1000) % 1000000
                 self.product_code = f"{self.get_company_prefix()}{str(timestamp).zfill(6)}"
-
         super().save(*args, **kwargs)
 
     @property
     def display_id(self):
         return self.product_code or "N/A"
 
+    def stock_at(self, branch):
+        return self.branch_stocks.filter(branch=branch).first()
+
+    def available_at(self, branch):
+        s = self.stock_at(branch)
+        return s.quantity_in_stock if s else 0
+
+    def total_stock(self):
+        return self.branch_stocks.aggregate(t=__import__('django.db.models', fromlist=['Sum']).Sum('quantity_in_stock'))['t'] or 0
+
 
 # ============================================
-# PHONE MODEL
+# BRANCH STOCK (Fully fixed for SQLite)
+# ============================================
+
+class BranchStock(models.Model):
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='branch_stocks')
+    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='branch_stocks')
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField(db_index=True)
+    product = GenericForeignKey('content_type', 'object_id')
+    quantity_in_stock = models.IntegerField(default=0)
+    minimum_stock_level = models.IntegerField(default=2)
+    maximum_stock_level = models.IntegerField(default=100, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'epa_branch_stocks'
+
+    def __str__(self):
+        return f"{self.product} @ {self.branch}: {self.quantity_in_stock}"
+
+# ============================================
+# STOCK TRANSFER (Fully fixed for SQLite)
+# ============================================
+
+# ============================================
+# STOCK TRANSFER (Fully fixed for SQLite)
+# ============================================
+
+class StockTransfer(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('in_transit', 'In Transit'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    )
+
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name='stock_transfers'
+    )
+    from_branch = models.ForeignKey(
+        'company.Branch', on_delete=models.CASCADE,
+        related_name='stock_transfers_from'
+    )
+    to_branch = models.ForeignKey(
+        'company.Branch', on_delete=models.CASCADE,
+        related_name='stock_transfers_to'
+    )
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField(db_index=True)
+    product = GenericForeignKey('content_type', 'object_id')
+    quantity = models.PositiveIntegerField()
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default='pending'
+    )
+    transfer_number = models.CharField(
+        max_length=50, unique=True, blank=True
+    )
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True,
+        related_name='stock_transfers_created'
+    )
+    completed_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='stock_transfers_completed'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'epa_stock_transfers'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return (
+            f"Transfer {self.transfer_number or '—'}: "
+            f"{self.quantity}× {self.product} → {self.to_branch}"
+        )
+
+    # ------------------------------------------------------------
+    # Auto-generate transfer_number
+    # ------------------------------------------------------------
+    # Mirrors PurchaseRecord.save(): a per-company, per-day sequence
+    # like TRF-20260112-0001, TRF-20260112-0002, ...
+    #
+    # Wrapped in a bounded retry loop because two concurrent saves
+    # can read the same "last" row and compute the same next number.
+    # The UNIQUE constraint catches the loser and we retry with the
+    # next number. This is the only reliable approach on SQLite,
+    # which has no row-level locking for select_for_update().
+    # ------------------------------------------------------------
+    def save(self, *args, **kwargs):
+        if self.transfer_number:
+            # Already set — normal save, no generation needed.
+            return super().save(*args, **kwargs)
+
+        from datetime import datetime
+        from django.db import IntegrityError
+
+        date_str = datetime.now().strftime('%Y%m%d')
+        prefix = f'TRF-{date_str}-'
+
+        last_error = None
+        for attempt in range(10):
+            last = (
+                StockTransfer.objects
+                .filter(
+                    company=self.company,
+                    transfer_number__startswith=prefix,
+                )
+                .order_by('-transfer_number')
+                .first()
+            )
+
+            next_num = 1
+            if last:
+                try:
+                    next_num = (
+                        int(last.transfer_number.rsplit('-', 1)[-1]) + 1 + attempt
+                    )
+                except (ValueError, IndexError):
+                    # Malformed existing number — start from attempt+1
+                    next_num = 1 + attempt
+
+            self.transfer_number = f"{prefix}{str(next_num).zfill(4)}"
+
+            try:
+                return super().save(*args, **kwargs)
+            except IntegrityError as exc:
+                # Another worker grabbed this number; try the next one.
+                last_error = exc
+                self.transfer_number = ''
+                continue
+
+        # Exhausted retries — surface the last error cleanly.
+        raise last_error
+
+        
+# ============================================
+# PHONE
 # ============================================
 
 class Phone(BaseProduct):
-    """Mobile phones and smartphones"""
-    CONDITION_CHOICES = (
-        ('new', 'New'),
-        ('used', 'Used'),
-        ('refurbished', 'Refurbished'),
-    )
+    CONDITION_CHOICES = (('new', 'New'), ('used', 'Used'), ('refurbished', 'Refurbished'))
+    PHONE_TYPE_CHOICES = (('smartphone', 'Smartphone'), ('feature', 'Feature Phone'))
+    NETWORK_CHOICES = (('2g', '2G'), ('3g', '3G'), ('4g', '4G'), ('dual_sim', 'Dual SIM'))
+    MEMORY_CARD_CHOICES = (('yes', 'Yes'), ('no', 'No'))
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='epa_phone_products')
-
-    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='phones')
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='phones')
     supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, related_name='phones')
 
-    # Basic Info
     name = models.CharField(max_length=200)
     brand = models.CharField(max_length=100)
     model = models.CharField(max_length=100)
     imei = models.CharField(max_length=15, db_index=True, null=True, blank=True)
-
-    # Specifications
     color = models.CharField(max_length=50)
     storage_capacity = models.CharField(max_length=50)
     ram = models.CharField(max_length=20)
     screen_size = models.CharField(max_length=20)
     battery_capacity = models.CharField(max_length=20)
-
-    # Condition
     condition = models.CharField(max_length=20, choices=CONDITION_CHOICES, default='new')
-
-    # Pricing
     purchase_price = models.DecimalField(max_digits=10, decimal_places=2)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
     best_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
-    # Stock
-    quantity_in_stock = models.IntegerField(default=0)
-    minimum_stock_level = models.IntegerField(default=2, blank=True, null=True)
-    maximum_stock_level = models.IntegerField(default=100, null=True, blank=True)
+    total_quantity_in_stock = models.IntegerField(default=0)
 
-    # Images
     image = models.ImageField(upload_to='epa/phones/%Y/%m/', blank=True, null=True, max_length=500)
-
-    # Warranty
     warranty_period_months = models.IntegerField(default=12)
     warranty_expiry = models.DateField(null=True, blank=True)
-
-    # Owner
     owner = models.ForeignKey(Owner, on_delete=models.SET_NULL, null=True, blank=True, related_name='phones')
-
-    # Status
+    phone_type = models.CharField(max_length=20, choices=PHONE_TYPE_CHOICES, default='smartphone')
+    network_type = models.CharField(max_length=20, choices=NETWORK_CHOICES, blank=True, null=True)
+    memory_card = models.CharField(max_length=10, choices=MEMORY_CARD_CHOICES, default='no')
+    features = models.TextField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # Generic relation for sale items
     sale_items = GenericRelation('SaleItem', content_type_field='content_type', object_id_field='object_id')
-
-    # Feature phone support
-    PHONE_TYPE_CHOICES = (
-        ('smartphone', 'Smartphone'),
-        ('feature', 'Feature Phone'),
-    )
-
-    NETWORK_CHOICES = (
-        ('2g', '2G'),
-        ('3g', '3G'),
-        ('4g', '4G'),
-        ('dual_sim', 'Dual SIM'),
-    )
-
-    MEMORY_CARD_CHOICES = (
-        ('yes', 'Yes'),
-        ('no', 'No'),
-    )
-
-    phone_type = models.CharField(max_length=20, choices=PHONE_TYPE_CHOICES, default='smartphone')
-    network_type = models.CharField(max_length=20, choices=NETWORK_CHOICES, blank=True, null=True)
-    memory_card = models.CharField(max_length=10, choices=MEMORY_CARD_CHOICES, default='no')
-    features = models.TextField(blank=True, null=True, help_text="Feature phone features like FM Radio, Torch, etc.")
+    branch_stocks = GenericRelation('BranchStock', content_type_field='content_type', object_id_field='object_id', related_query_name='phone')
 
     class Meta:
         db_table = 'epa_phones'
@@ -356,7 +395,6 @@ class Phone(BaseProduct):
         unique_together = ['company', 'product_code']
         indexes = [
             models.Index(fields=['company', 'is_active']),
-            models.Index(fields=['branch', 'is_active']),
             models.Index(fields=['imei']),
             models.Index(fields=['owner']),
             models.Index(fields=['product_code']),
@@ -364,94 +402,52 @@ class Phone(BaseProduct):
         ]
 
     def __str__(self):
-        return f"{self.product_code} - {self.brand} {self.model} ({self.storage_capacity})"
+        return f"{self.product_code} - {self.brand} {self.model}"
 
-    @property
-    def is_in_stock(self):
-        return self.quantity_in_stock > 0
-
-    @property
-    def profit_margin_percentage(self):
-        if self.purchase_price > 0:
-            return (float(self.selling_price - self.purchase_price) / float(self.purchase_price)) * 100
-        return 0
-
-    # ── NEW: Cloudinary-ready URL ──
     @property
     def image_url(self):
-        """
-        Fully-formed Cloudinary URL for the phone image, or None.
-
-        The view uploads to Cloudinary via cloudinary.uploader.upload()
-        and stores the returned public_id in `self.image`. This property
-        builds the delivery URL.
-        """
         return _build_cloudinary_url(self.image, resource_type='image')
 
 
 # ============================================
-# ELECTRONIC MODEL
+# ELECTRONIC
 # ============================================
 
 class Electronic(BaseProduct):
-    """Electronic products like laptops, desktops, tablets"""
     TYPE_CHOICES = (
-        ('laptop', 'Laptop'),
-        ('desktop', 'Desktop'),
-        ('tablet', 'Tablet'),
-        ('monitor', 'Monitor'),
-        ('printer', 'Printer'),
-        ('camera', 'Camera'),
-        ('audio', 'Audio Equipment'),
-        ('other', 'Other'),
+        ('laptop', 'Laptop'), ('desktop', 'Desktop'), ('tablet', 'Tablet'), ('monitor', 'Monitor'),
+        ('printer', 'Printer'), ('camera', 'Camera'), ('audio', 'Audio Equipment'), ('other', 'Other'),
     )
-
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='epa_electronic_products')
-
-    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='electronics')
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='electronics')
     supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, related_name='electronics')
 
-    # Basic Info
     name = models.CharField(max_length=200)
     brand = models.CharField(max_length=100)
     model_number = models.CharField(max_length=100)
     serial_number = models.CharField(max_length=100, db_index=True, null=True, blank=True)
-
-    # Technical Specs
     device_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     processor = models.CharField(max_length=200, blank=True)
     ram = models.CharField(max_length=50, blank=True)
     storage = models.CharField(max_length=100, blank=True)
     screen_size = models.CharField(max_length=20, blank=True)
     color = models.CharField(max_length=50, blank=True)
-
-    # Pricing
     purchase_price = models.DecimalField(max_digits=10, decimal_places=2)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
     best_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
-    # Stock
-    quantity_in_stock = models.IntegerField(default=0)
-    minimum_stock_level = models.IntegerField(default=2)
-    maximum_stock_level = models.IntegerField(default=100, null=True, blank=True)
+    total_quantity_in_stock = models.IntegerField(default=0)
 
-    # Images
     image = models.ImageField(upload_to='epa/electronics/%Y/%m/', blank=True, null=True, max_length=500)
-
-    # Warranty
     warranty_period_months = models.IntegerField(default=12)
     warranty_expiry = models.DateField(null=True, blank=True)
-
-    # Owner
     owner = models.ForeignKey(Owner, on_delete=models.SET_NULL, null=True, blank=True, related_name='electronics')
-
-    # Status
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     sale_items = GenericRelation('SaleItem', content_type_field='content_type', object_id_field='object_id')
+    branch_stocks = GenericRelation('BranchStock', content_type_field='content_type', object_id_field='object_id', related_query_name='electronic')
 
     class Meta:
         db_table = 'epa_electronics'
@@ -459,7 +455,6 @@ class Electronic(BaseProduct):
         unique_together = ['company', 'product_code']
         indexes = [
             models.Index(fields=['company', 'is_active']),
-            models.Index(fields=['branch', 'is_active']),
             models.Index(fields=['serial_number']),
             models.Index(fields=['owner']),
             models.Index(fields=['product_code']),
@@ -467,81 +462,43 @@ class Electronic(BaseProduct):
         ]
 
     def __str__(self):
-        return f"{self.product_code} - {self.brand} {self.name} ({self.model_number})"
+        return f"{self.product_code} - {self.brand} {self.name}"
 
-    @property
-    def is_in_stock(self):
-        return self.quantity_in_stock > 0
-
-    @property
-    def profit_margin(self):
-        if self.purchase_price:
-            return float(self.selling_price - self.purchase_price)
-        return 0
-
-    @property
-    def profit_margin_percentage(self):
-        if self.purchase_price > 0:
-            return (float(self.selling_price - self.purchase_price) / float(self.purchase_price)) * 100
-        return 0
-
-    # ── NEW: Cloudinary-ready URL ──
     @property
     def image_url(self):
         return _build_cloudinary_url(self.image, resource_type='image')
 
 
 # ============================================
-# ACCESSORY MODEL
+# ACCESSORY
 # ============================================
 
 class Accessory(BaseProduct):
-    """Accessories like cases, chargers, headphones"""
-    ACCESSORY_TYPES = (
-        ('electronic accessory', 'Electronic Accessory'),
-        ('phone accessory', 'Phone Accessory'),
-    )
-
+    ACCESSORY_TYPES = (('electronic accessory', 'Electronic Accessory'), ('phone accessory', 'Phone Accessory'))
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='epa_accessory_products')
-
-    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='accessories')
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='accessories')
     supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, related_name='accessories')
 
-    # Basic Info
     name = models.CharField(max_length=200)
     brand = models.CharField(max_length=100)
     accessory_type = models.CharField(max_length=20, choices=ACCESSORY_TYPES)
     model = models.CharField(max_length=100, blank=True)
-
-    # Compatibility
     compatible_phone_models = models.TextField(help_text="Comma-separated list of phone models", blank=True)
-
-    # Pricing
     purchase_price = models.DecimalField(max_digits=10, decimal_places=2)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
     best_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
-    # Stock
-    quantity_in_stock = models.IntegerField(default=0)
-    minimum_stock_level = models.IntegerField(default=10)
-    maximum_stock_level = models.IntegerField(default=100, null=True, blank=True)
+    total_quantity_in_stock = models.IntegerField(default=0)
 
-    # Images
     image = models.ImageField(upload_to='epa/accessories/%Y/%m/', blank=True, null=True, max_length=500)
-
-    # Warranty
     warranty_period_months = models.IntegerField(default=6)
-
-    # Owner
     owner = models.ForeignKey(Owner, on_delete=models.SET_NULL, null=True, blank=True, related_name='accessories')
-
-    # Status
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     sale_items = GenericRelation('SaleItem', content_type_field='content_type', object_id_field='object_id')
+    branch_stocks = GenericRelation('BranchStock', content_type_field='content_type', object_id_field='object_id', related_query_name='accessory')
 
     class Meta:
         db_table = 'epa_accessories'
@@ -549,67 +506,42 @@ class Accessory(BaseProduct):
         unique_together = ['company', 'product_code']
         indexes = [
             models.Index(fields=['company', 'is_active']),
-            models.Index(fields=['branch', 'is_active']),
             models.Index(fields=['owner']),
             models.Index(fields=['product_code']),
             models.Index(fields=['company', 'barcode']),
         ]
 
     def __str__(self):
-        return f"{self.product_code} - {self.brand} {self.name} ({self.accessory_type})"
+        return f"{self.product_code} - {self.brand} {self.name}"
 
-    @property
-    def is_in_stock(self):
-        return self.quantity_in_stock > 0
-
-    # ── NEW: Cloudinary-ready URL ──
     @property
     def image_url(self):
         return _build_cloudinary_url(self.image, resource_type='image')
 
 
 # ============================================
-# UNIT MODEL - For IMEI/Serial Numbers
+# UNIT
 # ============================================
 
 class Unit(models.Model):
-    """Individual units with IMEI/Serial numbers"""
+    UNIT_TYPES = (('imei', 'IMEI Number'), ('serial', 'Serial Number'))
+    STATUS_CHOICES = (('available', 'Available'), ('sold', 'Sold'), ('reserved', 'Reserved'), ('repair', 'Repair'))
 
-    UNIT_TYPES = (
-        ('imei', 'IMEI Number'),
-        ('serial', 'Serial Number'),
-    )
-
-    STATUS_CHOICES = (
-        ('available', 'Available'),
-        ('sold', 'Sold'),
-        ('reserved', 'Reserved'),
-        ('repair', 'Repair'),
-    )
-
-    # Product reference (Generic relationship)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
     object_id = models.PositiveIntegerField(null=True, blank=True)
     product = GenericForeignKey('content_type', 'object_id')
 
-    # Or direct reference (simpler approach)
     phone = models.ForeignKey(Phone, on_delete=models.CASCADE, null=True, blank=True, related_name='units')
     electronic = models.ForeignKey(Electronic, on_delete=models.CASCADE, null=True, blank=True, related_name='units')
+    branch = models.ForeignKey('company.Branch', on_delete=models.SET_NULL, null=True, blank=True, related_name='units')
 
-    # Unit details
     identifier = models.CharField(max_length=100, unique=True, db_index=True)
     unit_type = models.CharField(max_length=20, choices=UNIT_TYPES, default='imei')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='available')
-
-    # Owner tracking
     owner = models.ForeignKey(Owner, on_delete=models.SET_NULL, null=True, blank=True, related_name='units')
-
-    # Legacy owner fields
     owner_name = models.CharField(max_length=200, blank=True, null=True)
     owner_phone = models.CharField(max_length=20, blank=True, null=True)
     sold_date = models.DateTimeField(null=True, blank=True)
-
-    # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -621,77 +553,29 @@ class Unit(models.Model):
             models.Index(fields=['phone', 'status']),
             models.Index(fields=['electronic', 'status']),
             models.Index(fields=['owner']),
+            models.Index(fields=['branch', 'status']),
         ]
 
     def __str__(self):
         return f"{self.identifier} ({self.status})"
 
-    @property
-    def product_name(self):
-        if self.phone:
-            return self.phone.name
-        elif self.electronic:
-            return self.electronic.name
-        return "Unknown"
-
-    @property
-    def product_brand(self):
-        if self.phone:
-            return self.phone.brand
-        elif self.electronic:
-            return self.electronic.brand
-        return "Unknown"
-
-    @property
-    def product_code(self):
-        if self.phone:
-            return self.phone.product_code
-        elif self.electronic:
-            return self.electronic.product_code
-        return None
-
 
 # ============================================
-# SALE MODELS
+# SALE
 # ============================================
 
 class Sale(models.Model):
-    """Sales transactions"""
-    PAYMENT_STATUS = (
-        ('pending', 'Pending'),
-        ('paid', 'Paid'),
-        ('partially_paid', 'Partially Paid'),
-        ('refunded', 'Refunded'),
-    )
-
-    PAYMENT_METHOD = (
-        ('cash', 'Cash'),
-        ('m-pesa', 'M-Pesa'),
-        ('bank_transfer', 'Bank Transfer'),
-        ('card', 'Card'),
-        ('credit', 'Credit'),
-    )
+    PAYMENT_STATUS = (('pending', 'Pending'), ('paid', 'Paid'), ('partially_paid', 'Partially Paid'), ('refunded', 'Refunded'))
+    PAYMENT_METHOD = (('cash', 'Cash'), ('m-pesa', 'M-Pesa'), ('bank_transfer', 'Bank Transfer'), ('card', 'Card'), ('credit', 'Credit'))
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='epa_sales')
     branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='sales')
     customer = models.ForeignKey('Customer', on_delete=models.SET_NULL, null=True, blank=True, related_name='sales')
 
-    # Company-specific sale number (auto-incremented per company)
-    sale_number = models.PositiveIntegerField(default=1, editable=False, help_text="Sequential number per company")
-    company_sale_id = models.CharField(max_length=50, unique=True, blank=True, editable=False, help_text="Company prefix + sale number")
+    sale_number = models.PositiveIntegerField(default=1, editable=False)
+    company_sale_id = models.CharField(max_length=50, unique=True, blank=True, editable=False)
+    barcode_number = models.CharField(max_length=50, unique=True, null=True, blank=True, db_index=True, editable=False)
 
-    # ── NEW: scannable barcode for the sale ──
-    barcode_number = models.CharField(
-        max_length=50,
-        unique=True,
-        null=True,
-        blank=True,
-        db_index=True,
-        editable=False,
-        help_text="Auto-generated scannable barcode (BAR-YYYYMMDD-XXXXXX)"
-    )
-
-    # Denormalized customer info (snapshot at time of sale)
     customer_name = models.CharField(max_length=200)
     customer_phone = models.CharField(max_length=20)
     customer_email = models.EmailField(blank=True)
@@ -700,20 +584,11 @@ class Sale(models.Model):
     discount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     tax = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     net_amount = models.DecimalField(max_digits=10, decimal_places=2)
-
-    # ── NEW: Frozen COGS total for this sale ──
-    cogs_amount = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        default=Decimal('0.00'),
-        help_text="Total COGS snapshot for this sale. Frozen at sale time."
-    )
+    cogs_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
 
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS, default='pending')
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD)
-
     sold_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='epa_sales_created')
-
     sale_date = models.DateTimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -727,118 +602,52 @@ class Sale(models.Model):
             models.Index(fields=['payment_status']),
             models.Index(fields=['company', 'sale_number']),
             models.Index(fields=['company_sale_id']),
-            models.Index(fields=['barcode_number']),   # 👈 NEW
+            models.Index(fields=['barcode_number']),
         ]
         unique_together = [['company', 'sale_number']]
 
     def __str__(self):
-        return f"Sale #{self.company_sale_id} - {self.customer_name} ({self.net_amount})"
+        return f"Sale #{self.company_sale_id} - {self.customer_name}"
+
+    def save(self, *args, **kwargs):
+        # 1. If we're creating a new sale, auto-generate the sale_number
+        if self._state.adding:
+            last_sale = Sale.objects.filter(company=self.company).order_by('-sale_number').first()
+            self.sale_number = (last_sale.sale_number + 1) if last_sale else 1
+
+        # 2. Always generate company_sale_id from the actual sale_number
+        self.company_sale_id = f"SALE-{str(self.sale_number).zfill(5)}"
+
+        # 3. Auto-generate the scannable barcode (BAR-000001 matching the sale_number)
+        if not self.barcode_number:
+            self.barcode_number = f"BAR-{str(self.sale_number).zfill(6)}"
+
+        # 4. Retry loop to handle race conditions
+        from django.db import IntegrityError
+        for attempt in range(5):
+            try:
+                super().save(*args, **kwargs)
+                return  # ✅ Success
+            except IntegrityError:
+                # Number collision — bump and retry
+                self.sale_number += 1
+                self.company_sale_id = f"SALE-{str(self.sale_number).zfill(5)}"
+                self.barcode_number = f"BAR-{str(self.sale_number).zfill(6)}"
+                if attempt == 4:
+                    raise  # Give up after 5 tries
 
     @property
     def item_count(self):
-        return self.items.count()
+        """Total number of items (sum of quantities) across all sale lines."""
+        from django.db.models import Sum
+        return self.items.aggregate(total=Sum('quantity'))['total'] or 0
 
-    # ── NEW: barcode generation helper ──
-    def generate_barcode_number(self):
-        """
-        Return a unique barcode of the form BAR-YYYYMMDD-XXXXXX.
-
-        The sequence X is per-company, per-day, so:
-          - Day 1: BAR-20261009-000001, BAR-20261009-000002, ...
-          - Day 2: BAR-20261010-000001, ...  (sequence restarts each day)
-        """
-        from datetime import datetime
-
-        date_str = datetime.now().strftime('%Y%m%d')
-        prefix = f"BAR-{date_str}-"
-
-        # Find the highest existing sequence for this company today
-        last = (
-            Sale.objects
-            .filter(company=self.company, barcode_number__startswith=prefix)
-            .order_by('-barcode_number')
-            .values_list('barcode_number', flat=True)
-            .first()
-        )
-
-        if last:
-            try:
-                last_num = int(last.split('-')[-1])
-                next_num = last_num + 1
-            except (ValueError, IndexError):
-                next_num = 1
-        else:
-            next_num = 1
-
-        candidate = f"{prefix}{str(next_num).zfill(6)}"
-
-        # Safety: if a collision somehow exists, keep incrementing
-        while Sale.objects.filter(barcode_number=candidate).exists():
-            next_num += 1
-            candidate = f"{prefix}{str(next_num).zfill(6)}"
-
-        return candidate
-
-    def save(self, *args, **kwargs):
-        # 1) Company sale ID (existing behaviour)
-        if not self.company_sale_id:
-            last_sale = Sale.objects.filter(company=self.company).order_by('-sale_number').first()
-
-            if last_sale:
-                self.sale_number = last_sale.sale_number + 1
-            else:
-                self.sale_number = 1
-
-            company_prefix = self.company.name[:3].upper() if self.company and self.company.name else "COM"
-            self.company_sale_id = f"{company_prefix}-{str(self.sale_number).zfill(6)}"
-
-        # 2) Barcode (new)
-        if not self.barcode_number and self.company:
-            self.barcode_number = self.generate_barcode_number()
-
-        super().save(*args, **kwargs)
-
-
-
-
-    @property
-    def short_sale_id(self):
-        """
-        Return only the numeric part of company_sale_id.
-            'FIE-000123'  →  '000123'
-            'ABC-000456'  →  '000456'
-        Falls back to the full string if no '-' is present.
-        """
-        if not self.company_sale_id:
-            return ''
-        return self.company_sale_id.split('-')[-1]
-
-    @property
-    def short_barcode(self):
-        """
-        Return barcode minus its leading 'BAR-' prefix.
-            'BAR-20261010-000123'  →  '20261010-000123'
-        Falls back to the full string if the prefix isn't present.
-        """
-        if not self.barcode_number:
-            return ''
-        prefix = 'BAR-'
-        if self.barcode_number.upper().startswith(prefix):
-            return self.barcode_number[len(prefix):]
-        return self.barcode_number
-        
 
 class SaleItem(models.Model):
-    """Individual items in a sale using GenericForeignKey"""
     sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name='items')
-
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, limit_choices_to={
-        'app_label': 'epa_shop',
-        'model__in': ['electronic', 'phone', 'accessory']
-    })
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, limit_choices_to={'app_label': 'epa_shop', 'model__in': ['electronic', 'phone', 'accessory']})
     object_id = models.PositiveIntegerField(db_index=True)
     item = GenericForeignKey('content_type', 'object_id')
-
     unit = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, blank=True, related_name='sale_items')
 
     item_name = models.CharField(max_length=200)
@@ -846,32 +655,13 @@ class SaleItem(models.Model):
     quantity = models.IntegerField()
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
-
-    # ── NEW: Historical COGS snapshot (frozen at sale time) ──
-    unit_cost = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        default=Decimal('0.00'),
-        help_text="Buying/cost price per unit at the time of sale. Frozen."
-    )
-    cogs_amount = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        default=Decimal('0.00'),
-        help_text="COGS captured at the time of sale. Never recalculated."
-    )
-
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    cogs_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'epa_sale_items'
-        indexes = [
-            models.Index(fields=['content_type', 'object_id']),
-            models.Index(fields=['unit']),
-        ]
-
-    def __str__(self):
-        return f"{self.quantity}x {self.item_name}"
+        indexes = [models.Index(fields=['content_type', 'object_id']), models.Index(fields=['unit'])]
 
 
 class ReturnItem(models.Model):
@@ -897,33 +687,20 @@ class ReturnItem(models.Model):
 # ============================================
 
 class StockMovement(models.Model):
-    """Track all inventory movements (in/out)"""
-    MOVEMENT_TYPES = (
-        ('purchase', 'Purchase Order'),
-        ('sale', 'Sale'),
-        ('return', 'Return'),
-        ('adjustment', 'Adjustment'),
-        ('transfer', 'Branch Transfer'),
-        ('damage', 'Damaged/Write-off'),
-    )
-
+    MOVEMENT_TYPES = (('purchase', 'Purchase Order'), ('sale', 'Sale'), ('return', 'Return'), ('adjustment', 'Adjustment'), ('transfer', 'Branch Transfer'), ('damage', 'Damaged/Write-off'))
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='stock_movements')
     branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='stock_movements', null=True, blank=True)
-
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField(db_index=True)
     product = GenericForeignKey('content_type', 'object_id')
-
     unit = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, blank=True, related_name='stock_movements')
 
     movement_type = models.CharField(max_length=20, choices=MOVEMENT_TYPES)
     quantity = models.IntegerField()
     previous_quantity = models.IntegerField()
     new_quantity = models.IntegerField()
-
     reference_id = models.CharField(max_length=100, blank=True)
     reference_model = models.CharField(max_length=50, blank=True)
-
     notes = models.TextField(blank=True)
     performed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='stock_movements')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -931,63 +708,58 @@ class StockMovement(models.Model):
     class Meta:
         db_table = 'epa_stock_movements'
         ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['company', 'movement_type']),
-            models.Index(fields=['branch', 'created_at']),
-            models.Index(fields=['content_type', 'object_id']),
-            models.Index(fields=['unit']),
-        ]
 
-    def __str__(self):
-        return f"{self.movement_type}: {self.quantity} of {self.product}"
+    @property
+    def product_name(self):
+        if self.product:
+            # Try 'name' (Phones/Electronics/Accessories)
+            if hasattr(self.product, 'name'):
+                return self.product.name
+            # Try 'display_name' (some apps use this)
+            if hasattr(self.product, 'display_name'):
+                return self.product.display_name
+            # Fallback to string representation
+            return str(self.product)
+        return "Unknown Product"
 
+    @property
+    def product_code(self):
+        if self.product:
+            # Try 'product_code' (Phones/Electronics/Accessories)
+            if hasattr(self.product, 'product_code'):
+                return self.product.product_code or f"ID: {self.object_id}"
+            # Fallback to the object's PK
+            return f"ID: {self.object_id}"
+        return "-"
 
 # ============================================
 # PURCHASE ORDER
 # ============================================
 
 class PurchaseOrder(models.Model):
-    """Purchase orders from suppliers"""
-    STATUS_CHOICES = (
-        ('draft', 'Draft'),
-        ('ordered', 'Ordered'),
-        ('received', 'Received'),
-        ('partially_received', 'Partially Received'),
-        ('cancelled', 'Cancelled'),
-    )
-
+    STATUS_CHOICES = (('draft', 'Draft'), ('ordered', 'Ordered'), ('received', 'Received'), ('partially_received', 'Partially Received'), ('cancelled', 'Cancelled'))
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='purchase_orders')
     branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='purchase_orders')
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, related_name='purchase_orders')
-
     order_number = models.CharField(max_length=50, unique=True)
     order_date = models.DateField(default=timezone.now)
     expected_delivery_date = models.DateField(null=True, blank=True)
     received_date = models.DateField(null=True, blank=True)
-
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
     tax = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
-
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     notes = models.TextField(blank=True)
-
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='purchase_orders_created')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'epa_purchase_orders'
-        ordering = ['-order_date']
-
-    def __str__(self):
-        return f"PO #{self.order_number} - {self.supplier.name}"
 
 
 class PurchaseOrderItem(models.Model):
-    """Items in a purchase order"""
     purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='items')
-
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     product = GenericForeignKey('content_type', 'object_id')
@@ -997,15 +769,11 @@ class PurchaseOrderItem(models.Model):
     quantity_received = models.IntegerField(default=0)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'epa_purchase_order_items'
-
-    def __str__(self):
-        return f"{self.quantity_ordered}x {self.product_name}"
 
 
 # ============================================
@@ -1013,14 +781,7 @@ class PurchaseOrderItem(models.Model):
 # ============================================
 
 class Warranty(models.Model):
-    """Warranty tracking for products"""
-    STATUS_CHOICES = (
-        ('active', 'Active'),
-        ('expired', 'Expired'),
-        ('claimed', 'Claimed'),
-        ('void', 'Void'),
-    )
-
+    STATUS_CHOICES = (('active', 'Active'), ('expired', 'Expired'), ('claimed', 'Claimed'), ('void', 'Void'))
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='warranties')
     branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='warranties')
     sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name='warranties', null=True, blank=True)
@@ -1029,54 +790,30 @@ class Warranty(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     product = GenericForeignKey('content_type', 'object_id')
-
     unit = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, blank=True, related_name='warranties')
 
     product_name = models.CharField(max_length=200)
     serial_number = models.CharField(max_length=100, blank=True)
-
     warranty_number = models.CharField(max_length=50, unique=True)
     start_date = models.DateField()
     end_date = models.DateField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
-
     terms_conditions = models.TextField(blank=True)
     notes = models.TextField(blank=True)
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'epa_warranties'
         ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['company', 'status']),
-            models.Index(fields=['end_date']),
-            models.Index(fields=['unit']),
-        ]
-
-    def __str__(self):
-        return f"Warranty #{self.warranty_number} - {self.product_name}"
-
-    @property
-    def is_expired(self):
-        return timezone.now().date() > self.end_date
 
 
 # ============================================
-# REPAIR / SERVICE
+# REPAIR
 # ============================================
 
 class Repair(models.Model):
-    """Product repair and service tracking"""
-    STATUS_CHOICES = (
-        ('pending', 'Pending'),
-        ('in_progress', 'In Progress'),
-        ('completed', 'Completed'),
-        ('cancelled', 'Cancelled'),
-        ('waiting_parts', 'Waiting for Parts'),
-    )
-
+    STATUS_CHOICES = (('pending', 'Pending'), ('in_progress', 'In Progress'), ('completed', 'Completed'), ('cancelled', 'Cancelled'), ('waiting_parts', 'Waiting for Parts'))
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='repairs')
     branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='repairs')
     customer = models.ForeignKey('Customer', on_delete=models.CASCADE, related_name='repairs')
@@ -1085,34 +822,22 @@ class Repair(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     product = GenericForeignKey('content_type', 'object_id')
-
     unit = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, blank=True, related_name='repairs')
 
     product_name = models.CharField(max_length=200)
     serial_number = models.CharField(max_length=100, blank=True)
-
     repair_number = models.CharField(max_length=50, unique=True)
     issue_description = models.TextField()
     diagnosis = models.TextField(blank=True)
     solution = models.TextField(blank=True)
-
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    priority = models.CharField(max_length=20, choices=(
-        ('low', 'Low'),
-        ('medium', 'Medium'),
-        ('high', 'High'),
-        ('urgent', 'Urgent'),
-    ), default='medium')
-
+    priority = models.CharField(max_length=20, choices=(('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('urgent', 'Urgent')), default='medium')
     estimated_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     actual_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-
     received_date = models.DateTimeField(default=timezone.now)
     completed_date = models.DateTimeField(null=True, blank=True)
-
     assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_repairs')
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_repairs')
-
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -1120,92 +845,52 @@ class Repair(models.Model):
     class Meta:
         db_table = 'epa_repairs'
         ordering = ['-received_date']
-        indexes = [
-            models.Index(fields=['company', 'status']),
-            models.Index(fields=['branch', 'status']),
-            models.Index(fields=['unit']),
-        ]
-
-    def __str__(self):
-        return f"Repair #{self.repair_number} - {self.product_name} ({self.status})"
 
 
 # ============================================
-# CUSTOMER MODELS
+# CUSTOMER
 # ============================================
 
 class Customer(models.Model):
-    """Customer profiles for loyalty and tracking"""
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='epa_customers')
     branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='customers', null=True, blank=True)
-
     name = models.CharField(max_length=200)
     phone = models.CharField(max_length=20, db_index=True)
     email = models.EmailField(blank=True)
     address = models.TextField(blank=True)
-
-    id_number = models.CharField(max_length=50, blank=True, db_index=True, verbose_name="ID Number")
-    next_of_keen_name = models.CharField(max_length=200, blank=True, verbose_name="Next of Keen Name")
-    next_of_keen_phone = models.CharField(max_length=20, blank=True, verbose_name="Next of Keen Phone")
-
+    id_number = models.CharField(max_length=50, blank=True, db_index=True)
+    next_of_keen_name = models.CharField(max_length=200, blank=True)
+    next_of_keen_phone = models.CharField(max_length=20, blank=True)
     total_purchases = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     visit_count = models.IntegerField(default=0)
     last_visit = models.DateTimeField(null=True, blank=True)
-
     loyalty_points = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'epa_customers'
-        ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['company', 'is_active']),
-            models.Index(fields=['phone']),
-            models.Index(fields=['id_number']),
-            models.Index(fields=['company', 'phone']),
-        ]
-
-    def __str__(self):
-        return f"{self.name} ({self.phone})"
-
-    @property
-    def full_name(self):
-        return self.name
-
-    @property
-    def customer_id(self):
-        return self.id_number or '-'
 
 
 # ============================================
-# COGS ACCOUNT MODEL
+# COGS
 # ============================================
 
 class COGSAccount(models.Model):
-    """
-    Main COGS account that tracks the balance of Cost of Goods Sold.
-    This account receives COGS from sales and is debited when purchases are made.
-    """
     ACCOUNT_TYPES = (
         ('main', 'Main COGS Account'),
         ('branch', 'Branch COGS Account'),
         ('product', 'Product Category Account'),
     )
-
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='cogs_accounts')
     branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='cogs_accounts', null=True, blank=True)
-
     account_name = models.CharField(max_length=200)
     account_code = models.CharField(max_length=50, unique=True)
     account_type = models.CharField(max_length=20, choices=ACCOUNT_TYPES, default='main')
-
     current_balance = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     total_credited = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     total_debited = models.DecimalField(max_digits=15, decimal_places=2, default=0)
-
     is_active = models.BooleanField(default=True)
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -1214,208 +899,96 @@ class COGSAccount(models.Model):
     class Meta:
         db_table = 'finance_cogs_accounts'
         ordering = ['account_code']
-        indexes = [
-            models.Index(fields=['company', 'is_active']),
-            models.Index(fields=['branch', 'is_active']),
-            models.Index(fields=['account_code']),
-        ]
 
     def __str__(self):
         return f"{self.account_code} - {self.account_name} (Balance: {self.current_balance})"
 
-    @property
-    def available_balance(self):
-        return self.current_balance
-
     def credit(self, amount, description="", reference=None, created_by=None):
         if amount <= 0:
             raise ValueError("Credit amount must be positive")
-
         self.current_balance += amount
         self.total_credited += amount
         self.save()
-
         return COGSTransaction.objects.create(
-            company=self.company,
-            branch=self.branch,
-            cogs_account=self,
-            transaction_type='credit',
-            amount=amount,
+            company=self.company, branch=self.branch, cogs_account=self,
+            transaction_type='credit', amount=amount,
             balance_after=self.current_balance,
-            description=description or f"COGS credited from sales",
-            reference=reference,
-            created_by=created_by
+            description=description or "COGS credited from sales",
+            reference=reference, created_by=created_by,
         )
 
     def debit(self, amount, description="", reference=None, created_by=None):
         if amount <= 0:
             raise ValueError("Debit amount must be positive")
-
         if self.current_balance < amount:
             raise ValueError(f"Insufficient COGS balance. Available: {self.current_balance}, Required: {amount}")
-
         self.current_balance -= amount
         self.total_debited += amount
         self.save()
-
         return COGSTransaction.objects.create(
-            company=self.company,
-            branch=self.branch,
-            cogs_account=self,
-            transaction_type='debit',
-            amount=amount,
+            company=self.company, branch=self.branch, cogs_account=self,
+            transaction_type='debit', amount=amount,
             balance_after=self.current_balance,
-            description=description or f"COGS used for purchases",
-            reference=reference,
-            created_by=created_by
+            description=description or "COGS used for purchases",
+            reference=reference, created_by=created_by,
         )
 
 
-# ============================================
-# COGS TRANSACTION MODEL
-# ============================================
-
 class COGSTransaction(models.Model):
-    """Individual transaction entries for COGS account"""
-    TRANSACTION_TYPES = (
-        ('credit', 'Credit (From Sales)'),
-        ('debit', 'Debit (Used for Purchases)'),
-        ('adjustment', 'Adjustment'),
-        ('transfer', 'Transfer'),
-    )
-
+    TRANSACTION_TYPES = (('credit', 'Credit (From Sales)'), ('debit', 'Debit (Used for Purchases)'), ('adjustment', 'Adjustment'), ('transfer', 'Transfer'))
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='cogs_transactions')
     branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='cogs_transactions', null=True, blank=True)
     cogs_account = models.ForeignKey(COGSAccount, on_delete=models.CASCADE, related_name='transactions')
-
     transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES)
     amount = models.DecimalField(max_digits=15, decimal_places=2)
     balance_after = models.DecimalField(max_digits=15, decimal_places=2)
-
     sale = models.ForeignKey(Sale, on_delete=models.SET_NULL, null=True, blank=True, related_name='cogs_transactions')
-
     description = models.TextField()
     reference = models.CharField(max_length=200, blank=True, null=True)
     notes = models.TextField(blank=True)
-
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='cogs_transactions')
-
     transaction_date = models.DateTimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'finance_cogs_transactions'
         ordering = ['-transaction_date']
-        indexes = [
-            models.Index(fields=['company', 'transaction_date']),
-            models.Index(fields=['cogs_account', 'transaction_date']),
-            models.Index(fields=['transaction_type']),
-            models.Index(fields=['sale']),
-        ]
 
-    def __str__(self):
-        return f"{self.transaction_type}: {self.amount} - {self.description[:50]}"
-
-
-# ============================================
-# PURCHASE RECORD MODEL
-# ============================================
 
 class PurchaseRecord(models.Model):
-    """
-    Records of purchases made using COGS balance
-    """
-    PURCHASE_TYPES = (
-        ('inventory', 'Inventory Purchase'),
-        ('supplies', 'Supplies'),
-        ('equipment', 'Equipment'),
-        ('maintenance', 'Maintenance'),
-        ('other', 'Other'),
-    )
-
-    PAYMENT_METHODS = (
-        ('cash', 'Cash'),
-        ('bank_transfer', 'Bank Transfer'),
-        ('m-pesa', 'M-Pesa'),
-        ('cheque', 'Cheque'),
-        ('credit', 'Credit'),
-    )
-
+    PURCHASE_TYPES = (('inventory', 'Inventory Purchase'), ('supplies', 'Supplies'), ('equipment', 'Equipment'), ('maintenance', 'Maintenance'), ('other', 'Other'))
+    PAYMENT_METHODS = (('cash', 'Cash'), ('bank_transfer', 'Bank Transfer'), ('m-pesa', 'M-Pesa'), ('cheque', 'Cheque'), ('credit', 'Credit'))
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='purchase_records')
     branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='purchase_records')
-    cogs_account = models.ForeignKey(
-        COGSAccount,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='purchases'
-    )
-    cogs_transaction = models.ForeignKey(
-        COGSTransaction,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='purchase_record'
-    )
-
-    # Purchase details
+    cogs_account = models.ForeignKey(COGSAccount, on_delete=models.SET_NULL, null=True, blank=True, related_name='purchases')
+    cogs_transaction = models.ForeignKey(COGSTransaction, on_delete=models.SET_NULL, null=True, blank=True, related_name='purchase_record')
     purchase_number = models.CharField(max_length=50, unique=True)
     purchase_type = models.CharField(max_length=20, choices=PURCHASE_TYPES)
     purchase_date = models.DateField(default=timezone.now)
-
-    # Amount
     amount = models.DecimalField(max_digits=15, decimal_places=2)
     tax = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     total_amount = models.DecimalField(max_digits=15, decimal_places=2)
-
-    # Supplier/vendor
     supplier_name = models.CharField(max_length=200)
     supplier_contact = models.CharField(max_length=100, blank=True)
     supplier_phone = models.CharField(max_length=20, blank=True)
-
-    # Payment
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS, default='cash')
     payment_reference = models.CharField(max_length=100, blank=True)
     payment_date = models.DateField(null=True, blank=True)
-
-    # Description
     description = models.TextField()
     notes = models.TextField(blank=True)
-
-    # Status
-    STATUS_CHOICES = (
-        ('pending', 'Pending'),
-        ('completed', 'Completed'),
-        ('cancelled', 'Cancelled'),
-    )
+    STATUS_CHOICES = (('pending', 'Pending'), ('completed', 'Completed'), ('cancelled', 'Cancelled'))
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-
-    # Receipt/document
-    receipt_image = models.ImageField(
-        upload_to='finance/purchases/%Y/%m/',
-        blank=True, null=True,
-        max_length=500,
-        help_text="Cloudinary public_id (URL built via receipt_image_url property)"
-    )
+    receipt_image = models.ImageField(upload_to='finance/purchases/%Y/%m/', blank=True, null=True, max_length=500)
     receipt_number = models.CharField(max_length=100, blank=True)
-
-    # User tracking
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='purchase_records')
     approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_purchases')
     approved_date = models.DateTimeField(null=True, blank=True)
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'finance_purchase_records'
         ordering = ['-purchase_date']
-        indexes = [
-            models.Index(fields=['company', 'purchase_date']),
-            models.Index(fields=['branch', 'purchase_date']),
-            models.Index(fields=['status']),
-            models.Index(fields=['purchase_number']),
-        ]
 
     def __str__(self):
         return f"Purchase #{self.purchase_number} - {self.supplier_name} ({self.total_amount})"
@@ -1426,61 +999,35 @@ class PurchaseRecord(models.Model):
             date_str = datetime.now().strftime('%Y%m%d')
             last_purchase = PurchaseRecord.objects.filter(
                 company=self.company,
-                purchase_number__startswith=f'PUR-{date_str}'
+                purchase_number__startswith=f'PUR-{date_str}',
             ).order_by('-purchase_number').first()
-
-            if last_purchase:
-                last_num = int(last_purchase.purchase_number.split('-')[-1])
-                next_num = last_num + 1
-            else:
-                next_num = 1
-
+            next_num = int(last_purchase.purchase_number.split('-')[-1]) + 1 if last_purchase else 1
             self.purchase_number = f"PUR-{date_str}-{str(next_num).zfill(4)}"
-
         super().save(*args, **kwargs)
 
     def approve(self, user):
-        """Approve the purchase"""
         self.status = 'completed'
         self.approved_by = user
         self.approved_date = timezone.now()
         self.save()
 
-    # ── NEW: Cloudinary-ready URL ──
     @property
     def receipt_image_url(self):
-        """
-        Fully-formed Cloudinary URL for the receipt image, or None.
-
-        The view uploads to Cloudinary via cloudinary.uploader.upload()
-        and stores the returned public_id in `self.receipt_image`.
-        This property builds the delivery URL.
-        """
         return _build_cloudinary_url(self.receipt_image, resource_type='image')
 
 
-# ============================================
-# COGS ALLOCATION RULES
-# ============================================
-
 class COGSAllocationRule(models.Model):
-    """Rules for how COGS should be allocated from sales to accounts"""
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='cogs_rules')
     branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='cogs_rules', null=True, blank=True)
-
     rule_name = models.CharField(max_length=200)
     is_active = models.BooleanField(default=True)
-
     electronics_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=100)
     phones_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=100)
     accessories_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=100)
-
     electronics_account = models.ForeignKey(COGSAccount, on_delete=models.SET_NULL, null=True, blank=True, related_name='electronics_rules')
     phones_account = models.ForeignKey(COGSAccount, on_delete=models.SET_NULL, null=True, blank=True, related_name='phones_rules')
     accessories_account = models.ForeignKey(COGSAccount, on_delete=models.SET_NULL, null=True, blank=True, related_name='accessories_rules')
-
     default_account = models.ForeignKey(COGSAccount, on_delete=models.SET_NULL, null=True, blank=True, related_name='default_rules')
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1491,38 +1038,22 @@ class COGSAllocationRule(models.Model):
         return f"{self.rule_name} ({'Active' if self.is_active else 'Inactive'})"
 
 
-# ============================================
-# COGS SUMMARY BY PERIOD
-# ============================================
-
 class COGSSummary(models.Model):
-    """Periodic summary of COGS activity"""
-    PERIOD_TYPES = (
-        ('daily', 'Daily'),
-        ('weekly', 'Weekly'),
-        ('monthly', 'Monthly'),
-        ('quarterly', 'Quarterly'),
-        ('yearly', 'Yearly'),
-    )
-
+    PERIOD_TYPES = (('daily', 'Daily'), ('weekly', 'Weekly'), ('monthly', 'Monthly'), ('quarterly', 'Quarterly'), ('yearly', 'Yearly'))
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='cogs_summaries')
     branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='cogs_summaries', null=True, blank=True)
     cogs_account = models.ForeignKey(COGSAccount, on_delete=models.CASCADE, related_name='summaries')
-
     period_type = models.CharField(max_length=20, choices=PERIOD_TYPES)
     period_start = models.DateField()
     period_end = models.DateField()
-
     opening_balance = models.DecimalField(max_digits=15, decimal_places=2)
     closing_balance = models.DecimalField(max_digits=15, decimal_places=2)
     total_credits = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     total_debits = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     net_change = models.DecimalField(max_digits=15, decimal_places=2, default=0)
-
     transaction_count = models.IntegerField(default=0)
     sale_count = models.IntegerField(default=0)
     purchase_count = models.IntegerField(default=0)
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1530,6 +1061,3 @@ class COGSSummary(models.Model):
         db_table = 'finance_cogs_summaries'
         ordering = ['-period_start']
         unique_together = ['company', 'cogs_account', 'period_type', 'period_start']
-
-    def __str__(self):
-        return f"{self.cogs_account.account_name} - {self.period_type} ({self.period_start} to {self.period_end})"

@@ -322,11 +322,11 @@
             LEFT COLUMN - INPUT FORM
             ========================================== -->
             <div class="split-left">
-                <!-- Section 1: Category & Branch -->
+                <!-- Section 1: Category ONLY -->
                 <div class="form-section">
-                    <h6 class="form-section-title"><i class="fas fa-tag"></i> 1. Category & Branch</h6>
+                    <h6 class="form-section-title"><i class="fas fa-tag"></i> 1. Category</h6>
                     <div class="row">
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-12 mb-3">
                             <label class="form-label required">Category</label>
                             <select class="form-select" name="category" id="categorySelect" required>
                                 <option value="">Select Category...</option>
@@ -334,19 +334,6 @@
                                 <option value="feature_phone" {% if category_value == 'feature_phone' %}selected{% endif %}>📞 Feature Phone</option>
                                 <option value="electronics" {% if category_value == 'electronics' %}selected{% endif %}>💻 Electronics</option>
                                 <option value="accessory" {% if category_value == 'accessory' %}selected{% endif %}>🎧 Accessory</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label required">Branch</label>
-                            <select class="form-select" name="branch" id="branchSelect" required>
-                                <option value="">Select Branch</option>
-                                {% for branch in branches %}
-                                <option value="{{ branch.id }}" 
-                                    {% if product.branch_id == branch.id %}selected{% endif %}
-                                    {% if not product and branch.is_default %}selected{% endif %}>
-                                    {{ branch.name }}
-                                </option>
-                                {% endfor %}
                             </select>
                         </div>
                     </div>
@@ -397,9 +384,7 @@
                         </div>
                     </div>
 
-                    <!-- ==========================================
-                    SMARTPHONE SPECS
-                    ========================================== -->
+                    <!-- SMARTPHONE SPECS -->
                     <div id="smartphoneSpecs" class="spec-section {% if category_value != 'smartphone' %}hidden{% endif %}">
                         <hr>
                         <h6 class="text-primary"><i class="fas fa-mobile-alt"></i> Smartphone Specifications</h6>
@@ -445,9 +430,7 @@
                         </div>
                     </div>
 
-                    <!-- ==========================================
-                    FEATURE PHONE SPECS
-                    ========================================== -->
+                    <!-- FEATURE PHONE SPECS -->
                     <div id="featurePhoneSpecs" class="spec-section {% if category_value != 'feature_phone' %}hidden{% endif %}">
                         <hr>
                         <h6 class="text-warning"><i class="fas fa-phone"></i> Feature Phone Specifications</h6>
@@ -490,9 +473,7 @@
                         </div>
                     </div>
 
-                    <!-- ==========================================
-                    ELECTRONICS SPECS
-                    ========================================== -->
+                    <!-- ELECTRONICS SPECS -->
                     <div id="electronicsSpecs" class="spec-section {% if category_value != 'electronics' %}hidden{% endif %}">
                         <hr>
                         <h6 class="text-success"><i class="fas fa-laptop"></i> Electronics Specifications</h6>
@@ -543,9 +524,7 @@
                         </div>
                     </div>
 
-                    <!-- ==========================================
-                    ACCESSORY SPECS
-                    ========================================== -->
+                    <!-- ACCESSORY SPECS -->
                     <div id="accessorySpecs" class="spec-section {% if category_value != 'accessory' %}hidden{% endif %}">
                         <hr>
                         <h6 class="text-info"><i class="fas fa-headphones"></i> Accessory Specifications</h6>
@@ -605,13 +584,31 @@
                 <div class="form-section" id="identifiersSection">
                     <h6 class="form-section-title"><i class="fas fa-qrcode"></i> 4. Stock & Identifiers</h6>
                     
+                    <!-- MOVED HERE: Branch Selection -->
+                    <div class="row mb-4">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required text-primary fw-bold"><i class="fas fa-store"></i> Assign Stock to Branch</label>
+                            <select class="form-select border-primary" name="branch" id="branchSelect" required onchange="reloadWithBranch(this.value)">
+                                <option value="">Select Branch for this Stock...</option>
+                                {% for branch in branches %}
+                                <option value="{{ branch.id }}" 
+                                    {% if current_branch_id == branch.id %}selected{% endif %}
+                                    {% if not product and branch.is_default %}selected{% endif %}>
+                                    {{ branch.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="field-hint text-primary">Which branch will physically receive these items?</small>
+                        </div>
+                    </div>
+
                     <!-- Accessory Stock (simple quantity) -->
                     <div id="accessoryStock" class="{% if category_value != 'accessory' %}hidden{% endif %}">
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label required">Quantity in Stock</label>
                                 <input type="number" class="form-control" name="quantity" 
-                                       value="{% if product %}{{ product.quantity_in_stock|default:0 }}{% else %}{{ form_data.quantity|default:0 }}{% endif %}" 
+                                       value="{% if current_quantity %}{{ current_quantity }}{% else %}0{% endif %}" 
                                        min="0" placeholder="0" id="accessoryQuantity">
                             </div>
                             <div class="col-md-6 mb-3">
@@ -676,7 +673,7 @@
                     </h6>
                     <span class="badge bg-primary" id="countBadge">
                         {% if category_value == 'accessory' %}
-                            {% if product %}{{ product.quantity_in_stock|default:0 }}{% else %}{{ form_data.quantity|default:0 }}{% endif %}
+                            {% if current_quantity %}{{ current_quantity }}{% else %}0{% endif %}
                         {% else %}
                             {{ units|length }}
                         {% endif %}
@@ -765,6 +762,16 @@ JAVASCRIPT - COMPLETE REWRITE WITH FIXES
     // ============================================
     var units = [];
     var categoryValue = '{{ category_value|default:"" }}';
+
+    // ============================================
+    // RELOAD WITH BRANCH (for Edit mode)
+    // ============================================
+    window.reloadWithBranch = function(branchId) {
+        if (!branchId) return;
+        var url = new URL(window.location.href);
+        url.searchParams.set('branch', branchId);
+        window.location.href = url.toString();
+    };
 
     // ============================================
     // SAFE ELEMENT GETTER
@@ -1262,6 +1269,15 @@ JAVASCRIPT - COMPLETE REWRITE WITH FIXES
         
         var category = categorySelect.value;
         
+        // Check Branch first
+        var branchSelect = safeGetElement('branchSelect');
+        if (branchSelect && !branchSelect.value) {
+            e.preventDefault();
+            alert('Please select a branch to assign this stock to.');
+            branchSelect.focus();
+            return false;
+        }
+
         if (category === 'smartphone') {
             var ram = safeGetElement('smartphoneRam');
             var rom = safeGetElement('smartphoneRom');

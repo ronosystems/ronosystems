@@ -7,24 +7,11 @@ from datetime import timedelta, date
 from .models import Electronic, Phone, Accessory, Sale, Unit, SaleItem, Owner
 from apps.companies.models import Company
 
-
 # ============================================
 # SUPPORT MODE HELPER
 # ============================================
 
 def get_active_company(request):
-    """
-    Get the currently active company for the request.
-
-    Priority:
-    1. Custom Domain: If request came via a verified custom domain AND
-       the user belongs to that company (or is super admin), use it.
-    2. Support Mode: If super admin is viewing a company, return that company.
-    3. Regular: Return the user's assigned company.
-
-    Returns:
-        tuple: (company, is_support_mode)
-    """
     user = request.user
 
     # 1. Custom domain resolution (with isolation check)
@@ -38,7 +25,6 @@ def get_active_company(request):
             or user_company == tenant_company
         ):
             return tenant_company, False
-        # else: domain mismatch → fall through to user's own company
 
     # 2. Support Mode: Super admin viewing a specific company
     if user.is_authenticated and user.role == 'super_admin':
@@ -60,7 +46,6 @@ def get_active_company(request):
 
 
 def is_support_mode(request):
-    """Check if current request is in support mode"""
     return (
         request.user.is_authenticated
         and request.user.role == 'super_admin'
@@ -77,42 +62,26 @@ def is_support_mode(request):
 def epa_dashboard(request):
     """EPA Shop Web Dashboard - Shows company-specific EPA data in HTML"""
 
-    # ============================================
-    # COMPANY SELECTION (with super admin switching)
-    # ============================================
-
     company, is_viewing_company = get_active_company(request)
 
-    # If no company found, handle redirects
     if not company:
-        # SUPER ADMIN: If no company is selected, redirect to support selector
         if request.user.role == 'super_admin':
             messages.info(request, 'Please select a company to view.')
             return redirect('/api/support/select/')
 
-        # Regular user: Check if assigned to a company
         if not request.user.company:
             messages.warning(request, 'You are not assigned to any company.')
             return redirect('/dashboard/')
 
         company = request.user.company
 
-    # ============================================
-    # BUSINESS TYPE VALIDATION (Skip for super admin in support mode)
-    # ============================================
-
     if not is_viewing_company:
         if not company.business_type or 'epa' not in company.business_type.name.lower():
             messages.warning(request, 'Your company is not an EPA Shop.')
             return redirect('/dashboard/')
 
-    # ============================================
-    # Role-based data filtering
-    # ============================================
-
     user = request.user
 
-    # For super admin viewing a company, treat as admin
     if is_viewing_company and user.role == 'super_admin':
         is_admin = True
         user_branch = None
@@ -127,77 +96,63 @@ def epa_dashboard(request):
         user_branch = user.branch if not is_admin else None
 
     # ============================================
-    # Product counts (filtered by branch for non-admins)
+    # Product counts
     # ============================================
-
     electronics = Electronic.objects.filter(company=company)
     phones = Phone.objects.filter(company=company)
     accessories = Accessory.objects.filter(company=company)
 
-    # Filter by branch for non-admins (skip in support mode)
-    if not is_admin and user_branch and not is_viewing_company:
-        electronics = electronics.filter(branch=user_branch)
-        phones = phones.filter(branch=user_branch)
-        accessories = accessories.filter(branch=user_branch)
-
-    # Product counts
+    # Option B: Branch filtering disabled (stock is per BranchStock)
+    
     electronics_count = electronics.count()
     phones_count = phones.count()
     accessories_count = accessories.count()
-
-    # Total PRODUCTS (all product types - 1 product = 1 count)
     total_products = electronics_count + phones_count + accessories_count
 
     # ============================================
-    # TOTAL UNITS (from Phone and Electronic only)
+    # TOTAL UNITS
     # ============================================
-
-    # Get total units across all products
     total_units = Unit.objects.filter(
         Q(phone__company=company) | Q(electronic__company=company)
     )
-
-    # Filter by branch for non-admins (skip in support mode)
-    if not is_admin and user_branch and not is_viewing_company:
-        total_units = total_units.filter(
-            Q(phone__branch=user_branch) | Q(electronic__branch=user_branch)
-        )
-
     total_unit_items = total_units.count()
 
     # ============================================
-    # TOTAL STOCK (Products + Accessories quantity)
+    # DONUT CHART DATA (Added)
     # ============================================
-    # This counts accessories as their quantity, not 1
-    total_phone_stock = phones.aggregate(total=Sum('quantity_in_stock'))['total'] or 0
-    total_electronic_stock = electronics.aggregate(total=Sum('quantity_in_stock'))['total'] or 0
-    total_accessory_stock = accessories.aggregate(total=Sum('quantity_in_stock'))['total'] or 0
+    phones_unit_count = Unit.objects.filter(phone__company=company).count()
+    electronics_unit_count = Unit.objects.filter(electronic__company=company).count()
+
+    # ============================================
+    # TOTAL STOCK
+    # ============================================
+    total_phone_stock = phones.aggregate(total=Sum('total_quantity_in_stock'))['total'] or 0
+    total_electronic_stock = electronics.aggregate(total=Sum('total_quantity_in_stock'))['total'] or 0
+    total_accessory_stock = accessories.aggregate(total=Sum('total_quantity_in_stock'))['total'] or 0
     total_stock_items = total_phone_stock + total_electronic_stock + total_accessory_stock
+    
+    # Accessories are the only ones with a direct stock count for the chart
+    accessories_unit_count = total_accessory_stock
 
     # ============================================
-    # Sales data (filtered by branch/agent)
+    # Sales data
     # ============================================
-
     sales = Sale.objects.filter(company=company)
 
-    # Filter by role (skip in support mode - super admin sees all)
     if not is_viewing_company:
         if user.role == 'company_agent':
-            # Agents see only sales they created
             sales = sales.filter(sold_by=user)
         elif user.role == 'company_cashier':
-            # Cashiers see sales in their branch
             if user_branch:
                 sales = sales.filter(branch=user_branch)
         elif not is_admin and user_branch:
-            # Staff see sales in their branch
             sales = sales.filter(branch=user_branch)
 
     total_sales = sales.count()
     total_revenue = sales.aggregate(total=Sum('net_amount'))['total'] or 0
 
     # ============================================
-    # TODAY (local timezone)
+    # Date-based stats
     # ============================================
     today = timezone.localtime(timezone.now()).date()
 
@@ -205,23 +160,15 @@ def epa_dashboard(request):
     today_count = today_sales.count()
     today_revenue = today_sales.aggregate(total=Sum('net_amount'))['total'] or 0
 
-    # ============================================
-    # THIS WEEK (Monday → Sunday, capped at today)
-    # ============================================
-    # weekday(): Monday=0 ... Sunday=6
-    week_start = today - timedelta(days=today.weekday())   # Monday of this week
-    week_end = week_start + timedelta(days=6)              # Sunday of this week
-
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=6)
     week_sales = sales.filter(
         sale_date__date__gte=week_start,
-        sale_date__date__lte=min(week_end, today),         # don't include future days
+        sale_date__date__lte=min(week_end, today),
     )
     week_count = week_sales.count()
     week_revenue = week_sales.aggregate(total=Sum('net_amount'))['total'] or 0
 
-    # ============================================
-    # LAST WEEK (Monday → Sunday, fully completed)
-    # ============================================
     last_week_start = week_start - timedelta(days=7)
     last_week_end = week_start - timedelta(days=1)
     last_week_sales = sales.filter(
@@ -231,9 +178,6 @@ def epa_dashboard(request):
     last_week_count = last_week_sales.count()
     last_week_revenue = last_week_sales.aggregate(total=Sum('net_amount'))['total'] or 0
 
-    # ============================================
-    # THIS MONTH (1st → end of month, capped at today)
-    # ============================================
     month_start = today.replace(day=1)
     if today.month == 12:
         month_end = date(today.year + 1, 1, 1) - timedelta(days=1)
@@ -248,48 +192,38 @@ def epa_dashboard(request):
     month_revenue = month_sales.aggregate(total=Sum('net_amount'))['total'] or 0
 
     # ============================================
-    # Low stock items (filtered by branch)
+    # Low stock items (Fixed for Option B)
     # ============================================
-
     low_stock_products = []
 
-    electronics_low = electronics.filter(quantity_in_stock__lte=F('minimum_stock_level'))
-    phones_low = phones.filter(quantity_in_stock__lte=F('minimum_stock_level'))
-    accessories_low = accessories.filter(quantity_in_stock__lte=F('minimum_stock_level'))
-
-    for item in electronics_low[:5]:
+    for item in electronics.filter(total_quantity_in_stock__lte=5)[:5]:
         low_stock_products.append({
             'name': f"{item.brand} {item.name}",
-            'quantity': item.quantity_in_stock,
+            'quantity': item.total_quantity_in_stock,
             'type': 'Electronic',
-            'branch': item.branch.name if item.branch else 'N/A'
+            'branch': 'N/A'  # Multi-branch now
         })
 
-    for item in phones_low[:5]:
+    for item in phones.filter(total_quantity_in_stock__lte=5)[:5]:
         low_stock_products.append({
             'name': f"{item.brand} {item.model}",
-            'quantity': item.quantity_in_stock,
+            'quantity': item.total_quantity_in_stock,
             'type': 'Phone',
-            'branch': item.branch.name if item.branch else 'N/A'
+            'branch': 'N/A'
         })
 
-    for item in accessories_low[:5]:
+    for item in accessories.filter(total_quantity_in_stock__lte=5)[:5]:
         low_stock_products.append({
             'name': f"{item.brand} {item.name}",
-            'quantity': item.quantity_in_stock,
+            'quantity': item.total_quantity_in_stock,
             'type': 'Accessory',
-            'branch': item.branch.name if item.branch else 'N/A'
+            'branch': 'N/A'
         })
 
     # ============================================
-    # Recent sales (filtered)
+    # Recent sales & Top products
     # ============================================
-
     recent_sales = sales.select_related('branch', 'sold_by').order_by('-sale_date')[:10]
-
-    # ============================================
-    # Agent-specific stats (units owned by agent)
-    # ============================================
 
     if user.role == 'company_agent' and not is_viewing_company:
         owner = Owner.objects.filter(company=company, phone=user.phone).first()
@@ -307,10 +241,6 @@ def epa_dashboard(request):
         agent_available_units = 0
         agent_sold_units = 0
 
-    # ============================================
-    # Top selling products
-    # ============================================
-
     top_products = []
     try:
         top_items = SaleItem.objects.filter(
@@ -323,23 +253,15 @@ def epa_dashboard(request):
         pass
 
     # ============================================
-    # Stats for template
+    # Stats & Context
     # ============================================
-
     stats = {
-        # Product counts
         'total_products': total_products,
         'electronics': electronics_count,
         'phones': phones_count,
         'accessories': accessories_count,
-
-        # Unit counts (individual IMEI/Serial numbers)
         'total_unit_items': total_unit_items,
-
-        # Total stock (including accessory quantities)
         'total_stock_items': total_stock_items,
-
-        # Sales stats
         'total_sales': total_sales,
         'total_revenue': total_revenue,
         'today_sales': today_count,
@@ -349,20 +271,17 @@ def epa_dashboard(request):
         'month_sales': month_count,
         'month_revenue': month_revenue,
         'low_stock': len(low_stock_products),
-
-        # Last week (for comparison)
         'last_week_sales': last_week_count,
         'last_week_revenue': last_week_revenue,
-
-        # Agent-specific stats
         'agent_units': agent_units_count,
         'agent_available': agent_available_units,
         'agent_sold': agent_sold_units,
+        
+        # 👇 DONUT CHART DATA ADDED HERE
+        'phones_unit_count': phones_unit_count,
+        'electronics_unit_count': electronics_unit_count,
+        'accessories_unit_count': accessories_unit_count,
     }
-
-    # ============================================
-    # Context
-    # ============================================
 
     context = {
         'company': company,

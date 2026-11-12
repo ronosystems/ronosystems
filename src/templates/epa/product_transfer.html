@@ -1,0 +1,336 @@
+{% extends 'base.html' %}
+
+{% block title %}Transfer {{ product.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .transfer-layout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        align-items: start;
+    }
+    @media (max-width: 992px) {
+        .transfer-layout { grid-template-columns: 1fr; }
+    }
+    .card-custom {
+        border: 2px solid #000;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+    .card-header-custom {
+        background: #87CEEB;
+        border-bottom: 2px solid #000;
+        padding: 12px 16px;
+        font-weight: 700;
+    }
+    .card-body-custom { padding: 20px; }
+    .form-label { font-weight: 600; font-size: 0.9rem; }
+    .form-control, .form-select { border: 2px solid #000; }
+    
+    .unit-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin-bottom: 6px;
+        background: #f8f9fa;
+    }
+    .unit-item:hover { background: #e9ecef; }
+    .unit-id { font-family: monospace; font-weight: 700; font-size: 14px; }
+    
+    .suggestion-box {
+        position: absolute;
+        width: 100%;
+        background: white;
+        border: 1px solid #ccc;
+        border-top: none;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 1000;
+        display: none;
+    }
+    .suggestion-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        border-bottom: 1px solid #eee;
+    }
+    .suggestion-item:hover { background: #f0f0f0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-truck text-primary"></i> Transfer Stock</h2>
+        <a href="/epa_shop/products/{{ product.product_code }}/" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Product
+        </a>
+    </div>
+
+    <div class="alert alert-info border-dark">
+        <strong>Product Name:</strong> {{ product.name }} <br>
+        <strong>Product Code:</strong> {{ product.product_code }} <br>
+        <strong>Product Type:</strong> {{ product_type }} <br>
+        {% if product_type == 'Accessory' %}
+            <strong>Available Quantity:</strong> {{ total_quantity }}
+        {% else %}
+            <strong>Available Units:</strong> {{ total_quantity }}
+        {% endif %}
+        <strong>Company-Stock:</strong> {{ total_branch_stock }} units
+    </div>
+
+    <form method="post" id="transferForm">
+        {% csrf_token %}
+        
+        <div class="transfer-layout">
+            <!-- LEFT COLUMN: Form & Scanning -->
+            <div>
+                <div class="card-custom">
+                    <div class="card-header-custom"><i class="fas fa-store"></i> 1. Branches</div>
+                    <div class="card-body-custom">
+                        <div class="mb-3">
+                            <label class="form-label">From Branch (Source)</label>
+                            <select name="from_branch" id="fromBranch" class="form-select" required>
+                                <option value="">-- Select Source --</option>
+                                {% for item in branches_with_stock %}
+                                    <option value="{{ item.branch.id }}" data-qty="{{ item.quantity }}">
+                                        {{ item.branch.name }} ({{ item.quantity }} available)
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">To Branch (Destination)</label>
+                            <select name="to_branch" id="toBranch" class="form-select" required>
+                                <option value="">-- Select Destination --</option>
+                                {% for b in all_branches %}
+                                    <option value="{{ b.id }}">{{ b.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-custom">
+                    <div class="card-header-custom"><i class="fas fa-barcode"></i> 2. Scan / Select Units</div>
+                    <div class="card-body-custom">
+                        <p class="text-muted small mb-2">
+                            {% if product_type == 'Accessory' %}
+                                Enter the quantity of accessories to transfer.
+                            {% else %}
+                                Scan or type IMEI/Serial numbers to add them to the transfer list.
+                            {% endif %}
+                        </p>
+
+                        {% if product_type == 'Accessory' %}
+                            <label class="form-label">Quantity</label>
+                            <input type="number" name="quantity" class="form-control" min="1" required placeholder="Enter quantity...">
+                        {% else %}
+                            <label class="form-label">Scan IMEI / Serial</label>
+                            <div style="position: relative;">
+                                <input type="text" id="unitScanner" class="form-control" placeholder="Scan or type IMEI..." autocomplete="off">
+                                <div id="suggestions" class="suggestion-box"></div>
+                            </div>
+                            <input type="hidden" name="selected_units" id="selectedUnitsInput" value="[]">
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-primary btn-lg fw-bold border-dark border-2" id="submitBtn">
+                        <i class="fas fa-exchange-alt"></i> Execute Transfer
+                    </button>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Preview List -->
+            {% if product_type != 'Accessory' %}
+            <div>
+                <div class="card-custom h-100">
+                    <div class="card-header-custom d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-list"></i> Selected Units</span>
+                        <span class="badge bg-dark" id="countBadge">0</span>
+                    </div>
+                    <div class="card-body-custom" style="max-height: 500px; overflow-y: auto;" id="previewList">
+                        <div class="text-center text-muted py-5" id="emptyState">
+                            <i class="fas fa-box-open fa-3x mb-3" style="opacity:0.3;"></i>
+                            <p>No units selected yet.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const productType = "{{ product_type }}";
+    if (productType === 'Accessory') return; // Skip JS for accessories
+
+    const scannerInput = document.getElementById('unitScanner');
+    const suggestionsBox = document.getElementById('suggestions');
+    const previewList = document.getElementById('previewList');
+    const emptyState = document.getElementById('emptyState');
+    const countBadge = document.getElementById('countBadge');
+    const hiddenInput = document.getElementById('selectedUnitsInput');
+    const fromBranch = document.getElementById('fromBranch');
+    const toBranch = document.getElementById('toBranch');
+    
+    let selectedUnits = [];
+    let debounceTimer = null;
+
+    // Prevent selecting same branch in both dropdowns
+    fromBranch.addEventListener('change', function() {
+        const val = this.value;
+        Array.from(toBranch.options).forEach(opt => {
+            opt.disabled = false;
+            if(opt.value === val) opt.disabled = true;
+        });
+        if (toBranch.value === val) toBranch.value = "";
+        
+        // Clear selected units if source branch changes
+        selectedUnits = [];
+        updateUI();
+    });
+
+    // Handle typing (Live Search)
+    scannerInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        const sourceBranchId = fromBranch.value; 
+        
+        clearTimeout(debounceTimer);
+        
+        // 👇 CHANGED TO < 1 SO IT TRIGGERS ON THE FIRST LETTER
+        if (query.length < 1) {
+            suggestionsBox.style.display = 'none';
+            return;
+        }
+
+        if (!sourceBranchId) {
+            suggestionsBox.innerHTML = '<div class="suggestion-item text-danger">Please select a source branch first.</div>';
+            suggestionsBox.style.display = 'block';
+            return;
+        }
+
+        debounceTimer = setTimeout(() => {
+            // Fetch suggestions from backend
+            fetch(`/epa_shop/products/search-units/?q=${encodeURIComponent(query)}&product_id={{ product.pk }}&branch_id=${sourceBranchId}`)
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    suggestionsBox.innerHTML = '';
+                    if (data.units && data.units.length > 0) {
+                        data.units.forEach(u => {
+                            // Only show if not already selected
+                            if (!selectedUnits.includes(u.identifier)) {
+                                const div = document.createElement('div');
+                                div.className = 'suggestion-item';
+                                div.innerHTML = `<strong>${u.identifier}</strong> <small class="text-muted">(${u.status})</small>`;
+                                div.onclick = () => addUnit(u.identifier);
+                                suggestionsBox.appendChild(div);
+                            }
+                        });
+                        if (suggestionsBox.children.length > 0) {
+                            suggestionsBox.style.display = 'block';
+                        } else {
+                            suggestionsBox.style.display = 'none';
+                        }
+                    } else {
+                        suggestionsBox.innerHTML = '<div class="suggestion-item text-muted">No available units found.</div>';
+                        suggestionsBox.style.display = 'block';
+                    }
+                })
+                .catch(err => {
+                    console.error('Fetch error:', err);
+                    suggestionsBox.innerHTML = '<div class="suggestion-item text-danger">Error fetching units. Check console.</div>';
+                    suggestionsBox.style.display = 'block';
+                });
+        }, 300);
+    });
+
+    // Hide suggestions when clicking outside
+    document.addEventListener('click', function(e) {
+        if (e.target !== scannerInput) {
+            suggestionsBox.style.display = 'none';
+        }
+    });
+
+    // Handle Enter Key (Exact Match Scan)
+    scannerInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const val = this.value.trim();
+            const sourceBranchId = fromBranch.value;
+            
+            if (!sourceBranchId) {
+                alert("Please select a source branch first.");
+                return;
+            }
+
+            if (val) {
+                addUnit(val);
+                this.value = '';
+                suggestionsBox.style.display = 'none';
+            }
+        }
+    });
+
+    function addUnit(identifier) {
+        if (selectedUnits.includes(identifier)) {
+            alert('This unit is already in the list.');
+            return;
+        }
+        
+        selectedUnits.push(identifier);
+        updateUI();
+        scannerInput.value = '';
+        scannerInput.focus();
+    }
+
+    function removeUnit(identifier) {
+        selectedUnits = selectedUnits.filter(id => id !== identifier);
+        updateUI();
+    }
+
+    function updateUI() {
+        hiddenInput.value = JSON.stringify(selectedUnits);
+        countBadge.textContent = selectedUnits.length;
+        
+        if (selectedUnits.length === 0) {
+            emptyState.style.display = 'block';
+            Array.from(previewList.querySelectorAll('.unit-item')).forEach(el => el.remove());
+            return;
+        }
+
+        emptyState.style.display = 'none';
+        
+        // Clear and re-render list
+        Array.from(previewList.querySelectorAll('.unit-item')).forEach(el => el.remove());
+        
+        selectedUnits.forEach(id => {
+            const div = document.createElement('div');
+            div.className = 'unit-item';
+            div.innerHTML = `
+                <span class="unit-id">${id}</span>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeUnit('${id}')">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            previewList.appendChild(div);
+        });
+    }
+
+    // Expose removeUnit to window for inline onclick
+    window.removeUnit = removeUnit;
+});
+</script>
+{% endblock %}

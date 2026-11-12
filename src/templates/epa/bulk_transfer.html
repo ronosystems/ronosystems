@@ -407,15 +407,12 @@
        RESPONSIVE — MOBILE (≤768px)
     ============================================ */
     @media (max-width: 768px) {
-        /* Layout stacks to 1 col */
         .bt-layout { grid-template-columns: 1fr; gap: 14px; }
 
-        /* Card padding */
         .bt-card-body { padding: 14px; }
         .bt-card-header { padding: 10px 12px; }
         .bt-card-header h5 { font-size: 0.88rem; }
 
-        /* Form labels / inputs */
         .bt-label { font-size: 0.8rem; }
         .bt-input, .bt-select {
             font-size: 12px;
@@ -427,7 +424,6 @@
             font-size: 12px;
         }
 
-        /* Type options — still 2 in one row */
         .bt-type-row {
             grid-template-columns: 1fr 1fr;
             gap: 6px;
@@ -445,14 +441,12 @@
         .bt-type-option .bt-type-desc { font-size: 0.65rem; }
         .bt-type-option .bt-type-label i { font-size: 0.75rem; }
 
-        /* From/To row — 2 cols with smaller arrow */
         .bt-row {
             grid-template-columns: 1fr 30px 1fr;
             gap: 8px;
         }
         .bt-arrow { font-size: 18px; padding-bottom: 6px; }
 
-        /* Mode toggle */
         .bt-mode-row {
             gap: 10px;
             padding: 8px 10px;
@@ -463,7 +457,6 @@
             height: 15px;
         }
 
-        /* Submit bar — side by side */
         .bt-submit-bar {
             padding: 12px 14px;
             gap: 8px;
@@ -480,7 +473,6 @@
             text-overflow: ellipsis;
         }
 
-        /* Preview table */
         .pv-table-wrap { max-height: 320px; }
         .pv-summary { padding: 8px 10px; gap: 5px; font-size: 11px; }
         .pv-summary .chip {
@@ -494,7 +486,6 @@
         .pv-table th { font-size: 10px; }
         .pv-badge { font-size: 10px; padding: 2px 8px; }
 
-        /* Server results */
         .bt-result-table { font-size: 12px; }
         .bt-result-table th,
         .bt-result-table td { padding: 5px 8px; }
@@ -574,6 +565,47 @@
 <div style="max-width: 1400px; margin: 0 auto;">
 
     <!-- ============================================ -->
+    <!-- PENDING TRANSFERS (IN TRANSIT)                -->
+    <!-- ============================================ -->
+    {% if pending_transfers %}
+    <div class="bt-card border-warning mb-4">
+        <div class="bt-card-header bg-warning text-dark">
+            <h5><i class="fas fa-truck"></i> Incoming Stock (In Transit)</h5>
+        </div>
+        <div class="bt-card-body p-0">
+            <table class="table table-bordered mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Transfer #</th>
+                        <th>Product</th>
+                        <th>From Branch</th>
+                        <th>To Branch</th>
+                        <th>Qty</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in pending_transfers %}
+                    <tr>
+                        <td><strong>{{ t.transfer_number }}</strong></td>
+                        <td>{{ t.product.name }} ({{ t.product.product_code }})</td>
+                        <td>{{ t.from_branch.name }}</td>
+                        <td>{{ t.to_branch.name }}</td>
+                        <td><span class="badge bg-dark">{{ t.quantity }}</span></td>
+                        <td>
+                            <a href="{% url 'receive-transfer' t.id %}" class="btn btn-sm btn-success">
+                                <i class="fas fa-check"></i> Receive Stock
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ============================================ -->
     <!-- TWO-COLUMN LAYOUT                             -->
     <!-- ============================================ -->
     <div class="bt-layout">
@@ -645,7 +677,7 @@
                                 <div class="bt-arrow"><i class="fas fa-arrow-right"></i></div>
                                 <div>
                                     <label class="bt-label required">To Branch</label>
-                                    <select class="bt-select" name="to_branch">
+                                    <select class="bt-select" name="to_branch" id="sel-to-branch">
                                         <option value="">— Select destination —</option>
                                         {% for b in branches %}
                                         <option value="{{ b.id }}">{{ b.name }}</option>
@@ -687,7 +719,7 @@
                                 <div class="bt-arrow"><i class="fas fa-arrow-right"></i></div>
                                 <div>
                                     <label class="bt-label required">To User</label>
-                                    <select class="bt-select" name="to_user">
+                                    <select class="bt-select" name="to_user" id="sel-to-user">
                                         <option value="">— Select destination user —</option>
                                         {% for u in users %}
                                         <option value="{{ u.id }}">
@@ -903,37 +935,52 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // ============================================================
-    // From-source mode toggle
+    // From-source mode toggle & Dropdown Exclusions
     // ============================================================
     const branchModeRadios = document.querySelectorAll('input[name="from_mode_branch"]');
     const selFromBranch    = document.getElementById('sel-from-branch');
-    const lblFromBranch    = document.getElementById('lbl-from-branch');
-    const hintFromBranch   = document.getElementById('hint-from-branch');
+    const selToBranch      = document.getElementById('sel-to-branch');
+    
+    // Exclude source branch from destination branch
+    if (selFromBranch && selToBranch) {
+        selFromBranch.addEventListener('change', function() {
+            const sourceVal = this.value;
+            
+            // Reset all options in destination
+            Array.from(selToBranch.options).forEach(opt => opt.disabled = false);
 
+            if (sourceVal) {
+                // Find matching option in destination and disable it
+                const toOpt = Array.from(selToBranch.options).find(opt => opt.value === sourceVal);
+                if (toOpt) {
+                    toOpt.disabled = true;
+                    // If the destination was already selected, reset it
+                    if (selToBranch.value === sourceVal) {
+                        selToBranch.value = "";
+                    }
+                }
+            }
+        });
+    }
+
+    const lblFromBranch = document.getElementById('lbl-from-branch');
     branchModeRadios.forEach(r => r.addEventListener('change', () => {
         const specific = document.querySelector('input[name="from_mode_branch"]:checked').value === 'specific';
         selFromBranch.disabled = !specific;
         selFromBranch.required = specific;
-        lblFromBranch.classList.toggle('required', specific);
-        hintFromBranch.textContent = specific
-            ? 'Only units currently in this branch will be moved. Others will be skipped.'
-            : 'Units from any branch will be moved. Units already in the destination will be updated in place.';
+        if(lblFromBranch) lblFromBranch.classList.toggle('required', specific);
         syncFromModeHidden();
     }));
 
     const userModeRadios = document.querySelectorAll('input[name="from_mode_user"]');
     const selFromUser    = document.getElementById('sel-from-user');
     const lblFromUser    = document.getElementById('lbl-from-user');
-    const hintFromUser   = document.getElementById('hint-from-user');
-
+    
     userModeRadios.forEach(r => r.addEventListener('change', () => {
         const specific = document.querySelector('input[name="from_mode_user"]:checked').value === 'specific';
         selFromUser.disabled = !specific;
         selFromUser.required = specific;
-        lblFromUser.classList.toggle('required', specific);
-        hintFromUser.textContent = specific
-            ? 'Only units currently assigned to this user will be moved. Others will be skipped.'
-            : 'Units from any user — including unassigned stock — will be reassigned to the destination.';
+        if(lblFromUser) lblFromUser.classList.toggle('required', specific);
         syncFromModeHidden();
     }));
 
