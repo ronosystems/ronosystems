@@ -143,56 +143,33 @@ def contact(request):
 
 
 from django.http import JsonResponse
-from django.conf import settings
+from django.templatetags.static import static
 
 def manifest_view(request):
-    """
-    Generate the PWA manifest, pulling the logo from the database.
-    Never falls back to static() because that crashes in production
-    when ManifestStaticFilesStorage is enabled.
-    """
-    icon_url = None
-
-    # 1. Try the current user's company logo
-    if request.user.is_authenticated and getattr(request.user, 'company', None):
-        company = request.user.company
-        logo = getattr(company, 'logo', None)
-        if logo:
-            if hasattr(company, 'logo_url'):
-                icon_url = company.logo_url
-            else:
-                try:
-                    icon_url = logo.url
-                except Exception:
-                    icon_url = None
-
-    # 2. Fall back to a hardcoded production URL (Cloudinary static icon)
-    if not icon_url:
-        icon_url = "https://res.cloudinary.com/dg9it0ut8/image/upload/companies/1_1789797176"
-
-    # 3. Ensure it's absolute
-    if icon_url.startswith('/'):
-        icon_url = request.build_absolute_uri(icon_url)
+    # Force absolute URLs to the static images we just created
+    icon_192 = request.build_absolute_uri(static('images/icon-192.png'))
+    icon_512 = request.build_absolute_uri(static('images/icon-512.png'))
 
     manifest = {
         "name": "RONOSYSTEMS",
         "short_name": "RONOSYSTEMS",
+        "description": "Manage your business smarter and faster with RonoSystems.",
         "start_url": "/epa_shop/pos/",
         "display": "standalone",
         "background_color": "#f0f2f5",
         "theme_color": "#1e4e6d",
         "icons": [
             {
-                "src": icon_url,
+                "src": icon_192,
                 "sizes": "192x192",
                 "type": "image/png",
                 "purpose": "any"
             },
             {
-                "src": icon_url,
+                "src": icon_512,
                 "sizes": "512x512",
                 "type": "image/png",
-                "purpose": "maskable"
+                "purpose": "any maskable"
             }
         ]
     }
