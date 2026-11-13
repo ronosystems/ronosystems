@@ -148,30 +148,47 @@ def contact(request):
 # ============================================
 
 def manifest_view(request):
-    """
-    Generate a dynamic multi-tenant PWA manifest.
-    Reads the company name and logo dynamically.
-    """
-    company_name = "RONOSYSTEMS"
-    icon_url = request.build_absolute_uri(static('images/icon-512.png'))
-    company = None
+    from apps.companies.models import Company
+    from django.templatetags.static import static
+    from django.http import JsonResponse
 
-    # 1. Try to get the company from the logged-in user
-    if request.user.is_authenticated and getattr(request.user, 'company', None):
-        company = request.user.company
-    # 2. Fallback: Allow fetching via ?company_id=X (useful for background PWABuilder requests)
-    elif request.GET.get('company_id'):
+    company = None
+    
+    # 1. Check URL parameter first
+    company_id = request.GET.get('company_id')
+    if company_id:
         try:
-            from apps.companies.models import Company
-            company = Company.objects.get(id=request.GET.get('company_id'))
+            company = Company.objects.get(id=company_id)
+        except Company.DoesNotExist:
+            pass
+    
+    # 2. If no company_id, check logged-in user
+    if not company and request.user.is_authenticated and getattr(request.user, 'company', None):
+        company = request.user.company
+
+    # 3. If STILL no company, try to match the domain name to a company!
+    if not company:
+        host = request.get_host().split(':')[0] # Gets 'fieldmax.shop' or 'ronosystems.onrender.com'
+        # Try to find a company whose custom domain or name matches the host
+        try:
+            # Assuming you have a field called 'domain' or 'subdomain' on Company. 
+            # If not, we can do a name match:
+            company = Company.objects.filter(custom_domain__iexact=host).first()
+            
+            # Fallback: If host contains 'fieldmax', find company named 'Fieldmax'
+            if not company and 'fieldmax' in host:
+                company = Company.objects.filter(display_name__icontains='fieldmax').first()
+                
         except Exception:
             pass
 
-    # 3. Apply the company's dynamic data
+    # 4. Build the manifest data
+    company_name = "RONOSYSTEMS" # Default Platform Name
+    icon_url = request.build_absolute_uri(static('images/icon-512.png'))
+
     if company:
         if company.display_name:
             company_name = company.display_name.upper()
-        
         if company.logo:
             try:
                 if hasattr(company, 'logo_url') and company.logo_url:
@@ -181,15 +198,13 @@ def manifest_view(request):
             except Exception:
                 pass
 
-    # 4. Force a valid PNG format for PWABuilder and Android (512x512)
+    # Force PNG for PWABuilder
     if not icon_url.endswith('.png'):
         if 'cloudinary' in icon_url:
-             # Force Cloudinary to resize to 512x512 and output PNG
-             icon_url = icon_url.replace('/upload/', '/upload/w_512,h_512,c_fill/') + '.png'
+            icon_url = icon_url.replace('/upload/', '/upload/w_512,h_512,c_fill/') + '.png'
         else:
-             icon_url = request.build_absolute_uri(static('images/icon-512.png'))
+            icon_url = request.build_absolute_uri(static('images/icon-512.png'))
 
-    # 5. Build the manifest
     manifest = {
         "name": company_name,
         "short_name": company_name,
@@ -199,26 +214,13 @@ def manifest_view(request):
         "background_color": "#f0f2f5",
         "theme_color": "#1e4e6d",
         "icons": [
-            {
-                "src": icon_url,
-                "sizes": "192x192",
-                "type": "image/png",
-                "purpose": "any"
-            },
-            {
-                "src": icon_url,
-                "sizes": "512x512",
-                "type": "image/png",
-                "purpose": "any maskable"
-            }
+            {"src": icon_url, "sizes": "192x192", "type": "image/png", "purpose": "any"},
+            {"src": icon_url, "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
         ]
     }
-    
-    # 6. Return with strict no-cache headers
+
     response = JsonResponse(manifest)
     response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-    response['Pragma'] = 'no-cache'
-    response['Expires'] = '0'
     return response
 
 
