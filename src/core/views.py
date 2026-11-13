@@ -198,3 +198,29 @@ def manifest_view(request):
     }
     return JsonResponse(manifest)
     
+
+
+from django.http import HttpResponse
+from django.templatetags.static import static as static_url
+import os
+from django.conf import settings
+
+def service_worker(request):
+    """Serve sw.js from the root path so PWABuilder and Chrome can find it."""
+    sw_path = os.path.join(settings.BASE_DIR, 'static', 'sw.js')
+    try:
+        with open(sw_path, 'rb') as f:
+            content = f.read()
+        return HttpResponse(content, content_type='application/javascript')
+    except FileNotFoundError:
+        # Fallback to static files storage
+        try:
+            from django.contrib.staticfiles import finders
+            result = finders.find('sw.js')
+            if result:
+                with open(result, 'rb') as f:
+                    content = f.read()
+                return HttpResponse(content, content_type='application/javascript')
+        except Exception:
+            pass
+        return HttpResponse("// sw.js not found", content_type='application/javascript', status=404)

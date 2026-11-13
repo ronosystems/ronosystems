@@ -6,7 +6,7 @@ from django.views.generic import TemplateView
 from apps.companies import web_views as company_views
 from apps.accounts.admin_site import restricted_admin_site
 from apps.accounts import views_guest
-from core.views import qz_sign, contact, manifest_view
+from core.views import qz_sign, contact, manifest_view, service_worker
 from core.ai_views import ai_assistant
 from . import views
 
@@ -67,6 +67,7 @@ urlpatterns = [
     path('contact/', contact, name='contact'),
     path('ai/assistant/', ai_assistant, name='ai-assistant'),
     path('manifest.json', manifest_view, name='manifest'),
+    path('sw.js', service_worker, name='service-worker'),
 
     # ============================================
     # TEMPLATE PAGES (static content)
