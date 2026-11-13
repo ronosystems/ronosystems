@@ -1,7 +1,7 @@
 import os
 import base64
 from django.conf import settings
-from django.http import JsonResponse, HttpResponse, FileResponse
+from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.core.mail import send_mail
@@ -49,9 +49,6 @@ def home(request):
     """Homepage for RonoSystems"""
     return render(request, 'home.html')
 
-# ============================================
-# API ROOT
-# ============================================
 
 def api_root(request):
     """API Root endpoint"""
@@ -93,9 +90,6 @@ def api_root(request):
         }
     })
 
-# ============================================
-# CONTACT FORM
-# ============================================
 
 def contact(request):
     """
@@ -155,32 +149,47 @@ def contact(request):
 
 def manifest_view(request):
     """
-    Generate the PWA manifest dynamically using the company's name and logo.
+    Generate a dynamic multi-tenant PWA manifest.
+    Reads the company name and logo dynamically.
     """
     company_name = "RONOSYSTEMS"
     icon_url = request.build_absolute_uri(static('images/icon-512.png'))
+    company = None
 
+    # 1. Try to get the company from the logged-in user
     if request.user.is_authenticated and getattr(request.user, 'company', None):
         company = request.user.company
+    # 2. Fallback: Allow fetching via ?company_id=X (useful for background PWABuilder requests)
+    elif request.GET.get('company_id'):
+        try:
+            from apps.companies.models import Company
+            company = Company.objects.get(id=request.GET.get('company_id'))
+        except Exception:
+            pass
+
+    # 3. Apply the company's dynamic data
+    if company:
         if company.display_name:
             company_name = company.display_name.upper()
         
         if company.logo:
             try:
-                if hasattr(company, 'logo_url'):
+                if hasattr(company, 'logo_url') and company.logo_url:
                     icon_url = company.logo_url
                 else:
                     icon_url = request.build_absolute_uri(company.logo.url)
             except Exception:
                 pass
 
-    # Force the icon to be a PNG format for PWABuilder validation
+    # 4. Force a valid PNG format for PWABuilder and Android (512x512)
     if not icon_url.endswith('.png'):
         if 'cloudinary' in icon_url:
+             # Force Cloudinary to resize to 512x512 and output PNG
              icon_url = icon_url.replace('/upload/', '/upload/w_512,h_512,c_fill/') + '.png'
         else:
              icon_url = request.build_absolute_uri(static('images/icon-512.png'))
 
+    # 5. Build the manifest
     manifest = {
         "name": company_name,
         "short_name": company_name,
@@ -204,7 +213,13 @@ def manifest_view(request):
             }
         ]
     }
-    return JsonResponse(manifest)
+    
+    # 6. Return with strict no-cache headers
+    response = JsonResponse(manifest)
+    response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response['Pragma'] = 'no-cache'
+    response['Expires'] = '0'
+    return response
 
 
 # ============================================
@@ -234,6 +249,7 @@ def service_worker(request):
 # ============================================
 # PWA: ASSET LINKS
 # ============================================
+
 def asset_links(request):
     """Serve the assetlinks.json for Android TWA verification."""
     file_path = os.path.join(settings.BASE_DIR, 'static', '.well-known', 'assetlinks.json')
