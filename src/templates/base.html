@@ -1862,89 +1862,109 @@
         const btnText = installBtn ? installBtn.querySelector('span') : null;
         const btnIcon = installBtn ? installBtn.querySelector('i') : null;
 
-        // 1. Detect if the app is running as a standalone installed app
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+        // Function to set button to "Install" state
+        function setInstallState() {
+            if (!installBtn) return;
+            installBtn.style.display = 'flex';
+            installBtn.style.background = '#28a745'; // Green
+            if (btnText) btnText.textContent = 'Install App';
+            if (btnIcon) btnIcon.className = 'fas fa-download';
+        }
 
-        // 2. Capture the install prompt
+        // Function to set button to "Update" state
+        function setUpdateState() {
+            if (!installBtn) return;
+            installBtn.style.display = 'flex';
+            installBtn.style.background = '#007bff'; // Blue
+            if (btnText) btnText.textContent = 'Update App';
+            if (btnIcon) btnIcon.className = 'fas fa-sync-alt';
+        }
+
+        // 1. Check if app is already installed on load
+        async function checkInstallStatus() {
+            // If running as standalone app, hide the button (they are already inside the app)
+            if (window.matchMedia('(display-mode: standalone)').matches) {
+                if (installBtn) installBtn.style.display = 'none';
+                return;
+            }
+
+            // Check related apps API (Supported by Chrome/Edge)
+            if (navigator.getInstalledRelatedApps) {
+                try {
+                    const relatedApps = await navigator.getInstalledRelatedApps();
+                    if (relatedApps.length > 0) {
+                        // App is installed -> Set to Update
+                        setUpdateState();
+                        return;
+                    }
+                } catch (e) {
+                    console.log('Error checking installed apps:', e);
+                }
+            }
+            
+            // Default to install state if not installed
+            setInstallState();
+        }
+
+        // Run the check immediately
+        checkInstallStatus();
+
+        // 2. Capture the install prompt (Only fires if NOT installed)
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            
-            if (installBtn && !isStandalone) {
-                installBtn.style.display = 'flex';
-                if (btnText) btnText.textContent = 'Install App';
-                if (btnIcon) btnIcon.className = 'fas fa-download';
-                installBtn.style.background = '#28a745'; // Green
-            }
+            setInstallState();
         });
 
-        // 3. Handle Button Click
+        // 3. Handle the button click
         if (installBtn) {
             installBtn.addEventListener('click', async () => {
-                // A. If we have an install prompt, show it
+                // If we have a prompt, install it
                 if (deferredPrompt) {
                     deferredPrompt.prompt();
                     const { outcome } = await deferredPrompt.userChoice;
                     if (outcome === 'accepted') {
-                        installBtn.style.display = 'none';
+                        // They installed it! Change button to update state
+                        setUpdateState();
                     }
                     deferredPrompt = null;
                     return;
                 }
 
-                // B. If not installed but no prompt (browser restriction)
-                if (!isStandalone) {
-                    if (btnText) btnText.textContent = 'Use Menu to Install';
-                    if (btnIcon) btnIcon.className = 'fas fa-info-circle';
-                    setTimeout(() => {
-                        if (btnText) btnText.textContent = 'Install App';
-                        if (btnIcon) btnIcon.className = 'fas fa-download';
-                    }, 3000);
-                    return;
-                }
-
-                // C. If installed and there is an update, reload the page
-                if (window._appNeedsUpdate) {
-                    window.location.reload();
-                } else {
-                    // D. If installed and up to date
-                    if (btnText) btnText.textContent = 'App is Up to Date';
-                    if (btnIcon) btnIcon.className = 'fas fa-check';
-                    installBtn.style.background = '#6c757d'; // Gray
-                    setTimeout(() => {
-                        if (btnText) btnText.textContent = 'Update App';
-                        if (btnIcon) btnIcon.className = 'fas fa-sync-alt';
-                        installBtn.style.background = '#007bff'; // Blue
-                    }, 3000);
+                // If it's already installed (Update App clicked)
+                if (btnText && btnText.textContent.includes('Update')) {
+                    if (btnIcon) btnIcon.className = 'fas fa-spinner fa-spin';
+                    if (btnText) btnText.textContent = 'Checking for updates...';
+                    
+                    // Force the Service Worker to check for a new version and reload
+                    if ('serviceWorker' in navigator) {
+                        const reg = await navigator.serviceWorker.getRegistration();
+                        if (reg) {
+                            await reg.update();
+                        }
+                    }
+                    // Reload the page to apply any updates
+                    setTimeout(() => window.location.reload(), 1000);
                 }
             });
         }
 
-        // 4. Service Worker Registration & Update Logic
+        // 4. Register Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js').then(reg => {
-                    
-                    // If the app is already installed, set the button to "Update App"
-                    if (isStandalone && installBtn) {
-                        installBtn.style.display = 'flex';
-                        installBtn.style.background = '#007bff'; // Blue
-                        if (btnText) btnText.textContent = 'Update App';
-                        if (btnIcon) btnIcon.className = 'fas fa-sync-alt';
-                    }
-
-                    // Check if there is a new version waiting
+                    // Check for a new version in the background
                     reg.addEventListener('updatefound', () => {
                         const newWorker = reg.installing;
                         newWorker.addEventListener('statechange', () => {
                             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                // A new update is ready!
-                                window._appNeedsUpdate = true;
-                                if (installBtn && isStandalone) {
-                                    if (btnText) btnText.textContent = 'Update Available!';
-                                    if (btnIcon) btnIcon.className = 'fas fa-arrow-up';
+                                // A NEW UPDATE IS READY!
+                                if (installBtn) {
                                     installBtn.style.background = '#ffc107'; // Yellow
                                     installBtn.style.color = '#000';
+                                    if (btnText) btnText.textContent = 'Update Available!';
+                                    if (btnIcon) btnIcon.className = 'fas fa-arrow-up';
+                                    installBtn.style.display = 'flex';
                                 }
                             }
                         });
@@ -1952,7 +1972,7 @@
                 });
             });
 
-            // Force reload when the new service worker takes over
+            // Force reload when the new Service Worker takes over
             let refreshing;
             navigator.serviceWorker.addEventListener('controllerchange', () => {
                 if (refreshing) return;
@@ -1961,7 +1981,6 @@
             });
         }
     </script>
-
 
     {% block extra_js %}{% endblock %}
 </body>
