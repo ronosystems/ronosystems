@@ -1054,6 +1054,7 @@ def scanner_lookup(request):
                     'selling_price': float(product.selling_price),
                     'best_price': float(product.best_price) if product.best_price else 0,
                     'purchase_price': float(product.purchase_price),
+                    'image': product.image_url,
                     'detail_url': f'/epa_shop/products/{product.product_code}/',
                     'units_url': f'/epa_shop/products/{product.product_code}/units/',
                 },
@@ -1125,6 +1126,7 @@ def scanner_lookup(request):
                 'selling_price': float(product.selling_price),
                 'best_price': float(product.best_price) if product.best_price else 0,
                 'purchase_price': float(product.purchase_price),
+                'image': product.image_url, # 👈 ADD THIS LINE
                 'detail_url': f'/epa_shop/products/{product.product_code}/',
                 'units_url': f'/epa_shop/products/{product.product_code}/units/',
             },
