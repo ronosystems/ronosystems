@@ -209,7 +209,6 @@ import os
 from django.conf import settings
 
 def asset_links(request):
-    # Create a folder called '.well-known' in your 'static' folder and put assetlinks.json there
     file_path = os.path.join(settings.BASE_DIR, 'static', '.well-known', 'assetlinks.json')
     try:
         with open(file_path, 'r') as f:
