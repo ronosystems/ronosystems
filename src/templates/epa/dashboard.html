@@ -162,7 +162,7 @@
         border-radius: 6px; padding: 20px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.03);
         height: 100%; display: flex; flex-direction: column;
-        overflow: hidden; /* Prevents chart from breaking out */
+        overflow: hidden;
     }
     .panel-title {
         font-size: 0.85rem; font-weight: 800; text-transform: uppercase;
@@ -231,9 +231,37 @@
        CASHIER / AGENT
     ============================================ */
     .cashier-full-banner { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 45px 20px; min-height: 220px; box-shadow: #000000 0px 4px 12px rgb(0, 0, 0); }
-    .cashier-branch-wrapper { width: 100%; overflow: hidden; margin-top: 18px; padding-top: 18px; border-top: 2px dashed #000; -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%); mask-image: linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%); }
-    .cashier-branch-name { font-size: clamp(4rem, 6vw, 6rem); font-weight: 1000; text-transform: uppercase; text-shadow: 2px 2px 0 #000; letter-spacing: 4px; color: #fc5c00; white-space: nowrap; padding-left: 100%; animation: branchMarquee 15s linear infinite; }
-    @keyframes branchMarquee { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+    
+    /* 👇 FIXED MARQUEE ANIMATION */
+    .cashier-branch-wrapper { 
+        width: 100%; 
+        overflow: hidden; 
+        margin-top: 18px; 
+        padding-top: 18px; 
+        border-top: 2px dashed #000; 
+        position: relative;
+    }
+    .cashier-branch-name { 
+        display: inline-block; 
+        white-space: nowrap; 
+        font-size: clamp(4rem, 6vw, 6rem); 
+        font-weight: 1000; 
+        text-transform: uppercase; 
+        text-shadow: 2px 2px 0 #000; 
+        letter-spacing: 4px; 
+        color: #fc5c00; 
+        animation: marquee 20s linear infinite; 
+        padding-left: 100%;
+    }
+    @keyframes marquee {
+        0%   { transform: translateX(0); }
+        100% { transform: translateX(-100%); }
+    }
+    .cashier-branch-wrapper:hover .cashier-branch-name {
+        animation-play-state: paused;
+    }
+    /* 👆 END FIXED MARQUEE */
+
     .cashier-scanner-wrap { margin-top: 22px; width: 100%; max-width: 760px; text-align: left; }
     .cashier-scan-input-wrap { display: flex; gap: 8px; background: #000; border: 3px solid #000; border-radius: 10px; padding: 6px; box-shadow: 0 6px 0 rgba(0,0,0,0.35); }
     .cashier-scan-input-wrap .scan-icon { display: flex; align-items: center; justify-content: center; padding: 0 16px; color: #fc5c00; font-size: 1.5rem; background: #fff; border-radius: 6px; border: 2px solid #000; }
@@ -245,11 +273,30 @@
     .csr-body { display: flex; gap: 18px; padding: 18px; }
     .csr-img-placeholder { width: 130px; height: 130px; border-radius: 10px; border: 3px solid #000; background: #e9ecef; display: flex; align-items: center; justify-content: center; font-size: 2.8rem; }
     .csr-info { flex: 1; }
-    .csr-name { font-size: 1.5rem; font-weight: 900; margin: 0 0 4px; }
+    .csr-name { font-size: 1.5rem; font-weight: 900; margin: 0 0 4px; color: #000; }
     .csr-prices { display: flex; gap: 12px; margin-top: 6px; }
     .csr-price-box { background: #f0faff; border: 3px solid #000; border-radius: 10px; padding: 10px 16px; }
     .csr-price-box.best { background: #d4edda; border-color: #155724; }
     .csr-price-box.best.locked { background: #333; border-color: #000; cursor: pointer; color: #ffcc00; }
+    
+    /* 👇 ADDED MISSING STYLES FOR TEXT VISIBILITY 👇 */
+    .csr-price-label { 
+        font-size: 0.75rem; 
+        font-weight: 700; 
+        color: #333; 
+        text-transform: uppercase; 
+        margin-bottom: 4px; 
+    }
+    .csr-price-value { 
+        font-size: 1.2rem; 
+        font-weight: 900; 
+        color: #000; 
+    }
+    .csr-price-box.best.locked .csr-price-value { 
+        color: #ffcc00; 
+    }
+    /* 👆 END NEW STYLES 👆 */
+
     .pin-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 9999; align-items: center; justify-content: center; }
     .pin-modal-overlay.show { display: flex; }
     .pin-modal { background: #fff; border: 3px solid #000; border-radius: 12px; width: 100%; max-width: 360px; overflow: hidden; }
@@ -375,7 +422,8 @@
                     <div class="cashier-scanner-wrap">
                         <div class="cashier-scan-input-wrap">
                             <span class="scan-icon"><i class="fas fa-barcode"></i></span>
-                            <input type="text" id="cashierScanInput" class="cashier-scan-input" placeholder="Scan barcode / IMEI / serial here…" autocomplete="off" autofocus spellcheck="false">
+                            <!-- FIX APPLIED: autocomplete="new-password" and name="barcode_scan" to prevent email autofill -->
+                            <input type="text" id="cashierScanInput" name="barcode_scan" class="cashier-scan-input" placeholder="Scan barcode / IMEI / serial here…" autocomplete="new-password" autofocus spellcheck="false">
                             <button type="button" id="cashierScanBtn" class="cashier-scan-btn"><i class="fas fa-search"></i> Check</button>
                         </div>
                         <div id="cashierScanResult" class="cashier-scan-result">
@@ -396,7 +444,7 @@
                         <span class="pin-modal-close" id="pinModalClose"><i class="fas fa-times"></i></span>
                     </div>
                     <div style="padding: 20px; text-align: center;">
-                        <p style="margin-bottom: 14px; font-weight: 600;">Enter PIN to reveal the <strong>Best Price</strong></p>
+                        <p style="margin-bottom: 14px; font-weight: 600; color: #000;">Enter PIN to reveal the <strong>Best Price</strong></p>
                         <input type="password" id="pinInput" class="pin-input" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••">
                         <div class="pin-error" id="pinError" style="display:none; color:#dc3545; font-weight:700; margin-top:8px;">Incorrect PIN. Try again.</div>
                     </div>
@@ -703,6 +751,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const closeBtn = document.getElementById('cashierScanClose');
     const LOOKUP_URL = "{% url 'epa-pos-search-barcode' %}";
     let lastValue = '', inFlight = false;
+
+    // FIX APPLIED: Force clear the input on page load to override browser autofill
+    window.addEventListener('load', function() {
+        setTimeout(() => {
+            if (input) {
+                input.value = '';
+                input.focus();
+            }
+        }, 100);
+    });
 
     const BEST_PRICE_PIN = '1234';
     const pinOverlay = document.getElementById('pinModalOverlay');
