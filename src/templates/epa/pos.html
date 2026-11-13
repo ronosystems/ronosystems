@@ -3,6 +3,7 @@
 {% block title %}POS{% endblock %}
 
 {% block extra_css %}
+
 <style>
     /* ============================================
        GLOBAL / ROOT
@@ -13,14 +14,14 @@
         font-family: Tahoma, Verdana, "Segoe UI", sans-serif;
         font-size: 12px;
         color: #000;
-        height: calc(100vh - 100px); /* Fixed height for the whole app */
+        height: calc(100vh - 100px);
         display: flex;
         flex-direction: column;
         user-select: none;
+        overflow-x: hidden;
     }
     .pos-root * { box-sizing: border-box; }
 
-    /* Classic WinForms panel */
     .panel {
         background: #d4d0c8;
         border: 2px solid;
@@ -46,15 +47,23 @@
     }
 
     /* ============================================
-       LAYOUT: LEFT (scan/totals) + RIGHT (ticket/tabs)
+       LAYOUT
     ============================================ */
     .pos-container {
         display: grid;
         grid-template-columns: 400px 1fr;
         gap: 8px;
         align-items: stretch;
-        flex: 1; /* Fills remaining space */
-        min-height: 0; /* Crucial for flexbox to allow inner scrolling */
+        flex: 1;
+        min-height: 0;
+        min-width: 0;
+    }
+    .pos-container > .panel,
+    .pos-container > div {
+        min-width: 0;
+    }
+    .pos-container > .panel {
+        overflow-y: auto;
     }
 
     /* ============================================
@@ -133,7 +142,7 @@
     }
 
     /* ============================================
-       PRODUCT EDIT PREVIEW PANEL
+       PRODUCT PREVIEW PANEL
     ============================================ */
     .preview-panel {
         display: none;
@@ -146,7 +155,7 @@
         flex-direction: column;
     }
     .preview-panel.active { display: flex; }
-    
+
     .preview-header {
         display: flex;
         gap: 10px;
@@ -172,22 +181,10 @@
         max-height: 100%;
         object-fit: contain;
     }
-    .preview-title {
-        font-weight: 700;
-        font-size: 14px;
-        line-height: 1.2;
-    }
-    .preview-sub {
-        font-size: 11px;
-        color: #555;
-        margin-top: 4px;
-    }
-    .preview-stock {
-        font-size: 11px;
-        font-weight: 700;
-        color: #009900;
-        margin-top: 4px;
-    }
+    .preview-title { font-weight: 700; font-size: 14px; line-height: 1.2; }
+    .preview-sub { font-size: 11px; color: #555; margin-top: 4px; }
+    .preview-stock { font-size: 11px; font-weight: 700; color: #009900; margin-top: 4px; }
+
     .preview-inputs {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -227,17 +224,16 @@
         border-color: #808080 #ffffff #ffffff #808080;
         margin-bottom: 8px;
     }
-    
+
     /* ============================================
-       TICKET TABLE (yellow grid) — main workspace
+       TICKET TABLE
     ============================================ */
     .ticket-wrap {
         background: #ffff99;
         border: 2px solid;
         border-color: #808080 #ffffff #ffffff #808080;
         flex: 1 1 auto;
-        /* HEIGHT CONTROL: 10 rows max, then scroll */
-        max-height: 800px; 
+        max-height: 800px;
         overflow-y: auto;
     }
     table.ticket {
@@ -323,22 +319,12 @@
         max-height: 100%;
         object-fit: contain;
     }
-    .ticket-preview .emoji {
-        font-size: 24px;
-    }
-    .ticket-prod-name {
-        font-weight: 700;
-        font-size: 13px;
-        line-height: 1.3;
-    }
-    .ticket-prod-meta {
-        font-size: 10px;
-        color: #666;
-        margin-top: 2px;
-    }
+    .ticket-preview .emoji { font-size: 24px; }
+    .ticket-prod-name { font-weight: 700; font-size: 13px; line-height: 1.3; }
+    .ticket-prod-meta { font-size: 10px; color: #666; margin-top: 2px; }
 
     /* ============================================
-       TOTALS BAR (2 Columns x 4 Rows - COMPACT)
+       TOTALS BAR
     ============================================ */
     .totals-grid {
         display: grid;
@@ -382,11 +368,31 @@
         overflow: hidden;
         white-space: nowrap;
     }
+
     .t-value.total-red   { background: #ff0000; color: #ffffff; font-size: 14px; }
     .t-value.paid-green  { background: #009900; color: #ffffff; font-size: 13px; }
     .t-value.due-yellow  { background: #ffff00; color: #000000; font-size: 13px; }
     .t-value.type-cell   { background: #ffcc66; justify-content: flex-start; font-size: 11px; }
     .t-value.rn-cell     { background: #ffffff; justify-content: flex-start; font-weight: 400; color: #666; font-size: 10px; }
+
+    /* ============================================
+       BIG TOTAL DISPLAY
+    ============================================ */
+    .big-total-display {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 70px;
+        background: #000;
+        color: #00ff00;
+        font-family: 'Courier New', monospace;
+        font-size: 32px;
+        font-weight: 900;
+        letter-spacing: 1px;
+        border: 2px solid;
+        border-color: #808080 #ffffff #ffffff #808080;
+        text-shadow: 0 0 8px #00ff00;
+    }
 
     /* ============================================
        BIG SUBMIT BUTTON
@@ -409,7 +415,7 @@
     }
 
     /* ============================================
-       RIGHT PANEL — TABS
+       TABS
     ============================================ */
     .tab-bar {
         display: flex;
@@ -446,13 +452,13 @@
         flex-direction: column;
         flex: 1;
         min-height: 0;
-        overflow: hidden; 
+        overflow: hidden;
     }
     .tab-content { display: none; height: 100%; flex-direction: column; overflow: hidden; }
     .tab-content.active { display: flex; }
 
     /* ============================================
-       BOTTOM FUNCTION-KEY BAR
+       FUNCTION-KEY BAR
     ============================================ */
     .fn-bar {
         margin-top: 8px;
@@ -589,9 +595,7 @@
         font-size: 13px;
         font-family: Tahoma, sans-serif;
     }
-    .modal-field input:focus {
-        background: #ffffe0;
-    }
+    .modal-field input:focus { background: #ffffe0; }
     .modal-field small { color: #555; font-size: 11px; }
     .modal-field .text-danger { color: #cc0000; }
     .pos-modal-footer {
@@ -624,7 +628,6 @@
         cursor: not-allowed;
     }
 
-    /* Checkout — active payment-method button */
     .checkout-pm { opacity: 0.55; }
     .checkout-pm.active {
         opacity: 1;
@@ -633,7 +636,6 @@
         transform: translateY(-1px);
     }
 
-    /* Payment modal */
     .payment-amount-display {
         background: #000;
         color: #00ff00;
@@ -659,7 +661,6 @@
     .payment-status.error   { display: block; background: #f8d7da; color: #721c24; }
     .payment-status.pending { display: block; background: #fff3cd; color: #856404; }
 
-    /* Toast */
     .success-toast {
         position: fixed;
         bottom: 20px;
@@ -691,7 +692,6 @@
     }
     .stock-update-indicator.error { background: #cc0000; }
 
-    /* Barcode / Search dropdown */
     .barcode-results {
         position: absolute;
         top: 100%;
@@ -735,7 +735,6 @@
     .barcode-result-item .badge-tag.sku     { background: #fff3cd; }
     .barcode-no-match { padding: 12px; text-align: center; color: #cc0000; }
 
-    /* Unit search dropdown (product modal) */
     .unit-search-container { position: relative; }
     .unit-results {
         position: absolute;
@@ -780,7 +779,6 @@
         padding: 2px 8px;
     }
 
-    /* Loading / error states */
     .grid-msg {
         grid-column: 1 / -1;
         text-align: center;
@@ -790,19 +788,165 @@
     }
 
     /* ============================================
-       RESPONSIVE GRID
+       RESPONSIVE
     ============================================ */
     @media (max-width: 1200px) {
         .pos-container { grid-template-columns: 340px 1fr; }
     }
+
     @media (max-width: 900px) {
-        .pos-container { grid-template-columns: 1fr; height: auto; }
+        .pos-root {
+            height: auto;
+            min-height: 100vh;
+            padding: 4px;
+            padding-bottom: 100px;
+        }
+
+        .pos-container {
+            grid-template-columns: 1fr;
+            height: auto;
+            gap: 6px;
+        }
+
+        .pos-container > .panel {
+            overflow-y: visible;
+            overflow-x: hidden;
+        }
+
+        .pos-container > div:last-child {
+            min-height: 420px;
+        }
+
         .pos-label { width: 80px; }
-        .fn-bar { flex-wrap: wrap; }
-        .fn-btn { min-width: 60px; }
-        .ticket-wrap { height: 400px; }
+
+        .preview-inputs {
+            grid-template-columns: 1fr;
+        }
+        #identifierFieldContainer {
+            grid-column: span 1 !important;
+        }
+
+        .totals-grid {
+            padding: 6px;
+            gap: 4px 8px;
+        }
+        .totals-grid .t-label { width: 40px; font-size: 10px; }
+        .totals-grid .t-value { font-size: 11px; height: 22px; }
+
+        .big-total-display {
+            font-size: 22px;
+            height: 54px;
+        }
+
+        #completeSaleBtn {
+            height: 54px !important;
+            font-size: 13px !important;
+        }
+
+        .fn-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            margin: 0;
+            padding: 6px 4px;
+            z-index: 900;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+            gap: 4px;
+        }
+        .fn-bar::-webkit-scrollbar { height: 4px; }
+        .fn-bar::-webkit-scrollbar-thumb { background: #888; }
+
+        .fn-btn {
+            flex: 0 0 auto;
+            min-width: 64px;
+            max-width: 74px;
+            padding: 4px 2px;
+        }
+        .fn-btn .fn-icon { width: 28px; height: 28px; font-size: 14px; }
+        .fn-btn .fn-key  { font-size: 9px; padding: 0 3px; }
+        .fn-btn .fn-label { font-size: 9px; }
+
+        .ticket-wrap {
+            max-height: 340px;
+            overflow-x: auto;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        table.ticket {
+            min-width: 720px;
+        }
+
+        .tab-btn {
+            padding: 5px 10px;
+            font-size: 11px;
+        }
+
+        .pos-modal {
+            width: 96%;
+            max-width: none;
+            max-height: 92vh;
+        }
+        .pos-modal-footer button { height: 40px; }
+
+        .scanner-input { height: 48px !important; font-size: 14px; }
+
+        #checkoutModal [style*="grid-template-columns:repeat(4,1fr)"] {
+            grid-template-columns: repeat(2, 1fr) !important;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .pos-root {
+            padding: 2px;
+            padding-bottom: 90px;
+        }
+
+        table.ticket .col-preview,
+        table.ticket .col-tax,
+        table.ticket .col-disc { display: none; }
+
+        table.ticket { min-width: 420px; }
+
+        table.ticket tbody td { padding: 4px 5px; font-size: 11px; }
+        .ticket-prod-name { font-size: 11px; }
+
+
+        /* Keep totals grid 2-columns on small phones */
+        .totals-grid {
+            grid-template-columns: 1fr 1fr; /* Force 2 columns */
+            gap: 3px 6px;
+            padding: 4px;
+        }
+        .totals-grid .t-row {
+            gap: 2px;
+        }
+        .totals-grid .t-label {
+            width: 34px;
+            font-size: 9px;
+        }
+        .totals-grid .t-value {
+            font-size: 10px;
+            height: 20px;
+            padding: 1px 3px;
+        }
+
+        .fn-btn { min-width: 56px; max-width: 60px; }
+        .fn-btn .fn-label { font-size: 8px; }
+        .fn-btn .fn-icon { width: 24px; height: 24px; font-size: 12px; }
+
+        .groupbox-title { font-size: 11px; }
+        .preview-total { font-size: 14px; padding: 4px 8px; }
+
+        .tab-bar { flex-wrap: wrap; }
+        .tab-btn { flex: 1 1 auto; padding: 5px 6px; font-size: 10px; }
     }
 </style>
+
 {% endblock %}
 
 
@@ -814,7 +958,7 @@
         <!-- ============================================
              LEFT COLUMN — SCAN / SEARCH + PREVIEW + TOTAL (bottom)
         ============================================ -->
-        <div class="panel" style="display:flex; flex-direction:column; overflow-y: auto;">
+        <div class="panel" style="display:flex; flex-direction:column;">
 
             <!-- ---------- Scanner / Search row ---------- -->
             <div class="groupbox" style="margin-top: 4px;">
@@ -878,21 +1022,7 @@
                 <!-- ---------- Total Price Display (read-only) ---------- -->
                 <div class="groupbox" style="margin-top: 6px; margin-bottom: 0;">
                     <span class="groupbox-title">Total</span>
-                    <div style="
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        height: 70px;
-                        background: #000;
-                        color: #00ff00;
-                        font-family: 'Courier New', monospace;
-                        font-size: 32px;
-                        font-weight: 900;
-                        letter-spacing: 1px;
-                        border: 2px solid;
-                        border-color: #808080 #ffffff #ffffff #808080;
-                        text-shadow: 0 0 8px #00ff00;
-                    ">
+                    <div class="big-total-display">
                         <span id="btnTotal">KSh 0.00</span>
                     </div>
                 </div>
@@ -2922,7 +3052,6 @@ document.addEventListener('DOMContentLoaded', function () {
     loadPendingPayments();
     loadCartState(); // <--- NEW: Load from localStorage on page load
     searchInput.focus();
-    restorePrinter();
 });
 </script>
 {% endblock %}
