@@ -1860,36 +1860,70 @@
         let deferredPrompt;
         const installBtn = document.getElementById('pwaInstallBtn');
 
+        // The button is always visible (matches your current HTML style)
+        if (installBtn) installBtn.style.display = 'flex';
+
+        // Capture the prompt when Chrome offers it
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            // The browser says it's ready: show the button
-            if (installBtn) installBtn.style.display = 'flex';
+            console.log('Install prompt captured.');
         });
 
+        // Handle clicks
         if (installBtn) {
             installBtn.addEventListener('click', async () => {
-                if (!deferredPrompt) return;
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                console.log(`User choice: ${outcome}`);
-                deferredPrompt = null;
-                installBtn.style.display = 'none';
+                if (deferredPrompt) {
+                    // Fresh install is available
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    console.log('User choice:', outcome);
+
+                    if (outcome === 'accepted') {
+                        installBtn.textContent = '✅ Installed';
+                    }
+                    deferredPrompt = null;
+                    return;
+                }
+
+                // No prompt available — could be one of these reasons:
+                //   1. Already installed
+                //   2. Browser doesn't support PWA install
+                //   3. Not on HTTPS or valid origin
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                const isFirefox = /Firefox/.test(navigator.userAgent);
+                const isInstalled = window.matchMedia('(display-mode: standalone)').matches;
+
+                if (isInstalled) {
+                    alert('The app is already installed.\n\nTo reinstall it, first uninstall the app from your device (long-press the app icon → Uninstall), then come back here and tap Install App again.');
+                } else if (isIOS) {
+                    alert('To install on iPhone/iPad:\n\n1. Tap the Share button at the bottom of Safari.\n2. Scroll down and tap "Add to Home Screen".\n3. Tap Add.');
+                } else if (isFirefox) {
+                    alert('To install:\n\n1. Open this site in Chrome or Edge.\n2. Tap the browser menu (⋮) → "Install App" or "Add to Home Screen".');
+                } else {
+                    alert('Install isn\'t available right now.\n\nIf you already installed the app, uninstall it first (long-press the app icon → Uninstall), then reload this page.\n\nOtherwise try: browser menu (⋮) → "Install App".');
+                }
             });
         }
 
+        // Detect when the app is installed, to update button text
+        window.addEventListener('appinstalled', () => {
+            if (installBtn) {
+                installBtn.textContent = '✅ Installed';
+            }
+            console.log('App installed.');
+        });
+
+        // Register service worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js')
-                    .then(registration => {
-                        console.log('Service Worker registered with scope:', registration.scope);
-                    })
-                    .catch(error => {
-                        console.error('Service Worker registration failed:', error);
-                    });
+                    .then(reg => console.log('Service Worker registered:', reg.scope))
+                    .catch(err => console.error('Service Worker failed:', err));
             });
         }
     </script>
+
 
     {% block extra_js %}{% endblock %}
 </body>
