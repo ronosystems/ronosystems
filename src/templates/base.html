@@ -1858,84 +1858,112 @@
 
 
     <script>
-    let deferredPrompt;
-    const installBtn = document.getElementById('pwaInstallBtn');
-    const btnText = installBtn ? installBtn.querySelector('span') : null;
+        let deferredPrompt;
+        const installBtn = document.getElementById('pwaInstallBtn');
+        const btnText = installBtn ? installBtn.querySelector('span') : null;
 
-    // 1. Check if app is installed via localStorage or API
-    async function checkInstallStatus() {
-        // A. If running inside the installed app, hide button
+        // STEP 1: Immediately hide only if we're inside the standalone app
+        // (this is the ONLY reliable synchronous check — it means "we're running the installed app")
         if (window.matchMedia('(display-mode: standalone)').matches) {
             if (installBtn) installBtn.style.display = 'none';
-            return;
         }
 
-        // B. Check localStorage flag (set after first install)
-        if (localStorage.getItem('pwa_installed') === 'true') {
-            if (installBtn) installBtn.style.display = 'none';
-            return;
-        }
+        // STEP 2: Async — verify actual install status
+        async function verifyInstallStatus() {
+            if (!installBtn) return;
 
-        // C. Check Related Apps API
-        if (navigator.getInstalledRelatedApps) {
-            try {
-                const relatedApps = await navigator.getInstalledRelatedApps();
-                if (relatedApps.length > 0) {
-                    if (installBtn) installBtn.style.display = 'none';
-                    localStorage.setItem('pwa_installed', 'true'); // Remember!
-                    return;
-                }
-            } catch (e) {}
-        }
-        
-        // D. If none of the above, show button
-        if (installBtn) {
-            installBtn.style.display = 'flex';
-            installBtn.style.background = '#28a745';
-            if (btnText) btnText.textContent = 'Install App';
-        }
-    }
-
-    checkInstallStatus();
-
-    // 2. Capture the install prompt
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-    });
-
-    // 3. Handle click
-    if (installBtn) {
-        installBtn.addEventListener('click', async () => {
-            if (!deferredPrompt) return;
-            
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            
-            if (outcome === 'accepted') {
-                // Hide button AND remember installation
+            // If we're inside the installed app, nothing to do
+            if (window.matchMedia('(display-mode: standalone)').matches) {
                 installBtn.style.display = 'none';
                 localStorage.setItem('pwa_installed', 'true');
+                return;
             }
-            deferredPrompt = null;
-        });
-    }
 
-    // 4. Also listen for the 'appinstalled' event (fires when installed from browser menu)
-    window.addEventListener('appinstalled', () => {
-        if (installBtn) installBtn.style.display = 'none';
-        localStorage.setItem('pwa_installed', 'true');
-    });
+            let isInstalled = false;
 
-    // 5. Register Service Worker
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js')
-                .then(reg => console.log('SW registered:', reg.scope))
-                .catch(err => console.error('SW failed:', err));
+            // Primary check: getInstalledRelatedApps (Chrome/Edge only)
+            if (navigator.getInstalledRelatedApps) {
+                try {
+                    const apps = await navigator.getInstalledRelatedApps();
+                    if (apps && apps.length > 0) {
+                        isInstalled = true;
+                    }
+                } catch (e) {
+                    // Ignore — API might fail on some browsers
+                }
+            }
+
+            // Fallback: use localStorage hint if API is unsupported
+            // (helps with browsers that don't implement the API)
+            if (!isInstalled && !navigator.getInstalledRelatedApps) {
+                isInstalled = localStorage.getItem('pwa_installed') === 'true';
+            }
+
+            // Apply result
+            if (isInstalled) {
+                installBtn.style.display = 'none';
+                localStorage.setItem('pwa_installed', 'true');
+            } else {
+                // App is NOT installed — clear the flag and show the button
+                installBtn.style.display = 'flex';
+                localStorage.removeItem('pwa_installed');
+            }
+        }
+
+        // Run on page load
+        verifyInstallStatus();
+
+        // Re-check whenever the page becomes visible again
+        // (handles the case where the user uninstalled while the tab was in the background)
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) verifyInstallStatus();
         });
-    }
-</script>
+
+        // STEP 3: Capture the install prompt
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            // Chrome fires this only when the app is NOT already installed,
+            // so we know the button should be visible
+            if (installBtn) installBtn.style.display = 'flex';
+        });
+
+        // STEP 4: Handle button click
+        if (installBtn) {
+            installBtn.addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    if (outcome === 'accepted') {
+                        installBtn.style.display = 'none';
+                        localStorage.setItem('pwa_installed', 'true');
+                    }
+                    deferredPrompt = null;
+                } else {
+                    // No prompt available — guide them
+                    if (btnText) btnText.textContent = 'Use browser menu to install';
+                    setTimeout(() => {
+                        if (btnText) btnText.textContent = 'Install App';
+                    }, 3000);
+                }
+            });
+        }
+
+        // STEP 5: Listen for the install event
+        window.addEventListener('appinstalled', () => {
+            if (installBtn) installBtn.style.display = 'none';
+            localStorage.setItem('pwa_installed', 'true');
+        });
+
+        // STEP 6: Register Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('SW registered:', reg.scope))
+                    .catch(err => console.error('SW failed:', err));
+            });
+        }
+    </script>
 
 
     {% block extra_js %}{% endblock %}

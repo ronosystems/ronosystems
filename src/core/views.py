@@ -8,7 +8,20 @@ from django.core.mail import send_mail
 from django.templatetags.static import static
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
+from django.views.decorators.cache import never_cache
 
+# Add this helper
+def no_session(view_func):
+    """
+    Decorator that prevents Django from touching the session for
+    a view. Used for PWA endpoints (manifest, sw.js, assetlinks)
+    so background fetches don't overwrite the user's session.
+    """
+    def wrapper(request, *args, **kwargs):
+        request.session.modified = False
+        response = view_func(request, *args, **kwargs)
+        return response
+    return wrapper
 
 # ============================================
 # QZ TRAY SIGNING
@@ -147,6 +160,7 @@ def contact(request):
 # PWA: MANIFEST
 # ============================================
 
+@no_session
 def manifest_view(request):
     from apps.companies.models import Company
     from django.templatetags.static import static
@@ -209,7 +223,7 @@ def manifest_view(request):
         "name": company_name,
         "short_name": company_name,
         "description": f"Manage {company_name} smarter and faster.",
-        "start_url": "/epa_shop/pos/",
+        "start_url": "/",  # ← home page
         "display": "standalone",
         "background_color": "#f0f2f5",
         "theme_color": "#1e4e6d",
@@ -228,6 +242,7 @@ def manifest_view(request):
 # PWA: SERVICE WORKER 
 # ============================================
 
+@no_session
 def service_worker(request):
     """Serve sw.js from the root path so PWABuilder and Chrome can find it."""
     sw_path = os.path.join(settings.BASE_DIR, 'static', 'sw.js')
@@ -252,6 +267,7 @@ def service_worker(request):
 # PWA: ASSET LINKS
 # ============================================
 
+@no_session
 def asset_links(request):
     """Serve the assetlinks.json for Android TWA verification."""
     file_path = os.path.join(settings.BASE_DIR, 'static', '.well-known', 'assetlinks.json')
