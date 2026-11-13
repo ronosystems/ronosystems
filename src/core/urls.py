@@ -62,12 +62,11 @@ urlpatterns = [
     path('api/', include('apps.companies.urls')),
     path('api/epa/', include('apps.epa_shop.urls')),
     path('api/supermarket/', include('apps.supermarket.urls')),
-
-    path('qz/sign/', qz_sign, name='qz-sign'),
     path('contact/', contact, name='contact'),
     path('ai/assistant/', ai_assistant, name='ai-assistant'),
     path('manifest.json', manifest_view, name='manifest'),
     path('sw.js', service_worker, name='service-worker'),
+    path('.well-known/assetlinks.json', asset_links, name='asset_links'),
 
     # ============================================
     # TEMPLATE PAGES (static content)

@@ -201,3 +201,18 @@ def service_worker(request):
         except Exception:
             pass
         return HttpResponse("// sw.js not found", content_type='application/javascript', status=404)
+
+
+
+from django.http import HttpResponse
+import os
+from django.conf import settings
+
+def asset_links(request):
+    # Create a folder called '.well-known' in your 'static' folder and put assetlinks.json there
+    file_path = os.path.join(settings.BASE_DIR, 'static', '.well-known', 'assetlinks.json')
+    try:
+        with open(file_path, 'r') as f:
+            return HttpResponse(f.read(), content_type='application/json')
+    except FileNotFoundError:
+        return HttpResponse('Not found', status=404)
