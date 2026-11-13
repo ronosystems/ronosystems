@@ -1860,61 +1860,79 @@
         let deferredPrompt;
         const installBtn = document.getElementById('pwaInstallBtn');
 
-        // The button is always visible (matches your current HTML style)
-        if (installBtn) installBtn.style.display = 'flex';
+        // 1. Check if the app is already running as a standalone installed app
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+        
+        if (isStandalone) {
+            // If they are already using the installed app, hide the button
+            if (installBtn) installBtn.style.display = 'none';
+        } else {
+            // If they are in the browser, show the button
+            if (installBtn) installBtn.style.display = 'flex';
+        }
 
-        // Capture the prompt when Chrome offers it
+        // 2. Capture the install prompt when Chrome offers it
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            console.log('Install prompt captured.');
+            // We can change the button text to indicate it's ready
+            if (installBtn) {
+                installBtn.innerHTML = '<i class="fas fa-download"></i> <span>Install App</span>';
+            }
         });
 
-        // Handle clicks
+        // 3. Handle the button click
         if (installBtn) {
             installBtn.addEventListener('click', async () => {
+                // Check if the app is already installed on the device
+                // (We check the related apps API)
+                if (navigator.getInstalledRelatedApps) {
+                    const relatedApps = await navigator.getInstalledRelatedApps();
+                    if (relatedApps.length > 0) {
+                        // App IS installed.
+                        // If they are on a desktop/mobile browser, we can try to open it.
+                        // But a website cannot programmatically open an installed PWA.
+                        // The best we can do is change the button to say "Open App"
+                        installBtn.innerHTML = '<i class="fas fa-external-link-alt"></i> <span>Open App</span>';
+                        
+                        // On Android, if the app is installed, clicking the link might open it.
+                        // We can't force it, so we just leave it as a visual indicator.
+                        return;
+                    }
+                }
+
+                // If the install prompt is available (not installed yet)
                 if (deferredPrompt) {
-                    // Fresh install is available
                     deferredPrompt.prompt();
                     const { outcome } = await deferredPrompt.userChoice;
                     console.log('User choice:', outcome);
-
+                    
                     if (outcome === 'accepted') {
-                        installBtn.textContent = '✅ Installed';
+                        installBtn.innerHTML = '<i class="fas fa-check"></i> <span>Installed</span>';
+                        installBtn.style.background = '#6c757d'; // Gray out
                     }
                     deferredPrompt = null;
-                    return;
-                }
-
-                // No prompt available — could be one of these reasons:
-                //   1. Already installed
-                //   2. Browser doesn't support PWA install
-                //   3. Not on HTTPS or valid origin
-                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                const isFirefox = /Firefox/.test(navigator.userAgent);
-                const isInstalled = window.matchMedia('(display-mode: standalone)').matches;
-
-                if (isInstalled) {
-                    alert('The app is already installed.\n\nTo reinstall it, first uninstall the app from your device (long-press the app icon → Uninstall), then come back here and tap Install App again.');
-                } else if (isIOS) {
-                    alert('To install on iPhone/iPad:\n\n1. Tap the Share button at the bottom of Safari.\n2. Scroll down and tap "Add to Home Screen".\n3. Tap Add.');
-                } else if (isFirefox) {
-                    alert('To install:\n\n1. Open this site in Chrome or Edge.\n2. Tap the browser menu (⋮) → "Install App" or "Add to Home Screen".');
                 } else {
-                    alert('Install isn\'t available right now.\n\nIf you already installed the app, uninstall it first (long-press the app icon → Uninstall), then reload this page.\n\nOtherwise try: browser menu (⋮) → "Install App".');
+                    // Prompt is not available (maybe already installed, or browser doesn't support it)
+                    // Instead of an alert, we just change the button text to guide them
+                    installBtn.innerHTML = '<i class="fas fa-info-circle"></i> <span>Use Browser Menu to Install</span>';
+                    setTimeout(() => {
+                        installBtn.innerHTML = '<i class="fas fa-download"></i> <span>Install App</span>';
+                    }, 4000);
                 }
             });
         }
 
-        // Detect when the app is installed, to update button text
+        // 4. Listen for the 'appinstalled' event
         window.addEventListener('appinstalled', () => {
             if (installBtn) {
-                installBtn.textContent = '✅ Installed';
+                installBtn.innerHTML = '<i class="fas fa-check"></i> <span>Installed</span>';
+                installBtn.style.background = '#6c757d';
             }
-            console.log('App installed.');
+            console.log('App was installed.');
         });
 
-        // Register service worker
+        // 5. Register Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js')
