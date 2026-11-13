@@ -1,14 +1,19 @@
-from django.http import JsonResponse
-from django.shortcuts import render
-import base64
 import os
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
+import base64
 from django.conf import settings
+from django.http import JsonResponse, HttpResponse, FileResponse
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.core.mail import send_mail
+from django.templatetags.static import static
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 
-@csrf_exempt
+
+# ============================================
+# QZ TRAY SIGNING
+# ============================================
+
 def qz_sign(request):
     """
     Sign QZ Tray print requests so the browser doesn't get the
@@ -17,25 +22,36 @@ def qz_sign(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
-    # QZ Tray sends the message to sign in the POST body
     message = request.body.decode('utf-8')
-
     key_path = os.path.join(settings.BASE_DIR, 'qz_keys', 'private.key')
-    with open(key_path, 'rb') as f:
-        private_key = serialization.load_pem_private_key(f.read(), password=None)
+    
+    try:
+        with open(key_path, 'rb') as f:
+            private_key = serialization.load_pem_private_key(f.read(), password=None)
 
-    signature = private_key.sign(
-        message.encode('utf-8'),
-        padding.PKCS1v15(),
-        hashes.SHA512(),
-    )
-    return JsonResponse({
-        'signature': base64.b64encode(signature).decode('ascii')
-    })
+        signature = private_key.sign(
+            message.encode('utf-8'),
+            padding.PKCS1v15(),
+            hashes.SHA512(),
+        )
+        return JsonResponse({
+            'signature': base64.b64encode(signature).decode('ascii')
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# ============================================
+# PUBLIC PAGES
+# ============================================
 
 def home(request):
     """Homepage for RonoSystems"""
     return render(request, 'home.html')
+
+# ============================================
+# API ROOT
+# ============================================
 
 def api_root(request):
     """API Root endpoint"""
@@ -77,13 +93,9 @@ def api_root(request):
         }
     })
 
-
-# core/views.py  (or wherever your qz_sign lives)
-from django.shortcuts import render, redirect
-from django.contrib import messages
-from django.core.mail import send_mail
-from django.conf import settings as django_settings
-
+# ============================================
+# CONTACT FORM
+# ============================================
 
 def contact(request):
     """
@@ -95,12 +107,10 @@ def contact(request):
         subject = (request.POST.get('subject') or '').strip()
         message = (request.POST.get('message') or '').strip()
 
-        # Basic validation
         if not name or not email or not message:
             messages.error(request, 'Please fill in all required fields.')
             return render(request, 'contact.html')
 
-        # Compose the email
         full_subject = f"[Contact] {subject or 'New message'} — from {name}"
         body = (
             f"New contact form submission\n"
@@ -112,17 +122,15 @@ def contact(request):
             f"{message}\n"
         )
 
-        # Send to the address in settings, fallback to a default
-        recipient = getattr(django_settings, 'CONTACT_EMAIL', None)
+        recipient = getattr(settings, 'CONTACT_EMAIL', None)
         if not recipient:
-            # try the SystemSetting "EMAIL_FROM" address
             try:
                 from apps.settings.models import SystemSetting
                 recipient = SystemSetting.get_setting('EMAIL_FROM', 'support@ronosystems.com')
             except Exception:
                 recipient = 'support@ronosystems.com'
 
-        from_email = getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'noreply@ronosystems.com')
+        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@ronosystems.com')
 
         try:
             send_mail(
@@ -138,35 +146,58 @@ def contact(request):
 
         return redirect('contact')
 
-    # GET
     return render(request, 'contact.html')
 
 
-from django.http import JsonResponse
-from django.templatetags.static import static
+# ============================================
+# PWA: MANIFEST
+# ============================================
 
 def manifest_view(request):
-    # Force absolute URLs to the static images we just created
-    icon_192 = request.build_absolute_uri(static('images/icon-192.png'))
-    icon_512 = request.build_absolute_uri(static('images/icon-512.png'))
+    """
+    Generate the PWA manifest dynamically using the company's name and logo.
+    """
+    company_name = "RONOSYSTEMS"
+    icon_url = request.build_absolute_uri(static('images/icon-512.png'))
+
+    if request.user.is_authenticated and getattr(request.user, 'company', None):
+        company = request.user.company
+        if company.display_name:
+            company_name = company.display_name.upper()
+        
+        if company.logo:
+            try:
+                if hasattr(company, 'logo_url'):
+                    icon_url = company.logo_url
+                else:
+                    icon_url = request.build_absolute_uri(company.logo.url)
+            except Exception:
+                pass
+
+    # Force the icon to be a PNG format for PWABuilder validation
+    if not icon_url.endswith('.png'):
+        if 'cloudinary' in icon_url:
+             icon_url = icon_url.replace('/upload/', '/upload/w_512,h_512,c_fill/') + '.png'
+        else:
+             icon_url = request.build_absolute_uri(static('images/icon-512.png'))
 
     manifest = {
-        "name": "RONOSYSTEMS",
-        "short_name": "RONOSYSTEMS",
-        "description": "Manage your business smarter and faster with RonoSystems.",
+        "name": company_name,
+        "short_name": company_name,
+        "description": f"Manage {company_name} smarter and faster.",
         "start_url": "/epa_shop/pos/",
         "display": "standalone",
         "background_color": "#f0f2f5",
         "theme_color": "#1e4e6d",
         "icons": [
             {
-                "src": icon_192,
+                "src": icon_url,
                 "sizes": "192x192",
                 "type": "image/png",
                 "purpose": "any"
             },
             {
-                "src": icon_512,
+                "src": icon_url,
                 "sizes": "512x512",
                 "type": "image/png",
                 "purpose": "any maskable"
@@ -174,13 +205,11 @@ def manifest_view(request):
         ]
     }
     return JsonResponse(manifest)
-    
 
 
-from django.http import HttpResponse
-from django.templatetags.static import static as static_url
-import os
-from django.conf import settings
+# ============================================
+# PWA: SERVICE WORKER 
+# ============================================
 
 def service_worker(request):
     """Serve sw.js from the root path so PWABuilder and Chrome can find it."""
@@ -190,7 +219,6 @@ def service_worker(request):
             content = f.read()
         return HttpResponse(content, content_type='application/javascript')
     except FileNotFoundError:
-        # Fallback to static files storage
         try:
             from django.contrib.staticfiles import finders
             result = finders.find('sw.js')
@@ -203,12 +231,11 @@ def service_worker(request):
         return HttpResponse("// sw.js not found", content_type='application/javascript', status=404)
 
 
-
-from django.http import HttpResponse
-import os
-from django.conf import settings
-
+# ============================================
+# PWA: ASSET LINKS
+# ============================================
 def asset_links(request):
+    """Serve the assetlinks.json for Android TWA verification."""
     file_path = os.path.join(settings.BASE_DIR, 'static', '.well-known', 'assetlinks.json')
     try:
         with open(file_path, 'r') as f:
