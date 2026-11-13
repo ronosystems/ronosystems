@@ -142,22 +142,47 @@ def contact(request):
     return render(request, 'contact.html')
 
 
-
+from django.http import JsonResponse
 from django.templatetags.static import static
 
 def manifest_view(request):
     """
-    Dynamically generate the PWA manifest.json so it uses the
-    currently active company logo or the site fallback.
+    Generate the PWA manifest, pulling the logo from the database
+    (Company logo → SystemSetting favicon → static fallback).
     """
-    # Try to grab the logo from your context processors if they attach it to the request
-    icon_url = getattr(request, 'site_favicon_url', None) or getattr(request, 'site_logo_url', None)
-    
-    # Fallback to a static icon if no dynamic logo is found
+    icon_url = None
+
+    # 1. Try the current user's company logo
+    if request.user.is_authenticated and getattr(request.user, 'company', None):
+        company = request.user.company
+        logo = getattr(company, 'logo', None)
+        if logo:
+            # Use the model's image_url property if it has one
+            if hasattr(company, 'logo_url'):
+                icon_url = company.logo_url
+            else:
+                # Otherwise build the URL manually
+                try:
+                    icon_url = logo.url
+                except Exception:
+                    icon_url = None
+
+    # 2. Fall back to the SystemSetting (site-wide favicon/logo)
+    if not icon_url:
+        try:
+            from apps.settings.models import SystemSetting
+            icon_url = (
+                SystemSetting.get_setting('FAVICON_URL')
+                or SystemSetting.get_setting('LOGO_URL')
+            )
+        except Exception:
+            icon_url = None
+
+    # 3. Final fallback to a static icon
     if not icon_url:
         icon_url = static('images/icon-512.png')
-        
-    # Browsers require absolute URLs (https://...) for the PWA icons
+
+    # 4. Make sure it's an absolute URL
     if icon_url.startswith('/'):
         icon_url = request.build_absolute_uri(icon_url)
 
@@ -169,18 +194,9 @@ def manifest_view(request):
         "background_color": "#f0f2f5",
         "theme_color": "#1e4e6d",
         "icons": [
-            {
-                "src": icon_url,
-                "sizes": "192x192",
-                "type": "image/png",
-                "purpose": "any maskable"
-            },
-            {
-                "src": icon_url,
-                "sizes": "512x512",
-                "type": "image/png",
-                "purpose": "any maskable"
-            }
+            {"src": icon_url, "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+            {"src": icon_url, "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
         ]
     }
     return JsonResponse(manifest)
+    
