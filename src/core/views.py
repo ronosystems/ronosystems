@@ -140,3 +140,47 @@ def contact(request):
 
     # GET
     return render(request, 'contact.html')
+
+
+
+from django.templatetags.static import static
+
+def manifest_view(request):
+    """
+    Dynamically generate the PWA manifest.json so it uses the
+    currently active company logo or the site fallback.
+    """
+    # Try to grab the logo from your context processors if they attach it to the request
+    icon_url = getattr(request, 'site_favicon_url', None) or getattr(request, 'site_logo_url', None)
+    
+    # Fallback to a static icon if no dynamic logo is found
+    if not icon_url:
+        icon_url = static('images/icon-512.png')
+        
+    # Browsers require absolute URLs (https://...) for the PWA icons
+    if icon_url.startswith('/'):
+        icon_url = request.build_absolute_uri(icon_url)
+
+    manifest = {
+        "name": "RONOSYSTEMS",
+        "short_name": "RONOSYSTEMS",
+        "start_url": "/epa_shop/pos/",
+        "display": "standalone",
+        "background_color": "#f0f2f5",
+        "theme_color": "#1e4e6d",
+        "icons": [
+            {
+                "src": icon_url,
+                "sizes": "192x192",
+                "type": "image/png",
+                "purpose": "any maskable"
+            },
+            {
+                "src": icon_url,
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "any maskable"
+            }
+        ]
+    }
+    return JsonResponse(manifest)
