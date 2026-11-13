@@ -773,6 +773,19 @@
         }
         .btn-login-gradient:active { transform: translateY(0); }
 
+        /* Disabled / submitting state */
+        .btn-login-gradient:disabled {
+            opacity: 0.75;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: 0 6px 18px rgba(30, 78, 109, 0.15);
+            background: linear-gradient(90deg, #3d6f8a 0%, #4a7d99 100%);
+        }
+        .btn-login-gradient:disabled:hover {
+            transform: none !important;
+            box-shadow: 0 6px 18px rgba(30, 78, 109, 0.15);
+        }
+
         /* Divider */
         .divider-text {
             text-align: center;
@@ -840,6 +853,19 @@
             opacity: 0.6;
         }
         .alert .btn-close:hover { opacity: 1; }
+
+        /* Inline error created by JS */
+        #login-inline-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 0.82rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
 
         /* ============================================
            FOOTER
@@ -1285,13 +1311,14 @@
                         <div class="login-right">
                             <h2 class="form-title">Sign in</h2>
 
-                            <form method="post" action="{% url 'account_login' %}">
+                            <form method="post" action="{% url 'account_login' %}" id="loginForm" novalidate>
                                 {% csrf_token %}
 
                                 <!-- Username / Email -->
                                 <div class="login-field">
                                     <input type="text"
                                            name="login"
+                                           id="id_login"
                                            placeholder="Email"
                                            required
                                            autofocus
@@ -1303,7 +1330,7 @@
                                 <div class="login-field">
                                     <input type="password"
                                            name="password"
-                                           id="login-password"
+                                           id="id_password"
                                            placeholder="Password"
                                            required
                                            autocomplete="current-password">
@@ -1318,7 +1345,7 @@
                                 </div>
 
                                 <!-- Login Button -->
-                                <button type="submit" class="btn-login-gradient">
+                                <button type="submit" id="loginSubmitBtn" class="btn-login-gradient">
                                     Sign in
                                 </button>
 
@@ -1520,7 +1547,7 @@
         const toggleBtn = document.getElementById('togglePassword');
         if (toggleBtn) {
             toggleBtn.addEventListener('click', function() {
-                const input = document.getElementById('login-password');
+                const input = document.getElementById('id_password');
                 const icon = this.querySelector('i');
                 if (input.type === 'password') {
                     input.type = 'text';
@@ -1533,6 +1560,84 @@
                 }
             });
         }
+
+        // ============================================
+        // LOGIN: SINGLE SUBMIT + DOUBLE-TAP PREVENTION
+        // ============================================
+        (function () {
+            const form = document.getElementById('loginForm');
+            if (!form) return;
+
+            let isSubmitting = false;
+            const submitBtn = document.getElementById('loginSubmitBtn');
+            if (!submitBtn) return;
+
+            // Store original button HTML for restoration
+            const originalBtnHTML = submitBtn.innerHTML;
+
+            function resetButton() {
+                isSubmitting = false;
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHTML;
+            }
+
+            form.addEventListener('submit', function (e) {
+                // If we're already submitting, block this second submit
+                if (isSubmitting) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                }
+
+                // Validate before locking the button
+                const usernameInput = form.querySelector('input[name="login"]');
+                const passwordInput = form.querySelector('input[name="password"]');
+                const username = usernameInput ? usernameInput.value.trim() : '';
+                const password = passwordInput ? passwordInput.value : '';
+
+                // Remove any previous inline error
+                const oldErr = document.getElementById('login-inline-error');
+                if (oldErr) oldErr.remove();
+
+                // If fields are empty (autofill glitch or user tapped submit too fast)
+                if (!username || !password) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const err = document.createElement('div');
+                    err.id = 'login-inline-error';
+                    err.innerHTML = '<i class="fas fa-exclamation-circle"></i><span>Please fill in your email and password before signing in.</span>';
+                    form.prepend(err);
+
+                    // Re-enable button (in case it was disabled)
+                    resetButton();
+                    return false;
+                }
+
+                // ---- All validations passed: lock the button ----
+                isSubmitting = true;
+
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in…';
+
+                // DO NOT preventDefault() — let the browser submit the form
+
+                // Safety: if the form fails to actually navigate (e.g., CSRF error, network fail)
+                // re-enable the button after 30 seconds
+                setTimeout(() => {
+                    if (isSubmitting) {
+                        resetButton();
+                    }
+                }, 30000);
+            });
+
+            // Safety: if the user navigates back to this page (browser back button)
+            // the button should be re-enabled so they can try again
+            window.addEventListener('pageshow', function (event) {
+                resetButton();
+            });
+
+        })();
     </script>
 </body>
 </html>
