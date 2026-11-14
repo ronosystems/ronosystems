@@ -863,8 +863,6 @@
             </a>
         </div>
 
-
-
         <!-- ============================================
         DESKTOP HEADER NAVIGATION
         ============================================ -->
@@ -924,6 +922,7 @@
                     </div>
                 </a>
 
+                {% if not current_company %}
                 <a href="{% url 'account_signup' %}"
                 class="ff-tool-item {% if request.resolver_match.url_name == 'account_signup' %}active{% endif %}"
                 {% if request.resolver_match.url_name == 'account_signup' %}style="background: var(--nav-active-bg); color: var(--nav-active-text); border-left: none;"{% endif %}>
@@ -931,12 +930,11 @@
                         <i class="fas fa-user-plus"></i> <span>Sign Up</span>
                     </div>
                 </a>
+                {% endif %}
             {% endif %}
         </div>
     </header>
 
-
-    
     <!-- ============================================
     MOBILE HEADER
     ============================================ -->
@@ -976,14 +974,21 @@
                 {% if user.is_authenticated %}
                     <a href="/dashboard/"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
                 {% else %}
+                    {# Sign In is always visible; the Sign Up quick-link is only for the system domain #}
                     {% if request.resolver_match.url_name == 'account_signup' %}
                         <a href="{% url 'account_login' %}" style="color: #7bc043; font-weight: bold;">
                             <i class="fas fa-sign-in-alt"></i> Sign In
                         </a>
                     {% elif request.resolver_match.url_name == 'account_login' %}
-                        <a href="{% url 'account_signup' %}" style="color: #7bc043; font-weight: bold;">
-                            <i class="fas fa-user-plus"></i> Sign Up
-                        </a>
+                        {% if not current_company %}
+                            <a href="{% url 'account_signup' %}" style="color: #7bc043; font-weight: bold;">
+                                <i class="fas fa-user-plus"></i> Sign Up
+                            </a>
+                        {% else %}
+                            <a href="{% url 'account_login' %}">
+                                <i class="fas fa-user"></i> Sign in
+                            </a>
+                        {% endif %}
                     {% else %}
                         <a href="{% url 'account_login' %}">
                             <i class="fas fa-user"></i> Sign in
@@ -1007,9 +1012,11 @@
             <a href="{% url 'terms' %}" class="mobile-nav-tab {% nav_active 'terms' %}"><div class="mobile-nav-tab-inner"><i class="fas fa-gavel"></i> Terms of Service</div></a>
             <a href="{% url 'ai-assistant-page' %}" class="mobile-nav-tab {% nav_active 'ai-assistant-page' %}"><div class="mobile-nav-tab-inner"><i class="fas fa-robot"></i> AI Assistant</div></a>
 
+            {% if not current_company %}
             <a href="{% url 'account_signup' %}" class="mobile-nav-tab {% if request.resolver_match.url_name == 'account_signup' %}active{% endif %}">
                 <div class="mobile-nav-tab-inner"><i class="fas fa-rocket"></i> Sign Up</div>
             </a>
+            {% endif %}
         </nav>
     </header>
 
@@ -1092,7 +1099,7 @@
             <a href="{% url 'privacy' %}" class="sidebar-link">Privacy Policy</a>
             <a href="{% url 'terms' %}" class="sidebar-link">Terms of Service</a>
 
-            <!-- DYNAMIC SIDEBAR PROMO (desktop) — now mirrors mobile logic -->
+            <!-- DYNAMIC SIDEBAR PROMO (desktop) — mirrors mobile logic -->
             <div class="sidebar-promo">
                 {% if current_company %}
                     <h5>Join {{ current_company.display_name }}</h5>
