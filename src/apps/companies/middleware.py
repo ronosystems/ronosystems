@@ -61,18 +61,6 @@ def _trust_csrf_origin(origin: str) -> None:
 
 
 class CustomDomainMiddleware:
-    """
-    Resolves the tenant Company from the request's Host header when a
-    custom domain is being used.
-
-    - Sets `request.company` AND `request.tenant_company` to the matched
-      Company (or None).
-    - Runs BEFORE SubscriptionExpiryMiddleware.
-    - Skips lookup for:
-        * platform hosts (localhost, 127.0.0.1, *.onrender.com, ronosystems.com)
-        * explicitly bypassed paths (webhooks, admin, static, auth, ...)
-    """
-
     def __init__(self, get_response):
         self.get_response = get_response
 
@@ -82,12 +70,10 @@ class CustomDomainMiddleware:
         # ------------------------------------------------------------
         # BYPASS 1: Paths that never resolve a tenant company
         # ------------------------------------------------------------
-        # Critical for webhooks (KCB / M-Pesa callbacks) which arrive at
-        # arbitrary hosts (ngrok, Render) that may not be registered as a
-        # custom_domain on any Company.
         if any(request.path_info.startswith(p) for p in BYPASS_DOMAIN_PREFIXES):
             request.company = None
             request.tenant_company = None
+            request.current_company = None
             return self.get_response(request)
 
         # ------------------------------------------------------------
@@ -96,35 +82,40 @@ class CustomDomainMiddleware:
         if host in PLATFORM_HOSTS or host.endswith(PLATFORM_HOST_SUFFIXES):
             request.company = None
             request.tenant_company = None
+            request.current_company = None
             return self.get_response(request)
 
         # ------------------------------------------------------------
         # Resolve company by custom domain
         # ------------------------------------------------------------
-        # `find_by_domain` normalizes `host` (strips www., protocols, ports)
-        # and only returns is_active=True companies.
-        # `require_verified=True` means unverified domains 404 — flip to
-        # False if you want super admins to be able to preview DNS-pending
-        # domains from the settings UI.
         from apps.companies.models import Company
 
-        company = Company.find_by_domain(host, require_verified=True)
+        # 1. Strip '.localhost' for local testing (e.g., fieldmax.localhost -> fieldmax)
+        is_local_test = host.endswith('.localhost')
+        lookup_host = host.replace('.localhost', '') if is_local_test else host
+
+        # 2. Try exact match on custom_domain field
+        company = Company.find_by_domain(lookup_host, require_verified=not is_local_test)
+
+        # 3. If no domain match, dynamically search by company name (substring match)
+        if not company:
+            # 'fieldmax' will match 'FIELDMAX SHOP'
+            company = Company.objects.filter(name__icontains=lookup_host).first()
 
         if company is None:
-            # No tenant for this hostname. 404 rather than redirect — we
-            # don't want to leak which domains are (or aren't) registered.
-            raise Http404("No company registered for this domain.")
+            raise Http404(f"No company registered for this domain: {host}")
 
+        request.current_company = company
         request.company = company
         request.tenant_company = company
 
-        # Trust this domain for CSRF on this and future requests.
-        # Django doesn't support wildcards in CSRF_TRUSTED_ORIGINS.
+        # Trust CSRF
         _trust_csrf_origin(f"https://{host}")
         _trust_csrf_origin(f"http://{host}")
 
         return self.get_response(request)
 
+        
 
 # ============================================
 # URL names that remain accessible when subscription is expired

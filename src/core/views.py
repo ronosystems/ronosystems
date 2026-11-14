@@ -53,14 +53,20 @@ def qz_sign(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
-
 # ============================================
 # PUBLIC PAGES
 # ============================================
 
 def home(request):
-    """Homepage for RonoSystems"""
-    return render(request, 'website/home.html')
+    """Homepage for RonoSystems (or company subdomain)"""
+    # Check if we are on a company domain
+    if getattr(request, 'current_company', None):
+        template_name = 'website/company_home.html'
+    else:
+        template_name = 'website/home.html'
+        
+    return render(request, template_name)
+
 
 def api_root(request):
     """API Root endpoint"""
@@ -107,6 +113,10 @@ def contact(request):
     """
     Handle GET (show form) and POST (send message).
     """
+    # Determine the correct template based on the domain
+    is_company_domain = getattr(request, 'current_company', None)
+    template_name = 'website/company_contact.html' if is_company_domain else 'website/contact.html'
+
     if request.method == 'POST':
         name    = (request.POST.get('name') or '').strip()
         email   = (request.POST.get('email') or '').strip()
@@ -115,7 +125,7 @@ def contact(request):
 
         if not name or not email or not message:
             messages.error(request, 'Please fill in all required fields.')
-            return render(request, 'contact.html')
+            return render(request, template_name) # <-- Updated this render call
 
         full_subject = f"[Contact] {subject or 'New message'} — from {name}"
         body = (
@@ -152,7 +162,7 @@ def contact(request):
 
         return redirect('contact')
 
-    return render(request, 'website/contact.html')
+    return render(request, template_name) # <-- Updated this render call too
 
 
 # ============================================

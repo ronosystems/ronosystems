@@ -17,6 +17,20 @@ restricted_admin_site.site_header = "RONOSYSTEMS ADMINISTRATION"
 restricted_admin_site.site_title = "Administration Portal"
 restricted_admin_site.index_title = "Welcome to RonoSystems Administration"
 
+# ============================================
+# HELPER FUNCTION FOR DYNAMIC TEMPLATES
+# ============================================
+def get_template(system_tpl, company_tpl):
+    """
+    Returns a view that serves either the system template or company template
+    based on whether 'current_company' is present on the request.
+    """
+    def view(request, *args, **kwargs):
+        # Check if current_company is set (by your middleware)
+        template_name = company_tpl if getattr(request, 'current_company', None) else system_tpl
+        return TemplateView.as_view(template_name=template_name)(request, *args, **kwargs)
+    return view
+
 
 urlpatterns = [
     # Home
@@ -76,20 +90,20 @@ urlpatterns = [
     path('.well-known/assetlinks.json', asset_links, name='asset_links'),
 
     # ============================================
-    # TEMPLATE PAGES — MOVED TO templates/website/
+    # TEMPLATE PAGES — DYNAMIC ROUTING (COMPANY VS SYSTEM)
     # ============================================
-    path('about/', TemplateView.as_view(template_name='website/about.html'), name='about'),
-    path('help/', TemplateView.as_view(template_name='website/help.html'), name='help'),
-    path('support/', TemplateView.as_view(template_name='website/support.html'), name='support'),
-    path('feedback/', TemplateView.as_view(template_name='website/feedback.html'), name='feedback'),
-    path('features/', TemplateView.as_view(template_name='website/features.html'), name='features'),
-    path('faq/', TemplateView.as_view(template_name='website/faq.html'), name='faq'),
-    path('documentation/', TemplateView.as_view(template_name='website/documentation.html'), name='documentation'),
-    path('ai-assistant/', TemplateView.as_view(template_name='website/ai_assistant.html'), name='ai-assistant-page'),
-    path('invoicing/', TemplateView.as_view(template_name='website/invoicing.html'), name='invoicing'),
-    path('pricing/', TemplateView.as_view(template_name='website/pricing.html'), name='pricing'),
-    path('terms/', TemplateView.as_view(template_name='website/terms.html'), name='terms'),
-    path('privacy/', TemplateView.as_view(template_name='website/privacy.html'), name='privacy'),
+    path('about/', get_template('website/about.html', 'website/company_about.html'), name='about'),
+    path('help/', get_template('website/help.html', 'website/company_help.html'), name='help'),
+    path('support/', get_template('website/support.html', 'website/company_support.html'), name='support'),
+    path('feedback/', get_template('website/feedback.html', 'website/company_feedback.html'), name='feedback'),
+    path('features/', get_template('website/features.html', 'website/company_features.html'), name='features'),
+    path('faq/', get_template('website/faq.html', 'website/company_faq.html'), name='faq'),
+    path('documentation/', get_template('website/documentation.html', 'website/company_documentation.html'), name='documentation'),
+    path('ai-assistant/', get_template('website/ai_assistant.html', 'website/company_ai_assistant.html'), name='ai-assistant-page'),
+    path('invoicing/', get_template('website/invoicing.html', 'website/company_invoicing.html'), name='invoicing'),
+    path('pricing/', get_template('website/pricing.html', 'website/company_pricing.html'), name='pricing'),
+    path('terms/', get_template('website/terms.html', 'website/company_terms.html'), name='terms'),
+    path('privacy/', get_template('website/privacy.html', 'website/company_privacy.html'), name='privacy'),
 ]
 
 
