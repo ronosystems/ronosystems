@@ -272,9 +272,29 @@
             gap: 18px;
             color: #cbe6f5;
         }
+        
         .mobile-header-right a {
             color: #cbe6f5;
-            font-size: 16px;
+            font-size: 14px;
+            text-decoration: none;
+        }
+
+        /* NEW: Mobile Header Button Styling */
+        .mobile-header-btn {
+            background: #ffffff;
+            color: var(--nav-bg-bottom) !important;
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 12px !important;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+        .mobile-header-btn:hover {
+            background: #f0f4f7;
             text-decoration: none;
         }
 
@@ -694,14 +714,6 @@
             padding: 0 20px;
             overflow: hidden;
         }
-        .ff-footer .row {
-            margin-left: -10px;
-            margin-right: -10px;
-        }
-        .ff-footer [class*="col-"] {
-            padding-left: 10px;
-            padding-right: 10px;
-        }
         .ff-footer h5 {
             color: white;
             font-size: 13px;
@@ -729,7 +741,7 @@
             margin-top: 20px;
             color: #7f8c8d;
             display: flex;
-            justify-content: space-between;
+            justify-content: space-between; /* Pushes items to left & right ends */
             align-items: center;
             flex-wrap: wrap;
             gap: 10px;
@@ -805,24 +817,22 @@
             .content-header { flex-direction: column; align-items: flex-start; gap: 10px; }
             .features-grid th { font-size: 11px; padding: 8px; }
             .features-grid td { padding: 10px; }
-            .ff-footer .col-lg-4,
-            .ff-footer .col-lg-2,
-            .ff-footer .col-md-3,
-            .ff-footer .col-6 {
-                text-align: center;
-                margin-bottom: 25px;
-            }
-            .ff-footer h5 { text-align: center; margin-bottom: 10px; justify-content: center; }
-            .ff-footer a { margin-bottom: 8px; display: block; width: 100%; }
-            .ff-social { gap: 10px; justify-content: center; }
+            
+            /* 1 ROW COPYRIGHT - Left and Right Alignment */
             .ff-footer .copyright {
-                flex-direction: column;
-                text-align: center;
-                gap: 10px;
+                flex-direction: row;
+                text-align: left;
+                justify-content: space-between; /* Forces left and right ends */
+                gap: 0;
                 padding-top: 15px;
+                font-size: 11px;
+                width: 100%;
             }
-            .ff-footer .copyright-links { display: flex; justify-content: center; gap: 20px; }
-            .ff-footer .copyright-links a { margin: 0; width: auto; display: inline-block; }
+            .ff-footer .copyright-text,
+            .ff-footer .powered-by {
+                display: inline-block;
+                margin: 0;
+            }
             .ff-footer-inner { padding: 0 15px; }
         }
 
@@ -976,22 +986,22 @@
                 {% else %}
                     {# Sign In is always visible; the Sign Up quick-link is only for the system domain #}
                     {% if request.resolver_match.url_name == 'account_signup' %}
-                        <a href="{% url 'account_login' %}" style="color: #7bc043; font-weight: bold;">
+                        <a href="{% url 'account_login' %}" class="mobile-header-btn">
                             <i class="fas fa-sign-in-alt"></i> Sign In
                         </a>
                     {% elif request.resolver_match.url_name == 'account_login' %}
                         {% if not current_company %}
-                            <a href="{% url 'account_signup' %}" style="color: #7bc043; font-weight: bold;">
+                            <a href="{% url 'account_signup' %}" class="mobile-header-btn">
                                 <i class="fas fa-user-plus"></i> Sign Up
                             </a>
                         {% else %}
-                            <a href="{% url 'account_login' %}">
+                            <a href="{% url 'account_login' %}" class="mobile-header-btn">
                                 <i class="fas fa-user"></i> Sign in
                             </a>
                         {% endif %}
                     {% else %}
-                        <a href="{% url 'account_login' %}">
-                            <i class="fas fa-user"></i> Sign in
+                        <a href="{% url 'account_login' %}" class="mobile-header-btn">
+                            <i class="fas fa-sign-in-alt"></i> Sign in
                         </a>
                     {% endif %}
                 {% endif %}
@@ -1148,98 +1158,66 @@
     ============================================ -->
     <footer class="ff-footer">
         <div class="ff-footer-inner">
-            <div class="row">
-                <div class="col-lg-4 col-md-6 mb-4">
-                    <h5>
-                        <span class="brand-icon">
-                            {% if current_company and current_company.logo %}
-                                <img src="{{ current_company.logo_url }}"
-                                     alt="{{ current_company.display_name }}"
-                                     style="max-height: 22px; max-width: 28px; object-fit: contain;">
-                            {% elif site_logo_url %}
-                                <img src="{{ site_logo_url }}"
-                                     alt="{{ system_name|default:'RonoSystems' }}"
-                                     style="max-height: 22px; max-width: 28px; object-fit: contain;">
-                            {% else %}
-                                <i class="fas fa-cube me-2"></i>
-                            {% endif %}
-                        </span>
-                        {% if current_company %}
-                            {{ current_company.display_name|default:system_name }}
+            
+            <!-- Centered content block -->
+            <div class="footer-main-content text-center" style="max-width: 800px; margin: 0 auto 30px;">
+                <h5 style="justify-content: center; display: flex; align-items: center;">
+                    <span class="brand-icon">
+                        {% if current_company and current_company.logo %}
+                            <img src="{{ current_company.logo_url }}"
+                                 alt="{{ current_company.display_name }}"
+                                 style="max-height: 22px; max-width: 28px; object-fit: contain;">
+                        {% elif site_logo_url %}
+                            <img src="{{ site_logo_url }}"
+                                 alt="{{ system_name|default:'RonoSystems' }}"
+                                 style="max-height: 22px; max-width: 28px; object-fit: contain;">
                         {% else %}
-                            {{ system_name|default:"RonoSystems" }}
+                            <i class="fas fa-cube me-2"></i>
                         {% endif %}
-                    </h5>
-                    <p style="line-height: 1.6; margin-bottom: 15px;">
-                        {% if current_company %}
-                            {{ current_company.tagline|default:site_tagline|default:"Enterprise Management Platform helping businesses streamline operations, manage teams, and drive growth with AI-powered insights." }}
-                        {% else %}
-                            {{ site_tagline|default:"Enterprise Management Platform helping businesses streamline operations, manage teams, and drive growth with AI-powered insights." }}
-                        {% endif %}
-                    </p>
+                    </span>
+                    {% if current_company %}
+                        {{ current_company.display_name|default:system_name }}
+                    {% else %}
+                        {{ system_name|default:"RonoSystems" }}
+                    {% endif %}
+                </h5>
+                <p style="line-height: 1.6; margin-bottom: 15px; font-size: 12px;">
+                    {% if current_company %}
+                        {{ current_company.tagline|default:site_tagline|default:"Enterprise Management Platform helping businesses streamline operations, manage teams, and drive growth with AI-powered insights." }}
+                    {% else %}
+                        {{ site_tagline|default:"Enterprise Management Platform helping businesses streamline operations, manage teams, and drive growth with AI-powered insights." }}
+                    {% endif %}
+                </p>
 
-                    <div class="ff-social">
-                        <a href="https://facebook.com/" rel="noopener" title="Facebook" class="ff-social-link facebook">
-                            <i class="fab fa-facebook-f"></i>
-                        </a>
-                        <a href="https://wa.me/254722527955" rel="noopener" title="WhatsApp" class="ff-social-link whatsapp">
-                            <i class="fab fa-whatsapp"></i>
-                        </a>
-                        <a href="https://x.com/" rel="noopener" title="X (Twitter)" class="ff-social-link x">
-                            <i class="fab fa-x-twitter"></i>
-                        </a>
-                        <a href="https://t.me/" rel="noopener" title="Telegram" class="ff-social-link telegram">
-                            <i class="fab fa-telegram-plane"></i>
-                        </a>
-                        <a href="https://instagram.com/" rel="noopener" title="Instagram" class="ff-social-link instagram">
-                            <i class="fab fa-instagram"></i>
-                        </a>
-                        <a href="https://linkedin.com/" rel="noopener" title="LinkedIn" class="ff-social-link linkedin">
-                            <i class="fab fa-linkedin-in"></i>
-                        </a>
-                    </div>
-                </div>
-
-                <div class="col-lg-2 col-md-3 col-6 mb-4">
-                    <h5>About</h5>
-                    <a href="{% url 'about' %}">Our Company</a>
-                    <a href="{% url 'about' %}">Team</a>
-                    <a href="{% url 'about' %}">Mission &amp; Vision</a>
-                    <a href="{% url 'about' %}">Our Story</a>
-                </div>
-
-                <div class="col-lg-2 col-md-3 col-6 mb-4">
-                    <h5>Features</h5>
-                    <a href="{% url 'features' %}">POS System</a>
-                    <a href="{% url 'features' %}">Analytics</a>
-                    <a href="{% url 'ai-assistant-page' %}">AI Assistant</a>
-                    <a href="{% url 'features' %}">Team Management</a>
-                </div>
-
-                <div class="col-lg-2 col-md-3 col-6 mb-4">
-                    <h5>Pricing</h5>
-                    <a href="{% url 'pricing' %}">Basic</a>
-                    <a href="{% url 'pricing' %}">Standard</a>
-                    <a href="{% url 'pricing' %}">Premium</a>
-                    <a href="{% url 'pricing' %}">Enterprise</a>
-                </div>
-
-                <div class="col-lg-2 col-md-3 col-6 mb-4">
-                    <h5>Contact</h5>
-                    <a href="{% url 'contact' %}">Email Us</a>
-                    <a href="{% url 'contact' %}">Call Us</a>
-                    <a href="{% url 'contact' %}">Live Chat</a>
-                    <a href="{% url 'support' %}">Help Center</a>
+                <div class="ff-social" style="justify-content: center;">
+                    <a href="https://facebook.com/" rel="noopener" title="Facebook" class="ff-social-link facebook">
+                        <i class="fab fa-facebook-f"></i>
+                    </a>
+                    <a href="https://wa.me/254722527955" rel="noopener" title="WhatsApp" class="ff-social-link whatsapp">
+                        <i class="fab fa-whatsapp"></i>
+                    </a>
+                    <a href="https://x.com/" rel="noopener" title="X (Twitter)" class="ff-social-link x">
+                        <i class="fab fa-x-twitter"></i>
+                    </a>
+                    <a href="https://t.me/" rel="noopener" title="Telegram" class="ff-social-link telegram">
+                        <i class="fab fa-telegram-plane"></i>
+                    </a>
+                    <a href="https://instagram.com/" rel="noopener" title="Instagram" class="ff-social-link instagram">
+                        <i class="fab fa-instagram"></i>
+                    </a>
+                    <a href="https://linkedin.com/" rel="noopener" title="LinkedIn" class="ff-social-link linkedin">
+                        <i class="fab fa-linkedin-in"></i>
+                    </a>
                 </div>
             </div>
 
+            <!-- Split Copyright Block -->
             <div class="copyright">
                 <span class="copyright-text">
-                    &copy; {% now "Y" %} {{ system_name|default:"RonoSystems" }}. All rights reserved.
+                    Copyright <i class="fas fa-copyright"></i> {% now "Y" %}.
                 </span>
-                <span class="copyright-links">
-                    <a href="{% url 'privacy' %}">Privacy Policy</a>
-                    <a href="{% url 'terms' %}">Terms of Service</a>
+                <span class="powered-by">
+                    Powered by {{ system_name|default:"RonoSystems" }}
                 </span>
             </div>
         </div>
