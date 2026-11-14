@@ -165,10 +165,16 @@ def manifest_view(request):
     from apps.companies.models import Company
     from django.templatetags.static import static
     from django.http import JsonResponse
+    
+    # Try to import SystemSetting for the main site logo
+    try:
+        from apps.settings.models import SystemSetting
+    except ImportError:
+        SystemSetting = None
 
     company = None
     
-    # 1. Check URL parameter first
+    # 1. Check URL parameter first (useful for local testing)
     company_id = request.GET.get('company_id')
     if company_id:
         try:
@@ -176,67 +182,121 @@ def manifest_view(request):
         except Company.DoesNotExist:
             pass
     
-    # 2. If no company_id, check logged-in user
+    # 2. Check logged-in user's company
     if not company and request.user.is_authenticated and getattr(request.user, 'company', None):
         company = request.user.company
 
-    # 3. If STILL no company, try to match the domain name to a company!
+    # 3. Match the domain name to a company (for custom domains like fieldmax.shop)
     if not company:
-        host = request.get_host().split(':')[0] # Gets 'fieldmax.shop' or 'ronosystems.onrender.com'
-        # Try to find a company whose custom domain or name matches the host
+        host = request.get_host().split(':')[0] # e.g., 'fieldmax.shop' or 'ronosystems.onrender.com'
         try:
-            # Assuming you have a field called 'domain' or 'subdomain' on Company. 
-            # If not, we can do a name match:
+            # Check custom domain first
             company = Company.objects.filter(custom_domain__iexact=host).first()
             
-            # Fallback: If host contains 'fieldmax', find company named 'Fieldmax'
+            # Fallback: If host contains 'fieldmax', find company named 'fieldmax'
             if not company and 'fieldmax' in host:
                 company = Company.objects.filter(display_name__icontains='fieldmax').first()
-                
         except Exception:
             pass
 
-    # 4. Build the manifest data
-    company_name = "RONOSYSTEMS" # Default Platform Name
-    icon_url = request.build_absolute_uri(static('images/icon-512.png'))
+    # ============================================
+    # BUILD MANIFEST DATA
+    # ============================================
+    
+    # Defaults (Main Site)
+    company_name = "RONOSYSTEMS"
+    icon_192 = request.build_absolute_uri(static('images/icon-192.png'))
+    icon_512 = request.build_absolute_uri(static('images/icon-512.png'))
 
     if company:
+        # === TENANT LOGIC (e.g., fieldmax.shop) ===
         if company.display_name:
             company_name = company.display_name.upper()
+            
         if company.logo:
             try:
-                if hasattr(company, 'logo_url') and company.logo_url:
-                    icon_url = company.logo_url
-                else:
-                    icon_url = request.build_absolute_uri(company.logo.url)
+                # Get the raw URL (Cloudinary or local)
+                raw_logo = company.logo_url if hasattr(company, 'logo_url') and company.logo_url else company.logo.url
+                
+                # If Cloudinary: Force exact 192x192 and 512x512 sizes in PNG format
+                if 'cloudinary' in raw_logo:
+                    icon_192 = raw_logo.replace('/upload/', '/upload/w_192,h_192,c_fill,f_png/')
+                    icon_512 = raw_logo.replace('/upload/', '/upload/w_512,h_512,c_fill,f_png/')
+                # If local PNG: Use it for both (assuming it's high-res enough)
+                elif raw_logo.endswith('.png'):
+                    icon_192 = raw_logo
+                    icon_512 = raw_logo
+            except Exception:
+                pass # Fallback to default static icons
+    else:
+        # === MAIN SITE LOGIC (ronosystems.onrender.com) ===
+        if SystemSetting:
+            try:
+                # Get the main site logo from your settings app
+                site_logo = SystemSetting.get_setting('SITE_LOGO_URL', '')
+                if site_logo:
+                    if 'cloudinary' in site_logo:
+                        icon_192 = site_logo.replace('/upload/', '/upload/w_192,h_192,c_fill,f_png/')
+                        icon_512 = site_logo.replace('/upload/', '/upload/w_512,h_512,c_fill,f_png/')
+                    elif site_logo.endswith('.png'):
+                        icon_192 = site_logo
+                        icon_512 = site_logo
             except Exception:
                 pass
 
-    # Force PNG for PWABuilder
-    if not icon_url.endswith('.png'):
-        if 'cloudinary' in icon_url:
-            icon_url = icon_url.replace('/upload/', '/upload/w_512,h_512,c_fill/') + '.png'
-        else:
-            icon_url = request.build_absolute_uri(static('images/icon-512.png'))
 
     manifest = {
+        "id": "/",
         "name": company_name,
         "short_name": company_name,
         "description": f"Manage {company_name} smarter and faster.",
-        "start_url": "/",  # ← home page
+        "start_url": "/",
+        "scope": "/",
         "display": "standalone",
+        "display_override": ["window-controls-overlay", "standalone"],
+        "orientation": "any",
         "background_color": "#f0f2f5",
         "theme_color": "#1e4e6d",
+        "categories": ["business", "productivity"],
+        
+        # Dynamic Icons (Safely resized for PWABuilder)
         "icons": [
-            {"src": icon_url, "sizes": "192x192", "type": "image/png", "purpose": "any"},
-            {"src": icon_url, "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
+            {
+                "src": icon_192, 
+                "sizes": "192x192", 
+                "type": "image/png", 
+                "purpose": "any"
+            },
+            {
+                "src": icon_512, 
+                "sizes": "512x512", 
+                "type": "image/png", 
+                "purpose": "any maskable"
+            }
+        ],
+        
+        # Screenshots (Required by PWABuilder)
+        "screenshots": [
+            {
+                "src": request.build_absolute_uri(static('images/screenshot-wide.png')),
+                "sizes": "1280x720",
+                "type": "image/png",
+                "form_factor": "wide",
+                "label": "Dashboard view"
+            },
+            {
+                "src": request.build_absolute_uri(static('images/screenshot-narrow.png')),
+                "sizes": "720x1280",
+                "type": "image/png",
+                "form_factor": "narrow",
+                "label": "Mobile view"
+            }
         ]
     }
 
     response = JsonResponse(manifest)
     response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     return response
-
 
 # ============================================
 # PWA: SERVICE WORKER 
