@@ -1,14 +1,18 @@
 {% load static %}
+{% load nav_tags %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forgot Password — {{ system_name|default:"RonoSystems" }}</title>
+
+    <!-- Per-page title -->
+    <title>{% block title %}Home Page{% endblock %} — {{ company.name|default:"RonoSystems" }}</title>
+
     <link rel="manifest" href="{% url 'manifest' %}{% if current_company %}?company_id={{ current_company.id }}{% endif %}">
     <meta name="theme-color" content="#1e4e6d">
 
-    {# ---------- Favicon from Settings ---------- #}
+    <!-- Favicon from Settings -->
     {% if site_favicon_url %}
         <link rel="icon" type="image/png" href="{{ site_favicon_url }}">
         <link rel="shortcut icon" href="{{ site_favicon_url }}">
@@ -21,7 +25,7 @@
 
     <style>
         /* ============================================
-           FOREX FACTORY STYLE VARIABLES
+           SHARED VARIABLES
         ============================================ */
         :root {
             --nav-bg-top: #2d5f7c;
@@ -200,6 +204,16 @@
             color: white;
             text-decoration: none;
         }
+
+        .ff-tool-item.active {
+            background: var(--nav-active-bg);
+            color: var(--nav-active-text);
+            border-left: none;
+        }
+        .ff-tool-item.active i {
+            color: var(--nav-active-text);
+        }
+
         .ff-tool-item i {
             margin-right: 6px;
             font-size: 14px;
@@ -360,7 +374,7 @@
         }
 
         /* ============================================
-           LAYOUT CONTAINER
+           LAYOUT
         ============================================ */
         .main-wrapper {
             display: flex;
@@ -368,9 +382,6 @@
             min-height: calc(100vh - 56px);
         }
 
-        /* ============================================
-           SIDEBAR (Desktop)
-        ============================================ */
         .ff-sidebar {
             width: var(--sidebar-width);
             background: #fff;
@@ -380,6 +391,7 @@
             display: flex;
             flex-direction: column;
         }
+
         .sidebar-header {
             font-size: 11px;
             font-weight: 700;
@@ -392,6 +404,7 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+
         .sidebar-link {
             display: block;
             padding: 6px 15px;
@@ -437,7 +450,28 @@
             width: 100%;
             padding: 8px;
         }
-        .sidebar-promo .btn:hover { background: #6aa838; }
+        .sidebar-promo .btn:hover {
+            background: #6aa838;
+        }
+
+        /* PWA install button */
+        .pwa-install-btn {
+            display: none;
+            width: calc(100% - 30px);
+            margin: 0 15px 15px;
+            padding: 10px 12px;
+            border-radius: 6px;
+            background: #28a745;
+            color: #fff;
+            font-weight: 700;
+            font-size: 0.85rem;
+            text-align: center;
+            cursor: pointer;
+            border: 2px solid #1e7e34;
+            transition: background 0.2s;
+        }
+        .pwa-install-btn:hover { background: #218838; }
+        .pwa-install-btn i { margin-right: 6px; }
 
         /* ============================================
            CONTENT AREA
@@ -446,7 +480,7 @@
             flex-grow: 1;
             padding: 20px;
             background-color: #f0f4f7;
-            background-image: 
+            background-image:
                 radial-gradient(circle, #c8d4dc 1px, transparent 1px),
                 radial-gradient(circle, #c8d4dc 1px, transparent 1px);
             background-size: 7px 7px;
@@ -454,9 +488,7 @@
             overflow-x: hidden;
         }
 
-        /* ============================================
-        CONTENT HEADER (With Scrolling Marquee)
-        ============================================ */
+        /* Content header with marquee */
         .content-header {
             background: #f9f9f9;
             border: 1px solid var(--ff-border);
@@ -468,7 +500,6 @@
             border-radius: 2px;
             overflow: hidden;
         }
-
         .content-header h1 {
             font-size: 18px;
             font-weight: 700;
@@ -480,20 +511,13 @@
             animation: headerMarquee 15s linear infinite;
             will-change: transform;
         }
-
         .content-header:hover h1 {
             animation-play-state: paused;
         }
-
         @keyframes headerMarquee {
-            0% {
-                transform: translateX(0);
-            }
-            100% {
-                transform: translateX(-100%);
-            }
+            0%   { transform: translateX(0); }
+            100% { transform: translateX(-100%); }
         }
-
         .breadcrumb-custom {
             font-size: 11px;
             color: #666;
@@ -506,56 +530,15 @@
             text-decoration: none;
         }
 
-
-        /* ============================================
-           FORGOT PASSWORD PANEL — with background image
-        ============================================ */
-        .forgot-bg-panel {
-            position: relative;
-            background-color: #ffffff;
+        /* Panels & cards (shared) */
+        .dashboard-panel {
+            background: #fff;
             border: 1px solid var(--ff-border);
             margin-bottom: 25px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-            overflow: hidden;
-            border-radius: 4px;
+            box-shadow: 0 1px 3px rgb(0, 0, 0);
         }
-
-        /* Background image layer */
-        .forgot-bg-panel::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            z-index: 0;
-            {% if login_background_url %}
-                background: url('{{ login_background_url }}') center center / cover no-repeat;
-            {% else %}
-                background: linear-gradient(135deg, #e8f2f7 0%, #d5e6ef 100%);
-            {% endif %}
-        }
-
-        /* Dimming overlay — LIGHT so the background image shows clearly */
-        .forgot-bg-panel::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            z-index: 0;
-            background: linear-gradient(
-                135deg,
-                rgba(240, 244, 247, 0.15) 0%,
-                rgba(240, 244, 247, 0.35) 100%
-            );
-            pointer-events: none;
-        }
-
-        .forgot-bg-panel > * {
-            position: relative;
-            z-index: 1;
-        }
-
-        .forgot-bg-panel .panel-header {
-            background: rgba(230, 230, 230, 0.85);
-            backdrop-filter: blur(6px);
-            -webkit-backdrop-filter: blur(6px);
+        .panel-header {
+            background: #e6e6e6;
             padding: 8px 15px;
             border-bottom: 1px solid var(--ff-border);
             font-weight: 700;
@@ -563,250 +546,137 @@
             text-transform: uppercase;
             color: #333;
         }
+        .panel-body { padding: 20px; }
 
-        .forgot-bg-panel .panel-body {
-            padding: 30px 20px 40px;
-        }
-
-        /* ============================================
-           FORGOT PASSWORD CARD
-           Slightly translucent so the bg image bleeds through subtly
-        ============================================ */
-        .forgot-card {
-            display: flex;
-            width: 100%;
-            max-width: 900px;
-            min-height: 520px;
-            margin: 0 auto;
-            background: rgba(255, 255, 255, 0.96);
-            border: 1px solid rgba(255, 255, 255, 0.6);
-            border-radius: 28px;
-            box-shadow:
-                0 20px 50px rgba(0, 0, 0, 0.35),
-                0 5px 15px rgba(0, 0, 0, 0.25);
-            overflow: hidden;
-            position: relative;
-            z-index: 2;
-            backdrop-filter: blur(2px);
-            -webkit-backdrop-filter: blur(2px);
-        }
-
-        /* ---------- LEFT PANEL — colored info ---------- */
-        .forgot-left {
-            flex: 1;
-            background: linear-gradient(160deg, var(--nav-bg-top) 0%, var(--nav-bg-bottom) 100%);
-            color: #ffffff;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 40px 30px;
-            text-align: center;
-            position: relative;
-            z-index: 1;
-            /* Smooth rounded right edge */
-            border-top-right-radius: 55% 100%;
-            border-bottom-right-radius: 55% 100%;
-        }
-
-        .forgot-left .logo-wrap {
-            width: 90px;
-            height: 90px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 18px;
-            background: #ffffff;
-            border-radius: 16px;
-            padding: 8px;
-            box-shadow: 0 6px 18px rgba(0,0,0,0.15);
-        }
-        .forgot-left .logo-wrap img {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-        }
-        .forgot-left .logo-wrap i {
-            font-size: 2.6rem;
-            color: var(--nav-bg-bottom);
-        }
-
-        .forgot-left .welcome-title {
+        .hero-title {
             font-size: 2rem;
             font-weight: 800;
-            margin: 0 0 10px 0;
+            color: var(--nav-bg-bottom);
+            margin-bottom: 15px;
             line-height: 1.2;
-            color: #ffffff;
         }
-
-        .forgot-left .welcome-sub {
-            font-size: 0.92rem;
-            font-weight: 400;
-            opacity: 0.95;
-            margin-bottom: 26px;
-            line-height: 1.5;
-            max-width: 240px;
-            color: #ffffff;
-        }
-
-        .forgot-left .btn-back-login {
-            display: inline-block;
-            padding: 12px 40px;
-            border: 2px solid #ffffff;
-            border-radius: 50px;
-            color: #ffffff;
-            font-weight: 700;
-            font-size: 0.92rem;
-            text-decoration: none;
-            background: transparent;
-            transition: all 0.25s ease;
-        }
-        .forgot-left .btn-back-login:hover {
-            background: var(--nav-border-green);
-            border-color: var(--nav-border-green);
-            color: var(--nav-bg-bottom);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-        }
-        .forgot-left .btn-back-login i {
-            margin-right: 6px;
-        }
-
-        /* ---------- RIGHT PANEL — form ---------- */
-        .forgot-right {
-            flex: 1;
-            padding: 50px 45px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            background: #ffffff;
-        }
-
-        .forgot-right .form-title {
-            font-size: 1.9rem;
-            font-weight: 800;
-            color: var(--nav-bg-bottom);
-            text-align: center;
-            margin: 0 0 10px 0;
-        }
-
-        .forgot-right .form-subtitle {
-            font-size: 0.85rem;
-            color: #6b7280;
-            text-align: center;
-            margin-bottom: 26px;
-            line-height: 1.5;
-        }
-
-        /* Input fields */
-        .forgot-field {
-            display: flex;
-            align-items: center;
-            background: #f3f4f6;
-            border-radius: 10px;
-            padding: 12px 16px;
-            margin-bottom: 16px;
-            transition: box-shadow 0.2s ease, border-color 0.2s ease;
-            border: 1px solid transparent;
-        }
-        .forgot-field:focus-within {
-            background: #f9fafb;
-            border-color: var(--nav-bg-top);
-            box-shadow: 0 0 0 3px rgba(45, 95, 124, 0.15);
-        }
-        .forgot-field input {
-            flex: 1;
-            border: none;
-            background: transparent;
-            font-family: 'Open Sans', Arial, sans-serif;
-            font-size: 0.9rem;
-            color: #1f2937;
-            outline: none;
-            min-width: 0;
-        }
-        .forgot-field input::placeholder {
-            color: #9ca3af;
-            font-weight: 400;
-        }
-        .forgot-field .field-icon {
-            color: #4b5563;
-            font-size: 1rem;
-            margin-left: 12px;
-            flex-shrink: 0;
-        }
-
-        /* Info box */
-        .info-box {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            background: #f0f7fa;
-            border: 1px solid #c6dbe6;
-            border-radius: 10px;
-            padding: 12px 14px;
-            font-size: 0.8rem;
-            color: var(--nav-bg-bottom);
-            line-height: 1.5;
-            margin-bottom: 20px;
-        }
-        .info-box i {
+        .hero-title .highlight {
             color: var(--nav-bg-top);
-            font-size: 1rem;
-            margin-top: 2px;
-            flex-shrink: 0;
+            text-decoration: underline;
+            text-decoration-color: #7bc043;
+            text-decoration-thickness: 3px;
+        }
+        .hero-subtitle {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.6;
         }
 
-        /* Send Reset button — gradient pill */
-        .btn-reset-gradient {
-            width: 100%;
-            padding: 14px;
-            border: none;
-            border-radius: 50px;
-            background: linear-gradient(90deg, var(--nav-bg-bottom) 0%, var(--nav-bg-top) 100%);
-            color: #ffffff;
-            font-family: 'Open Sans', Arial, sans-serif;
+        .stats-bar {
+            display: flex;
+            border: 1px solid var(--ff-border);
+            margin-bottom: 20px;
+            background: #f9f9f9;
+        }
+        .stat-item {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            border-right: 1px solid var(--ff-border);
+        }
+        .stat-item:last-child { border-right: none; }
+        .stat-item .number {
+            font-size: 1.2rem;
             font-weight: 700;
-            font-size: 1rem;
-            text-transform: capitalize;
-            cursor: pointer;
-            transition: all 0.25s ease;
+            color: var(--nav-bg-bottom);
+            display: block;
+        }
+        .stat-item .label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        .features-grid {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .features-grid th {
+            background: var(--nav-bg-bottom);
+            color: white;
+            text-align: left;
+            padding: 10px 15px;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            border-right: 1px solid rgba(255,255,255,0.1);
+        }
+        .features-grid td {
+            padding: 15px;
+            border-bottom: 1px solid var(--ff-border);
+            vertical-align: top;
+        }
+        .features-grid tr:nth-child(even) { background-color: #f9f9f9; }
+        .features-grid tr:hover { background-color: #f0f7fa; }
+
+        .feature-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--nav-bg-top);
+            color: white;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
-            box-shadow: 0 6px 18px rgba(30, 78, 109, 0.25);
+            border-radius: 4px;
+            margin-bottom: 8px;
+            font-size: 14px;
         }
-        .btn-reset-gradient:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 12px 26px rgba(30, 78, 109, 0.35);
+        .feature-title {
+            font-weight: 700;
+            color: var(--nav-bg-bottom);
+            margin-bottom: 5px;
+            display: block;
         }
-        .btn-reset-gradient:active { transform: translateY(0); }
+        .feature-desc {
+            color: #666;
+            font-size: 12px;
+            line-height: 1.5;
+            margin-bottom: 10px;
+        }
 
-        /* Alerts */
-        .alert {
-            padding: 10px 14px;
-            border-radius: 10px;
-            font-size: 0.82rem;
-            margin-bottom: 16px;
+        .cta-bar {
+            background: #d9edf7;
+            border: 1px solid #bce8f1;
+            color: #31708f;
+            padding: 20px;
+            margin: 25px 0;
             display: flex;
             align-items: center;
-            gap: 8px;
-            background: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #fecaca;
+            justify-content: space-between;
+            border-radius: 4px;
         }
-        .alert.success { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
-        .alert.info    { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
-        .alert .btn-close {
-            margin-left: auto;
-            background: transparent;
+        .cta-bar h3 {
+            font-size: 16px;
+            font-weight: 700;
+            margin: 0 0 5px 0;
+        }
+        .cta-bar p {
+            margin: 0;
+            font-size: 13px;
+        }
+        .btn-cta {
+            background: var(--nav-bg-bottom);
+            color: white;
             border: none;
-            cursor: pointer;
-            color: inherit;
-            font-size: 1rem;
-            opacity: 0.6;
+            padding: 10px 20px;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            border-radius: 2px;
+            white-space: nowrap;
         }
-        .alert .btn-close:hover { opacity: 1; }
+        .btn-cta:hover {
+            background: var(--nav-bg-top);
+            color: white;
+            text-decoration: none;
+        }
 
         /* ============================================
            FOOTER
@@ -850,7 +720,9 @@
             margin-bottom: 8px;
             transition: color 0.2s;
         }
-        .ff-footer a:hover { color: #7bc043; }
+        .ff-footer a:hover {
+            color: #7bc043;
+        }
         .ff-footer .copyright {
             border-top: 1px solid #34495e;
             padding-top: 20px;
@@ -867,8 +739,13 @@
             margin-bottom: 0;
             margin-left: 15px;
         }
+        .ff-footer h5 .brand-icon img {
+            max-height: 22px;
+            max-width: 28px;
+            object-fit: contain;
+            display: block;
+        }
 
-        /* Social icons in footer */
         .ff-social {
             display: flex;
             flex-wrap: wrap;
@@ -906,13 +783,6 @@
             text-decoration: none !important;
         }
 
-        .ff-footer h5 .brand-icon img {
-            max-height: 22px;
-            max-width: 28px;
-            object-fit: contain;
-            display: block;
-        }
-
         /* ============================================
            RESPONSIVE
         ============================================ */
@@ -922,46 +792,19 @@
             .main-wrapper { margin-top: 92px; }
             .ff-sidebar { display: none; }
             .ff-content { padding: 15px; }
+            .cta-bar { flex-direction: column; text-align: center; gap: 15px; }
+            .stats-bar { flex-direction: column; }
+            .stat-item { border-right: none; border-bottom: 1px solid var(--ff-border); }
+            .stat-item:last-child { border-bottom: none; }
+            .hero-title { font-size: 1.6rem; }
             .mobile-sidebar-overlay.active { display: block; }
-
             .ff-footer { border-top: 4px solid var(--nav-border-green); }
         }
-
-        @media (max-width: 768px) {
-            .forgot-bg-panel .panel-body {
-                padding: 20px 12px 25px;
-            }
-            .forgot-card {
-                flex-direction: column;
-                max-width: 440px;
-                min-height: auto;
-                border-radius: 22px;
-            }
-            .forgot-left {
-                border-top-right-radius: 22px;
-                border-top-left-radius: 22px;
-                border-bottom-right-radius: 40px;
-                border-bottom-left-radius: 40px;
-                padding: 32px 24px;
-                min-height: 240px;
-            }
-            .forgot-left .logo-wrap {
-                width: 70px;
-                height: 70px;
-                margin-bottom: 12px;
-            }
-            .forgot-left .welcome-title { font-size: 1.5rem; }
-            .forgot-left .welcome-sub { font-size: 0.82rem; margin-bottom: 18px; }
-            .forgot-left .btn-back-login { padding: 10px 30px; font-size: 0.85rem; }
-
-            .forgot-right { padding: 34px 24px; }
-            .forgot-right .form-title { font-size: 1.6rem; }
-            .forgot-right .form-subtitle { margin-bottom: 20px; }
-        }
-
         @media (max-width: 576px) {
+            .hero-title { font-size: 1.4rem; }
             .content-header { flex-direction: column; align-items: flex-start; gap: 10px; }
-
+            .features-grid th { font-size: 11px; padding: 8px; }
+            .features-grid td { padding: 10px; }
             .ff-footer .col-lg-4,
             .ff-footer .col-lg-2,
             .ff-footer .col-md-3,
@@ -969,7 +812,7 @@
                 text-align: center;
                 margin-bottom: 25px;
             }
-            .ff-footer h5 { justify-content: center; }
+            .ff-footer h5 { text-align: center; margin-bottom: 10px; justify-content: center; }
             .ff-footer a { margin-bottom: 8px; display: block; width: 100%; }
             .ff-social { gap: 10px; justify-content: center; }
             .ff-footer .copyright {
@@ -978,18 +821,15 @@
                 gap: 10px;
                 padding-top: 15px;
             }
-            .ff-footer .copyright-links {
-                display: flex;
-                justify-content: center;
-                gap: 20px;
-            }
-            .ff-footer .copyright-links a {
-                margin: 0;
-                width: auto;
-                display: inline-block;
-            }
+            .ff-footer .copyright-links { display: flex; justify-content: center; gap: 20px; }
+            .ff-footer .copyright-links a { margin: 0; width: auto; display: inline-block; }
             .ff-footer-inner { padding: 0 15px; }
         }
+
+        /* ============================================
+           PAGE-SPECIFIC CSS (children override)
+        ============================================ */
+        {% block extra_css %}{% endblock %}
     </style>
 </head>
 <body>
@@ -998,18 +838,17 @@
     DESKTOP HEADER
     ============================================ -->
     <header class="desktop-header">
-
         <div class="ff-logo-section">
-            <a href="/" class="ff-logo-content">
+            <a href="{% url 'home' %}" class="ff-logo-content">
                 <span class="brand-icon">
                     {% if current_company and current_company.logo %}
                         <img src="{{ current_company.logo_url }}"
-                            alt="{{ current_company.display_name }}"
-                            style="max-height: 34px; max-width: 44px; object-fit: contain;">
+                             alt="{{ current_company.display_name }}"
+                             style="max-height: 34px; max-width: 44px; object-fit: contain;">
                     {% elif site_logo_url %}
                         <img src="{{ site_logo_url }}"
-                            alt="{{ system_name|default:'RonoSystems' }}"
-                            style="max-height: 34px; max-width: 44px; object-fit: contain;">
+                             alt="{{ system_name|default:'RonoSystems' }}"
+                             style="max-height: 34px; max-width: 44px; object-fit: contain;">
                     {% else %}
                         <i class="fas fa-cube"></i>
                     {% endif %}
@@ -1024,31 +863,32 @@
             </a>
         </div>
 
+
+
+        <!-- ============================================
+        DESKTOP HEADER NAVIGATION
+        ============================================ -->
         <nav class="ff-nav-container">
-            <a href="/" class="ff-nav-item">
-                <div class="ff-nav-item-inner">
-                    <i class="fas fa-home"></i> <span>Home</span>
-                </div>
+            <a href="{% url 'home' %}" class="ff-nav-item {% nav_active 'home' %}">
+                <div class="ff-nav-item-inner"><i class="fas fa-home"></i> <span>Home</span></div>
             </a>
-            <a href="/features/" class="ff-nav-item">
-                <div class="ff-nav-item-inner">
-                    <i class="fas fa-cogs"></i> <span>Features</span>
-                </div>
+            <a href="{% url 'features' %}" class="ff-nav-item {% nav_active 'features' %}">
+                <div class="ff-nav-item-inner"><i class="fas fa-cogs"></i> <span>Features</span></div>
             </a>
-            <a href="/contact/" class="ff-nav-item">
-                <div class="ff-nav-item-inner">
-                    <i class="fas fa-envelope"></i> <span>Contact</span>
-                </div>
+            <a href="{% url 'pricing' %}" class="ff-nav-item {% nav_active 'pricing' %}">
+                <div class="ff-nav-item-inner"><i class="fas fa-tags"></i> <span>Pricing</span></div>
             </a>
-            <a href="/about/" class="ff-nav-item">
-                <div class="ff-nav-item-inner">
-                    <i class="fas fa-info-circle"></i> <span>About</span>
-                </div>
+            <a href="{% url 'contact' %}" class="ff-nav-item {% nav_active 'contact' %}">
+                <div class="ff-nav-item-inner"><i class="fas fa-envelope"></i> <span>Contact</span></div>
             </a>
-            <a href="/ai-assistant/" class="ff-nav-item">
-                <div class="ff-nav-item-inner">
-                    <i class="fas fa-robot"></i> <span>AI Assistant</span>
-                </div>
+            <a href="{% url 'about' %}" class="ff-nav-item {% nav_active 'about' %}">
+                <div class="ff-nav-item-inner"><i class="fas fa-info-circle"></i> <span>About</span></div>
+            </a>
+            <a href="{% url 'ai-assistant-page' %}" class="ff-nav-item {% nav_active 'ai-assistant-page' %}">
+                <div class="ff-nav-item-inner"><i class="fas fa-robot"></i> <span>AI Assistant</span></div>
+            </a>
+            <a href="{% url 'support' %}" class="ff-nav-item {% nav_active 'support' 'help' 'faq' %}">
+                <div class="ff-nav-item-inner"><i class="fas fa-question-circle"></i> <span>Support</span></div>
             </a>
         </nav>
 
@@ -1057,84 +897,119 @@
                 <div class="ff-tool-item-inner"><i class="fas fa-bell"></i></div>
             </a>
             <a href="#" class="ff-tool-item">
-                <div class="ff-tool-item-inner">
-                    <i class="far fa-clock"></i> <span id="desktop-clock">--:--</span>
-                </div>
+                <div class="ff-tool-item-inner"><i class="far fa-clock"></i> <span id="desktop-clock">--:--</span></div>
             </a>
-            <a href="/pricing/" class="ff-tool-item">
-                <div class="ff-tool-item-inner"><i class="fas fa-dollar"></i> <span>Pricing</span></div>
+
+            <a href="{% url 'help' %}" class="ff-tool-item {% nav_active 'help' %}">
+                <div class="ff-tool-item-inner"><i class="fas fa-question-circle"></i> <span>Help</span></div>
             </a>
-            <a href="/documentation/" class="ff-tool-item">
+
+            <a href="{% url 'documentation' %}" class="ff-tool-item {% nav_active 'documentation' %}">
                 <div class="ff-tool-item-inner"><i class="fas fa-book"></i> <span>Documentation</span></div>
             </a>
-            <a href="/invoicing/" class="ff-tool-item">
+            <a href="{% url 'invoicing' %}" class="ff-tool-item {% nav_active 'invoicing' %}">
                 <div class="ff-tool-item-inner"><i class="fas fa-receipt"></i> <span>Invoicing</span></div>
             </a>
+
             {% if user.is_authenticated %}
-            <a href="/dashboard/" class="ff-tool-item">
-                <div class="ff-tool-item-inner"><i class="fas fa-tachometer-alt"></i> <span>Dashboard</span></div>
-            </a>
+                <a href="/dashboard/" class="ff-tool-item">
+                    <div class="ff-tool-item-inner"><i class="fas fa-tachometer-alt"></i> <span>Dashboard</span></div>
+                </a>
             {% else %}
-            <a href="/auth/login/" class="ff-tool-item">
-                <div class="ff-tool-item-inner"><i class="fas fa-sign-in-alt"></i> <span>Sign in</span></div>
-            </a>
+                <a href="{% url 'account_login' %}"
+                class="ff-tool-item {% if request.resolver_match.url_name == 'account_login' %}active{% endif %}"
+                {% if request.resolver_match.url_name == 'account_login' %}style="background: var(--nav-active-bg); color: var(--nav-active-text); border-left: none;"{% endif %}>
+                    <div class="ff-tool-item-inner">
+                        <i class="fas fa-sign-in-alt"></i> <span>Sign In</span>
+                    </div>
+                </a>
+
+                <a href="{% url 'account_signup' %}"
+                class="ff-tool-item {% if request.resolver_match.url_name == 'account_signup' %}active{% endif %}"
+                {% if request.resolver_match.url_name == 'account_signup' %}style="background: var(--nav-active-bg); color: var(--nav-active-text); border-left: none;"{% endif %}>
+                    <div class="ff-tool-item-inner">
+                        <i class="fas fa-user-plus"></i> <span>Sign Up</span>
+                    </div>
+                </a>
             {% endif %}
         </div>
     </header>
 
+
+    
     <!-- ============================================
     MOBILE HEADER
     ============================================ -->
     <header class="mobile-header">
-
-
         <div class="mobile-header-top">
-            <a href="/" class="mobile-logo">
-                <span class="brand-icon">
-                    {% if current_company and current_company.logo %}
-                        <img src="{{ current_company.logo_url }}"
-                            alt="{{ current_company.display_name }}"
-                            style="max-height: 28px; max-width: 36px; object-fit: contain;">
-                    {% elif site_logo_url %}
-                        <img src="{{ site_logo_url }}"
-                            alt="{{ system_name|default:'RonoSystems' }}"
-                            style="max-height: 28px; max-width: 36px; object-fit: contain;">
-                    {% else %}
-                        <i class="fas fa-cube"></i>
-                    {% endif %}
-                </span>
-                <span style="text-transform: uppercase;">
-                    {% if current_company %}
-                        {{ current_company.display_name|default:system_name }}
-                    {% else %}
-                        {{ system_name|default:"RONOSYSTEMS" }}
-                    {% endif %}
-                </span>
-            </a>
+            <div class="mobile-header-left">
+                <!-- HAMBURGER MENU BUTTON -->
+                <div class="mobile-hamburger" id="mobile-menu-toggle">
+                    <i class="fas fa-bars"></i>
+                </div>
 
+                <a href="{% url 'home' %}" class="mobile-logo">
+                    <span class="brand-icon">
+                        {% if current_company and current_company.logo %}
+                            <img src="{{ current_company.logo_url }}"
+                                 alt="{{ current_company.display_name }}"
+                                 style="max-height: 28px; max-width: 36px; object-fit: contain;">
+                        {% elif site_logo_url %}
+                            <img src="{{ site_logo_url }}"
+                                 alt="{{ system_name|default:'RonoSystems' }}"
+                                 style="max-height: 28px; max-width: 36px; object-fit: contain;">
+                        {% else %}
+                            <i class="fas fa-cube"></i>
+                        {% endif %}
+                    </span>
+                    <span style="text-transform: uppercase;">
+                        {% if current_company %}
+                            {{ current_company.display_name|default:system_name }}
+                        {% else %}
+                            {{ system_name|default:"RONOSYSTEMS" }}
+                        {% endif %}
+                    </span>
+                </a>
+            </div>
 
             <div class="mobile-header-right">
                 {% if user.is_authenticated %}
                     <a href="/dashboard/"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
                 {% else %}
-                    <a href="/auth/login/"><i class="fas fa-user"></i> Sign in</a>
+                    {% if request.resolver_match.url_name == 'account_signup' %}
+                        <a href="{% url 'account_login' %}" style="color: #7bc043; font-weight: bold;">
+                            <i class="fas fa-sign-in-alt"></i> Sign In
+                        </a>
+                    {% elif request.resolver_match.url_name == 'account_login' %}
+                        <a href="{% url 'account_signup' %}" style="color: #7bc043; font-weight: bold;">
+                            <i class="fas fa-user-plus"></i> Sign Up
+                        </a>
+                    {% else %}
+                        <a href="{% url 'account_login' %}">
+                            <i class="fas fa-user"></i> Sign in
+                        </a>
+                    {% endif %}
                 {% endif %}
             </div>
         </div>
 
         <nav class="mobile-nav-tabs">
-            <a href="/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-home"></i> Home</div></a>
-            <a href="/features/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-cogs"></i> Features</div></a>
-            <a href="/documentation/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-book"></i> Documentation</div></a>
-            <a href="/invoicing/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-receipt"></i> Invoicing</div></a>
-            <a href="/pricing/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-tags"></i> Pricing</div></a>
-            <a href="/contact/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-envelope"></i> Contact</div></a>
-            <a href="/about/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-info-circle"></i> About</div></a>
-            <a href="/help/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-question-circle"></i> Help</div></a>
-            <a href="/privacy/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-shield-alt"></i> Privacy Policy</div></a>
-            <a href="/terms/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-gavel"></i> Terms of Service</div></a>
-            <a href="/ai-assistant/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-robot"></i> AI Assistant</div></a>
-            <a href="/auth/register/" class="mobile-nav-tab"><div class="mobile-nav-tab-inner"><i class="fas fa-rocket"></i> Sign Up</div></a>
+            <a href="{% url 'home' %}" class="mobile-nav-tab {% nav_active 'home' %}"><div class="mobile-nav-tab-inner"><i class="fas fa-home"></i> Home</div></a>
+            <a href="{% url 'features' %}" class="mobile-nav-tab {% nav_active 'features' %}"><div class="mobile-nav-tab-inner"><i class="fas fa-cogs"></i> Features</div></a>
+            <a href="{% url 'documentation' %}" class="mobile-nav-tab {% nav_active 'documentation' %}"><div class="mobile-nav-tab-inner"><i class="fas fa-book"></i> Documentation</div></a>
+            <a href="{% url 'invoicing' %}" class="mobile-nav-tab {% nav_active 'invoicing' %}"><div class="mobile-nav-tab-inner"><i class="fas fa-receipt"></i> Invoicing</div></a>
+            <a href="{% url 'pricing' %}" class="mobile-nav-tab {% nav_active 'pricing' %}"><div class="mobile-nav-tab-inner"><i class="fas fa-tags"></i> Pricing</div></a>
+            <a href="{% url 'contact' %}" class="mobile-nav-tab {% nav_active 'contact' %}"><div class="mobile-nav-tab-inner"><i class="fas fa-envelope"></i> Contact</div></a>
+            <a href="{% url 'about' %}" class="mobile-nav-tab {% nav_active 'about' %}"><div class="mobile-nav-tab-inner"><i class="fas fa-info-circle"></i> About</div></a>
+            <a href="{% url 'support' %}" class="mobile-nav-tab {% nav_active 'support' 'help' 'faq' %}"><div class="mobile-nav-tab-inner"><i class="fas fa-question-circle"></i> Support</div></a>
+            <a href="{% url 'help' %}" class="mobile-nav-tab {% nav_active 'help' %}"><div class="mobile-nav-tab-inner"><i class="fas fa-life-ring"></i> Help</div></a>
+            <a href="{% url 'privacy' %}" class="mobile-nav-tab {% nav_active 'privacy' %}"><div class="mobile-nav-tab-inner"><i class="fas fa-shield-alt"></i> Privacy Policy</div></a>
+            <a href="{% url 'terms' %}" class="mobile-nav-tab {% nav_active 'terms' %}"><div class="mobile-nav-tab-inner"><i class="fas fa-gavel"></i> Terms of Service</div></a>
+            <a href="{% url 'ai-assistant-page' %}" class="mobile-nav-tab {% nav_active 'ai-assistant-page' %}"><div class="mobile-nav-tab-inner"><i class="fas fa-robot"></i> AI Assistant</div></a>
+
+            <a href="{% url 'account_signup' %}" class="mobile-nav-tab {% if request.resolver_match.url_name == 'account_signup' %}active{% endif %}">
+                <div class="mobile-nav-tab-inner"><i class="fas fa-rocket"></i> Sign Up</div>
+            </a>
         </nav>
     </header>
 
@@ -1150,24 +1025,46 @@
         </div>
         <div class="mobile-sidebar-content">
             <div class="sidebar-header">Platform</div>
-            <a href="/" class="sidebar-link">Dashboard</a>
-            <a href="/features/" class="sidebar-link">Features</a>
-            <a href="/pricing/" class="sidebar-link">Pricing</a>
-            <a href="/documentation/" class="sidebar-link">Documentation</a>
-            <a href="/invoicing/" class="sidebar-link">Invoicing</a>
-            <a href="/contact/" class="sidebar-link">Contact</a>
-            <a href="/about/" class="sidebar-link">About</a>
-            <a href="/auth/register/" class="sidebar-link">Start Free Trial</a>
+            <a href="{% url 'documentation' %}" class="sidebar-link">Documentation</a>
+            <a href="/dashboard/" class="sidebar-link">Dashboard</a>
+            <a href="{% url 'features' %}" class="sidebar-link">Features</a>
+            <a href="{% url 'pricing' %}" class="sidebar-link">Pricing</a>
+            <a href="{% url 'invoicing' %}" class="sidebar-link">Invoicing</a>
+            <a href="{% url 'contact' %}" class="sidebar-link">Contact</a>
+            <a href="{% url 'about' %}" class="sidebar-link">About</a>
+            <a href="{% url 'support' %}" class="sidebar-link">Support</a>
+            <a href="{% url 'help' %}" class="sidebar-link">Help Center</a>
 
             <div class="sidebar-header">Legal</div>
-            <a href="/privacy/" class="sidebar-link">Privacy Policy</a>
-            <a href="/terms/" class="sidebar-link">Terms of Service</a>
+            <a href="{% url 'privacy' %}" class="sidebar-link">Privacy Policy</a>
+            <a href="{% url 'terms' %}" class="sidebar-link">Terms of Service</a>
 
+            <!-- DYNAMIC SIDEBAR PROMO (mobile) -->
             <div class="sidebar-promo">
-                <h5>Ready to transform?</h5>
-                <p>Join thousands of companies using {{ system_name|default:"RonoSystems" }}.</p>
-                <a href="/auth/register/" class="btn">Get Started</a>
+                {% if current_company %}
+                    <!-- ON A COMPANY DOMAIN -->
+                    <h5>Join {{ current_company.display_name }}</h5>
+                    <p>Request access to manage {{ current_company.display_name }} on {{ system_name|default:"RonoSystems" }}.</p>
+
+                    {% if user.is_authenticated %}
+                        <a href="/dashboard/" class="btn">Go to Dashboard</a>
+                    {% else %}
+                        <!-- FIX: URL-encode the inner URL so the query string stays intact -->
+                        <a href="{% url 'account_signup' %}?next={% url 'web_accounts:join-company' %}%3Fcompany_id%3D{{ current_company.id }}" class="btn">
+                            Join Company
+                        </a>
+                    {% endif %}
+                {% else %}
+                    <!-- ON THE SYSTEM DOMAIN (RonoSystems.com) -->
+                    <h5>Ready to transform?</h5>
+                    <p>Join thousands of companies using {{ system_name|default:"RonoSystems" }}.</p>
+                    <a href="{% url 'account_signup' %}" class="btn">Get Started</a>
+                {% endif %}
             </div>
+
+            <button id="pwaInstallBtnMobile" class="pwa-install-btn" onclick="triggerPWAInstall()">
+                <i class="fas fa-download"></i> Install App
+            </button>
         </div>
     </aside>
 
@@ -1176,118 +1073,72 @@
     ============================================ -->
     <div class="main-wrapper">
 
+        <!-- ============================================
+        DESKTOP SIDEBAR
+        ============================================ -->
         <aside class="ff-sidebar">
             <div class="sidebar-header">Platform</div>
-            <a href="/" class="sidebar-link">Dashboard</a>
-            <a href="/features/" class="sidebar-link">Features</a>
-            <a href="/pricing/" class="sidebar-link">Pricing</a>
-            <a href="/documentation/" class="sidebar-link">Documentation</a>
-            <a href="/invoicing/" class="sidebar-link">Invoicing</a>
-            <a href="/contact/" class="sidebar-link">Contact</a>
-            <a href="/about/" class="sidebar-link">About</a>
-            <a href="/auth/register/" class="sidebar-link">Start Free Trial</a>
+            <a href="{% url 'documentation' %}" class="sidebar-link">Documentation</a>
+            <a href="/dashboard/" class="sidebar-link">Dashboard</a>
+            <a href="{% url 'features' %}" class="sidebar-link">Features</a>
+            <a href="{% url 'pricing' %}" class="sidebar-link">Pricing</a>
+            <a href="{% url 'invoicing' %}" class="sidebar-link">Invoicing</a>
+            <a href="{% url 'contact' %}" class="sidebar-link">Contact</a>
+            <a href="{% url 'about' %}" class="sidebar-link">About</a>
+            <a href="{% url 'support' %}" class="sidebar-link">Support</a>
+            <a href="{% url 'help' %}" class="sidebar-link">Help Center</a>
 
             <div class="sidebar-header">Legal</div>
-            <a href="/privacy/" class="sidebar-link">Privacy Policy</a>
-            <a href="/terms/" class="sidebar-link">Terms of Service</a>
+            <a href="{% url 'privacy' %}" class="sidebar-link">Privacy Policy</a>
+            <a href="{% url 'terms' %}" class="sidebar-link">Terms of Service</a>
 
+            <!-- DYNAMIC SIDEBAR PROMO (desktop) — now mirrors mobile logic -->
             <div class="sidebar-promo">
-                <h5>Ready to transform?</h5>
-                <p>Join thousands of companies using {{ system_name|default:"RonoSystems" }}.</p>
-                <a href="/auth/register/" class="btn">Get Started</a>
+                {% if current_company %}
+                    <h5>Join {{ current_company.display_name }}</h5>
+                    <p>Request access to manage {{ current_company.display_name }} on {{ system_name|default:"RonoSystems" }}.</p>
+
+                    {% if user.is_authenticated %}
+                        <a href="/dashboard/" class="btn">Go to Dashboard</a>
+                    {% else %}
+                        <a href="{% url 'account_signup' %}?next={% url 'web_accounts:join-company' %}%3Fcompany_id%3D{{ current_company.id }}" class="btn">
+                            Join Company
+                        </a>
+                    {% endif %}
+                {% else %}
+                    <h5>Ready to transform?</h5>
+                    <p>Join thousands of companies using {{ system_name|default:"RonoSystems" }}.</p>
+                    <a href="{% url 'account_signup' %}" class="btn">Get Started</a>
+                {% endif %}
             </div>
+
+            <button id="pwaInstallBtnDesktop" class="pwa-install-btn" onclick="triggerPWAInstall()">
+                <i class="fas fa-download"></i> Install App
+            </button>
         </aside>
 
         <main class="ff-content">
 
-            <!-- ============================================
-                RUNNING TEXT
-            ============================================ -->
+            <!-- CONTENT HEADER (marquee + breadcrumb) -->
             <div class="content-header">
                 <div style="flex-grow: 1; overflow: hidden; width: 100%;">
-                <h1>Reset Your Password if forgot  enter  your email then submit and check you inbox</h1>
+                    <h1>{% block marquee_text %}Welcome to {{ system_name|default:"RonoSystems" }}{% endblock %}</h1>
                 </div>
                 <div class="breadcrumb-custom">
-                    <a href="/">Home</a> &raquo; <a href="/auth/login/">Sign in</a> &raquo; <span>Forgot Password</span>
+                    <a href="{% url 'home' %}">Home</a> &raquo;
+                    <span>{% block breadcrumb %}Dashboard{% endblock %}</span>
                 </div>
             </div>
 
-            <!-- ============================================
-                 FORGOT PASSWORD PANEL — background image + split card
-                 ============================================ -->
-            <div class="forgot-bg-panel">
-                <div class="panel-header">
-                    <i class="fas fa-key me-1"></i> Password Recovery
-                </div>
-                <div class="panel-body">
-
-                    <!-- FORGOT PASSWORD CARD -->
-                    <div class="forgot-card">
-
-                        <!-- LEFT PANEL — Logo + Info + Back to Login -->
-                        <div class="forgot-left">
-                            <div class="logo-wrap">
-                                {% if site_logo_url %}
-                                    <img src="{{ site_logo_url }}" alt="{{ system_name|default:'RonoSystems' }}">
-                                {% else %}
-                                    <i class="fas fa-key"></i>
-                                {% endif %}
-                            </div>
-                            <h1 class="welcome-title">Forgot Password?</h1>
-                            <p class="welcome-sub">
-                                No worries — it happens. We'll help you reset it in seconds.
-                            </p>
-                            <a href="/auth/login/" class="btn-back-login">
-                                <i class="fas fa-arrow-left"></i> Back to Login
-                            </a>
-                        </div>
-
-                        <!-- RIGHT PANEL — Reset Form -->
-                        <div class="forgot-right">
-                            <h2 class="form-title">Reset Your Password</h2>
-                            <p class="form-subtitle">
-                                Enter the email address associated with your account
-                                and we'll send you a link to reset your password.
-                            </p>
-
-                            {% if messages %}
-                                {% for message in messages %}
-                                    <div class="alert {% if message.tags == 'success' %}success{% elif message.tags == 'info' %}info{% endif %}">
-                                        <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-circle{% else %}info-circle{% endif %}"></i>
-                                        <span>{{ message }}</span>
-                                        <button type="button" class="btn-close" onclick="this.parentElement.remove()">×</button>
-                                    </div>
-                                {% endfor %}
-                            {% endif %}
-
-                            <div class="info-box">
-                                <i class="fas fa-info-circle"></i>
-                                <span>Check your inbox and spam folder after submitting. The reset link expires in 24 hours.</span>
-                            </div>
-
-                            <form method="post">
-                                {% csrf_token %}
-
-                                <div class="forgot-field">
-                                    <input type="email" name="email" placeholder="Enter your email" required autofocus autocomplete="email">
-                                    <i class="fas fa-envelope field-icon"></i>
-                                </div>
-
-                                <button type="submit" class="btn-reset-gradient">
-                                    <i class="fas fa-paper-plane"></i>
-                                    Send Reset Link
-                                </button>
-                            </form>
-                        </div>
-
-                    </div>
-
-                </div>
-            </div>
+            <!-- PAGE-SPECIFIC CONTENT -->
+            {% block content %}{% endblock %}
 
         </main>
     </div>
 
+    <!-- ============================================
+    FOOTER
+    ============================================ -->
     <footer class="ff-footer">
         <div class="ff-footer-inner">
             <div class="row">
@@ -1296,12 +1147,12 @@
                         <span class="brand-icon">
                             {% if current_company and current_company.logo %}
                                 <img src="{{ current_company.logo_url }}"
-                                    alt="{{ current_company.display_name }}"
-                                    style="max-height: 22px; max-width: 28px; object-fit: contain;">
+                                     alt="{{ current_company.display_name }}"
+                                     style="max-height: 22px; max-width: 28px; object-fit: contain;">
                             {% elif site_logo_url %}
                                 <img src="{{ site_logo_url }}"
-                                    alt="{{ system_name|default:'RonoSystems' }}"
-                                    style="max-height: 22px; max-width: 28px; object-fit: contain;">
+                                     alt="{{ system_name|default:'RonoSystems' }}"
+                                     style="max-height: 22px; max-width: 28px; object-fit: contain;">
                             {% else %}
                                 <i class="fas fa-cube me-2"></i>
                             {% endif %}
@@ -1344,34 +1195,34 @@
 
                 <div class="col-lg-2 col-md-3 col-6 mb-4">
                     <h5>About</h5>
-                    <a href="/about/">Our Company</a>
-                    <a href="/about/">Team</a>
-                    <a href="/about/">Mission & Vision</a>
-                    <a href="/about/">Our Story</a>
+                    <a href="{% url 'about' %}">Our Company</a>
+                    <a href="{% url 'about' %}">Team</a>
+                    <a href="{% url 'about' %}">Mission &amp; Vision</a>
+                    <a href="{% url 'about' %}">Our Story</a>
                 </div>
 
                 <div class="col-lg-2 col-md-3 col-6 mb-4">
                     <h5>Features</h5>
-                    <a href="/features/">POS System</a>
-                    <a href="/features/">Analytics</a>
-                    <a href="/features/">AI Assistant</a>
-                    <a href="/features/">Team Management</a>
+                    <a href="{% url 'features' %}">POS System</a>
+                    <a href="{% url 'features' %}">Analytics</a>
+                    <a href="{% url 'ai-assistant-page' %}">AI Assistant</a>
+                    <a href="{% url 'features' %}">Team Management</a>
                 </div>
 
                 <div class="col-lg-2 col-md-3 col-6 mb-4">
                     <h5>Pricing</h5>
-                    <a href="/pricing/">Basic</a>
-                    <a href="/pricing/">Standard</a>
-                    <a href="/pricing/">Premium</a>
-                    <a href="/pricing/">Enterprise</a>
+                    <a href="{% url 'pricing' %}">Basic</a>
+                    <a href="{% url 'pricing' %}">Standard</a>
+                    <a href="{% url 'pricing' %}">Premium</a>
+                    <a href="{% url 'pricing' %}">Enterprise</a>
                 </div>
 
                 <div class="col-lg-2 col-md-3 col-6 mb-4">
                     <h5>Contact</h5>
-                    <a href="/contact/">Email Us</a>
-                    <a href="/contact/">Call Us</a>
-                    <a href="/contact/">Live Chat</a>
-                    <a href="/contact/">Help Center</a>
+                    <a href="{% url 'contact' %}">Email Us</a>
+                    <a href="{% url 'contact' %}">Call Us</a>
+                    <a href="{% url 'contact' %}">Live Chat</a>
+                    <a href="{% url 'support' %}">Help Center</a>
                 </div>
             </div>
 
@@ -1380,65 +1231,63 @@
                     &copy; {% now "Y" %} {{ system_name|default:"RonoSystems" }}. All rights reserved.
                 </span>
                 <span class="copyright-links">
-                    <a href="/privacy/">Privacy Policy</a>
-                    <a href="/terms/">Terms of Service</a>
+                    <a href="{% url 'privacy' %}">Privacy Policy</a>
+                    <a href="{% url 'terms' %}">Terms of Service</a>
                 </span>
             </div>
         </div>
     </footer>
 
+    <!-- ============================================
+    SHARED SCRIPTS
+    ============================================ -->
     <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
     <script>
-        // ============================================
-        // LIVE CLOCK
-        // ============================================
+        // ── LIVE CLOCK ──
         function updateClock() {
             const now = new Date();
             let hours = now.getHours();
             const minutes = String(now.getMinutes()).padStart(2, '0');
             const ampm = hours >= 12 ? 'pm' : 'am';
-            hours = hours % 12;
-            hours = hours ? hours : 12;
-            const timeString = hours + ':' + minutes + ampm;
+            hours = hours % 12 || 12;
             const desktopClock = document.getElementById('desktop-clock');
-            if (desktopClock) desktopClock.textContent = timeString;
+            if (desktopClock) desktopClock.textContent = hours + ':' + minutes + ampm;
         }
         updateClock();
         setInterval(updateClock, 1000);
 
-        // ============================================
-        // MOBILE SIDEBAR TOGGLE
-        // ============================================
-        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
-        const mobileSidebar = document.getElementById('mobile-sidebar');
-        const mobileSidebarOverlay = document.getElementById('mobile-sidebar-overlay');
-        const mobileSidebarClose = document.getElementById('mobile-sidebar-close');
+        // ── MOBILE SIDEBAR TOGGLE ──
+        (function () {
+            const mobileSidebar = document.getElementById('mobile-sidebar');
+            const mobileSidebarOverlay = document.getElementById('mobile-sidebar-overlay');
+            const mobileSidebarClose = document.getElementById('mobile-sidebar-close');
+            const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
 
-        function openMobileSidebar() {
-            mobileSidebar.classList.add('open');
-            mobileSidebarOverlay.classList.add('active');
-            document.body.style.overflow = 'hidden';
-        }
-        function closeMobileSidebar() {
-            mobileSidebar.classList.remove('open');
-            mobileSidebarOverlay.classList.remove('active');
-            document.body.style.overflow = '';
-        }
-        if (mobileMenuToggle) mobileMenuToggle.addEventListener('click', openMobileSidebar);
-        if (mobileSidebarClose) mobileSidebarClose.addEventListener('click', closeMobileSidebar);
-        if (mobileSidebarOverlay) mobileSidebarOverlay.addEventListener('click', closeMobileSidebar);
+            function openMobileSidebar() {
+                mobileSidebar.classList.add('open');
+                mobileSidebarOverlay.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeMobileSidebar() {
+                mobileSidebar.classList.remove('open');
+                mobileSidebarOverlay.classList.remove('active');
+                document.body.style.overflow = '';
+            }
 
-        document.querySelectorAll('.mobile-sidebar .sidebar-link, .mobile-sidebar .btn').forEach(link => {
-            link.addEventListener('click', closeMobileSidebar);
-        });
+            if (mobileMenuToggle) mobileMenuToggle.addEventListener('click', openMobileSidebar);
+            if (mobileSidebarClose) mobileSidebarClose.addEventListener('click', closeMobileSidebar);
+            if (mobileSidebarOverlay) mobileSidebarOverlay.addEventListener('click', closeMobileSidebar);
 
-        // ============================================
-        // SMOOTH SCROLL
-        // ============================================
+            document.querySelectorAll('.mobile-sidebar .sidebar-link, .mobile-sidebar .btn').forEach(link => {
+                link.addEventListener('click', closeMobileSidebar);
+            });
+        })();
+
+        // ── SMOOTH SCROLL ──
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function(e) {
+            anchor.addEventListener('click', function (e) {
                 const targetId = this.getAttribute('href');
-                if (targetId === '#') return;
+                if (targetId === '#' || targetId.length < 2) return;
                 const target = document.querySelector(targetId);
                 if (target) {
                     e.preventDefault();
@@ -1450,6 +1299,89 @@
                 }
             });
         });
+
+        // ── PWA INSTALL ──
+        let deferredPrompt = null;
+        const installBtns = [
+            document.getElementById('pwaInstallBtnDesktop'),
+            document.getElementById('pwaInstallBtnMobile')
+        ].filter(Boolean);
+
+        function setInstallVisible(show) {
+            installBtns.forEach(btn => { btn.style.display = show ? 'block' : 'none'; });
+        }
+
+        if (window.matchMedia('(display-mode: standalone)').matches) setInstallVisible(false);
+
+        async function verifyInstallStatus() {
+            if (window.matchMedia('(display-mode: standalone)').matches) {
+                setInstallVisible(false);
+                localStorage.setItem('pwa_installed', 'true');
+                return;
+            }
+            let isInstalled = false;
+            if (navigator.getInstalledRelatedApps) {
+                try {
+                    const apps = await navigator.getInstalledRelatedApps();
+                    if (apps && apps.length > 0) isInstalled = true;
+                } catch (e) {}
+            }
+            if (!isInstalled && !navigator.getInstalledRelatedApps) {
+                isInstalled = localStorage.getItem('pwa_installed') === 'true';
+            }
+            if (isInstalled) {
+                setInstallVisible(false);
+                localStorage.setItem('pwa_installed', 'true');
+            } else {
+                setInstallVisible(true);
+                localStorage.removeItem('pwa_installed');
+            }
+        }
+        verifyInstallStatus();
+
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) verifyInstallStatus();
+        });
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            setInstallVisible(true);
+        });
+
+        window.triggerPWAInstall = async function () {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    setInstallVisible(false);
+                    localStorage.setItem('pwa_installed', 'true');
+                }
+                deferredPrompt = null;
+            } else {
+                installBtns.forEach(btn => {
+                    const original = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-info-circle"></i> Use browser menu to install';
+                    setTimeout(() => { btn.innerHTML = original; }, 3000);
+                });
+            }
+        };
+
+        window.addEventListener('appinstalled', () => {
+            setInstallVisible(false);
+            localStorage.setItem('pwa_installed', 'true');
+        });
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('SW registered:', reg.scope))
+                    .catch(err => console.error('SW failed:', err));
+            });
+        }
     </script>
+
+    <!-- PAGE-SPECIFIC JS (children override) -->
+    {% block extra_js %}{% endblock %}
 </body>
 </html>

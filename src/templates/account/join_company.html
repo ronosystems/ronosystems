@@ -1,0 +1,750 @@
+{% extends "web_base.html" %}
+{% load static %}
+
+{% block title %}Join Company{% endblock %}
+{% block marquee_text %}Create your account — request to join a company{% endblock %}
+{% block breadcrumb %}Registration Portal{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       REGISTRATION PORTAL STYLES
+    ============================================ */
+    .reg-portal {
+        max-width: 720px;
+        margin: 0 auto;
+    }
+
+    .reg-header-strip {
+        background: linear-gradient(135deg, #2d5f7c 0%, #1e4e6d 100%);
+        border: 2px solid #000;
+        border-radius: 4px;
+        padding: 22px 25px;
+        color: #fff;
+        margin-bottom: 18px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+    .reg-header-strip .header-icon {
+        font-size: 2.4rem;
+        color: #7bc043;
+    }
+    .reg-header-strip h3 {
+        margin: 0;
+        font-weight: 800;
+        font-size: 1.35rem;
+        color: #fff;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .reg-header-strip p {
+        margin: 4px 0 0;
+        font-size: 0.88rem;
+        color: rgba(255,255,255,0.85);
+    }
+
+    .reg-company-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(255,255,255,0.12);
+        border: 1px solid rgba(255,255,255,0.3);
+        border-radius: 50px;
+        padding: 5px 14px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        margin-top: 8px;
+    }
+    .reg-company-badge i { color: #ffe066; }
+
+    /* Card */
+    .reg-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 4px;
+        overflow: hidden;
+        box-shadow: 0 4px 18px rgba(0,0,0,0.08);
+    }
+    .reg-card-header {
+        background: #e6e6e6;
+        border-bottom: 2px solid #000;
+        padding: 12px 20px;
+        font-weight: 700;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #1e4e6d;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .reg-card-body { padding: 24px; }
+
+    /* Section titles inside form */
+    .reg-section-title {
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: #2d5f7c;
+        padding-bottom: 8px;
+        margin: 6px 0 16px;
+        border-bottom: 2px solid #e6e6e6;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .reg-section-title i { color: #7bc043; }
+
+    /* Field layout */
+    .reg-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+    .reg-row.single { grid-template-columns: 1fr; }
+    .reg-field { display: flex; flex-direction: column; }
+
+    .reg-field label {
+        font-size: 12px;
+        font-weight: 700;
+        color: #1e4e6d;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+    }
+    .reg-field label .req { color: #dc3545; margin-left: 2px; }
+
+    .reg-input-wrap { position: relative; }
+    .reg-input-wrap > i.field-icon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #8aa3b3;
+        font-size: 0.85rem;
+        pointer-events: none;
+    }
+    .reg-input-wrap input {
+        width: 100%;
+        padding: 11px 12px 11px 36px;
+        border: 2px solid #000;
+        border-radius: 4px;
+        font-size: 0.92rem;
+        background: #fff;
+        color: #000;
+        transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .reg-input-wrap input:focus {
+        outline: none;
+        border-color: #2d5f7c;
+        box-shadow: 0 0 0 3px rgba(45,95,124,0.18);
+    }
+    .reg-input-wrap input.is-invalid {
+        border-color: #dc3545;
+        box-shadow: 0 0 0 3px rgba(220,53,69,0.15);
+    }
+    .reg-input-wrap input.is-valid {
+        border-color: #28a745;
+    }
+
+    /* Password toggle */
+    .pw-toggle {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: #6c757d;
+        cursor: pointer;
+        padding: 4px 6px;
+        font-size: 0.9rem;
+    }
+    .pw-toggle:hover { color: #1e4e6d; }
+
+    /* Password strength / match hint */
+    .pw-hint {
+        font-size: 11px;
+        margin-top: 5px;
+        font-weight: 600;
+        min-height: 15px;
+    }
+    .pw-hint.ok   { color: #28a745; }
+    .pw-hint.bad  { color: #dc3545; }
+    .pw-hint.muted { color: #8aa3b3; }
+
+    /* Checkbox rows */
+    .reg-check {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 12px 14px;
+        border: 2px solid #dcdcdc;
+        border-radius: 4px;
+        background: #f9f9f9;
+        margin-bottom: 12px;
+        font-size: 0.86rem;
+        line-height: 1.5;
+        transition: border-color 0.15s, background 0.15s;
+    }
+    .reg-check:hover { border-color: #b7c8d3; background: #f3f8fb; }
+    .reg-check input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        margin-top: 2px;
+        flex-shrink: 0;
+        cursor: pointer;
+        accent-color: #2d5f7c;
+    }
+    .reg-check label {
+        margin: 0;
+        cursor: pointer;
+        color: #333;
+        font-weight: 500;
+    }
+    .reg-check label a {
+        color: #2a6496;
+        font-weight: 700;
+        text-decoration: underline;
+    }
+    .reg-check.is-invalid { border-color: #dc3545; background: #fdf2f3; }
+
+    /* Submit */
+    .reg-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 15px;
+        flex-wrap: wrap;
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 2px solid #e6e6e6;
+    }
+    .reg-submit {
+        background: #2d5f7c;
+        color: #fff;
+        border: 2px solid #1e4e6d;
+        border-radius: 4px;
+        padding: 12px 30px;
+        font-weight: 800;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.18s;
+    }
+    .reg-submit:hover {
+        background: #1e4e6d;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+    }
+    .reg-submit:disabled {
+        background: #adb5bd;
+        border-color: #adb5bd;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+    .reg-signin-note {
+        font-size: 12px;
+        color: #666;
+    }
+    .reg-signin-note a { color: #2a6496; font-weight: 700; }
+
+    /* Error summary */
+    .reg-errors {
+        background: #f8d7da;
+        border: 2px solid #dc3545;
+        border-radius: 4px;
+        padding: 12px 16px;
+        color: #721c24;
+        font-size: 0.88rem;
+        margin-bottom: 18px;
+    }
+    .reg-errors ul { margin: 6px 0 0; padding-left: 20px; }
+    .reg-errors li { margin-bottom: 3px; }
+
+    /* Company code fallback */
+    .company-code-note {
+        background: #d9edf7;
+        border: 2px solid #bce8f1;
+        color: #31708f;
+        padding: 14px 16px;
+        border-radius: 4px;
+        font-size: 0.88rem;
+        margin-bottom: 18px;
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+    }
+    .company-code-note i { font-size: 1.1rem; margin-top: 2px; }
+
+    @media (max-width: 576px) {
+        .reg-row { grid-template-columns: 1fr; }
+        .reg-card-body { padding: 18px; }
+        .reg-header-strip { padding: 16px; }
+        .reg-header-strip h3 { font-size: 1.05rem; }
+        .reg-actions { flex-direction: column; align-items: stretch; }
+        .reg-submit { justify-content: center; }
+        .reg-signin-note { text-align: center; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="reg-portal">
+
+    {# HEADER STRIP #}
+    <div class="reg-header-strip">
+        <i class="fas fa-user-plus header-icon"></i>
+        <div>
+            <h3>Registration Portal</h3>
+            <p>Create your account to request access to this workspace.</p>
+            {% if company %}
+                <span class="reg-company-badge">
+                    <i class="fas fa-building"></i>
+                    {{ company.display_name }}
+                    {% if company.company_id %}&nbsp;[{{ company.company_id }}]{% endif %}
+                </span>
+            {% endif %}
+        </div>
+    </div>
+
+    {# FORM CARD #}
+    <div class="reg-card">
+        <div class="reg-card-header">
+            <i class="fas fa-id-card"></i> New Account Details
+        </div>
+
+        <div class="reg-card-body">
+
+            {# Server-side error summary #}
+            {% if messages %}
+                <div class="reg-errors">
+                    <strong><i class="fas fa-exclamation-triangle"></i> Please review:</strong>
+                    <ul>
+                        {% for m in messages %}
+                            <li>{{ m }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+
+            {# No company in URL — show company-code fallback hint #}
+            {% if not company %}
+                <div class="company-code-note">
+                    <i class="fas fa-info-circle"></i>
+                    <div>
+                        No company was specified. Enter the <strong>Company Code</strong> your
+                        employer gave you below — we’ll route your request to them.
+                    </div>
+                </div>
+            {% endif %}
+
+            <form method="post" id="registrationForm" novalidate>
+                {% csrf_token %}
+
+                {# Carry company through POST either via hidden id or code fallback #}
+                {% if company %}
+                    <input type="hidden" name="company_id" value="{{ company.id }}">
+                {% else %}
+                    <div class="reg-row single" style="margin-bottom: 22px;">
+                        <div class="reg-field">
+                            <label for="company_code">
+                                Company Code <span class="req">*</span>
+                            </label>
+                            <div class="reg-input-wrap">
+                                <i class="fas fa-hashtag field-icon"></i>
+                                <input type="text"
+                                       id="company_code"
+                                       name="code"
+                                       placeholder="e.g. ACME-001"
+                                       required
+                                       maxlength="30"
+                                       style="text-transform: uppercase;">
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                {# PERSONAL INFORMATION #}
+                <div class="reg-section-title">
+                    <i class="fas fa-user"></i> Personal Information
+                </div>
+
+                <div class="reg-row single">
+                    <div class="reg-field">
+                        <label for="full_names">
+                            Full Names <span class="req">*</span>
+                        </label>
+                        <div class="reg-input-wrap">
+                            <i class="fas fa-signature field-icon"></i>
+                            <input type="text"
+                                   id="full_names"
+                                   name="full_names"
+                                   placeholder="e.g. John Kamau Mwangi"
+                                   required
+                                   maxlength="120"
+                                   autocomplete="name">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="reg-row">
+                    <div class="reg-field">
+                        <label for="phone">
+                            Phone Number <span class="req">*</span>
+                        </label>
+                        <div class="reg-input-wrap">
+                            <i class="fas fa-phone field-icon"></i>
+                            <input type="tel"
+                                   id="phone"
+                                   name="phone"
+                                   placeholder="+254 712 345 678"
+                                   required
+                                   maxlength="20"
+                                   autocomplete="tel">
+                        </div>
+                    </div>
+
+                    <div class="reg-field">
+                        <label for="id_number">
+                            ID Number <span class="req">*</span>
+                        </label>
+                        <div class="reg-input-wrap">
+                            <i class="fas fa-id-card field-icon"></i>
+                            <input type="text"
+                                   id="id_number"
+                                   name="id_number"
+                                   placeholder="e.g. 12345678"
+                                   required
+                                   maxlength="20">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="reg-row single">
+                    <div class="reg-field">
+                        <label for="email">
+                            Email Address <span class="req">*</span>
+                        </label>
+                        <div class="reg-input-wrap">
+                            <i class="fas fa-envelope field-icon"></i>
+                            <input type="email"
+                                   id="email"
+                                   name="email"
+                                   placeholder="you@example.com"
+                                   required
+                                   maxlength="150"
+                                   autocomplete="email">
+                        </div>
+                    </div>
+                </div>
+
+                {# SECURITY #}
+                <div class="reg-section-title">
+                    <i class="fas fa-lock"></i> Account Security
+                </div>
+
+                <div class="reg-row">
+                    <div class="reg-field">
+                        <label for="password">
+                            New Password <span class="req">*</span>
+                        </label>
+                        <div class="reg-input-wrap">
+                            <i class="fas fa-key field-icon"></i>
+                            <input type="password"
+                                   id="password"
+                                   name="password"
+                                   placeholder="Minimum 8 characters"
+                                   required
+                                   minlength="8"
+                                   autocomplete="new-password"
+                                   style="padding-right: 42px;">
+                            <button type="button" class="pw-toggle" data-target="password" aria-label="Show password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <div class="pw-hint muted" id="pwStrengthHint">
+                            Use 8+ characters, mixing letters &amp; numbers.
+                        </div>
+                    </div>
+
+                    <div class="reg-field">
+                        <label for="password_confirm">
+                            Confirm Password <span class="req">*</span>
+                        </label>
+                        <div class="reg-input-wrap">
+                            <i class="fas fa-key field-icon"></i>
+                            <input type="password"
+                                   id="password_confirm"
+                                   name="password_confirm"
+                                   placeholder="Re-type password"
+                                   required
+                                   minlength="8"
+                                   autocomplete="new-password"
+                                   style="padding-right: 42px;">
+                            <button type="button" class="pw-toggle" data-target="password_confirm" aria-label="Show password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <div class="pw-hint muted" id="pwMatchHint">
+                            Passwords must match.
+                        </div>
+                    </div>
+                </div>
+
+                {# COMPLIANCE #}
+                <div class="reg-section-title">
+                    <i class="fas fa-shield-alt"></i> Compliance
+                </div>
+
+                <div class="reg-check" id="policyCheckWrap">
+                    <input type="checkbox"
+                           id="accept_policy"
+                           name="accept_policy"
+                           required>
+                    <label for="accept_policy">
+                        I have read and agree to the
+                        <a href="{% url 'privacy' %}" target="_blank" rel="noopener">Privacy Policy</a>.
+                    </label>
+                </div>
+
+                <div class="reg-check" id="termsCheckWrap">
+                    <input type="checkbox"
+                           id="accept_terms"
+                           name="accept_terms"
+                           required>
+                    <label for="accept_terms">
+                        I accept the
+                        <a href="{% url 'terms' %}" target="_blank" rel="noopener">Terms of Service</a>
+                        and confirm the details above are accurate.
+                    </label>
+                </div>
+
+                {# ACTIONS #}
+                <div class="reg-actions">
+                    <span class="reg-signin-note">
+                        Already registered?
+                        <a href="{% url 'account_login' %}">Sign in</a>
+                    </span>
+                    <button type="submit" class="reg-submit" id="submitBtn">
+                        <i class="fas fa-paper-plane"></i> Submit Registration
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    // ── Show/hide password toggles ──
+    document.querySelectorAll('.pw-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const targetId = this.getAttribute('data-target');
+            const input = document.getElementById(targetId);
+            if (!input) return;
+            const showing = input.type === 'text';
+            input.type = showing ? 'password' : 'text';
+            this.innerHTML = showing
+                ? '<i class="fas fa-eye"></i>'
+                : '<i class="fas fa-eye-slash"></i>';
+        });
+    });
+
+    const form        = document.getElementById('registrationForm');
+    const pw          = document.getElementById('password');
+    const pwConfirm   = document.getElementById('password_confirm');
+    const pwStrength  = document.getElementById('pwStrengthHint');
+    const pwMatch     = document.getElementById('pwMatchHint');
+    const policy      = document.getElementById('accept_policy');
+    const terms       = document.getElementById('accept_terms');
+    const policyWrap  = document.getElementById('policyCheckWrap');
+    const termsWrap   = document.getElementById('termsCheckWrap');
+    const submitBtn   = document.getElementById('submitBtn');
+    const emailInput  = document.getElementById('email');
+    const phoneInput  = document.getElementById('phone');
+    const codeInput   = document.getElementById('company_code');
+
+    // ── Password strength feedback ──
+    function evaluateStrength(value) {
+        let score = 0;
+        if (value.length >= 8)          score++;
+        if (value.length >= 12)         score++;
+        if (/[A-Z]/.test(value))        score++;
+        if (/[a-z]/.test(value))        score++;
+        if (/[0-9]/.test(value))        score++;
+        if (/[^A-Za-z0-9]/.test(value)) score++;
+        return score;
+    }
+
+    if (pw && pwStrength) {
+        pw.addEventListener('input', function () {
+            const value = this.value;
+            this.classList.remove('is-invalid', 'is-valid');
+
+            if (!value) {
+                pwStrength.className = 'pw-hint muted';
+                pwStrength.textContent = 'Use 8+ characters, mixing letters & numbers.';
+                return;
+            }
+
+            const score = evaluateStrength(value);
+            if (value.length < 8) {
+                pwStrength.className = 'pw-hint bad';
+                pwStrength.textContent = 'Too short — use at least 8 characters.';
+                this.classList.add('is-invalid');
+            } else if (score <= 2) {
+                pwStrength.className = 'pw-hint bad';
+                pwStrength.textContent = 'Weak — add uppercase letters and numbers.';
+                this.classList.add('is-valid');
+            } else if (score <= 4) {
+                pwStrength.className = 'pw-hint ok';
+                pwStrength.textContent = 'Good password.';
+                this.classList.add('is-valid');
+            } else {
+                pwStrength.className = 'pw-hint ok';
+                pwStrength.textContent = 'Strong password.';
+                this.classList.add('is-valid');
+            }
+
+            if (pwConfirm && pwConfirm.value) checkMatch();
+        });
+    }
+
+    // ── Password match feedback ──
+    function checkMatch() {
+        if (!pw || !pwConfirm || !pwMatch) return;
+        pwConfirm.classList.remove('is-invalid', 'is-valid');
+
+        if (!pwConfirm.value) {
+            pwMatch.className = 'pw-hint muted';
+            pwMatch.textContent = 'Passwords must match.';
+            return;
+        }
+
+        if (pw.value === pwConfirm.value) {
+            pwMatch.className = 'pw-hint ok';
+            pwMatch.textContent = 'Passwords match ✓';
+            pwConfirm.classList.add('is-valid');
+        } else {
+            pwMatch.className = 'pw-hint bad';
+            pwMatch.textContent = 'Passwords do not match.';
+            pwConfirm.classList.add('is-invalid');
+        }
+    }
+
+    if (pwConfirm) pwConfirm.addEventListener('input', checkMatch);
+
+    // ── Checkbox wrap highlight ──
+    function wireCheckbox(cb, wrap) {
+        if (!cb || !wrap) return;
+        cb.addEventListener('change', function () {
+            wrap.classList.toggle('is-invalid', !this.checked);
+        });
+    }
+    wireCheckbox(policy, policyWrap);
+    wireCheckbox(terms, termsWrap);
+
+    // ── Uppercase company code as you type ──
+    if (codeInput) {
+        codeInput.addEventListener('input', function () {
+            this.value = this.value.toUpperCase();
+        });
+    }
+
+    function isValidEmail(v) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+    }
+
+    function isValidPhone(v) {
+        const digits = v.replace(/[^\d]/g, '');
+        return digits.length >= 7 && digits.length <= 15;
+    }
+
+    // ── Submit guard ──
+    if (form) {
+        form.addEventListener('submit', function (e) {
+            const errors = [];
+
+            if (pw && pwConfirm && pw.value !== pwConfirm.value) {
+                errors.push('Passwords do not match.');
+                pwConfirm.classList.add('is-invalid');
+            }
+            if (pw && pw.value.length < 8) {
+                errors.push('Password must be at least 8 characters.');
+                pw.classList.add('is-invalid');
+            }
+            if (emailInput && !isValidEmail(emailInput.value.trim())) {
+                errors.push('Please enter a valid email address.');
+                emailInput.classList.add('is-invalid');
+            }
+            if (phoneInput && !isValidPhone(phoneInput.value.trim())) {
+                errors.push('Please enter a valid phone number.');
+                phoneInput.classList.add('is-invalid');
+            }
+            if (codeInput && !codeInput.value.trim()) {
+                errors.push('Company code is required.');
+                codeInput.classList.add('is-invalid');
+            }
+            if (policy && !policy.checked) {
+                errors.push('You must accept the Privacy Policy.');
+                policyWrap.classList.add('is-invalid');
+            }
+            if (terms && !terms.checked) {
+                errors.push('You must accept the Terms of Service.');
+                termsWrap.classList.add('is-invalid');
+            }
+
+            if (errors.length) {
+                e.preventDefault();
+                const firstInvalid = form.querySelector('.is-invalid');
+                if (firstInvalid) {
+                    firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                if (submitBtn) {
+                    submitBtn.style.animation = 'none';
+                    submitBtn.offsetHeight;
+                    submitBtn.style.animation = 'shake 0.4s';
+                }
+                return;
+            }
+
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting…';
+            }
+        });
+    }
+
+    // ── Clear invalid state on input ──
+    document.querySelectorAll('input').forEach(function (inp) {
+        inp.addEventListener('input', function () {
+            this.classList.remove('is-invalid');
+        });
+    });
+});
+</script>
+<style>
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+}
+</style>
+{% endblock %}

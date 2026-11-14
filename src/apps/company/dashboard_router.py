@@ -12,7 +12,7 @@ def dashboard_router(request):
 
     # SUPER ADMIN
     if user.role == 'super_admin':
-        return redirect(reverse('super-admin-dashboard'))
+        return redirect('web_accounts:super-admin-dashboard')
 
     # COMPANY USERS — must have a company
     if not user.company:

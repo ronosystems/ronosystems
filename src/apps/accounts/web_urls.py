@@ -1,17 +1,14 @@
+# apps/accounts/web_urls.py
 from django.urls import path
-from . import login_views
-from . import super_dashboard
 from . import views_guest
+from . import super_dashboard
+from . import join_company as jc
+
+
+app_name = 'web_accounts'  
 
 urlpatterns = [
-    # Web Login/Logout/Register
-    path('login/', login_views.login_page, name='login'),
-    path('logout/', login_views.logout_view, name='logout'),
-    path('register/', login_views.register_page, name='register'),
-    path('forgot-password/', login_views.forgot_password_page, name='forgot-password'),
-    path('reset-password/<uidb64>/<token>/', login_views.reset_password_page, name='reset-password'),
     path('no-access/', views_guest.no_access, name='no-access'),
-    
-    # Super Admin Dashboard
     path('super-dashboard/', super_dashboard.super_admin_dashboard, name='super-admin-dashboard'),
+    path('join-company/', jc.join_company, name='join-company'),
 ]

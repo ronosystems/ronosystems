@@ -60,8 +60,7 @@ def qz_sign(request):
 
 def home(request):
     """Homepage for RonoSystems"""
-    return render(request, 'home.html')
-
+    return render(request, 'website/home.html')
 
 def api_root(request):
     """API Root endpoint"""
@@ -153,7 +152,7 @@ def contact(request):
 
         return redirect('contact')
 
-    return render(request, 'contact.html')
+    return render(request, 'website/contact.html')
 
 
 # ============================================
@@ -202,48 +201,58 @@ def manifest_view(request):
     # ============================================
     # BUILD MANIFEST DATA
     # ============================================
-    
-    # Defaults (Main Site)
+    # 4. Build the manifest data
     company_name = "RONOSYSTEMS"
+    
+    # --- Dynamic Icons ---
     icon_192 = request.build_absolute_uri(static('images/icon-192.png'))
     icon_512 = request.build_absolute_uri(static('images/icon-512.png'))
+    
+    # --- Dynamic Screenshots ---
+    screenshot_wide = request.build_absolute_uri(f"{settings.STATIC_URL}images/screenshot-wide.png")
+    screenshot_narrow = request.build_absolute_uri(f"{settings.STATIC_URL}images/screenshot-narrow.png")
 
     if company:
-        # === TENANT LOGIC (e.g., fieldmax.shop) ===
         if company.display_name:
             company_name = company.display_name.upper()
             
+        # Process Company Logo (Icons)
         if company.logo:
             try:
-                # Get the raw URL (Cloudinary or local)
                 raw_logo = company.logo_url if hasattr(company, 'logo_url') and company.logo_url else company.logo.url
-                
-                # If Cloudinary: Force exact 192x192 and 512x512 sizes in PNG format
                 if 'cloudinary' in raw_logo:
                     icon_192 = raw_logo.replace('/upload/', '/upload/w_192,h_192,c_fill,f_png/')
                     icon_512 = raw_logo.replace('/upload/', '/upload/w_512,h_512,c_fill,f_png/')
-                # If local PNG: Use it for both (assuming it's high-res enough)
                 elif raw_logo.endswith('.png'):
                     icon_192 = raw_logo
                     icon_512 = raw_logo
             except Exception:
-                pass # Fallback to default static icons
-    else:
-        # === MAIN SITE LOGIC (ronosystems.onrender.com) ===
-        if SystemSetting:
-            try:
-                # Get the main site logo from your settings app
-                site_logo = SystemSetting.get_setting('SITE_LOGO_URL', '')
-                if site_logo:
-                    if 'cloudinary' in site_logo:
-                        icon_192 = site_logo.replace('/upload/', '/upload/w_192,h_192,c_fill,f_png/')
-                        icon_512 = site_logo.replace('/upload/', '/upload/w_512,h_512,c_fill,f_png/')
-                    elif site_logo.endswith('.png'):
-                        icon_192 = site_logo
-                        icon_512 = site_logo
-            except Exception:
                 pass
 
+        # Process Company Screenshots
+        # Assuming your Company model has fields named 'screenshot_wide' and 'screenshot_narrow'
+        # (If they are named differently in your models, update these lines!)
+        if hasattr(company, 'screenshot_wide') and company.screenshot_wide:
+            try:
+                raw_shot = company.screenshot_wide.url
+                if 'cloudinary' in raw_shot:
+                    # Force 1280x720 on Cloudinary
+                    screenshot_wide = raw_shot.replace('/upload/', '/upload/w_1280,h_720,c_fill,f_png/')
+                else:
+                    screenshot_wide = request.build_absolute_uri(raw_shot)
+            except Exception:
+                pass
+                
+        if hasattr(company, 'screenshot_narrow') and company.screenshot_narrow:
+            try:
+                raw_shot = company.screenshot_narrow.url
+                if 'cloudinary' in raw_shot:
+                    # Force 720x1280 on Cloudinary
+                    screenshot_narrow = raw_shot.replace('/upload/', '/upload/w_720,h_1280,c_fill,f_png/')
+                else:
+                    screenshot_narrow = request.build_absolute_uri(raw_shot)
+            except Exception:
+                pass
 
     manifest = {
         "id": "/",
@@ -259,7 +268,6 @@ def manifest_view(request):
         "theme_color": "#1e4e6d",
         "categories": ["business", "productivity"],
         
-        # Dynamic Icons (Safely resized for PWABuilder)
         "icons": [
             {
                 "src": icon_192, 
@@ -275,21 +283,21 @@ def manifest_view(request):
             }
         ],
         
-        # Screenshots (Required by PWABuilder)
+        # Using our dynamic variables here!
         "screenshots": [
             {
-                "src": request.build_absolute_uri(static('images/screenshot-wide.png')),
+                "src": screenshot_wide,
                 "sizes": "1280x720",
                 "type": "image/png",
                 "form_factor": "wide",
-                "label": "Dashboard view"
+                "label": f"{company_name} Dashboard view"
             },
             {
-                "src": request.build_absolute_uri(static('images/screenshot-narrow.png')),
+                "src": screenshot_narrow,
                 "sizes": "720x1280",
                 "type": "image/png",
                 "form_factor": "narrow",
-                "label": "Mobile view"
+                "label": f"{company_name} Mobile view"
             }
         ]
     }

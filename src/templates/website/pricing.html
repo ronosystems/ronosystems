@@ -1,0 +1,399 @@
+{% extends "web_base.html" %}
+{% load static %}
+{% load plan_tags %}
+
+{% block title %}Pricing{% endblock %}
+{% block marquee_text %}Check Pricing Plans{% endblock %}
+{% block breadcrumb %}Pricing{% endblock %}
+
+{% block content %}
+<div class="dashboard-panel" id="pricing">
+    <div class="panel-header">
+        <i class="fas fa-tags me-1"></i> Simple, Transparent Pricing
+    </div>
+    <div class="panel-body">
+
+        <h2 class="hero-title" style="text-align: center;">
+            Plans That <span class="highlight">Grow With You</span>
+        </h2>
+
+        <p class="pricing-lead">
+            Start free, upgrade when you're ready. Every plan includes the core
+            platform — you only pay for the features and scale you need.
+        </p>
+
+        <!-- Billing cycle toggle (client-side, filters plans) -->
+        <div class="billing-toggle" id="billingToggle">
+            <button type="button" class="active" data-cycle="all">All Plans</button>
+            <button type="button" data-cycle="monthly">Monthly</button>
+            <button type="button" data-cycle="yearly">Yearly</button>
+            <button type="button" data-cycle="lifetime">Lifetime</button>
+        </div>
+
+        <!-- LIVE PLAN CARDS -->
+        <div class="plan-grid" id="planGrid">
+
+            {% for plan in plans %}
+            <div class="plan-card {% if plan.is_featured %}featured{% endif %}"
+                 data-cycle="{{ plan.billing_cycle }}">
+
+                <h3 class="plan-name">{{ plan.display_name }}</h3>
+
+                <p class="plan-description">
+                    {{ plan.description|default:"A great plan to get you started."|truncatechars:110 }}
+                </p>
+
+                <div class="plan-price">
+                    {% if plan.price == 0 %}
+                        <span class="free">FREE</span>
+                    {% else %}
+                        <span class="currency">{{ plan.currency }}</span>
+                        <span class="amount">{{ plan.price|floatformat:0 }}</span>
+                        <span class="cycle">/ {{ plan.billing_cycle }}</span>
+                    {% endif %}
+                </div>
+
+                <ul class="plan-features">
+                    <li><strong>Up to {{ plan.max_employees }}</strong> employees</li>
+                    <li><strong>Up to {{ plan.max_companies }}</strong> compan{{ plan.max_companies|pluralize:"y,ies" }}</li>
+                    <li><strong>Up to {{ plan.max_branches }}</strong> branch{{ plan.max_branches|pluralize:"es" }}</li>
+                    <li><strong>{{ plan.max_storage }} GB</strong> storage</li>
+
+                    {% for flag, label in plan.FEATURE_FLAGS %}
+                        {% if plan|attr:flag %}<li>{{ label }}</li>{% endif %}
+                    {% endfor %}
+                </ul>
+
+                {% if plan.price == 0 %}
+                    <a href="/auth/register/" class="plan-btn outline">
+                        <i class="fas fa-rocket"></i> Get Started Free
+                    </a>
+                {% elif plan.is_featured %}
+                    <a href="/auth/register/?plan={{ plan.id }}" class="plan-btn">
+                        <i class="fas fa-bolt"></i> Choose {{ plan.display_name }}
+                    </a>
+                {% else %}
+                    <a href="/auth/register/?plan={{ plan.id }}" class="plan-btn outline">
+                        Choose {{ plan.display_name }}
+                    </a>
+                {% endif %}
+            </div>
+            {% empty %}
+            <div class="plan-card" style="grid-column: 1 / -1; text-align: center; padding: 40px 20px;">
+                <i class="fas fa-inbox" style="font-size: 36px; color: #ccc; margin-bottom: 12px; display: block;"></i>
+                <h3 class="plan-name">No plans yet</h3>
+                <p class="plan-description" style="min-height: auto;">
+                    Plans will appear here once they're added by an administrator.
+                </p>
+            </div>
+            {% endfor %}
+
+        </div>
+
+        <p class="pricing-note">
+            <i class="fas fa-shield-alt"></i>
+            All prices are billed in the plan's local currency.
+            Cancel anytime — no long-term contracts.
+        </p>
+
+    </div>
+</div>
+
+<!-- FAQ PANEL -->
+<div class="dashboard-panel" id="pricing-faq">
+    <div class="panel-header">
+        <i class="fas fa-question-circle me-1"></i> Frequently Asked Questions
+    </div>
+    <div class="panel-body">
+        <div class="pricing-faq">
+
+            <div class="faq-item">
+                <h4><i class="fas fa-check-circle" style="color:#7bc043;"></i> Can I change plans later?</h4>
+                <p>Yes. You can upgrade, downgrade, or switch to a different plan at any time from your dashboard. Changes take effect at your next billing cycle.</p>
+            </div>
+
+            <div class="faq-item">
+                <h4><i class="fas fa-check-circle" style="color:#7bc043;"></i> Is there a free trial?</h4>
+                <p>Absolutely. Every new account starts on a free trial — no credit card required. Upgrade whenever you're ready.</p>
+            </div>
+
+            <div class="faq-item">
+                <h4><i class="fas fa-check-circle" style="color:#7bc043;"></i> What payment methods do you accept?</h4>
+                <p>M-Pesa (STK, Paybill, Buy Goods), bank transfer, and card payments. Manual payments can be verified by our team.</p>
+            </div>
+
+            <div class="faq-item">
+                <h4><i class="fas fa-check-circle" style="color:#7bc043;"></i> Do you offer custom plans?</h4>
+                <p>Yes — for Enterprise customers we offer custom plans, SLAs, and dedicated support. Contact us to discuss.</p>
+            </div>
+
+            <div class="faq-item">
+                <h4><i class="fas fa-check-circle" style="color:#7bc043;"></i> What happens if I exceed my limits?</h4>
+                <p>We'll notify you when you're nearing a limit. You can upgrade instantly — no downtime, no data loss.</p>
+            </div>
+
+            <div class="faq-item">
+                <h4><i class="fas fa-check-circle" style="color:#7bc043;"></i> Can I cancel anytime?</h4>
+                <p>Yes. Cancel from your dashboard — your plan stays active until the end of your billing period.</p>
+            </div>
+
+        </div>
+
+        <div style="text-align: center; margin-top: 25px;">
+            <a href="{% url 'contact' %}" class="plan-btn" style="display: inline-block; width: auto; padding: 10px 28px;">
+                <i class="fas fa-envelope"></i> Talk to Sales
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+/* ============================================
+   PRICING PAGE SPECIFIC STYLES
+============================================ */
+.pricing-lead {
+    font-size: 15px;
+    color: #333;
+    line-height: 1.7;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+/* Billing cycle toggle */
+.billing-toggle {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    margin: 20px auto 25px;
+    background: #f0f4f7;
+    border: 2px solid var(--ff-border);
+    border-radius: 40px;
+    padding: 4px;
+    width: fit-content;
+}
+.billing-toggle button {
+    border: none;
+    background: transparent;
+    padding: 8px 22px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    border-radius: 40px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.billing-toggle button.active {
+    background: var(--nav-bg-bottom);
+    color: #fff;
+}
+.billing-toggle button:hover:not(.active) {
+    color: var(--nav-bg-bottom);
+}
+
+/* Plan grid */
+.plan-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 20px;
+    margin-top: 10px;
+    align-items: stretch;
+}
+
+.plan-card {
+    background: #fff;
+    border: 2px solid var(--ff-border);
+    border-radius: 6px;
+    padding: 24px 20px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.25s ease;
+}
+.plan-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgb(0, 0, 0);
+    border-color: var(--nav-bg-top);
+}
+.plan-card.featured {
+    border-color: var(--nav-active-bg);
+    box-shadow: 0 8px 28px rgb(123, 192, 67);
+}
+.plan-card.featured::before {
+    content: "MOST POPULAR";
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--nav-active-bg);
+    color: var(--nav-active-text);
+    padding: 3px 14px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    border-radius: 12px;
+    white-space: nowrap;
+}
+
+.plan-name {
+    font-size: 16px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--nav-bg-bottom);
+    margin: 0 0 6px 0;
+}
+.plan-description {
+    font-size: 12px;
+    color: #777;
+    line-height: 1.5;
+    min-height: 32px;
+    margin-bottom: 14px;
+}
+
+.plan-price {
+    margin: 10px 0 6px;
+    padding-bottom: 14px;
+    border-bottom: 1px dashed var(--ff-border);
+}
+.plan-price .amount {
+    font-size: 30px;
+    font-weight: 800;
+    color: var(--nav-bg-bottom);
+    line-height: 1;
+}
+.plan-price .currency {
+    font-size: 15px;
+    font-weight: 700;
+    vertical-align: top;
+    color: var(--nav-bg-top);
+    margin-right: 2px;
+}
+.plan-price .cycle {
+    font-size: 12px;
+    color: #888;
+    margin-left: 4px;
+}
+.plan-price .free {
+    font-size: 24px;
+    font-weight: 800;
+    color: #28a745;
+}
+
+.plan-features {
+    list-style: none;
+    padding: 0;
+    margin: 14px 0 18px;
+    flex-grow: 1;
+}
+.plan-features li {
+    font-size: 12.5px;
+    color: #333;
+    padding: 5px 0 5px 22px;
+    position: relative;
+    line-height: 1.5;
+}
+.plan-features li::before {
+    content: "\f00c";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    color: var(--nav-active-bg);
+    position: absolute;
+    left: 0;
+    top: 5px;
+    font-size: 12px;
+}
+
+.plan-btn {
+    display: block;
+    width: 100%;
+    text-align: center;
+    padding: 10px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-radius: 4px;
+    text-decoration: none;
+    transition: all 0.2s;
+    background: var(--nav-bg-bottom);
+    color: #fff;
+    border: 2px solid var(--nav-bg-bottom);
+}
+.plan-btn:hover {
+    background: var(--nav-bg-top);
+    border-color: var(--nav-bg-top);
+    color: #fff;
+    text-decoration: none;
+}
+.plan-btn.outline {
+    background: transparent;
+    color: var(--nav-bg-bottom);
+}
+.plan-btn.outline:hover {
+    background: var(--nav-bg-bottom);
+    color: #fff;
+}
+
+.pricing-note {
+    text-align: center;
+    color: #777;
+    font-size: 12px;
+    margin-top: 25px;
+    line-height: 1.6;
+}
+.pricing-note i { color: var(--nav-active-bg); }
+
+.pricing-faq {
+    margin-top: 30px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 18px;
+}
+.faq-item {
+    background: #f9f9f9;
+    border: 1px solid var(--ff-border);
+    border-radius: 4px;
+    padding: 16px 18px;
+}
+.faq-item h4 {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--nav-bg-bottom);
+    margin: 0 0 6px;
+}
+.faq-item p {
+    font-size: 12px;
+    color: #666;
+    line-height: 1.6;
+    margin: 0;
+}
+
+@media (max-width: 576px) {
+    .plan-grid { grid-template-columns: 1fr; }
+    .plan-price .amount { font-size: 26px; }
+}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Billing Cycle Toggle (client-side filter)
+    document.querySelectorAll('#billingToggle button').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('#billingToggle button').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+
+            const cycle = this.dataset.cycle;
+            document.querySelectorAll('#planGrid .plan-card').forEach(function (card) {
+                if (cycle === 'all' || card.dataset.cycle === cycle) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

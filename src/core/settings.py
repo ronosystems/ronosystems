@@ -118,6 +118,9 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.apple',
     'allauth.socialaccount.providers.facebook',
 
+    # Main app
+    'core', 
+
     # Custom Apps
     'apps.accounts',
     'apps.employees',

@@ -1849,33 +1849,60 @@ def sale_edit(request, pk):
 # SALE COMPLETE - Mark Sale as Completed
 # ============================================
 
+
 @login_required
-def sale_complete(request, company_sale_id):
-    """Mark a sale as completed — with payment method + amount tendered."""
+def sale_complete(request, sale_id=None, company_sale_id=None):
+    """Mark a sale as completed — with payment method and amount tendered."""
+
+    # --------------------------------------------------
+    # Resolve identifier from either URL pattern
+    # --------------------------------------------------
+    sale_identifier = (
+        sale_id if sale_id is not None else company_sale_id
+    )
+
+    if sale_identifier is None:
+        raise Http404("No sale ID was supplied.")
+
     company, is_viewing_company = get_active_company(request)
 
     if not company:
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             return JsonResponse({'error': 'No company assigned'}, status=400)
+
         messages.error(request, 'No company assigned.')
         return redirect('epa-dashboard')
 
-    # --- Resolve sale by pk OR by company_sale_id (e.g. FIE-000081) ---
+    # --------------------------------------------------
+    # Find sale by database ID or company sale reference
+    # --------------------------------------------------
     sale = None
-    if str(company_sale_id).isdigit():
-        sale = Sale.objects.filter(id=int(company_sale_id), company=company).first()
-    if not sale:
-        sale = Sale.objects.filter(company_sale_id=company_sale_id, company=company).first()
-    if not sale:
-        raise Http404(f'Sale "{company_sale_id}" not found.')
 
+    if str(sale_identifier).isdigit():
+        sale = Sale.objects.filter(
+            id=int(sale_identifier),
+            company=company
+        ).first()
+
+    if not sale:
+        sale = Sale.objects.filter(
+            company_sale_id=str(sale_identifier),
+            company=company
+        ).first()
+
+    if not sale:
+        raise Http404(f'Sale "{sale_identifier}" not found.')
+
+    # --------------------------------------------------
+    # Authorization
+    # --------------------------------------------------
     is_authorized = (
-        is_viewing_company or
-        request.user.is_company_admin or
-        request.user.is_company_manager or
-        request.user.is_super_admin or
-        request.user.is_superuser or
-        request.user.is_staff
+        is_viewing_company
+        or request.user.is_company_admin
+        or request.user.is_company_manager
+        or request.user.is_super_admin
+        or request.user.is_superuser
+        or request.user.is_staff
     )
 
     if not is_authorized:
@@ -1883,36 +1910,69 @@ def sale_complete(request, company_sale_id):
             return JsonResponse({
                 'error': 'Unauthorized. Only Company Admins and Managers can complete sales.'
             }, status=403)
+
         messages.error(request, 'You do not have permission to complete sales.')
         return redirect('epa-sales')
 
+    # --------------------------------------------------
+    # Verification page helper
+    # --------------------------------------------------
+    def verification_page():
+        return render(request, 'epa/sale_verify.html', {
+            'sale': sale,
+            'page_title': 'Verify Sale',
+            'page_subtitle': f'Verify and complete sale #{sale.company_sale_id}',
+        })
+
+    # --------------------------------------------------
+    # Process payment
+    # --------------------------------------------------
     if request.method == 'POST':
         try:
-            payment_method      = (request.POST.get('payment_method') or '').strip().lower()
-            amount_tendered_raw = (request.POST.get('amount_tendered') or '').strip()
-            payment_reference   = (request.POST.get('payment_reference') or '').strip() or None
+            payment_method = (
+                request.POST.get('payment_method') or ''
+            ).strip().lower()
 
-            allowed_methods = {'cash', 'mpesa', 'card', 'bank_transfer'}
+            amount_tendered_raw = (
+                request.POST.get('amount_tendered') or ''
+            ).strip()
+
+            payment_reference = (
+                request.POST.get('payment_reference') or ''
+            ).strip() or None
+
+            allowed_methods = {
+                'cash',
+                'mpesa',
+                'card',
+                'bank_transfer'
+            }
+
             if payment_method not in allowed_methods:
                 messages.error(request, 'Please choose a valid payment method.')
-                return render(request, 'epa/sale_verify.html', {
-                    'sale': sale,
-                    'page_title': 'Verify Sale',
-                    'page_subtitle': f'Verify and complete sale #{sale.company_sale_id}',
-                })
+                return verification_page()
 
+            # Validate amount tendered
             try:
                 amount_tendered = Decimal(amount_tendered_raw)
-            except (ValueError, TypeError, ArithmeticError):
+
+                if not amount_tendered.is_finite():
+                    raise InvalidOperation
+
+            except (InvalidOperation, ValueError, TypeError):
                 messages.error(request, 'Invalid amount tendered.')
-                return render(request, 'epa/sale_verify.html', {
-                    'sale': sale,
-                    'page_title': 'Verify Sale',
-                    'page_subtitle': f'Verify and complete sale #{sale.company_sale_id}',
-                })
+                return verification_page()
 
             total_due = Decimal(str(sale.net_amount))
 
+            if amount_tendered <= 0:
+                messages.error(
+                    request,
+                    'Amount tendered must be greater than zero.'
+                )
+                return verification_page()
+
+            # Cash may exceed total due
             if payment_method == 'cash':
                 if amount_tendered < total_due:
                     messages.error(
@@ -1920,74 +1980,138 @@ def sale_complete(request, company_sale_id):
                         f'Amount tendered (KSh {amount_tendered}) is less than '
                         f'total due (KSh {total_due}).'
                     )
-                    return render(request, 'epa/sale_verify.html', {
-                        'sale': sale,
-                        'page_title': 'Verify Sale',
-                        'page_subtitle': f'Verify and complete sale #{sale.company_sale_id}',
-                    })
+                    return verification_page()
+
+            # Other payment methods must equal total due
             else:
                 if amount_tendered != total_due:
                     messages.error(
                         request,
-                        f'For {payment_method.replace("_", " ").title()}, the amount '
-                        f'must equal the total due (KSh {total_due}).'
+                        f'For {payment_method.replace("_", " ").title()}, '
+                        f'the amount must equal the total due (KSh {total_due}).'
                     )
-                    return render(request, 'epa/sale_verify.html', {
-                        'sale': sale,
-                        'page_title': 'Verify Sale',
-                        'page_subtitle': f'Verify and complete sale #{sale.company_sale_id}',
+                    return verification_page()
+
+            # --------------------------------------------------
+            # Complete sale inside database transaction
+            # --------------------------------------------------
+            with transaction.atomic():
+
+                locked_sale = Sale.objects.select_for_update().get(
+                    id=sale.id,
+                    company=company
+                )
+
+                # Prevent processing the same sale twice
+                if locked_sale.payment_status == 'paid':
+                    already_paid = True
+                else:
+                    already_paid = False
+
+                    locked_sale.payment_status = 'paid'
+                    locked_sale.payment_method = payment_method
+
+                    # Save payment reference if the model supports it
+                    if hasattr(locked_sale, 'payment_reference'):
+                        locked_sale.payment_reference = payment_reference
+
+                    locked_sale.save()
+
+                    # Update customer purchase statistics
+                    if locked_sale.customer:
+                        customer = locked_sale.customer
+
+                        customer.total_purchases = (
+                            (customer.total_purchases or Decimal('0.00'))
+                            + locked_sale.net_amount
+                        )
+
+                        customer.visit_count = (
+                            (customer.visit_count or 0) + 1
+                        )
+
+                        customer.last_visit = timezone.now()
+                        customer.save()
+
+                    # Update unit owner purchase statistics
+                    for item in locked_sale.items.all():
+
+                        if item.unit and item.unit.owner:
+                            owner = item.unit.owner
+
+                            owner.total_purchases = (
+                                (owner.total_purchases or Decimal('0.00'))
+                                + item.total_price
+                            )
+
+                            owner.purchase_count = (
+                                (owner.purchase_count or 0) + 1
+                            )
+
+                            owner.last_purchase_date = timezone.now()
+                            owner.save()
+
+            # --------------------------------------------------
+            # Already completed
+            # --------------------------------------------------
+            receipt_url = f'/epa_shop/sale/receipt/{sale.id}/'
+
+            if already_paid:
+                message = f'Sale #{sale.company_sale_id} has already been completed.'
+
+                if (
+                    request.headers.get('x-requested-with') == 'XMLHttpRequest'
+                    or request.content_type == 'application/json'
+                ):
+                    return JsonResponse({
+                        'success': True,
+                        'message': message,
+                        'sale_id': sale.id,
+                        'redirect_url': receipt_url,
                     })
 
-            # ---- Apply ----
-            sale.payment_status = 'paid'
-            sale.payment_method = payment_method
-            sale.save()
+                messages.warning(request, message)
+                return redirect(receipt_url)
 
-            if sale.customer:
-                sale.customer.total_purchases += sale.net_amount
-                sale.customer.visit_count += 1
-                sale.customer.last_visit = timezone.now()
-                sale.customer.save()
-
-            for item in sale.items.all():
-                if item.unit and item.unit.owner:
-                    owner = item.unit.owner
-                    owner.total_purchases += item.total_price
-                    owner.purchase_count += 1
-                    owner.last_purchase_date = timezone.now()
-                    owner.save()
-
-            messages.success(
-                request,
+            # --------------------------------------------------
+            # Success response
+            # --------------------------------------------------
+            success_message = (
                 f'Sale #{sale.company_sale_id} marked as completed '
                 f'({payment_method.replace("_", " ").title()}).'
             )
 
-            if (request.headers.get('x-requested-with') == 'XMLHttpRequest'
-                    or request.content_type == 'application/json'):
+            if (
+                request.headers.get('x-requested-with') == 'XMLHttpRequest'
+                or request.content_type == 'application/json'
+            ):
                 return JsonResponse({
                     'success': True,
-                    'message': f'Sale #{sale.company_sale_id} marked as completed.',
+                    'message': success_message,
                     'sale_id': sale.id,
-                    'redirect_url': f'/epa_shop/sale/receipt/{sale.id}/',
+                    'redirect_url': receipt_url,
                 })
 
-            return redirect(f'/epa_shop/sale/receipt/{sale.id}/')
+            messages.success(request, success_message)
+            return redirect(receipt_url)
 
         except Exception as e:
             import traceback
             traceback.print_exc()
-            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+
+            if (
+                request.headers.get('x-requested-with') == 'XMLHttpRequest'
+                or request.content_type == 'application/json'
+            ):
                 return JsonResponse({'error': str(e)}, status=500)
+
             messages.error(request, f'Error completing sale: {str(e)}')
             return redirect('epa-sales')
 
-    context = {
-        'sale': sale,
-        'page_title': 'Verify Sale',
-        'page_subtitle': f'Verify and complete sale #{sale.company_sale_id}',
-    }
-    return render(request, 'epa/sale_verify.html', context)
+    # --------------------------------------------------
+    # GET: Display verification page
+    # --------------------------------------------------
+    return verification_page()
 
 
 @login_required
