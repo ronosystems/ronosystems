@@ -20,22 +20,23 @@ def user_context(request):
         'user_role': None,
     }
 
-# apps/epa_shop/context_processors.py
-from .models import Sale
+
+
+# /home/rs/ronosystems/src/apps/epa_shop/context_processors.py
+
+from apps.cart_orders.models import Order
 
 def pending_orders_count(request):
-    """
-    Returns the count of unassigned pending orders for the current company.
-    Only runs for authenticated users on a company domain.
-    """
-    current_company = getattr(request, 'current_company', None)
-    if not current_company or not request.user.is_authenticated:
+    company = getattr(request, 'current_company', None)
+    
+    # If there is no company, or the user is not logged in, return 0
+    if not company or not request.user.is_authenticated:
         return {'pending_orders_count': 0}
 
-    count = Sale.objects.filter(
-        company=current_company,
-        payment_status='pending',
-        assigned_to__isnull=True
+    # Count the open orders (new, picked, confirmed) for this company
+    count = Order.objects.filter(
+        company=company,
+        status__in=['new', 'picked', 'confirmed']
     ).count()
 
     return {'pending_orders_count': count}

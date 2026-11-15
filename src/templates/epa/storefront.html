@@ -19,13 +19,16 @@
                 {% endif %}
             </p>
         </div>
-        <a href="{% url 'cart-view' %}" class="btn btn-primary position-relative">
+        <!-- FIXED: Added namespace 'cart-orders:' -->
+        <a href="{% url 'cart-orders:view-cart' %}" class="btn btn-primary position-relative">
             <i class="fas fa-shopping-cart"></i> View Cart
             {% if cart_count > 0 %}
                 <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" 
                     style="font-size: 11px;">
                     {{ cart_count }}
                 </span>
+            {% else %}
+                <span id="header-cart-count" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 11px; display: none;"></span>
             {% endif %}
         </a>
     </div>
@@ -128,11 +131,14 @@
 <!-- JavaScript for Cart -->
 <script>
 function addToCart(btnElement, modelType, productId, productName, price, imageUrl) {
-    var originalText = btnElement.innerHTML;
+    var originalHtml = btnElement.innerHTML;
+    var originalClasses = btnElement.className;
+
     btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
     btnElement.disabled = true;
 
-    fetch('/epa_shop/cart/add/', {
+    // FIXED: Use the new cart-orders URL
+    fetch("{% url 'cart-orders:add-to-cart' %}", {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -150,22 +156,44 @@ function addToCart(btnElement, modelType, productId, productName, price, imageUr
     .then(data => {
         if (data.status === 'success') {
             btnElement.innerHTML = '<i class="fas fa-check"></i> Added';
-            btnElement.classList.replace('btn-outline-primary', 'btn-success');
+            btnElement.className = 'btn btn-sm btn-success w-100';
+
+            // Update the header count
+            var headerBadge = document.getElementById('header-cart-count');
+            var headerBadgeExisting = document.querySelector('.position-absolute.top-0.start-100');
+
+            if (headerBadgeExisting) {
+                headerBadgeExisting.textContent = data.cart_count;
+                headerBadgeExisting.style.display = 'inline-block';
+            } else if (headerBadge) {
+                headerBadge.textContent = data.cart_count;
+                headerBadge.style.display = 'inline-block';
+            }
+
+            // Update the floating counter (if it exists on this page)
+            var floatingCounter = document.getElementById('cart-counter');
+            if (floatingCounter) {
+                floatingCounter.textContent = data.cart_count;
+                floatingCounter.style.display = 'inline-block';
+            }
+
             setTimeout(function() {
-                btnElement.innerHTML = originalText;
-                btnElement.classList.replace('btn-success', 'btn-outline-primary');
+                btnElement.innerHTML = originalHtml;
+                btnElement.className = originalClasses;
                 btnElement.disabled = false;
             }, 2000);
         } else {
             alert(data.message || "Failed to add to cart.");
-            btnElement.innerHTML = originalText;
+            btnElement.innerHTML = originalHtml;
+            btnElement.className = originalClasses;
             btnElement.disabled = false;
         }
     })
     .catch(error => {
         console.error('Error:', error);
         alert("Network error. Please try again.");
-        btnElement.innerHTML = originalText;
+        btnElement.innerHTML = originalHtml;
+        btnElement.className = originalClasses;
         btnElement.disabled = false;
     });
 }

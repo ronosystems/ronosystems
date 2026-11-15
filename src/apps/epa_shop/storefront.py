@@ -45,6 +45,9 @@ def get_epa_products(company):
                 if item.image:
                     product.override_image_url = item.image_url
                 
+                # Attach the model type to the product object
+                product.model_type = item.content_type.model
+                
                 items.append(product)
         return items
 
@@ -75,7 +78,7 @@ def get_epa_products(company):
         except Exception:
             pass
 
-    # 👇 Build banner slider items as explicit dictionaries
+    # Build banner slider items as explicit dictionaries
     banner_items = []
     banner_query = HomepageFeaturedProduct.objects.filter(
         company=company, is_active=True
@@ -84,16 +87,13 @@ def get_epa_products(company):
     for item in banner_query:
         img_url = item.image_url 
         if img_url:
-            # Fetch the actual product via GenericForeignKey
             product = item.product 
             
-            # Safely get the name directly from the product object
             if product and hasattr(product, 'name'):
                 real_product_name = product.name
             else:
                 real_product_name = "Featured Product"
 
-            # Determine the price to display
             if product:
                 display_price = item.custom_price if item.custom_price else product.selling_price
                 original_price = product.selling_price if item.section in ['discounted', 'flash_sale'] else None
@@ -159,8 +159,8 @@ def epa_storefront(request):
     all_products = list(phones) + list(electronics) + list(accessories)
     all_products.sort(key=lambda p: p.name)
 
-    # 2. HESABU YA CART
-    cart = request.session.get('epa_cart', {})
+    # 2. HESABU YA CART (UPDATED TO NEW SESSION KEY)
+    cart = request.session.get('cart_orders_cart', {}) # 👈 FIXED HERE
     cart_count = sum(item['quantity'] for item in cart.values())
 
     # 3. Fetch homepage-featured sections
@@ -238,8 +238,8 @@ def public_product_detail(request, product_code):
         if featured_item.image:
             display_image = featured_item.image_url
 
-    # Calculate Cart Count
-    cart = request.session.get('epa_cart', {})
+    # Calculate Cart Count (UPDATED TO NEW SESSION KEY)
+    cart = request.session.get('cart_orders_cart', {}) # 👈 FIXED HERE
     cart_count = sum(item['quantity'] for item in cart.values())
 
     context = {
