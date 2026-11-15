@@ -375,7 +375,7 @@ def manifest_view(request):
                 "url": "/epa_shop/pos/",
                 "description": "Open Point of Sale"
             }
-        ]
+        ],
 
         # --- Protocol Handlers ---
         "protocol_handlers": [
