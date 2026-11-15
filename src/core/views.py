@@ -194,19 +194,20 @@ def contact(request):
 # PWA: MANIFEST
 # ============================================
 
+# ============================================
+# PWA: MANIFEST
+# ============================================
+
+from django.template.context_processors import request
+
 @no_session
 def manifest_view(request):
     from apps.companies.models import Company
     from django.templatetags.static import static
     from django.http import JsonResponse
     from django.conf import settings
+    from django.template import RequestContext
     
-    # Try to import SystemSetting for the main site logo
-    try:
-        from apps.settings.models import SystemSetting
-    except ImportError:
-        SystemSetting = None
-
     company = None
     
     # 1. Check URL parameter first (useful for local testing)
@@ -223,32 +224,38 @@ def manifest_view(request):
 
     # 3. Match the domain name to a company dynamically
     if not company:
-        host = request.get_host().split(':')[0].lower() # e.g., 'fieldmax.shop' or 'ronosystems.onrender.com'
-        
+        host = request.get_host().split(':')[0].lower()
         try:
-            # Look for a company that owns this custom domain
             company = Company.objects.filter(custom_domain__iexact=host).first()
         except Exception:
             pass
 
     # ============================================
+    # GET THE EXACT SAME VARIABLES AS BASE.HTML
+    # ============================================
+    # This runs your context processors to get site_logo_url, system_name, etc.
+    context = RequestContext(request)
+    ctx_dict = context.flatten()
+    
+    site_logo_url = ctx_dict.get('site_logo_url')
+    system_name = ctx_dict.get('system_name', 'RONOSYSTEMS')
+
+    # ============================================
     # BUILD MANIFEST DATA
     # ============================================
-    # 4. Build the manifest data
-    company_name = "RONOSYSTEMS" # Default system name
+    company_name = system_name.upper() if system_name else "RONOSYSTEMS"
     
-    # --- Default System Icons (Fallback) ---
+    # Default fallback icons (only used if no logo is found anywhere)
     icon_192 = request.build_absolute_uri(static('images/icon-192.png'))
     icon_512 = request.build_absolute_uri(static('images/icon-512.png'))
     
     if company:
         # ---------------------------------------------------------
-        # COMPANY DOMAIN LOGIC (Any Tenant)
+        # COMPANY DOMAIN LOGIC (e.g., Fieldmax)
         # ---------------------------------------------------------
         if company.display_name:
             company_name = company.display_name.upper()
             
-        # Process Company Logo
         if company.logo:
             try:
                 raw_logo = company.logo_url if hasattr(company, 'logo_url') and company.logo_url else company.logo.url
@@ -262,21 +269,22 @@ def manifest_view(request):
                 pass
     else:
         # ---------------------------------------------------------
-        # SYSTEM DOMAIN LOGIC (RonoSystems Main Site)
+        # SYSTEM DOMAIN LOGIC (RonoSystems)
         # ---------------------------------------------------------
-        if SystemSetting:
+        # Use the site_logo_url passed by the context processor
+        if site_logo_url:
             try:
-                # Fetch the main site logo from settings
-                # (Adjust 'SITE_LOGO_URL' to whatever key you use in your settings)
-                sys_logo_url = SystemSetting.get_setting('SITE_LOGO_URL') 
-                
-                if sys_logo_url:
-                    if 'cloudinary' in sys_logo_url:
-                        icon_192 = sys_logo_url.replace('/upload/', '/upload/w_192,h_192,c_fill,f_png/')
-                        icon_512 = sys_logo_url.replace('/upload/', '/upload/w_512,h_512,c_fill,f_png/')
+                if 'cloudinary' in site_logo_url:
+                    icon_192 = site_logo_url.replace('/upload/', '/upload/w_192,h_192,c_fill,f_png/')
+                    icon_512 = site_logo_url.replace('/upload/', '/upload/w_512,h_512,c_fill,f_png/')
+                else:
+                    # Ensure it's an absolute URL
+                    if site_logo_url.startswith('http'):
+                        icon_192 = site_logo_url
+                        icon_512 = site_logo_url
                     else:
-                        icon_192 = request.build_absolute_uri(sys_logo_url)
-                        icon_512 = request.build_absolute_uri(sys_logo_url)
+                        icon_192 = request.build_absolute_uri(site_logo_url)
+                        icon_512 = request.build_absolute_uri(site_logo_url)
             except Exception:
                 pass
 
@@ -313,7 +321,6 @@ def manifest_view(request):
     response = JsonResponse(manifest)
     response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     return response
-
 
 
 # ============================================
