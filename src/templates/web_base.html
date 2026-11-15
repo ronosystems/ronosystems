@@ -151,6 +151,93 @@
         .ff-social-link.linkedin { background: #0a66c2; }
         .ff-social-link:hover { color: #ffffff !important; transform: translateY(-3px) scale(1.05); box-shadow: 0 6px 16px rgba(0,0,0,0.35); filter: brightness(1.1); text-decoration: none !important; }
 
+        /* ============================================
+           CUSTOM PWA INSTALL MODAL
+           ============================================ */
+        #customInstallModal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 99999;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        #customInstallModal .modal-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 24px;
+            width: 100%;
+            max-width: 320px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            animation: modalPop 0.25s ease-out;
+        }
+        @keyframes modalPop {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        #customInstallModal .modal-icon {
+            width: 72px;
+            height: 72px;
+            margin: 0 auto 16px;
+            border-radius: 16px;
+            background: #f0f4f7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        #customInstallModal .modal-icon img {
+            max-width: 64px;
+            max-height: 64px;
+            object-fit: contain;
+        }
+        #customInstallModal .modal-icon i {
+            font-size: 32px;
+            color: #1e4e6d;
+        }
+        #customInstallModal h3 {
+            font-size: 16px;
+            font-weight: 700;
+            margin: 0 0 8px;
+            color: #1e4e6d;
+        }
+        #customInstallModal p {
+            font-size: 13px;
+            color: #555;
+            margin: 0 0 20px;
+            line-height: 1.5;
+        }
+        #customInstallModal .btn-install {
+            width: 100%;
+            background: #28a745;
+            color: #fff;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #customInstallModal .btn-install:hover { background: #218838; }
+        #customInstallModal .btn-cancel {
+            width: 100%;
+            background: #e9ecef;
+            color: #333;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #customInstallModal .btn-cancel:hover { background: #dcdfe3; }
+
         @media (max-width: 992px) {
             .desktop-header { display: none; }
             .mobile-header { display: flex; }
@@ -487,8 +574,36 @@
         </div>
     </footer>
 
+    <!-- ============================================
+    CUSTOM PWA INSTALL MODAL (centered)
+    ============================================ -->
+    <div id="customInstallModal" role="dialog" aria-modal="true" aria-labelledby="installModalTitle">
+        <div class="modal-card">
+            <div class="modal-icon">
+                {% if current_company and current_company.logo %}
+                    <img src="{{ current_company.logo_url }}" alt="{{ current_company.display_name }}">
+                {% elif site_logo_url %}
+                    <img src="{{ site_logo_url }}" alt="{{ system_name|default:'RonoSystems' }}">
+                {% else %}
+                    <i class="fas fa-cube"></i>
+                {% endif %}
+            </div>
+            <h3 id="installModalTitle">
+                Install {% if current_company %}{{ current_company.display_name }}{% else %}{{ system_name|default:"RonoSystems" }}{% endif %}
+            </h3>
+            <p>Add the app to your home screen for faster access — works offline too.</p>
+            <button type="button" class="btn-install" onclick="confirmInstall()">
+                <i class="fas fa-download"></i> Install
+            </button>
+            <button type="button" class="btn-cancel" onclick="closeInstallModal()">
+                Not now
+            </button>
+        </div>
+    </div>
+
     <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
     <script>
+        /* ---------- CLOCK ---------- */
         function updateClock() {
             const now = new Date();
             let hours = now.getHours();
@@ -501,6 +616,7 @@
         updateClock();
         setInterval(updateClock, 1000);
 
+        /* ---------- MOBILE SIDEBAR ---------- */
         (function () {
             const mobileSidebar = document.getElementById('mobile-sidebar');
             const mobileSidebarOverlay = document.getElementById('mobile-sidebar-overlay');
@@ -514,6 +630,7 @@
             document.querySelectorAll('.mobile-sidebar .sidebar-link, .mobile-sidebar .btn').forEach(link => { link.addEventListener('click', closeMobileSidebar); });
         })();
 
+        /* ---------- SMOOTH SCROLL ---------- */
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
                 const targetId = this.getAttribute('href');
@@ -530,32 +647,129 @@
             });
         });
 
+        /* ============================================
+           PWA INSTALL LOGIC (custom centered modal)
+           ============================================ */
         let deferredPrompt = null;
-        const installBtns = [document.getElementById('pwaInstallBtnDesktop'), document.getElementById('pwaInstallBtnMobile')].filter(Boolean);
-        function setInstallVisible(show) { installBtns.forEach(btn => { btn.style.display = show ? 'block' : 'none'; }); }
-        if (window.matchMedia('(display-mode: standalone)').matches) setInstallVisible(false);
+        const installBtns = [
+            document.getElementById('pwaInstallBtnDesktop'),
+            document.getElementById('pwaInstallBtnMobile')
+        ].filter(Boolean);
+
+        const INSTALL_FLAG_KEY = 'pwa_installed';
+        const INSTALL_TIME_KEY = 'pwa_installed_at';
+        const INSTALL_TRUST_DAYS = 7;
+
+        function setInstallVisible(show) {
+            installBtns.forEach(btn => { btn.style.display = show ? 'block' : 'none'; });
+        }
+
+        function markInstalled() {
+            try {
+                localStorage.setItem(INSTALL_FLAG_KEY, 'true');
+                localStorage.setItem(INSTALL_TIME_KEY, Date.now().toString());
+            } catch (e) {}
+            setInstallVisible(false);
+        }
+
+        function isRecentlyInstalled() {
+            try {
+                if (localStorage.getItem(INSTALL_FLAG_KEY) !== 'true') return false;
+                const ts = parseInt(localStorage.getItem(INSTALL_TIME_KEY) || '0', 10);
+                if (!ts) return false;
+                const days = (Date.now() - ts) / (1000 * 60 * 60 * 24);
+                return days < INSTALL_TRUST_DAYS;
+            } catch (e) { return false; }
+        }
+
         async function verifyInstallStatus() {
-            if (window.matchMedia('(display-mode: standalone)').matches) { setInstallVisible(false); localStorage.setItem('pwa_installed', 'true'); return; }
+            // Running as an installed PWA already?
+            if (window.matchMedia('(display-mode: standalone)').matches) {
+                markInstalled();
+                return;
+            }
+            // Trust a recent install to avoid button flicker
+            if (isRecentlyInstalled()) {
+                setInstallVisible(false);
+                return;
+            }
             let isInstalled = false;
-            if (navigator.getInstalledRelatedApps) { try { const apps = await navigator.getInstalledRelatedApps(); if (apps && apps.length > 0) isInstalled = true; } catch (e) {} }
-            if (!isInstalled && !navigator.getInstalledRelatedApps) { isInstalled = localStorage.getItem('pwa_installed') === 'true'; }
-            if (isInstalled) { setInstallVisible(false); localStorage.setItem('pwa_installed', 'true'); } else { setInstallVisible(true); localStorage.removeItem('pwa_installed'); }
+            if (navigator.getInstalledRelatedApps) {
+                try {
+                    const apps = await navigator.getInstalledRelatedApps();
+                    if (apps && apps.length > 0) isInstalled = true;
+                } catch (e) {}
+            }
+            if (isInstalled) {
+                markInstalled();
+            } else {
+                setInstallVisible(true);
+            }
         }
         verifyInstallStatus();
         document.addEventListener('visibilitychange', () => { if (!document.hidden) verifyInstallStatus(); });
-        window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; setInstallVisible(true); });
-        window.triggerPWAInstall = async function () {
+
+        // Capture the deferred prompt (do NOT auto-show anything)
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            setInstallVisible(true);
+        });
+
+        // Called by the sidebar / mobile sidebar "Install App" buttons
+        window.triggerPWAInstall = function () {
             if (deferredPrompt) {
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                if (outcome === 'accepted') { setInstallVisible(false); localStorage.setItem('pwa_installed', 'true'); }
-                deferredPrompt = null;
+                document.getElementById('customInstallModal').style.display = 'flex';
             } else {
-                installBtns.forEach(btn => { const original = btn.innerHTML; btn.innerHTML = '<i class="fas fa-info-circle"></i> Use browser menu to install'; setTimeout(() => { btn.innerHTML = original; }, 3000); });
+                // No prompt available — guide the user
+                installBtns.forEach(btn => {
+                    const original = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-info-circle"></i> Use browser menu to install';
+                    setTimeout(() => { btn.innerHTML = original; }, 3000);
+                });
             }
         };
-        window.addEventListener('appinstalled', () => { setInstallVisible(false); localStorage.setItem('pwa_installed', 'true'); });
-        if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').then(reg => console.log('SW registered:', reg.scope)).catch(err => console.error('SW failed:', err)); }); }
+
+        // Called by the "Install" button inside the custom modal
+        window.confirmInstall = async function () {
+            closeInstallModal();
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                markInstalled();
+            }
+            deferredPrompt = null;
+        };
+
+        window.closeInstallModal = function () {
+            document.getElementById('customInstallModal').style.display = 'none';
+        };
+
+        // Close modal on overlay click
+        document.getElementById('customInstallModal').addEventListener('click', function (e) {
+            if (e.target === this) closeInstallModal();
+        });
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeInstallModal();
+        });
+
+        // Browser reports the app was installed
+        window.addEventListener('appinstalled', () => {
+            markInstalled();
+            deferredPrompt = null;
+        });
+
+        /* ---------- SERVICE WORKER ---------- */
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('SW registered:', reg.scope))
+                    .catch(err => console.error('SW failed:', err));
+            });
+        }
     </script>
 
     {% block extra_js %}{% endblock %}

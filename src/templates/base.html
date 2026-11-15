@@ -824,6 +824,93 @@
         }
 
         /* ============================================
+           CUSTOM PWA INSTALL MODAL
+        ============================================ */
+        #customInstallModal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 99999;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        #customInstallModal .modal-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 24px;
+            width: 100%;
+            max-width: 320px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            animation: modalPop 0.25s ease-out;
+        }
+        @keyframes modalPop {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        #customInstallModal .modal-icon {
+            width: 72px;
+            height: 72px;
+            margin: 0 auto 16px;
+            border-radius: 16px;
+            background: #f0f4f7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        #customInstallModal .modal-icon img {
+            max-width: 64px;
+            max-height: 64px;
+            object-fit: contain;
+        }
+        #customInstallModal .modal-icon i {
+            font-size: 32px;
+            color: #1e4e6d;
+        }
+        #customInstallModal h3 {
+            font-size: 16px;
+            font-weight: 700;
+            margin: 0 0 8px;
+            color: #1e4e6d;
+        }
+        #customInstallModal p {
+            font-size: 13px;
+            color: #555;
+            margin: 0 0 20px;
+            line-height: 1.5;
+        }
+        #customInstallModal .btn-install {
+            width: 100%;
+            background: #28a745;
+            color: #fff;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #customInstallModal .btn-install:hover { background: #218838; }
+        #customInstallModal .btn-cancel {
+            width: 100%;
+            background: #e9ecef;
+            color: #333;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #customInstallModal .btn-cancel:hover { background: #dcdfe3; }
+
+        /* ============================================
            RESPONSIVE
         ============================================ */
         @media (max-width: 992px) {
@@ -1537,6 +1624,34 @@
     </div>
 
 
+    <!-- ============================================
+         CUSTOM PWA INSTALL MODAL (centered)
+    ============================================ -->
+    <div id="customInstallModal" role="dialog" aria-modal="true" aria-labelledby="installModalTitle">
+        <div class="modal-card">
+            <div class="modal-icon">
+                {% if current_company and current_company.logo %}
+                    <img src="{{ current_company.logo_url }}" alt="{{ current_company.display_name }}">
+                {% elif site_logo_url %}
+                    <img src="{{ site_logo_url }}" alt="{{ system_name|default:'RonoSystems' }}">
+                {% else %}
+                    <i class="fas fa-rocket"></i>
+                {% endif %}
+            </div>
+            <h3 id="installModalTitle">
+                Install {% if current_company %}{{ current_company.display_name }}{% else %}{{ system_name|default:"RonoSystems" }}{% endif %}
+            </h3>
+            <p>Add the app to your home screen for faster access — works offline too.</p>
+            <button type="button" class="btn-install" onclick="confirmInstall()">
+                <i class="fas fa-download"></i> Install
+            </button>
+            <button type="button" class="btn-cancel" onclick="closeInstallModal()">
+                Not now
+            </button>
+        </div>
+    </div>
+
+
     <!-- ============================================ -->
     <!-- JAVASCRIPT                                    -->
     <!-- ============================================ -->
@@ -1858,12 +1973,36 @@
 
 
     <script>
-        let deferredPrompt;
+        /* ============================================================
+           PWA INSTALL (custom centered modal)
+           ============================================================ */
+        let deferredPrompt = null;
         const installBtn = document.getElementById('pwaInstallBtn');
         const btnText = installBtn ? installBtn.querySelector('span') : null;
 
-        // STEP 1: Immediately hide only if we're inside the standalone app
-        // (this is the ONLY reliable synchronous check — it means "we're running the installed app")
+        const INSTALL_FLAG_KEY = 'pwa_installed';
+        const INSTALL_TIME_KEY = 'pwa_installed_at';
+        const INSTALL_TRUST_DAYS = 7;
+
+        function markInstalled() {
+            try {
+                localStorage.setItem(INSTALL_FLAG_KEY, 'true');
+                localStorage.setItem(INSTALL_TIME_KEY, Date.now().toString());
+            } catch (e) {}
+            if (installBtn) installBtn.style.display = 'none';
+        }
+
+        function isRecentlyInstalled() {
+            try {
+                if (localStorage.getItem(INSTALL_FLAG_KEY) !== 'true') return false;
+                const ts = parseInt(localStorage.getItem(INSTALL_TIME_KEY) || '0', 10);
+                if (!ts) return false;
+                const days = (Date.now() - ts) / (1000 * 60 * 60 * 24);
+                return days < INSTALL_TRUST_DAYS;
+            } catch (e) { return false; }
+        }
+
+        // STEP 1: Hide on first paint if running inside the installed app
         if (window.matchMedia('(display-mode: standalone)').matches) {
             if (installBtn) installBtn.style.display = 'none';
         }
@@ -1872,10 +2011,15 @@
         async function verifyInstallStatus() {
             if (!installBtn) return;
 
-            // If we're inside the installed app, nothing to do
+            // Inside the installed app
             if (window.matchMedia('(display-mode: standalone)').matches) {
+                markInstalled();
+                return;
+            }
+
+            // Trust a recent install to avoid button flicker
+            if (isRecentlyInstalled()) {
                 installBtn.style.display = 'none';
-                localStorage.setItem('pwa_installed', 'true');
                 return;
             }
 
@@ -1894,51 +2038,39 @@
             }
 
             // Fallback: use localStorage hint if API is unsupported
-            // (helps with browsers that don't implement the API)
             if (!isInstalled && !navigator.getInstalledRelatedApps) {
-                isInstalled = localStorage.getItem('pwa_installed') === 'true';
+                isInstalled = localStorage.getItem(INSTALL_FLAG_KEY) === 'true';
             }
 
             // Apply result
             if (isInstalled) {
-                installBtn.style.display = 'none';
-                localStorage.setItem('pwa_installed', 'true');
+                markInstalled();
             } else {
                 // App is NOT installed — clear the flag and show the button
                 installBtn.style.display = 'flex';
-                localStorage.removeItem('pwa_installed');
+                try { localStorage.removeItem(INSTALL_FLAG_KEY); } catch (e) {}
             }
         }
 
-        // Run on page load
         verifyInstallStatus();
 
         // Re-check whenever the page becomes visible again
-        // (handles the case where the user uninstalled while the tab was in the background)
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) verifyInstallStatus();
         });
 
-        // STEP 3: Capture the install prompt
+        // STEP 3: Capture the install prompt (do NOT auto-show anything)
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            // Chrome fires this only when the app is NOT already installed,
-            // so we know the button should be visible
             if (installBtn) installBtn.style.display = 'flex';
         });
 
-        // STEP 4: Handle button click
+        // STEP 4: Sidebar "Install App" button opens the custom modal
         if (installBtn) {
-            installBtn.addEventListener('click', async () => {
+            installBtn.addEventListener('click', function () {
                 if (deferredPrompt) {
-                    deferredPrompt.prompt();
-                    const { outcome } = await deferredPrompt.userChoice;
-                    if (outcome === 'accepted') {
-                        installBtn.style.display = 'none';
-                        localStorage.setItem('pwa_installed', 'true');
-                    }
-                    deferredPrompt = null;
+                    document.getElementById('customInstallModal').style.display = 'flex';
                 } else {
                     // No prompt available — guide them
                     if (btnText) btnText.textContent = 'Use browser menu to install';
@@ -1949,10 +2081,41 @@
             });
         }
 
+        // Called by the "Install" button inside the custom modal
+        window.confirmInstall = async function () {
+            closeInstallModal();
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                markInstalled();
+            }
+            deferredPrompt = null;
+        };
+
+        window.closeInstallModal = function () {
+            document.getElementById('customInstallModal').style.display = 'none';
+        };
+
+        // Close modal on overlay click
+        (function () {
+            const modalEl = document.getElementById('customInstallModal');
+            if (modalEl) {
+                modalEl.addEventListener('click', function (e) {
+                    if (e.target === this) closeInstallModal();
+                });
+            }
+        })();
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeInstallModal();
+        });
+
         // STEP 5: Listen for the install event
         window.addEventListener('appinstalled', () => {
-            if (installBtn) installBtn.style.display = 'none';
-            localStorage.setItem('pwa_installed', 'true');
+            markInstalled();
+            deferredPrompt = null;
         });
 
         // STEP 6: Register Service Worker

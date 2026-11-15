@@ -199,6 +199,7 @@ def manifest_view(request):
     from apps.companies.models import Company
     from django.templatetags.static import static
     from django.http import JsonResponse
+    from django.conf import settings
     
     # Try to import SystemSetting for the main site logo
     try:
@@ -220,16 +221,13 @@ def manifest_view(request):
     if not company and request.user.is_authenticated and getattr(request.user, 'company', None):
         company = request.user.company
 
-    # 3. Match the domain name to a company (for custom domains like fieldmax.shop)
+    # 3. Match the domain name to a company dynamically
     if not company:
-        host = request.get_host().split(':')[0] # e.g., 'fieldmax.shop' or 'ronosystems.onrender.com'
+        host = request.get_host().split(':')[0].lower() # e.g., 'fieldmax.shop' or 'ronosystems.onrender.com'
+        
         try:
-            # Check custom domain first
+            # Look for a company that owns this custom domain
             company = Company.objects.filter(custom_domain__iexact=host).first()
-            
-            # Fallback: If host contains 'fieldmax', find company named 'fieldmax'
-            if not company and 'fieldmax' in host:
-                company = Company.objects.filter(display_name__icontains='fieldmax').first()
         except Exception:
             pass
 
@@ -237,55 +235,48 @@ def manifest_view(request):
     # BUILD MANIFEST DATA
     # ============================================
     # 4. Build the manifest data
-    company_name = "RONOSYSTEMS"
+    company_name = "RONOSYSTEMS" # Default system name
     
-    # --- Dynamic Icons ---
+    # --- Default System Icons (Fallback) ---
     icon_192 = request.build_absolute_uri(static('images/icon-192.png'))
     icon_512 = request.build_absolute_uri(static('images/icon-512.png'))
     
-    # --- Dynamic Screenshots ---
-    screenshot_wide = request.build_absolute_uri(f"{settings.STATIC_URL}images/screenshot-wide.png")
-    screenshot_narrow = request.build_absolute_uri(f"{settings.STATIC_URL}images/screenshot-narrow.png")
-
     if company:
+        # ---------------------------------------------------------
+        # COMPANY DOMAIN LOGIC (Any Tenant)
+        # ---------------------------------------------------------
         if company.display_name:
             company_name = company.display_name.upper()
             
-        # Process Company Logo (Icons)
+        # Process Company Logo
         if company.logo:
             try:
                 raw_logo = company.logo_url if hasattr(company, 'logo_url') and company.logo_url else company.logo.url
                 if 'cloudinary' in raw_logo:
                     icon_192 = raw_logo.replace('/upload/', '/upload/w_192,h_192,c_fill,f_png/')
                     icon_512 = raw_logo.replace('/upload/', '/upload/w_512,h_512,c_fill,f_png/')
-                elif raw_logo.endswith('.png'):
-                    icon_192 = raw_logo
-                    icon_512 = raw_logo
-            except Exception:
-                pass
-
-        # Process Company Screenshots
-        # Assuming your Company model has fields named 'screenshot_wide' and 'screenshot_narrow'
-        # (If they are named differently in your models, update these lines!)
-        if hasattr(company, 'screenshot_wide') and company.screenshot_wide:
-            try:
-                raw_shot = company.screenshot_wide.url
-                if 'cloudinary' in raw_shot:
-                    # Force 1280x720 on Cloudinary
-                    screenshot_wide = raw_shot.replace('/upload/', '/upload/w_1280,h_720,c_fill,f_png/')
                 else:
-                    screenshot_wide = request.build_absolute_uri(raw_shot)
+                    icon_192 = request.build_absolute_uri(raw_logo)
+                    icon_512 = request.build_absolute_uri(raw_logo)
             except Exception:
                 pass
+    else:
+        # ---------------------------------------------------------
+        # SYSTEM DOMAIN LOGIC (RonoSystems Main Site)
+        # ---------------------------------------------------------
+        if SystemSetting:
+            try:
+                # Fetch the main site logo from settings
+                # (Adjust 'SITE_LOGO_URL' to whatever key you use in your settings)
+                sys_logo_url = SystemSetting.get_setting('SITE_LOGO_URL') 
                 
-        if hasattr(company, 'screenshot_narrow') and company.screenshot_narrow:
-            try:
-                raw_shot = company.screenshot_narrow.url
-                if 'cloudinary' in raw_shot:
-                    # Force 720x1280 on Cloudinary
-                    screenshot_narrow = raw_shot.replace('/upload/', '/upload/w_720,h_1280,c_fill,f_png/')
-                else:
-                    screenshot_narrow = request.build_absolute_uri(raw_shot)
+                if sys_logo_url:
+                    if 'cloudinary' in sys_logo_url:
+                        icon_192 = sys_logo_url.replace('/upload/', '/upload/w_192,h_192,c_fill,f_png/')
+                        icon_512 = sys_logo_url.replace('/upload/', '/upload/w_512,h_512,c_fill,f_png/')
+                    else:
+                        icon_192 = request.build_absolute_uri(sys_logo_url)
+                        icon_512 = request.build_absolute_uri(sys_logo_url)
             except Exception:
                 pass
 
@@ -293,7 +284,7 @@ def manifest_view(request):
         "id": "/",
         "name": company_name,
         "short_name": company_name,
-        "description": f"Manage {company_name} smarter and faster.",
+        "description": f"Install {company_name} App .",
         "start_url": "/",
         "scope": "/",
         "display": "standalone",
@@ -317,29 +308,13 @@ def manifest_view(request):
                 "purpose": "any maskable"
             }
         ],
-        
-        # Using our dynamic variables here!
-        "screenshots": [
-            {
-                "src": screenshot_wide,
-                "sizes": "1280x720",
-                "type": "image/png",
-                "form_factor": "wide",
-                "label": f"{company_name} Dashboard view"
-            },
-            {
-                "src": screenshot_narrow,
-                "sizes": "720x1280",
-                "type": "image/png",
-                "form_factor": "narrow",
-                "label": f"{company_name} Mobile view"
-            }
-        ]
     }
 
     response = JsonResponse(manifest)
     response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     return response
+
+
 
 # ============================================
 # PWA: SERVICE WORKER 
