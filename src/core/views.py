@@ -190,15 +190,10 @@ def contact(request):
     return render(request, template_name) # <-- Updated this render call too
 
 
-# ============================================
-# PWA: MANIFEST
-# ============================================
 
 # ============================================
 # PWA: MANIFEST
 # ============================================
-
-from django.template.context_processors import request
 
 @no_session
 def manifest_view(request):
@@ -206,8 +201,12 @@ def manifest_view(request):
     from django.templatetags.static import static
     from django.http import JsonResponse
     from django.conf import settings
-    from django.template import RequestContext
     
+    try:
+        from apps.settings.models import SystemSetting
+    except ImportError:
+        SystemSetting = None
+
     company = None
     
     # 1. Check URL parameter first (useful for local testing)
@@ -231,27 +230,15 @@ def manifest_view(request):
             pass
 
     # ============================================
-    # GET THE EXACT SAME VARIABLES AS BASE.HTML
-    # ============================================
-    # This runs your context processors to get site_logo_url, system_name, etc.
-    context = RequestContext(request)
-    ctx_dict = context.flatten()
-    
-    site_logo_url = ctx_dict.get('site_logo_url')
-    system_name = ctx_dict.get('system_name', 'RONOSYSTEMS')
-
-    # ============================================
     # BUILD MANIFEST DATA
     # ============================================
-    company_name = system_name.upper() if system_name else "RONOSYSTEMS"
-    
-    # Default fallback icons (only used if no logo is found anywhere)
+    company_name = "RONOSYSTEMS"
     icon_192 = request.build_absolute_uri(static('images/icon-192.png'))
     icon_512 = request.build_absolute_uri(static('images/icon-512.png'))
     
     if company:
         # ---------------------------------------------------------
-        # COMPANY DOMAIN LOGIC (e.g., Fieldmax)
+        # COMPANY DOMAIN LOGIC
         # ---------------------------------------------------------
         if company.display_name:
             company_name = company.display_name.upper()
@@ -269,24 +256,32 @@ def manifest_view(request):
                 pass
     else:
         # ---------------------------------------------------------
-        # SYSTEM DOMAIN LOGIC (RonoSystems)
+        # SYSTEM DOMAIN LOGIC (DATABASE DRIVEN)
         # ---------------------------------------------------------
-        # Use the site_logo_url passed by the context processor
-        if site_logo_url:
+        sys_logo_url = None
+        
+        if SystemSetting:
             try:
-                if 'cloudinary' in site_logo_url:
-                    icon_192 = site_logo_url.replace('/upload/', '/upload/w_192,h_192,c_fill,f_png/')
-                    icon_512 = site_logo_url.replace('/upload/', '/upload/w_512,h_512,c_fill,f_png/')
-                else:
-                    # Ensure it's an absolute URL
-                    if site_logo_url.startswith('http'):
-                        icon_192 = site_logo_url
-                        icon_512 = site_logo_url
-                    else:
-                        icon_192 = request.build_absolute_uri(site_logo_url)
-                        icon_512 = request.build_absolute_uri(site_logo_url)
+                # Fetch the system name from the database
+                db_name = SystemSetting.get_setting('SITE_NAME')
+                if db_name:
+                    company_name = db_name.upper()
+                
+                # Fetch the FULL URL for the system logo from the database
+                # We use get_image_url() because it formats the Cloudinary public_id correctly
+                sys_logo_url = SystemSetting.get_image_url('SITE_LOGO')
             except Exception:
                 pass
+
+        # If the database had a logo, apply the Cloudinary transformations
+        if sys_logo_url:
+            if 'cloudinary' in sys_logo_url:
+                icon_192 = sys_logo_url.replace('/upload/', '/upload/w_192,h_192,c_fill,f_png/')
+                icon_512 = sys_logo_url.replace('/upload/', '/upload/w_512,h_512,c_fill,f_png/')
+            else:
+                # If it's a local media URL
+                icon_192 = sys_logo_url
+                icon_512 = sys_logo_url
 
     manifest = {
         "id": "/",
@@ -321,7 +316,6 @@ def manifest_view(request):
     response = JsonResponse(manifest)
     response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     return response
-
 
 # ============================================
 # PWA: SERVICE WORKER 
