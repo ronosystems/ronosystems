@@ -1364,8 +1364,17 @@ JAVASCRIPT - COMPLETE REWRITE WITH FIXES
             }
         }
         
+        // If everything passes, disable the button to prevent double submission
+        var submitBtn = document.getElementById('submitBtn');
+        if (submitBtn) {
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+            submitBtn.disabled = true;
+            submitBtn.classList.add('disabled');
+        }
+
         return true;
     }
+
 
     // ============================================
     // SINGLE DOMContentLoaded LISTENER
@@ -1416,11 +1425,36 @@ JAVASCRIPT - COMPLETE REWRITE WITH FIXES
             });
         }
         
-        // --- Setup Form Validation ---
+        // --- Setup Form Validation & Prevent Double Submission ---
         var form = safeGetElement('productForm');
         if (form) {
             form.addEventListener('submit', function(e) {
-                return validateForm(e);
+                // 1. Run validation first
+                var isValid = validateForm(e);
+                
+                // 2. If invalid, stop here (validation function already alerted the user)
+                if (!isValid) {
+                    return false;
+                }
+
+                // 3. If valid, disable the button and change text to prevent double clicks
+                var submitBtn = document.getElementById('submitBtn');
+                if (submitBtn) {
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+                    submitBtn.disabled = true;
+                    submitBtn.classList.add('disabled');
+                    
+                    // 4. Safety net: If the server hangs, re-enable the button after 10 seconds
+                    setTimeout(function() {
+                        if (submitBtn.disabled) {
+                            submitBtn.innerHTML = '<i class="fas fa-save"></i> {% if is_edit %}Update Product{% else %}Save Product{% endif %}';
+                            submitBtn.disabled = false;
+                            submitBtn.classList.remove('disabled');
+                        }
+                    }, 10000); 
+                }
+                
+                return true;
             });
         }
         
