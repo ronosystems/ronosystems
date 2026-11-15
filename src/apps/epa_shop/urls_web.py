@@ -16,6 +16,7 @@ urlpatterns = [
     # EPA SHOP FRONTEND (PUBLIC)
     # ============================================
     path('', storefront.epa_storefront, name='epa-storefront'),
+    path('shop/product/<str:product_code>/', storefront.public_product_detail, name='public-product-detail'),
     path('manage-home/', home_views.manage_homepage, name='manage-homepage'),
 
 

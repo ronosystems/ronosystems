@@ -4,8 +4,8 @@ from django.contrib.auth.decorators import login_required
 from .models import HomepageFeaturedProduct, Phone, Electronic, Accessory
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
-
 from .cloudinary_utils import _upload_product_image_to_cloudinary
+
 
 @login_required
 def manage_homepage(request):
@@ -47,7 +47,7 @@ def manage_homepage(request):
                         display_order=display_order,
                     )
                     
-                    # --- FIX: Upload image to Cloudinary ---
+                    # --- Upload image to Cloudinary ---
                     if image:
                         public_id = _upload_product_image_to_cloudinary(
                             image, 
@@ -69,7 +69,9 @@ def manage_homepage(request):
 
         return redirect('manage-homepage')
 
+    # ============================================
     # GET Request Logic
+    # ============================================
     phones = Phone.objects.filter(company=company, is_active=True)
     electronics = Electronic.objects.filter(company=company, is_active=True)
     accessories = Accessory.objects.filter(company=company, is_active=True)
@@ -82,10 +84,22 @@ def manage_homepage(request):
         'flash_sale': current_items.filter(section='flash_sale'),
     }
 
+    # ---------------------------------------------------------
+    # NEW: Build the banner slider list
+    # We only want to show items in the slider if they have an image.
+    # ---------------------------------------------------------
+    banner_items = []
+    for item in current_items:
+        # Check if the item has an uploaded image
+        if item.image:
+            banner_items.append(item)
+
     context = {
         'phones': phones,
         'electronics': electronics,
         'accessories': accessories,
         'sections': sections,
+        'banner_items': banner_items, # Pass to template
     }
+    
     return render(request, 'epa/home_set.html', context)

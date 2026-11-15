@@ -16,40 +16,108 @@
     <!-- HERO BANNER / FLASH SALES -->
     <div class="mb-4">
         <div class="row g-3">
-            <!-- Main Banner -->
+
+            <!-- Main Banner (Split Layout: Text Left, Slider Right) -->
             <div class="col-lg-8">
-                <div class="card border-0 shadow-sm text-white" style="background-color: var(--nav-bg-bottom); min-height: 200px;">
-                    <div class="card-body d-flex flex-column justify-content-center p-4">
-                        <h2 class="fw-bold mb-2">Latest Tech, Best Prices</h2>
-                        <p class="mb-3 text-light" style="font-size: 14px;">Discover the newest smartphones, laptops, and accessories at unbeatable prices.</p>
-                        <a href="{% url 'epa-storefront' %}" class="btn btn-sm btn-light fw-bold text-primary px-3 align-self-start">
-                            Shop Now <i class="fas fa-arrow-right ms-1"></i>
-                        </a>
+                <div class="card border-0 shadow-sm" style="border-radius: 6px; overflow: hidden; height: 300px;">
+                    <div class="row g-0 h-100">
+                        
+                        <!-- LEFT SIDE: Text / Branding -->
+                        <div class="col-md-5 d-flex flex-column justify-content-center p-4 h-100" style="background-color: var(--nav-bg-bottom); color: white; z-index: 2;">
+                            <h2 class="fw-bold mb-2">Latest Arrivals,<br>Best Prices</h2>
+                            <p class="mb-4 text-light" style="font-size: 14px;">Discover the newest smartphones, laptops, and accessories at unbeatable prices.</p>
+                            <a href="{% url 'epa-storefront' %}" class="btn btn-sm btn-light fw-bold text-primary px-4 py-2 align-self-start">
+                                Shop Now <i class="fas fa-arrow-right ms-1"></i>
+                            </a>
+                        </div>
+
+                        <!-- RIGHT SIDE: Dynamic Slider -->
+                        <div class="col-md-7 position-relative h-100" style="background-color: #f8f9fa;">
+                            {% if banner_items %}
+                            <div id="heroSlider" class="carousel slide h-100" data-bs-ride="carousel">
+                                
+                                <!-- Indicators -->
+                                <div class="carousel-indicators" style="z-index: 3;">
+                                    {% for item in banner_items %}
+                                    <button type="button" data-bs-target="#heroSlider" data-bs-slide-to="{{ forloop.counter0 }}" class="{% if forloop.first %}active{% endif %}" aria-current="true" aria-label="Slide {{ forloop.counter }}"></button>
+                                    {% endfor %}
+                                </div>
+
+                                <!-- Slides -->
+                                <div class="carousel-inner h-100">
+                                    {% for item in banner_items %}
+                                    <div class="carousel-item h-100 {% if forloop.first %}active{% endif %}" data-bs-interval="4000" data-section="{{ item.section }}">
+                                        
+                                        <!-- Center Image (Clickable Link) -->
+                                        <a href="{{ item.product_url }}" class="d-flex align-items-center justify-content-center w-100 h-100 p-2 text-decoration-none" style="padding-bottom: 55px !important;">
+                                            <img src="{{ item.image_url }}" 
+                                                 alt="{{ item.product_name }}" 
+                                                 style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;">
+                                        </a>
+
+                                        <!-- BOTTOM CAPTION BAR (Name & Price) -->
+                                        <div style="position: absolute; bottom: 0; left: 0; width: 100%; 
+                                                    background: rgba(0, 0, 0, 0.75); color: white; 
+                                                    padding: 8px 15px; display: flex; justify-content: space-between; align-items: center; z-index: 2;">
+                                            
+                                            <span class="fw-bold text-truncate" style="font-size: 14px; max-width: 60%;" title="{{ item.product_name }}">
+                                                {{ item.product_name }}
+                                            </span>
+                                            
+                                            <div class="text-end">
+                                                {% if item.original_price %}
+                                                    <span class="text-decoration-line-through text-muted me-2" style="font-size: 11px;">
+                                                        KSh {{ item.original_price }}
+                                                    </span>
+                                                {% endif %}
+                                                <span class="fw-bold text-warning" style="font-size: 15px;">
+                                                    KSh {{ item.display_price }}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                    {% endfor %}
+                                </div>
+
+                                <!-- Controls -->
+                                <button class="carousel-control-prev" type="button" data-bs-target="#heroSlider" data-bs-slide="prev" style="z-index: 4; width: 10%;">
+                                    <span class="carousel-control-prev-icon" aria-hidden="true" style="filter: invert(1);"></span>
+                                </button>
+                                <button class="carousel-control-next" type="button" data-bs-target="#heroSlider" data-bs-slide="next" style="z-index: 4; width: 10%;">
+                                    <span class="carousel-control-next-icon" aria-hidden="true" style="filter: invert(1);"></span>
+                                </button>
+                            </div>
+                            {% else %}
+                            <!-- Fallback image if no banner items -->
+                            <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-image fa-3x text-muted"></i>
+                            </div>
+                            {% endif %}
+                        </div>
+
                     </div>
                 </div>
             </div>
             
-            <!-- Flash Sales Box -->
+            <!-- Dynamic Right Side Card -->
             <div class="col-lg-4">
-                <div class="card border-0 shadow-sm h-100 bg-danger text-white">
-                    <div class="card-body d-flex flex-column justify-content-center text-center p-3">
-                        <i class="fas fa-bolt fa-2x mb-2 text-warning"></i>
-                        <h4 class="fw-bold mb-1">Flash Sales</h4>
-                        <p class="small mb-3">Up to 40% off selected items. Today only!</p>
-                        {% if flash_sales %}
-                            <a href="#flash-sales-section" class="btn btn-sm btn-outline-light fw-bold">View Deals</a>
-                        {% else %}
-                            <span class="badge bg-light text-danger">Coming Soon</span>
-                        {% endif %}
+                <div id="dynamicSideCard" class="card border-0 shadow-sm text-white h-100" style="height: 300px; transition: background-color 0.4s ease;">
+                    <div class="card-body d-flex flex-column justify-content-center text-center p-3 h-100">
+                        <i id="sideCardIcon" class="fas fa-bolt fa-2x mb-2 text-warning"></i>
+                        <h4 id="sideCardTitle" class="fw-bold mb-1">Flash Sales</h4>
+                        <p id="sideCardDesc" class="small mb-3">Up to 40% off selected items. Today only!</p>
+                        <a id="sideCardBtn" href="#flash-sales-section" class="btn btn-sm btn-outline-light fw-bold">View Deals</a>
                     </div>
                 </div>
             </div>
+            
         </div>
     </div>
 
     <!-- NEW ARRIVALS -->
     {% if new_arrivals %}
-    <div class="mb-4">
+    <div class="mb-4" id="new-arrivals-section">
         <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
             <h5 class="fw-bold mb-0 text-dark"><i class="fas fa-star text-warning me-2"></i> New Arrivals</h5>
             <a href="{% url 'epa-storefront' %}" class="text-decoration-none small fw-bold">View All</a>
@@ -58,23 +126,30 @@
         <div class="row row-cols-2 row-cols-md-3 row-cols-lg-6 g-3">
             {% for product in new_arrivals %}
             <div class="col">
-                <div class="card shadow-sm border-0 h-100" style="max-width: 100%;">
+                <div class="card shadow-sm border-0 h-100 position-relative" style="max-width: 100%;">
                     
-                    <div style="height: 120px; background-color: #f8f9fa; border-radius: 6px 6px 0 0; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
-                        {% if product.override_image_url and product.override_image_url != 'None' %}
-                            <img src="{{ product.override_image_url }}" alt="{{ product.name }}" style="max-height: 100%; max-width: 100%; object-fit: contain; padding: 8px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                        {% elif product.image_url and product.image_url != 'None' %}
-                            <img src="{{ product.image_url }}" alt="{{ product.name }}" style="max-height: 100%; max-width: 100%; object-fit: contain; padding: 8px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                        {% endif %}
-                        <i class="fas fa-image fa-2x text-muted" style="display: {% if product.override_image_url or product.image_url %}none{% else %}block{% endif %}; position: absolute;"></i>
-                    </div>
-                    
-                    <div class="card-body p-2 d-flex flex-column">
-                        <small class="text-muted text-uppercase" style="font-size: 10px;">{{ product.brand|default:"BRAND" }}</small>
-                        <h6 class="card-title text-truncate mt-1 mb-2" style="font-size: 12px;" title="{{ product.name }}">{{ product.name }}</h6>
-                        <p class="card-text fw-bold text-dark mt-auto mb-2" style="font-size: 13px;">KSh {{ product.display_price }}</p>
+                    <!-- Clickable Link for Image and Details -->
+                    <a href="{% url 'public-product-detail' product.product_code %}" class="text-decoration-none text-dark d-flex flex-column h-100">
+                        <div style="height: 120px; background-color: #f8f9fa; border-radius: 6px 6px 0 0; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
+                            {% if product.override_image_url and product.override_image_url != 'None' %}
+                                <img src="{{ product.override_image_url }}" alt="{{ product.name }}" style="max-height: 100%; max-width: 100%; object-fit: contain; padding: 8px;">
+                            {% elif product.image_url and product.image_url != 'None' %}
+                                <img src="{{ product.image_url }}" alt="{{ product.name }}" style="max-height: 100%; max-width: 100%; object-fit: contain; padding: 8px;">
+                            {% else %}
+                                <i class="fas fa-image fa-2x text-muted" style="position: absolute;"></i>
+                            {% endif %}
+                        </div>
                         
-                        <button onclick="addToCart(this, '{{ product.content_type.model }}', {{ product.id }}, '{{ product.name|escapejs }}', '{{ product.display_price }}', '{{ product.override_image_url|default:product.image_url|default:'' }}')" class="btn btn-sm btn-outline-primary w-100 mt-auto">
+                        <div class="card-body p-2 d-flex flex-column">
+                            <small class="text-muted text-uppercase" style="font-size: 10px;">{{ product.brand|default:"BRAND" }}</small>
+                            <h6 class="card-title text-truncate mt-1 mb-2" style="font-size: 12px;" title="{{ product.name }}">{{ product.name }}</h6>
+                            <p class="card-text fw-bold text-dark mt-auto mb-2" style="font-size: 13px;">KSh {{ product.display_price }}</p>
+                        </div>
+                    </a>
+
+                    <!-- Add to Cart Button (Separate from link) -->
+                    <div class="px-2 pb-2 mt-auto">
+                        <button onclick="addToCart(this, '{{ product.content_type.model }}', {{ product.id }}, '{{ product.name|escapejs }}', '{{ product.display_price }}', '{{ product.override_image_url|default:product.image_url|default:'' }}')" class="btn btn-sm btn-outline-primary w-100">
                             <i class="fas fa-cart-plus"></i> Add
                         </button>
                     </div>
@@ -85,7 +160,7 @@
     </div>
     {% endif %}
 
-    <!-- FLASH SALES SECTION (Loop Added!) -->
+    <!-- FLASH SALES SECTION -->
     {% if flash_sales %}
     <div class="mb-4" id="flash-sales-section">
         <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
@@ -96,27 +171,34 @@
         <div class="row row-cols-2 row-cols-md-3 row-cols-lg-6 g-3">
             {% for product in flash_sales %}
             <div class="col">
-                <div class="card shadow-sm border-0 h-100" style="max-width: 100%; border: 2px solid #dc3545 !important;">
+                <div class="card shadow-sm border-0 h-100 position-relative" style="max-width: 100%; border: 2px solid #dc3545 !important;">
                     
-                    <div style="height: 120px; background-color: #f8f9fa; border-radius: 6px 6px 0 0; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
-                        {% if product.override_image_url and product.override_image_url != 'None' %}
-                            <img src="{{ product.override_image_url }}" alt="{{ product.name }}" style="max-height: 100%; max-width: 100%; object-fit: contain; padding: 8px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                        {% elif product.image_url and product.image_url != 'None' %}
-                            <img src="{{ product.image_url }}" alt="{{ product.name }}" style="max-height: 100%; max-width: 100%; object-fit: contain; padding: 8px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                        {% endif %}
-                        <i class="fas fa-image fa-2x text-muted" style="display: {% if product.override_image_url or product.image_url %}none{% else %}block{% endif %}; position: absolute;"></i>
-                    </div>
-                    
-                    <div class="card-body p-2 d-flex flex-column">
-                        <small class="text-muted text-uppercase" style="font-size: 10px;">{{ product.brand|default:"BRAND" }}</small>
-                        <h6 class="card-title text-truncate mt-1 mb-2" style="font-size: 12px;" title="{{ product.name }}">{{ product.name }}</h6>
-                        
-                        <div class="mt-auto mb-2">
-                            <span class="text-muted text-decoration-line-through d-block" style="font-size: 10px;">KSh {{ product.original_price }}</span>
-                            <span class="fw-bold text-danger" style="font-size: 13px;">KSh {{ product.display_price }}</span>
+                    <!-- Clickable Link for Image and Details -->
+                    <a href="{% url 'public-product-detail' product.product_code %}" class="text-decoration-none text-dark d-flex flex-column h-100">
+                        <div style="height: 120px; background-color: #f8f9fa; border-radius: 6px 6px 0 0; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
+                            {% if product.override_image_url and product.override_image_url != 'None' %}
+                                <img src="{{ product.override_image_url }}" alt="{{ product.name }}" style="max-height: 100%; max-width: 100%; object-fit: contain; padding: 8px;">
+                            {% elif product.image_url and product.image_url != 'None' %}
+                                <img src="{{ product.image_url }}" alt="{{ product.name }}" style="max-height: 100%; max-width: 100%; object-fit: contain; padding: 8px;">
+                            {% else %}
+                                <i class="fas fa-image fa-2x text-muted" style="position: absolute;"></i>
+                            {% endif %}
                         </div>
+                        
+                        <div class="card-body p-2 d-flex flex-column">
+                            <small class="text-muted text-uppercase" style="font-size: 10px;">{{ product.brand|default:"BRAND" }}</small>
+                            <h6 class="card-title text-truncate mt-1 mb-2" style="font-size: 12px;" title="{{ product.name }}">{{ product.name }}</h6>
+                            
+                            <div class="mt-auto mb-2">
+                                <span class="text-muted text-decoration-line-through d-block" style="font-size: 10px;">KSh {{ product.original_price }}</span>
+                                <span class="fw-bold text-danger" style="font-size: 13px;">KSh {{ product.display_price }}</span>
+                            </div>
+                        </div>
+                    </a>
 
-                        <button onclick="addToCart(this, '{{ product.content_type.model }}', {{ product.id }}, '{{ product.name|escapejs }}', '{{ product.display_price }}', '{{ product.override_image_url|default:product.image_url|default:'' }}')" class="btn btn-sm btn-outline-danger w-100 mt-auto">
+                    <!-- Add to Cart Button (Separate from link) -->
+                    <div class="px-2 pb-2 mt-auto">
+                        <button onclick="addToCart(this, '{{ product.content_type.model }}', {{ product.id }}, '{{ product.name|escapejs }}', '{{ product.display_price }}', '{{ product.override_image_url|default:product.image_url|default:'' }}')" class="btn btn-sm btn-outline-danger w-100">
                             <i class="fas fa-cart-plus"></i> Add
                         </button>
                     </div>
@@ -127,9 +209,9 @@
     </div>
     {% endif %}
 
-    <!-- DISCOUNTED PRODUCTS SECTION (Loop Added!) -->
+    <!-- DISCOUNTED PRODUCTS SECTION -->
     {% if discounted_products %}
-    <div class="mb-4">
+    <div class="mb-4" id="discounted-section">
         <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
             <h5 class="fw-bold mb-0 text-success"><i class="fas fa-tags me-2"></i> Exclusive Discounts</h5>
             <a href="{% url 'epa-storefront' %}" class="text-decoration-none small fw-bold">View All</a>
@@ -138,27 +220,34 @@
         <div class="row row-cols-2 row-cols-md-3 row-cols-lg-6 g-3">
             {% for product in discounted_products %}
             <div class="col">
-                <div class="card shadow-sm border-0 h-100" style="max-width: 100%;">
+                <div class="card shadow-sm border-0 h-100 position-relative" style="max-width: 100%;">
                     
-                    <div style="height: 120px; background-color: #f8f9fa; border-radius: 6px 6px 0 0; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
-                        {% if product.override_image_url and product.override_image_url != 'None' %}
-                            <img src="{{ product.override_image_url }}" alt="{{ product.name }}" style="max-height: 100%; max-width: 100%; object-fit: contain; padding: 8px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                        {% elif product.image_url and product.image_url != 'None' %}
-                            <img src="{{ product.image_url }}" alt="{{ product.name }}" style="max-height: 100%; max-width: 100%; object-fit: contain; padding: 8px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                        {% endif %}
-                        <i class="fas fa-image fa-2x text-muted" style="display: {% if product.override_image_url or product.image_url %}none{% else %}block{% endif %}; position: absolute;"></i>
-                    </div>
-                    
-                    <div class="card-body p-2 d-flex flex-column">
-                        <small class="text-muted text-uppercase" style="font-size: 10px;">{{ product.brand|default:"BRAND" }}</small>
-                        <h6 class="card-title text-truncate mt-1 mb-2" style="font-size: 12px;" title="{{ product.name }}">{{ product.name }}</h6>
-                        
-                        <div class="mt-auto mb-2">
-                            <span class="text-muted text-decoration-line-through d-block" style="font-size: 10px;">KSh {{ product.original_price }}</span>
-                            <span class="fw-bold text-success" style="font-size: 13px;">KSh {{ product.display_price }}</span>
+                    <!-- Clickable Link for Image and Details -->
+                    <a href="{% url 'public-product-detail' product.product_code %}" class="text-decoration-none text-dark d-flex flex-column h-100">
+                        <div style="height: 120px; background-color: #f8f9fa; border-radius: 6px 6px 0 0; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
+                            {% if product.override_image_url and product.override_image_url != 'None' %}
+                                <img src="{{ product.override_image_url }}" alt="{{ product.name }}" style="max-height: 100%; max-width: 100%; object-fit: contain; padding: 8px;">
+                            {% elif product.image_url and product.image_url != 'None' %}
+                                <img src="{{ product.image_url }}" alt="{{ product.name }}" style="max-height: 100%; max-width: 100%; object-fit: contain; padding: 8px;">
+                            {% else %}
+                                <i class="fas fa-image fa-2x text-muted" style="position: absolute;"></i>
+                            {% endif %}
                         </div>
+                        
+                        <div class="card-body p-2 d-flex flex-column">
+                            <small class="text-muted text-uppercase" style="font-size: 10px;">{{ product.brand|default:"BRAND" }}</small>
+                            <h6 class="card-title text-truncate mt-1 mb-2" style="font-size: 12px;" title="{{ product.name }}">{{ product.name }}</h6>
+                            
+                            <div class="mt-auto mb-2">
+                                <span class="text-muted text-decoration-line-through d-block" style="font-size: 10px;">KSh {{ product.original_price }}</span>
+                                <span class="fw-bold text-success" style="font-size: 13px;">KSh {{ product.display_price }}</span>
+                            </div>
+                        </div>
+                    </a>
 
-                        <button onclick="addToCart(this, '{{ product.content_type.model }}', {{ product.id }}, '{{ product.name|escapejs }}', '{{ product.display_price }}', '{{ product.override_image_url|default:product.image_url|default:'' }}')" class="btn btn-sm btn-outline-success w-100 mt-auto">
+                    <!-- Add to Cart Button (Separate from link) -->
+                    <div class="px-2 pb-2 mt-auto">
+                        <button onclick="addToCart(this, '{{ product.content_type.model }}', {{ product.id }}, '{{ product.name|escapejs }}', '{{ product.display_price }}', '{{ product.override_image_url|default:product.image_url|default:'' }}')" class="btn btn-sm btn-outline-success w-100">
                             <i class="fas fa-cart-plus"></i> Add
                         </button>
                     </div>
@@ -171,8 +260,9 @@
 
 </div>
 
-<!-- JAVASCRIPT TO HANDLE CART -->
+<!-- JAVASCRIPT TO HANDLE CART & DYNAMIC SIDE CARD -->
 <script>
+// --- CART LOGIC ---
 function addToCart(btnElement, modelType, productId, productName, price, imageUrl) {
     var originalText = btnElement.innerHTML;
     btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
@@ -198,7 +288,6 @@ function addToCart(btnElement, modelType, productId, productName, price, imageUr
             btnElement.innerHTML = '<i class="fas fa-check"></i> Added';
             btnElement.classList.replace('btn-outline-primary', 'btn-success');
             
-            // Update the Floating Cart Counter
             var counter = document.getElementById('cart-counter');
             if (counter) {
                 counter.textContent = data.cart_count;
@@ -238,4 +327,61 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+
+// --- DYNAMIC SIDE CARD LOGIC ---
+document.addEventListener('DOMContentLoaded', function() {
+    const heroSlider = document.getElementById('heroSlider');
+    const sideCard = document.getElementById('dynamicSideCard');
+    
+    if (!heroSlider || !sideCard) return;
+
+    function updateSideCard(section) {
+        const icon = document.getElementById('sideCardIcon');
+        const title = document.getElementById('sideCardTitle');
+        const desc = document.getElementById('sideCardDesc');
+        const btn = document.getElementById('sideCardBtn');
+
+        if (section === 'flash_sale') {
+            sideCard.className = 'card border-0 shadow-sm text-white h-100 bg-danger';
+            sideCard.style.height = '300px';
+            icon.className = 'fas fa-bolt fa-2x mb-2 text-warning';
+            title.textContent = 'Flash Sales';
+            desc.textContent = 'Up to 40% off selected items. Today only!';
+            btn.textContent = 'View Deals';
+            btn.href = '#flash-sales-section';
+        } 
+        else if (section === 'new_arrival') {
+            sideCard.className = 'card border-0 shadow-sm text-white h-100'; 
+            sideCard.style.backgroundColor = 'var(--nav-bg-top)'; 
+            sideCard.style.height = '300px';
+            icon.className = 'fas fa-star fa-2x mb-2 text-warning';
+            title.textContent = 'New Arrivals';
+            desc.textContent = 'Check out the latest products just added to our store.';
+            btn.textContent = 'View New Arrivals';
+            btn.href = '#new-arrivals-section';
+        } 
+        else if (section === 'discounted') {
+            sideCard.className = 'card border-0 shadow-sm text-white h-100 bg-success';
+            sideCard.style.height = '300px';
+            icon.className = 'fas fa-tags fa-2x mb-2 text-warning';
+            title.textContent = 'Exclusive Discounts';
+            desc.textContent = 'Grab these items at special discounted prices.';
+            btn.textContent = 'View Discounts';
+            btn.href = '#discounted-section';
+        }
+    }
+
+    // Listen for slide change
+    heroSlider.addEventListener('slid.bs.carousel', function (event) {
+        const activeItem = event.relatedTarget;
+        const section = activeItem.getAttribute('data-section');
+        updateSideCard(section);
+    });
+
+    // Initialize on page load
+    const firstSlide = heroSlider.querySelector('.carousel-item.active');
+    if (firstSlide) {
+        updateSideCard(firstSlide.getAttribute('data-section'));
+    }
+});
 </script>

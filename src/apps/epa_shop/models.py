@@ -86,6 +86,13 @@ class HomepageFeaturedProduct(models.Model):
     @property
     def image_url(self):
         return _build_cloudinary_url(self.image, resource_type='image')
+        
+    @property
+    def product_name(self):
+        try:
+            return self.content_object.name
+        except Exception:
+            return "Featured Product"
 
 
 # ============================================
