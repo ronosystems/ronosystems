@@ -19,3 +19,23 @@ def user_context(request):
         'user_branch': None,
         'user_role': None,
     }
+
+# apps/epa_shop/context_processors.py
+from .models import Sale
+
+def pending_orders_count(request):
+    """
+    Returns the count of unassigned pending orders for the current company.
+    Only runs for authenticated users on a company domain.
+    """
+    current_company = getattr(request, 'current_company', None)
+    if not current_company or not request.user.is_authenticated:
+        return {'pending_orders_count': 0}
+
+    count = Sale.objects.filter(
+        company=current_company,
+        payment_status='pending',
+        assigned_to__isnull=True
+    ).count()
+
+    return {'pending_orders_count': count}

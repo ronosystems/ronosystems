@@ -1,19 +1,43 @@
 {% extends "web_base.html" %}
 
-{% block title %}Home — {{ current_company.display_name|default:"Company" }}{% endblock %}
-{% block marquee_text %}Welcome to {{ current_company.display_name|default:"Company" }}{% endblock %}
+{% block title %}Home — {{ current_company.name|default:"Company" }}{% endblock %}
+{% block marquee_text %}Welcome to {{ current_company.name|default:"Company" }}{% endblock %}
 {% block breadcrumb %}Home{% endblock %}
 
 {% block content %}
-<div class="dashboard-panel">
-    <div class="panel-header">
-        <i class="fas fa-home me-1"></i> {{ current_company.display_name|default:"Company" }} Home
-    </div>
-    <div class="panel-body">
-        <h1 class="hero-title">Welcome to <span class="highlight">{{ current_company.display_name|default:"Company" }}</span></h1>
-        <p class="hero-subtitle">{{ current_company.tagline|default:"This is the company home page." }}</p>
+
+<!-- DYNAMIC BUSINESS TYPE CONTENT -->
+<div class="dynamic-content-wrapper">
+    {% if business_type_slug == 'epa-shop' %}
+        {% include 'website/company_types/electronics.html' %}
         
-        <p>Customize this file at <code>templates/website/company_home.html</code> with your company's landing content.</p>
-    </div>
+    {% elif business_type_slug == 'kuku-biz' %}
+        {% include 'website/company_types/poultry.html' %}
+        
+    {% elif business_type_slug == 'chama' %}
+        {% include 'website/company_types/chama.html' %}
+        
+    {% else %}
+        <!-- Fallback for new business types (This is where the Welcome banner should live) -->
+        <div class="p-4 mb-4 rounded-3" style="background: linear-gradient(135deg, var(--nav-bg-top) 0%, var(--nav-bg-bottom) 100%); color: white;">
+            <div class="container-fluid py-3">
+                <h1 class="display-6 fw-bold mb-2">Welcome to {{ current_company.name|default:"Our Company" }}</h1>
+                <p class="fs-5 mb-4" style="opacity: 0.9;">
+                    {{ current_company.tagline|default:"We provide top-quality products and services tailored for you." }}
+                </p>
+                <a href="/contact/" class="btn btn-light btn-lg fw-bold px-4">Contact Us</a>
+            </div>
+        </div>
+        <div class="dashboard-panel mt-4">
+            <div class="panel-header">
+                <i class="fas fa-info-circle me-1"></i> Welcome
+            </div>
+            <div class="panel-body text-center py-5">
+                <h3 class="mb-3">We're glad you're here!</h3>
+                <p class="text-muted">A custom homepage layout for your specific business type ({{ business_type_slug|default:"General" }}) is currently being built.</p>
+            </div>
+        </div>
+    {% endif %}
 </div>
+
 {% endblock %}

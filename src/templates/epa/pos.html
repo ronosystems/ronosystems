@@ -2094,9 +2094,14 @@ function hideBarcodeResults() {
 
 searchInput.addEventListener('input', function () {
     const q = this.value.trim();
-    if (q.length === 0) { hideBarcodeResults(); return; }
-    const matches = allProducts.filter(p => 
-        p.name.toLowerCase().includes(q.toLowerCase()) || 
+    if (q.length === 0) {
+        hideBarcodeResults();
+        return;
+    }
+
+    // 1. First, search local products instantly (for speed)
+    const matches = allProducts.filter(p =>
+        p.name.toLowerCase().includes(q.toLowerCase()) ||
         p.product_code.toLowerCase().includes(q.toLowerCase()) ||
         p.brand.toLowerCase().includes(q.toLowerCase()) ||
         p.model.toLowerCase().includes(q.toLowerCase())
@@ -2104,18 +2109,58 @@ searchInput.addEventListener('input', function () {
 
     if (matches.length > 0) {
         renderBarcodeResults(matches.map(m => ({
-            product_code: m.product_code, name: m.name, brand: m.brand, model: m.model, price: m.price, stock: m.stock, category: m.category, unit_type: 'SKU', identifier: m.product_code
+            product_code: m.product_code,
+            name: m.name,
+            brand: m.brand,
+            model: m.model,
+            price: m.price,
+            stock: m.stock,
+            category: m.category,
+            unit_type: 'SKU',
+            identifier: m.product_code
         })));
+        return;
+    }
+
+    // 2. If no local matches and the query looks like a barcode/IMEI, search the DB
+    if (q.length >= BARCODE_MIN_LEN) {
+        // Show a loading state
+        barcodeResults.innerHTML = '<div class="barcode-no-match" style="color:#555;">Searching database...</div>';
+        barcodeResults.classList.add('active');
+
+        clearTimeout(barcodeDebounce);
+        barcodeDebounce = setTimeout(async () => {
+            try {
+                const res = await fetch(`/epa_shop/pos/search/barcode/?q=${encodeURIComponent(q)}`);
+                
+                // Catch backend errors before trying to parse JSON
+                if (!res.ok) {
+                    throw new Error(`Server responded with status ${res.status}`);
+                }
+                
+                const data = await res.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                if (!data.units || data.units.length === 0) {
+                    barcodeResults.innerHTML = `<div class="barcode-no-match">No match for "${q}"</div>`;
+                } else {
+                    renderBarcodeResults(data.units);
+                }
+            } catch (err) {
+                console.error("Barcode Search Error:", err);
+                barcodeResults.innerHTML = `<div class="barcode-no-match" style="color:#cc0000;">Error: ${err.message}. Check console.</div>`;
+                barcodeResults.classList.add('active');
+            }
+        }, 300); // 300ms delay for typing
     } else {
-        if (q.length >= BARCODE_MIN_LEN && /\d/.test(q)) {
-            clearTimeout(barcodeDebounce);
-            barcodeDebounce = setTimeout(() => runBarcodeSearch(q), 180);
-        } else {
-            barcodeResults.innerHTML = `<div class="barcode-no-match">No product found for "${q}"</div>`;
-            barcodeResults.classList.add('active');
-        }
+        barcodeResults.innerHTML = `<div class="barcode-no-match">No product found for "${q}"</div>`;
+        barcodeResults.classList.add('active');
     }
 });
+
 
 searchInput.addEventListener('keydown', async function (e) {
     if (e.key !== 'Enter') return;

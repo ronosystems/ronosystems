@@ -1,0 +1,196 @@
+{% extends "web_base.html" %}
+{% load static %}
+
+{% block title %}Shop — {{ current_company.name }}{% endblock %}
+{% block breadcrumb %}Shop{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    
+    <!-- Header -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+        <div>
+            <h2 class="mb-1"><i class="fas fa-shopping-bag text-primary"></i> Our Products</h2>
+            <p class="text-muted mb-0">
+                {% if search_query %}
+                    {{ total_products }} result(s) for "{{ search_query }}"
+                {% else %}
+                    {{ total_products }} products available in {{ current_company.name }}
+                {% endif %}
+            </p>
+        </div>
+        <a href="{% url 'cart-view' %}" class="btn btn-primary position-relative">
+            <i class="fas fa-shopping-cart"></i> View Cart
+            {% if cart_count > 0 %}
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" 
+                    style="font-size: 11px;">
+                    {{ cart_count }}
+                </span>
+            {% endif %}
+        </a>
+    </div>
+
+    <!-- SEARCH BAR -->
+    <div class="mb-4">
+        <form method="get" action="{% url 'epa-storefront' %}" class="d-flex gap-2">
+            <div class="input-group" style="max-width: 600px;">
+                <span class="input-group-text bg-white border-end-0">
+                    <i class="fas fa-search text-muted"></i>
+                </span>
+                <input type="text" 
+                       name="q" 
+                       class="form-control border-start-0" 
+                       placeholder="Search for phones, laptops, accessories..." 
+                       value="{{ search_query }}"
+                       autocomplete="off">
+                {% if search_query %}
+                    <a href="{% url 'epa-storefront' %}" class="btn btn-outline-secondary" title="Clear search">
+                        <i class="fas fa-times"></i>
+                    </a>
+                {% endif %}
+                <button type="submit" class="btn btn-primary px-4">
+                    <i class="fas fa-search"></i> Search
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Products Grid -->
+    {% if products %}
+    <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 row-cols-xl-6 g-3">
+        {% for product in products %}
+        <div class="col">
+            <div class="card shadow-sm border-0 h-100 product-card">
+                
+                <div style="height: 160px; background-color: #f8f9fa; border-radius: 8px 8px 0 0; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
+                    {% if product.image_url and product.image_url != 'None' %}
+                        <img src="{{ product.image_url }}" alt="{{ product.name }}" 
+                             style="max-height: 100%; max-width: 100%; object-fit: contain; padding: 10px;"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    {% endif %}
+                    <i class="fas fa-image fa-2x text-muted" style="display: {% if product.image_url and product.image_url != 'None' %}none{% else %}block{% endif %}; position: absolute;"></i>
+                </div>
+                
+                <div class="card-body p-2 d-flex flex-column">
+                    <small class="text-muted text-uppercase" style="font-size: 10px;">
+                        {{ product.brand|default:"Brand" }}
+                    </small>
+                    <h6 class="card-title text-truncate mt-1 mb-2" style="font-size: 13px;" title="{{ product.name }}">
+                        {{ product.name }}
+                    </h6>
+                    
+                    <p class="fw-bold text-primary mt-auto mb-2" style="font-size: 15px;">
+                        KSh {{ product.selling_price|floatformat:2 }}
+                    </p>
+                    
+                    <button onclick="addToCart(this, '{% if product.accessory_type %}accessory{% elif product.model_number %}electronic{% else %}phone{% endif %}', {{ product.id }}, '{{ product.name|escapejs }}', '{{ product.selling_price }}', '{{ product.image_url|default:'' }}')" 
+                            class="btn btn-sm btn-outline-primary w-100 mt-auto">
+                        <i class="fas fa-cart-plus"></i> Add to Cart
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <!-- Empty State -->
+    <div class="text-center py-5">
+        <i class="fas fa-search fa-4x text-muted mb-3"></i>
+        <h3>
+            {% if search_query %}
+                No results for "{{ search_query }}"
+            {% else %}
+                No products available
+            {% endif %}
+        </h3>
+        <p class="text-muted">
+            {% if search_query %}
+                Try searching with different keywords.
+            {% else %}
+                Come back later, we're adding new products soon.
+            {% endif %}
+        </p>
+        {% if search_query %}
+            <a href="{% url 'epa-storefront' %}" class="btn btn-primary mt-3">
+                <i class="fas fa-list"></i> View All Products
+            </a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- JavaScript for Cart -->
+<script>
+function addToCart(btnElement, modelType, productId, productName, price, imageUrl) {
+    var originalText = btnElement.innerHTML;
+    btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+    btnElement.disabled = true;
+
+    fetch('/epa_shop/cart/add/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            'model_type': modelType,
+            'product_id': productId,
+            'name': productName,
+            'price': price,
+            'image': imageUrl
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            btnElement.innerHTML = '<i class="fas fa-check"></i> Added';
+            btnElement.classList.replace('btn-outline-primary', 'btn-success');
+            setTimeout(function() {
+                btnElement.innerHTML = originalText;
+                btnElement.classList.replace('btn-success', 'btn-outline-primary');
+                btnElement.disabled = false;
+            }, 2000);
+        } else {
+            alert(data.message || "Failed to add to cart.");
+            btnElement.innerHTML = originalText;
+            btnElement.disabled = false;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert("Network error. Please try again.");
+        btnElement.innerHTML = originalText;
+        btnElement.disabled = false;
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+
+<style>
+    .product-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-radius: 8px;
+    }
+    .product-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.1) !important;
+    }
+    .input-group-text {
+        background-color: #fff;
+    }
+</style>
+{% endblock %}

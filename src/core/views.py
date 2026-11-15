@@ -9,6 +9,10 @@ from django.templatetags.static import static
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from django.views.decorators.cache import never_cache
+from apps.epa_shop.storefront import get_epa_products
+from apps.business_types.business_type_registry import BusinessTypeEnum
+
+
 
 # Add this helper
 def no_session(view_func):
@@ -57,15 +61,36 @@ def qz_sign(request):
 # PUBLIC PAGES
 # ============================================
 
+
 def home(request):
     """Homepage for RonoSystems (or company subdomain)"""
-    # Check if we are on a company domain
-    if getattr(request, 'current_company', None):
-        template_name = 'website/company_home.html'
-    else:
-        template_name = 'website/home.html'
+    company = getattr(request, 'current_company', None)
+    
+    if company:
+        bt_slug = ""
+        if company.business_type:
+            from apps.business_types.business_type_registry import BusinessTypeEnum
+            bt_enum = BusinessTypeEnum.get_by_name(company.business_type.name)
+            if bt_enum:
+                bt_slug = bt_enum.value['slug']
+
+        # 1. Calculate Cart Count
+        cart = request.session.get('epa_cart', {})
+        cart_count = sum(item['quantity'] for item in cart.values())
+
+        context = {
+            'company': company,
+            'business_type_slug': bt_slug,
+            'cart_count': cart_count, # Pass this to the template
+        }
+
+        if bt_slug == 'epa-shop':
+            from apps.epa_shop.storefront import get_epa_products
+            context.update(get_epa_products(company))
+                
+        return render(request, 'website/company_home.html', context)
         
-    return render(request, template_name)
+    return render(request, 'website/home.html')
 
 
 def api_root(request):

@@ -2,6 +2,8 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 from django.conf import settings
 from django.conf import settings as django_settings
@@ -33,6 +35,57 @@ def _build_cloudinary_url(field_value, resource_type='image'):
     if not media_url.endswith('/'):
         media_url += '/'
     return f"{media_url}{key}"
+
+
+
+# ============================================
+# HOME PAGE FEATURED PRODUCT
+# ============================================
+
+class HomepageFeaturedProduct(models.Model):
+    SECTION_CHOICES = (
+        ('new_arrival', 'New Arrival'),
+        ('discounted', 'Discounted Product'),
+        ('flash_sale', 'Flash Sale'),
+    )
+    
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='homepage_featured_products')
+    section = models.CharField(max_length=20, choices=SECTION_CHOICES)
+    
+    # Link to ANY product model (Phone, Electronic, Accessory)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    product = GenericForeignKey('content_type', 'object_id')
+    
+    # Custom Pricing for this section
+    custom_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Override the selling price for this section. Leave blank to use the product's default selling price."
+    )
+    image = models.ImageField(
+        upload_to='homepage/%Y/%m/', 
+        blank=True, null=True, 
+        help_text="Upload a specific image for the homepage. If empty, the product's default image will be used."
+    )
+    
+    # Display Control
+    is_active = models.BooleanField(default=True)
+    display_order = models.PositiveIntegerField(default=0, help_text="Order to show on the homepage")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'companies_homepage_featured_products'
+        ordering = ['section', 'display_order', '-created_at']
+        # Prevent adding the same product to the same section twice
+        unique_together = ['company', 'section', 'content_type', 'object_id']
+
+    def __str__(self):
+        return f"[{self.get_section_display()}] {self.product.name} - {self.company.name}"
+
+    @property
+    def image_url(self):
+        return _build_cloudinary_url(self.image, resource_type='image')
 
 
 # ============================================
@@ -230,9 +283,6 @@ class BranchStock(models.Model):
 # STOCK TRANSFER (Fully fixed for SQLite)
 # ============================================
 
-# ============================================
-# STOCK TRANSFER (Fully fixed for SQLite)
-# ============================================
 
 class StockTransfer(models.Model):
     STATUS_CHOICES = (
@@ -586,6 +636,17 @@ class Sale(models.Model):
     net_amount = models.DecimalField(max_digits=10, decimal_places=2)
     cogs_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
 
+    # NEW: Order assignment tracking
+    assigned_to = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='assigned_orders',
+        help_text="Staff member who picked this order for follow-up"
+    )
+    assigned_at = models.DateTimeField(null=True, blank=True)
+
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS, default='pending')
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD)
     sold_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='epa_sales_created')
@@ -856,6 +917,8 @@ class Customer(models.Model):
     branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='customers', null=True, blank=True)
     name = models.CharField(max_length=200)
     phone = models.CharField(max_length=20, db_index=True)
+    alternative_phone = models.CharField(max_length=20, blank=True)
+    city = models.CharField(max_length=100, blank=True)
     email = models.EmailField(blank=True)
     address = models.TextField(blank=True)
     id_number = models.CharField(max_length=50, blank=True, db_index=True)

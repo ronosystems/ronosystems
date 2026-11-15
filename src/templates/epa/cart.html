@@ -1,0 +1,146 @@
+{% extends "web_base.html" %}
+{% load static %}
+
+{% block title %}Your Cart — {{ current_company.name }}{% endblock %}
+{% block breadcrumb %}Cart{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4"><i class="fas fa-shopping-cart text-primary"></i> Your Shopping Cart</h2>
+
+    {% if cart %}
+    <div class="row">
+        <!-- LEFT: Cart Items -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Product</th>
+                                <th>Price</th>
+                                <th>Qty</th>
+                                <th>Total</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for key, item in cart.items %}
+                            <tr id="cart-row-{{ forloop.counter }}">
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {% if item.image %}
+                                            <img src="{{ item.image }}" alt="{{ item.name }}" style="width: 50px; height: 50px; object-fit: contain; margin-right: 15px;" class="rounded border">
+                                        {% else %}
+                                            <div class="bg-light d-flex align-items-center justify-content-center rounded border" style="width: 50px; height: 50px; margin-right: 15px;">
+                                                <i class="fas fa-image text-muted"></i>
+                                            </div>
+                                        {% endif %}
+                                        <div>
+                                            <h6 class="mb-0">{{ item.name }}</h6>
+                                            <small class="text-muted text-uppercase">{{ item.model_type }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>KSh {{ item.price|floatformat:2 }}</td>
+                                <td>{{ item.quantity }}</td>
+                                <td class="fw-bold">KSh {{ item.price|floatformat:2 }}</td>
+                                <td>
+                                    <!-- KITUFE CHA KUONDOA BIDHAA -->
+                                    <button class="btn btn-sm btn-outline-danger border-0" 
+                                            onclick="removeItem('{{ key }}')" title="Remove from cart">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <a href="/" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Continue Shopping
+            </a>
+        </div>
+
+        <!-- RIGHT: Order Summary -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 bg-light sticky-top" style="top: 20px;">
+                <div class="card-body">
+                    <h5 class="card-title fw-bold mb-3">Order Summary</h5>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Subtotal</span>
+                        <span>KSh {{ total|floatformat:2 }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2 text-muted">
+                        <span>Shipping</span>
+                        <span>Calculated at checkout</span>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between mb-4 fw-bold fs-5">
+                        <span>Total</span>
+                        <span class="text-primary">KSh {{ total|floatformat:2 }}</span>
+                    </div>
+                    
+                    <!-- KITUFE CHA PROCEED TO CHECKOUT (SASA KINAFANYA KAZI) -->
+                    <a href="{% url 'checkout' %}" class="btn btn-primary w-100 py-2 fw-bold">
+                        Proceed to Checkout <i class="fas fa-arrow-right ms-2"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <!-- EMPTY CART -->
+    <div class="text-center py-5">
+        <i class="fas fa-shopping-cart fa-4x text-muted mb-3"></i>
+        <h3>Your cart is empty</h3>
+        <p class="text-muted mb-4">Looks like you haven't added any products yet.</p>
+        <a href="/" class="btn btn-primary px-4">Start Shopping</a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- JAVASCRIPT: Handle item removal -->
+<script>
+function removeItem(productKey) {
+    if (!confirm('Are you sure you want to remove this item?')) return;
+
+    fetch('/epa_shop/cart/remove/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({ 'product_key': productKey })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            location.reload(); // Refresh page to show updated cart
+        } else {
+            alert('Error: ' + (data.message || 'Could not remove item.'));
+        }
+    })
+    .catch(err => {
+        console.error('Error:', err);
+        alert('Network error. Please try again.');
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

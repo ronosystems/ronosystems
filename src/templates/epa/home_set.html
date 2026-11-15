@@ -1,0 +1,283 @@
+{% extends "web_base.html" %}
+
+{% block title %}Manage Homepage Layout{% endblock %}
+{% block breadcrumb %}Homepage Layout{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-desktop text-primary"></i> Homepage Layout Manager</h2>
+        <a href="/" class="btn btn-outline-primary">
+            <i class="fas fa-external-link-alt"></i> View Live Homepage
+        </a>
+    </div>
+
+    <!-- Messages -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row">
+        <!-- LEFT COLUMN: ADD PRODUCT FORM -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-dark text-white fw-bold">
+                    <i class="fas fa-plus-circle"></i> Add Product to Homepage
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="add_product">
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Select Section</label>
+                            <select name="section" class="form-select" required>
+                                <option value="new_arrival">🌟 New Arrivals</option>
+                                <option value="discounted">🏷️ Discounted Products</option>
+                                <option value="flash_sale">⚡ Flash Sales</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Product Type</label>
+                            <select name="product_type" class="form-select" id="productTypeSelect" onchange="filterProducts()" required>
+                                <option value="">-- Select Type --</option>
+                                <option value="phone">📱 Phones</option>
+                                <option value="electronic">💻 Electronics</option>
+                                <option value="accessory">🎧 Accessories</option>
+                            </select>
+                        </div>
+
+                        <!-- Dropdowns for specific product -->
+                        <div class="mb-3" id="productDropdownContainer">
+                            <label class="form-label fw-bold">Select Product</label>
+                            
+                            <select name="product_id" class="form-select product-list" id="phoneList" style="display:none;">
+                                <option value="">-- Select a Phone --</option>
+                                {% for p in phones %}
+                                <option value="{{ p.id }}">{{ p.brand }} {{ p.name }} (Ksh {{ p.selling_price }})</option>
+                                {% endfor %}
+                            </select>
+
+                            <select name="product_id" class="form-select product-list" id="electronicList" style="display:none;">
+                                <option value="">-- Select an Electronic --</option>
+                                {% for p in electronics %}
+                                <option value="{{ p.id }}">{{ p.brand }} {{ p.name }} (Ksh {{ p.selling_price }})</option>
+                                {% endfor %}
+                            </select>
+
+                            <select name="product_id" class="form-select product-list" id="accessoryList" style="display:none;">
+                                <option value="">-- Select an Accessory --</option>
+                                {% for p in accessories %}
+                                <option value="{{ p.id }}">{{ p.brand }} {{ p.name }} (Ksh {{ p.selling_price }})</option>
+                                {% endfor %}
+                            </select>
+                            
+                            <small class="text-muted mt-1 d-block">Changing product type will update the list.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Custom Price (Optional)</label>
+                            <input type="number" step="0.01" name="custom_price" class="form-control" placeholder="e.g., 80.00">
+                            <small class="text-muted">Leave empty to use default selling price.</small>
+                        </div>
+
+                        <!-- Image Upload Field -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Custom Image (Optional)</label>
+                            <input type="file" name="image" class="form-control" accept="image/*">
+                            <small class="text-muted">Override the product's default image for the homepage.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Display Order</label>
+                            <input type="number" name="display_order" class="form-control" value="0">
+                            <small class="text-muted">Lower numbers appear first (0, 1, 2...)</small>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 fw-bold">
+                            <i class="fas fa-save"></i> Add to Homepage
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: CURRENT LAYOUT -->
+        <div class="col-lg-8">
+            <div class="row">
+                
+                <!-- NEW ARRIVALS -->
+                <div class="col-md-6 mb-4">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-header bg-warning text-dark fw-bold">
+                            <i class="fas fa-star"></i> New Arrivals
+                        </div>
+                        <div class="card-body p-0">
+                            <ul class="list-group list-group-flush">
+                                {% for item in sections.new_arrival %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div class="d-flex align-items-center">
+                                        <!-- Image Fallback Wrapper -->
+                                        <div class="me-3 rounded border d-flex align-items-center justify-content-center overflow-hidden" style="width: 40px; height: 40px; background-color: #f8f9fa;">
+                                            {% if item.image_url %}
+                                                <img src="{{ item.image_url }}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                            {% elif item.product.image_url %}
+                                                <img src="{{ item.product.image_url }}" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                            {% endif %}
+                                            <i class="fas fa-image text-muted" style="display: {% if item.image_url or item.product.image_url %}none{% else %}flex{% endif %};"></i>
+                                        </div>
+                                        
+                                        <div>
+                                            <strong>{{ item.product.brand }} {{ item.product.name }}</strong><br>
+                                            <small class="text-muted">
+                                                Price: {% if item.custom_price %}<span class="text-danger fw-bold">Ksh {{ item.custom_price }}</span>{% else %}Ksh {{ item.product.selling_price }}{% endif %}
+                                                | Order: {{ item.display_order }}
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <form method="post" class="m-0">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="delete_product">
+                                        <input type="hidden" name="item_id" value="{{ item.id }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger border-0" title="Remove">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </li>
+                                {% empty %}
+                                <li class="list-group-item text-muted text-center py-4">No products added yet.</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DISCOUNTED PRODUCTS -->
+                <div class="col-md-6 mb-4">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-header bg-success text-white fw-bold">
+                            <i class="fas fa-tags"></i> Discounted Products
+                        </div>
+                        <div class="card-body p-0">
+                            <ul class="list-group list-group-flush">
+                                {% for item in sections.discounted %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div class="d-flex align-items-center">
+                                        <!-- Image Fallback Wrapper -->
+                                        <div class="me-3 rounded border d-flex align-items-center justify-content-center overflow-hidden" style="width: 40px; height: 40px; background-color: #f8f9fa;">
+                                            {% if item.image_url %}
+                                                <img src="{{ item.image_url }}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                            {% elif item.product.image_url %}
+                                                <img src="{{ item.product.image_url }}" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                            {% endif %}
+                                            <i class="fas fa-image text-muted" style="display: {% if item.image_url or item.product.image_url %}none{% else %}flex{% endif %};"></i>
+                                        </div>
+
+                                        <div>
+                                            <strong>{{ item.product.brand }} {{ item.product.name }}</strong><br>
+                                            <small class="text-muted">
+                                                Price: {% if item.custom_price %}<span class="text-danger fw-bold">Ksh {{ item.custom_price }}</span>{% else %}Ksh {{ item.product.selling_price }}{% endif %}
+                                                | Order: {{ item.display_order }}
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <form method="post" class="m-0">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="delete_product">
+                                        <input type="hidden" name="item_id" value="{{ item.id }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger border-0" title="Remove">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </li>
+                                {% empty %}
+                                <li class="list-group-item text-muted text-center py-4">No products added yet.</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FLASH SALES -->
+                <div class="col-md-12 mb-4">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-header bg-danger text-white fw-bold">
+                            <i class="fas fa-bolt"></i> Flash Sales
+                        </div>
+                        <div class="card-body p-0">
+                            <ul class="list-group list-group-flush">
+                                {% for item in sections.flash_sale %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div class="d-flex align-items-center">
+                                        <!-- Image Fallback Wrapper -->
+                                        <div class="me-3 rounded border d-flex align-items-center justify-content-center overflow-hidden" style="width: 40px; height: 40px; background-color: #f8f9fa;">
+                                            {% if item.image_url %}
+                                                <img src="{{ item.image_url }}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                            {% elif item.product.image_url %}
+                                                <img src="{{ item.product.image_url }}" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                            {% endif %}
+                                            <i class="fas fa-image text-muted" style="display: {% if item.image_url or item.product.image_url %}none{% else %}flex{% endif %};"></i>
+                                        </div>
+
+                                        <div>
+                                            <strong>{{ item.product.brand }} {{ item.product.name }}</strong><br>
+                                            <small class="text-muted">
+                                                Price: {% if item.custom_price %}<span class="text-danger fw-bold">Ksh {{ item.custom_price }}</span>{% else %}Ksh {{ item.product.selling_price }}{% endif %}
+                                                | Order: {{ item.display_order }}
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <form method="post" class="m-0">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="delete_product">
+                                        <input type="hidden" name="item_id" value="{{ item.id }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger border-0" title="Remove">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </li>
+                                {% empty %}
+                                <li class="list-group-item text-muted text-center py-4">No products added yet.</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function filterProducts() {
+        var type = document.getElementById('productTypeSelect').value;
+        var lists = document.querySelectorAll('.product-list');
+        
+        lists.forEach(function(list) {
+            list.style.display = 'none';
+            list.disabled = true; // disable so empty selects aren't submitted
+        });
+
+        if (type === 'phone') {
+            document.getElementById('phoneList').style.display = 'block';
+            document.getElementById('phoneList').disabled = false;
+        } else if (type === 'electronic') {
+            document.getElementById('electronicList').style.display = 'block';
+            document.getElementById('electronicList').disabled = false;
+        } else if (type === 'accessory') {
+            document.getElementById('accessoryList').style.display = 'block';
+            document.getElementById('accessoryList').disabled = false;
+        }
+    }
+</script>
+{% endblock %}
