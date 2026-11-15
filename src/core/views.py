@@ -306,6 +306,29 @@ def manifest_view(request):
         # IARC Rating (Replace '0' with your actual IARC code if you get one)
         # "iarc_rating_id": "YOUR-IARC-CODE", 
         
+        # --- Launch Handler (Focus existing window instead of opening new tabs) ---
+        "launch_handler": {
+            "client_mode": "focus-existing"
+        },
+        
+        # --- Scope Extensions (Allows navigating to external subdomains) ---
+        "scope_extensions": [
+            {"type": "origin", "value": "https://ronosystems.com"},
+            {"type": "origin", "value": "https://fieldmax.shop"}
+        ],
+        
+        # --- File Handlers (Allows users to open files with your PWA) ---
+        "file_handlers": [
+            {
+                "action": "/epa_shop/pos/import/", # Change this to your actual upload route
+                "accept": {
+                    "text/csv": [".csv"],
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+                    "application/pdf": [".pdf"]
+                }
+            }
+        ],
+        
         # --- Icons ---
         "icons": [
             {
