@@ -376,6 +376,26 @@ def manifest_view(request):
                 "description": "Open Point of Sale"
             }
         ]
+
+        # --- Protocol Handlers ---
+        "protocol_handlers": [
+            {
+                "protocol": "web+ronosystems",
+                "url": "/?action=%s"
+            }
+        ],
+        
+        # --- Share Target ---
+        "share_target": {
+            "action": "/share-target/",
+            "method": "GET",
+            "enctype": "application/x-www-form-urlencoded",
+            "params": {
+                "title": "title",
+                "text": "text",
+                "url": "url"
+            }
+        },
     }
 
     response = JsonResponse(manifest)
