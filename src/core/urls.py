@@ -55,6 +55,7 @@ urlpatterns = [
     path('dashboard/', include('apps.company.dashboard_urls')),
     path('company/', include('apps.company.urls_web')),
     path('epa_shop/', include('apps.epa_shop.urls_web')),
+    path('cart/', include('apps.cart_orders.urls', namespace='cart-orders')),
     path('kuku_biz/', include('apps.kuku_biz.urls')),
     path('chama/', include('apps.chama.urls')),
     path('business-types/', include('apps.business_types.urls')),

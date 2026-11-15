@@ -1,7 +1,6 @@
 from django.urls import path
 from . import storefront
 from . import home_views
-from . import cart_views
 from . import dashboard_views
 from . import product_views
 from . import pos_views
@@ -19,19 +18,6 @@ urlpatterns = [
     path('shop/product/<str:product_code>/', storefront.public_product_detail, name='public-product-detail'),
     path('manage-home/', home_views.manage_homepage, name='manage-homepage'),
     path('api/search-products/', home_views.search_products_api, name='search-products-api'),
-
-
-    path('cart/add/', cart_views.add_to_cart, name='cart-add'),
-    path('cart/remove/', cart_views.remove_from_cart, name='cart-remove'),
-    path('cart/', cart_views.view_cart, name='cart-view'),
-    path('checkout/', cart_views.checkout, name='checkout'),
-    path('order-success/<int:sale_id>/', cart_views.order_success, name='order-success'),
-    
-     # Staff view
-     path('orders/', cart_views.order_list, name='order-list'),
-     path('orders/<int:sale_id>/pick/', cart_views.pick_order, name='pick-order'),
-     path('orders/<int:sale_id>/unpick/', cart_views.unpick_order, name='unpick-order'),
-     path('orders/<int:sale_id>/mark-followed/', cart_views.mark_order_followed_up, name='mark-order-followed'),
 
 
     # ============================================

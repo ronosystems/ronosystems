@@ -135,6 +135,7 @@ INSTALLED_APPS = [
     'apps.analytics',
     'apps.workshop', 
     'apps.mpesa',  
+    'apps.cart_orders', 
 
     # Business Type Apps
     'apps.epa_shop',
@@ -186,6 +187,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'apps.settings.context_processors.system_settings',
                 'apps.epa_shop.context_processors.user_context',
+                'apps.cart_orders.context_processors.cart_count', 
                 'apps.epa_shop.context_processors.pending_orders_count',
                 'apps.company.context_processors.company_context',
                 'apps.companies.context_processors.active_base_template',
