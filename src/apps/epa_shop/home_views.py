@@ -5,6 +5,54 @@ from .models import HomepageFeaturedProduct, Phone, Electronic, Accessory
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 from .cloudinary_utils import _upload_product_image_to_cloudinary
+import json
+from django.http import JsonResponse
+from django.db.models import Q
+from django.contrib.auth.decorators import login_required
+from .models import Phone, Electronic, Accessory
+
+
+@login_required
+def search_products_api(request):
+    """AJAX endpoint for product search in the homepage manager."""
+    company = getattr(request, 'current_company', None)
+    if not company:
+        return JsonResponse({'results': []})
+
+    query = request.GET.get('q', '').strip()
+    ptype = request.GET.get('type', '').strip()  # 'phone', 'electronic', or 'accessory'
+
+    if len(query) < 1 or not ptype:
+        return JsonResponse({'results': []})
+
+    model_map = {'phone': Phone, 'electronic': Electronic, 'accessory': Accessory}
+    model = model_map.get(ptype)
+    if not model:
+        return JsonResponse({'results': []})
+
+    # Filter only this company's active products
+    qs = model.objects.filter(company=company, is_active=True)
+
+    # Search across multiple fields
+    qs = qs.filter(
+        Q(name__icontains=query) |
+        Q(brand__icontains=query) |
+        Q(product_code__icontains=query) |
+        Q(barcode__icontains=query)
+    ).order_by('name')[:10]  # Limit to 10 results
+
+    results = []
+    for p in qs:
+        results.append({
+            'id': p.id,
+            'name': p.name,
+            'brand': p.brand or '',
+            'product_code': p.product_code or '',
+            'price': str(p.selling_price),
+            'type': ptype,
+        })
+
+    return JsonResponse({'results': results})
 
 
 @login_required

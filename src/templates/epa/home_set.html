@@ -13,7 +13,6 @@
         </a>
     </div>
 
-    <!-- Messages -->
     {% if messages %}
         {% for message in messages %}
             <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
@@ -31,7 +30,7 @@
                     <i class="fas fa-plus-circle"></i> Add Product to Homepage
                 </div>
                 <div class="card-body">
-                    <form method="post" enctype="multipart/form-data">
+                    <form method="post" enctype="multipart/form-data" id="addProductForm">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="add_product">
                         
@@ -46,7 +45,7 @@
 
                         <div class="mb-3">
                             <label class="form-label fw-bold">Product Type</label>
-                            <select name="product_type" class="form-select" id="productTypeSelect" onchange="filterProducts()" required>
+                            <select name="product_type" class="form-select" id="productTypeSelect" onchange="resetSearch()" required>
                                 <option value="">-- Select Type --</option>
                                 <option value="phone">📱 Phones</option>
                                 <option value="electronic">💻 Electronics</option>
@@ -54,41 +53,45 @@
                             </select>
                         </div>
 
-                        <!-- 👇 NEW: Search/Scan Input Fields (Datalists) -->
-                        <div class="mb-3" id="productSearchContainer" style="display: none;">
-                            <label class="form-label fw-bold">Search / Scan Product</label>
-                            
-                            <!-- Phone Search -->
-                            <div id="phoneSearchWrapper" style="display: none;">
-                                <input type="text" name="product_id" class="form-control" list="phoneDataList" placeholder="Type phone name or scan barcode..." autocomplete="off">
-                                <datalist id="phoneDataList">
-                                    {% for p in phones %}
-                                    <option value="{{ p.id }}">{{ p.brand }} {{ p.name }} (Ksh {{ p.selling_price }}) - {{ p.product_code }}</option>
-                                    {% endfor %}
-                                </datalist>
-                            </div>
+                        <!-- SEARCH BOX (Hidden until type is selected) -->
+                        <div class="mb-3" id="searchContainer" style="display: none;">
+                            <label class="form-label fw-bold">Search Product</label>
+                            <div class="position-relative">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                                    <input type="text" id="productSearchInput" class="form-control" 
+                                           placeholder="Type name, brand, or code..." 
+                                           autocomplete="off"
+                                           oninput="debouncedSearch(this.value)">
+                                    <span class="input-group-text bg-white" id="searchSpinner" style="display: none;">
+                                        <i class="fas fa-spinner fa-spin text-muted"></i>
+                                    </span>
+                                </div>
 
-                            <!-- Electronic Search -->
-                            <div id="electronicSearchWrapper" style="display: none;">
-                                <input type="text" name="product_id" class="form-control" list="electronicDataList" placeholder="Type electronic name or scan barcode..." autocomplete="off">
-                                <datalist id="electronicDataList">
-                                    {% for p in electronics %}
-                                    <option value="{{ p.id }}">{{ p.brand }} {{ p.name }} (Ksh {{ p.selling_price }}) - {{ p.product_code }}</option>
-                                    {% endfor %}
-                                </datalist>
+                                <!-- Results Dropdown -->
+                                <div id="searchResults" 
+                                     class="list-group position-absolute w-100 shadow" 
+                                     style="display: none; z-index: 1000; max-height: 300px; overflow-y: auto;">
+                                </div>
                             </div>
+                        </div>
 
-                            <!-- Accessory Search -->
-                            <div id="accessorySearchWrapper" style="display: none;">
-                                <input type="text" name="product_id" class="form-control" list="accessoryDataList" placeholder="Type accessory name or scan barcode..." autocomplete="off">
-                                <datalist id="accessoryDataList">
-                                    {% for p in accessories %}
-                                    <option value="{{ p.id }}">{{ p.brand }} {{ p.name }} (Ksh {{ p.selling_price }}) - {{ p.product_code }}</option>
-                                    {% endfor %}
-                                </datalist>
+                        <!-- SELECTED PRODUCT PREVIEW (Hidden until product is picked) -->
+                        <div class="mb-3" id="selectedProductContainer" style="display: none;">
+                            <label class="form-label fw-bold">Selected Product</label>
+                            <div class="card border-success bg-light">
+                                <div class="card-body p-2 d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong id="selectedProductName" class="text-success d-block"></strong>
+                                        <small class="text-muted" id="selectedProductDetails"></small>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="clearSelection()">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
                             </div>
-                            
-                            <small class="text-muted mt-1 d-block">Type to see suggestions. The value sent is the Product ID.</small>
+                            <!-- Hidden field that actually submits the product_id -->
+                            <input type="hidden" name="product_id" id="selectedProductId" required>
                         </div>
 
                         <div class="mb-3">
@@ -97,17 +100,16 @@
                             <small class="text-muted">Leave empty to use default selling price.</small>
                         </div>
 
-                        <!-- Image Upload Field -->
                         <div class="mb-3">
                             <label class="form-label fw-bold">Custom Image (Optional)</label>
                             <input type="file" name="image" class="form-control" accept="image/*">
-                            <small class="text-muted">Override the product's default image for the homepage.</small>
+                            <small class="text-muted">Override the product's default image.</small>
                         </div>
 
                         <div class="mb-3">
                             <label class="form-label fw-bold">Display Order</label>
                             <input type="number" name="display_order" class="form-control" value="0">
-                            <small class="text-muted">Lower numbers appear first (0, 1, 2...)</small>
+                            <small class="text-muted">Lower numbers appear first.</small>
                         </div>
 
                         <button type="submit" class="btn btn-primary w-100 fw-bold">
@@ -135,11 +137,10 @@
                                     <div class="d-flex align-items-center">
                                         <div class="me-3 rounded border d-flex align-items-center justify-content-center overflow-hidden" style="width: 40px; height: 40px; background-color: #f8f9fa;">
                                             {% if item.image_url %}
-                                                <img src="{{ item.image_url }}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                                <img src="{{ item.image_url }}" style="width: 100%; height: 100%; object-fit: cover;">
                                             {% elif item.product.image_url %}
-                                                <img src="{{ item.product.image_url }}" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                                <img src="{{ item.product.image_url }}" style="width: 100%; height: 100%; object-fit: contain;">
                                             {% endif %}
-                                            <i class="fas fa-image text-muted" style="display: {% if item.image_url or item.product.image_url %}none{% else %}flex{% endif %};"></i>
                                         </div>
                                         <div>
                                             <strong>{{ item.product.brand }} {{ item.product.name }}</strong><br>
@@ -179,11 +180,10 @@
                                     <div class="d-flex align-items-center">
                                         <div class="me-3 rounded border d-flex align-items-center justify-content-center overflow-hidden" style="width: 40px; height: 40px; background-color: #f8f9fa;">
                                             {% if item.image_url %}
-                                                <img src="{{ item.image_url }}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                                <img src="{{ item.image_url }}" style="width: 100%; height: 100%; object-fit: cover;">
                                             {% elif item.product.image_url %}
-                                                <img src="{{ item.product.image_url }}" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                                <img src="{{ item.product.image_url }}" style="width: 100%; height: 100%; object-fit: contain;">
                                             {% endif %}
-                                            <i class="fas fa-image text-muted" style="display: {% if item.image_url or item.product.image_url %}none{% else %}flex{% endif %};"></i>
                                         </div>
                                         <div>
                                             <strong>{{ item.product.brand }} {{ item.product.name }}</strong><br>
@@ -223,11 +223,10 @@
                                     <div class="d-flex align-items-center">
                                         <div class="me-3 rounded border d-flex align-items-center justify-content-center overflow-hidden" style="width: 40px; height: 40px; background-color: #f8f9fa;">
                                             {% if item.image_url %}
-                                                <img src="{{ item.image_url }}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                                <img src="{{ item.image_url }}" style="width: 100%; height: 100%; object-fit: cover;">
                                             {% elif item.product.image_url %}
-                                                <img src="{{ item.product.image_url }}" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                                <img src="{{ item.product.image_url }}" style="width: 100%; height: 100%; object-fit: contain;">
                                             {% endif %}
-                                            <i class="fas fa-image text-muted" style="display: {% if item.image_url or item.product.image_url %}none{% else %}flex{% endif %};"></i>
                                         </div>
                                         <div>
                                             <strong>{{ item.product.brand }} {{ item.product.name }}</strong><br>
@@ -262,35 +261,116 @@
 
 {% block extra_js %}
 <script>
-    // Function to switch search inputs based on Product Type
-    function filterProducts() {
-        var type = document.getElementById('productTypeSelect').value;
-        
-        // Hide all wrappers
-        document.getElementById('phoneSearchWrapper').style.display = 'none';
-        document.getElementById('electronicSearchWrapper').style.display = 'none';
-        document.getElementById('accessorySearchWrapper').style.display = 'none';
-        
-        // Disable all inputs (so they aren't submitted with empty values)
-        document.querySelectorAll('#productSearchContainer input').forEach(i => i.disabled = true);
+// =========================================================
+// SEARCH LOGIC
+// =========================================================
+let searchTimeout = null;
+let currentSearchTerm = '';
 
-        var container = document.getElementById('productSearchContainer');
+function resetSearch() {
+    document.getElementById('productSearchInput').value = '';
+    document.getElementById('searchResults').style.display = 'none';
+    document.getElementById('searchResults').innerHTML = '';
+    clearSelection();
+    
+    const type = document.getElementById('productTypeSelect').value;
+    document.getElementById('searchContainer').style.display = type ? 'block' : 'none';
+}
 
-        if (type === 'phone') {
-            container.style.display = 'block';
-            document.getElementById('phoneSearchWrapper').style.display = 'block';
-            document.querySelector('#phoneSearchWrapper input').disabled = false;
-        } else if (type === 'electronic') {
-            container.style.display = 'block';
-            document.getElementById('electronicSearchWrapper').style.display = 'block';
-            document.querySelector('#electronicSearchWrapper input').disabled = false;
-        } else if (type === 'accessory') {
-            container.style.display = 'block';
-            document.getElementById('accessorySearchWrapper').style.display = 'block';
-            document.querySelector('#accessorySearchWrapper input').disabled = false;
-        } else {
-            container.style.display = 'none';
-        }
+function debouncedSearch(query) {
+    clearTimeout(searchTimeout);
+    currentSearchTerm = query;
+    
+    if (query.length < 1) {
+        document.getElementById('searchResults').style.display = 'none';
+        return;
     }
+    
+    document.getElementById('searchSpinner').style.display = 'inline-flex';
+    
+    // 300ms debounce
+    searchTimeout = setTimeout(() => {
+        doSearch(query);
+    }, 300);
+}
+
+function doSearch(query) {
+    const type = document.getElementById('productTypeSelect').value;
+    if (!type) return;
+    
+    fetch(`{% url 'search-products-api' %}?q=${encodeURIComponent(query)}&type=${type}`)
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('searchSpinner').style.display = 'none';
+            
+            // Ignore stale responses
+            if (query !== currentSearchTerm) return;
+            
+            const resultsDiv = document.getElementById('searchResults');
+            
+            if (data.results.length === 0) {
+                resultsDiv.innerHTML = '<div class="list-group-item text-muted">No products found.</div>';
+                resultsDiv.style.display = 'block';
+                return;
+            }
+            
+            let html = '';
+            data.results.forEach(p => {
+                html += `
+                    <a href="javascript:void(0)" 
+                       class="list-group-item list-group-item-action"
+                       onclick="selectProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}', '${p.brand.replace(/'/g, "\\'")}', '${p.product_code}', '${p.price}')">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <strong>${p.name}</strong>
+                                <br><small class="text-muted">${p.brand} • ${p.product_code}</small>
+                            </div>
+                            <span class="text-success fw-bold">Ksh ${p.price}</span>
+                        </div>
+                    </a>
+                `;
+            });
+            
+            resultsDiv.innerHTML = html;
+            resultsDiv.style.display = 'block';
+        })
+        .catch(err => {
+            document.getElementById('searchSpinner').style.display = 'none';
+            console.error(err);
+        });
+}
+
+// =========================================================
+// SELECT PRODUCT
+// =========================================================
+function selectProduct(id, name, brand, code, price) {
+    // Show the selected product card
+    document.getElementById('selectedProductContainer').style.display = 'block';
+    document.getElementById('selectedProductName').textContent = name;
+    document.getElementById('selectedProductDetails').textContent = `${brand} • ${code} • Ksh ${price}`;
+    document.getElementById('selectedProductId').value = id;
+    
+    // Clear and hide search
+    document.getElementById('productSearchInput').value = '';
+    document.getElementById('searchResults').style.display = 'none';
+    document.getElementById('searchResults').innerHTML = '';
+}
+
+function clearSelection() {
+    document.getElementById('selectedProductContainer').style.display = 'none';
+    document.getElementById('selectedProductId').value = '';
+    document.getElementById('selectedProductName').textContent = '';
+    document.getElementById('selectedProductDetails').textContent = '';
+}
+
+// =========================================================
+// HIDE RESULTS WHEN CLICKING OUTSIDE
+// =========================================================
+document.addEventListener('click', function(e) {
+    const searchContainer = document.getElementById('searchContainer');
+    if (searchContainer && !searchContainer.contains(e.target)) {
+        document.getElementById('searchResults').style.display = 'none';
+    }
+});
 </script>
 {% endblock %}

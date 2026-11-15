@@ -18,6 +18,7 @@ urlpatterns = [
     path('', storefront.epa_storefront, name='epa-storefront'),
     path('shop/product/<str:product_code>/', storefront.public_product_detail, name='public-product-detail'),
     path('manage-home/', home_views.manage_homepage, name='manage-homepage'),
+    path('api/search-products/', home_views.search_products_api, name='search-products-api'),
 
 
     path('cart/add/', cart_views.add_to_cart, name='cart-add'),
