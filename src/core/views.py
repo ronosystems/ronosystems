@@ -190,7 +190,6 @@ def contact(request):
     return render(request, template_name) # <-- Updated this render call too
 
 
-
 # ============================================
 # PWA: MANIFEST
 # ============================================
@@ -236,9 +235,13 @@ def manifest_view(request):
     icon_192 = request.build_absolute_uri(static('images/icon-192.png'))
     icon_512 = request.build_absolute_uri(static('images/icon-512.png'))
     
+    # Default fallback screenshots
+    screenshot_wide = request.build_absolute_uri(static('images/screenshot-wide.png'))
+    screenshot_narrow = request.build_absolute_uri(static('images/screenshot-narrow.png'))
+    
     if company:
         # ---------------------------------------------------------
-        # COMPANY DOMAIN LOGIC
+        # COMPANY DOMAIN LOGIC (e.g., Fieldmax)
         # ---------------------------------------------------------
         if company.display_name:
             company_name = company.display_name.upper()
@@ -254,32 +257,30 @@ def manifest_view(request):
                     icon_512 = request.build_absolute_uri(raw_logo)
             except Exception:
                 pass
+                
+        # Optional: If your Company model has custom screenshot fields, use them here.
+        # If not, it will fall back to the static screenshots above.
     else:
         # ---------------------------------------------------------
-        # SYSTEM DOMAIN LOGIC (DATABASE DRIVEN)
+        # SYSTEM DOMAIN LOGIC (RonoSystems)
         # ---------------------------------------------------------
         sys_logo_url = None
         
         if SystemSetting:
             try:
-                # Fetch the system name from the database
                 db_name = SystemSetting.get_setting('SITE_NAME')
                 if db_name:
                     company_name = db_name.upper()
                 
-                # Fetch the FULL URL for the system logo from the database
-                # We use get_image_url() because it formats the Cloudinary public_id correctly
                 sys_logo_url = SystemSetting.get_image_url('SITE_LOGO')
             except Exception:
                 pass
 
-        # If the database had a logo, apply the Cloudinary transformations
         if sys_logo_url:
             if 'cloudinary' in sys_logo_url:
                 icon_192 = sys_logo_url.replace('/upload/', '/upload/w_192,h_192,c_fill,f_png/')
                 icon_512 = sys_logo_url.replace('/upload/', '/upload/w_512,h_512,c_fill,f_png/')
             else:
-                # If it's a local media URL
                 icon_192 = sys_logo_url
                 icon_512 = sys_logo_url
 
@@ -287,7 +288,7 @@ def manifest_view(request):
         "id": "/",
         "name": company_name,
         "short_name": company_name,
-        "description": f"Install {company_name} App .",
+        "description": f"Manage {company_name} smarter and faster.",
         "start_url": "/",
         "scope": "/",
         "display": "standalone",
@@ -297,6 +298,15 @@ def manifest_view(request):
         "theme_color": "#1e4e6d",
         "categories": ["business", "productivity"],
         
+        # --- PWABuilder Score Boosters ---
+        "lang": "en",
+        "dir": "ltr",
+        "prefer_related_applications": False,
+        
+        # IARC Rating (Replace '0' with your actual IARC code if you get one)
+        # "iarc_rating_id": "YOUR-IARC-CODE", 
+        
+        # --- Icons ---
         "icons": [
             {
                 "src": icon_192, 
@@ -311,11 +321,44 @@ def manifest_view(request):
                 "purpose": "any maskable"
             }
         ],
+        
+        # --- Screenshots (Sized exactly to pass PWABuilder strict checks) ---
+        "screenshots": [
+            {
+                "src": screenshot_wide,
+                "sizes": "1280x720",
+                "type": "image/png",
+                "form_factor": "wide",
+                "label": f"{company_name} Desktop View"
+            },
+            {
+                "src": screenshot_narrow,
+                "sizes": "720x1280",
+                "type": "image/png",
+                "form_factor": "narrow",
+                "label": f"{company_name} Mobile View"
+            }
+        ],
+        
+        # --- App Shortcuts (Long-press the app icon to see these) ---
+        "shortcuts": [
+            {
+                "name": "Dashboard",
+                "url": "/dashboard/",
+                "description": "Open your dashboard"
+            },
+            {
+                "name": "POS System",
+                "url": "/epa_shop/pos/",
+                "description": "Open Point of Sale"
+            }
+        ]
     }
 
     response = JsonResponse(manifest)
     response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     return response
+
 
 # ============================================
 # PWA: SERVICE WORKER 
