@@ -1,0 +1,536 @@
+{% extends base_template|default:"base.html" %}
+{% load static %}
+
+{% block title %}Orders — {{ current_company.name }}{% endblock %}
+{% block breadcrumb %}Orders{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-2">
+        <h2 class="mb-0"><i class="fas fa-box text-primary"></i> Customer Orders</h2>
+        <div class="d-flex flex-wrap gap-2">
+            <span class="badge bg-warning text-dark p-2 fs-6">
+                <i class="fas fa-clock"></i> {{ total_pending }} Open Orders
+            </span>
+            <span class="badge bg-success p-2 fs-6">
+                <i class="fas fa-money-bill"></i> KSh {{ total_revenue|floatformat:2 }} Active Revenue
+            </span>
+        </div>
+    </div>
+
+    <!-- DESKTOP: Table -->
+    <div class="card shadow-sm border-0 d-none d-md-block">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 10%;">Order #</th>
+                            <th style="width: 12%;">Customer</th>
+                            <th style="width: 12%;">Date</th>
+                            <th style="width: 13%;">Selected Shop</th> 
+                            <th style="width: 13%;">Delivery Location</th> 
+                            <th style="width: 10%;">Status</th>
+                            <th style="width: 10%;">Picked By</th>
+                            <th class="text-end" style="width: 8%;">Total</th>
+                            <th class="text-start ps-3" style="width: 22%;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                        <tr id="order-row-{{ order.id }}" class="{% if order.status == 'fulfilled' or order.status == 'cancelled' %}table-light{% endif %}">
+                            
+                            <!-- 1. Order # -->
+                            <td><span class="badge bg-secondary">#{{ order.order_number }}</span></td>
+                            
+                            <!-- 2. Customer Name -->
+                            <td><strong>{{ order.customer_name }}</strong></td>
+                            
+                            <!-- 3. Date -->
+                            <td>{{ order.created_at|date:"d M Y, H:i" }}</td>
+
+                            <!-- 4. Shop (Branch) - NO LONGER HIDDEN -->
+                            <td>
+                                <div class="small fw-bold text-dark">
+                                    <i class="fas fa-store text-primary me-1"></i> {{ order.branch.name|default:"Main Shop" }}
+                                </div>
+                            </td>
+
+                            <!-- 5. Delivery Location - NO LONGER HIDDEN -->
+                            <td>
+                                <div class="small fw-bold text-dark">
+                                    <i class="fas fa-map-marker-alt text-danger me-1"></i> {{ order.customer_city|default:"-" }}
+                                </div>
+                                <div class="small text-muted text-truncate" style="max-width: 150px;" title="{{ order.customer_address }}">
+                                    {{ order.customer_address|default:"No address provided" }}
+                                </div>
+                            </td>
+                            
+                            <!-- 6. Status -->
+                            <td>
+                                {% if order.status == 'new' %}
+                                    <span class="badge bg-warning text-dark">New</span>
+                                {% elif order.status == 'picked' %}
+                                    <span class="badge bg-info text-dark">On Process Now</span>
+                                {% elif order.status == 'confirmed' %}
+                                    <span class="badge bg-primary">Confirmed</span>
+                                {% elif order.status == 'fulfilled' %}
+                                    <span class="badge bg-success">Fulfilled (Archived)</span>
+                                {% elif order.status == 'cancelled' %}
+                                    <span class="badge bg-danger">Cancelled</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ order.get_status_display }}</span>
+                                {% endif %}
+                            </td>
+                            
+                            <!-- 7. Picked By -->
+                            <td>
+                                {% if order.assigned_to %}
+                                    <span class="badge bg-secondary">
+                                        <i class="fas fa-user-check"></i> {{ order.assigned_to.get_full_name|default:order.assigned_to.username }}
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-light text-muted border">Unassigned</span>
+                                {% endif %}
+                            </td>
+                            
+                            <!-- 8. Total -->
+                            <td class="text-end fw-bold">KSh {{ order.total_amount|floatformat:2 }}</td>
+                            
+                            <!-- 9. Actions -->
+                            <td class="text-start ps-3">
+                                <div class="d-flex flex-wrap justify-content-start gap-1">
+                                    
+                                    <!-- NEW ORDER: Only Pick button. No View button! -->
+                                    {% if order.status == 'new' %}
+                                        <button class="btn btn-sm btn-warning fw-bold" onclick="pickOrder({{ order.id }})">
+                                            <i class="fas fa-hand-paper"></i> Pick Order
+                                        </button>
+                                    
+                                    <!-- CANCELLED: Admin can verify, no view for staff -->
+                                    {% elif order.status == 'cancelled' %}
+                                        {% if is_admin %}
+                                            <button class="btn btn-sm btn-outline-danger" onclick="showCancelledDetails({{ order.id }})">
+                                                <i class="fas fa-exclamation-triangle"></i> Client Check
+                                            </button>
+                                        {% else %}
+                                            <span class="text-muted small fst-italic">Awaiting Admin</span>
+                                        {% endif %}
+
+                                    <!-- PICKED/CONFIRMED: Show buttons ONLY to the user who picked it, or Admin -->
+                                    {% elif order.status == 'picked' or order.status == 'confirmed' %}
+                                        {% if order.assigned_to == request.user or is_admin %}
+                                            
+                                            <button class="btn btn-sm btn-outline-primary" onclick="showOrderDetails({{ order.id }})">
+                                                <i class="fas fa-eye"></i> View
+                                            </button>
+                                            
+                                            <button class="btn btn-sm btn-outline-danger" onclick="cancelOrder({{ order.id }})">
+                                                <i class="fas fa-times"></i> Cancel
+                                            </button>
+
+                                        {% else %}
+                                            <!-- Message for other staff members -->
+                                            <span class="text-muted small fst-italic">
+                                                <i class="fas fa-info-circle"></i> Handled by {{ order.assigned_to.get_full_name|default:order.assigned_to.username }}
+                                            </span>
+                                        {% endif %}
+
+                                    <!-- FULFILLED: Admin archive view -->
+                                    {% elif order.status == 'fulfilled' %}
+                                        {% if is_admin %}
+                                            <a href="{% url 'cart-orders:order-archive-detail' order.id %}" class="btn btn-sm btn-outline-dark">
+                                                <i class="fas fa-archive"></i> View Archive
+                                            </a>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="text-center text-muted py-5">
+                                <i class="fas fa-inbox fa-3x mb-3 text-muted"></i>
+                                <h5>No orders found</h5>
+                                <p>When customers place orders from the website, they will appear here.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- MOBILE: Cards -->
+    <div class="d-block d-md-none">
+        {% for order in orders %}
+        <div class="card shadow-sm border-0 mb-3 {% if order.status == 'fulfilled' or order.status == 'cancelled' %}bg-light{% endif %}" id="order-card-{{ order.id }}">
+            <div class="card-body p-3">
+                <!-- Header: Order ID + Status -->
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="badge bg-secondary">#{{ order.order_number }}</span>
+                    <div>
+                        {% if order.status == 'new' %}
+                            <span class="badge bg-warning text-dark">New</span>
+                        {% elif order.status == 'picked' %}
+                            <span class="badge bg-info text-dark">On Process Now</span>
+                        {% elif order.status == 'confirmed' %}
+                            <span class="badge bg-primary">Confirmed</span>
+                        {% elif order.status == 'cancelled' %}
+                            <span class="badge bg-danger">Cancelled</span>
+                        {% else %}
+                            <span class="badge bg-success">Fulfilled</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Customer Name & Date (Hidden if not authorized) -->
+                <h6 class="mb-1 fw-bold">
+                    {% if order.status == 'new' and not is_admin %}
+                        <span class="text-muted fst-italic">Customer Hidden</span>
+                    {% elif order.status == 'cancelled' and not is_admin %}
+                        <span class="text-muted fst-italic">Customer Hidden</span>
+                    {% else %}
+                        {{ order.customer_name }}
+                    {% endif %}
+                </h6>
+                <p class="text-muted small mb-2">
+                    <i class="fas fa-calendar text-muted"></i> {{ order.created_at|date:"d M Y, H:i" }}
+                </p>
+
+                <!-- SHOP & DELIVERY SECTION - ALWAYS SHOWN -->
+                <div class="mb-3 pb-3 border-bottom">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <div class="small text-muted text-uppercase fw-bold" style="font-size: 10px;">Shop</div>
+                            <div class="small fw-bold text-dark"><i class="fas fa-store text-primary me-1"></i> {{ order.branch.name|default:"Main Shop" }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="small text-muted text-uppercase fw-bold" style="font-size: 10px;">Delivery</div>
+                            <div class="small fw-bold text-dark"><i class="fas fa-map-marker-alt text-danger me-1"></i> {{ order.customer_city|default:"-" }}</div>
+                            <div class="small text-muted text-truncate" style="max-width: 100%;" title="{{ order.customer_address }}">{{ order.customer_address }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Picked By -->
+                <div class="mb-2">
+                    {% if order.assigned_to %}
+                        <span class="badge bg-secondary">
+                            <i class="fas fa-user-check"></i> {{ order.assigned_to.get_full_name|default:order.assigned_to.username }}
+                        </span>
+                    {% else %}
+                        <span class="badge bg-light text-muted border">Unassigned</span>
+                    {% endif %}
+                </div>
+
+                <!-- Total -->
+                <p class="fw-bold fs-5 text-primary mb-3">KSh {{ order.total_amount|floatformat:2 }}</p>
+
+                <!-- Action Buttons -->
+                <div class="d-flex gap-2 flex-wrap">
+                    
+                    <!-- NEW ORDER: Only Pick -->
+                    {% if order.status == 'new' %}
+                        <button class="btn btn-sm btn-warning flex-grow-1 fw-bold" onclick="pickOrder({{ order.id }})">
+                            <i class="fas fa-hand-paper"></i> Pick Order
+                        </button>
+                    
+                    <!-- CANCELLED: Admin verify only -->
+                    {% elif order.status == 'cancelled' %}
+                        {% if is_admin %}
+                            <button class="btn btn-sm btn-outline-danger flex-grow-1" onclick="showCancelledDetails({{ order.id }})">
+                                <i class="fas fa-exclamation-triangle"></i> Client Check
+                            </button>
+                        {% else %}
+                            <span class="text-muted small flex-grow-1 text-center py-2 border rounded">Awaiting Admin</span>
+                        {% endif %}
+
+                    <!-- PICKED: Only owner or admin can View/Confirm/Cancel -->
+                    {% elif order.status == 'picked' or order.status == 'confirmed' %}
+                        {% if order.assigned_to == request.user or is_admin %}
+                            
+                            <button class="btn btn-sm btn-outline-primary flex-grow-1" onclick="showOrderDetails({{ order.id }})">
+                                <i class="fas fa-eye"></i> View
+                            </button>
+                            
+                            <button class="btn btn-sm btn-outline-danger flex-grow-1" onclick="cancelOrder({{ order.id }})">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+
+                        {% else %}
+                            <span class="text-muted small flex-grow-1 text-center py-2 border rounded">
+                                Handled by {{ order.assigned_to.get_full_name|default:order.assigned_to.username }}
+                            </span>
+                        {% endif %}
+
+                    <!-- FULFILLED: Admin archive view -->
+                    {% elif order.status == 'fulfilled' %}
+                        {% if is_admin %}
+                            <a href="{% url 'cart-orders:order-archive-detail' order.id %}" class="btn btn-sm btn-outline-dark flex-grow-1">
+                                <i class="fas fa-archive"></i> View Archive
+                            </a>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- MODAL 1: Customer Details -->
+<div class="modal fade" id="orderDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-user-circle me-2"></i> Order Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="orderDetailsContent"></div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL 2: Cancelled Order Verification (Admin Only) -->
+<div class="modal fade" id="cancelledDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i> Verify Cancellation</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="cancelledDetailsContent"></div>
+            <div class="modal-footer bg-light d-flex justify-content-between">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-danger fw-bold" id="btnApproveCancellation">
+                    <i class="fas fa-check-circle"></i> Approve & Delete Order
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Data ya orders
+const ordersData = {
+    {% for order in orders %}
+    "{{ order.id }}": {
+        "order_number": "{{ order.order_number }}",
+        "date": "{{ order.created_at|date:'d M Y, H:i' }}",
+        "customer_name": "{{ order.customer_name|escapejs }}",
+        "customer_phone": "{{ order.customer_phone|escapejs }}",
+        "customer_email": "{{ order.customer_email|default:''|escapejs }}",
+        "alt_phone": "{{ order.alternative_phone|default:''|escapejs }}",
+        "city": "{{ order.customer_city|default:'-'|escapejs }}",
+        "address": "{{ order.customer_address|default:'-'|escapejs }}",
+        "branch_name": "{{ order.branch.name|default:'Main Shop'|escapejs }}",
+        "total": "{{ order.total_amount|floatformat:2 }}",
+        "payment_method": "{{ order.payment_method|upper }}",
+        "cancel_reason": "{{ order.cancel_reason|default:''|escapejs }}",
+        "items": [
+            {% for item in order.items.all %}
+            {
+                "name": "{{ item.item_name|escapejs }}",
+                "qty": {{ item.quantity }},
+                "price": "{{ item.unit_price|floatformat:2 }}",
+                "total": "{{ item.total_price|floatformat:2 }}"
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ]
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+};
+
+// Helper: Get CSRF Token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Pick Order
+function pickOrder(orderId) {
+    const csrfToken = getCookie('csrftoken');
+    if (!csrfToken) { alert('CSRF token not found. Please refresh the page.'); return; }
+    
+    fetch(`/cart/orders/${orderId}/pick/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) { location.reload(); }
+        else { alert("Error: " + data.error); }
+    })
+    .catch(err => alert("Network error: " + err.message));
+}
+
+// Cancel Order (Prompts for Reason)
+function cancelOrder(orderId) {
+    const reason = prompt("Please enter the reason for cancelling this order:");
+    if (reason === null) return; // User clicked Cancel on the prompt
+    if (!reason.trim()) {
+        alert("A cancellation reason is required.");
+        return;
+    }
+
+    const csrfToken = getCookie('csrftoken');
+    if (!csrfToken) { alert('CSRF token not found.'); return; }
+    
+    fetch(`/cart/orders/${orderId}/cancel/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({ reason: reason.trim() })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) { location.reload(); }
+        else { alert("Error: " + data.error); }
+    })
+    .catch(err => alert("Network error: " + err.message));
+}
+
+// Show Order Details Modal (For active orders and fulfilled archives)
+function showOrderDetails(orderId) {
+    const order = ordersData[orderId];
+    if (!order) return;
+
+    let itemsHtml = '';
+    order.items.forEach(item => {
+        itemsHtml += `
+            <tr>
+                <td>${item.name}</td>
+                <td class="text-center">${item.qty}</td>
+                <td class="text-end">KSh ${item.price}</td>
+                <td class="text-end fw-bold">KSh ${item.total}</td>
+            </tr>
+        `;
+    });
+
+    const html = `
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-md-6">
+                <div class="p-3 bg-light rounded h-100">
+                    <h6 class="text-uppercase text-muted mb-3" style="font-size: 11px;">Customer Info</h6>
+                    <p class="mb-2"><strong>${order.customer_name}</strong></p>
+                    <p class="mb-2"><i class="fas fa-phone text-success me-2"></i> 
+                        <a href="tel:${order.customer_phone}" class="text-decoration-none fw-bold">${order.customer_phone}</a>
+                    </p>
+                    ${order.alt_phone ? `<p class="mb-2"><i class="fas fa-phone-alt text-muted me-2"></i> ${order.alt_phone}</p>` : ''}
+                    ${order.customer_email ? `<p class="mb-2"><i class="fas fa-envelope text-muted me-2"></i> ${order.customer_email}</p>` : ''}
+                </div>
+            </div>
+            <div class="col-12 col-md-6">
+                <div class="p-3 bg-light rounded h-100">
+                    <h6 class="text-uppercase text-muted mb-3" style="font-size: 11px;">Delivery Details</h6>
+                    <p class="mb-2"><i class="fas fa-store text-primary me-2"></i> <strong>${order.branch_name}</strong></p>
+                    <p class="mb-2"><i class="fas fa-map-marker-alt text-danger me-2"></i> <strong>${order.city}</strong></p>
+                    <p class="mb-2 text-muted small">${order.address}</p>
+                    <p class="mb-0 mt-3"><i class="fas fa-credit-card text-info me-2"></i> ${order.payment_method}</p>
+                </div>
+            </div>
+        </div>
+
+        <h6 class="text-uppercase text-muted mb-2" style="font-size: 11px;">Items Ordered</h6>
+        <div class="table-responsive mb-3">
+            <table class="table table-sm table-bordered">
+                <thead class="table-light">
+                    <tr><th>Product</th><th class="text-center">Qty</th><th class="text-end">Price</th><th class="text-end">Total</th></tr>
+                </thead>
+                <tbody>${itemsHtml}</tbody>
+                <tfoot><tr class="fw-bold">
+                    <td colspan="3" class="text-end">GRAND TOTAL</td>
+                    <td class="text-end text-primary">KSh ${order.total}</td>
+                </tr></tfoot>
+            </table>
+        </div>
+
+        <div class="d-flex flex-column flex-sm-row gap-2">
+            <a href="tel:${order.customer_phone}" class="btn btn-success flex-fill fw-bold">
+                <i class="fas fa-phone"></i> Call Now
+            </a>
+            <a href="https://wa.me/${order.customer_phone.replace(/^0/, '254')}" target="_blank" class="btn btn-outline-success flex-fill fw-bold">
+                <i class="fab fa-whatsapp"></i> WhatsApp
+            </a>
+            <!-- Link to Link Sale Page -->
+            <a href="/cart/orders/${orderId}/link-sale/" class="btn btn-primary flex-fill fw-bold">
+                <i class="fas fa-link"></i> Link Sale
+            </a>
+        </div>
+    `;
+
+    document.getElementById('orderDetailsContent').innerHTML = html;
+    new bootstrap.Modal(document.getElementById('orderDetailsModal')).show();
+}
+
+// ADMIN: Show Cancelled Details for Verification
+let currentCancelOrderId = null;
+
+function showCancelledDetails(orderId) {
+    const order = ordersData[orderId];
+    if (!order) return;
+    
+    currentCancelOrderId = orderId;
+
+    const html = `
+        <div class="alert alert-danger mb-4">
+            <h6 class="fw-bold mb-1"><i class="fas fa-info-circle"></i> Cancellation Reason</h6>
+            <p class="mb-0 fst-italic">"${order.cancel_reason || 'No reason provided.'}"</p>
+        </div>
+        
+        <h6 class="text-uppercase text-muted mb-2" style="font-size: 11px;">Order Details</h6>
+        <table class="table table-sm table-bordered">
+            <tr><th width="35%">Order #</th><td>${order.order_number}</td></tr>
+            <tr><th>Date</th><td>${order.date}</td></tr>
+            <tr><th>Customer Name</th><td>${order.customer_name}</td></tr>
+            <tr><th>Customer Phone</th><td>${order.customer_phone}</td></tr>
+            <tr><th>Total Amount</th><td class="fw-bold text-primary">KSh ${order.total}</td></tr>
+        </table>
+        <p class="text-muted small mt-3">
+            <i class="fas fa-info-circle"></i> Approving this cancellation will permanently delete the order from the system.
+        </p>
+    `;
+
+    document.getElementById('cancelledDetailsContent').innerHTML = html;
+    new bootstrap.Modal(document.getElementById('cancelledDetailsModal')).show();
+}
+
+// ADMIN: Approve Cancellation & Delete
+document.getElementById('btnApproveCancellation').addEventListener('click', function() {
+    if (!currentCancelOrderId) return;
+    if (!confirm("Are you sure you want to permanently delete this cancelled order?")) return;
+
+    const csrfToken = getCookie('csrftoken');
+    if (!csrfToken) { alert('CSRF token not found.'); return; }
+
+    fetch(`/cart/orders/${currentCancelOrderId}/approve-cancellation/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert("Error: " + data.error);
+        }
+    })
+    .catch(err => alert("Network error: " + err.message));
+});
+</script>
+{% endblock %}

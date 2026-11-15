@@ -1,0 +1,115 @@
+{% extends base_template|default:"base.html" %}
+{% load static %}
+
+{% block title %}Archive — {{ order.order_number }}{% endblock %}
+{% block breadcrumb %}Archived Order{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-archive text-dark"></i> Archived Order: #{{ order.order_number }}</h2>
+        <a href="{% url 'cart-orders:order-list' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Orders
+        </a>
+    </div>
+
+    <div class="row">
+        <!-- Left: Order & Customer Details -->
+        <div class="col-lg-7">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-dark text-white fw-bold">
+                    <i class="fas fa-info-circle"></i> Order Summary
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-sm-6">
+                            <h6 class="text-muted text-uppercase" style="font-size: 11px;">Customer Details</h6>
+                            <p class="mb-1 fw-bold">{{ order.customer_name }}</p>
+                            <p class="mb-1"><i class="fas fa-phone text-success"></i> {{ order.customer_phone }}</p>
+                            {% if order.customer_email %}
+                                <p class="mb-1"><i class="fas fa-envelope text-muted"></i> {{ order.customer_email }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="col-sm-6">
+                            <h6 class="text-muted text-uppercase" style="font-size: 11px;">Delivery Details</h6>
+                            <p class="mb-1"><i class="fas fa-store text-primary"></i> {{ order.branch.name|default:"Main Shop" }}</p>
+                            <p class="mb-1"><i class="fas fa-map-marker-alt text-danger"></i> {{ order.customer_city }}</p>
+                            <p class="mb-1 text-muted small">{{ order.customer_address }}</p>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Order Date:</span>
+                        <span class="fw-bold">{{ order.created_at|date:"d M Y, H:i" }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Payment Method:</span>
+                        <span class="fw-bold">{{ order.payment_method|upper }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Status:</span>
+                        <span class="badge bg-success">Fulfilled / Archived</span>
+                    </div>
+                    
+                    {% if order.sale %}
+                    <div class="alert alert-success mt-4 mb-0">
+                        <i class="fas fa-link"></i> This order is linked to Sale <strong>#{{ order.sale.company_sale_id }}</strong>.
+                        <a href="/epa_shop/sale/receipt/{{ order.sale.id }}/" class="alert-link ms-2">
+                            View Receipt <i class="fas fa-external-link-alt"></i>
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Items Sold -->
+        <div class="col-lg-5">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white fw-bold border-bottom">
+                    <i class="fas fa-box-open text-primary"></i> Items Sold
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-sm table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3">Product</th>
+                                <th class="text-center">Qty</th>
+                                <th class="text-end pe-3">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in order.sale.items.all %}
+                            <tr>
+                                <td class="ps-3">
+                                    <div class="fw-bold text-dark text-truncate" style="max-width: 150px;">{{ item.item_name }}</div>
+                                    {% if item.unit %}
+                                        <small class="text-muted" style="font-size: 10px;">
+                                            {{ item.unit.unit_type|title }}: {{ item.unit.identifier }}
+                                        </small>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">{{ item.quantity }}</td>
+                                <td class="text-end pe-3 fw-bold">KSh {{ item.total_price|floatformat:2 }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted py-3">No items found in this sale.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <td colspan="2" class="text-end fw-bold">Total Paid:</td>
+                                <td class="text-end pe-3 fw-bold text-primary">KSh {{ order.total_amount|floatformat:2 }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

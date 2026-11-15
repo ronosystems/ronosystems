@@ -1,0 +1,193 @@
+{% extends "web_base.html" %}
+{% load static %}
+
+{% block title %}Checkout — {{ current_company.name }}{% endblock %}
+{% block breadcrumb %}Checkout{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4"><i class="fas fa-credit-card text-primary"></i> Checkout</h2>
+
+    <div class="row">
+        <!-- Left: Delivery & Payment Form -->
+        <div class="col-lg-7">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-dark text-white fw-bold">
+                    <i class="fas fa-user"></i> Delivery Details
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- NEW: Select Shop Near You -->
+                        {% if branches %}
+                        <div class="mb-4 pb-3 border-bottom">
+                            <label class="form-label fw-bold text-primary"><i class="fas fa-store"></i> Select Shop Near You</label>
+                            <!-- The 'required' attribute is here 👇 -->
+                            <select name="branch_id" class="form-select form-select-lg fw-bold" required>
+                                <option value="" disabled selected>-- Choose the branch closest to you --</option>
+                                {% for branch in branches %}
+                                    <option value="{{ branch.id }}">{{ branch.name }} ({{ branch.city|default:"Main" }})</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text text-muted mt-1">Selecting a branch near you ensures faster delivery and better service.</div>
+                        </div>
+                        {% endif %}
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Full Name</label>
+                                <input type="text" name="name" class="form-control" placeholder="e.g. John Doe" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Email Address</label>
+                                <input type="email" name="email" class="form-control" placeholder="john@example.com">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Phone Number</label>
+                                <input type="text" name="phone" class="form-control" placeholder="0712 345 678" required>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Alternative Phone</label>
+                                <input type="text" name="alternative_phone" class="form-control" placeholder="Optional">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">City / Town</label>
+                                <input type="text" name="city" class="form-control" placeholder="e.g. Nairobi">
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Delivery Address</label>
+                            <textarea name="address" class="form-control" rows="3" placeholder="Street name, building, house number..."></textarea>
+                        </div>
+
+                        <h5 class="border-bottom pb-2 mb-3">Payment Method</h5>
+
+                        <div class="row mb-4">
+                            <!-- Cash on Delivery (Left Side) -->
+                            <div class="col-md-6 mb-2 mb-md-0">
+                                <div class="card h-100">
+                                    <div class="card-body py-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="payment_method" id="pmCash" value="cash" checked>
+                                            <label class="form-check-label fw-bold" for="pmCash">
+                                                <i class="fas fa-money-bill-wave text-success"></i> Cash on Delivery
+                                            </label>
+                                            <div class="text-muted small mt-1">Pay when your order arrives.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- M-Pesa (Right Side) -->
+                            <div class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-body py-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="payment_method" id="pmMpesa" value="mpesa">
+                                            <label class="form-check-label fw-bold" for="pmMpesa">
+                                                <i class="fas fa-mobile-alt text-success"></i> Pay Now via M-Pesa
+                                            </label>
+                                            <div class="text-muted small mt-1">Pay immediately to confirm your order.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-success btn-lg w-100 fw-bold py-3">
+                            <i class="fas fa-check-circle"></i> Confirm Order — KSh {{ total|floatformat:2 }}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Order Summary (Table View) -->
+        <div class="col-lg-5">
+            <div class="card shadow-sm border-0 bg-light sticky-top" style="top: 20px;">
+                <!-- HEADER WITH BACK TO CART -->
+                <div class="card-header bg-white fw-bold border-bottom d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-shopping-bag me-2 text-primary"></i> Order Summary</span>
+                    <a href="{% url 'cart-orders:view-cart' %}" class="btn btn-sm btn-primary text-decoration-none">
+                        <i class="fas fa-arrow-left me-1"></i> Back to Cart
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0 align-middle">
+                            <thead class="table-light text-muted" style="font-size: 11px; text-transform: uppercase;">
+                                <tr>
+                                    <th class="ps-3">Description</th>
+                                    <th class="text-center">Qty</th>
+                                    <th class="text-end">Unit Price</th>
+                                    <th class="text-end pe-3">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for key, item in cart.items %}
+                                <tr>
+                                    <td class="ps-3 py-3">
+                                        <div class="d-flex align-items-center">
+                                            {% if item.image %}
+                                                <img src="{{ item.image }}" alt="{{ item.name }}" style="width: 35px; height: 35px; object-fit: contain; margin-right: 10px;" class="rounded border bg-white">
+                                            {% else %}
+                                                <div class="bg-secondary text-white rounded d-flex align-items-center justify-content-center me-2" style="width: 35px; height: 35px;">
+                                                    <i class="fas fa-image" style="font-size: 12px;"></i>
+                                                </div>
+                                            {% endif %}
+                                            <div>
+                                                <div class="fw-bold text-dark text-truncate" style="max-width: 130px; font-size: 13px;" title="{{ item.name }}">{{ item.name }}</div>
+                                                <small class="text-muted" style="font-size: 10px;">{{ item.model_type|title }}</small>
+                                                
+                                                <!-- DISCOUNT LOGIC -->
+                                                {% if item.original_price and item.original_price > item.price %}
+                                                    <div class="text-success" style="font-size: 10px;">
+                                                        {% widthratio item.original_price 1 1 as orig_p %}
+                                                        {% widthratio item.price 1 1 as curr_p %}
+                                                        {% with discount=orig_p|add:"-"|add:curr_p %}
+                                                            <i class="fas fa-tag"></i> Discount: -KSh {{ discount|floatformat:2 }}
+                                                        {% endwith %}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="text-center fw-bold">{{ item.quantity }}</td>
+                                    <td class="text-end">KSh {{ item.price|floatformat:2 }}</td>
+                                    <td class="text-end pe-3 fw-bold text-dark">
+                                        {% widthratio item.price 1 item.quantity as line_total %}
+                                        KSh {{ line_total|floatformat:2 }}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- TOTALS FOOTER -->
+                <div class="card-footer bg-white pt-3 pb-3">
+                    <div class="d-flex justify-content-between mb-2 text-muted">
+                        <span>Subtotal</span>
+                        <span>KSh {{ total|floatformat:2 }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2 text-muted">
+                        <span>Shipping</span>
+                        <span>Free</span>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between fw-bold fs-5">
+                        <span>Grand Total</span>
+                        <span class="text-primary">KSh {{ total|floatformat:2 }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
