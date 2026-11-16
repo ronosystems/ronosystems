@@ -7,10 +7,12 @@
 {% block content %}
 <div class="container-fluid py-4">
 
-    <!-- Header -->
+    <!-- ============================================================ -->
+    <!-- TOP HEADER WITH NAVIGATION BUTTONS                           -->
+    <!-- ============================================================ -->
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
         <div>
-            <h2 class="mb-1"><i class="fas fa-shopping-bag text-primary"></i> Our Products</h2>
+            <h4 class="fw-bold mb-0 text-dark"><i class="fas fa-store text-primary me-2"></i> Our Products</h4>
             <p class="text-muted mb-0">
                 {% if search_query %}
                     {{ total_products }} result(s) for "{{ search_query }}"
@@ -19,19 +21,27 @@
                 {% endif %}
             </p>
         </div>
-        <a href="{% url 'cart-orders:view-cart' %}" class="btn btn-primary position-relative">
-            <i class="fas fa-shopping-cart"></i> View Cart
-            {% if cart_count > 0 %}
-                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-                      style="font-size: 11px;">
-                    {{ cart_count }}
-                </span>
-            {% else %}
-                <span id="header-cart-count" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-                      style="font-size: 11px; display: none;"></span>
-            {% endif %}
-        </a>
+        
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="/" class="btn btn-outline-primary d-flex align-items-center gap-2 shadow-sm">
+                <i class="fas fa-home"></i>
+                <span class="d-none d-sm-inline">HOME</span>
+            </a>
+            <a href="{% url 'cart-orders:view-cart' %}" class="btn btn-primary position-relative">
+                <i class="fas fa-shopping-cart"></i> View Cart
+                {% if cart_count > 0 %}
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                        style="font-size: 11px;">
+                        {{ cart_count }}
+                    </span>
+                {% else %}
+                    <span id="header-cart-count" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                        style="font-size: 11px; display: none;"></span>
+                {% endif %}
+            </a>
+        </div>
     </div>
+
 
     <!-- SEARCH BAR -->
     <div class="mb-4">
@@ -68,59 +78,71 @@
                  data-product-kind="{% if product.accessory_type %}accessory{% elif product.model_number %}electronic{% else %}phone{% endif %}"
                  data-product-id="{{ product.id }}">
 
-                <!-- Add Image button (role-gated) -->
-                {% if can_manage_images %}
-                <button type="button"
-                        class="btn btn-sm btn-light position-absolute shadow-sm add-image-btn d-flex align-items-center gap-1"
-                        style="top: 8px; right: 8px; z-index: 10; border-radius: 20px; padding: 4px 10px;"
-                        title="Add image"
-                        onclick="openImagePicker(this)">
-                    <i class="fas fa-camera text-primary"></i>
-                    <span style="font-size: 11px; font-weight: 600;">Add Image</span>
-                </button>
-                <input type="file"
-                       class="d-none product-image-input"
-                       accept="image/*">
-                {% endif %}
+                <!-- TOP ROW: Brand & Add Image Button -->
+                <div class="d-flex justify-content-between align-items-center px-2 pt-2 pb-0">
+                    <small class="text-muted text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 0.5px;">
+                        {{ product.brand|default:"Brand" }}
+                    </small>
+                    
+                    {% if can_manage_images %}
+                    <button type="button"
+                            class="btn btn-sm btn-light border-0 shadow-none p-1 add-image-btn"
+                            title="Add image"
+                            onclick="openImagePicker(this)">
+                        <i class="fas fa-camera text-primary"></i>
+                    </button>
+                    <input type="file" class="d-none product-image-input" accept="image/*">
+                    {% endif %}
+                </div>
 
-                <!-- Clickable Link for Image and Details -->
-                <a href="{% url 'public-product-detail' product.product_code %}"
-                   class="text-decoration-none text-dark d-flex flex-column h-100">
-                    <div class="product-thumb"
-                         style="height: 160px; background-color: #f8f9fa; border-radius: 8px 8px 0 0; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
+                <!-- IMAGE CONTAINER -->
+                <a href="{% url 'public-product-detail' product.product_code %}" class="text-decoration-none text-dark">
+                    <div class="product-thumb mt-1"
+                         style="height: 140px; background-color: #f8f9fa; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; margin: 0 8px;">
                         
-                        {# 🚀 FIX: Use the resolved dynamic image or fallback cleanly #}
                         {% if product.gallery_image_url and product.gallery_image_url != 'None' %}
                             <img src="{{ product.gallery_image_url }}"
                                  alt="{{ product.name }}"
                                  class="product-thumb-img"
-                                 style="max-height: 100%; max-width: 100%; object-fit: contain; padding: 10px;">
+                                 style="max-height: 100%; max-width: 100%; object-fit: contain; padding: 5px;">
                         {% else %}
                             <i class="fas fa-image fa-2x text-muted product-thumb-placeholder"
                                style="position: absolute;"></i>
                         {% endif %}
                     </div>
-
-                    <div class="card-body p-2 d-flex flex-column">
-                        <small class="text-muted text-uppercase" style="font-size: 10px;">
-                            {{ product.brand|default:"Brand" }}
-                        </small>
-                        <h6 class="card-title text-truncate mt-1 mb-2" style="font-size: 13px;" title="{{ product.name }}">
-                            {{ product.name }}
-                        </h6>
-
-                        <p class="fw-bold text-primary mt-auto mb-2" style="font-size: 15px;">
-                            KSh {{ product.selling_price|floatformat:2 }}
-                        </p>
-                    </div>
                 </a>
 
-                <!-- Add to Cart Button (Separate from Link) -->
-                <div class="px-2 pb-2 mt-auto">
-                    <button onclick="addToCart(this, '{% if product.accessory_type %}accessory{% elif product.model_number %}electronic{% else %}phone{% endif %}', {{ product.id }}, '{{ product.name|escapejs }}', '{{ product.selling_price }}', '{{ product.gallery_image_url|default:'' }}')"
-                            class="btn btn-sm btn-outline-primary w-100">
-                        <i class="fas fa-cart-plus"></i> Add to Cart
-                    </button>
+                <!-- DETAILS AREA -->
+                <div class="card-body p-2 d-flex flex-column">
+                    <!-- Product Display Name -->
+                    <h6 class="card-title text-truncate mb-1 fw-bold" style="font-size: 13px;" title="{{ product.name }}">
+                        {{ product.name }}
+                    </h6>
+                    
+                    <!-- Model and Specs in same row -->
+                    <div class="d-flex justify-content-between text-muted mb-2" style="font-size: 10px;">
+                        <span class="fw-bold">
+                            {% if product.model %}{{ product.model }}{% elif product.model_number %}{{ product.model_number }}{% endif %}
+                        </span>
+                        <span>
+                            {% if product.ram and product.storage_capacity %}
+                                {{ product.ram }} / {{ product.storage_capacity }}
+                            {% elif product.ram and product.storage %}
+                                {{ product.ram }} / {{ product.storage }}
+                            {% endif %}
+                        </span>
+                    </div>
+
+                    <!-- Price and Add to Cart in one row -->
+                    <div class="d-flex justify-content-between align-items-center mt-auto pt-2 border-top">
+                        <span class="fw-bold text-primary mb-0" style="font-size: 15px;">
+                            KSh {{ product.selling_price|floatformat:0 }}
+                        </span>
+                        <button onclick="addToCart(this, '{% if product.accessory_type %}accessory{% elif product.model_number %}electronic{% else %}phone{% endif %}', {{ product.id }}, '{{ product.name|escapejs }}', '{{ product.selling_price }}', '{{ product.gallery_image_url|default:'' }}')"
+                                class="btn btn-sm btn-outline-primary py-1 px-2" style="font-size: 11px;">
+                            <i class="fas fa-cart-plus"></i> Add
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -183,7 +205,7 @@ function addToCart(btnElement, modelType, productId, productName, price, imageUr
     .then(data => {
         if (data.status === 'success') {
             btnElement.innerHTML = '<i class="fas fa-check"></i> Added';
-            btnElement.className = 'btn btn-sm btn-success w-100';
+            btnElement.className = 'btn btn-sm btn-success py-1 px-2';
 
             var headerBadge = document.getElementById('header-cart-count');
             var headerBadgeExisting = document.querySelector('.position-absolute.top-0.start-100');
@@ -224,7 +246,7 @@ function addToCart(btnElement, modelType, productId, productName, price, imageUr
 }
 
 /* ================================================================
-   IMAGE UPLOAD — from the card overlay button
+   IMAGE UPLOAD
    ================================================================ */
 function openImagePicker(btn) {
     var card = btn.closest('.product-card');
@@ -284,7 +306,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             img.src = res.data.image.url;
                             img.alt = res.data.image.alt || '';
                             img.className = 'product-thumb-img';
-                            img.style.cssText = 'max-height:100%;max-width:100%;object-fit:contain;padding:10px;';
+                            img.style.cssText = 'max-height:100%;max-width:100%;object-fit:contain;padding:5px;';
                             thumbContainer.insertBefore(img, thumbContainer.firstChild);
                         }
                         if (placeholder) placeholder.style.display = 'none';
@@ -352,6 +374,9 @@ function getCookie(name) {
     .add-image-btn:hover {
         opacity: 1;
         transform: scale(1.08);
+    }
+    .card-title {
+        line-height: 1.2;
     }
 </style>
 {% endblock %}
