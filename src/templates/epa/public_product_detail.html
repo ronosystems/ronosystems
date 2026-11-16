@@ -18,24 +18,93 @@
 
 <div class="container py-5">
     <div class="row">
-        <!-- Image -->
+
+        <!-- ============================================================ -->
+        <!-- IMAGE GALLERY                                                -->
+        <!-- ============================================================ -->
         <div class="col-md-5">
-            <div class="card shadow-sm border-0 p-4">
-                {% if display_image %}
-                    <img src="{{ display_image }}" class="img-fluid" alt="{{ product.name }}">
-                {% else %}
-                    <div class="text-center text-muted py-5">
-                        <i class="fas fa-image fa-4x"></i>
+            <div class="card shadow-sm border-0 p-4 position-relative">
+
+                {# ---- Add Image button (role-gated) ---- #}
+                {% if can_manage_images %}
+                <button type="button"
+                        id="add-image-btn"
+                        class="btn btn-sm btn-light position-absolute shadow-sm d-flex align-items-center gap-1"
+                        style="top: 12px; right: 12px; z-index: 10; border-radius: 20px; padding: 4px 12px;"
+                        title="Add image to gallery"
+                        onclick="openImagePicker()">
+                    <i class="fas fa-camera text-primary"></i>
+                    <span style="font-size: 12px; font-weight: 600;">Add Image</span>
+                </button>
+                <input type="file"
+                       id="product-image-input"
+                       class="d-none"
+                       accept="image/*">
+                {% endif %}
+
+                {% if gallery %}
+                    <!-- Main preview -->
+                    <div class="text-center mb-3">
+                        <img id="main-product-image"
+                             src="{{ gallery.0.url }}"
+                             class="img-fluid rounded"
+                             alt="{{ gallery.0.alt }}"
+                             style="max-height: 420px; width: 100%; object-fit: contain;">
                     </div>
+
+                    <!-- Thumbnail strip -->
+                    <div id="gallery-thumbnails"
+                         class="d-flex flex-wrap gap-2 justify-content-center mb-2">
+                        {% for img in gallery %}
+                        <div class="position-relative thumbnail-wrapper" id="thumb-wrapper-{{ forloop.counter0 }}">
+                            <button type="button"
+                                    class="btn p-0 border rounded thumbnail-btn {% if forloop.first %}border-primary border-2 active-thumb{% endif %}"
+                                    data-image-url="{{ img.url }}"
+                                    data-image-alt="{{ img.alt }}"
+                                    onclick="swapMainImage(this)"
+                                    aria-label="View image {{ forloop.counter }} of {{ gallery|length }}">
+                                <img src="{{ img.url }}"
+                                     alt="{{ img.alt }}"
+                                     style="width: 72px; height: 72px; object-fit: cover; display: block; border-radius: 4px;">
+                            </button>
+
+                            {# Delete button — always show if role allows #}
+                            {% if can_manage_images %}
+                            <button type="button"
+                                    class="btn btn-danger btn-sm position-absolute top-0 end-0 p-0 delete-image-btn"
+                                    style="width: 20px; height: 20px; line-height: 1; font-size: 14px; border-radius: 50%; transform: translate(30%, -30%); z-index: 5;"
+                                    title="Delete this image"
+                                    data-image-id="{{ img.id }}" 
+                                    data-image-url="{{ img.url }}"
+                                    onclick="deleteGalleryImage(event, this)">
+                                &times;
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <!-- No images at all -->
+                    <div id="gallery-empty"
+                         class="text-center text-muted py-5">
+                        <i class="fas fa-image fa-4x mb-3"></i>
+                        <p class="mb-0">No image available</p>
+                    </div>
+                {% endif %}
+
+                {% if can_manage_images %}
+                <div id="upload-status" class="small text-muted mt-2 text-center"></div>
                 {% endif %}
             </div>
         </div>
 
-        <!-- Details -->
+        <!-- ============================================================ -->
+        <!-- PRODUCT DETAILS                                              -->
+        <!-- ============================================================ -->
         <div class="col-md-7">
             <h2 class="fw-bold">{{ product.name }}</h2>
             <p class="text-muted">{{ product.brand }}</p>
-            
+
             <div class="my-3">
                 {% if original_price %}
                     <span class="text-danger text-decoration-line-through fs-5 me-2">KSh {{ original_price }}</span>
@@ -44,7 +113,7 @@
                     <span class="text-primary fw-bold" style="font-size: 2rem;">KSh {{ display_price }}</span>
                 {% endif %}
             </div>
-            
+
             <p class="text-success"><i class="fas fa-check-circle"></i> In Stock</p>
 
             <div class="mb-4">
@@ -68,14 +137,246 @@
             </div>
 
             <!-- Add to Cart Button -->
-            <button onclick="addToCart(this, '{{ product_type }}', {{ product.id }}, '{{ product.name|escapejs }}', '{{ display_price }}', '{{ display_image|default:'' }}')" class="btn btn-primary btn-lg w-100">
+            <button onclick="addToCart(this, '{{ product_type }}', {{ product.id }}, '{{ product.name|escapejs }}', '{{ display_price }}', '{{ display_image|default:'' }}')"
+                    class="btn btn-primary btn-lg w-100 mb-4">
                 <i class="fas fa-shopping-cart"></i> Add to Cart
             </button>
+
+
+            <!-- ============================================================ -->
+            <!-- SIMILAR PRODUCTS                                             -->
+            <!-- ============================================================ -->
+            {% if similar_products %}
+            <hr class="my-4">
+            <h5 class="fw-bold mb-3"><i class="fas fa-box-open text-muted me-2"></i> Similar Products</h5>
+            <div class="row row-cols-2 row-cols-md-3 g-2">
+                {% for sp in similar_products %}
+                <div class="col">
+                    <a href="{% url 'public-product-detail' sp.product_code %}" class="text-decoration-none text-dark">
+                        <div class="card shadow-sm border-0 h-100 product-card">
+                            <div style="height: 100px; background-color: #f8f9fa; border-radius: 8px 8px 0 0; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                                {% if sp.similar_image_url %}
+                                    <img src="{{ sp.similar_image_url }}" alt="{{ sp.name }}" style="max-height: 100%; max-width: 100%; object-fit: contain; padding: 5px;">
+                                {% else %}
+                                    <i class="fas fa-image fa-2x text-muted"></i>
+                                {% endif %}
+                            </div>
+                            <div class="card-body p-2">
+                                <h6 class="card-title text-truncate mb-1" style="font-size: 11px;" title="{{ sp.name }}">{{ sp.name }}</h6>
+                                <p class="fw-bold text-primary mb-0" style="font-size: 12px;">KSh {{ sp.selling_price|floatformat:2 }}</p>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
         </div>
     </div>
 </div>
 
 <script>
+/* ================================================================
+   GALLERY: swap main preview when a thumbnail is clicked
+   ================================================================ */
+function swapMainImage(btn) {
+    var main = document.getElementById('main-product-image');
+    if (!main) return;
+
+    var url = btn.getAttribute('data-image-url');
+    var alt = btn.getAttribute('data-image-alt') || '';
+    if (!url) return;
+
+    main.src = url;
+    main.alt = alt;
+
+    document.querySelectorAll('.thumbnail-btn').forEach(function (b) {
+        b.classList.remove('border-primary', 'border-2', 'active-thumb');
+    });
+    btn.classList.add('border-primary', 'border-2', 'active-thumb');
+}
+
+/* ================================================================
+   ADD IMAGE (role-gated, server enforced too)
+   ================================================================ */
+function openImagePicker() {
+    var input = document.getElementById('product-image-input');
+    if (!input) return;
+    input.value = '';
+    input.click();
+}
+
+(function () {
+    var input = document.getElementById('product-image-input');
+    var addBtn = document.getElementById('add-image-btn');
+    var statusEl = document.getElementById('upload-status');
+    if (!input || !addBtn) return;   // role doesn't allow managing images
+
+    input.addEventListener('change', function () {
+        if (!input.files || input.files.length === 0) return;
+        var file = input.files[0];
+
+        if (!file.type.startsWith('image/')) {
+            if (statusEl) statusEl.textContent = 'Please choose an image file.';
+            input.value = '';
+            return;
+        }
+
+        var fd = new FormData();
+        fd.append('image', file);
+
+        var originalHtml = addBtn.innerHTML;
+        addBtn.disabled = true;
+        addBtn.innerHTML = '<i class="fas fa-spinner fa-spin text-primary"></i>';
+        if (statusEl) statusEl.textContent = 'Uploading...';
+
+        var endpoint = '/epa_shop/products/'
+            + encodeURIComponent('{{ product.product_code|escapejs }}')
+            + '/images/add/';
+
+        fetch(endpoint, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+            body: fd
+        })
+        .then(async function (r) {
+            // 🚀 SAFETY CHECK: Catch HTML error pages (500, 404) before trying to parse JSON
+            if (!r.ok) {
+                var text = await r.text();
+                console.error("Server Error Response:", text);
+                throw new Error("Server returned status " + r.status);
+            }
+            return r.json();
+        })
+        .then(function (data) {
+            if (data.success) {
+                var main = document.getElementById('main-product-image');
+                var strip = document.getElementById('gallery-thumbnails');
+                var empty = document.getElementById('gallery-empty');
+
+                if (!main || !strip) {
+                    window.location.href = window.location.pathname + '?t=' + new Date().getTime();
+                    return;
+                }
+
+                main.src = data.image.url;
+                main.alt = data.image.alt || '';
+
+                document.querySelectorAll('.thumbnail-btn').forEach(function(b) {
+                    b.classList.remove('border-primary', 'border-2', 'active-thumb');
+                });
+
+                var wrapper = document.createElement('div');
+                wrapper.className = 'position-relative thumbnail-wrapper';
+                
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'btn p-0 border rounded thumbnail-btn border-primary border-2 active-thumb';
+                btn.setAttribute('data-image-url', data.image.url);
+                btn.setAttribute('data-image-alt', data.image.alt || '');
+                btn.setAttribute('onclick', 'swapMainImage(this)');
+                btn.innerHTML =
+                    '<img src="' + data.image.url + '" alt="" '
+                    + 'style="width:72px;height:72px;object-fit:cover;display:block;border-radius:4px;">';
+                wrapper.appendChild(btn);
+
+                {% if can_manage_images %}
+                if (data.image.id) {
+                    var delBtn = document.createElement('button');
+                    delBtn.type = 'button';
+                    delBtn.className = 'btn btn-danger btn-sm position-absolute top-0 end-0 p-0 delete-image-btn';
+                    delBtn.style = 'width: 20px; height: 20px; line-height: 1; font-size: 14px; border-radius: 50%; transform: translate(30%, -30%); z-index: 5;';
+                    delBtn.title = 'Delete this image';
+                    delBtn.setAttribute('data-image-id', data.image.id);
+                    delBtn.setAttribute('data-image-url', data.image.url);
+                    delBtn.setAttribute('onclick', 'deleteGalleryImage(event, this)');
+                    delBtn.innerHTML = '&times;';
+                    wrapper.appendChild(delBtn);
+                }
+                {% endif %}
+
+                strip.appendChild(wrapper);
+
+                if (empty) empty.style.display = 'none';
+
+                if (statusEl) statusEl.textContent = '✅ Image added.';
+                addBtn.innerHTML = '<i class="fas fa-check text-success"></i>';
+                setTimeout(function () {
+                    addBtn.innerHTML = originalHtml;
+                    addBtn.disabled = false;
+                }, 1500);
+            } else {
+                if (statusEl) statusEl.textContent = '❌ ' + (data.error || 'Upload failed.');
+                addBtn.innerHTML = originalHtml;
+                addBtn.disabled = false;
+            }
+        })
+        .catch(function (err) {
+            console.error("Upload Error Details:", err);
+            alert("Upload Error: " + err.message + "\n\nCheck the browser console (F12) for the raw server response.");
+            if (statusEl) statusEl.textContent = '❌ Network error.';
+            addBtn.innerHTML = originalHtml;
+            addBtn.disabled = false;
+        })
+        .finally(function () { input.value = ''; });
+    });
+})();
+
+
+function deleteGalleryImage(event, btn) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!confirm("Are you sure you want to delete this image?")) return;
+
+    var imageId = btn.getAttribute('data-image-id');
+    var wrapper = btn.closest('.thumbnail-wrapper');
+    
+    var originalHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size:10px;"></i>';
+    btn.disabled = true;
+
+    var isCover = (imageId === 'cover' || imageId === 'featured');
+    var endpoint = '/epa_shop/products/' + encodeURIComponent('{{ product.product_code|escapejs }}') 
+                 + (isCover ? '/images/cover/delete/' : '/images/' + imageId + '/delete/');
+
+    fetch(endpoint, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(async function (r) {
+        if (!r.ok) {
+            var text = await r.text();
+            console.error("Server Error Response:", text);
+            throw new Error("Server returned status " + r.status);
+        }
+        return r.json();
+    })
+    .then(function (data) {
+        if (data.success) {
+            // 🚀 FORCE RELOAD WITH CACHE BUSTER
+            window.location.href = window.location.pathname + '?t=' + new Date().getTime();
+        } else {
+            alert(data.error || "Failed to delete image.");
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        }
+    })
+    .catch(function (err) {
+        console.error("Delete Error Details:", err);
+        alert("Delete Error: " + err.message + "\n\nCheck the browser console (F12) for the raw server response.");
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+    });
+}
+
+/* ================================================================
+   ADD TO CART (unchanged behaviour)
+   ================================================================ */
 function addToCart(btnElement, modelType, productId, productName, price, imageUrl) {
     var originalHtml = btnElement.innerHTML;
     var originalClasses = btnElement.className;
@@ -101,16 +402,15 @@ function addToCart(btnElement, modelType, productId, productName, price, imageUr
     .then(data => {
         if (data.status === 'success') {
             btnElement.innerHTML = '<i class="fas fa-check"></i> Added';
-            btnElement.className = 'btn btn-success btn-lg w-100';
+            btnElement.className = 'btn btn-success btn-lg w-100 mb-4';
 
-            // Update the floating cart counter
             var counter = document.getElementById('cart-counter');
             if (counter) {
                 counter.textContent = data.cart_count;
                 counter.style.display = 'inline-block';
             }
 
-            setTimeout(function() {
+            setTimeout(function () {
                 btnElement.innerHTML = originalHtml;
                 btnElement.className = originalClasses;
                 btnElement.disabled = false;
@@ -146,4 +446,27 @@ function getCookie(name) {
     return cookieValue;
 }
 </script>
+
+<style>
+    /* Gallery thumbnails hover polish */
+    .thumbnail-btn {
+        cursor: pointer;
+        transition: border-color .15s ease, transform .15s ease;
+        background: #fff;
+    }
+    .thumbnail-btn:hover {
+        border-color: #0d6efd;
+        transform: translateY(-2px);
+    }
+
+    /* Similar products card hover */
+    .product-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-radius: 8px;
+    }
+    .product-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+    }
+</style>
 {% endblock %}

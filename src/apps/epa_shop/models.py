@@ -47,6 +47,7 @@ class HomepageFeaturedProduct(models.Model):
         ('new_arrival', 'New Arrival'),
         ('discounted', 'Discounted Product'),
         ('flash_sale', 'Flash Sale'),
+        ('amazing_deals', 'Amazing Deals'),
     )
     
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='homepage_featured_products')
@@ -266,6 +267,76 @@ class BaseProduct(models.Model):
 
 
 # ============================================
+# PRODUCT IMAGE (multiple images per product)
+# ============================================
+
+class ProductImage(models.Model):
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name='product_images'
+    )
+
+    # Generic link to Phone / Electronic / Accessory
+    content_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.CASCADE,
+        limit_choices_to={
+            'app_label': 'epa_shop',
+            'model__in': ['phone', 'electronic', 'accessory'],
+        },
+    )
+    object_id = models.PositiveIntegerField(db_index=True)
+    product = GenericForeignKey('content_type', 'object_id')
+
+    image = models.ImageField(
+        upload_to='epa/products/%Y/%m/',
+        max_length=500,
+        help_text="Additional gallery image for this product.",
+    )
+    alt_text = models.CharField(max_length=200, blank=True)
+    display_order = models.PositiveIntegerField(
+        default=0, help_text="Lower numbers show first."
+    )
+    is_primary = models.BooleanField(
+        default=False,
+        help_text="Mark one image as the cover/primary image.",
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'epa_product_images'
+        ordering = ['is_primary', 'display_order', 'id']
+        indexes = [
+            models.Index(fields=['content_type', 'object_id']),
+            models.Index(fields=['company', 'is_active']),
+        ]
+
+    def __str__(self):
+        return f"{self.product_name} — image #{self.pk}"
+
+    @property
+    def image_url(self):
+        return _build_cloudinary_url(self.image, resource_type='image')
+
+    @property
+    def product_name(self):
+        try:
+            return self.product.name
+        except Exception:
+            return "Product"
+
+    def save(self, *args, **kwargs):
+        # Ensure only one primary image per product
+        if self.is_primary and self.content_type_id and self.object_id:
+            ProductImage.objects.filter(
+                content_type=self.content_type,
+                object_id=self.object_id,
+                is_primary=True,
+            ).exclude(pk=self.pk).update(is_primary=False)
+        super().save(*args, **kwargs)
+        
+
+# ============================================
 # BRANCH STOCK (Fully fixed for SQLite)
 # ============================================
 
@@ -445,6 +516,7 @@ class Phone(BaseProduct):
 
     sale_items = GenericRelation('SaleItem', content_type_field='content_type', object_id_field='object_id')
     branch_stocks = GenericRelation('BranchStock', content_type_field='content_type', object_id_field='object_id', related_query_name='phone')
+    gallery_images = GenericRelation('ProductImage',content_type_field='content_type',object_id_field='object_id',related_query_name='gallery_phone',)
 
     class Meta:
         db_table = 'epa_phones'
@@ -505,6 +577,7 @@ class Electronic(BaseProduct):
 
     sale_items = GenericRelation('SaleItem', content_type_field='content_type', object_id_field='object_id')
     branch_stocks = GenericRelation('BranchStock', content_type_field='content_type', object_id_field='object_id', related_query_name='electronic')
+    gallery_images = GenericRelation('ProductImage',content_type_field='content_type',object_id_field='object_id',related_query_name='gallery_electronic',)
 
     class Meta:
         db_table = 'epa_electronics'
@@ -556,6 +629,7 @@ class Accessory(BaseProduct):
 
     sale_items = GenericRelation('SaleItem', content_type_field='content_type', object_id_field='object_id')
     branch_stocks = GenericRelation('BranchStock', content_type_field='content_type', object_id_field='object_id', related_query_name='accessory')
+    gallery_images = GenericRelation('ProductImage',content_type_field='content_type',object_id_field='object_id',related_query_name='gallery_accessory',)
 
     class Meta:
         db_table = 'epa_accessories'

@@ -1,15 +1,22 @@
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from .models import HomepageFeaturedProduct, Phone, Electronic, Accessory
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
-from .cloudinary_utils import _upload_product_image_to_cloudinary
-import json
 from django.http import JsonResponse
 from django.db.models import Q
-from django.contrib.auth.decorators import login_required
-from .models import Phone, Electronic, Accessory
+import json
+
+# ✅ CRITICAL: Import all models needed
+from apps.epa_shop.models import (
+    HomepageFeaturedProduct, 
+    Phone, 
+    Electronic, 
+    Accessory, 
+    ProductImage
+)
+
+from apps.epa_shop.cloudinary_utils import _upload_product_image_to_cloudinary
 
 
 @login_required
@@ -20,7 +27,7 @@ def search_products_api(request):
         return JsonResponse({'results': []})
 
     query = request.GET.get('q', '').strip()
-    ptype = request.GET.get('type', '').strip()  # 'phone', 'electronic', or 'accessory'
+    ptype = request.GET.get('type', '').strip()
 
     if len(query) < 1 or not ptype:
         return JsonResponse({'results': []})
@@ -30,16 +37,13 @@ def search_products_api(request):
     if not model:
         return JsonResponse({'results': []})
 
-    # Filter only this company's active products
     qs = model.objects.filter(company=company, is_active=True)
-
-    # Search across multiple fields
     qs = qs.filter(
         Q(name__icontains=query) |
         Q(brand__icontains=query) |
         Q(product_code__icontains=query) |
         Q(barcode__icontains=query)
-    ).order_by('name')[:10]  # Limit to 10 results
+    ).order_by('name')[:10]
 
     results = []
     for p in qs:
@@ -71,7 +75,6 @@ def manage_homepage(request):
             product_id = request.POST.get('product_id')
             custom_price = request.POST.get('custom_price')
             display_order = request.POST.get('display_order', 0)
-            image = request.FILES.get('image')
             
             model_map = {'phone': Phone, 'electronic': Electronic, 'accessory': Accessory}
             
@@ -86,7 +89,7 @@ def manage_homepage(request):
                 if exists:
                     messages.warning(request, "This product is already in that section.")
                 else:
-                    item = HomepageFeaturedProduct.objects.create(
+                    HomepageFeaturedProduct.objects.create(
                         company=company,
                         section=section,
                         content_type=content_type,
@@ -94,20 +97,6 @@ def manage_homepage(request):
                         custom_price=custom_price if custom_price else None,
                         display_order=display_order,
                     )
-                    
-                    # --- Upload image to Cloudinary ---
-                    if image:
-                        public_id = _upload_product_image_to_cloudinary(
-                            image, 
-                            folder=f"homepage/{timezone.now().strftime('%Y/%m')}"
-                        )
-                        if public_id:
-                            item.image = public_id
-                            item.save()
-                        else:
-                            messages.warning(request, "Product added, but the image failed to upload to Cloudinary.")
-                    # ---------------------------------------
-
                     messages.success(request, "Product added to homepage successfully!")
 
         elif action == 'delete_product':
@@ -124,30 +113,56 @@ def manage_homepage(request):
     electronics = Electronic.objects.filter(company=company, is_active=True)
     accessories = Accessory.objects.filter(company=company, is_active=True)
 
-    current_items = HomepageFeaturedProduct.objects.filter(company=company).select_related('content_type')
+    # 🚀 1. CRITICAL: Convert to a list so dynamic attributes persist
+    current_items = list(HomepageFeaturedProduct.objects.filter(company=company).select_related('content_type'))
 
+    # 🚀 2. Attach the dynamic image to each item
+    for item in current_items:
+        img_url = None
+        
+        # Priority 1: Gallery Image (ProductImage)
+        gallery_img = ProductImage.objects.filter(
+            company=company,
+            content_type=item.content_type,
+            object_id=item.object_id,
+            is_active=True
+        ).order_by('-is_primary', 'display_order', 'id').first()
+        
+        if gallery_img:
+            gal_url = gallery_img.image_url
+            if gal_url and gal_url != "None":
+                img_url = gal_url
+                
+        # Priority 2: Original Product Image
+        if not img_url:
+            product = item.product
+            if product and getattr(product, 'image', None):
+                prod_url = product.image_url
+                if prod_url and prod_url != "None":
+                    img_url = prod_url
+
+        # Final safety check
+        if img_url == "None":
+            img_url = None
+            
+        item.dynamic_preview_image = img_url
+
+    # 🚀 3. Build sections from the LIST using Python list comprehensions
     sections = {
-        'new_arrival': current_items.filter(section='new_arrival'),
-        'discounted': current_items.filter(section='discounted'),
-        'flash_sale': current_items.filter(section='flash_sale'),
+        'new_arrival': [i for i in current_items if i.section == 'new_arrival'],
+        'discounted': [i for i in current_items if i.section == 'discounted'],
+        'flash_sale': [i for i in current_items if i.section == 'flash_sale'],
+        'amazing_deals': [i for i in current_items if i.section == 'amazing_deals'], 
     }
 
-    # ---------------------------------------------------------
-    # NEW: Build the banner slider list
-    # We only want to show items in the slider if they have an image.
-    # ---------------------------------------------------------
-    banner_items = []
-    for item in current_items:
-        # Check if the item has an uploaded image
-        if item.image:
-            banner_items.append(item)
+    banner_items = [item for item in current_items if item.dynamic_preview_image]
 
     context = {
         'phones': phones,
         'electronics': electronics,
         'accessories': accessories,
         'sections': sections,
-        'banner_items': banner_items, # Pass to template
+        'banner_items': banner_items,
     }
     
     return render(request, 'epa/home_set.html', context)

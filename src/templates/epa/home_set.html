@@ -24,13 +24,13 @@
 
     <div class="row">
         <!-- LEFT COLUMN: ADD PRODUCT FORM -->
-        <div class="col-lg-4 mb-4">
+        <div class="col-lg-3 mb-4">
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-dark text-white fw-bold">
                     <i class="fas fa-plus-circle"></i> Add Product to Homepage
                 </div>
                 <div class="card-body">
-                    <form method="post" enctype="multipart/form-data" id="addProductForm">
+                    <form method="post" id="addProductForm">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="add_product">
                         
@@ -40,6 +40,7 @@
                                 <option value="new_arrival">🌟 New Arrivals</option>
                                 <option value="discounted">🏷️ Discounted Products</option>
                                 <option value="flash_sale">⚡ Flash Sales</option>
+                                <option value="amazing_deals">🔥 Amazing Deals</option> <!-- 👈 NEW -->
                             </select>
                         </div>
 
@@ -53,7 +54,7 @@
                             </select>
                         </div>
 
-                        <!-- SEARCH BOX (Hidden until type is selected) -->
+                        <!-- SEARCH BOX -->
                         <div class="mb-3" id="searchContainer" style="display: none;">
                             <label class="form-label fw-bold">Search Product</label>
                             <div class="position-relative">
@@ -67,8 +68,6 @@
                                         <i class="fas fa-spinner fa-spin text-muted"></i>
                                     </span>
                                 </div>
-
-                                <!-- Results Dropdown -->
                                 <div id="searchResults" 
                                      class="list-group position-absolute w-100 shadow" 
                                      style="display: none; z-index: 1000; max-height: 300px; overflow-y: auto;">
@@ -76,7 +75,7 @@
                             </div>
                         </div>
 
-                        <!-- SELECTED PRODUCT PREVIEW (Hidden until product is picked) -->
+                        <!-- SELECTED PRODUCT PREVIEW -->
                         <div class="mb-3" id="selectedProductContainer" style="display: none;">
                             <label class="form-label fw-bold">Selected Product</label>
                             <div class="card border-success bg-light">
@@ -90,26 +89,17 @@
                                     </button>
                                 </div>
                             </div>
-                            <!-- Hidden field that actually submits the product_id -->
                             <input type="hidden" name="product_id" id="selectedProductId" required>
                         </div>
 
                         <div class="mb-3">
                             <label class="form-label fw-bold">Custom Price (Optional)</label>
                             <input type="number" step="0.01" name="custom_price" class="form-control" placeholder="e.g., 80.00">
-                            <small class="text-muted">Leave empty to use default selling price.</small>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Custom Image (Optional)</label>
-                            <input type="file" name="image" class="form-control" accept="image/*">
-                            <small class="text-muted">Override the product's default image.</small>
                         </div>
 
                         <div class="mb-3">
                             <label class="form-label fw-bold">Display Order</label>
                             <input type="number" name="display_order" class="form-control" value="0">
-                            <small class="text-muted">Lower numbers appear first.</small>
                         </div>
 
                         <button type="submit" class="btn btn-primary w-100 fw-bold">
@@ -121,7 +111,7 @@
         </div>
 
         <!-- RIGHT COLUMN: CURRENT LAYOUT -->
-        <div class="col-lg-8">
+        <div class="col-lg-9">
             <div class="row">
                 
                 <!-- NEW ARRIVALS -->
@@ -133,13 +123,14 @@
                         <div class="card-body p-0">
                             <ul class="list-group list-group-flush">
                                 {% for item in sections.new_arrival %}
+                                <!-- Loop content (same as before) -->
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
                                     <div class="d-flex align-items-center">
                                         <div class="me-3 rounded border d-flex align-items-center justify-content-center overflow-hidden" style="width: 40px; height: 40px; background-color: #f8f9fa;">
-                                            {% if item.image_url %}
-                                                <img src="{{ item.image_url }}" style="width: 100%; height: 100%; object-fit: cover;">
-                                            {% elif item.product.image_url %}
-                                                <img src="{{ item.product.image_url }}" style="width: 100%; height: 100%; object-fit: contain;">
+                                            {% if item.dynamic_preview_image %}
+                                                <img src="{{ item.dynamic_preview_image }}" style="width: 100%; height: 100%; object-fit: cover;">
+                                            {% else %}
+                                                <i class="fas fa-image text-muted"></i>
                                             {% endif %}
                                         </div>
                                         <div>
@@ -176,13 +167,14 @@
                         <div class="card-body p-0">
                             <ul class="list-group list-group-flush">
                                 {% for item in sections.discounted %}
+                                <!-- Loop content -->
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
                                     <div class="d-flex align-items-center">
                                         <div class="me-3 rounded border d-flex align-items-center justify-content-center overflow-hidden" style="width: 40px; height: 40px; background-color: #f8f9fa;">
-                                            {% if item.image_url %}
-                                                <img src="{{ item.image_url }}" style="width: 100%; height: 100%; object-fit: cover;">
-                                            {% elif item.product.image_url %}
-                                                <img src="{{ item.product.image_url }}" style="width: 100%; height: 100%; object-fit: contain;">
+                                            {% if item.dynamic_preview_image %}
+                                                <img src="{{ item.dynamic_preview_image }}" style="width: 100%; height: 100%; object-fit: cover;">
+                                            {% else %}
+                                                <i class="fas fa-image text-muted"></i>
                                             {% endif %}
                                         </div>
                                         <div>
@@ -211,7 +203,7 @@
                 </div>
 
                 <!-- FLASH SALES -->
-                <div class="col-md-12 mb-4">
+                <div class="col-md-6 mb-4">
                     <div class="card shadow-sm border-0 h-100">
                         <div class="card-header bg-danger text-white fw-bold">
                             <i class="fas fa-bolt"></i> Flash Sales
@@ -219,13 +211,57 @@
                         <div class="card-body p-0">
                             <ul class="list-group list-group-flush">
                                 {% for item in sections.flash_sale %}
+                                <!-- Loop content -->
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
                                     <div class="d-flex align-items-center">
                                         <div class="me-3 rounded border d-flex align-items-center justify-content-center overflow-hidden" style="width: 40px; height: 40px; background-color: #f8f9fa;">
-                                            {% if item.image_url %}
-                                                <img src="{{ item.image_url }}" style="width: 100%; height: 100%; object-fit: cover;">
-                                            {% elif item.product.image_url %}
-                                                <img src="{{ item.product.image_url }}" style="width: 100%; height: 100%; object-fit: contain;">
+                                            {% if item.dynamic_preview_image %}
+                                                <img src="{{ item.dynamic_preview_image }}" style="width: 100%; height: 100%; object-fit: cover;">
+                                            {% else %}
+                                                <i class="fas fa-image text-muted"></i>
+                                            {% endif %}
+                                        </div>
+                                        <div>
+                                            <strong>{{ item.product.brand }} {{ item.product.name }}</strong><br>
+                                            <small class="text-muted">
+                                                Price: {% if item.custom_price %}<span class="text-danger fw-bold">Ksh {{ item.custom_price }}</span>{% else %}Ksh {{ item.product.selling_price }}{% endif %}
+                                                | Order: {{ item.display_order }}
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <form method="post" class="m-0">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="delete_product">
+                                        <input type="hidden" name="item_id" value="{{ item.id }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger border-0" title="Remove">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </li>
+                                {% empty %}
+                                <li class="list-group-item text-muted text-center py-4">No products added yet.</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AMAZING DEALS (NEW) -->
+                <div class="col-md-6 mb-4">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-header bg-primary text-white fw-bold">
+                            <i class="fas fa-fire"></i> Amazing Deals
+                        </div>
+                        <div class="card-body p-0">
+                            <ul class="list-group list-group-flush">
+                                {% for item in sections.amazing_deals %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div class="d-flex align-items-center">
+                                        <div class="me-3 rounded border d-flex align-items-center justify-content-center overflow-hidden" style="width: 40px; height: 40px; background-color: #f8f9fa;">
+                                            {% if item.dynamic_preview_image %}
+                                                <img src="{{ item.dynamic_preview_image }}" style="width: 100%; height: 100%; object-fit: cover;">
+                                            {% else %}
+                                                <i class="fas fa-image text-muted"></i>
                                             {% endif %}
                                         </div>
                                         <div>
@@ -262,7 +298,7 @@
 {% block extra_js %}
 <script>
 // =========================================================
-// SEARCH LOGIC
+// SEARCH LOGIC (unchanged)
 // =========================================================
 let searchTimeout = null;
 let currentSearchTerm = '';
@@ -288,7 +324,6 @@ function debouncedSearch(query) {
     
     document.getElementById('searchSpinner').style.display = 'inline-flex';
     
-    // 300ms debounce
     searchTimeout = setTimeout(() => {
         doSearch(query);
     }, 300);
@@ -303,7 +338,6 @@ function doSearch(query) {
         .then(data => {
             document.getElementById('searchSpinner').style.display = 'none';
             
-            // Ignore stale responses
             if (query !== currentSearchTerm) return;
             
             const resultsDiv = document.getElementById('searchResults');
@@ -340,17 +374,12 @@ function doSearch(query) {
         });
 }
 
-// =========================================================
-// SELECT PRODUCT
-// =========================================================
 function selectProduct(id, name, brand, code, price) {
-    // Show the selected product card
     document.getElementById('selectedProductContainer').style.display = 'block';
     document.getElementById('selectedProductName').textContent = name;
     document.getElementById('selectedProductDetails').textContent = `${brand} • ${code} • Ksh ${price}`;
     document.getElementById('selectedProductId').value = id;
     
-    // Clear and hide search
     document.getElementById('productSearchInput').value = '';
     document.getElementById('searchResults').style.display = 'none';
     document.getElementById('searchResults').innerHTML = '';
@@ -363,9 +392,6 @@ function clearSelection() {
     document.getElementById('selectedProductDetails').textContent = '';
 }
 
-// =========================================================
-// HIDE RESULTS WHEN CLICKING OUTSIDE
-// =========================================================
 document.addEventListener('click', function(e) {
     const searchContainer = document.getElementById('searchContainer');
     if (searchContainer && !searchContainer.contains(e.target)) {

@@ -56,7 +56,11 @@ urlpatterns = [
     path('products/<str:product_code>/restock/',          product_views.product_restock, name='epa-product-restock'),
     path('products/<str:product_code>/units/',            product_views.product_units,   name='epa-product-units'),
     path('products/<str:product_code>/update-prices/',    product_views.update_product_prices, name='epa-product-update-prices'),
-    path('products/<str:product_code>/transfer/',        product_views.product_transfer, name='epa-product-transfer'),
+    path('products/<str:product_code>/transfer/',         product_views.product_transfer,      name='epa-product-transfer'),
+    path('products/<str:product_code>/images/add/',       product_views.product_image_add,     name='product_image_add'),
+    path('products/<str:product_code>/images/<int:image_id>/delete/',    product_views.product_image_delete,   name='product_image_delete'),
+    path('products/<str:product_code>/unit/<str:identifier>/delete/',    product_views.unit_delete,            name='epa-unit-delete'),
+    path('products/<str:product_code>/images/cover/delete/',             product_views.product_image_cover_delete, name='product_image_cover_delete'),
 
 
     # ============================================
@@ -65,9 +69,7 @@ urlpatterns = [
     path('units/',             product_views.all_units_combined,    name='epa-all-units'),
     path('unit/<int:unit_id>/edit/',      product_views.unit_edit,     name='epa-unit-edit'),
     path('unit/<int:unit_id>/transfer/',  product_views.unit_transfer, name='epa-unit-transfer'),
-    path('products/<str:product_code>/unit/<str:identifier>/delete/',
-         product_views.unit_delete,
-         name='epa-unit-delete'),
+    
 
     # ============================================
     # ALL UNITS PAGES

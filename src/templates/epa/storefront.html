@@ -6,7 +6,7 @@
 
 {% block content %}
 <div class="container-fluid py-4">
-    
+
     <!-- Header -->
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
         <div>
@@ -19,16 +19,16 @@
                 {% endif %}
             </p>
         </div>
-        <!-- FIXED: Added namespace 'cart-orders:' -->
         <a href="{% url 'cart-orders:view-cart' %}" class="btn btn-primary position-relative">
             <i class="fas fa-shopping-cart"></i> View Cart
             {% if cart_count > 0 %}
-                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" 
-                    style="font-size: 11px;">
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                      style="font-size: 11px;">
                     {{ cart_count }}
                 </span>
             {% else %}
-                <span id="header-cart-count" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 11px; display: none;"></span>
+                <span id="header-cart-count" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                      style="font-size: 11px; display: none;"></span>
             {% endif %}
         </a>
     </div>
@@ -40,10 +40,10 @@
                 <span class="input-group-text bg-white border-end-0">
                     <i class="fas fa-search text-muted"></i>
                 </span>
-                <input type="text" 
-                       name="q" 
-                       class="form-control border-start-0" 
-                       placeholder="Search for phones, laptops, accessories..." 
+                <input type="text"
+                       name="q"
+                       class="form-control border-start-0"
+                       placeholder="Search for phones, laptops, accessories..."
                        value="{{ search_query }}"
                        autocomplete="off">
                 {% if search_query %}
@@ -63,19 +63,44 @@
     <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 row-cols-xl-6 g-3">
         {% for product in products %}
         <div class="col">
-            <div class="card shadow-sm border-0 h-100 product-card position-relative">
-                
+            <div class="card shadow-sm border-0 h-100 product-card position-relative"
+                 data-product-code="{{ product.product_code }}"
+                 data-product-kind="{% if product.accessory_type %}accessory{% elif product.model_number %}electronic{% else %}phone{% endif %}"
+                 data-product-id="{{ product.id }}">
+
+                <!-- Add Image button (role-gated) -->
+                {% if can_manage_images %}
+                <button type="button"
+                        class="btn btn-sm btn-light position-absolute shadow-sm add-image-btn d-flex align-items-center gap-1"
+                        style="top: 8px; right: 8px; z-index: 10; border-radius: 20px; padding: 4px 10px;"
+                        title="Add image"
+                        onclick="openImagePicker(this)">
+                    <i class="fas fa-camera text-primary"></i>
+                    <span style="font-size: 11px; font-weight: 600;">Add Image</span>
+                </button>
+                <input type="file"
+                       class="d-none product-image-input"
+                       accept="image/*">
+                {% endif %}
+
                 <!-- Clickable Link for Image and Details -->
-                <a href="{% url 'public-product-detail' product.product_code %}" class="text-decoration-none text-dark d-flex flex-column h-100">
-                    <div style="height: 160px; background-color: #f8f9fa; border-radius: 8px 8px 0 0; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
-                        {% if product.image_url and product.image_url != 'None' %}
-                            <img src="{{ product.image_url }}" alt="{{ product.name }}" 
-                                 style="max-height: 100%; max-width: 100%; object-fit: contain; padding: 10px;"
-                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <a href="{% url 'public-product-detail' product.product_code %}"
+                   class="text-decoration-none text-dark d-flex flex-column h-100">
+                    <div class="product-thumb"
+                         style="height: 160px; background-color: #f8f9fa; border-radius: 8px 8px 0 0; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
+                        
+                        {# 🚀 FIX: Use the resolved dynamic image or fallback cleanly #}
+                        {% if product.gallery_image_url and product.gallery_image_url != 'None' %}
+                            <img src="{{ product.gallery_image_url }}"
+                                 alt="{{ product.name }}"
+                                 class="product-thumb-img"
+                                 style="max-height: 100%; max-width: 100%; object-fit: contain; padding: 10px;">
+                        {% else %}
+                            <i class="fas fa-image fa-2x text-muted product-thumb-placeholder"
+                               style="position: absolute;"></i>
                         {% endif %}
-                        <i class="fas fa-image fa-2x text-muted" style="display: {% if product.image_url and product.image_url != 'None' %}none{% else %}block{% endif %}; position: absolute;"></i>
                     </div>
-                    
+
                     <div class="card-body p-2 d-flex flex-column">
                         <small class="text-muted text-uppercase" style="font-size: 10px;">
                             {{ product.brand|default:"Brand" }}
@@ -83,7 +108,7 @@
                         <h6 class="card-title text-truncate mt-1 mb-2" style="font-size: 13px;" title="{{ product.name }}">
                             {{ product.name }}
                         </h6>
-                        
+
                         <p class="fw-bold text-primary mt-auto mb-2" style="font-size: 15px;">
                             KSh {{ product.selling_price|floatformat:2 }}
                         </p>
@@ -92,7 +117,7 @@
 
                 <!-- Add to Cart Button (Separate from Link) -->
                 <div class="px-2 pb-2 mt-auto">
-                    <button onclick="addToCart(this, '{% if product.accessory_type %}accessory{% elif product.model_number %}electronic{% else %}phone{% endif %}', {{ product.id }}, '{{ product.name|escapejs }}', '{{ product.selling_price }}', '{{ product.image_url|default:'' }}')" 
+                    <button onclick="addToCart(this, '{% if product.accessory_type %}accessory{% elif product.model_number %}electronic{% else %}phone{% endif %}', {{ product.id }}, '{{ product.name|escapejs }}', '{{ product.selling_price }}', '{{ product.gallery_image_url|default:'' }}')"
                             class="btn btn-sm btn-outline-primary w-100">
                         <i class="fas fa-cart-plus"></i> Add to Cart
                     </button>
@@ -128,8 +153,11 @@
     {% endif %}
 </div>
 
-<!-- JavaScript for Cart -->
+<!-- JavaScript for Cart + Image Upload -->
 <script>
+/* ================================================================
+   ADD TO CART
+   ================================================================ */
 function addToCart(btnElement, modelType, productId, productName, price, imageUrl) {
     var originalHtml = btnElement.innerHTML;
     var originalClasses = btnElement.className;
@@ -137,7 +165,6 @@ function addToCart(btnElement, modelType, productId, productName, price, imageUr
     btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
     btnElement.disabled = true;
 
-    // FIXED: Use the new cart-orders URL
     fetch("{% url 'cart-orders:add-to-cart' %}", {
         method: 'POST',
         headers: {
@@ -158,7 +185,6 @@ function addToCart(btnElement, modelType, productId, productName, price, imageUr
             btnElement.innerHTML = '<i class="fas fa-check"></i> Added';
             btnElement.className = 'btn btn-sm btn-success w-100';
 
-            // Update the header count
             var headerBadge = document.getElementById('header-cart-count');
             var headerBadgeExisting = document.querySelector('.position-absolute.top-0.start-100');
 
@@ -170,14 +196,13 @@ function addToCart(btnElement, modelType, productId, productName, price, imageUr
                 headerBadge.style.display = 'inline-block';
             }
 
-            // Update the floating counter (if it exists on this page)
             var floatingCounter = document.getElementById('cart-counter');
             if (floatingCounter) {
                 floatingCounter.textContent = data.cart_count;
                 floatingCounter.style.display = 'inline-block';
             }
 
-            setTimeout(function() {
+            setTimeout(function () {
                 btnElement.innerHTML = originalHtml;
                 btnElement.className = originalClasses;
                 btnElement.disabled = false;
@@ -198,6 +223,100 @@ function addToCart(btnElement, modelType, productId, productName, price, imageUr
     });
 }
 
+/* ================================================================
+   IMAGE UPLOAD — from the card overlay button
+   ================================================================ */
+function openImagePicker(btn) {
+    var card = btn.closest('.product-card');
+    if (!card) return;
+    var input = card.querySelector('.product-image-input');
+    if (!input) return;
+
+    input.value = '';
+    input.click();
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.product-image-input').forEach(function (input) {
+        var card = input.closest('.product-card');
+        if (!card) return;
+
+        var productCode = card.getAttribute('data-product-code');
+        var uploadBtn = card.querySelector('.add-image-btn');
+
+        input.addEventListener('change', function () {
+            if (!input.files || input.files.length === 0) return;
+            var file = input.files[0];
+
+            if (!file.type.startsWith('image/')) {
+                alert('Please choose an image file.');
+                input.value = '';
+                return;
+            }
+
+            var fd = new FormData();
+            fd.append('image', file);
+
+            var originalHtml = uploadBtn.innerHTML;
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin text-primary"></i>';
+
+            var endpoint = '/epa_shop/products/' + encodeURIComponent(productCode) + '/images/add/';
+
+            fetch(endpoint, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': getCookie('csrftoken') },
+                body: fd
+            })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+            .then(function (res) {
+                if (res.ok && res.data.success) {
+                    var thumbContainer = card.querySelector('.product-thumb');
+                    if (thumbContainer) {
+                        var img = thumbContainer.querySelector('.product-thumb-img');
+                        var placeholder = thumbContainer.querySelector('.product-thumb-placeholder');
+
+                        if (img) {
+                            img.src = res.data.image.url;
+                            img.style.display = 'block';
+                        } else {
+                            img = document.createElement('img');
+                            img.src = res.data.image.url;
+                            img.alt = res.data.image.alt || '';
+                            img.className = 'product-thumb-img';
+                            img.style.cssText = 'max-height:100%;max-width:100%;object-fit:contain;padding:10px;';
+                            thumbContainer.insertBefore(img, thumbContainer.firstChild);
+                        }
+                        if (placeholder) placeholder.style.display = 'none';
+                    }
+
+                    uploadBtn.innerHTML = '<i class="fas fa-check text-success"></i>';
+                    setTimeout(function () {
+                        uploadBtn.innerHTML = originalHtml;
+                        uploadBtn.disabled = false;
+                    }, 1500);
+                } else {
+                    alert(res.data.error || 'Failed to upload image.');
+                    uploadBtn.innerHTML = originalHtml;
+                    uploadBtn.disabled = false;
+                }
+            })
+            .catch(function (err) {
+                console.error(err);
+                alert('Network error while uploading.');
+                uploadBtn.innerHTML = originalHtml;
+                uploadBtn.disabled = false;
+            })
+            .finally(function () {
+                input.value = '';
+            });
+        });
+    });
+});
+
+/* ================================================================
+   CSRF helper
+   ================================================================ */
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -225,6 +344,14 @@ function getCookie(name) {
     }
     .input-group-text {
         background-color: #fff;
+    }
+    .add-image-btn {
+        opacity: 0.85;
+        transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+    .add-image-btn:hover {
+        opacity: 1;
+        transform: scale(1.08);
     }
 </style>
 {% endblock %}

@@ -3,19 +3,19 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
-from django.db.models import Q, Count, Sum
+from django.db.models import Q, Count, Sum, F
 from decimal import Decimal
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse, Http404
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
 from apps.company.models import Branch
-from .models import Electronic, Phone, Accessory, Category, Supplier, Unit, Sale, SaleItem, Customer, Owner
+from .models import Electronic, Phone, Accessory, Category, Supplier, Unit, Sale, SaleItem, Customer, Owner, ProductImage
 from django.contrib.auth import get_user_model
 from .utils import record_stock_movement
-from django.http import Http404
 from django.db import transaction
 from django.views.decorators.http import require_POST
+from django.contrib.contenttypes.models import ContentType
 from apps.companies.support_utils import (
     get_active_company,
     is_support_mode,
@@ -29,7 +29,6 @@ import cloudinary
 import cloudinary.uploader
 from django.conf import settings
 import csv
-from django.http import HttpResponse
 import openpyxl
 from openpyxl.styles import Font, PatternFill
 
@@ -158,6 +157,14 @@ def is_stock_controller(user):
     return user.role == 'stock_controller'
 
 
+def can_manage_product_images(user):
+    if not user or not user.is_authenticated:
+        return False
+    if getattr(user, 'is_superuser', False):
+        return True
+    return getattr(user, 'role', None) in ['super_admin', 'company_admin', 'stock_controller']
+
+
 def get_user_branch(user):
     """Get the user's branch"""
     return user.branch if user else None
@@ -201,6 +208,7 @@ def filter_by_user_access(queryset, user, model_type='product'):
     
     return queryset
 
+
 def filter_units_by_user_access(units_queryset, user):
     """Filter units based on user's role"""
     if not user:
@@ -224,6 +232,7 @@ def filter_units_by_user_access(units_queryset, user):
         return units_queryset.none()
     
     return units_queryset
+
 
 def filter_sales_by_user_access(sales_queryset, user):
     """Filter sales based on user's role"""
@@ -2329,6 +2338,192 @@ def product_delete(request, product_code):
         'page_subtitle': f'Code: {product.product_code}',
     }
     return render(request, 'epa/product_delete_confirm.html', context)
+
+
+# ============================================
+# PRODUCT IMAGE GALLERY — ADD / DELETE
+# ============================================
+
+@login_required
+@require_POST
+def product_image_add(request, product_code):
+    """Upload a gallery image for a product."""
+    company, is_viewing_company = get_active_company(request)
+    if not company:
+        return JsonResponse({'success': False, 'error': 'No active company.'}, status=400)
+
+    if not (can_manage_product_images(request.user) or is_viewing_company):
+        return JsonResponse({'success': False, 'error': 'You do not have permission.'}, status=403)
+
+    product, product_type = get_product_by_code(company, product_code)
+    if not product:
+        return JsonResponse({'success': False, 'error': 'Product not found.'}, status=404)
+
+    image_file = request.FILES.get('image')
+    if not image_file:
+        return JsonResponse({'success': False, 'error': 'No image file provided.'}, status=400)
+
+    folder_root = {
+        'Phone': 'epa/phones',
+        'Electronic': 'epa/electronics',
+        'Accessory': 'epa/accessories',
+    }.get(product_type, 'epa/products')
+
+    public_id = _upload_product_image_to_cloudinary(
+        image_file,
+        folder=f"{folder_root}/gallery/{timezone.now().strftime('%Y/%m')}",
+    )
+    if not public_id:
+        return JsonResponse({'success': False, 'error': 'Cloudinary upload failed.'}, status=500)
+
+    model_cls = {'Phone': Phone, 'Electronic': Electronic, 'Accessory': Accessory}[product_type]
+    ctype = ContentType.objects.get_for_model(model_cls)
+
+    # 🔥 CRITICAL FIX: Force this new image to the front
+    next_order = 0
+    
+    # Reset all existing images for this product to NOT primary
+    ProductImage.objects.filter(
+        company=company, content_type=ctype, object_id=product.id
+    ).update(is_primary=False, display_order=F('display_order') + 1)
+
+    img = ProductImage.objects.create(
+        company=company,
+        content_type=ctype,
+        object_id=product.id,
+        image=public_id,
+        alt_text=request.POST.get('alt_text', '').strip()[:200],
+        display_order=next_order,
+        is_primary=True,  # 👈 Force new upload to be primary
+        is_active=True,
+    )
+
+    return JsonResponse({
+        'success': True,
+        'image': {
+            'id': img.id,
+            'url': img.image_url,
+            'alt': img.alt_text or product.name,
+            'is_primary': img.is_primary,
+            'display_order': img.display_order,
+        },
+        'message': 'Image added.',
+    })
+
+
+@login_required
+@require_POST
+def product_image_delete(request, product_code, image_id):
+    """
+    Delete a gallery image. Same role gate as add.
+    """
+    company, is_viewing_company = get_active_company(request)
+    if not company:
+        return JsonResponse({'success': False, 'error': 'No active company.'}, status=400)
+
+    if not (can_manage_product_images(request.user) or is_viewing_company):
+        return JsonResponse(
+            {'success': False, 'error': 'You do not have permission to delete images.'},
+            status=403,
+        )
+
+    product, product_type = get_product_by_code(company, product_code)
+    if not product:
+        return JsonResponse({'success': False, 'error': 'Product not found.'}, status=404)
+
+    model_cls = {'Phone': Phone, 'Electronic': Electronic, 'Accessory': Accessory}[product_type]
+    ctype = ContentType.objects.get_for_model(model_cls)
+
+    img = ProductImage.objects.filter(
+        id=image_id,
+        company=company,
+        content_type=ctype,          # 👈 CRITICAL: scoped per model
+        object_id=product.id,
+    ).first()
+    if not img:
+        return JsonResponse({'success': False, 'error': 'Image not found.'}, status=404)
+
+    # Best-effort Cloudinary cleanup
+    try:
+        _cloudinary_configure()
+        cloudinary.uploader.destroy(str(img.image.name))
+    except Exception as e:
+        print(f"⚠️ Could not delete Cloudinary asset: {e}")
+
+    was_primary = img.is_primary
+    img.delete()
+
+    # If we deleted the primary, promote the next image (if any)
+    if was_primary:
+        nxt = (
+            ProductImage.objects
+            .filter(
+                company=company,
+                content_type=ctype,      # 👈 same scope
+                object_id=product.id,
+                is_active=True,
+            )
+            .order_by('display_order', 'id')
+            .first()
+        )
+        if nxt:
+            nxt.is_primary = True
+            nxt.save(update_fields=['is_primary'])
+
+    return JsonResponse({'success': True, 'message': 'Image deleted.'})
+
+
+@login_required
+@require_POST
+def product_image_cover_delete(request, product_code):
+    """Delete the product's main cover image (and the homepage featured image if it exists)."""
+    company, is_viewing_company = get_active_company(request)
+    if not company:
+        return JsonResponse({'success': False, 'error': 'No active company.'}, status=400)
+
+    if not (can_manage_product_images(request.user) or is_viewing_company):
+        return JsonResponse({'success': False, 'error': 'You do not have permission.'}, status=403)
+
+    product, product_type = get_product_by_code(company, product_code)
+    if not product:
+        return JsonResponse({'success': False, 'error': 'Product not found.'}, status=404)
+
+    # 1. Clear the product's main image
+    if product.image:
+        try:
+            _cloudinary_configure()
+            cloudinary.uploader.destroy(str(product.image.name))
+        except Exception as e:
+            print(f"⚠️ Could not delete Cloudinary asset: {e}")
+        
+        product.image = None
+        product.save(update_fields=['image'])
+
+    # 2. Clear the homepage featured image (if it exists)
+    from apps.epa_shop.models import HomepageFeaturedProduct
+    from django.contrib.contenttypes.models import ContentType
+    
+    model_cls = {'Phone': Phone, 'Electronic': Electronic, 'Accessory': Accessory}[product_type]
+    ctype = ContentType.objects.get_for_model(model_cls)
+    
+    featured_items = HomepageFeaturedProduct.objects.filter(
+        company=company,
+        content_type=ctype,
+        object_id=product.id
+    )
+    
+    for item in featured_items:
+        if item.image:
+            try:
+                _cloudinary_configure()
+                cloudinary.uploader.destroy(str(item.image.name))
+            except Exception as e:
+                print(f"⚠️ Could not delete homepage Cloudinary asset: {e}")
+            
+            item.image = None
+            item.save(update_fields=['image'])
+
+    return JsonResponse({'success': True, 'message': 'Cover image deleted.'})
 
 
 # ============================================
