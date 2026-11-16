@@ -9,51 +9,79 @@
 <style>
     /* Make Select2 match Bootstrap 5 styling */
     .select2-container .select2-selection--single {
-        height: 38px !important;
+        height: 40px !important;
         border: 1px solid #ced4da;
         border-radius: 0.375rem;
+        padding-top: 5px;
     }
     .select2-container--default .select2-selection--single .select2-selection__rendered {
-        line-height: 36px !important;
+        line-height: 28px !important;
     }
     .select2-container--default .select2-selection--single .select2-selection__arrow {
-        height: 36px !important;
+        height: 38px !important;
+    }
+    
+    /* Sticky footer for mobile submit button */
+    @media (max-width: 991px) {
+        .mobile-sticky-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: #fff;
+            padding: 15px;
+            box-shadow: 0 -4px 10px rgba(0,0,0,0.1);
+            z-index: 1040;
+            border-top: 1px solid #dee2e6;
+        }
+        .content-area {
+            padding-bottom: 100px !important; /* Ensure content isn't hidden behind the button */
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="fas fa-link text-primary"></i> Complete Sale: #{{ order.order_number }}</h2>
-        <a href="{% url 'cart-orders:order-list' %}" class="btn btn-outline-secondary">Back to Orders</a>
+<div class="container py-3 py-md-4">
+    
+    <!-- Mobile Optimized Header -->
+    <div class="d-flex flex-row justify-content-between align-items-center mb-3 gap-2">
+        <div>
+            <h4 class="mb-0 fw-bold" style="font-size: 1.1rem;">
+                <i class="fas fa-link text-primary me-1"></i> #{{ order.order_number }}
+            </h4>
+        </div>
+        <a href="{% url 'cart-orders:order-list' %}" class="btn btn-sm btn-outline-secondary px-3">
+            <i class="fas fa-arrow-left"></i> <span class="d-none d-sm-inline">Back</span>
+        </a>
     </div>
 
     <form id="linkSaleForm" data-order-id="{{ order.id }}">
-        <div class="row">
+        <div class="row g-3">
+            
+            <!-- LEFT COLUMN: ITEMS -->
             <div class="col-lg-7">
-                <div class="card shadow-sm border-0 mb-4">
-                    <div class="card-header bg-dark text-white fw-bold">
+                <div class="card shadow-sm border-0 mb-3">
+                    <div class="card-header bg-dark text-white fw-bold py-2">
                         Select Units & Adjust Quantity
                     </div>
-                    <div class="card-body">
+                    <div class="card-body p-2 p-md-3">
                         {% for data in items_data %}
                         <div class="mb-4 pb-3 border-bottom">
                             
-                            <!-- Product Header & Available Stock -->
+                            <!-- Product Title & Qty Input Row -->
                             <div class="d-flex justify-content-between align-items-start mb-2">
-                                <div>
-                                    <h5 class="fw-bold mb-1">{{ data.product.name }}</h5>
-                                    <p class="text-muted small mb-1">Original Request: {{ data.order_item.quantity }} unit(s) | Price: KSh {{ data.order_item.unit_price }}</p>
-                                    
-                                    <span class="badge bg-info text-dark">
-                                        <i class="fas fa-boxes"></i> Available Stock: {{ data.available_stock }}
+                                <div style="flex: 1;">
+                                    <h6 class="fw-bold mb-1">{{ data.product.name }}</h6>
+                                    <span class="badge bg-info text-dark" style="font-size: 10px;">
+                                        Stock: {{ data.available_stock }}
+                                    </span>
+                                    <span class="text-muted" style="font-size: 11px;">
+                                        Req: {{ data.order_item.quantity }}
                                     </span>
                                 </div>
-                                
-                                <!-- Quantity Input -->
-                                <div style="width: 120px;">
-                                    <label class="form-label small fw-bold text-primary mb-1">New Qty</label>
+                                <div style="width: 80px;">
+                                    <label class="form-label text-muted mb-0" style="font-size: 10px;">Qty</label>
                                     <input type="number" 
                                            class="form-control form-control-sm qty-input text-center fw-bold" 
                                            data-item-id="{{ data.order_item.id }}" 
@@ -65,21 +93,18 @@
                             </div>
                             
                             {% if data.is_serialized %}
-                                <label class="form-label fw-bold text-danger mt-2">Search & Select IMEI / Serial Number</label>
                                 <div class="unit-container" data-item-id="{{ data.order_item.id }}">
-                                    <!-- Initial inputs based on original quantity -->
                                     {% for i in "x"|rjust:data.order_item.quantity %}
                                     <div class="mb-2 unit-row">
-                                        <!-- We use a class 'searchable-unit' to initialize Select2 -->
                                         <select class="form-select searchable-unit" data-item-id="{{ data.order_item.id }}" required>
-                                            <option value="">-- Type or scan to search IMEI/Serial --</option>
+                                            <option value="">-- Type or scan IMEI/Serial --</option>
                                         </select>
                                     </div>
                                     {% endfor %}
                                 </div>
                             {% else %}
-                                <div class="alert alert-info py-2 mb-0 mt-2">
-                                    <i class="fas fa-box"></i> Bulk Item: The stock will be deducted based on the quantity entered above.
+                                <div class="alert alert-light border py-2 mb-0 mt-2" style="font-size: 12px;">
+                                    <i class="fas fa-box text-primary"></i> Bulk item (no IMEI needed).
                                 </div>
                             {% endif %}
                         </div>
@@ -88,44 +113,54 @@
                 </div>
             </div>
 
+            <!-- RIGHT COLUMN: SUMMARY -->
             <div class="col-lg-5">
                 <div class="card shadow-sm border-0 sticky-top" style="top: 20px;">
-                    <div class="card-header bg-white fw-bold border-bottom">
+                    <div class="card-header bg-white fw-bold border-bottom py-2">
                         Order Summary
                     </div>
-                    <div class="card-body">
-                        <!-- Dynamic Total Display -->
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>New Total Amount:</span>
+                    <div class="card-body p-3">
+                        
+                        <!-- Dynamic Total -->
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted small">New Total:</span>
                             <span class="fw-bold fs-5 text-primary" id="newTotalDisplay">KSh {{ order.total_amount|floatformat:2 }}</span>
                         </div>
-                        <div class="d-flex justify-content-between mb-3 text-muted small">
+                        <div class="d-flex justify-content-between text-muted mb-3" style="font-size: 11px;">
                             <span>Original Total:</span>
                             <span>KSh {{ order.total_amount|floatformat:2 }}</span>
                         </div>
                         
-                        <hr>
+                        <hr class="my-2">
                         
-                        <h6 class="fw-bold mb-3">Payment Status</h6>
+                        <h6 class="fw-bold mb-2 small text-uppercase text-muted">Payment Status</h6>
                         <div class="form-check mb-2">
                             <input class="form-check-input" type="radio" name="payment_status" id="statusPaid" value="paid" checked>
-                            <label class="form-check-label fw-bold text-success" for="statusPaid">
-                                <i class="fas fa-money-bill-wave"></i> Paid (Complete Sale)
+                            <label class="form-check-label fw-bold text-success small" for="statusPaid">
+                                <i class="fas fa-money-bill-wave"></i> Paid
                             </label>
                         </div>
-                        <div class="form-check mb-4">
+                        <div class="form-check mb-3">
                             <input class="form-check-input" type="radio" name="payment_status" id="statusPending" value="pending">
-                            <label class="form-check-label fw-bold text-warning" for="statusPending">
-                                <i class="fas fa-truck"></i> Pay on Delivery (Pending Sale)
+                            <label class="form-check-label fw-bold text-warning small" for="statusPending">
+                                <i class="fas fa-truck"></i> Pay on Delivery
                             </label>
                         </div>
 
-                        <button type="submit" class="btn btn-primary w-100 py-3 fw-bold" id="btnSubmit">
-                            <i class="fas fa-check-circle"></i> Confirm & Create Sale
+                        <!-- Desktop Submit Button -->
+                        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold d-none d-lg-block" id="btnSubmitDesktop">
+                            <i class="fas fa-check-circle"></i> Confirm Sale
                         </button>
                     </div>
                 </div>
             </div>
+        </div>
+        
+        <!-- Mobile Sticky Footer Submit Button -->
+        <div class="mobile-sticky-footer d-lg-none">
+            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold" id="btnSubmitMobile">
+                <i class="fas fa-check-circle"></i> Confirm Sale — <span id="mobileTotalDisplay">KSh {{ order.total_amount|floatformat:2 }}</span>
+            </button>
         </div>
     </form>
 </div>
@@ -150,10 +185,10 @@ const itemsData = [
     {% endfor %}
 ];
 
-// Initialize Select2 for searchable IMEI inputs
+// Initialize Select2
 function initSelect2(element) {
     $(element).select2({
-        placeholder: "-- Type or scan to search IMEI/Serial --",
+        placeholder: "-- Search IMEI/Serial --",
         allowClear: true,
         minimumInputLength: 2,
         ajax: {
@@ -171,7 +206,6 @@ function initSelect2(element) {
     });
 }
 
-// Init on page load
 $('.searchable-unit').each(function() {
     initSelect2(this);
 });
@@ -186,21 +220,13 @@ function updateTotal() {
             newTotal += (qty * item.unitPrice);
         }
     });
-    document.getElementById('newTotalDisplay').textContent = 'KSh ' + newTotal.toLocaleString('en-KE', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-}
-
-// Filter out options already selected in other dropdowns
-function filterSelectOptions() {
-    // Collect all currently selected values
-    const selectedValues = [];
-    $('.searchable-unit').each(function() {
-        const val = $(this).val();
-        if (val) selectedValues.push(val);
-    });
-
-    // Optionally: You could disable selected options in other select2 instances here
-    // But Select2 handles this well natively in the dropdown by showing everything
-    // It's best to rely on backend validation + the user's visual check
+    
+    const formattedTotal = 'KSh ' + newTotal.toLocaleString('en-KE', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('newTotalDisplay').textContent = formattedTotal;
+    
+    // Update the mobile sticky button too
+    const mobileTotal = document.getElementById('mobileTotalDisplay');
+    if (mobileTotal) mobileTotal.textContent = formattedTotal;
 }
 
 // Attach listeners to quantity inputs
@@ -214,14 +240,14 @@ document.querySelectorAll('.qty-input').forEach(input => {
         
         if (item && item.isSerialized) {
             if (qty > item.availableStock) {
-                alert(`Only ${item.availableStock} units available for this product.`);
+                alert(`Only ${item.availableStock} units available.`);
                 this.value = item.availableStock;
                 return;
             }
 
             const container = document.querySelector(`.unit-container[data-item-id="${itemId}"]`);
             if (container) {
-                // If we increased quantity, add a new searchable dropdown
+                // Add dropdowns
                 while (container.children.length < qty) {
                     const newRow = document.createElement('div');
                     newRow.className = 'mb-2 unit-row';
@@ -230,18 +256,17 @@ document.querySelectorAll('.qty-input').forEach(input => {
                     newSelect.className = 'form-select searchable-unit';
                     newSelect.setAttribute('data-item-id', itemId);
                     newSelect.setAttribute('required', 'required');
-                    newSelect.innerHTML = '<option value="">-- Type or scan to search IMEI/Serial --</option>';
+                    newSelect.innerHTML = '<option value="">-- Search IMEI/Serial --</option>';
                     
                     newRow.appendChild(newSelect);
                     container.appendChild(newRow);
                     
-                    // Initialize Select2 on the new element
                     initSelect2(newSelect);
                 }
-                // If we decreased quantity, remove the extra dropdowns
+                // Remove dropdowns
                 while (container.children.length > qty) {
                     const lastChild = container.lastChild;
-                    $(lastChild).find('.searchable-unit').select2('destroy'); // Cleanup Select2
+                    $(lastChild).find('.searchable-unit').select2('destroy');
                     container.removeChild(lastChild);
                 }
             }
@@ -249,15 +274,9 @@ document.querySelectorAll('.qty-input').forEach(input => {
     });
 });
 
-// Submit Form
-document.getElementById('linkSaleForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const btn = document.getElementById('btnSubmit');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-
-    const orderId = this.dataset.orderId;
+// Submit Form (attached to both buttons)
+function submitForm(btnElement) {
+    const orderId = document.getElementById('linkSaleForm').dataset.orderId;
     const paymentStatus = document.querySelector('input[name="payment_status"]:checked').value;
     
     const quantities = {};
@@ -269,9 +288,8 @@ document.getElementById('linkSaleForm').addEventListener('submit', function(e) {
         
         if (item.isSerialized) {
             selectedUnits[item.id] = [];
-            // Since Select2 hides the original <select>, we still access .val() through jQuery
             document.querySelectorAll(`.searchable-unit[data-item-id="${item.id}"]`).forEach(select => {
-                const val = $(select).val(); // Get Select2 value
+                const val = $(select).val();
                 if (val) {
                     selectedUnits[item.id].push(val);
                 }
@@ -280,6 +298,15 @@ document.getElementById('linkSaleForm').addEventListener('submit', function(e) {
     });
 
     const csrfToken = getCookie('csrftoken');
+    
+    // Disable both buttons visually
+    const btnDesktop = document.getElementById('btnSubmitDesktop');
+    const btnMobile = document.getElementById('btnSubmitMobile');
+    
+    const originalText = btnElement.innerHTML;
+    btnDesktop.disabled = true;
+    btnMobile.disabled = true;
+    btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
 
     fetch(`/cart/orders/${orderId}/confirm/`, {
         method: 'POST',
@@ -296,15 +323,25 @@ document.getElementById('linkSaleForm').addEventListener('submit', function(e) {
             window.location.href = `/epa_shop/sale/receipt/${data.sale_id}/`;
         } else {
             alert("Error: " + data.error);
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm & Create Sale';
+            btnDesktop.disabled = false;
+            btnMobile.disabled = false;
+            btnElement.innerHTML = originalText;
         }
     })
     .catch(err => {
         alert("Network error: " + err.message);
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm & Create Sale';
+        btnDesktop.disabled = false;
+        btnMobile.disabled = false;
+        btnElement.innerHTML = originalText;
     });
+}
+
+document.getElementById('linkSaleForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    // Find which button is visible (the one that was clicked)
+    const isMobile = window.innerWidth < 992;
+    const btn = isMobile ? document.getElementById('btnSubmitMobile') : document.getElementById('btnSubmitDesktop');
+    submitForm(btn);
 });
 
 function getCookie(name) {
