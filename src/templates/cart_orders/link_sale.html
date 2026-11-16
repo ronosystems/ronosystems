@@ -3,6 +3,25 @@
 
 {% block title %}Complete Sale — {{ order.order_number }}{% endblock %}
 
+{% block extra_css %}
+<!-- Select2 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<style>
+    /* Make Select2 match Bootstrap 5 styling */
+    .select2-container .select2-selection--single {
+        height: 38px !important;
+        border: 1px solid #ced4da;
+        border-radius: 0.375rem;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 36px !important;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 36px !important;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -15,29 +34,52 @@
             <div class="col-lg-7">
                 <div class="card shadow-sm border-0 mb-4">
                     <div class="card-header bg-dark text-white fw-bold">
-                        Select Units to Sell
+                        Select Units & Adjust Quantity
                     </div>
                     <div class="card-body">
                         {% for data in items_data %}
                         <div class="mb-4 pb-3 border-bottom">
-                            <h5 class="fw-bold mb-1">{{ data.product.name }}</h5>
-                            <p class="text-muted small mb-2">Requested: {{ data.order_item.quantity }} unit(s) | Price: KSh {{ data.order_item.unit_price }}</p>
+                            
+                            <!-- Product Header & Available Stock -->
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <h5 class="fw-bold mb-1">{{ data.product.name }}</h5>
+                                    <p class="text-muted small mb-1">Original Request: {{ data.order_item.quantity }} unit(s) | Price: KSh {{ data.order_item.unit_price }}</p>
+                                    
+                                    <span class="badge bg-info text-dark">
+                                        <i class="fas fa-boxes"></i> Available Stock: {{ data.available_stock }}
+                                    </span>
+                                </div>
+                                
+                                <!-- Quantity Input -->
+                                <div style="width: 120px;">
+                                    <label class="form-label small fw-bold text-primary mb-1">New Qty</label>
+                                    <input type="number" 
+                                           class="form-control form-control-sm qty-input text-center fw-bold" 
+                                           data-item-id="{{ data.order_item.id }}" 
+                                           value="{{ data.order_item.quantity }}" 
+                                           min="1" 
+                                           max="{{ data.available_stock }}"
+                                           required>
+                                </div>
+                            </div>
                             
                             {% if data.is_serialized %}
-                                <label class="form-label fw-bold text-danger">Select IMEI / Serial Number</label>
-                                {% for i in "x"|rjust:data.order_item.quantity %}
-                                <div class="mb-2">
-                                    <select class="form-select unit-select" data-item-id="{{ data.order_item.id }}" required>
-                                        <option value="">-- Select Unit --</option>
-                                        {% for unit in data.available_units %}
-                                            <option value="{{ unit.id }}">{{ unit.identifier }}</option>
-                                        {% endfor %}
-                                    </select>
+                                <label class="form-label fw-bold text-danger mt-2">Search & Select IMEI / Serial Number</label>
+                                <div class="unit-container" data-item-id="{{ data.order_item.id }}">
+                                    <!-- Initial inputs based on original quantity -->
+                                    {% for i in "x"|rjust:data.order_item.quantity %}
+                                    <div class="mb-2 unit-row">
+                                        <!-- We use a class 'searchable-unit' to initialize Select2 -->
+                                        <select class="form-select searchable-unit" data-item-id="{{ data.order_item.id }}" required>
+                                            <option value="">-- Type or scan to search IMEI/Serial --</option>
+                                        </select>
+                                    </div>
+                                    {% endfor %}
                                 </div>
-                                {% endfor %}
                             {% else %}
-                                <div class="alert alert-info py-2 mb-0">
-                                    <i class="fas fa-box"></i> Bulk Item: {{ data.order_item.quantity }} will be deducted from stock automatically.
+                                <div class="alert alert-info py-2 mb-0 mt-2">
+                                    <i class="fas fa-box"></i> Bulk Item: The stock will be deducted based on the quantity entered above.
                                 </div>
                             {% endif %}
                         </div>
@@ -52,9 +94,14 @@
                         Order Summary
                     </div>
                     <div class="card-body">
+                        <!-- Dynamic Total Display -->
                         <div class="d-flex justify-content-between mb-2">
-                            <span>Total Amount:</span>
-                            <span class="fw-bold fs-5 text-primary">KSh {{ order.total_amount|floatformat:2 }}</span>
+                            <span>New Total Amount:</span>
+                            <span class="fw-bold fs-5 text-primary" id="newTotalDisplay">KSh {{ order.total_amount|floatformat:2 }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3 text-muted small">
+                            <span>Original Total:</span>
+                            <span>KSh {{ order.total_amount|floatformat:2 }}</span>
                         </div>
                         
                         <hr>
@@ -85,7 +132,124 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- jQuery (Required for Select2) -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<!-- Select2 JS -->
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
 <script>
+// Pass data to JS
+const itemsData = [
+    {% for data in items_data %}
+    {
+        id: "{{ data.order_item.id }}",
+        unitPrice: {{ data.order_item.unit_price }},
+        isSerialized: {{ data.is_serialized|yesno:"true,false" }},
+        availableStock: {{ data.available_stock }}
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+];
+
+// Initialize Select2 for searchable IMEI inputs
+function initSelect2(element) {
+    $(element).select2({
+        placeholder: "-- Type or scan to search IMEI/Serial --",
+        allowClear: true,
+        minimumInputLength: 2,
+        ajax: {
+            url: "{% url 'cart-orders:search-units-api' %}",
+            dataType: 'json',
+            delay: 250,
+            data: function (params) {
+                return { q: params.term };
+            },
+            processResults: function (data) {
+                return { results: data.results };
+            },
+            cache: true
+        }
+    });
+}
+
+// Init on page load
+$('.searchable-unit').each(function() {
+    initSelect2(this);
+});
+
+// Live Total Calculation
+function updateTotal() {
+    let newTotal = 0;
+    itemsData.forEach(item => {
+        const qtyInput = document.querySelector(`.qty-input[data-item-id="${item.id}"]`);
+        if (qtyInput) {
+            const qty = parseInt(qtyInput.value) || 1;
+            newTotal += (qty * item.unitPrice);
+        }
+    });
+    document.getElementById('newTotalDisplay').textContent = 'KSh ' + newTotal.toLocaleString('en-KE', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+// Filter out options already selected in other dropdowns
+function filterSelectOptions() {
+    // Collect all currently selected values
+    const selectedValues = [];
+    $('.searchable-unit').each(function() {
+        const val = $(this).val();
+        if (val) selectedValues.push(val);
+    });
+
+    // Optionally: You could disable selected options in other select2 instances here
+    // But Select2 handles this well natively in the dropdown by showing everything
+    // It's best to rely on backend validation + the user's visual check
+}
+
+// Attach listeners to quantity inputs
+document.querySelectorAll('.qty-input').forEach(input => {
+    input.addEventListener('input', function() {
+        updateTotal();
+        
+        const itemId = this.dataset.itemId;
+        const qty = parseInt(this.value) || 1;
+        const item = itemsData.find(i => i.id === itemId);
+        
+        if (item && item.isSerialized) {
+            if (qty > item.availableStock) {
+                alert(`Only ${item.availableStock} units available for this product.`);
+                this.value = item.availableStock;
+                return;
+            }
+
+            const container = document.querySelector(`.unit-container[data-item-id="${itemId}"]`);
+            if (container) {
+                // If we increased quantity, add a new searchable dropdown
+                while (container.children.length < qty) {
+                    const newRow = document.createElement('div');
+                    newRow.className = 'mb-2 unit-row';
+                    
+                    const newSelect = document.createElement('select');
+                    newSelect.className = 'form-select searchable-unit';
+                    newSelect.setAttribute('data-item-id', itemId);
+                    newSelect.setAttribute('required', 'required');
+                    newSelect.innerHTML = '<option value="">-- Type or scan to search IMEI/Serial --</option>';
+                    
+                    newRow.appendChild(newSelect);
+                    container.appendChild(newRow);
+                    
+                    // Initialize Select2 on the new element
+                    initSelect2(newSelect);
+                }
+                // If we decreased quantity, remove the extra dropdowns
+                while (container.children.length > qty) {
+                    const lastChild = container.lastChild;
+                    $(lastChild).find('.searchable-unit').select2('destroy'); // Cleanup Select2
+                    container.removeChild(lastChild);
+                }
+            }
+        }
+    });
+});
+
+// Submit Form
 document.getElementById('linkSaleForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
@@ -96,15 +260,22 @@ document.getElementById('linkSaleForm').addEventListener('submit', function(e) {
     const orderId = this.dataset.orderId;
     const paymentStatus = document.querySelector('input[name="payment_status"]:checked').value;
     
-    // Group selected units by OrderItem ID
+    const quantities = {};
     const selectedUnits = {};
-    document.querySelectorAll('.unit-select').forEach(select => {
-        const itemId = select.dataset.itemId;
-        if (!selectedUnits[itemId]) {
-            selectedUnits[itemId] = [];
-        }
-        if (select.value) {
-            selectedUnits[itemId].push(select.value);
+    
+    itemsData.forEach(item => {
+        const qtyInput = document.querySelector(`.qty-input[data-item-id="${item.id}"]`);
+        quantities[item.id] = parseInt(qtyInput.value) || 1;
+        
+        if (item.isSerialized) {
+            selectedUnits[item.id] = [];
+            // Since Select2 hides the original <select>, we still access .val() through jQuery
+            document.querySelectorAll(`.searchable-unit[data-item-id="${item.id}"]`).forEach(select => {
+                const val = $(select).val(); // Get Select2 value
+                if (val) {
+                    selectedUnits[item.id].push(val);
+                }
+            });
         }
     });
 
@@ -115,6 +286,7 @@ document.getElementById('linkSaleForm').addEventListener('submit', function(e) {
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
         body: JSON.stringify({
             payment_status: paymentStatus,
+            quantities: quantities,
             selected_units: selectedUnits
         })
     })

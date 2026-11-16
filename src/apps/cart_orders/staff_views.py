@@ -16,6 +16,8 @@ from apps.epa_shop.models import Unit
 from decimal import Decimal
 import json
 
+from django.http import JsonResponse
+from django.db.models import Q
 from .models import Order
 
 
@@ -384,41 +386,63 @@ def approve_cancellation(request, order_id):
 
 
 
+@login_required
+def search_units_api(request):
+    """AJAX endpoint to search available units by IMEI/Serial"""
+    query = request.GET.get('q', '').strip()
+    company = _get_company(request)
+    
+    if len(query) < 2 or not company:
+        return JsonResponse({'results': []})
+
+    # Search across both Phone and Electronic units
+    units = Unit.objects.filter(
+        Q(identifier__icontains=query) | Q(identifier__istartswith=query),
+        status='available'
+    ).select_related('phone', 'electronic')[:20] # Limit to 20 results
+
+    results = []
+    for u in units:
+        # Filter by company to prevent cross-tenant data leaks
+        if (u.phone and u.phone.company == company) or (u.electronic and u.electronic.company == company):
+            product_name = u.phone.name if u.phone else u.electronic.name
+            results.append({
+                'id': u.id,
+                'text': f"{u.identifier} - {product_name}"
+            })
+
+    return JsonResponse({'results': results})
+
 
 @login_required
 def link_sale_page(request, order_id):
-    """Page to link an existing order to a Sale, selecting specific units."""
     company = _get_company(request)
     order = Order.objects.filter(id=order_id, company=company).first()
     
-    if not order:
+    if not order or order.status not in ('picked', 'confirmed') or order.sale_id:
         return redirect('cart-orders:order-list')
 
-    if order.status not in ('picked', 'confirmed'):
-        return redirect('cart-orders:order-list')
-
-    if order.sale_id:
-        return redirect('cart-orders:order-list')
-
-    # Attach available units to each item (for serialized products)
     items_data = []
     for oi in order.items.select_related('content_type'):
         product = oi.product
         available_units = []
+        available_stock = 0
         
         if oi.content_type.model in ('phone', 'electronic'):
-            # Fetch available units for this product
-            available_units = Unit.objects.filter(
-                phone=product, status='available'
-            ) if oi.content_type.model == 'phone' else Unit.objects.filter(
-                electronic=product, status='available'
-            )
+            if oi.content_type.model == 'phone':
+                available_units = Unit.objects.filter(phone=product, status='available')
+            else:
+                available_units = Unit.objects.filter(electronic=product, status='available')
+            available_stock = available_units.count()
+        else:
+            available_stock = product.total_quantity_in_stock
             
         items_data.append({
             'order_item': oi,
             'product': product,
             'is_serialized': oi.content_type.model in ('phone', 'electronic'),
             'available_units': available_units,
+            'available_stock': available_stock, # <--- ADDED THIS
         })
 
     context = {
@@ -426,6 +450,41 @@ def link_sale_page(request, order_id):
         'items_data': items_data,
     }
     return render(request, 'cart_orders/link_sale.html', context)
+
+
+@login_required
+@require_POST
+def pay_pending_order(request, order_id):
+    """
+    Mark a 'Pay on Delivery' order as Paid.
+    Updates the linked Sale to 'paid' and clears the pending flag.
+    """
+    company = _get_company(request)
+    order = Order.objects.filter(id=order_id, company=company).first()
+
+    if not order or not order.sale:
+        return JsonResponse({'success': False, 'error': 'Order or linked Sale not found.'}, status=404)
+
+    # Ensure it's actually a pending sale
+    if order.sale.payment_status != 'pending':
+        return JsonResponse({'success': False, 'error': 'This sale is already paid.'}, status=400)
+
+    try:
+        with transaction.atomic():
+            # Update the Sale
+            order.sale.payment_status = 'paid'
+            order.sale.save(update_fields=['payment_status'])
+            
+            # Optional: Change order status so it's no longer "Fulfilled (Pending)"
+            # If you want a distinct status for fulfilled+paid, you can use 'fulfilled'
+            # The template will now see sale.payment_status == 'paid' and show "Completed Order"
+            order.save()
+
+        return JsonResponse({'success': True, 'message': 'Order marked as PAID.'})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
 

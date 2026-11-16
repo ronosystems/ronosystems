@@ -50,14 +50,14 @@
                             <!-- 3. Date -->
                             <td>{{ order.created_at|date:"d M Y, H:i" }}</td>
 
-                            <!-- 4. Shop (Branch) - NO LONGER HIDDEN -->
+                            <!-- 4. Shop (Branch) -->
                             <td>
                                 <div class="small fw-bold text-dark">
                                     <i class="fas fa-store text-primary me-1"></i> {{ order.branch.name|default:"Main Shop" }}
                                 </div>
                             </td>
 
-                            <!-- 5. Delivery Location - NO LONGER HIDDEN -->
+                            <!-- 5. Delivery Location -->
                             <td>
                                 <div class="small fw-bold text-dark">
                                     <i class="fas fa-map-marker-alt text-danger me-1"></i> {{ order.customer_city|default:"-" }}
@@ -76,7 +76,11 @@
                                 {% elif order.status == 'confirmed' %}
                                     <span class="badge bg-primary">Confirmed</span>
                                 {% elif order.status == 'fulfilled' %}
-                                    <span class="badge bg-success">Fulfilled (Archived)</span>
+                                    {% if order.sale and order.sale.payment_status == 'pending' %}
+                                        <span class="badge bg-warning text-dark">Pending Order (POD)</span>
+                                    {% else %}
+                                        <span class="badge bg-success">Completed Order</span>
+                                    {% endif %}
                                 {% elif order.status == 'cancelled' %}
                                     <span class="badge bg-danger">Cancelled</span>
                                 {% else %}
@@ -137,14 +141,24 @@
                                             </span>
                                         {% endif %}
 
-                                    <!-- FULFILLED: Admin archive view -->
-                                    {% elif order.status == 'fulfilled' %}
+                                <!-- FULFILLED: Admin archive view + PAY button -->
+                                {% elif order.status == 'fulfilled' %}
+                                    
+                                    {% if order.sale and order.sale.payment_status == 'pending' %}
+                                        <!-- If pending, ONLY show the Pay Order button -->
+                                        <button class="btn btn-sm btn-success fw-bold" onclick="payPendingOrder({{ order.id }})">
+                                            <i class="fas fa-money-bill-wave"></i> Pay Order
+                                        </button>
+                                    {% else %}
+                                        <!-- If paid, ONLY show the View Archive button -->
                                         {% if is_admin %}
                                             <a href="{% url 'cart-orders:order-archive-detail' order.id %}" class="btn btn-sm btn-outline-dark">
                                                 <i class="fas fa-archive"></i> View Archive
                                             </a>
                                         {% endif %}
                                     {% endif %}
+
+                                {% endif %}
                                 </div>
                             </td>
                         </tr>
@@ -180,13 +194,19 @@
                             <span class="badge bg-primary">Confirmed</span>
                         {% elif order.status == 'cancelled' %}
                             <span class="badge bg-danger">Cancelled</span>
+                        {% elif order.status == 'fulfilled' %}
+                            {% if order.sale and order.sale.payment_status == 'pending' %}
+                                <span class="badge bg-warning text-dark">Pending Order</span>
+                            {% else %}
+                                <span class="badge bg-success">Completed</span>
+                            {% endif %}
                         {% else %}
-                            <span class="badge bg-success">Fulfilled</span>
+                            <span class="badge bg-success">Completed</span>
                         {% endif %}
                     </div>
                 </div>
 
-                <!-- Customer Name & Date (Hidden if not authorized) -->
+                <!-- Customer Name & Date -->
                 <h6 class="mb-1 fw-bold">
                     {% if order.status == 'new' and not is_admin %}
                         <span class="text-muted fst-italic">Customer Hidden</span>
@@ -200,7 +220,7 @@
                     <i class="fas fa-calendar text-muted"></i> {{ order.created_at|date:"d M Y, H:i" }}
                 </p>
 
-                <!-- SHOP & DELIVERY SECTION - ALWAYS SHOWN -->
+                <!-- SHOP & DELIVERY SECTION -->
                 <div class="mb-3 pb-3 border-bottom">
                     <div class="row g-2">
                         <div class="col-6">
@@ -266,14 +286,24 @@
                             </span>
                         {% endif %}
 
-                    <!-- FULFILLED: Admin archive view -->
-                    {% elif order.status == 'fulfilled' %}
+                <!-- FULFILLED: Admin archive view + PAY button -->
+                {% elif order.status == 'fulfilled' %}
+                    
+                    {% if order.sale and order.sale.payment_status == 'pending' %}
+                        <!-- If pending, ONLY show the Pay Order button -->
+                        <button class="btn btn-sm btn-success flex-grow-1 fw-bold" onclick="payPendingOrder({{ order.id }})">
+                            <i class="fas fa-money-bill-wave"></i> Pay Order
+                        </button>
+                    {% else %}
+                        <!-- If paid, ONLY show the View Archive button -->
                         {% if is_admin %}
                             <a href="{% url 'cart-orders:order-archive-detail' order.id %}" class="btn btn-sm btn-outline-dark flex-grow-1">
                                 <i class="fas fa-archive"></i> View Archive
                             </a>
                         {% endif %}
                     {% endif %}
+
+                {% endif %}
                 </div>
             </div>
         </div>
@@ -532,5 +562,28 @@ document.getElementById('btnApproveCancellation').addEventListener('click', func
     })
     .catch(err => alert("Network error: " + err.message));
 });
+
+// MARK PENDING ORDER AS PAID
+function payPendingOrder(orderId) {
+    if (!confirm("Confirm that you have received the payment for this order?")) return;
+
+    const csrfToken = getCookie('csrftoken');
+    if (!csrfToken) { alert('CSRF token not found.'); return; }
+
+    fetch(`/cart/orders/${orderId}/pay-pending/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert("Success! The order has been marked as Paid.");
+            location.reload();
+        } else {
+            alert("Error: " + data.error);
+        }
+    })
+    .catch(err => alert("Network error: " + err.message));
+}
 </script>
 {% endblock %}
