@@ -7,7 +7,6 @@ from apps.companies import web_views as company_views
 from apps.accounts.admin_site import restricted_admin_site
 from apps.accounts import views_guest
 from core.views import qz_sign, contact, manifest_view, service_worker, asset_links
-from core.ai_views import ai_assistant
 from . import views
 
 # ============================================
@@ -85,7 +84,7 @@ urlpatterns = [
     # CORE PAGES & PWA
     # ============================================
     path('contact/', contact, name='contact'),
-    path('ai/assistant/', ai_assistant, name='ai-assistant'),
+    path('ai/chat/', include('apps.ai_chatbot.urls', namespace='ai_chatbot')),
     path('manifest.json', manifest_view, name='manifest'),
     path('sw.js', service_worker, name='service-worker'),
     path('.well-known/assetlinks.json', asset_links, name='asset_links'),
@@ -100,7 +99,6 @@ urlpatterns = [
     path('features/', get_template('website/features.html', 'website/company_features.html'), name='features'),
     path('faq/', get_template('website/faq.html', 'website/company_faq.html'), name='faq'),
     path('documentation/', get_template('website/documentation.html', 'website/company_documentation.html'), name='documentation'),
-    path('ai-assistant/', get_template('website/ai_assistant.html', 'website/company_ai_assistant.html'), name='ai-assistant-page'),
     path('invoicing/', get_template('website/invoicing.html', 'website/company_invoicing.html'), name='invoicing'),
     path('pricing/', get_template('website/pricing.html', 'website/company_pricing.html'), name='pricing'),
     path('terms/', get_template('website/terms.html', 'website/company_terms.html'), name='terms'),

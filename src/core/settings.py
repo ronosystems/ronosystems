@@ -136,6 +136,7 @@ INSTALLED_APPS = [
     'apps.workshop', 
     'apps.mpesa',  
     'apps.cart_orders', 
+    'apps.ai_chatbot',
 
     # Business Type Apps
     'apps.epa_shop',
@@ -186,6 +187,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'apps.settings.context_processors.system_settings',
+                'apps.ai_chatbot.context_processors.chatbot_available',
                 'apps.epa_shop.context_processors.user_context',
                 'apps.cart_orders.context_processors.cart_count', 
                 'apps.epa_shop.context_processors.pending_orders_count',
