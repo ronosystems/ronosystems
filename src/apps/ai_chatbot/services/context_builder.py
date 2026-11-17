@@ -9,12 +9,12 @@ def build_context(request):
     - business type slug
     - user identity
     - business rules from the prompt registry
+    - live company contact info
+    - live branch locations (prevents hallucination)
     """
     company = getattr(request, 'current_company', None)
     user = request.user if request.user.is_authenticated else None
 
-    # Company already exposes `.business_type_slug` (see models.py) —
-    # it returns the registry slug or None.
     business_type_slug = ''
     if company and company.business_type_slug:
         business_type_slug = company.business_type_slug
@@ -28,11 +28,44 @@ def build_context(request):
         rules = _generic_rules()
         tools = ['search_products']  # safe default
 
+    # --- Build Company Contact Info Context ---
+    contact_info = ""
+    if company:
+        contact_info = (
+            f"\nCOMPANY CONTACT INFO:\n"
+            f"- Email: {company.email or 'Not provided'}\n"
+            f"- Phone: {company.phone or 'Not provided'}\n"
+            f"- Address: {company.address or 'Not provided'}\n"
+            f"If the user asks for contact details, provide these directly.\n"
+        )
+
+    # --- Build Live Branch Info Context ---
+    branches_info = ""
+    if company:
+        try:
+            from apps.company.models import Branch
+            branches = Branch.objects.filter(company=company, is_active=True)
+            if branches.exists():
+                branches_info = "\nBRANCHES (live from database — use this, do not guess):\n"
+                for b in branches:
+                    main_tag = " (MAIN)" if getattr(b, 'is_main_branch', False) else ""
+                    branches_info += (
+                        f"- {b.name}{main_tag} | "
+                        f"Location: {getattr(b, 'location', 'N/A')} | "
+                        f"Phone: {getattr(b, 'phone', 'N/A')}\n"
+                    )
+                branches_info += (
+                    "If the user asks about branches or locations, "
+                    "quote this list directly. Do not invent branches.\n"
+                )
+        except Exception:
+            pass
+
     system_prompt = build_system_prompt(
         company=company,
         business_type_slug=business_type_slug,
         user=user,
-        extra_context=rules,
+        extra_context=rules + contact_info + branches_info,
     )
 
     return {

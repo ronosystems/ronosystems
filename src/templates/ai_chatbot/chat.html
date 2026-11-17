@@ -1,8 +1,8 @@
 {% extends active_base_template|default:"web_base.html" %}
 {% load static %}
 
-{% block title %}AI Assistant — {{ current_company.name|default:"RonoSystems" }}{% endblock %}
-{% block marquee_text %}AI Assistant — {{ current_company.display_name|default:"RonoSystems" }}{% endblock %}
+{% block title %}AI Assistant {% endblock %}
+{% block marquee_text %}AI Assistant — {% if current_company %}{{ current_company.display_name }}{% else %}{{ system_name|default:"RonoSystems" }}{% endif %}{% endblock %}
 {% block breadcrumb %}AI Chat{% endblock %}
 
 {% block content %}
@@ -22,6 +22,7 @@
   .chat-bubble.user { background: #0d6efd; color: #fff; border-bottom-right-radius: 4px; }
   .chat-bubble.bot { background: #fff; color: #333; border: 1px solid #e2e8f0; border-bottom-left-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); }
   .chat-bubble.bot img { max-width: 100%; max-height: 200px; object-fit: contain; border-radius: 8px; margin: 10px 0; background: #f8f9fa; padding: 5px; border: 1px solid #edf2f7; display: block; }
+  .chat-bubble.bot a.btn { text-decoration: none; }
   .chat-footer { padding: 1rem 1.5rem; background: #fff; border-top: 1px solid #eef2f5; }
   .input-wrapper { display: flex; background: #f1f5f9; border-radius: 30px; padding: 0.4rem 0.5rem 0.4rem 1.2rem; align-items: center; border: 1px solid transparent; transition: all 0.3s ease; }
   .input-wrapper:focus-within { background: #fff; border-color: #0d6efd; box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.1); }
@@ -57,6 +58,7 @@
   </div>
 </div>
 
+<!-- ADD TO CART MODAL -->
 <div class="modal fade" id="addToCartModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
@@ -97,12 +99,34 @@ input.addEventListener('input', () => { btnSend.disabled = input.value.trim().le
 
 function renderMarkdown(text) {
     let html = marked.parse(text);
-    // Parse ![Name|ID](url) to inject a button
+    
+    // 1. Inject Add to Cart buttons for images
     const imgRegex = /<img[^>]+src="([^">]+)"[^>]*alt="([^"|]+)\|(\d+)"[^>]*>/g;
     html = html.replace(imgRegex, (match, imgUrl, name, id) => `
         ${match}
         <div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="openChatCartModal('${name}', '${id}', '${imgUrl}')"><i class="fas fa-cart-plus"></i> Add ${name}</button></div>
     `);
+
+    // 2. Convert standard Markdown links to nice buttons and FIX THE DOMAIN
+    const linkRegex = /<a href="([^"]+)">([^<]+)<\/a>/g;
+    html = html.replace(linkRegex, (match, url, linkText) => {
+        // If it's an internal link, ensure it points to the current window's origin
+        if (url.startsWith('/') || url.includes('/auth/') || url.includes('/login')) {
+            // Extract just the path (e.g. /auth/login/)
+            let path = url;
+            try {
+                const urlObj = new URL(url);
+                path = urlObj.pathname + urlObj.search + urlObj.hash;
+            } catch(e) {}
+            
+            // Force the URL to use the current origin
+            const correctUrl = window.location.origin + path;
+            
+            return `<div class="mt-2"><a href="${correctUrl}" class="btn btn-sm btn-primary fw-bold"><i class="fas fa-arrow-right me-1"></i> ${linkText}</a></div>`;
+        }
+        return match; // Leave external links alone
+    });
+    
     return html;
 }
 
@@ -129,7 +153,7 @@ form.addEventListener('submit', async (e) => {
     try {
         const res = await fetch("{% url 'ai_chatbot:send' %}", {
             method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
-            body: JSON.stringify({ message: msg })
+            body: JSON.stringify({ message: msg, current_domain: window.location.origin })
         });
         const data = await res.json();
         document.getElementById('typing').remove();
