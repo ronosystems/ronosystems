@@ -1,102 +1,198 @@
 {% extends active_base_template|default:"web_base.html" %}
 {% load static %}
 
+{% block title %}AI Assistant — {{ current_company.name|default:"RonoSystems" }}{% endblock %}
+{% block marquee_text %}AI Assistant — {{ current_company.display_name|default:"RonoSystems" }}{% endblock %}
+{% block breadcrumb %}AI Chat{% endblock %}
+
 {% block content %}
-<!-- Add marked.js for Markdown parsing -->
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
 <style>
-  /* Make images in the chat responsive */
-  #chat-log img {
-    max-width: 100%;
-    border-radius: 8px;
-    margin-top: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  }
-  /* Style markdown links */
-  #chat-log a {
-    color: #0d6efd;
-    text-decoration: underline;
-  }
+  .chat-wrapper { display: flex; flex-direction: column; height: calc(100vh - 200px); min-height: 500px; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid #eef2f5; overflow: hidden; }
+  .chat-header { background: #fff; border-bottom: 1px solid #eef2f5; padding: 1rem 1.5rem; display: flex; align-items: center; gap: 1rem; }
+  .chat-avatar { width: 48px; height: 48px; background: #0d6efd; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
+  .chat-title h5 { margin: 0; font-weight: 700; color: #1e4e6d; font-size: 1.1rem; }
+  .chat-status { font-size: 0.85rem; color: #28a745; display: flex; align-items: center; gap: 5px; }
+  .chat-body { flex-grow: 1; padding: 1.5rem; overflow-y: auto; background-color: #f8f9fa; display: flex; flex-direction: column; gap: 1.5rem; }
+  .message-row { display: flex; width: 100%; animation: fadeIn 0.3s ease-out; }
+  .message-row.user { justify-content: flex-end; }
+  .message-row.bot { justify-content: flex-start; }
+  .chat-bubble { padding: 1rem 1.2rem; border-radius: 16px; max-width: 75%; font-size: 0.95rem; line-height: 1.6; word-wrap: break-word; }
+  .chat-bubble.user { background: #0d6efd; color: #fff; border-bottom-right-radius: 4px; }
+  .chat-bubble.bot { background: #fff; color: #333; border: 1px solid #e2e8f0; border-bottom-left-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); }
+  .chat-bubble.bot img { max-width: 100%; max-height: 200px; object-fit: contain; border-radius: 8px; margin: 10px 0; background: #f8f9fa; padding: 5px; border: 1px solid #edf2f7; display: block; }
+  .chat-footer { padding: 1rem 1.5rem; background: #fff; border-top: 1px solid #eef2f5; }
+  .input-wrapper { display: flex; background: #f1f5f9; border-radius: 30px; padding: 0.4rem 0.5rem 0.4rem 1.2rem; align-items: center; border: 1px solid transparent; transition: all 0.3s ease; }
+  .input-wrapper:focus-within { background: #fff; border-color: #0d6efd; box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.1); }
+  .chat-input { flex-grow: 1; border: none; background: transparent; padding: 0.6rem 0; font-size: 1rem; outline: none; }
+  .btn-send { background: #0d6efd; color: #fff; border: none; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .btn-send:disabled { background: #93c5fd; cursor: not-allowed; }
+  .typing-indicator { display: flex; gap: 4px; padding: 0.5rem 1rem; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; border-bottom-left-radius: 4px; width: fit-content; }
+  .typing-indicator span { width: 6px; height: 6px; background: #94a3b8; border-radius: 50%; animation: typing 1.4s infinite ease-in-out both; }
+  @keyframes typing { 0%, 80%, 100% { transform: scale(0); opacity: 0.5; } 40% { transform: scale(1); opacity: 1; } }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 </style>
 
-<div class="container py-5" style="max-width: 800px;">
-  <div class="card shadow-sm border-0">
-    <div class="card-header bg-primary text-white d-flex align-items-center gap-2">
-      <i class="fas fa-robot"></i>
-      <span class="fw-bold">
-        {% if scope == 'company' %} {{ current_company.display_name }} Assistant{% else %}{{ system_name|default:"RonoSystems" }} Assistant{% endif %}
-      </span>
+<div class="chat-wrapper">
+  <div class="chat-header">
+    <div class="chat-avatar"><i class="fas fa-robot"></i></div>
+    <div class="chat-title">
+      <h5>{% if scope == 'company' %}{{ current_company.display_name }} Assistant{% else %}{{ system_name|default:"RonoSystems" }} AI{% endif %}</h5>
+      <div class="chat-status"><i class="fas fa-circle" style="font-size: 8px;"></i> Online</div>
     </div>
+  </div>
 
-    <div id="chat-log" class="card-body"
-         style="height: 500px; overflow-y: auto; background: #f8f9fa;"></div>
-
-    <div class="card-footer bg-white">
-      <form id="chat-form" class="d-flex gap-2">
-        <input id="chat-input" type="text" class="form-control"
-               placeholder="Ask me anything…" autocomplete="off" required>
-        <button class="btn btn-primary" type="submit">
-          <i class="fas fa-paper-plane"></i>
-        </button>
-      </form>
+  <div id="chat-log" class="chat-body">
+    <div class="message-row bot">
+      <div class="chat-bubble bot">👋 Hi there! How can I help you today?</div>
     </div>
+  </div>
+
+  <div class="chat-footer">
+    <form id="chat-form" class="input-wrapper">
+      <input id="chat-input" type="text" class="chat-input" placeholder="Search products, check stock, ask a question..." autocomplete="off" required>
+      <button type="submit" id="btn-send" class="btn-send" disabled><i class="fas fa-paper-plane"></i></button>
+    </form>
   </div>
 </div>
 
-<script>
-const log   = document.getElementById('chat-log');
-const form  = document.getElementById('chat-form');
-const input = document.getElementById('chat-input');
-const url   = "{% url 'ai_chatbot:send' %}";
+<div class="modal fade" id="addToCartModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Add to Cart</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="modalProductImage" src="" class="img-fluid rounded mb-3" style="max-height: 120px;">
+                <h5 id="modalProductName" class="fw-bold mb-1"></h5>
+                <p class="text-muted">Price: <strong id="modalProductPrice"></strong></p>
+                <div class="d-flex justify-content-center align-items-center gap-3 mb-4">
+                    <button type="button" class="btn btn-outline-secondary btn-lg" onclick="adjustQty(-1)">-</button>
+                    <input type="number" id="modalQuantity" class="form-control text-center form-control-lg fw-bold" style="width: 80px;" value="1" min="1">
+                    <button type="button" class="btn btn-outline-secondary btn-lg" onclick="adjustQty(1)">+</button>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary fw-bold" id="btnConfirmAdd" onclick="submitAddToCart()">Add to Cart</button>
+            </div>
+        </div>
+    </div>
+</div>
 
-function append(role, text) {
-  const div = document.createElement('div');
-  div.className = 'mb-2 d-flex ' + (role === 'user' ? 'justify-content-end' : 'justify-content-start');
-  
-  // Use marked.js to parse markdown for the assistant
-  const content = role === 'assistant' ? marked.parse(text) : text;
-  
-  div.innerHTML = `
-    <div class="px-3 py-2 rounded-3 ${role === 'user'
-      ? 'bg-primary text-white' : 'bg-white border'}"
-      style="max-width: 85%; overflow-wrap: break-word;">
-      ${content}
-    </div>`;
-  log.appendChild(div);
-  log.scrollTop = log.scrollHeight;
+<script>
+const log = document.getElementById('chat-log');
+const form = document.getElementById('chat-form');
+const input = document.getElementById('chat-input');
+const btnSend = document.getElementById('btn-send');
+let cartModal;
+
+document.addEventListener('DOMContentLoaded', () => {
+    cartModal = new bootstrap.Modal(document.getElementById('addToCartModal'));
+});
+
+input.addEventListener('input', () => { btnSend.disabled = input.value.trim().length === 0; });
+
+function renderMarkdown(text) {
+    let html = marked.parse(text);
+    // Parse ![Name|ID](url) to inject a button
+    const imgRegex = /<img[^>]+src="([^">]+)"[^>]*alt="([^"|]+)\|(\d+)"[^>]*>/g;
+    html = html.replace(imgRegex, (match, imgUrl, name, id) => `
+        ${match}
+        <div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="openChatCartModal('${name}', '${id}', '${imgUrl}')"><i class="fas fa-cart-plus"></i> Add ${name}</button></div>
+    `);
+    return html;
+}
+
+function appendMessage(role, text) {
+    const row = document.createElement('div');
+    row.className = `message-row ${role}`;
+    row.innerHTML = `<div class="chat-bubble ${role}">${role === 'assistant' ? renderMarkdown(text) : text}</div>`;
+    log.appendChild(row);
+    log.scrollTop = log.scrollHeight;
 }
 
 form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const msg = input.value.trim();
-  if (!msg) return;
-  append('user', msg);
-  input.value = '';
-  input.disabled = true;
+    e.preventDefault();
+    const msg = input.value.trim();
+    if (!msg) return;
+    appendMessage('user', msg);
+    input.value = ''; btnSend.disabled = true;
+    
+    const indicator = document.createElement('div');
+    indicator.className = 'message-row bot'; indicator.id = 'typing';
+    indicator.innerHTML = `<div class="typing-indicator"><span></span><span></span><span></span></div>`;
+    log.appendChild(indicator); log.scrollTop = log.scrollHeight;
 
-  try {
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': getCookie('csrftoken'),
-      },
-      body: JSON.stringify({ message: msg }),
-    });
-    const data = await r.json();
-    append('assistant', data.reply || data.error || 'No reply.');
-  } catch (err) {
-    append('assistant', 'Network error — please try again.');
-  } finally {
-    input.disabled = false;
-    input.focus();
-  }
+    try {
+        const res = await fetch("{% url 'ai_chatbot:send' %}", {
+            method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+            body: JSON.stringify({ message: msg })
+        });
+        const data = await res.json();
+        document.getElementById('typing').remove();
+        appendMessage('assistant', data.reply || "⚠️ Error.");
+    } catch (err) {
+        document.getElementById('typing').remove();
+        appendMessage('assistant', "⚠️ Network error.");
+    } finally {
+        input.disabled = false; input.focus();
+    }
 });
 
+// CART LOGIC
+let currentProduct = {};
+
+function openChatCartModal(name, id, imgUrl) {
+    currentProduct = { name, id, image: imgUrl, model: 'phone' }; // Default model, backend resolves ID
+    document.getElementById('modalProductName').textContent = name;
+    document.getElementById('modalProductPrice').textContent = 'Standard Price'; // Price gets added via backend
+    document.getElementById('modalQuantity').value = 1;
+    document.getElementById('modalProductImage').src = imgUrl;
+    cartModal.show();
+}
+
+function adjustQty(amt) {
+    const el = document.getElementById('modalQuantity');
+    let val = (parseInt(el.value) || 1) + amt;
+    if (val < 1) val = 1;
+    el.value = val;
+}
+
+function submitAddToCart() {
+    const qty = parseInt(document.getElementById('modalQuantity').value) || 1;
+    const btn = document.getElementById('btnConfirmAdd');
+    btn.disabled = true; btn.innerHTML = 'Adding...';
+
+    fetch("{% url 'cart-orders:add-to-cart' %}", {
+        method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+        body: JSON.stringify({ 
+            'model_type': currentProduct.model, 
+            'product_id': currentProduct.id, 
+            'name': currentProduct.name, 
+            'image': currentProduct.image, 
+            'quantity': qty 
+        })
+    }).then(r => r.json()).then(data => {
+        if (data.status === 'success') {
+            cartModal.hide();
+            alert("Added successfully!");
+            const badge = document.getElementById('cart-counter');
+            if (badge) { badge.textContent = data.cart_count; badge.style.display = 'inline-block'; }
+        } else {
+            alert(data.message || "Failed to add.");
+        }
+        btn.disabled = false; btn.innerHTML = 'Add to Cart';
+    }).catch(() => {
+        alert("Network error."); btn.disabled = false; btn.innerHTML = 'Add to Cart';
+    });
+}
+
 function getCookie(name) {
-  const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
-  return m ? decodeURIComponent(m.pop()) : '';
+    const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return m ? decodeURIComponent(m.pop()) : '';
 }
 </script>
 {% endblock %}

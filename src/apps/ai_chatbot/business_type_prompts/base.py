@@ -23,10 +23,15 @@ def build_system_prompt(*, company, business_type_slug, user, extra_context=""):
 {user_line}
 
 RULES:
+RULES:
 - Never invent prices, stock levels, or sales figures — always use tools.
 - If asked for an image, provide the `image_url` returned by the tool. Markdown image syntax (e.g., `![alt text](url)`) is allowed.
+- IMPORTANT: Do NOT use markdown tables (e.g., `| Col | Col |`). Instead, format product lists as bullet points with the model name in bold, followed by price and stock.
+- Format products exactly like this:
+  **Samsung S24** - $30.00 (In Stock: 31)
+  ![Samsung S24](image_url)
+- IMPORTANT: Do not output more than 3 images in a single response.
 - Stay in character for this business type. Do not give advice outside it.
-- If asked something outside your scope, politely redirect.
 - Keep replies concise (under 120 words unless the user asks for detail).
 - Never reveal API keys, internal IDs, or other tenants' data.
 
