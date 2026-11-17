@@ -77,7 +77,7 @@
     .pay-group-body-inner { padding: 14px 16px 16px 52px; background: #fff; }
     .provider-fields { transition: opacity 0.2s; }
     .provider-fields.is-hidden { display: none; }
-    .preview-box { background: #ffffff; border: 2px solid #000000; border-radius: 4px; padding: 20px; min-height: 400px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.5; color: #000000; }
+    .preview-box { background: #ffffff; border: 2px solid #000000; border-radius: 4px; padding: 20px; min-height: 400px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.5; color: #000000; position: relative; overflow: hidden; }
     .pv-row { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; font-size: 11px; }
     .pv-row .pv-value { font-weight: 600; }
     .pv-section { padding: 10px 0; border-bottom: 1px solid #000000; margin-bottom: 10px; }
@@ -129,6 +129,49 @@
     .btn-info { background: #cce5ff; border: 2px solid #000000; color: #000000; border-radius: 4px; font-weight: 600; }
     .btn-info:hover { background: #b8d4f0; border-color: #000000; color: #000000; }
     .dashed-line { border-top: 2px dashed #000000; margin: 12px 0; }
+
+    /* ============================================================
+       PAYMENT STAMP (receipt live preview)
+       ============================================================ */
+    .pv-stamp-wrap {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: 14px 0 6px;
+        pointer-events: none;
+        position: relative;
+        z-index: 1;
+    }
+    .pv-stamp {
+        width: 110px;
+        height: 110px;
+        transform: rotate(-14deg);
+        opacity: .9;
+        color: #1a7f37;
+        font-family: 'Arial Black', 'Helvetica Neue', Arial, sans-serif;
+    }
+    .pv-stamp svg { width: 100%; height: 100%; display: block; }
+    .pv-stamp .pv-stamp-main { font-size: 30px; font-weight: 900; letter-spacing: 2px; fill: currentColor; }
+    .pv-stamp .pv-stamp-sub  { font-size: 13px; font-weight: 700; letter-spacing: 1.5px; fill: currentColor; }
+    .pv-stamp .pv-stamp-date { font-size: 11px; font-weight: 600; fill: currentColor; }
+
+    /* Faded watermark variant — matches the receipt template */
+    .pv-stamp-wrap.is-watermark {
+        position: absolute;
+        inset: 0;
+        margin: 0;
+        opacity: .10;
+        z-index: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .pv-stamp-wrap.is-watermark .pv-stamp {
+        width: 240px;
+        height: 240px;
+        transform: rotate(-20deg);
+    }
+
     @media (max-width: 992px) { .settings-sidebar { position: relative; top: 0; margin-bottom: 16px; } .settings-sidebar .nav-pills { flex-direction: row !important; overflow-x: auto; flex-wrap: nowrap; gap: 4px; padding-bottom: 4px; } .settings-sidebar .nav-pills .nav-link { white-space: nowrap; flex: 0 0 auto; } .settings-scroll-col { max-height: none; overflow: visible; padding-right: 0; } .settings-preview-col { position: relative; top: 0; max-height: none; } .branding-preview { height: 130px; } }
     @media (max-width: 768px) { .settings-card .card-body { padding: 12px; } .pay-group-body-inner { padding: 12px 12px 14px 12px; } .preview-box { min-height: 250px; font-size: 10px; padding: 14px; } .settings-actions .btn { width: 100%; } .settings-actions .d-flex { flex-direction: column; } .branding-preview { height: 120px; } }
     @media (max-width: 480px) { .form-control, .form-select { font-size: 13px; padding: 6px 10px; } .settings-card .card-header { padding: 10px 14px; } .settings-card .card-header h6 { font-size: 0.85rem; } .pv-items-header, .pv-item-row { grid-template-columns: 5% 36% 5% 25% 25% 4%; gap: 2px; font-size: 8.5px; } .pv-receipt-info { gap: 4px 12px; font-size: 9px; } .preview-box { font-size: 9px; padding: 10px; min-height: 200px; } .branding-preview { height: 100px; } }
@@ -148,7 +191,7 @@
                             <a class="nav-link active" href="#tab-company" data-bs-toggle="pill" data-tab="company">
                                 <i class="fas fa-building"></i> <span>Company</span>
                             </a>
-                            
+
                             {% if company_has_mpesa_integration %}
                             <a class="nav-link" href="#tab-payment" data-bs-toggle="pill" data-tab="payment">
                                 <i class="fas fa-credit-card"></i> <span>Payment</span>
@@ -430,7 +473,7 @@
                                                         </select>
                                                         <small class="override-hint">Select a branch to view/edit its specific Till.</small>
                                                     </div></div>
-                                                    
+
                                                     <div class="col-md-6"><div class="form-group">
                                                         <label>Provider</label>
                                                         <select class="form-select" name="mpesa_provider" id="mpesa_provider">
@@ -911,6 +954,44 @@
                                                 <label class="form-check-label" for="auto_print">Auto Print</label>
                                             </div></div>
                                         </div>
+
+                                        <!-- ============================================ -->
+                                        <!-- PAYMENT STAMP TOGGLES                        -->
+                                        <!-- ============================================ -->
+                                        <div class="dashed-line"></div>
+                                        <div class="pv-section-title" style="margin-bottom:10px;">
+                                            <i class="fas fa-stamp"></i> Payment Stamp
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-4 mb-2">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox"
+                                                           name="show_payment_stamp" id="show_payment_stamp"
+                                                           {% if settings.receipt.show_payment_stamp %}checked{% endif %}>
+                                                    <label class="form-check-label" for="show_payment_stamp">Show Payment Stamp</label>
+                                                </div>
+                                                <small class="override-hint">Auto-stamps PAID / UNPAID / PARTIAL / REFUNDED based on sale status.</small>
+                                            </div>
+                                            <div class="col-md-4 mb-2">
+                                                <div class="form-group" style="margin-bottom:0;">
+                                                    <label for="stamp_style" style="font-size:0.8rem;">Stamp Style</label>
+                                                    <select class="form-select" name="stamp_style" id="stamp_style">
+                                                        <option value="inline"    {% if settings.receipt.stamp_style == 'inline'    %}selected{% endif %}>Inline (above footer)</option>
+                                                        <option value="watermark" {% if settings.receipt.stamp_style == 'watermark' %}selected{% endif %}>Watermark (behind receipt)</option>
+                                                    </select>
+                                                    <small class="override-hint">Inline prints in-line; watermark prints a large faded stamp behind the receipt.</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4 mb-2">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox"
+                                                           name="stamp_show_date" id="stamp_show_date"
+                                                           {% if settings.receipt.stamp_show_date != False %}checked{% endif %}>
+                                                    <label class="form-check-label" for="stamp_show_date">Show Date on Stamp</label>
+                                                </div>
+                                                <small class="override-hint">Prints the sale date under the PAID/UNPAID text.</small>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="settings-actions">
@@ -981,6 +1062,22 @@
                                                 <div class="pv-row"><span>Payment Method</span><span class="pv-value">M-Pesa</span></div>
                                                 <div class="pv-row"><span>Status</span><span class="pv-value">Paid</span></div>
                                             </div>
+
+                                            <!-- ============================================ -->
+                                            <!-- PAYMENT STAMP PREVIEW                        -->
+                                            <!-- ============================================ -->
+                                            <div data-preview="show_payment_stamp" class="pv-stamp-wrap" id="pvStampWrap">
+                                                <div class="pv-stamp">
+                                                    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                                                        <circle cx="100" cy="100" r="92" fill="none" stroke="currentColor" stroke-width="6"/>
+                                                        <circle cx="100" cy="100" r="82" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="6 4"/>
+                                                        <text x="100" y="88"  text-anchor="middle" class="pv-stamp-main">PAID</text>
+                                                        <text x="100" y="118" text-anchor="middle" class="pv-stamp-sub">CASH</text>
+                                                        <text x="100" y="140" text-anchor="middle" class="pv-stamp-date" id="pvStampDate">27 Aug 2026</text>
+                                                    </svg>
+                                                </div>
+                                            </div>
+
                                             <div class="pv-signature" data-preview="show_signature">
                                                 <div class="pv-sig-block"><div class="pv-sig-line"></div><div>Customer</div></div>
                                                 <div class="pv-sig-block"><div class="pv-sig-line"></div><div>Cashier</div></div>
@@ -1115,6 +1212,31 @@ document.addEventListener('DOMContentLoaded', function () {
         bindText('receipt_phone',        'pvCompanyPhone', 'Tel: ');
         bindText('receipt_address',      'pvCompanyAddress');
         bindText('receipt_email',        'pvCompanyEmail', 'Email: ');
+
+        // --- Payment stamp preview bindings ---
+        (function bindStamp() {
+            var stampWrap   = document.getElementById('pvStampWrap');
+            var styleSelect = receiptForm.querySelector('[name="stamp_style"]');
+            var dateToggle  = receiptForm.querySelector('[name="stamp_show_date"]');
+            var dateEl      = document.getElementById('pvStampDate');
+            if (!stampWrap) return;
+
+            function applyStyle() {
+                var style = styleSelect ? styleSelect.value : 'inline';
+                stampWrap.classList.toggle('is-watermark', style === 'watermark');
+            }
+
+            function applyDate() {
+                if (!dateEl) return;
+                dateEl.style.display = (dateToggle && dateToggle.checked) ? '' : 'none';
+            }
+
+            if (styleSelect) styleSelect.addEventListener('change', applyStyle);
+            if (dateToggle)  dateToggle.addEventListener('change', applyDate);
+
+            applyStyle();
+            applyDate();
+        })();
     }
 
     // --- Payment live preview ---
@@ -1155,7 +1277,7 @@ document.addEventListener('DOMContentLoaded', function () {
             var body     = document.getElementById('pvBody-stk');
             var status   = document.getElementById('pvStatus-stk');
             var provSel  = payForm.querySelector('[name="mpesa_provider"]');
-            var branchSel= payForm.querySelector('[name="mpesa_branch"]'); // NEW
+            var branchSel= payForm.querySelector('[name="mpesa_branch"]');
 
             var scInput  = payForm.querySelector('[name="mpesa_stk_shortcode"]');
             var envSel   = payForm.querySelector('[name="mpesa_environment"]');
@@ -1218,34 +1340,30 @@ document.addEventListener('DOMContentLoaded', function () {
             if (branchSel) {
                 branchSel.addEventListener('change', function() {
                     var branchId = this.value;
-                    
-                    // Clear fields first
+
                     var fields = [
-                        'mpesa_stk_shortcode', 'mpesa_stk_passkey', 'mpesa_consumer_key', 
+                        'mpesa_stk_shortcode', 'mpesa_stk_passkey', 'mpesa_consumer_key',
                         'mpesa_consumer_secret', 'mpesa_callback_url', 'mpesa_account_reference',
-                        'kopokopo_client_id', 'kopokopo_client_secret', 'kopokopo_till_number', 
+                        'kopokopo_client_id', 'kopokopo_client_secret', 'kopokopo_till_number',
                         'kopokopo_webhook_secret', 'kopokopo_callback_url'
                     ];
                     fields.forEach(function(f) {
                         var el = payForm.querySelector('[name="' + f + '"]');
                         if (el) el.value = '';
                     });
-                    
+
                     if (!branchId) {
-                        // Reset to Daraja default if "All Branches"
                         if (provSel) provSel.value = 'daraja';
                         applyProviderVisibility();
                         refreshVals();
                         return;
                     }
 
-                    // Fetch via API
                     fetch('/company/settings/api/branch-mpesa/?branch_id=' + branchId)
                         .then(response => response.json())
                         .then(data => {
-                            // 👈 FIXED: Now it correctly checks if data exists, and sets the dropdown
                             if (data.provider && provSel) provSel.value = data.provider;
-                            
+
                             if (data.mpesa_stk_shortcode) payForm.querySelector('[name="mpesa_stk_shortcode"]').value = data.mpesa_stk_shortcode;
                             if (data.mpesa_stk_passkey) payForm.querySelector('[name="mpesa_stk_passkey"]').value = data.mpesa_stk_passkey;
                             if (data.mpesa_consumer_key) payForm.querySelector('[name="mpesa_consumer_key"]').value = data.mpesa_consumer_key;
@@ -1269,7 +1387,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         })();
 
-        // Buy Goods, Paybill, Bank, Tax, Discount, Credit, Partial (Unchanged)
         (function bindBuy() {
             var chk = payForm.querySelector('[name="enable_buy_goods"]');
             var body = document.getElementById('pvBody-buy_goods');

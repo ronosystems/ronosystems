@@ -9,16 +9,14 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Q
 from django.utils import timezone
 from django.shortcuts import render, redirect
 from apps.epa_shop.models import Unit
 from decimal import Decimal
+from .models import Order
 import json
 
-from django.http import JsonResponse
-from django.db.models import Q
-from .models import Order
 
 
 # ============================================
@@ -319,6 +317,23 @@ def cancel_order(request, order_id):
     order.save(update_fields=['status', 'cancel_reason'])
 
     return JsonResponse({'success': True, 'message': 'Order has been cancelled.'})
+
+
+@login_required
+@require_POST
+def delete_order(request, order_id):
+    # Add your admin check here
+    if not request.user.is_superuser and request.user.role != 'company_admin':
+        return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=403)
+        
+    try:
+        order = Order.objects.get(id=order_id)
+        order.delete()
+        return JsonResponse({'success': True})
+    except Order.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Order not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
 # ============================================

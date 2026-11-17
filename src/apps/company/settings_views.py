@@ -506,6 +506,9 @@ def settings_receipt(request):
                 'receipt_phone':          request.POST.get('receipt_phone', ''),
                 'receipt_email':          request.POST.get('receipt_email', ''),
                 'show_sale_barcode':      request.POST.get('show_sale_barcode') == 'on',
+                'show_payment_stamp':     request.POST.get('show_payment_stamp') == 'on',
+                'stamp_style':            request.POST.get('stamp_style', 'inline'),
+                'stamp_show_date':        request.POST.get('stamp_show_date') == 'on',
             }
             save_company_settings(company, receipt_settings, 'receipt')
             messages.success(request, 'Receipt settings updated successfully!')
@@ -730,7 +733,10 @@ def get_company_settings(company):
             'receipt_address': '',
             'receipt_phone': '',
             'receipt_email': '',
-            'show_sale_barcode': False
+            'show_sale_barcode': False,
+            'show_payment_stamp': False,
+            'stamp_style': 'inline',
+            'stamp_show_date': True,
         },
     }
 

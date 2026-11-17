@@ -18,6 +18,7 @@ urlpatterns = [
     path('orders/<int:order_id>/unpick/',      staff_views.unpick_order,            name='unpick-order'),
     path('orders/<int:order_id>/follow-up/',   staff_views.mark_order_followed_up,  name='follow-up'),
     path('orders/<int:order_id>/confirm/',     staff_views.confirm_order,           name='confirm-order'),
+    path('orders/<int:order_id>/delete/',      staff_views.delete_order,                  name='order-delete'),
     path('api/search-units/',                  staff_views.search_units_api,        name='search-units-api'),
     path('orders/<int:order_id>/link-sale/',   staff_views.link_sale_page,          name='link-sale'),
     path('orders/<int:order_id>/cancel/',      staff_views.cancel_order,            name='cancel-order'),

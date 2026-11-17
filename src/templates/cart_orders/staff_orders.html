@@ -76,12 +76,12 @@
                             <th style="width: 10%;">Order #</th>
                             <th style="width: 12%;">Customer</th>
                             <th style="width: 12%;">Date</th>
-                            <th style="width: 13%;">Selected Shop</th> 
+                            <th style="width: 10%;">Selected Shop</th> 
                             <th style="width: 13%;">Delivery Location</th> 
                             <th style="width: 10%;">Status</th>
                             <th style="width: 10%;">Picked By</th>
-                            <th class="text-end" style="width: 8%;">Total</th>
-                            <th class="text-start ps-3" style="width: 22%;">Actions</th>
+                            <th class="text-end" style="width: 8%;">Total Vallue</th>
+                            <th class="text-start ps-3" style="width: 25%;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -135,10 +135,18 @@
                             <td class="text-end fw-bold">KSh {{ order.total_amount|floatformat:2 }}</td>
                             <td class="text-start ps-3">
                                 <div class="d-flex flex-wrap justify-content-start gap-1">
-                                    {% if order.status == 'new' %}
+                                    {% if order.status == 'new' or not order.assigned_to %}
                                         <button class="btn btn-sm btn-warning fw-bold" onclick="pickOrder({{ order.id }})">
                                             <i class="fas fa-hand-paper"></i> Pick Order
                                         </button>
+                                        
+                                        {% if is_admin %}
+                                        <!-- ADMIN DELETE BUTTON -->
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteOrder({{ order.id }})">
+                                            <i class="fas fa-trash"></i> Delete
+                                        </button>
+                                        {% endif %}
+
                                     {% elif order.status == 'cancelled' %}
                                         {% if is_admin %}
                                             <button class="btn btn-sm btn-outline-danger" onclick="showCancelledDetails({{ order.id }})">
@@ -147,11 +155,14 @@
                                         {% else %}
                                             <span class="text-muted small fst-italic">Awaiting Admin</span>
                                         {% endif %}
+
                                     {% elif order.status == 'picked' or order.status == 'confirmed' %}
                                         {% if order.assigned_to == request.user or is_admin %}
+                                            
                                             <button class="btn btn-sm btn-outline-primary" onclick="showOrderDetails({{ order.id }})">
                                                 <i class="fas fa-eye"></i> View
                                             </button>
+                                            
                                             {% if is_admin %}
                                                 <button class="btn btn-sm btn-outline-warning text-dark fw-bold" onclick="unpickOrder({{ order.id }})">
                                                     <i class="fas fa-unlock"></i> Unpick
@@ -161,12 +172,15 @@
                                                     <i class="fas fa-times"></i> Cancel
                                                 </button>
                                             {% endif %}
+
                                         {% else %}
                                             <span class="text-muted small fst-italic">
                                                 <i class="fas fa-info-circle"></i> Handled by {{ order.assigned_to.get_full_name|default:order.assigned_to.username }}
                                             </span>
                                         {% endif %}
+
                                     {% elif order.status == 'fulfilled' %}
+                                        
                                         {% if order.sale and order.sale.payment_status == 'pending' %}
                                             <button class="btn btn-sm btn-success fw-bold" onclick="payPendingOrder({{ order.id }})">
                                                 <i class="fas fa-money-bill-wave"></i> Pay Order
@@ -178,6 +192,7 @@
                                                 </a>
                                             {% endif %}
                                         {% endif %}
+
                                     {% endif %}
                                 </div>
                             </td>
@@ -283,10 +298,17 @@
 
                         <!-- Action Buttons -->
                         <div class="d-flex gap-1">
-                            {% if order.status == 'new' %}
-                                <button class="btn btn-sm btn-warning w-100 fw-bold p-1" style="font-size: 10px;" onclick="pickOrder({{ order.id }})">
+                            {% if order.status == 'new' or not order.assigned_to %}
+                                <button class="btn btn-sm btn-warning flex-grow-1 fw-bold p-1" style="font-size: 10px;" onclick="pickOrder({{ order.id }})">
                                     <i class="fas fa-hand-paper"></i> Pick
                                 </button>
+                                
+                                {% if is_admin %}
+                                <!-- ADMIN DELETE BUTTON -->
+                                <button class="btn btn-sm btn-outline-danger flex-grow-1 p-1" style="font-size: 10px;" onclick="deleteOrder({{ order.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                {% endif %}
                             
                             {% elif order.status == 'cancelled' %}
                                 {% if is_admin %}
@@ -378,6 +400,32 @@
     </div>
 </div>
 
+<!-- MODAL 3: Confirm Delete (Centered) -->
+<div class="modal fade" id="deleteOrderModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-trash-alt me-2"></i> Delete Order</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <i class="fas fa-exclamation-triangle text-warning display-4 mb-3"></i>
+                <h5 class="fw-bold">Are you absolutely sure?</h5>
+                <p class="text-muted mb-0">
+                    You are about to permanently delete order <strong id="deleteOrderNumberDisplay"></strong>.<br>
+                    This action <strong>cannot</strong> be undone.
+                </p>
+            </div>
+            <div class="modal-footer bg-light justify-content-center">
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger px-4 fw-bold" id="btnConfirmDelete">
+                    <i class="fas fa-trash"></i> Yes, Delete It
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ========================================== -->
 <!-- JAVASCRIPT                                 -->
 <!-- ========================================== -->
@@ -444,6 +492,60 @@ function pickOrder(orderId) {
     })
     .catch(err => alert("Network error: " + err.message));
 }
+
+// ADMIN: Show Custom Delete Confirmation Modal
+let orderToDeleteId = null;
+
+function deleteOrder(orderId) {
+    orderToDeleteId = orderId;
+    
+    // Get the order number from the JS object to show in the modal
+    const order = ordersData[orderId];
+    if (order) {
+        document.getElementById('deleteOrderNumberDisplay').textContent = '#' + order.order_number;
+    }
+
+    // Show the Bootstrap Modal
+    new bootstrap.Modal(document.getElementById('deleteOrderModal')).show();
+}
+
+// This runs when the user clicks "Yes, Delete It" inside the modal
+document.getElementById('btnConfirmDelete').addEventListener('click', function() {
+    if (!orderToDeleteId) return;
+
+    const btn = this;
+    const originalHtml = btn.innerHTML;
+    
+    // Show loading state
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+
+    const csrfToken = getCookie('csrftoken');
+    if (!csrfToken) { alert('CSRF token not found.'); return; }
+
+    fetch(`/cart/orders/${orderToDeleteId}/delete/`, {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json', 
+            'X-CSRFToken': csrfToken 
+        }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert("Error: " + data.error);
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    })
+    .catch(err => {
+        alert("Network error: " + err.message);
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    });
+});
 
 // ADMIN: Unpick Order
 function unpickOrder(orderId) {
