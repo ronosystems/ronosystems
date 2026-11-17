@@ -13,15 +13,14 @@ def build_context(request):
     company = getattr(request, 'current_company', None)
     user = request.user if request.user.is_authenticated else None
 
+    # Company already exposes `.business_type_slug` (see models.py) —
+    # it returns the registry slug or None.
     business_type_slug = ''
-    if company and company.business_type:
-        bt_enum = company.business_type_registry_value()  # helper on Company
-        if bt_enum:
-            business_type_slug = bt_enum.value['slug']
+    if company and company.business_type_slug:
+        business_type_slug = company.business_type_slug
 
     mod = get_prompt_module(business_type_slug) if business_type_slug else None
 
-    # Pull business-specific rules
     if mod:
         rules = mod.business_rules()
         tools = mod.tool_whitelist()

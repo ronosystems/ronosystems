@@ -1,20 +1,53 @@
-from apps.epa_shop.models import Phone, Electronic, Accessory
+import logging
+import inspect
+from django.db.models import Q, Sum
+from apps.epa_shop.models import Phone, Electronic, Accessory, BranchStock, ProductImage
 from apps.supermarket.models import Product as SMProduct
 from apps.kuku_biz.models import Flock, EggProduction
 from apps.chama.models import Savings, Loan
-from django.db.models import Q
 
 
-# --- shared helpers ---------------------------------------------------------
+
+
+logger = logging.getLogger(__name__)
+
+
+
+
 def _serialize_product(p):
+    """
+    Serialize a product for the LLM. 
+    """
+    try:
+        stock_qty = p.total_stock()
+    except Exception:
+        stock_qty = 0
+
+    # 1. Try to get the main image
+    img_url = p.image_url
+
+    # 2. If no main image, fall back to the ProductImage gallery
+    if not img_url:
+        ctype_model = 'phone' if isinstance(p, Phone) else 'electronic' if isinstance(p, Electronic) else 'accessory'
+        gallery_img = ProductImage.objects.filter(
+            company=p.company,
+            content_type__model=ctype_model,
+            object_id=p.id,
+            is_active=True
+        ).order_by('-is_primary', 'display_order', 'id').first()
+        
+        if gallery_img and gallery_img.image_url:
+            img_url = gallery_img.image_url
+
     return {
         'id': p.id,
         'name': p.name,
         'brand': getattr(p, 'brand', ''),
         'price': float(p.selling_price),
-        'in_stock': getattr(p, 'stock_quantity', 0) > 0,
+        'in_stock': stock_qty > 0,
+        'stock_quantity': stock_qty,
+        'image_url': img_url or "",  # Pass empty string instead of None
     }
-
 
 # --- EPA SHOP ---------------------------------------------------------------
 def search_products(company, query, limit=5):
@@ -22,7 +55,12 @@ def search_products(company, query, limit=5):
     phones = Phone.objects.filter(company=company, is_active=True).filter(q)[:limit]
     electronics = Electronic.objects.filter(company=company, is_active=True).filter(q)[:limit]
     accessories = Accessory.objects.filter(company=company, is_active=True).filter(q)[:limit]
-    return [_serialize_product(p) for p in list(phones) + list(electronics) + list(accessories)]
+    
+    results = []
+    for p in list(phones) + list(electronics) + list(accessories):
+        results.append(_serialize_product(p))
+        
+    return results
 
 
 def get_product_details(company, product_id, model_type):
@@ -34,6 +72,7 @@ def get_product_details(company, product_id, model_type):
         p = Model.objects.get(company=company, id=product_id)
     except Model.DoesNotExist:
         return {'error': 'Product not found'}
+    
     return _serialize_product(p)
 
 
@@ -75,7 +114,7 @@ def get_my_savings_balance(company, user):
         return {'error': 'Login required'}
     total = Savings.objects.filter(
         company=company, member__user=user
-    ).aggregate(total=__import__('django.db.models', fromlist=['Sum']).Sum('amount'))
+    ).aggregate(total=Sum('amount'))
     return {'balance': float(total['total'] or 0)}
 
 
@@ -87,7 +126,6 @@ def get_my_loan_status(company, user):
 
 
 # --- TOOL SCHEMA MAP --------------------------------------------------------
-# Maps the tool name that the LLM sees → the Python callable + JSON schema
 TOOL_IMPLEMENTATIONS = {
     'search_products': search_products,
     'get_product_details': get_product_details,
@@ -130,7 +168,22 @@ TOOL_SCHEMAS = {
             },
         },
     },
-    # ...add the rest following the same shape
+    'check_stock': {
+        'type': 'function',
+        'function': {
+            'name': 'check_stock',
+            'description': 'Check the exact stock quantity for a specific product.',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'product_id': {'type': 'integer'},
+                    'model_type': {'type': 'string', 'enum': ['phone', 'electronic', 'accessory']},
+                },
+                'required': ['product_id', 'model_type'],
+            },
+        },
+    },
+    # Add the rest of the tools here as you build them out
 }
 
 
@@ -146,7 +199,6 @@ def dispatch_tool(name, args, *, company, user):
         return {'error': f'Unknown tool: {name}'}
 
     # Inject company/user when the signature requires it
-    import inspect
     sig = inspect.signature(fn)
     kwargs = dict(args)
     if 'company' in sig.parameters:
@@ -157,5 +209,5 @@ def dispatch_tool(name, args, *, company, user):
     try:
         return fn(**kwargs)
     except Exception as e:
-        logger.exception("Tool %s failed", name)
+        logger.exception(f"Tool {name} failed")
         return {'error': str(e)}

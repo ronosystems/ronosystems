@@ -1,7 +1,7 @@
 def build_system_prompt(*, company, business_type_slug, user, extra_context=""):
     """
-    Returns the base system prompt. Each business-type module overrides
-    `business_rules()` and optionally `tool_whitelist()`.
+    Returns the base system prompt. Business-type modules provide the
+    domain rules via `extra_context` (already built by context_builder).
     """
     tenant_line = (
         f"You are the AI assistant for **{company.display_name}**, "
@@ -24,11 +24,11 @@ def build_system_prompt(*, company, business_type_slug, user, extra_context=""):
 
 RULES:
 - Never invent prices, stock levels, or sales figures — always use tools.
+- If asked for an image, provide the `image_url` returned by the tool. Markdown image syntax (e.g., `![alt text](url)`) is allowed.
 - Stay in character for this business type. Do not give advice outside it.
 - If asked something outside your scope, politely redirect.
 - Keep replies concise (under 120 words unless the user asks for detail).
 - Never reveal API keys, internal IDs, or other tenants' data.
 
-{business_rules()}
-{extra_context}
+{extra_context or ''}
 """

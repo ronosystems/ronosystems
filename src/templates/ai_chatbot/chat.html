@@ -2,12 +2,30 @@
 {% load static %}
 
 {% block content %}
+<!-- Add marked.js for Markdown parsing -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+<style>
+  /* Make images in the chat responsive */
+  #chat-log img {
+    max-width: 100%;
+    border-radius: 8px;
+    margin-top: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  /* Style markdown links */
+  #chat-log a {
+    color: #0d6efd;
+    text-decoration: underline;
+  }
+</style>
+
 <div class="container py-5" style="max-width: 800px;">
   <div class="card shadow-sm border-0">
     <div class="card-header bg-primary text-white d-flex align-items-center gap-2">
       <i class="fas fa-robot"></i>
       <span class="fw-bold">
-        {% if scope == 'company' %}Business Assistant{% else %}RonoSystems Assistant{% endif %}
+        {% if scope == 'company' %} {{ current_company.display_name }} Assistant{% else %}{{ system_name|default:"RonoSystems" }} Assistant{% endif %}
       </span>
     </div>
 
@@ -35,10 +53,15 @@ const url   = "{% url 'ai_chatbot:send' %}";
 function append(role, text) {
   const div = document.createElement('div');
   div.className = 'mb-2 d-flex ' + (role === 'user' ? 'justify-content-end' : 'justify-content-start');
+  
+  // Use marked.js to parse markdown for the assistant
+  const content = role === 'assistant' ? marked.parse(text) : text;
+  
   div.innerHTML = `
     <div class="px-3 py-2 rounded-3 ${role === 'user'
-      ? 'bg-primary text-white' : 'bg-white border'}">
-      ${text}
+      ? 'bg-primary text-white' : 'bg-white border'}"
+      style="max-width: 85%; overflow-wrap: break-word;">
+      ${content}
     </div>`;
   log.appendChild(div);
   log.scrollTop = log.scrollHeight;
