@@ -7,10 +7,23 @@ register = template.Library()
 def nav_active(context, *url_names):
     """
     Return 'active' if the current URL name matches any of url_names.
-    Usage: {% nav_active 'home' %}  or  {% nav_active 'support' 'help' 'faq' %}
+    
+    Supports BOTH:
+      - Plain url names:        {% nav_active 'home' %}
+      - Namespaced view names:  {% nav_active 'ai_chatbot:page' %}
+      - Multiple fallbacks:     {% nav_active 'support' 'help' 'faq' %}
     """
     request = context.get('request')
     if not request or not request.resolver_match:
         return ''
-    current = request.resolver_match.url_name
-    return 'active' if current in url_names else ''
+    
+    match = request.resolver_match
+    # 'view_name' includes the namespace (e.g. 'ai_chatbot:page')
+    # 'url_name' strips it (e.g. 'page')
+    current_view_name = match.view_name
+    current_url_name = match.url_name
+    
+    for name in url_names:
+        if name == current_view_name or name == current_url_name:
+            return 'active'
+    return ''

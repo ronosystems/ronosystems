@@ -20,16 +20,10 @@ restricted_admin_site.index_title = "Welcome to RonoSystems Administration"
 # HELPER FUNCTION FOR DYNAMIC TEMPLATES
 # ============================================
 def get_template(system_tpl, company_tpl):
-    """
-    Returns a view that serves either the system template or company template
-    based on whether 'current_company' is present on the request.
-    """
     def view(request, *args, **kwargs):
-        # Check if current_company is set (by your middleware)
-        template_name = company_tpl if getattr(request, 'current_company', None) else system_tpl
+        template_name = company_tpl if getattr(request, 'company', None) else system_tpl
         return TemplateView.as_view(template_name=template_name)(request, *args, **kwargs)
     return view
-
 
 urlpatterns = [
     # Home
@@ -71,6 +65,7 @@ urlpatterns = [
     path('analytics/', include('apps.analytics.urls')),
     path('workshop/', include('apps.workshop.urls', namespace='workshop')),
     path('mpesa/', include('apps.mpesa.urls')),
+    path('ai/chatbot/', include('apps.ai_chatbot.urls')),
 
     # ============================================
     # API ENDPOINTS
@@ -84,7 +79,6 @@ urlpatterns = [
     # CORE PAGES & PWA
     # ============================================
     path('contact/', contact, name='contact'),
-    path('ai/chat/', include('apps.ai_chatbot.urls', namespace='ai_chatbot')),
     path('manifest.json', manifest_view, name='manifest'),
     path('sw.js', service_worker, name='service-worker'),
     path('.well-known/assetlinks.json', asset_links, name='asset_links'),
@@ -99,6 +93,7 @@ urlpatterns = [
     path('features/', get_template('website/features.html', 'website/company_features.html'), name='features'),
     path('faq/', get_template('website/faq.html', 'website/company_faq.html'), name='faq'),
     path('documentation/', get_template('website/documentation.html', 'website/company_documentation.html'), name='documentation'),
+    path('ai-assistant/', get_template('website/ai_assistant.html', 'website/company_ai_assistant.html'), name='ai-assistant-page'),
     path('invoicing/', get_template('website/invoicing.html', 'website/company_invoicing.html'), name='invoicing'),
     path('pricing/', get_template('website/pricing.html', 'website/company_pricing.html'), name='pricing'),
     path('terms/', get_template('website/terms.html', 'website/company_terms.html'), name='terms'),

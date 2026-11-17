@@ -64,7 +64,7 @@ def qz_sign(request):
 
 def home(request):
     """Homepage for RonoSystems (or company subdomain)"""
-    company = getattr(request, 'current_company', None)
+    company = getattr(request, 'company', None) 
     
     if company:
         bt_slug = ""

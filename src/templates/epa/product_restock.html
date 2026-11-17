@@ -196,6 +196,37 @@
         font-weight: 600;
     }
 
+    /* Submit button loading state */
+    #submitBtn:disabled {
+        opacity: 0.75;
+        cursor: not-allowed;
+    }
+    #submitBtn .btn-loading {
+        display: inline-flex;
+        align-items: center;
+    }
+    #submitBtn.loading .btn-text {
+        display: none !important;
+    }
+    #submitBtn.loading .btn-loading {
+        display: inline-flex !important;
+    }
+
+    @keyframes btn-spin {
+        to { transform: rotate(360deg); }
+    }
+    #submitBtn.loading .btn-loading::before {
+        content: "";
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        margin-right: 8px;
+        border: 2px solid rgba(255,255,255,0.4);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: btn-spin 0.7s linear infinite;
+    }
+
     /* Scrollbar styling for preview */
     .preview-body::-webkit-scrollbar { width: 6px; }
     .preview-body::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
@@ -222,7 +253,7 @@
         <div class="col-lg-8">
             <div class="card shadow-sm border-0">
                 <div class="card-body p-4">
-                    <form method="post">
+                    <form method="post" id="restockForm">
                         {% csrf_token %}
 
                         <!-- Product Info (Divided into 3 columns) -->
@@ -378,11 +409,16 @@
 
                         <!-- Form Actions -->
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-success btn-lg px-4">
-                                <i class="fas fa-save"></i> 
-                                {% if product_type == 'Accessory' %}Add Stock{% else %}Add Units{% endif %}
+                            <button type="submit" class="btn btn-success btn-lg px-4" id="submitBtn">
+                                <span class="btn-text">
+                                    <i class="fas fa-save"></i> 
+                                    {% if product_type == 'Accessory' %}Add Stock{% else %}Add Units{% endif %}
+                                </span>
+                                <span class="btn-loading d-none">
+                                    Submitting...
+                                </span>
                             </button>
-                            <a href="/epa_shop/products/{{ product.product_code }}/" class="btn btn-secondary btn-lg">
+                            <a href="/epa_shop/products/{{ product.product_code }}/" class="btn btn-secondary btn-lg" id="cancelBtn">
                                 <i class="fas fa-times"></i> Cancel
                             </a>
                         </div>
@@ -429,12 +465,18 @@
 JAVASCRIPT
 ============================================ -->
 <script>
+// ============================================
+// GLOBALS
+// ============================================
 let units = [];
+let isSubmitting = false;
 
 // ============================================
 // UNIT MANAGEMENT
 // ============================================
 function addUnit() {
+    if (isSubmitting) return;
+    
     const input = document.getElementById('unitInput');
     const status = document.getElementById('unitStatus');
     const identifier = input.value.trim();
@@ -456,6 +498,8 @@ function addUnit() {
 }
 
 function bulkAdd() {
+    if (isSubmitting) return;
+    
     const textarea = document.getElementById('bulkInput');
     const lines = textarea.value.split('\n').map(s => s.trim()).filter(s => s);
     
@@ -489,12 +533,14 @@ function bulkAdd() {
 }
 
 function removeUnit(index) {
+    if (isSubmitting) return;
     if (!confirm('Remove this unit?')) return;
     units.splice(index, 1);
     renderUnits();
 }
 
 function toggleBulk() {
+    if (isSubmitting) return;
     const bulk = document.getElementById('bulkAdd');
     bulk.classList.toggle('visible');
 }
@@ -504,6 +550,8 @@ function renderUnits() {
     const hidden = document.getElementById('unitsData');
     
     if (hidden) hidden.value = JSON.stringify(units);
+    
+    if (!list) return;
     
     // Find or create the new units container inside the right column
     let newUnitsContainer = document.getElementById('newUnitsList');
@@ -528,7 +576,7 @@ function renderUnits() {
             <div class="d-flex align-items-center gap-2">
                 <span class="unit-status-badge ${unit.status}">${unit.status}</span>
                 <div class="unit-actions">
-                    <button onclick="removeUnit(${index})" title="Remove">
+                    <button type="button" onclick="removeUnit(${index})" title="Remove">
                         <i class="fas fa-trash-alt"></i>
                     </button>
                 </div>
@@ -538,21 +586,27 @@ function renderUnits() {
     newUnitsContainer.innerHTML = html;
 }
 
-// Enter key support for IMEI input
+// ============================================
+// DOM READY
+// ============================================
 document.addEventListener('DOMContentLoaded', function() {
-    const input = document.getElementById('unitInput');
-    if (input) {
-        input.addEventListener('keypress', function(e) {
+    
+    // -----------------------------------------
+    // Enter key support for IMEI/Serial input
+    // -----------------------------------------
+    const unitInput = document.getElementById('unitInput');
+    if (unitInput) {
+        unitInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 addUnit();
             }
         });
     }
-});
 
-// Load existing units if editing (for JS array)
-document.addEventListener('DOMContentLoaded', function() {
+    // -----------------------------------------
+    // Load existing units (if editing) into JS array
+    // -----------------------------------------
     const unitsData = document.getElementById('unitsData');
     if (unitsData && unitsData.value && unitsData.value !== '[]') {
         try {
@@ -562,12 +616,10 @@ document.addEventListener('DOMContentLoaded', function() {
             units = [];
         }
     }
-});
 
-// ============================================
-// PRICE CLEAR CHECKBOX HANDLING
-// ============================================
-document.addEventListener('DOMContentLoaded', function() {
+    // -----------------------------------------
+    // PRICE CLEAR CHECKBOX HANDLING
+    // -----------------------------------------
     const clearCheckbox = document.querySelector('input[name="best_price_cleared"]');
     const bestPriceInput = document.querySelector('input[name="best_price"]');
     
@@ -580,6 +632,96 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 bestPriceInput.disabled = false;
                 bestPriceInput.placeholder = '{% if product.best_price %}{{ product.best_price }}{% else %}—{% endif %}';
+            }
+        });
+    }
+
+    // -----------------------------------------
+    // PREVENT DOUBLE SUBMISSION
+    // -----------------------------------------
+    const form = document.getElementById('restockForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    
+    if (form && submitBtn) {
+        form.addEventListener('submit', function(e) {
+            // Block duplicate submissions
+            if (isSubmitting) {
+                e.preventDefault();
+                return false;
+            }
+            
+            // Guard: Phone/Electronic need units OR a price update
+            {% if product_type == 'Phone' or product_type == 'Electronic' %}
+            const purchasePriceEl = form.querySelector('[name="purchase_price"]');
+            const sellingPriceEl  = form.querySelector('[name="selling_price"]');
+            const bestPriceEl     = form.querySelector('[name="best_price"]');
+            
+            const purchasePrice = purchasePriceEl ? purchasePriceEl.value.trim() : '';
+            const sellingPrice  = sellingPriceEl  ? sellingPriceEl.value.trim()  : '';
+            const bestPrice     = bestPriceEl     ? bestPriceEl.value.trim()     : '';
+            const bestPriceCleared = clearCheckbox && clearCheckbox.checked;
+            
+            const hasPriceUpdate = purchasePrice || sellingPrice || bestPrice || bestPriceCleared;
+            
+            if (units.length === 0 && !hasPriceUpdate) {
+                e.preventDefault();
+                alert('Please add at least one {% if product_type == "Phone" %}IMEI{% else %}Serial{% endif %} number, or update a price.');
+                return false;
+            }
+            {% endif %}
+            
+            // Lock the form
+            isSubmitting = true;
+            
+            // Button → loading state
+            submitBtn.classList.add('loading');
+            submitBtn.disabled = true;
+            
+            // Lock cancel link
+            if (cancelBtn) {
+                cancelBtn.classList.add('disabled');
+                cancelBtn.style.pointerEvents = 'none';
+                cancelBtn.style.opacity = '0.5';
+            }
+            
+            // Disable VISIBLE controls ONLY.
+            // Keep hidden inputs (like unitsData) and the clear-price checkbox
+            // enabled so they still get submitted with the form.
+            form.querySelectorAll('input, select, textarea, button').forEach(function(el) {
+                const isHidden        = el.type === 'hidden';
+                const isClearCheckbox = el.name === 'best_price_cleared';
+                if (el !== submitBtn && !isHidden && !isClearCheckbox) {
+                    el.disabled = true;
+                }
+            });
+            
+            return true;
+        });
+        
+        // -----------------------------------------
+        // Back-button cache recovery
+        // -----------------------------------------
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted) {
+                isSubmitting = false;
+                
+                submitBtn.classList.remove('loading');
+                submitBtn.disabled = false;
+                
+                if (cancelBtn) {
+                    cancelBtn.classList.remove('disabled');
+                    cancelBtn.style.pointerEvents = '';
+                    cancelBtn.style.opacity = '';
+                }
+                
+                form.querySelectorAll('input, select, textarea, button').forEach(function(el) {
+                    const isHidden        = el.type === 'hidden';
+                    const isClearCheckbox = el.name === 'best_price_cleared';
+                    if (!isHidden && !isClearCheckbox) {
+                        el.disabled = false;
+                    }
+                });
             }
         });
     }

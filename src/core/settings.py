@@ -17,7 +17,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Explicitly load .env from BASE_DIR → /home/rs/ronosystems/src/.env
 load_dotenv(BASE_DIR / '.env')
 
-
 # ============================================
 # ENVIRONMENT FLAGS
 # ============================================
@@ -191,6 +190,7 @@ TEMPLATES = [
                 'apps.epa_shop.context_processors.user_context',
                 'apps.cart_orders.context_processors.cart_count', 
                 'apps.epa_shop.context_processors.pending_orders_count',
+                'apps.companies.context_processors.system_website_url', 
                 'apps.company.context_processors.company_context',
                 'apps.companies.context_processors.active_base_template',
                 'apps.companies.context_processors.support_mode_context',
@@ -577,7 +577,12 @@ else:
 
 
 
+# ============================================
+# SYSTEM ENGINES 
+# ============================================
 SYSTEM_NAME = os.getenv('SYSTEM_NAME', 'RonoSystems')
+SYSTEM_WEBSITE_URL = os.getenv('SYSTEM_WEBSITE_URL', '')
+SYSTEM_DOMAIN = os.getenv('SYSTEM_DOMAIN', '')
 
 
 # ============================================

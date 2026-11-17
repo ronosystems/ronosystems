@@ -7,6 +7,9 @@ is anonymous, or a field is empty, they return safe defaults instead of
 raising — templates should never crash because of a missing tenant.
 """
 
+import os
+from django.conf import settings
+
 from apps.companies.models import Company, CompanyJoinRequest, TenantFeedback
 from apps.business_types.business_type_registry import BusinessTypeEnum
 
@@ -288,3 +291,64 @@ def company_features_context(request):
         'company_has_treasury': has_treasury,
         'company_has_workshop': has_workshop,
     }
+
+
+
+
+# ============================================
+# SYSTEM WEBSITE URL (for "Powered by" footer link)
+# ============================================
+def system_website_url(request):
+    """
+    URL of the system's own website homepage — never the tenant site.
+
+    Resolution order:
+      1. settings.SYSTEM_WEBSITE_URL  (explicit override, e.g. env var)
+      2. settings.SYSTEM_DOMAIN       (e.g. "ronosystems.onrender.com")
+      3. Strip a known tenant subdomain from the request host
+         (e.g. fieldmax.localhost -> localhost,
+               fieldmax.ronosystems.onrender.com -> ronosystems.onrender.com)
+      4. Fall back to the request host as-is
+    """
+    explicit = (
+        getattr(settings, 'SYSTEM_WEBSITE_URL', None)
+        or os.getenv('SYSTEM_WEBSITE_URL', '')
+    )
+    if explicit:
+        return {'system_website_url': explicit.rstrip('/') + '/'}
+
+    full_host = request.get_host()             # includes port
+    host, _, port = full_host.partition(':')
+    host = host.lower()
+
+    # --- 2. Explicit system domain ---
+    system_domain = (
+        getattr(settings, 'SYSTEM_DOMAIN', None)
+        or os.getenv('SYSTEM_DOMAIN', '')
+    )
+    if system_domain:
+        host = system_domain
+    else:
+        # --- 3. Strip tenant subdomain ---
+        # Base domains we know are system roots — never strip below these
+        SYSTEM_ROOTS = (
+            'localhost',
+            'ronosystems.onrender.com',
+            'ronosystems.co.ke',
+        )
+        for root in SYSTEM_ROOTS:
+            if host == root or host.endswith('.' + root):
+                host = root
+                break
+        else:
+            # Custom company domain (e.g. fieldmax.co.ke) → fall back to
+            # the canonical system domain if configured, else leave as-is
+            if settings.DEBUG:
+                host = 'localhost'
+            # In production, without SYSTEM_DOMAIN or SYSTEM_WEBSITE_URL set,
+            # we can't know the system domain → leave the host unchanged.
+            # Set SYSTEM_DOMAIN in prod to guarantee correct behaviour.
+
+    scheme = 'https' if request.is_secure() else 'http'
+    port_part = f':{port}' if port else ''
+    return {'system_website_url': f'{scheme}://{host}{port_part}/'}
