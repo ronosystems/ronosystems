@@ -85,6 +85,23 @@
         opacity: 0.6;
         cursor: not-allowed;
     }
+
+    .btn-danger {
+        background: #dc3545;
+        color: #ffffff;
+        border: 1px solid #000000 !important;
+        padding: 4px 12px;
+        font-size: 12px;
+        border-radius: 4px;
+        transition: all 0.2s;
+    }
+
+    .btn-danger:hover {
+        background: #c82333;
+        color: #ffffff;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
     
     .btn-outline-info {
         border: 1px solid #000000;
@@ -232,6 +249,47 @@
         flex-wrap: wrap;
         justify-content: center;
     }
+
+    /* Shared modal styling */
+    #deletePendingModal .modal-content,
+    #completeSaleModal .modal-content {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+
+    #deletePendingModal .modal-header {
+        background-color: #f8d7da;
+        border-bottom: 2px solid #000000;
+        color: #721c24;
+    }
+
+    #completeSaleModal .modal-header {
+        background-color: #d4edda;
+        border-bottom: 2px solid #000000;
+        color: #155724;
+    }
+
+    #deletePendingModal .modal-footer,
+    #completeSaleModal .modal-footer {
+        border-top: 2px solid #000000;
+        background-color: #f8f9fa;
+    }
+
+    #deletePendingModal .modal-body,
+    #completeSaleModal .modal-body {
+        font-size: 14px;
+        color: #000000;
+    }
+
+    .modal-body .sale-badge {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        background: #f8f9fa;
+        border: 1px solid #000000;
+        padding: 1px 6px;
+        border-radius: 4px;
+    }
     
     @media (max-width: 768px) {
         .table-excel th,
@@ -261,7 +319,8 @@
             flex-direction: column;
             align-items: center;
         }
-        .btn-complete {
+        .btn-complete,
+        .btn-danger {
             width: 100%;
         }
     }
@@ -391,15 +450,21 @@
                                         <a href="/epa_shop/sales/{{ sale.id }}/" class="btn btn-sm btn-outline-info">
                                             <i class="fas fa-eye"></i> View
                                         </a>
+
                                         {% if is_authorized %}
-                                            <form method="POST" action="/epa_shop/sale/{{ sale.id }}/complete/" style="display:inline;" 
-                                                  onsubmit="return confirm('Are you sure you want to mark this sale as completed? This action will verify the sale and cannot be undone.')">
-                                                {% csrf_token %}
-                                                <input type="hidden" name="action" value="complete">
-                                                <button type="submit" class="btn btn-complete btn-sm">
-                                                    <i class="fas fa-check-circle"></i> Complete
-                                                </button>
-                                            </form>
+                                            <button type="button"
+                                                    class="btn btn-complete btn-sm"
+                                                    onclick="openCompleteModal({{ sale.id }}, '{{ sale.company_sale_id|escapejs }}', '{{ sale.customer_name|escapejs }}', '{{ sale.net_amount }}')">
+                                                <i class="fas fa-check-circle"></i> Complete
+                                            </button>
+                                        {% endif %}
+
+                                        {% if user.role == 'company_admin' or user.role == 'super_admin' %}
+                                            <button type="button"
+                                                    class="btn btn-danger btn-sm"
+                                                    onclick="openDeleteModal({{ sale.id }}, '{{ sale.company_sale_id|escapejs }}')">
+                                                <i class="fas fa-trash"></i> Delete
+                                            </button>
                                         {% endif %}
                                     </div>
                                 </td>
@@ -432,20 +497,139 @@
     </div>
 </div>
 
-<script>
-// Sorting state
-let sortState = {
-    column: null,
-    direction: 'asc'
-};
+<!-- ============================================ -->
+<!-- COMPLETE SALE CONFIRMATION MODAL              -->
+<!-- ============================================ -->
+<div class="modal fade" id="completeSaleModal" tabindex="-1" aria-labelledby="completeSaleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="completeSaleModalLabel">
+                    <i class="fas fa-check-circle"></i> Complete Sale
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">
+                    Mark pending sale <span class="sale-badge" id="completeSaleLabel">#—</span>
+                    as <strong>completed</strong>?
+                </p>
+                <table class="table table-sm mb-3" style="font-size: 13px;">
+                    <tr>
+                        <td class="text-muted" style="width: 40%;">Customer</td>
+                        <td><strong id="completeSaleCustomer">—</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Amount</td>
+                        <td><strong>KSh <span id="completeSaleAmount">0</span></strong></td>
+                    </tr>
+                </table>
+                <p class="mb-0 text-muted" style="font-size: 13px;">
+                    On the next screen you will confirm the <strong>payment method</strong>
+                    and <strong>amount tendered</strong>. The sale will not be marked paid until you complete that step.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-info btn-sm" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-complete btn-sm" id="completeSaleConfirmBtn">
+                    <i class="fas fa-arrow-right"></i> Continue to Payment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
-// Filter sales by search
+<!-- ============================================ -->
+<!-- DELETE CONFIRMATION MODAL                     -->
+<!-- ============================================ -->
+<div class="modal fade" id="deletePendingModal" tabindex="-1" aria-labelledby="deletePendingModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deletePendingModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Delete
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">Are you sure you want to delete pending sale <span class="sale-badge" id="deleteSaleLabel">#—</span>?</p>
+                <p class="mb-0 text-muted" style="font-size: 13px;">This will:</p>
+                <ul class="mb-0" style="font-size: 13px; color: #000000;">
+                    <li>Permanently remove the sale and all its line items</li>
+                    <li>Return any attached unit (IMEI / Serial) back to <strong>available</strong></li>
+                    <li>This action <strong>cannot</strong> be undone</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-info btn-sm" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <form method="POST" id="deletePendingForm" action="" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm">
+                        <i class="fas fa-trash"></i> Yes, Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ----------------------------------------------------------
+// Complete-sale modal
+// ----------------------------------------------------------
+function openCompleteModal(saleId, saleLabel, customerName, amount) {
+    const modalEl = document.getElementById('completeSaleModal');
+    const labelEl = document.getElementById('completeSaleLabel');
+    const customerEl = document.getElementById('completeSaleCustomer');
+    const amountEl = document.getElementById('completeSaleAmount');
+    const btn = document.getElementById('completeSaleConfirmBtn');
+
+    labelEl.textContent = saleLabel ? `#${saleLabel}` : `#${saleId}`;
+    customerEl.textContent = customerName || 'Walk-in Customer';
+    amountEl.textContent = amount ? parseFloat(amount).toLocaleString() : '0';
+
+    // Store the sale id on the button so the click handler knows where to go
+    btn.dataset.saleId = saleId;
+
+    new bootstrap.Modal(modalEl).show();
+}
+
+document.getElementById('completeSaleConfirmBtn').addEventListener('click', function () {
+    const saleId = this.dataset.saleId;
+    if (!saleId) return;
+    // Navigate to the existing complete view, which renders the
+    // payment-method / amount-tendered verification page.
+    window.location.href = `/epa_shop/sale/${saleId}/complete/`;
+});
+
+// ----------------------------------------------------------
+// Delete modal
+// ----------------------------------------------------------
+function openDeleteModal(saleId, saleLabel) {
+    const modalEl = document.getElementById('deletePendingModal');
+    const form = document.getElementById('deletePendingForm');
+    const labelEl = document.getElementById('deleteSaleLabel');
+
+    form.action = `/epa_shop/sale/${saleId}/delete-pending/`;
+    labelEl.textContent = saleLabel ? `#${saleLabel}` : `#${saleId}`;
+
+    new bootstrap.Modal(modalEl).show();
+}
+
+// ----------------------------------------------------------
+// Search + sort (unchanged)
+// ----------------------------------------------------------
+let sortState = { column: null, direction: 'asc' };
+
 function filterSales() {
     const search = document.getElementById('searchSales').value.toLowerCase().trim();
     const rows = document.querySelectorAll('#salesTable tbody tr');
-    
     if (rows.length === 0 || rows[0].cells.length === 1) return;
-    
+
     rows.forEach(row => {
         const id = row.dataset.saleId || '';
         const customer = row.dataset.customer || '';
@@ -456,17 +640,17 @@ function filterSales() {
         const total = row.dataset.total || '';
         const date = row.dataset.date || '';
         const text = row.textContent.toLowerCase();
-        
+
         if (search === '') {
             row.style.display = '';
-        } else if (customer.includes(search) || 
-                   id.toString().includes(search) || 
-                   identifier.includes(search) || 
-                   idnumber.includes(search) || 
-                   phone.includes(search) || 
-                   soldby.includes(search) || 
-                   total.toString().includes(search) || 
-                   date.includes(search) || 
+        } else if (customer.includes(search) ||
+                   id.toString().includes(search) ||
+                   identifier.includes(search) ||
+                   idnumber.includes(search) ||
+                   phone.includes(search) ||
+                   soldby.includes(search) ||
+                   total.toString().includes(search) ||
+                   date.includes(search) ||
                    text.includes(search)) {
             row.style.display = '';
         } else {
@@ -475,20 +659,18 @@ function filterSales() {
     });
 }
 
-// Sort table function
 function sortTable(column) {
     const tbody = document.querySelector('#salesTable tbody');
     const rows = Array.from(tbody.querySelectorAll('tr'));
-    
     if (rows.length === 0 || rows[0].cells.length === 1) return;
-    
+
     let direction = 'asc';
     if (sortState.column === column) {
         direction = sortState.direction === 'asc' ? 'desc' : 'asc';
     }
     sortState.column = column;
     sortState.direction = direction;
-    
+
     document.querySelectorAll('.sortable-header').forEach(header => {
         header.classList.remove('active', 'asc', 'desc');
         const icon = header.querySelector('.sort-icon');
@@ -498,10 +680,9 @@ function sortTable(column) {
             icon.textContent = '';
         }
     });
-    
+
     rows.sort((a, b) => {
         let valueA, valueB;
-        
         switch(column) {
             case 'id':
                 valueA = parseInt(a.dataset.saleId) || 0;
@@ -538,7 +719,7 @@ function sortTable(column) {
             default:
                 return 0;
         }
-        
+
         let comparison = 0;
         if (typeof valueA === 'number' && typeof valueB === 'number') {
             comparison = valueA - valueB;
@@ -547,29 +728,25 @@ function sortTable(column) {
         } else {
             comparison = String(valueA).localeCompare(String(valueB), undefined, { sensitivity: 'base' });
         }
-        
         return direction === 'asc' ? comparison : -comparison;
     });
-    
+
     rows.forEach(row => tbody.appendChild(row));
-    
     rows.forEach((row, index) => {
         row.cells[0].textContent = '#' + (index + 1);
     });
 }
 
-// Keyboard shortcut: Escape to clear search
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         const searchInput = document.getElementById('searchSales');
-        if (searchInput) {
+        if (searchInput && document.activeElement === searchInput) {
             searchInput.value = '';
             filterSales();
         }
     }
 });
 
-// Initialize: set default sort to date descending
 document.addEventListener('DOMContentLoaded', function() {
     sortState.column = 'date';
     sortState.direction = 'desc';

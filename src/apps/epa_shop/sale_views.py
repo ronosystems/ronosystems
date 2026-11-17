@@ -2195,6 +2195,70 @@ def sale_pending_list(request):
     }
     return render(request, 'epa/sales_pending.html', context)
 
+# ============================================
+# SALE DELETE - Pending Sale (admin only)
+# ============================================
+
+@login_required
+@require_POST
+def sale_delete_pending(request, pk):
+    """Delete a PENDING sale (Company Admin / Super Admin only)."""
+    company, is_viewing_company = get_active_company(request)
+
+    if not company:
+        if request.user.role == 'super_admin':
+            return redirect('/api/support/select/')
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+
+    is_authorized = (
+        is_viewing_company or
+        request.user.is_company_admin or
+        request.user.is_super_admin or
+        request.user.is_superuser or
+        request.user.is_staff
+    )
+    # NOTE: intentionally excludes 'company_manager'
+
+    if not is_authorized:
+        messages.error(request, 'Only admins can delete pending sales.')
+        return redirect('/epa_shop/sales/pending/')
+
+    sale = get_object_or_404(Sale, pk=pk, company=company)
+
+    if sale.payment_status != 'pending':
+        messages.error(request, 'Only pending sales can be deleted here.')
+        return redirect('/epa_shop/sales/pending/')
+
+    sale_label = sale.company_sale_id or sale.id
+
+    try:
+        with transaction.atomic():
+            # Release any units tied to this sale back to available
+            for item in sale.items.select_related('unit').all():
+                if item.unit:
+                    unit = item.unit
+                    unit.status = 'available'
+                    unit.owner = None
+                    unit.owner_name = ''
+                    unit.owner_phone = ''
+                    unit.sold_date = None
+                    unit.save()
+
+            # Delete children first (in case FK isn't cascade)
+            sale.items.all().delete()
+            sale.delete()
+
+        messages.success(request, f'Pending sale #{sale_label} deleted.')
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        messages.error(request, f'Error deleting sale: {e}')
+
+    return redirect('/epa_shop/sales/pending/')
+
+
+
 
 # ============================================
 # SALE COMPLETE JSON

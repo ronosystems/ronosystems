@@ -483,6 +483,49 @@
     .table-responsive::-webkit-scrollbar-thumb:hover { background: #555; }
 
     /* ============================================
+       ACTION MODALS (Reverse + Delete)
+    ============================================ */
+    #reverseSaleModal .modal-content,
+    #deleteSaleModal .modal-content {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+
+    #reverseSaleModal .modal-header {
+        background-color: #ffe5cc;
+        border-bottom: 2px solid #000000;
+        color: #7a3d00;
+    }
+
+    #deleteSaleModal .modal-header {
+        background-color: #f8d7da;
+        border-bottom: 2px solid #000000;
+        color: #721c24;
+    }
+
+    #reverseSaleModal .modal-footer,
+    #deleteSaleModal .modal-footer {
+        border-top: 2px solid #000000;
+        background-color: #f8f9fa;
+    }
+
+    #reverseSaleModal .modal-body,
+    #deleteSaleModal .modal-body {
+        font-size: 14px;
+        color: #000000;
+    }
+
+    .modal-body .sale-badge {
+        font-family: 'Courier New', monospace;
+        font-weight: 700;
+        background: #f8f9fa;
+        border: 1px solid #000000;
+        padding: 1px 6px;
+        border-radius: 4px;
+    }
+
+    /* ============================================
        RESPONSIVE — TABLET (≤992px)
     ============================================ */
     @media (max-width: 992px) {
@@ -505,7 +548,6 @@
        RESPONSIVE — MOBILE (≤768px)
     ============================================ */
     @media (max-width: 768px) {
-        /* Table — smaller text but no truncation */
         .table-excel th,
         .table-excel td {
             padding: 6px 8px;
@@ -518,7 +560,6 @@
         .badge { font-size: 9px; padding: 2px 6px; }
         .company-sale-id { font-size: 11px; padding: 2px 6px; }
 
-        /* Revenue grid — 4 cols */
         .revenue-grid {
             gap: 6px;
             margin-bottom: 14px;
@@ -543,7 +584,6 @@
             opacity: 0.4;
         }
 
-        /* Card header actions — compact */
         .card-header { padding: 10px 12px; }
         .card-header-flex h5 { font-size: 0.9rem; }
         .card-header-actions { gap: 4px; }
@@ -553,7 +593,6 @@
         }
         .card-header-actions .btn i { font-size: 10px; }
 
-        /* Filter bar — 3 in one row (search · scan · branch) */
         .filter-bar {
             grid-template-columns: 1.2fr 1.2fr 1fr;
             gap: 6px;
@@ -572,7 +611,6 @@
             padding: 5px 6px;
         }
 
-        /* Footer — one row */
         .sales-footer {
             padding: 8px 10px;
             gap: 6px;
@@ -614,7 +652,6 @@
         .badge { font-size: 8px; padding: 1px 4px; }
         .company-sale-id { font-size: 9px; padding: 1px 4px; }
 
-        /* Revenue grid */
         .revenue-grid { gap: 4px; }
         .revenue-grid .stat-card {
             padding: 8px 6px;
@@ -635,7 +672,6 @@
             right: 4px;
         }
 
-        /* Card header */
         .card-header { padding: 8px 10px; }
         .card-header-flex h5 { font-size: 0.8rem; }
         .card-header-actions .btn {
@@ -644,7 +680,6 @@
         }
         .card-header-actions .btn i { font-size: 9px; }
 
-        /* Filter bar — still 3 cols */
         .filter-bar {
             grid-template-columns: 1fr 1fr 1fr;
             gap: 4px;
@@ -659,7 +694,6 @@
             padding: 4px 4px;
         }
 
-        /* Footer */
         .sales-footer {
             padding: 6px 8px;
             gap: 4px;
@@ -893,22 +927,18 @@
 
                                             {% if sale.payment_status == 'refunded' %}
                                                 {% if user.role == 'company_admin' or user.role == 'super_admin' %}
-                                                    <a href="/epa_shop/sale/{{ sale.id }}/delete/" 
-                                                       class="btn btn-danger btn-sm" 
-                                                       title="Delete Sale" 
-                                                       onclick="return confirm('Are you sure you want to delete this sale? This action cannot be undone.')">
+                                                    <button type="button" class="btn btn-danger btn-sm" title="Delete Sale"
+                                                            onclick="openDeleteSaleModal({{ sale.id }}, '{{ sale.company_sale_id|escapejs }}')">
                                                         <i class="fas fa-trash"></i>
-                                                    </a>
+                                                    </button>
                                                 {% endif %}
                                             {% elif sale.payment_status == 'pending' %}
                                                 {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' %}
                                                     {% if sale.items.exists %}
-                                                        <a href="/epa_shop/sale/{{ sale.id }}/reverse/?next={{ request.path }}" 
-                                                           class="btn btn-reverse btn-sm" 
-                                                           title="Reverse Sale" 
-                                                           onclick="return confirm('Are you sure you want to reverse this sale? This will return the unit to inventory.')">
+                                                        <button type="button" class="btn btn-reverse btn-sm" title="Reverse Sale"
+                                                                onclick="openReverseModal({{ sale.id }}, '{{ sale.company_sale_id|escapejs }}', '{{ request.path|escapejs }}')">
                                                             <i class="fas fa-undo"></i>
-                                                        </a>
+                                                        </button>
                                                     {% endif %}
                                                 {% endif %}
                                                 <a href="/epa_shop/sale/{{ sale.id }}/complete/" class="btn btn-success btn-sm" title="Complete Sale">
@@ -917,12 +947,10 @@
                                             {% else %}
                                                 {% if user.role == 'company_admin' or user.role == 'company_manager' or user.role == 'super_admin' %}
                                                     {% if sale.items.exists %}
-                                                        <a href="/epa_shop/sale/{{ sale.id }}/reverse/?next={{ request.path }}" 
-                                                           class="btn btn-reverse btn-sm" 
-                                                           title="Reverse Sale" 
-                                                           onclick="return confirm('Are you sure you want to reverse this sale? This will return the unit to inventory.')">
+                                                        <button type="button" class="btn btn-reverse btn-sm" title="Reverse Sale"
+                                                                onclick="openReverseModal({{ sale.id }}, '{{ sale.company_sale_id|escapejs }}', '{{ request.path|escapejs }}')">
                                                             <i class="fas fa-undo"></i>
-                                                        </a>
+                                                        </button>
                                                     {% endif %}
                                                 {% endif %}
                                             {% endif %}
@@ -1018,10 +1046,121 @@
     </div>
 </div>
 
+<!-- ============================================ -->
+<!-- REVERSE SALE CONFIRMATION MODAL               -->
+<!-- ============================================ -->
+<div class="modal fade" id="reverseSaleModal" tabindex="-1" aria-labelledby="reverseSaleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="reverseSaleModalLabel">
+                    <i class="fas fa-undo"></i> Reverse Sale
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">
+                    Reverse sale <span class="sale-badge" id="reverseSaleLabel">#—</span>?
+                </p>
+                <p class="mb-0 text-muted" style="font-size: 13px;">This will:</p>
+                <ul class="mb-0" style="font-size: 13px; color: #000000;">
+                    <li>Mark the sale as <strong>refunded</strong></li>
+                    <li>Return any attached unit (IMEI / Serial) back to <strong>available</strong></li>
+                    <li>Restock the item(s) into inventory</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-info btn-sm" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-reverse btn-sm" id="reverseSaleConfirmBtn">
+                    <i class="fas fa-undo"></i> Yes, Reverse
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- DELETE SALE CONFIRMATION MODAL                -->
+<!-- ============================================ -->
+<div class="modal fade" id="deleteSaleModal" tabindex="-1" aria-labelledby="deleteSaleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteSaleModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Delete Sale
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">
+                    Delete refunded sale <span class="sale-badge" id="deleteSaleLabel">#—</span>?
+                </p>
+                <ul class="mb-0" style="font-size: 13px; color: #000000;">
+                    <li>Permanently removes the sale and all its line items</li>
+                    <li>This action <strong>cannot</strong> be undone</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-info btn-sm" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-danger btn-sm" id="deleteSaleConfirmBtn">
+                    <i class="fas fa-trash"></i> Yes, Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 // Sorting state
 let sortState = { column: null, direction: 'asc' };
 
+// ============================================================
+// MODAL: Reverse Sale
+// ============================================================
+function openReverseModal(saleId, saleLabel, nextPath) {
+    const labelEl = document.getElementById('reverseSaleLabel');
+    const btn = document.getElementById('reverseSaleConfirmBtn');
+
+    labelEl.textContent = saleLabel ? `#${saleLabel}` : `#${saleId}`;
+    btn.dataset.saleId = saleId;
+    btn.dataset.nextPath = nextPath || window.location.pathname;
+
+    new bootstrap.Modal(document.getElementById('reverseSaleModal')).show();
+}
+
+document.getElementById('reverseSaleConfirmBtn').addEventListener('click', function () {
+    const saleId = this.dataset.saleId;
+    const nextPath = this.dataset.nextPath || window.location.pathname;
+    if (!saleId) return;
+    window.location.href = `/epa_shop/sale/${saleId}/reverse/?next=${encodeURIComponent(nextPath)}`;
+});
+
+// ============================================================
+// MODAL: Delete Sale (refunded only)
+// ============================================================
+function openDeleteSaleModal(saleId, saleLabel) {
+    const labelEl = document.getElementById('deleteSaleLabel');
+    const btn = document.getElementById('deleteSaleConfirmBtn');
+
+    labelEl.textContent = saleLabel ? `#${saleLabel}` : `#${saleId}`;
+    btn.dataset.saleId = saleId;
+
+    new bootstrap.Modal(document.getElementById('deleteSaleModal')).show();
+}
+
+document.getElementById('deleteSaleConfirmBtn').addEventListener('click', function () {
+    const saleId = this.dataset.saleId;
+    if (!saleId) return;
+    window.location.href = `/epa_shop/sale/${saleId}/delete/`;
+});
+
+// ============================================================
+// Filters / sorting / scanning (unchanged)
+// ============================================================
 function changeEntries() {
     const perPage = document.getElementById('entriesSelect').value;
     const currentUrl = new URL(window.location.href);
@@ -1130,7 +1269,7 @@ function sortTable(column) {
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         const searchInput = document.getElementById('searchSales');
-        if (searchInput) {
+        if (searchInput && document.activeElement === searchInput) {
             searchInput.value = '';
             filterSales();
             searchInput.blur();

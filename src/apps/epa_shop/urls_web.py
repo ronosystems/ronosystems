@@ -162,6 +162,10 @@ urlpatterns = [
          product_views.unit_reverse_sale,
          name='epa-sale-reverse-by-id'),
 
+     path('sale/<int:pk>/delete-pending/',
+          sale_views.sale_delete_pending,
+          name='epa-sale-delete-pending'),
+
     # ============================================
     # CATEGORIES — Full CRUD
     # ============================================
