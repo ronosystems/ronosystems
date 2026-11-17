@@ -70,15 +70,12 @@
             <a href="{% url 'cart-orders:view-cart' %}" class="btn btn-primary position-relative px-2 px-sm-3">
                 <i class="fas fa-shopping-cart"></i> 
                 <span class="d-none d-sm-inline">View Cart</span>
-                {% if cart_count > 0 %}
-                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-                        style="font-size: 11px;">
-                        {{ cart_count }}
-                    </span>
-                {% else %}
-                    <span id="header-cart-count" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-                        style="font-size: 11px; display: none;"></span>
-                {% endif %}
+                <!-- FIXED: Always render the badge with an ID so JS can update it live -->
+                <span id="cart-counter"
+                      class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                      style="font-size: 11px; display: {% if cart_count > 0 %}inline-block{% else %}none{% endif %};">
+                    {{ cart_count|default:"0" }}
+                </span>
             </a>
         </div>
     </div>
@@ -468,6 +465,33 @@
 let currentProduct = {};
 const cartModalElement = document.getElementById('addToCartModal');
 let cartModal;
+
+/* ================================================================
+   Helper: update every cart badge on the page
+   ================================================================ */
+function updateCartBadges(count) {
+    // Primary badge (home + detail templates)
+    var mainBadge = document.getElementById('cart-counter');
+    if (mainBadge) {
+        mainBadge.textContent = count;
+        mainBadge.style.display = (count > 0) ? 'inline-block' : 'none';
+    }
+
+    // Secondary badge used by storefront header
+    var headerBadge = document.getElementById('header-cart-count');
+    if (headerBadge) {
+        headerBadge.textContent = count;
+        headerBadge.style.display = (count > 0) ? 'inline-block' : 'none';
+    }
+
+    // Any floating counters elsewhere on the page
+    var floatingCounter = document.getElementById('cart-counter-floating');
+    if (floatingCounter) {
+        floatingCounter.textContent = count;
+        floatingCounter.style.display = (count > 0) ? 'inline-block' : 'none';
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     cartModal = new bootstrap.Modal(cartModalElement);
 
@@ -537,11 +561,8 @@ function submitAddToCart() {
     .then(response => response.json())
     .then(data => {
         if (data.status === 'success') {
-            var counter = document.getElementById('cart-counter');
-            if (counter) {
-                counter.textContent = data.cart_count;
-                counter.style.display = 'inline-block';
-            }
+            // ✅ Live-update the badge using the shared helper
+            updateCartBadges(data.cart_count);
 
             cartModal.hide();
             btnConfirm.disabled = false;

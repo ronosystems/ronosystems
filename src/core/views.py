@@ -75,7 +75,7 @@ def home(request):
                 bt_slug = bt_enum.value['slug']
 
         # 1. Calculate Cart Count
-        cart = request.session.get('epa_cart', {})
+        cart = request.session.get('cart_orders_cart', {})
         cart_count = sum(item['quantity'] for item in cart.values())
 
         context = {
