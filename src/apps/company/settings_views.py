@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 # CLOUDINARY HELPERS
 # ============================================
 ALLOWED_IMAGE_EXTS = ('.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp')
+ALLOWED_VIDEO_EXTS = ('.mp4', '.webm', '.ogg')
 
 
 def _cloudinary_configure():
@@ -44,9 +45,7 @@ def _cloudinary_configure():
 def _upload_company_media(file_obj, company_id, field_name, resource_type='image'):
     """
     Upload a company media file to Cloudinary at a UNIQUE public_id:
-
         companies/<company_id>/<field_name>_<timestamp>
-
     Returns the public_id Cloudinary used.
     """
     _cloudinary_configure()
@@ -80,10 +79,9 @@ def _current_public_id(field_value):
     return key.strip().lstrip('/')
 
 
-def _handle_media_upload(request, company, field_name, post_file_key):
+def _handle_media_upload(request, company, field_name, post_file_key, resource_type='image'):
     """
-    Shared upload handler for logo, favicon, login_background, and receipt_logo.
-
+    Shared upload handler for logo, favicon, login_background, receipt_logo, and hero media.
     Returns True if an upload was processed, False otherwise.
     Raises ValueError with a user-facing message on invalid input.
     """
@@ -92,10 +90,13 @@ def _handle_media_upload(request, company, field_name, post_file_key):
         return False
 
     ext = os.path.splitext(file_obj.name)[1].lower()
-    if ext not in ALLOWED_IMAGE_EXTS:
-        raise ValueError(
-            'Invalid file format. Please upload JPG, PNG, GIF, SVG, or WEBP.'
-        )
+    
+    if resource_type == 'video':
+        if ext not in ALLOWED_VIDEO_EXTS:
+            raise ValueError('Invalid video format. Please upload MP4, WEBM, or OGG.')
+    else:
+        if ext not in ALLOWED_IMAGE_EXTS:
+            raise ValueError('Invalid file format. Please upload JPG, PNG, GIF, SVG, or WEBP.')
 
     old_public_id = _current_public_id(getattr(company, field_name, ''))
 
@@ -104,7 +105,7 @@ def _handle_media_upload(request, company, field_name, post_file_key):
             file_obj,
             company.id or company.pk,
             field_name,
-            resource_type='image',
+            resource_type=resource_type,
         )
     except Exception as e:
         raise ValueError(f'{field_name.replace("_", " ").title()} upload failed: {e}')
@@ -113,15 +114,14 @@ def _handle_media_upload(request, company, field_name, post_file_key):
     company.save(update_fields=[field_name])
 
     if old_public_id and old_public_id != new_public_id:
-        _delete_company_media(old_public_id, resource_type='image')
+        _delete_company_media(old_public_id, resource_type=resource_type)
 
     return True
 
 
-def _handle_media_remove(request, company, field_name, post_remove_key):
+def _handle_media_remove(request, company, field_name, post_remove_key, resource_type='image'):
     """
-    Shared removal handler for logo, favicon, login_background, and receipt_logo.
-
+    Shared removal handler for media fields.
     Returns True if a removal was processed, False otherwise.
     """
     if request.POST.get(post_remove_key) != 'true':
@@ -129,7 +129,7 @@ def _handle_media_remove(request, company, field_name, post_remove_key):
 
     old_public_id = _current_public_id(getattr(company, field_name, ''))
     if old_public_id:
-        _delete_company_media(old_public_id, resource_type='image')
+        _delete_company_media(old_public_id, resource_type=resource_type)
 
     setattr(company, field_name, '')
     company.save(update_fields=[field_name])
@@ -158,9 +158,10 @@ def settings_dashboard(request):
         'settings': settings_data,
         'is_settings': True,
         'is_viewing_company': is_viewing_company,
-        'branches': branches,  # 👈 Pass the variable explicitly
+        'branches': branches,
     }
     return render(request, 'company/settings/dashboard.html', context)
+
 
 
 # ============================================
@@ -168,7 +169,10 @@ def settings_dashboard(request):
 # ============================================
 @login_required
 def settings_company(request):
-    """Company settings — update company info, logo, favicon, login background, receipt logo"""
+    """
+    Company settings — update company info, logo, favicon, login background, receipt logo,
+    hero media (video/image), hero text, and about page content.
+    """
     company, is_viewing_company = get_active_company(request)
 
     if not company:
@@ -180,65 +184,64 @@ def settings_company(request):
     if request.method == 'POST':
         try:
             # ---------- 1) Media removals ----------
-            removed_logo = _handle_media_remove(
-                request, company, 'logo', 'remove_logo'
+            removed_logo = _handle_media_remove(request, company, 'logo', 'remove_logo')
+            removed_favicon = _handle_media_remove(request, company, 'favicon', 'remove_favicon')
+            removed_bg = _handle_media_remove(request, company, 'login_background', 'remove_login_background')
+            removed_receipt_logo = _handle_media_remove(request, company, 'receipt_logo', 'remove_receipt_logo')
+            
+            # Hero removals
+            removed_hero_video = _handle_media_remove(
+                request, company, 'hero_video', 'remove_hero_video', resource_type='video'
             )
-            removed_favicon = _handle_media_remove(
-                request, company, 'favicon', 'remove_favicon'
-            )
-            removed_bg = _handle_media_remove(
-                request, company, 'login_background', 'remove_login_background'
-            )
-            removed_receipt_logo = _handle_media_remove(
-                request, company, 'receipt_logo', 'remove_receipt_logo'
+            removed_hero_image = _handle_media_remove(
+                request, company, 'hero_image', 'remove_hero_image'
             )
 
-            if removed_logo:
-                messages.success(request, 'Company logo removed.')
-            if removed_favicon:
-                messages.success(request, 'Favicon removed.')
-            if removed_bg:
-                messages.success(request, 'Login background removed.')
-            if removed_receipt_logo:
-                messages.success(request, 'Receipt logo removed.')
+            if removed_logo: messages.success(request, 'Company logo removed.')
+            if removed_favicon: messages.success(request, 'Favicon removed.')
+            if removed_bg: messages.success(request, 'Login background removed.')
+            if removed_receipt_logo: messages.success(request, 'Receipt logo removed.')
+            if removed_hero_video: messages.success(request, 'Hero video removed.')
+            if removed_hero_image: messages.success(request, 'Hero image removed.')
 
             # ---------- 2) Media uploads ----------
             uploaded_logo = False
             uploaded_favicon = False
             uploaded_bg = False
             uploaded_receipt_logo = False
+            uploaded_hero_video = False
+            uploaded_hero_image = False
 
             try:
                 if not removed_logo:
-                    uploaded_logo = _handle_media_upload(
-                        request, company, 'logo', 'company_logo'
-                    )
+                    uploaded_logo = _handle_media_upload(request, company, 'logo', 'company_logo')
                 if not removed_favicon:
-                    uploaded_favicon = _handle_media_upload(
-                        request, company, 'favicon', 'company_favicon'
-                    )
+                    uploaded_favicon = _handle_media_upload(request, company, 'favicon', 'company_favicon')
                 if not removed_bg:
-                    uploaded_bg = _handle_media_upload(
-                        request, company, 'login_background',
-                        'company_login_background'
-                    )
+                    uploaded_bg = _handle_media_upload(request, company, 'login_background', 'company_login_background')
                 if not removed_receipt_logo:
-                    uploaded_receipt_logo = _handle_media_upload(
-                        request, company, 'receipt_logo',
-                        'company_receipt_logo'
+                    uploaded_receipt_logo = _handle_media_upload(request, company, 'receipt_logo', 'company_receipt_logo')
+                
+                # Hero uploads
+                if not removed_hero_video:
+                    uploaded_hero_video = _handle_media_upload(
+                        request, company, 'hero_video', 'company_hero_video', resource_type='video'
                     )
+                if not removed_hero_image:
+                    uploaded_hero_image = _handle_media_upload(
+                        request, company, 'hero_image', 'company_hero_image'
+                    )
+
             except ValueError as e:
                 messages.error(request, str(e))
                 return redirect('company-settings-company')
 
-            if uploaded_logo:
-                messages.success(request, 'Company logo updated.')
-            if uploaded_favicon:
-                messages.success(request, 'Favicon updated.')
-            if uploaded_bg:
-                messages.success(request, 'Login background updated.')
-            if uploaded_receipt_logo:
-                messages.success(request, 'Receipt logo updated.')
+            if uploaded_logo: messages.success(request, 'Company logo updated.')
+            if uploaded_favicon: messages.success(request, 'Favicon updated.')
+            if uploaded_bg: messages.success(request, 'Login background updated.')
+            if uploaded_receipt_logo: messages.success(request, 'Receipt logo updated.')
+            if uploaded_hero_video: messages.success(request, 'Hero video updated.')
+            if uploaded_hero_image: messages.success(request, 'Hero image updated.')
 
             # ---------- 3) Text fields ----------
             company_name = request.POST.get('company_name')
@@ -246,6 +249,16 @@ def settings_company(request):
             company_phone = request.POST.get('company_phone')
             company_address = request.POST.get('company_address')
             company_pin     = request.POST.get('company_pin')
+            hero_title      = request.POST.get('hero_title', '')
+            hero_subtitle   = request.POST.get('hero_subtitle', '')
+
+            # New About Page Fields
+            about_tagline     = request.POST.get('about_tagline', '')
+            about_mission     = request.POST.get('about_mission', '')
+            about_vision      = request.POST.get('about_vision', '')
+            about_story       = request.POST.get('about_story', '')
+            founded_year_raw  = request.POST.get('founded_year', '').strip()
+            years_biz_raw     = request.POST.get('years_in_business', '').strip()
 
             text_changed = False
             if company_name and company.name != company_name:
@@ -263,6 +276,44 @@ def settings_company(request):
             if company_pin is not None and company.company_pin != company_pin:
                 company.company_pin = company_pin
                 text_changed = True
+            if company.hero_title != hero_title:
+                company.hero_title = hero_title
+                text_changed = True
+            if company.hero_subtitle != hero_subtitle:
+                company.hero_subtitle = hero_subtitle
+                text_changed = True
+
+            # About Page Fields
+            if company.about_tagline != about_tagline:
+                company.about_tagline = about_tagline
+                text_changed = True
+            if company.about_mission != about_mission:
+                company.about_mission = about_mission
+                text_changed = True
+            if company.about_vision != about_vision:
+                company.about_vision = about_vision
+                text_changed = True
+            if company.about_story != about_story:
+                company.about_story = about_story
+                text_changed = True
+
+            # Safe integer parsing
+            try:
+                new_founded = int(founded_year_raw) if founded_year_raw else None
+                if company.founded_year != new_founded:
+                    company.founded_year = new_founded
+                    text_changed = True
+            except ValueError:
+                pass
+
+            try:
+                new_years = int(years_biz_raw) if years_biz_raw else None
+                if company.years_in_business != new_years:
+                    company.years_in_business = new_years
+                    text_changed = True
+            except ValueError:
+                pass
+
             if text_changed:
                 company.save()
 
@@ -270,10 +321,10 @@ def settings_company(request):
             save_company_settings(company, request.POST)
 
             # ---------- 5) Final message ----------
-            if not any([removed_logo, removed_favicon, removed_bg,
-                        removed_receipt_logo,
-                        uploaded_logo, uploaded_favicon, uploaded_bg,
-                        uploaded_receipt_logo,
+            if not any([removed_logo, removed_favicon, removed_bg, removed_receipt_logo,
+                        removed_hero_video, removed_hero_image,
+                        uploaded_logo, uploaded_favicon, uploaded_bg, uploaded_receipt_logo,
+                        uploaded_hero_video, uploaded_hero_image,
                         text_changed]):
                 messages.info(request, 'No changes.')
             else:
@@ -295,6 +346,8 @@ def settings_company(request):
     }
     return render(request, 'company/settings/dashboard.html', context)
 
+
+    
 
 # ============================================
 # PAYMENT SETTINGS
@@ -415,7 +468,6 @@ def settings_payment(request):
             save_company_settings(company, payment_settings, 'payment')
 
             # Mirror the saved settings into an MpesaConfig row (per company)
-            # 👈 pass request so validation errors surface in the UI
             _sync_mpesa_config(company, payment_settings, request=request)
 
             messages.success(request, 'Payment settings updated successfully!')
@@ -440,7 +492,7 @@ def settings_payment(request):
             ('card', 'Card'),
             ('credit', 'Credit'),
         ],
-        'branches': branches,  # 👈 Pass the variable explicitly
+        'branches': branches,
     }
     return render(request, 'company/settings/dashboard.html', context)
 
@@ -595,11 +647,6 @@ def settings_preview_receipt(request):
 def _as_settings_dict(value):
     """
     Normalize `company.company_settings` into a plain dict.
-
-    `company_settings` is a Django JSONField, so on read Django already
-    returns a dict. But some legacy rows may have been stored as a JSON
-    string (from an older code path). This handles both — and treats
-    None / empty as an empty dict.
     """
     if not value:
         return {}
@@ -618,9 +665,6 @@ def get_company_settings(company):
     """
     Return company settings — defaults merged with whatever is stored on
     `company.company_settings` (a JSONField).
-
-    Each section (company, payment, receipt) is merged separately, so a
-    missing section in storage still returns its defaults.
     """
     default_settings = {
         'company': {
@@ -646,7 +690,7 @@ def get_company_settings(company):
 
             # ---------- M-Pesa STK Push ----------
             'enable_mpesa_stk': False,
-            'mpesa_branch':     '',   # 👈 ADDED
+            'mpesa_branch':     '',
             'mpesa_provider':   'daraja',
             'mpesa_stk_shortcode': '',
             'mpesa_stk_passkey': '',
@@ -752,11 +796,6 @@ def get_company_settings(company):
 def save_company_settings(company, settings_data, section=None):
     """
     Save settings into `company.company_settings` (a JSONField).
-
-    `section` (e.g. 'receipt', 'payment'): replaces that section wholesale.
-    No section: updates the 'company' section with the given keys.
-
-    Only writes the `company_settings` column — no full-row UPDATE.
     """
     existing = _as_settings_dict(company.company_settings)
 
@@ -776,13 +815,6 @@ def save_company_settings(company, settings_data, section=None):
 def _sync_mpesa_config(company, payment_settings, request=None):
     """
     Mirror the per-company payment settings into an MpesaConfig row.
-
-    Rules:
-      - Only creates / updates when the company has enabled STK push AND
-        the required fields for the selected provider are filled.
-      - If STK is disabled, deactivates the existing row (does not delete —
-        so historical MpesaTransaction rows keep their FK).
-      - Handles both Daraja and Kopokopo providers.
     """
     try:
         from apps.mpesa.models import MpesaConfig
@@ -901,7 +933,6 @@ def _sync_mpesa_config(company, payment_settings, request=None):
                 exc_info=True,
             )
 
-from django.http import JsonResponse
 
 @login_required
 def api_get_branch_mpesa_config(request):
@@ -951,5 +982,3 @@ def api_get_branch_mpesa_config(request):
             })
             
     return JsonResponse(data)
-
-    

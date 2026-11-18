@@ -211,6 +211,66 @@ class Company(models.Model):
                   "If empty, the main `logo` is used on receipts.",
     )
     
+
+    # ---------- Hero Settings ----------
+    hero_video = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="Cloudinary public_id for the hero background video (mp4)."
+    )
+    hero_image = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="Cloudinary public_id for the hero fallback image."
+    )
+    hero_title = models.CharField(
+        max_length=150,
+        blank=True,
+        default='',
+        help_text="Custom hero title. Defaults to Company Name if blank."
+    )
+    hero_subtitle = models.TextField(
+        blank=True,
+        default='',
+        help_text="Custom hero subtitle. Defaults to tagline if blank."
+    )
+
+
+    tagline = models.CharField(
+        max_length=200,
+        blank=True,
+        default='',
+        help_text="Short slogan shown under the company name.",
+    )
+
+    about_tagline = models.CharField(
+        max_length=200, blank=True, default='',
+        help_text="Short slogan shown under the company name on the About page."
+    )
+    about_mission = models.TextField(
+        blank=True, default='',
+        help_text="1–2 paragraph mission statement."
+    )
+    about_vision = models.TextField(
+        blank=True, default='',
+        help_text="1–2 paragraph vision statement."
+    )
+    about_story = models.TextField(
+        blank=True, default='',
+        help_text="Company history / story. Shown in a longer paragraph block."
+    )
+    years_in_business = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Used to display 'X years of experience'."
+    )
+    founded_year = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Year the company was founded."
+    )
+
+
     primary_color = models.CharField(
         max_length=7,
         default='#87CEEB',
@@ -398,11 +458,23 @@ class Company(models.Model):
         """
         return self._build_media_url(self.receipt_logo)
 
+
+    @property
+    def hero_video_url(self):
+        return self._build_media_url(self.hero_video)
+
+    @property
+    def hero_image_url(self):
+        return self._build_media_url(self.hero_image)
+
+
         
     @property
     def display_name(self):
         """`system_name` if set, otherwise fall back to `name`."""
         return (self.system_name or '').strip() or self.name
+
+
 
     # ============================================
     # SUBSCRIPTION ACCESSORS

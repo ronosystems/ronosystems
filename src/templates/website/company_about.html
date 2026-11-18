@@ -1,22 +1,267 @@
-{% extends "web_base.html" %}
+{% extends active_base_template|default:"web_base.html" %}
+{% load static %}
 
-{% block title %}{{ current_company.display_name|default:"Company" }} - About{% endblock %}
-{% block marquee_text %}Welcome to {{ current_company.display_name|default:"Company" }} {{ page|title }}{% endblock %}
+{% block title %}About — {{ current_company.display_name|default:current_company.name|default:"Company" }}{% endblock %}
+{% block marquee_text %}About {{ current_company.display_name|default:current_company.name|default:"Company" }}{% endblock %}
 {% block breadcrumb %}About{% endblock %}
 
 {% block content %}
-<div class="dashboard-panel">
+<style>
+    .about-hero {
+        position: relative;
+        height: 280px;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 25px;
+        display: flex; align-items: center; justify-content: center;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        background-color: #1e4e6d;
+    }
+    .about-hero video,
+    .about-hero .fallback-image {
+        position: absolute; top: 50%; left: 50%;
+        min-width: 100%; min-height: 100%;
+        width: auto; height: auto;
+        transform: translate(-50%, -50%);
+        object-fit: cover;
+        z-index: 0;
+    }
+    .about-hero::before {
+        content: ''; position: absolute; inset: 0;
+        background: linear-gradient(135deg, rgba(30, 78, 109, 0.75) 0%, rgba(15, 23, 42, 0.55) 100%);
+        z-index: 1;
+    }
+    .about-hero-content {
+        position: relative; z-index: 2;
+        padding: 20px; display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+    }
+    .about-hero-logo {
+        width: 80px; height: 80px;
+        background: #fff; border-radius: 12px;
+        padding: 8px; margin: 0 auto 15px;
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    .about-hero-logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .about-hero-logo .fallback-text { font-size: 32px; font-weight: 800; color: #1e4e6d; }
+    .about-hero h1 {
+        color: #fff; font-size: 2.2rem; font-weight: 800;
+        margin: 0 0 8px; text-transform: uppercase; letter-spacing: 1px;
+        text-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    }
+    .about-hero p {
+        color: #e2e8f0; font-size: 1rem; margin: 0;
+        font-weight: 500; max-width: 600px;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    }
+
+    /* Stats strip */
+    .about-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 15px;
+        margin-bottom: 25px;
+    }
+    .stat-card {
+        background: #fff;
+        border: 1px solid #dcdcdc;
+        border-radius: 8px;
+        padding: 18px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .stat-card .stat-number {
+        font-size: 1.8rem; font-weight: 800;
+        color: #1e4e6d; display: block; margin-bottom: 4px;
+    }
+    .stat-card .stat-label {
+        font-size: 11px; text-transform: uppercase;
+        font-weight: 700; color: #666;
+        letter-spacing: 0.5px;
+    }
+
+    /* Mission / Vision grid */
+    .mv-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin-bottom: 25px;
+    }
+    @media (max-width: 768px) { .mv-grid { grid-template-columns: 1fr; } }
+
+    .mv-card {
+        background: #fff;
+        border: 1px solid #dcdcdc;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .mv-card-header {
+        background: #1e4e6d; color: #fff;
+        padding: 12px 15px;
+        font-weight: 700; font-size: 13px;
+        text-transform: uppercase;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .mv-card-body {
+        padding: 18px;
+        font-size: 13px; color: #444; line-height: 1.6;
+        white-space: pre-line;
+    }
+    .mv-card-body.is-empty { color: #999; font-style: italic; }
+
+    /* Story section */
+    .story-card {
+        background: #fff;
+        border: 1px solid #dcdcdc;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 25px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .story-card-header {
+        background: #1e4e6d; color: #fff;
+        padding: 12px 15px;
+        font-weight: 700; font-size: 13px;
+        text-transform: uppercase;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .story-card-body {
+        padding: 20px;
+        font-size: 14px; color: #333;
+        line-height: 1.7;
+        white-space: pre-line;
+    }
+
+    /* Contact CTA at bottom */
+    .about-cta {
+        background: linear-gradient(135deg, #1e4e6d 0%, #2d5f7c 100%);
+        border-radius: 8px;
+        padding: 25px;
+        text-align: center;
+        color: #fff;
+    }
+    .about-cta h3 {
+        margin: 0 0 8px; font-size: 1.2rem; font-weight: 700;
+    }
+    .about-cta p {
+        margin: 0 0 15px; font-size: 13px; opacity: 0.9;
+    }
+    .about-cta a {
+        display: inline-flex; align-items: center; gap: 8px;
+        background: #fff; color: #1e4e6d;
+        padding: 10px 20px; border-radius: 6px;
+        font-weight: 700; font-size: 13px;
+        text-decoration: none;
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .about-cta a:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+    }
+</style>
+
+<div class="dashboard-panel" style="margin-bottom: 0;">
     <div class="panel-header">
-        <i class="fas fa-building me-1"></i> {{ current_company.display_name|default:"Company" }} - About
+        <i class="fas fa-building me-1"></i> About {{ current_company.display_name|default:current_company.name|default:"Company" }}
     </div>
-    <div class="panel-body">
-        <h1 class="hero-title">{{ current_company.display_name|default:"Company" }}</h1>
-        <p class="hero-subtitle">
-            This is the company-specific content for the <strong>About</strong> page.
-        </p>
-        
-        <!-- Edit this file: templates/website/company_about.html to add your custom company content -->
-        <p>Welcome to {{ current_company.display_name }}. You can customize this section with information relevant to this company.</p>
+    <div class="panel-body" style="padding: 15px;">
+
+        {# ---------- HERO ---------- #}
+        <div class="about-hero">
+            {% if current_company.hero_video_url %}
+                <video autoplay loop muted playsinline poster="{% if current_company.hero_image_url %}{{ current_company.hero_image_url }}{% else %}{% static 'images/login-bg.jpg' %}{% endif %}">
+                    <source src="{{ current_company.hero_video_url }}" type="video/mp4">
+                    <img src="{% if current_company.hero_image_url %}{{ current_company.hero_image_url }}{% else %}{% static 'images/login-bg.jpg' %}{% endif %}" class="fallback-image" alt="About Hero">
+                </video>
+            {% elif current_company.hero_image_url %}
+                <img src="{{ current_company.hero_image_url }}" class="fallback-image" alt="About Hero">
+            {% else %}
+                <img src="{% static 'images/login-bg.jpg' %}" class="fallback-image" alt="About Hero">
+            {% endif %}
+
+            <div class="about-hero-content">
+                <div class="about-hero-logo">
+                    {% if current_company.logo_url %}
+                        <img src="{{ current_company.logo_url }}" alt="{{ current_company.display_name }} logo">
+                    {% else %}
+                        <span class="fallback-text">{{ current_company.display_name|default:current_company.name|slice:":1"|upper }}</span>
+                    {% endif %}
+                </div>
+                <h1>{{ current_company.hero_title|default:current_company.display_name|default:"Company" }}</h1>
+                <p>{{ current_company.about_tagline|default:"Get to know us better." }}</p>
+            </div>
+        </div>
+
+        {# ---------- STATS STRIP ---------- #}
+        {% if current_company.founded_year or current_company.years_in_business or current_company.business_type %}
+        <div class="about-stats">
+            {% if current_company.founded_year %}
+            <div class="stat-card">
+                <span class="stat-number">{{ current_company.founded_year }}</span>
+                <span class="stat-label">Founded</span>
+            </div>
+            {% endif %}
+            {% if current_company.years_in_business %}
+            <div class="stat-card">
+                <span class="stat-number">{{ current_company.years_in_business }}+</span>
+                <span class="stat-label">Years in Business</span>
+            </div>
+            {% endif %}
+            {% if current_company.business_type %}
+            <div class="stat-card">
+                <span class="stat-number" style="font-size:1.1rem;">{{ current_company.business_type.name }}</span>
+                <span class="stat-label">Industry</span>
+            </div>
+            {% endif %}
+            <div class="stat-card">
+                <span class="stat-number" style="font-size:1.1rem;">{{ current_company.custom_domain|default:current_company.company_id }}</span>
+                <span class="stat-label">Reach Us Online</span>
+            </div>
+        </div>
+        {% endif %}
+
+        {# ---------- MISSION / VISION ---------- #}
+        <div class="mv-grid">
+            <div class="mv-card">
+                <div class="mv-card-header">
+                    <i class="fas fa-bullseye"></i> Our Mission
+                </div>
+                <div class="mv-card-body {% if not current_company.about_mission %}is-empty{% endif %}">
+                    {{ current_company.about_mission|default:"Our mission has not been added yet." }}
+                </div>
+            </div>
+            <div class="mv-card">
+                <div class="mv-card-header">
+                    <i class="fas fa-eye"></i> Our Vision
+                </div>
+                <div class="mv-card-body {% if not current_company.about_vision %}is-empty{% endif %}">
+                    {{ current_company.about_vision|default:"Our vision has not been added yet." }}
+                </div>
+            </div>
+        </div>
+
+        {# ---------- OUR STORY ---------- #}
+        <div class="story-card">
+            <div class="story-card-header">
+                <i class="fas fa-book-open"></i> Our Story
+            </div>
+            <div class="story-card-body {% if not current_company.about_story %}is-empty{% endif %}" style="{% if not current_company.about_story %}color:#999;font-style:italic;{% endif %}">
+                {{ current_company.about_story|default:"We're still writing this chapter. Check back soon to learn more about how "|add:current_company.display_name|add:" started." }}
+            </div>
+        </div>
+
+        {# ---------- CTA ---------- #}
+        <div class="about-cta">
+            <h3>Want to Work With Us?</h3>
+            <p>Reach out to us and let's build something together.</p>
+            <a href="{% url 'contact' %}">
+                <i class="fas fa-paper-plane"></i> Get in Touch
+            </a>
+        </div>
+
     </div>
 </div>
 {% endblock %}

@@ -138,19 +138,37 @@ def contact(request):
     """
     Handle GET (show form) and POST (send message).
     """
-    # Determine the correct template based on the domain
-    is_company_domain = getattr(request, 'current_company', None)
+    company = getattr(request, 'company', None)
+    is_company_domain = bool(company)
     template_name = 'website/company_contact.html' if is_company_domain else 'website/contact.html'
 
+    # ---- Fetch branches using the correct related_name ----
+    branches = []
+    if company:
+        try:
+            # Using the related_name defined in your Branch model
+            branches = company.company_branches.filter(is_active=True)
+        except Exception:
+            branches = []
+
+    context = {
+        'current_company': company,
+        'branches': branches,
+    }
+
     if request.method == 'POST':
+        if (request.POST.get('website_hp') or '').strip():
+            return redirect('contact')
+
         name    = (request.POST.get('name') or '').strip()
         email   = (request.POST.get('email') or '').strip()
+        phone   = (request.POST.get('phone') or '').strip()
         subject = (request.POST.get('subject') or '').strip()
         message = (request.POST.get('message') or '').strip()
 
         if not name or not email or not message:
             messages.error(request, 'Please fill in all required fields.')
-            return render(request, template_name) # <-- Updated this render call
+            return render(request, template_name, context)
 
         full_subject = f"[Contact] {subject or 'New message'} — from {name}"
         body = (
@@ -158,6 +176,7 @@ def contact(request):
             f"----------------------------------------\n"
             f"Name:    {name}\n"
             f"Email:   {email}\n"
+            f"Phone:   {phone or '(not provided)'}\n"
             f"Subject: {subject or '(none)'}\n"
             f"----------------------------------------\n\n"
             f"{message}\n"
@@ -184,11 +203,13 @@ def contact(request):
             messages.success(request, 'Thanks! Your message has been sent — we will reply shortly.')
         except Exception as e:
             messages.error(request, f'Sorry, we could not send your message right now. ({e})')
+            return render(request, template_name, context)
 
         return redirect('contact')
 
-    return render(request, template_name) # <-- Updated this render call too
+    return render(request, template_name, context)
 
+    
 
 # ============================================
 # PWA: MANIFEST
