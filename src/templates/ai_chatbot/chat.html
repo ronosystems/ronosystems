@@ -21,7 +21,6 @@
   .chat-bubble { padding: 1rem 1.2rem; border-radius: 16px; max-width: 75%; font-size: 0.95rem; line-height: 1.6; word-wrap: break-word; }
   .chat-bubble.user { background: #0d6efd; color: #fff; border-bottom-right-radius: 4px; }
   .chat-bubble.bot { background: #fff; color: #333; border: 1px solid #e2e8f0; border-bottom-left-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); }
-  .chat-bubble.bot img { max-width: 100%; max-height: 200px; object-fit: contain; border-radius: 8px; margin: 10px 0; background: #f8f9fa; padding: 5px; border: 1px solid #edf2f7; display: block; }
   .chat-bubble.bot a.btn { text-decoration: none; }
   .chat-footer { padding: 1rem 1.5rem; background: #fff; border-top: 1px solid #eef2f5; }
   .input-wrapper { display: flex; background: #f1f5f9; border-radius: 30px; padding: 0.4rem 0.5rem 0.4rem 1.2rem; align-items: center; border: 1px solid transparent; transition: all 0.3s ease; }
@@ -31,6 +30,34 @@
   .btn-send:disabled { background: #93c5fd; cursor: not-allowed; }
   .typing-indicator { display: flex; gap: 4px; padding: 0.5rem 1rem; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; border-bottom-left-radius: 4px; width: fit-content; }
   .typing-indicator span { width: 6px; height: 6px; background: #94a3b8; border-radius: 50%; animation: typing 1.4s infinite ease-in-out both; }
+  
+  /* Constrain AI product images to a fixed card size */
+  .chat-product-img {
+    width: 160px;
+    height: 160px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8f9fa;
+    border: 1px solid #edf2f7;
+    border-radius: 10px;
+    padding: 8px;
+    margin: 8px 0;
+    overflow: hidden;
+  }
+  .chat-product-img img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    display: block;
+    border-radius: 6px;
+  }
+  @media (max-width: 576px) {
+    .chat-product-img { width: 120px; height: 120px; }
+  }
+
   @keyframes typing { 0%, 80%, 100% { transform: scale(0); opacity: 0.5; } 40% { transform: scale(1); opacity: 1; } }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 </style>
@@ -99,15 +126,23 @@ input.addEventListener('input', () => { btnSend.disabled = input.value.trim().le
 
 function renderMarkdown(text) {
     let html = marked.parse(text);
-    
-    // 1. Inject Add to Cart buttons for images
+
+    // 1. Wrap all images in a constrained product card container.
+    //    This catches plain markdown images and images with custom inline attributes.
+    html = html.replace(/<img([^>]*)>/g, (match, attrs) => {
+        // Remove any inline width/height styles that might break the layout
+        let cleanAttrs = attrs.replace(/\s*(width|height|style)="[^"]*"/gi, '');
+        return `<div class="chat-product-img"><img ${cleanAttrs}></div>`;
+    });
+
+    // 2. Inject Add to Cart buttons for images with alt="name|id"
     const imgRegex = /<img[^>]+src="([^">]+)"[^>]*alt="([^"|]+)\|(\d+)"[^>]*>/g;
     html = html.replace(imgRegex, (match, imgUrl, name, id) => `
-        ${match}
+        <div class="chat-product-img"><img src="${imgUrl}" alt="${name}"></div>
         <div class="mt-2"><button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="openChatCartModal('${name}', '${id}', '${imgUrl}')"><i class="fas fa-cart-plus"></i> Add ${name}</button></div>
     `);
 
-    // 2. Convert standard Markdown links to nice buttons and FIX THE DOMAIN
+    // 3. Convert standard Markdown links to nice buttons and FIX THE DOMAIN
     const linkRegex = /<a href="([^"]+)">([^<]+)<\/a>/g;
     html = html.replace(linkRegex, (match, url, linkText) => {
         // If it's an internal link, ensure it points to the current window's origin
