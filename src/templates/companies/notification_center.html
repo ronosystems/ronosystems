@@ -1,0 +1,247 @@
+{% extends base_template|default:"base.html" %}
+{% load static %}
+
+{% block title %}Notification Center{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-bell text-primary me-2"></i> Notification Center
+        </h2>
+        <a href="/dashboard/" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Summary List -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="list-group list-group-flush">
+                    
+                    <!-- ROW 1: New Orders -->
+                    {% if pending_orders_count > 0 %}
+                    <div class="list-group-item p-3 d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                 style="width: 45px; height: 45px; flex-shrink: 0;">
+                                <i class="fas fa-shopping-cart fa-lg"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1 fw-bold text-dark">New Orders</h6>
+                                <p class="mb-0 text-muted small">You have <strong>{{ pending_orders_count }}</strong> new orders awaiting processing.</p>
+                            </div>
+                        </div>
+                        <a href="{% url 'cart-orders:order-list' %}" class="btn btn-primary btn-sm px-3">
+                            View Orders
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    <!-- ROW 2: Contact Messages -->
+                    {% if unread_messages_count > 0 %}
+                    <div class="list-group-item p-3 d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-info-subtle text-info rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                 style="width: 45px; height: 45px; flex-shrink: 0;">
+                                <i class="fas fa-envelope fa-lg"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1 fw-bold text-dark">Contact Messages</h6>
+                                <p class="mb-0 text-muted small">You have <strong>{{ unread_messages_count }}</strong> unread contact messages.</p>
+                            </div>
+                        </div>
+                        <a href="{% url 'admin_contact_messages' %}" class="btn btn-info btn-sm px-3 text-white">
+                            View Messages
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    <!-- ROW 3: Low Stock -->
+                    {% if low_stock_count > 0 %}
+                    <div class="list-group-item p-3 d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-danger-subtle text-danger rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                 style="width: 45px; height: 45px; flex-shrink: 0;">
+                                <i class="fas fa-exclamation-triangle fa-lg"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1 fw-bold text-dark">Low Stock Alert</h6>
+                                <p class="mb-0 text-muted small">You have <strong>{{ low_stock_count }}</strong> products running low on stock.</p>
+                            </div>
+                        </div>
+                        <a href="/epa_shop/inventory/low-stock/" class="btn btn-danger btn-sm px-3">
+                            View Low Stock
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    <!-- ROW 4: Join Requests -->
+                    {% if pending_join_requests_count > 0 and company %}
+                    <div class="list-group-item p-3 d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-warning-subtle text-warning rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                 style="width: 45px; height: 45px; flex-shrink: 0;">
+                                <i class="fas fa-user-plus fa-lg"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1 fw-bold text-dark">Staff Join Requests</h6>
+                                <p class="mb-0 text-muted small">You have <strong>{{ pending_join_requests_count }}</strong> pending staff join requests.</p>
+                            </div>
+                        </div>
+                        <a href="{% url 'companies:company-join-requests' company.id %}" class="btn btn-warning btn-sm px-3">
+                            View Requests
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    <!-- ROW 5: Pending Payments -->
+                    {% if pending_payments_count > 0 %}
+                    <div class="list-group-item p-3 d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-success-subtle text-success rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                 style="width: 45px; height: 45px; flex-shrink: 0;">
+                                <i class="fas fa-credit-card fa-lg"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1 fw-bold text-dark">Pending Payments</h6>
+                                <p class="mb-0 text-muted small">You have <strong>{{ pending_payments_count }}</strong> payments awaiting verification.</p>
+                            </div>
+                        </div>
+                        <a href="/settings/" class="btn btn-success btn-sm px-3">
+                            Verify Payments
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    <!-- ROW 6: Pending Losses / Returns -->
+                    {% if pending_losses_count > 0 and company %}
+                    <div class="list-group-item p-3 d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-secondary-subtle text-secondary rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                 style="width: 45px; height: 45px; flex-shrink: 0;">
+                                <i class="fas fa-undo fa-lg"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1 fw-bold text-dark">Pending Returns</h6>
+                                <p class="mb-0 text-muted small">You have <strong>{{ pending_losses_count }}</strong> returns awaiting approval.</p>
+                            </div>
+                        </div>
+                        <a href="{% url 'losses:loss_list_entry' company.id %}?status=pending" class="btn btn-secondary btn-sm px-3">
+                            View Returns
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    <!-- ROW 7: Unverified Daily Records -->
+                    {% if unverified_daily_records_count > 0 and company %}
+                    <div class="list-group-item p-3 d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-info-subtle text-info rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                 style="width: 45px; height: 45px; flex-shrink: 0;">
+                                <i class="fas fa-money-bill-wave fa-lg"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1 fw-bold text-dark">Unverified Records</h6>
+                                <p class="mb-0 text-muted small">You have <strong>{{ unverified_daily_records_count }}</strong> daily records needing verification.</p>
+                            </div>
+                        </div>
+                        <a href="{% url 'treasury:dashboard' company.id %}" class="btn btn-info btn-sm px-3 text-white">
+                            View Records
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    <!-- ROW 8: Workshop Jobs -->
+                    {% if my_open_jobs_count > 0 %}
+                    <div class="list-group-item p-3 d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-dark-subtle text-dark rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                 style="width: 45px; height: 45px; flex-shrink: 0;">
+                                <i class="fas fa-tools fa-lg"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1 fw-bold text-dark">Open Workshop Jobs</h6>
+                                <p class="mb-0 text-muted small">You have <strong>{{ my_open_jobs_count }}</strong> open jobs assigned to you.</p>
+                            </div>
+                        </div>
+                        <a href="{% url 'workshop:my-work' %}" class="btn btn-dark btn-sm px-3">
+                            View Jobs
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    <!-- ROW 9: Tenant Feedback (SuperAdmin only) -->
+                    {% if pending_feedback_count > 0 %}
+                    <div class="list-group-item p-3 d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                 style="width: 45px; height: 45px; flex-shrink: 0;">
+                                <i class="fas fa-comment-dots fa-lg"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1 fw-bold text-dark">Tenant Feedback</h6>
+                                <p class="mb-0 text-muted small">You have <strong>{{ pending_feedback_count }}</strong> new feedback items.</p>
+                            </div>
+                        </div>
+                        <a href="{% url 'companies:hub-feedback-list' %}" class="btn btn-primary btn-sm px-3">
+                            View Feedback
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    <!-- ROW 10: AI Chats (SuperAdmin only) -->
+                    {% if pending_ai_chats_count > 0 %}
+                    <div class="list-group-item p-3 d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-dark-subtle text-dark rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                 style="width: 45px; height: 45px; flex-shrink: 0;">
+                                <i class="fas fa-robot fa-lg"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1 fw-bold text-dark">AI Assistant Chats</h6>
+                                <p class="mb-0 text-muted small">You have <strong>{{ pending_ai_chats_count }}</strong> pending AI chat conversations.</p>
+                            </div>
+                        </div>
+                        <a href="{% url 'settings:ai-chats' %}" class="btn btn-dark btn-sm px-3">
+                            View Chats
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    <!-- ROW 11: Visits Today (SuperAdmin only) -->
+                    {% if visits_today_count > 0 %}
+                    <div class="list-group-item p-3 d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-success-subtle text-success rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                 style="width: 45px; height: 45px; flex-shrink: 0;">
+                                <i class="fas fa-chart-line fa-lg"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1 fw-bold text-dark">Website Visits</h6>
+                                <p class="mb-0 text-muted small">You have <strong>{{ visits_today_count }}</strong> visits to your site today.</p>
+                            </div>
+                        </div>
+                        <a href="{% url 'analytics:visit_dashboard' %}" class="btn btn-success btn-sm px-3">
+                            View Analytics
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    <!-- EMPTY STATE: If all counts are 0 -->
+                    {% if not pending_orders_count and not unread_messages_count and not low_stock_count and not pending_join_requests_count and not pending_payments_count and not pending_losses_count and not unverified_daily_records_count and not my_open_jobs_count and not pending_feedback_count and not pending_ai_chats_count and not visits_today_count %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-check-circle text-success mb-3" style="font-size: 3rem;"></i>
+                        <h5 class="text-muted">You're all caught up!</h5>
+                        <p class="text-muted">No new notifications at the moment.</p>
+                    </div>
+                    {% endif %}
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

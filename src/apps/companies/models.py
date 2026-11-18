@@ -6,6 +6,7 @@ from django.db import models
 from django.conf import settings as django_settings
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.conf import settings
 
 from apps.business_types.business_type_registry import (
     BusinessTypeEnum,
@@ -1243,3 +1244,105 @@ class TenantFeedback(models.Model):
             self.resolved_at = None
             self.resolved_by = None
         self.save()
+
+
+class ContactMessage(models.Model):
+    REPLY_CHOICES = [
+        ('email', 'Email'),
+        ('sms', 'SMS'),
+        ('whatsapp', 'WhatsApp'),
+    ]
+
+    # --- Core Message Data ---
+    company = models.ForeignKey(
+        'Company', 
+        on_delete=models.CASCADE, 
+        related_name='contact_messages', 
+        null=True, 
+        blank=True,
+        help_text="The company this message was sent to (if applicable)."
+    )
+    name = models.CharField(max_length=120)
+    email = models.EmailField()
+    
+    # We add separate fields for phone and WhatsApp just in case they differ
+    phone = models.CharField(max_length=50, blank=True, null=True, help_text="Phone number for SMS")
+    whatsapp_number = models.CharField(max_length=50, blank=True, null=True, help_text="WhatsApp number (if different from phone)")
+    
+    subject = models.CharField(max_length=200, blank=True, null=True)
+    message = models.TextField()
+
+    # --- Admin Tracking ---
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    # --- Reply Tracking ---
+    admin_reply = models.TextField(
+        blank=True, 
+        null=True, 
+        help_text="The reply message sent to the customer."
+    )
+    replied_at = models.DateTimeField(blank=True, null=True)
+    reply_method = models.CharField(
+        max_length=10, 
+        choices=REPLY_CHOICES, 
+        blank=True, 
+        null=True,
+        help_text="How the reply was sent (Email, SMS, or WhatsApp)."
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Contact Message"
+        verbose_name_plural = "Contact Messages"
+
+    def __str__(self):
+        return f"{self.name} - {self.subject or 'No Subject'} ({self.created_at.strftime('%Y-%m-%d')})"
+
+    # --- Helper Properties ---
+    @property
+    def status_badge(self):
+        if self.admin_reply:
+            return '<span class="badge bg-success">Replied</span>'
+        elif self.is_read:
+            return '<span class="badge bg-info">Read</span>'
+        else:
+            return '<span class="badge bg-danger">Unread</span>'
+    
+    @property
+    def has_phone(self):
+        return bool(self.phone and len(self.phone.strip()) > 5)
+
+    @property
+    def has_whatsapp(self):
+        return bool(self.whatsapp_number and len(self.whatsapp_number.strip()) > 5)
+
+    # --- Helper Methods ---
+    def get_formatted_phone(self):
+        """Formats the phone number to international format (e.g., +254...) for APIs."""
+        if not self.phone:
+            return None
+        return self._format_number(self.phone)
+
+    def get_formatted_whatsapp(self):
+        """Formats the WhatsApp number to international format for APIs."""
+        number = self.whatsapp_number or self.phone
+        if not number:
+            return None
+        return self._format_number(number)
+
+    def _format_number(self, number):
+        """Internal helper to convert Kenyan numbers to +254 format."""
+        phone = number.strip().replace(" ", "").replace("-", "")
+        
+        # If it's a Kenyan number starting with 07 or 01, convert to +254
+        if phone.startswith('07') or phone.startswith('01'):
+            return f"+254{phone[1:]}"
+        elif phone.startswith('7') or phone.startswith('1'):
+            return f"+254{phone}"
+        elif phone.startswith('+'):
+            return phone
+            
+        return phone # Return as-is if we don't know the format
+
+

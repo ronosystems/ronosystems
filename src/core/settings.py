@@ -185,24 +185,30 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+
+                'apps.settings.context_processors.pending_payments_count',
+                'apps.settings.context_processors.pending_ai_chats_count',
                 'apps.settings.context_processors.system_settings',
-                'apps.ai_chatbot.context_processors.chatbot_available',
-                'apps.epa_shop.context_processors.user_context',
-                'apps.cart_orders.context_processors.cart_count', 
+                
+                'apps.ai_chatbot.context_processors.chatbot_available',               
+                'apps.cart_orders.context_processors.cart_count',
+
+                'apps.epa_shop.context_processors.user_context', 
                 'apps.epa_shop.context_processors.pending_orders_count',
+
                 'apps.companies.context_processors.system_website_url', 
                 'apps.company.context_processors.company_context',
                 'apps.companies.context_processors.active_base_template',
                 'apps.companies.context_processors.support_mode_context',
                 'apps.companies.context_processors.pending_join_requests',
-                'apps.companies.context_processors.company_branding_context', 
+                'apps.companies.context_processors.company_branding_context',
+                'apps.companies.context_processors.unread_messages_count', 
                 'apps.companies.context_processors.receipt_settings_context', 
-                'apps.plans.context_processors.plan_features',   
                 'apps.companies.context_processors.pending_feedback_count',
+
+                'apps.plans.context_processors.plan_features',   
                 'apps.losses.context_processors.pending_losses_count',
                 'apps.treasury.context_processors.company_context',
-                'apps.settings.context_processors.pending_payments_count',
-                'apps.settings.context_processors.pending_ai_chats_count',
                 'apps.analytics.context_processors.visit_count_today', 
             ],
         },
@@ -399,6 +405,13 @@ SOCIALACCOUNT_PROVIDERS = {
 
 SOCIALACCOUNT_LOGIN_ON_GET = True
 SOCIALACCOUNT_STORE_TOKENS = False
+
+
+# ============================================
+# WHATSAPP TWILIO
+# ===========================================
+TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID', '')
+TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN', '')
 
 
 # ============================================

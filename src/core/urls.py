@@ -6,7 +6,7 @@ from django.views.generic import TemplateView
 from apps.companies import web_views as company_views
 from apps.accounts.admin_site import restricted_admin_site
 from apps.accounts import views_guest
-from core.views import qz_sign, contact, manifest_view, service_worker, asset_links
+from core.views import qz_sign, contact, manifest_view, service_worker, asset_links, admin_contact_messages
 from . import views
 
 # ============================================
@@ -66,6 +66,9 @@ urlpatterns = [
     path('workshop/', include('apps.workshop.urls', namespace='workshop')),
     path('mpesa/', include('apps.mpesa.urls')),
     path('ai/chatbot/', include('apps.ai_chatbot.urls')),
+    path('dashboard/contact-messages/', admin_contact_messages, name='admin_contact_messages'),
+    path('dashboard/contact-messages/delete/', views.delete_contact_messages, name='delete_contact_messages'),
+    path('dashboard/notifications/', views.notification_center, name='notification_center'),
 
     # ============================================
     # API ENDPOINTS

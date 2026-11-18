@@ -352,3 +352,39 @@ def system_website_url(request):
     scheme = 'https' if request.is_secure() else 'http'
     port_part = f':{port}' if port else ''
     return {'system_website_url': f'{scheme}://{host}{port_part}/'}
+
+
+# ============================================
+# UNREAD CONTACT MESSAGES (for navbar bell)
+# ============================================
+def unread_messages_count(request):
+    """
+    Inject the number of unread contact messages into every template context.
+    Only runs for authenticated admins/managers.
+    """
+    user = getattr(request, 'user', None)
+    if not user or not user.is_authenticated:
+        return {'unread_messages_count': 0}
+
+    # Check if the user has permission to see messages
+    is_admin = user.is_superuser or getattr(user, 'role', '') in ('super_admin', 'company_admin', 'company_manager')
+    if not is_admin:
+        return {'unread_messages_count': 0}
+
+    company = _get_effective_company(request)
+    
+    try:
+        from apps.companies.models import ContactMessage
+        
+        if company:
+            count = ContactMessage.objects.filter(company=company, is_read=False).count()
+        else:
+            # Super admin on the main site sees ALL unread messages
+            count = ContactMessage.objects.filter(is_read=False).count()
+            
+    except Exception:
+        count = 0
+
+    return {'unread_messages_count': count}
+
+    

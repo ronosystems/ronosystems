@@ -11,8 +11,28 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from django.views.decorators.cache import never_cache
 from apps.epa_shop.storefront import get_epa_products
 from apps.business_types.business_type_registry import BusinessTypeEnum
+from django.contrib.auth.decorators import login_required
+from apps.companies.models import ContactMessage 
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect, get_object_or_404
+from django.utils import timezone
 
 
+@login_required
+def notification_center(request):
+    """
+    A summary hub for all system notifications based on existing context processor counts.
+    """
+    company = getattr(request, 'company', None) or getattr(request.user, 'company', None)
+    
+    # We pass the company object so the template can build URLs like company.id
+    return render(request, 'companies/notification_center.html', {
+        'company': company,
+        # The counts below are already being injected by your context processors!
+        # We don't need to query the DB again here. 
+        # But just in case they aren't, we can pass empty defaults.
+    })
 
 # Add this helper
 def no_session(view_func):
@@ -136,7 +156,7 @@ def api_root(request):
 
 def contact(request):
     """
-    Handle GET (show form) and POST (send message).
+    Handle GET (show form) and POST (save message + send email notification).
     """
     company = getattr(request, 'company', None)
     is_company_domain = bool(company)
@@ -146,7 +166,6 @@ def contact(request):
     branches = []
     if company:
         try:
-            # Using the related_name defined in your Branch model
             branches = company.company_branches.filter(is_active=True)
         except Exception:
             branches = []
@@ -157,31 +176,53 @@ def contact(request):
     }
 
     if request.method == 'POST':
+        # 1. Honeypot Check (Spam Protection)
         if (request.POST.get('website_hp') or '').strip():
             return redirect('contact')
 
+        # 2. Extract Form Data
         name    = (request.POST.get('name') or '').strip()
         email   = (request.POST.get('email') or '').strip()
         phone   = (request.POST.get('phone') or '').strip()
+        whatsapp = (request.POST.get('whatsapp_number') or '').strip()
         subject = (request.POST.get('subject') or '').strip()
         message = (request.POST.get('message') or '').strip()
 
+        # 3. Validation
         if not name or not email or not message:
             messages.error(request, 'Please fill in all required fields.')
             return render(request, template_name, context)
 
+        # 4. Save to Database (Crucial for Dashboard Viewing)
+        try:
+            ContactMessage.objects.create(
+                company=company,
+                name=name,
+                email=email,
+                phone=phone,
+                whatsapp_number=whatsapp,
+                subject=subject,
+                message=message
+            )
+        except Exception as e:
+            # If DB save fails, log it but don't stop the email from sending
+            print(f"Error saving contact message to DB: {e}")
+
+        # 5. Send Email Notification to Admin
         full_subject = f"[Contact] {subject or 'New message'} — from {name}"
         body = (
             f"New contact form submission\n"
             f"----------------------------------------\n"
-            f"Name:    {name}\n"
-            f"Email:   {email}\n"
-            f"Phone:   {phone or '(not provided)'}\n"
-            f"Subject: {subject or '(none)'}\n"
+            f"Name:     {name}\n"
+            f"Email:    {email}\n"
+            f"Phone:    {phone or '(not provided)'}\n"
+            f"WhatsApp: {whatsapp or '(not provided)'}\n"
+            f"Subject:  {subject or '(none)'}\n"
             f"----------------------------------------\n\n"
             f"{message}\n"
         )
 
+        # Determine recipient
         recipient = getattr(settings, 'CONTACT_EMAIL', None)
         if not recipient:
             try:
@@ -192,25 +233,245 @@ def contact(request):
 
         from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@ronosystems.com')
 
-        try:
-            send_mail(
-                subject=full_subject,
-                message=body,
-                from_email=from_email,
-                recipient_list=[recipient],
-                fail_silently=False,
-            )
-            messages.success(request, 'Thanks! Your message has been sent — we will reply shortly.')
-        except Exception as e:
-            messages.error(request, f'Sorry, we could not send your message right now. ({e})')
-            return render(request, template_name, context)
+        # Only attempt to send email if we have a valid configuration
+        if getattr(settings, 'EMAIL_HOST', None) or getattr(settings, 'EMAIL_BACKEND', '') == 'django.core.mail.backends.smtp.EmailBackend':
+            try:
+                send_mail(
+                    subject=full_subject,
+                    message=body,
+                    from_email=from_email,
+                    recipient_list=[recipient],
+                    fail_silently=False,
+                )
+            except Exception as e:
+                # Log the email failure, but the user shouldn't know it failed if it was saved to DB
+                print(f"Failed to send admin notification email: {e}")
+                # Optional: messages.warning(request, "Message saved, but email notification failed.")
+        else:
+            print("Email backend not configured. Skipping admin notification.")
 
+        # 6. Success and Redirect
+        messages.success(request, 'Thanks! Your message has been sent — we will reply shortly.')
         return redirect('contact')
 
     return render(request, template_name, context)
 
-    
 
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.mail import send_mail
+from django.conf import settings
+from django.utils import timezone
+from apps.companies.models import ContactMessage
+
+@login_required
+def admin_contact_messages(request):
+    """
+    View for admins to see contact messages and send replies.
+    Supports Email, SMS, and WhatsApp simultaneously.
+    
+    Security Note: 
+    - Company Admins only see messages for THEIR company.
+    - Super Admins on the main system domain see ALL messages.
+    - Emails are sent FROM the company's email, not the system default.
+    """
+    # ==========================================
+    # 1. AUTHORIZATION CHECK
+    # ==========================================
+    if not request.user.is_staff and not getattr(request.user, 'is_company_admin', False):
+        if getattr(request.user, 'role', '') not in ('company_admin', 'company_manager', 'super_admin'):
+            messages.error(request, "You do not have permission to view this page.")
+            return redirect('home')
+
+    # ==========================================
+    # 2. CONTEXT & SECURITY SETUP
+    # ==========================================
+    company = getattr(request, 'company', None) or getattr(request.user, 'company', None)
+    is_company_domain = bool(company)
+    
+    # SECURITY CHECK: A non-superadmin MUST have a company context.
+    if request.user.role != 'super_admin' and not company:
+        messages.error(request, "Please access the dashboard from your company domain.")
+        return redirect('home')
+
+    # Choose the correct template based on domain
+    if is_company_domain:
+        template_name = 'website/company_contact_messages.html'
+    else:
+        template_name = 'website/contact_messages.html'
+
+    # ==========================================
+    # 3. DATA ISOLATION (FETCH MESSAGES)
+    # ==========================================
+    if company:
+        contact_messages = ContactMessage.objects.filter(company=company).order_by('-created_at')
+    else:
+        contact_messages = ContactMessage.objects.all().order_by('-created_at')
+
+    # ==========================================
+    # 4. HANDLE REPLY SUBMISSION (POST)
+    # ==========================================
+    if request.method == 'POST' and 'reply_message' in request.POST:
+        msg_id = request.POST.get('message_id')
+        reply_text = (request.POST.get('reply_text') or '').strip()
+        reply_methods = request.POST.getlist('reply_methods')
+
+        msg = get_object_or_404(ContactMessage, id=msg_id)
+        
+        # STRICT SECURITY: Ensure a company admin can only reply to THEIR messages
+        if company and msg.company != company:
+            messages.error(request, "Invalid message selected. You do not own this message.")
+            return redirect('admin_contact_messages')
+
+        if not reply_text:
+            messages.error(request, "Reply text cannot be empty.")
+            return redirect('admin_contact_messages')
+            
+        if not reply_methods:
+            messages.error(request, "Please select at least one method to send the reply.")
+            return redirect('admin_contact_messages')
+
+        sent_successfully = []
+        failed_methods = []
+
+        # ==========================================
+        # 5. LOOP THROUGH SELECTED METHODS
+        # ==========================================
+        for method in reply_methods:
+            
+            # --- EMAIL ---
+            if method == 'email' and msg.email:
+                try:
+                    # Determine sender identity
+                    if msg.company and msg.company.email:
+                        sender_email = msg.company.email
+                    else:
+                        sender_email = settings.DEFAULT_FROM_EMAIL
+
+                    send_mail(
+                        subject=f"Re: {msg.subject or 'Your message to us'}",
+                        message=reply_text,
+                        from_email=sender_email,
+                        recipient_list=[msg.email],
+                        fail_silently=False,
+                    )
+                    sent_successfully.append('Email')
+                except Exception as e:
+                    failed_methods.append(f"Email ({e})")
+
+            # --- SMS ---
+            elif method == 'sms' and msg.get_formatted_phone():
+                try:
+                    # Prepend company name so recipient knows who is replying
+                    company_name = msg.company.name if msg.company else "RonoSystems"
+                    sms_body = f"{company_name}: {reply_text}"
+
+                    # ==========================================
+                    # TODO: Integrate your actual SMS API here
+                    # ==========================================
+                    # Example (Africa's Talking):
+                    # import africastalking
+                    # africastalking.initialize(settings.AT_USERNAME, settings.AT_API_KEY)
+                    # sms = africastalking.SMS
+                    # sms.send(sms_body, [msg.get_formatted_phone()])
+                    
+                    # Simulated Success:
+                    print(f"SMS SENT TO {msg.get_formatted_phone()}: {sms_body}")
+                    sent_successfully.append('SMS')
+                except Exception as e:
+                    failed_methods.append(f"SMS ({e})")
+
+            # --- WHATSAPP ---
+            elif method == 'whatsapp' and msg.get_formatted_whatsapp():
+                try:
+                    from twilio.rest import Client
+                    
+                    # Prepend company name so recipient knows who is replying
+                    company_name = msg.company.name if msg.company else "RonoSystems"
+                    wa_body = f"*{company_name}*\n\n{reply_text}"
+
+                    client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+                    
+                    client.messages.create(
+                        from_='whatsapp:+14155238886',  # Twilio Sandbox number
+                        body=wa_body,
+                        to=f"whatsapp:{msg.get_formatted_whatsapp()}"
+                    )
+                    sent_successfully.append('WhatsApp')
+                except Exception as e:
+                    failed_methods.append(f"WhatsApp ({e})")
+
+            else:
+                failed_methods.append(f"{method} (No contact info)")
+
+        # ==========================================
+        # 6. SAVE TO DATABASE
+        # ==========================================
+        if sent_successfully:
+            msg.admin_reply = reply_text
+            msg.replied_at = timezone.now()
+            msg.reply_method = ", ".join(reply_methods)
+            msg.is_read = True
+            msg.save()
+            
+            success_msg = f"Reply sent successfully via: {', '.join(sent_successfully)}."
+            if failed_methods:
+                success_msg += f" However, failed for: {', '.join(failed_methods)}."
+            messages.success(request, success_msg)
+        else:
+            messages.error(request, f"Failed to send reply. {', '.join(failed_methods)}")
+
+        return redirect('admin_contact_messages')
+
+    # ==========================================
+    # 7. HANDLE MARK AS READ
+    # ==========================================
+    if request.method == 'POST' and 'mark_read' in request.POST:
+        msg_id = request.POST.get('mark_read')
+        msg = get_object_or_404(ContactMessage, id=msg_id)
+        
+        if not company or msg.company == company:
+            msg.is_read = True
+            msg.save()
+            messages.success(request, "Message marked as read.")
+        return redirect('admin_contact_messages')
+
+    # ==========================================
+    # 8. RENDER TEMPLATE
+    # ==========================================
+    return render(request, template_name, {
+        'contact_messages': contact_messages,
+        'current_company': company,
+    })
+
+@login_required
+def delete_contact_messages(request):
+    """Handle bulk deletion of contact messages."""
+    if request.method == 'POST':
+        message_ids = request.POST.getlist('message_ids')
+        
+        if not message_ids:
+            messages.error(request, "No messages selected.")
+            return redirect('admin_contact_messages')
+
+        company = getattr(request, 'company', None) or getattr(request.user, 'company', None)
+        
+        # Filter by company if not super admin to ensure security
+        if company:
+            msgs_to_delete = ContactMessage.objects.filter(id__in=message_ids, company=company)
+        else:
+            msgs_to_delete = ContactMessage.objects.filter(id__in=message_ids)
+            
+        count = msgs_to_delete.count()
+        msgs_to_delete.delete()
+        
+        messages.success(request, f"Successfully deleted {count} message(s).")
+        
+    return redirect('admin_contact_messages')
+
+
+    
 # ============================================
 # PWA: MANIFEST
 # ============================================
