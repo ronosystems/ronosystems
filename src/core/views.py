@@ -17,22 +17,93 @@ from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
+from apps.epa_shop.models import BranchStock
+from apps.treasury.models import DailyRecord
+from django.db.models import F
+from apps.settings.models import SystemSetting
+from datetime import datetime
+
+
 
 
 @login_required
 def notification_center(request):
     """
-    A summary hub for all system notifications based on existing context processor counts.
+    A summary hub for all system notifications.
     """
     company = getattr(request, 'company', None) or getattr(request.user, 'company', None)
+    user = request.user
     
-    # We pass the company object so the template can build URLs like company.id
-    return render(request, 'companies/notification_center.html', {
+    context = {
         'company': company,
-        # The counts below are already being injected by your context processors!
-        # We don't need to query the DB again here. 
-        # But just in case they aren't, we can pass empty defaults.
-    })
+    }
+
+    # ==========================================
+    # COMPANY-SPECIFIC COUNTS
+    # ==========================================
+    if company:
+        # 1. Low Stock
+        try:
+            from apps.epa_shop.models import BranchStock
+            context['low_stock_count'] = BranchStock.objects.filter(
+                company=company, quantity_in_stock__lte=F('minimum_stock_level')
+            ).count()
+        except Exception:
+            context['low_stock_count'] = 0
+
+        # 2. Unverified Treasury Records
+        try:
+            from apps.treasury.models import DailyRecord
+            context['unverified_daily_records_count'] = DailyRecord.objects.filter(
+                company=company, is_approved=False
+            ).count()
+        except Exception:
+            context['unverified_daily_records_count'] = 0
+            
+        # 3. Workshop Jobs
+        try:
+            from apps.workshop.models import WorkshopJob
+            open_statuses = ['received', 'diagnosed', 'awaiting_approval', 'approved', 'in_progress', 'on_hold']
+            context['my_open_jobs_count'] = WorkshopJob.objects.filter(
+                company=company, 
+                assigned_technician=user, 
+                status__in=open_statuses
+            ).count()
+        except Exception:
+            context['my_open_jobs_count'] = 0
+
+    # ==========================================
+    # SYSTEM-LEVEL COUNTS (SUPER ADMIN)
+    # ==========================================
+    if not company and user.role == 'super_admin':
+        
+        # 4. 
+
+        # 5. New Users
+        try:
+            from apps.accounts.models import User
+            
+            today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            last_seen_iso = request.session.get('users_last_seen')
+            
+            if last_seen_iso:
+                try:
+                    last_seen = datetime.fromisoformat(last_seen_iso)
+                    if timezone.is_naive(last_seen):
+                        last_seen = timezone.make_aware(last_seen)
+                    cutoff = max(last_seen, today_start)
+                except (ValueError, TypeError):
+                    cutoff = today_start
+            else:
+                cutoff = today_start
+
+            context['new_users_count'] = User.objects.filter(created_at__gte=cutoff).count()
+        except Exception:
+            context['new_users_count'] = 0
+
+    return render(request, 'companies/notification_center.html', context)
+
+
 
 # Add this helper
 def no_session(view_func):
@@ -156,13 +227,17 @@ def api_root(request):
 
 def contact(request):
     """
-    Handle GET (show form) and POST (save message + send email notification).
+    Handle GET (show form) and POST (send message).
+    - Company domains: Uses company-specific hero settings and branches.
+    - System domain: Uses system-wide hero settings.
     """
     company = getattr(request, 'company', None)
     is_company_domain = bool(company)
+    
+    # Determine which template to use
     template_name = 'website/company_contact.html' if is_company_domain else 'website/contact.html'
 
-    # ---- Fetch branches using the correct related_name ----
+    # ---- Fetch branches (only for company domains) ----
     branches = []
     if company:
         try:
@@ -175,18 +250,34 @@ def contact(request):
         'branches': branches,
     }
 
+    # ==========================================
+    # HERO SETTINGS
+    # ==========================================
+    if is_company_domain:
+        # COMPANY DOMAIN: Variables are handled directly in the template via current_company
+        pass
+    else:
+        # SYSTEM DOMAIN: Fetch system hero settings
+        context['system_hero_video'] = SystemSetting.get_video_url('SYSTEM_HERO_VIDEO')
+        context['system_hero_image'] = SystemSetting.get_image_url('SYSTEM_HERO_IMAGE')
+        context['system_hero_title'] = SystemSetting.get_setting('SYSTEM_HERO_TITLE', '')
+        context['system_hero_subtitle'] = SystemSetting.get_setting('SYSTEM_HERO_SUBTITLE', '')
+
+    # ==========================================
+    # POST HANDLING (MESSAGE SUBMISSION)
+    # ==========================================
     if request.method == 'POST':
         # 1. Honeypot Check (Spam Protection)
         if (request.POST.get('website_hp') or '').strip():
             return redirect('contact')
 
         # 2. Extract Form Data
-        name    = (request.POST.get('name') or '').strip()
-        email   = (request.POST.get('email') or '').strip()
-        phone   = (request.POST.get('phone') or '').strip()
+        name     = (request.POST.get('name') or '').strip()
+        email    = (request.POST.get('email') or '').strip()
+        phone    = (request.POST.get('phone') or '').strip()
         whatsapp = (request.POST.get('whatsapp_number') or '').strip()
-        subject = (request.POST.get('subject') or '').strip()
-        message = (request.POST.get('message') or '').strip()
+        subject  = (request.POST.get('subject') or '').strip()
+        message  = (request.POST.get('message') or '').strip()
 
         # 3. Validation
         if not name or not email or not message:
@@ -205,7 +296,6 @@ def contact(request):
                 message=message
             )
         except Exception as e:
-            # If DB save fails, log it but don't stop the email from sending
             print(f"Error saving contact message to DB: {e}")
 
         # 5. Send Email Notification to Admin
@@ -223,13 +313,15 @@ def contact(request):
         )
 
         # Determine recipient
-        recipient = getattr(settings, 'CONTACT_EMAIL', None)
-        if not recipient:
-            try:
-                from apps.settings.models import SystemSetting
-                recipient = SystemSetting.get_setting('EMAIL_FROM', 'support@ronosystems.com')
-            except Exception:
-                recipient = 'support@ronosystems.com'
+        if is_company_domain and company.email:
+            recipient = company.email
+        else:
+            recipient = getattr(settings, 'CONTACT_EMAIL', None)
+            if not recipient:
+                try:
+                    recipient = SystemSetting.get_setting('EMAIL_FROM', 'support@ronosystems.com')
+                except Exception:
+                    recipient = 'support@ronosystems.com'
 
         from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@ronosystems.com')
 
@@ -244,9 +336,7 @@ def contact(request):
                     fail_silently=False,
                 )
             except Exception as e:
-                # Log the email failure, but the user shouldn't know it failed if it was saved to DB
                 print(f"Failed to send admin notification email: {e}")
-                # Optional: messages.warning(request, "Message saved, but email notification failed.")
         else:
             print("Email backend not configured. Skipping admin notification.")
 
@@ -254,16 +344,11 @@ def contact(request):
         messages.success(request, 'Thanks! Your message has been sent — we will reply shortly.')
         return redirect('contact')
 
+    # ==========================================
+    # GET REQUEST: RENDER TEMPLATE
+    # ==========================================
     return render(request, template_name, context)
 
-
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.core.mail import send_mail
-from django.conf import settings
-from django.utils import timezone
-from apps.companies.models import ContactMessage
 
 @login_required
 def admin_contact_messages(request):

@@ -113,6 +113,55 @@ class BusinessType(models.Model):
         ordering = ['name']
 
 
+
+
+
+class CompanyApplication(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'Pending Review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    )
+
+    # Step 1: Company Info
+    company_name = models.CharField(max_length=200)
+    company_pin = models.CharField(max_length=20, help_text="Registration Number / KRA PIN")
+    company_email = models.EmailField()
+    company_phone = models.CharField(max_length=20)
+    company_website = models.URLField(blank=True)
+
+    # Step 2: Address
+    address = models.TextField()
+    city = models.CharField(max_length=100)
+    state = models.CharField(max_length=100)
+    country = models.CharField(max_length=100)
+    postal_code = models.CharField(max_length=20, blank=True)
+
+    # Step 3: Admin User Details
+    admin_first_name = models.CharField(max_length=150)
+    admin_last_name = models.CharField(max_length=150)
+    admin_email = models.EmailField(unique=True)
+    admin_phone = models.CharField(max_length=20)
+    admin_id_number = models.CharField(max_length=50, blank=True)
+
+    # Step 4: Authentication
+    password_hash = models.CharField(max_length=255)
+
+    # Metadata
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'rono_company_applications'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.company_name} - {self.admin_email} ({self.status})"
+
+
+
+
+
 # ============================================
 # COMPANY
 # ============================================

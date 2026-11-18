@@ -1,278 +1,448 @@
 {% extends "web_base.html" %}
 {% load static %}
 
-{% block title %}Contact Us{% endblock %}
+{% block title %}Contact Us — {{ system_name|default:"RonoSystems" }}{% endblock %}
 {% block marquee_text %}Contact {{ system_name|default:"RonoSystems" }}{% endblock %}
 {% block breadcrumb %}Contact{% endblock %}
 
 {% block content %}
-{% if messages %}
-    <div style="margin-bottom: 20px;">
-        {% for m in messages %}
-            <div class="alert alert-{% if m.tags == 'error' %}danger{% elif m.tags == 'success' %}success{% else %}info{% endif %}"
-                style="border-radius: 3px; font-size: 13px; padding: 10px 14px;">
-                <i class="fas fa-{% if m.tags == 'error' %}exclamation-circle{% elif m.tags == 'success' %}check-circle{% else %}info-circle{% endif %} me-2"></i>
-                {{ m }}
-            </div>
-        {% endfor %}
-    </div>
-{% endif %}
+<style>
+    /* ============================================
+       CONTACT PAGE SPECIFIC STYLES (SYSTEM DOMAIN)
+    ============================================ */
+    
+    /* Row 1: Dynamic Hero (Video / Image) */
+    .contact-hero {
+        position: relative;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        height: 300px; 
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        background-color: #1e4e6d; /* Fallback color */
+    }
 
-<div class="dashboard-panel" id="contact">
+    /* Hero Video */
+    .contact-hero video {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        min-width: 100%;
+        min-height: 100%;
+        width: auto;
+        height: auto;
+        transform: translate(-50%, -50%);
+        z-index: 0;
+        object-fit: cover;
+    }
+
+    /* Hero Image Fallback */
+    .contact-hero .fallback-image {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        min-width: 100%;
+        min-height: 100%;
+        width: auto;
+        height: auto;
+        transform: translate(-50%, -50%);
+        z-index: 0;
+        object-fit: cover;
+    }
+
+    /* Dark overlay so white text is readable */
+    .contact-hero::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(135deg, rgba(30, 78, 109, 0.75) 0%, rgba(15, 23, 42, 0.55) 100%);
+        z-index: 1;
+    }
+
+    /* Hero Content */
+    .contact-hero-content {
+        position: relative;
+        z-index: 2;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .contact-hero-logo {
+        width: 80px;
+        height: 80px;
+        background: #fff;
+        border-radius: 12px;
+        padding: 8px;
+        margin: 0 auto 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    .contact-hero-logo img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
+    .contact-hero-logo .fallback-text {
+        font-size: 32px;
+        font-weight: 800;
+        color: #1e4e6d;
+    }
+    .contact-hero h1 {
+        color: #fff;
+        font-size: 2.2rem;
+        font-weight: 800;
+        margin: 0 0 8px 0;
+        text-shadow: 0 2px 6px rgba(0,0,0,0.5);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .contact-hero p {
+        color: #e2e8f0;
+        font-size: 1rem;
+        margin: 0;
+        font-weight: 500;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        max-width: 600px;
+    }
+
+    /* Row 2: 3-Column Grid */
+    .contact-grid-3 {
+        display: grid;
+        grid-template-columns: 1fr 1.2fr 1fr;
+        gap: 15px;
+        margin-bottom: 25px;
+    }
+    @media (max-width: 992px) {
+        .contact-grid-3 {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .contact-card {
+        background: #fff;
+        border: 1px solid #dcdcdc;
+        border-radius: 8px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .contact-card-header {
+        background: #1e4e6d;
+        color: #fff;
+        padding: 12px 15px;
+        font-weight: 700;
+        font-size: 13px;
+        text-transform: uppercase;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .contact-card-body {
+        padding: 15px;
+        flex-grow: 1;
+    }
+
+    /* Left Column: Address / Info */
+    .info-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    .info-list li {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 15px;
+        align-items: flex-start;
+    }
+    .info-list li:last-child { margin-bottom: 0; }
+    .info-icon {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: #f0f9ff;
+        color: #2d5f7c;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 14px;
+    }
+    .info-text {
+        font-size: 13px;
+        color: #444;
+        line-height: 1.4;
+        word-break: break-word;
+    }
+    .info-text strong {
+        display: block;
+        color: #111;
+        font-size: 11px;
+        text-transform: uppercase;
+        margin-bottom: 2px;
+        font-weight: 700;
+    }
+    .info-text a {
+        color: #2d5f7c;
+        text-decoration: none;
+    }
+    .info-text a:hover { text-decoration: underline; }
+
+    /* Middle Column: Form */
+    .form-group {
+        margin-bottom: 12px;
+    }
+    .form-group label {
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        margin-bottom: 4px;
+        color: #333;
+        text-transform: uppercase;
+    }
+    .form-control {
+        width: 100%;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        padding: 8px 10px;
+        font-size: 13px;
+        background: #ffffff; 
+        transition: all 0.2s;
+        font-family: inherit;
+    }
+    .form-control:focus {
+        outline: none;
+        border-color: #2d5f7c;
+        background: #ffffff;
+        box-shadow: 0 0 0 2px rgba(45, 95, 124, 0.1);
+    }
+    textarea.form-control {
+        min-height: 90px;
+        resize: vertical;
+    }
+    .btn-submit {
+        background: #1e4e6d;
+        color: #fff;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 4px;
+        font-weight: 700;
+        font-size: 13px;
+        cursor: pointer;
+        width: 100%;
+        transition: background 0.2s;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+    }
+    .btn-submit:hover {
+        background: #2d5f7c;
+    }
+
+    /* Right Column: Map */
+    .map-container {
+        width: 100%;
+        height: 100%;
+        min-height: 300px;
+        background: #e9ecef;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    .map-container iframe {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        display: block;
+    }
+
+    /* Alerts */
+    .alert {
+        padding: 10px 15px;
+        border-radius: 4px;
+        margin-bottom: 15px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+    .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+</style>
+
+<div class="dashboard-panel" style="margin-bottom: 0;">
     <div class="panel-header">
-        <i class="fas fa-envelope me-1"></i> Get in Touch
+        <i class="fas fa-envelope me-1"></i> Contact Us
     </div>
-    <div class="panel-body">
+    <div class="panel-body" style="padding: 15px;">
 
-        <h2 class="hero-title">
-            We'd Love to <span class="highlight">Hear From You</span>
-        </h2>
-
-        <p class="contact-lead">
-            Whether you have a question about features, pricing, need a demo,
-            or anything else — our team is ready to answer all your questions.
-        </p>
-
-        <div class="contact-grid">
-
-            <!-- LEFT: Contact info -->
-            <div class="contact-info-card">
-
-                <div class="contact-info-item">
-                    <div class="contact-info-icon"><i class="fas fa-envelope"></i></div>
-                    <div class="contact-info-text">
-                        <strong>Email Us</strong>
-                        <span><a href="mailto:{{ contact_email|default:'support.ronosystems@gmail.com' }}">{{ contact_email|default:'support.ronosystems@gmail.com' }}</a></span>
-                    </div>
+        {# FLASH MESSAGES #}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}error{% else %}success{% endif %}">
+                    {{ message }}
                 </div>
+            {% endfor %}
+        {% endif %}
 
-                <div class="contact-info-item">
-                    <div class="contact-info-icon"><i class="fas fa-phone-alt"></i></div>
-                    <div class="contact-info-text">
-                        <strong>Call Us</strong>
-                        <span><a href="tel:+254722527955">+254 722 527 955</a></span>
-                    </div>
+        {# ============================================================ #}
+        {# ROW 1: DYNAMIC HERO                                          #}
+        {# ============================================================ #}
+        <div class="contact-hero">
+            {% if system_hero_video %}
+                <!-- 1. System Video -->
+                <video autoplay loop muted playsinline poster="{% if system_hero_image %}{{ system_hero_image }}{% else %}{% static 'images/login-bg.jpg' %}{% endif %}">
+                    <source src="{{ system_hero_video }}" type="video/mp4">
+                    <img src="{% if system_hero_image %}{{ system_hero_image }}{% else %}{% static 'images/login-bg.jpg' %}{% endif %}" class="fallback-image" alt="Hero Background">
+                </video>
+            {% elif system_hero_image %}
+                <!-- 2. System Image -->
+                <img src="{{ system_hero_image }}" class="fallback-image" alt="Hero Background">
+            {% else %}
+                <!-- 3. Default Fallback -->
+                <img src="{% static 'images/login-bg.jpg' %}" class="fallback-image" alt="Hero Background">
+            {% endif %}
+
+            <div class="contact-hero-content">
+                <div class="contact-hero-logo">
+                    {% if site_logo_url %}
+                        <img src="{{ site_logo_url }}" alt="{{ system_name }} logo">
+                    {% else %}
+                        <span class="fallback-text">{{ system_name|default:"R"|slice:":1"|upper }}</span>
+                    {% endif %}
                 </div>
-
-                <div class="contact-info-item">
-                    <div class="contact-info-icon"><i class="fas fa-comments"></i></div>
-                    <div class="contact-info-text">
-                        <strong>Live Chat</strong>
-                        <span>Mon–Fri, 9am–6pm EAT</span>
-                    </div>
-                </div>
-
-                <div class="contact-info-item">
-                    <div class="contact-info-icon"><i class="fas fa-map-marker-alt"></i></div>
-                    <div class="contact-info-text">
-                        <strong>Visit Us</strong>
-                        <span>Nairobi, Kenya<br>RS Plaza</span>
-                    </div>
-                </div>
-
-                <div class="contact-info-item">
-                    <div class="contact-info-icon"><i class="fas fa-question-circle"></i></div>
-                    <div class="contact-info-text">
-                        <strong>Help Center</strong>
-                        <span><a href="{% url 'help' %}">Browse guides &amp; FAQs</a></span>
-                    </div>
-                </div>
-
+                <h1>{{ system_hero_title|default:system_name|default:"RonoSystems" }}</h1>
+                <p>{{ system_hero_subtitle|default:"We'd love to hear from you. Get in touch today." }}</p>
             </div>
-
-            <!-- RIGHT: Contact form -->
-            <form class="contact-form"
-                  method="post"
-                  action="{% url 'contact' %}"
-                  id="contactForm">
-                {% csrf_token %}
-
-                <div class="form-group">
-                    <label for="contact-name">Your Name</label>
-                    <input type="text"
-                           class="form-control"
-                           id="contact-name"
-                           name="name"
-                           placeholder="John Doe"
-                           required>
-                </div>
-
-                <div class="form-group">
-                    <label for="contact-email">Email Address</label>
-                    <input type="email"
-                           class="form-control"
-                           id="contact-email"
-                           name="email"
-                           placeholder="you@example.com"
-                           required>
-                </div>
-
-                <div class="form-group">
-                    <label for="contact-subject">Subject</label>
-                    <input type="text"
-                           class="form-control"
-                           id="contact-subject"
-                           name="subject"
-                           placeholder="How can we help?">
-                </div>
-
-                <div class="form-group">
-                    <label for="contact-message">Message</label>
-                    <textarea class="form-control"
-                              id="contact-message"
-                              name="message"
-                              placeholder="Tell us more about your inquiry..."
-                              required></textarea>
-                </div>
-
-                <button type="submit" class="btn-submit">
-                    <i class="fas fa-paper-plane"></i> Send Message
-                </button>
-            </form>
-
         </div>
 
-        <!-- Optional map placeholder -->
-        <div class="contact-map">
-            <i class="fas fa-map-marked-alt" style="font-size: 24px; margin-right: 8px;"></i>
-            Map placeholder — embed Google Maps here
+        {# ============================================================ #}
+        {# ROW 2: 3-COLUMN GRID (ADDRESS, MESSAGE, MAP)                 #}
+        {# ============================================================ #}
+        <div class="contact-grid-3">
+
+            {# COLUMN 1: SYSTEM DETAILS #}
+            <div class="contact-card">
+                <div class="contact-card-header">
+                    <i class="fas fa-map-marker-alt"></i> Contact Details
+                </div>
+                <div class="contact-card-body">
+                    <ul class="info-list">
+                        <li>
+                            <div class="info-icon"><i class="fas fa-building"></i></div>
+                            <div class="info-text">
+                                <strong>Address</strong>
+                                Nairobi, Kenya<br>RS Plaza
+                            </div>
+                        </li>
+                        <li>
+                            <div class="info-icon"><i class="fas fa-phone-alt"></i></div>
+                            <div class="info-text">
+                                <strong>Phone</strong>
+                                <a href="tel:+254722527955">+254 722 527 955</a>
+                            </div>
+                        </li>
+                        <li>
+                            <div class="info-icon"><i class="fas fa-envelope"></i></div>
+                            <div class="info-text">
+                                <strong>Email</strong>
+                                <a href="mailto:{{ contact_email|default:'support.ronosystems@gmail.com' }}">{{ contact_email|default:'support.ronosystems@gmail.com' }}</a>
+                            </div>
+                        </li>
+                        <li>
+                            <div class="info-icon"><i class="fas fa-globe"></i></div>
+                            <div class="info-text">
+                                <strong>Website</strong>
+                                <a href="/">ronosystems.com</a>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            {# COLUMN 2: MESSAGE FORM #}
+            <div class="contact-card">
+                <div class="contact-card-header">
+                    <i class="fas fa-paper-plane"></i> Send Us a Message
+                </div>
+                <div class="contact-card-body">
+                    <form method="post" action="{% url 'contact' %}">
+                        {% csrf_token %}
+                        
+                        <div class="form-group">
+                            <label>Your Name *</label>
+                            <input type="text" name="name" class="form-control" required maxlength="120" value="{{ request.POST.name|default:'' }}">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Your Email *</label>
+                            <input type="email" name="email" class="form-control" required maxlength="200" value="{{ request.POST.email|default:'' }}">
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Phone Number (For SMS)</label>
+                                    <input type="tel" name="phone" class="form-control" placeholder="e.g. 0712345678" maxlength="20" value="{{ request.POST.phone|default:'' }}">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>WhatsApp Number</label>
+                                    <input type="tel" name="whatsapp_number" class="form-control" placeholder="e.g. +254712345678" maxlength="20" value="{{ request.POST.whatsapp_number|default:'' }}">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Subject *</label>
+                            <input type="text" name="subject" class="form-control" required maxlength="200" value="{{ request.POST.subject|default:'' }}">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Message *</label>
+                            <textarea name="message" class="form-control" required maxlength="5000">{{ request.POST.message|default:'' }}</textarea>
+                        </div>
+
+                        {# Honeypot #}
+                        <div style="position:absolute;left:-9999px;" aria-hidden="true">
+                            <input type="text" name="website_hp" tabindex="-1" autocomplete="off">
+                        </div>
+
+                        <button type="submit" class="btn-submit">
+                            <i class="fas fa-paper-plane"></i> Send Message
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            {# COLUMN 3: MAP #}
+            <div class="contact-card">
+                <div class="contact-card-header">
+                    <i class="fas fa-map-marked-alt"></i> Location Map
+                </div>
+                <div class="contact-card-body" style="padding: 0;">
+                    <div class="map-container">
+                        <iframe
+                            title="System location map"
+                            loading="lazy"
+                            referrerpolicy="no-referrer-when-downgrade"
+                            src="https://www.google.com/maps?q=Nairobi,Kenya&output=embed">
+                        </iframe>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
     </div>
 </div>
-{% endblock %}
-
-{% block extra_css %}
-/* ============================================
-   CONTACT PAGE — SPECIFIC STYLES
-============================================ */
-.contact-lead {
-    font-size: 15px;
-    color: #333;
-    line-height: 1.7;
-    margin-bottom: 20px;
-}
-
-.contact-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 25px;
-}
-
-.contact-info-card {
-    background: #f9f9f9;
-    border: 1px solid var(--ff-border);
-    border-radius: 4px;
-    padding: 20px;
-}
-
-.contact-info-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 14px;
-    padding: 12px 0;
-    border-bottom: 1px dashed #ddd;
-}
-.contact-info-item:last-child { border-bottom: none; }
-
-.contact-info-icon {
-    width: 42px;
-    height: 42px;
-    background: var(--nav-bg-top);
-    color: #fff;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    flex-shrink: 0;
-}
-.contact-info-text strong {
-    display: block;
-    font-size: 13px;
-    color: var(--nav-bg-bottom);
-    margin-bottom: 2px;
-}
-.contact-info-text span {
-    font-size: 12px;
-    color: #555;
-    line-height: 1.5;
-    word-break: break-word;
-}
-.contact-info-text a {
-    color: var(--ff-link);
-    text-decoration: none;
-}
-.contact-info-text a:hover { text-decoration: underline; }
-
-.contact-form .form-group {
-    margin-bottom: 14px;
-}
-.contact-form label {
-    font-weight: 600;
-    color: #333;
-    font-size: 12px;
-    display: block;
-    margin-bottom: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-}
-.contact-form .form-control {
-    border: 1px solid var(--ff-border);
-    border-radius: 3px;
-    padding: 9px 12px;
-    font-size: 13px;
-    height: auto;
-    background: #fff;
-    color: #333;
-    width: 100%;
-    transition: border-color 0.15s, box-shadow 0.15s;
-}
-.contact-form .form-control:focus {
-    border-color: var(--nav-bg-top);
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(45,95,124,0.15);
-}
-.contact-form textarea.form-control {
-    min-height: 130px;
-    resize: vertical;
-    line-height: 1.5;
-}
-.contact-form .btn-submit {
-    background: var(--nav-bg-bottom);
-    color: #fff;
-    border: none;
-    padding: 10px 24px;
-    font-weight: 700;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-radius: 3px;
-    cursor: pointer;
-    transition: background 0.2s;
-}
-.contact-form .btn-submit:hover {
-    background: var(--nav-bg-top);
-}
-
-.contact-map {
-    margin-top: 20px;
-    border: 1px solid var(--ff-border);
-    border-radius: 4px;
-    overflow: hidden;
-    height: 220px;
-    background: #eef2f5;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #666;
-    font-size: 12px;
-}
-
-@media (max-width: 992px) {
-    .contact-grid { grid-template-columns: 1fr; }
-}
-@media (max-width: 576px) {
-    .contact-info-icon { width: 36px; height: 36px; font-size: 14px; }
-}
 {% endblock %}

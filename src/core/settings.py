@@ -205,6 +205,8 @@ TEMPLATES = [
                 'apps.companies.context_processors.unread_messages_count', 
                 'apps.companies.context_processors.receipt_settings_context', 
                 'apps.companies.context_processors.pending_feedback_count',
+                'apps.companies.context_processors.total_notifications_count',
+                'apps.companies.context_processors.pending_applications_count', 
 
                 'apps.plans.context_processors.plan_features',   
                 'apps.losses.context_processors.pending_losses_count',

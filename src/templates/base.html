@@ -1439,6 +1439,17 @@
                         </a>
                     </li>
 
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/companies/applications/' in request.path %}active{% endif %}" 
+                        href="{% url 'companies:company-application-list' %}">
+                            <i class="fas fa-file-signature"></i> 
+                            <span>Applications</span>
+                            {% if pending_applications_count and pending_applications_count > 0 %}
+                                <span class="badge bg-danger">{{ pending_applications_count }}</span>
+                            {% endif %}
+                        </a>
+                    </li>
+
                     <li class="nav-label">Site Management</li>
                     <li class="nav-item">
                         <a class="nav-link {% if '/business_types/' in request.path %}active{% endif %}" href="/business-types/">
@@ -1581,17 +1592,6 @@
 
             <div class="navbar-actions">
 
-                {% if user.is_authenticated and user.role == 'super_admin' %}
-                <a href="{% url 'settings:ai-chats' %}"
-                class="ai-chats-btn {% if '/settings/ai-chats/' in request.path %}active{% endif %}"
-                title="View AI Assistant conversations">
-                    <i class="fas fa-robot"></i>
-                    <span class="ai-chats-label">AI Chats</span>
-                    {% if pending_ai_chats_count and pending_ai_chats_count > 0 %}
-                        <span class="ai-chats-badge">{{ pending_ai_chats_count }}</span>
-                    {% endif %}
-                </a>
-                {% endif %}
 
 
                 <!-- ============================================ -->
@@ -1608,47 +1608,21 @@
                     <div class="d-none d-sm-block fw-bold" style="font-size: 0.9rem; color: #000;">Website</div>
                 </a>
 
-                <!-- Company Notification Bell (Visible to Company Admins/Managers) -->
+                <!-- Company Notification Bell -->
                 {% if user.is_authenticated and user.role == 'company_admin' or user.role == 'company_manager' %}
-                <div class="dropdown">
-                    <a href="#" 
-                       class="user-profile text-decoration-none position-relative" 
-                       title="Notifications"
-                       data-bs-toggle="dropdown"
-                       aria-expanded="false"
-                       style="background: #fff;">
-                        <i class="fas fa-bell" style="font-size: 1.1rem; color: #000;"></i>
-                        
-                        {% if unread_messages_count and unread_messages_count > 0 %}
-                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" 
-                                  style="border: 2px solid #000; font-size: 10px; padding: 3px 6px; transform: translate(-50%, -50%) !important;">
-                                {{ unread_messages_count }}
-                            </span>
-                        {% endif %}
-                    </a>
+                <a href="{% url 'notification_center' %}" 
+                   class="user-profile text-decoration-none position-relative me-2" 
+                   title="View Notifications"
+                   style="background: #fff;">
+                    <i class="fas fa-bell" style="font-size: 1.1rem; color: #000;"></i>
                     
-                    <ul class="dropdown-menu dropdown-menu-end shadow" style="width: 320px; border: 2px solid #000; padding: 0;">
-                        <li class="dropdown-header bg-light fw-bold py-2" style="border-bottom: 2px solid #000;">
-                            Notifications
-                        </li>
-                        <li>
-                            <a class="dropdown-item py-3 border-bottom" href="{% url 'admin_contact_messages' %}">
-                                <div class="d-flex align-items-start gap-2">
-                                    <i class="fas fa-envelope text-primary mt-1"></i>
-                                    <div>
-                                        <div class="fw-bold" style="font-size: 13px;">New Messages</div>
-                                        <div class="text-muted" style="font-size: 11px;">You have {{ unread_messages_count|default:0 }} unread messages.</div>
-                                    </div>
-                                </div>
-                            </a>
-                        </li>
-                        <li style="border-top: 2px solid #000;">
-                            <a class="dropdown-item text-center fw-bold py-2 text-primary" href="{% url 'notification_center' %}">
-                                View All Notifications
-                            </a>
-                        </li>
-                    </ul>
-                </div>
+                    {% if total_notifications_count and total_notifications_count > 0 %}
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" 
+                              style="border: 2px solid #000; font-size: 10px; padding: 3px 6px; transform: translate(-50%, -50%) !important;">
+                            {{ total_notifications_count }}
+                        </span>
+                    {% endif %}
+                </a>
                 {% endif %}
                 
                 {% endif %}
@@ -1658,69 +1632,21 @@
                 <!-- 2. SYSTEM DOMAIN NOTIFICATIONS (SUPER ADMIN) -->
                 <!-- ============================================ -->
                 {% if not is_custom_domain and user.is_authenticated and user.role == 'super_admin' %}
-                <div class="dropdown me-2">
-                    <a href="#" 
-                       class="user-profile text-decoration-none position-relative" 
-                       title="System Notifications"
-                       data-bs-toggle="dropdown"
-                       aria-expanded="false"
-                       style="background: #fff;">
-                        <i class="fas fa-bell" style="font-size: 1.1rem; color: #000;"></i>
-                        
-                        <!-- You can use pending_feedback_count or another system-wide counter here -->
-                        {% if pending_feedback_count and pending_feedback_count > 0 %}
-                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" 
-                                  style="border: 2px solid #000; font-size: 10px; padding: 3px 6px; transform: translate(-50%, -50%) !important;">
-                                {{ pending_feedback_count }}
-                            </span>
-                        {% endif %}
-                    </a>
+                <a href="{% url 'notification_center' %}" 
+                   class="user-profile text-decoration-none position-relative me-2" 
+                   title="View System Notifications"
+                   style="background: #fff;">
+                    <i class="fas fa-bell" style="font-size: 1.1rem; color: #000;"></i>
                     
-                    <ul class="dropdown-menu dropdown-menu-end shadow" style="width: 320px; border: 2px solid #000; padding: 0;">
-                        <li class="dropdown-header bg-light fw-bold py-2" style="border-bottom: 2px solid #000;">
-                            System Overview
-                        </li>
-                        <li>
-                            <a class="dropdown-item py-3 border-bottom" href="{% url 'admin_contact_messages' %}">
-                                <div class="d-flex align-items-start gap-2">
-                                    <i class="fas fa-envelope text-primary mt-1"></i>
-                                    <div>
-                                        <div class="fw-bold" style="font-size: 13px;">All Messages</div>
-                                        <div class="text-muted" style="font-size: 11px;">View messages from all companies.</div>
-                                    </div>
-                                </div>
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item py-3 border-bottom" href="{% url 'companies:hub-feedback-list' %}">
-                                <div class="d-flex align-items-start gap-2">
-                                    <i class="fas fa-inbox text-warning mt-1"></i>
-                                    <div>
-                                        <div class="fw-bold" style="font-size: 13px;">Tenant Feedback</div>
-                                        <div class="text-muted" style="font-size: 11px;">{{ pending_feedback_count|default:0 }} pending feedback items.</div>
-                                    </div>
-                                </div>
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item py-3" href="{% url 'settings:ai-chats' %}">
-                                <div class="d-flex align-items-start gap-2">
-                                    <i class="fas fa-robot text-success mt-1"></i>
-                                    <div>
-                                        <div class="fw-bold" style="font-size: 13px;">AI Chats</div>
-                                        <div class="text-muted" style="font-size: 11px;">Review AI assistant conversations.</div>
-                                    </div>
-                                </div>
-                            </a>
-                        </li>
-                        <li style="border-top: 2px solid #000;">
-                            <a class="dropdown-item text-center fw-bold py-2 text-primary" href="{% url 'notification_center' %}">
-                                View All System Notifications
-                            </a>
-                        </li>
-                    </ul>
-                </div>
+                    {% if total_notifications_count and total_notifications_count > 0 %}
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" 
+                              style="border: 2px solid #000; font-size: 10px; padding: 3px 6px; transform: translate(-50%, -50%) !important;">
+                            {{ total_notifications_count }}
+                        </span>
+                    {% endif %}
+                </a>
                 {% endif %}
+
 
 
                 <a href="#" class="user-profile" data-bs-toggle="dropdown">

@@ -388,3 +388,144 @@ def unread_messages_count(request):
     return {'unread_messages_count': count}
 
     
+
+def pending_applications_count(request):
+    """
+    Injects the count of pending company applications into every template context.
+    Only visible to super admins.
+    """
+    user = getattr(request, 'user', None)
+    if not user or not user.is_authenticated:
+        return {'pending_applications_count': 0}
+
+    role = getattr(user, 'role', '')
+    if role != 'super_admin' and not user.is_staff:
+        return {'pending_applications_count': 0}
+
+    try:
+        from apps.companies.models import CompanyApplication
+        count = CompanyApplication.objects.filter(status='pending').count()
+    except Exception:
+        count = 0
+
+    return {'pending_applications_count': count}
+
+
+
+
+from datetime import datetime
+from django.utils import timezone
+from django.db.models import F
+
+def total_notifications_count(request):
+    """
+    Combines all relevant notification counts into a single integer
+    to display on the navbar bell. Matches the logic of the Notification Center.
+    """
+    user = getattr(request, 'user', None)
+    if not user or not user.is_authenticated:
+        return {'total_notifications_count': 0}
+
+    total = 0
+    company = _get_effective_company(request)
+    role = getattr(user, 'role', '')
+
+    # ==========================================
+    # COMPANY-SPECIFIC COUNTS
+    # ==========================================
+
+    # 1. Unread Messages
+    if role in ('company_admin', 'company_manager', 'super_admin'):
+        try:
+            from apps.companies.models import ContactMessage
+            if company:
+                total += ContactMessage.objects.filter(company=company, is_read=False).count()
+            else:
+                total += ContactMessage.objects.filter(is_read=False).count()
+        except Exception:
+            pass
+
+    # 2. Pending Orders
+    if company and role in ('company_admin', 'company_manager', 'super_admin'):
+        try:
+            from apps.cart_orders.models import Order
+            total += Order.objects.filter(company=company, status='new').count()
+        except ImportError:
+            pass
+
+    # 3. Low Stock
+    if company and role in ('company_admin', 'stock_controller', 'super_admin'):
+        try:
+            from apps.epa_shop.models import BranchStock
+            total += BranchStock.objects.filter(
+                company=company,
+                quantity_in_stock__lte=F('minimum_stock_level')
+            ).count()
+        except Exception as e:
+            print(f"Low stock count error: {e}")
+
+    # 4. Pending Join Requests
+    if company and role in ('company_admin', 'super_admin'):
+        try:
+            from apps.companies.models import CompanyJoinRequest
+            total += CompanyJoinRequest.objects.filter(company=company, status='pending').count()
+        except ImportError:
+            pass
+
+    # 5. Unverified Daily Records
+    if company and role in ('company_admin', 'super_admin'):
+        try:
+            from apps.treasury.models import DailyRecord
+            total += DailyRecord.objects.filter(company=company, is_approved=False).count()
+        except ImportError:
+            pass
+
+    # 6. Pending Losses / Returns
+    if company and role in ('company_admin', 'super_admin'):
+        try:
+            from apps.losses.models import LossReturn
+            total += LossReturn.objects.filter(company=company, is_verified=False).count()
+        except ImportError:
+            pass
+
+    # ==========================================
+    # SYSTEM-LEVEL COUNTS (SUPER ADMIN ONLY)
+    # ==========================================
+    if role == 'super_admin' and not company:
+
+        # 7. Website Visits
+
+
+        # 8. New Users
+        try:
+            from apps.accounts.models import User
+
+            if request.path.startswith('/companies/'):
+                request.session['users_last_seen'] = timezone.now().isoformat()
+            else:
+                today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                last_seen_iso = request.session.get('users_last_seen')
+
+                if last_seen_iso:
+                    try:
+                        last_seen = datetime.fromisoformat(last_seen_iso)
+                        if timezone.is_naive(last_seen):
+                            last_seen = timezone.make_aware(last_seen)
+                        cutoff = max(last_seen, today_start)
+                    except (ValueError, TypeError):
+                        cutoff = today_start
+                else:
+                    cutoff = today_start
+
+                total += User.objects.filter(created_at__gte=cutoff).count()
+        except Exception as e:
+            print(f"Users count error: {e}")
+
+        # 9. Pending Company Applications
+        try:
+            from apps.companies.models import CompanyApplication
+            total += CompanyApplication.objects.filter(status='pending').count()
+        except Exception:
+            pass
+
+    return {'total_notifications_count': total}

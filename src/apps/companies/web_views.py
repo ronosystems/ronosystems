@@ -12,6 +12,7 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.hashers import make_password
 from django.db import transaction
 from django.db.models import Q
 from django.http import JsonResponse
@@ -24,7 +25,12 @@ from apps.settings.models import SystemSetting
 from apps.company.models import Branch
 from apps.plans.models import Plan, Subscription
 
-from .models import Company, BusinessType, CompanyJoinRequest
+from .models import (
+    Company, 
+    BusinessType, 
+    CompanyJoinRequest, 
+    CompanyApplication
+)
 from .kcb_client import KCBClient
 
 
@@ -38,8 +44,6 @@ from django.core.paginator import Paginator
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
-
-
 
 
 # ============================================
@@ -85,8 +89,6 @@ def _upload_receipt(file_obj, company_id, subscription_id):
         resource_type=resource_type,
     )
     return result.get('public_id') or public_id
-
-
 
 
 # ============================================
@@ -294,6 +296,253 @@ def _can_manage_company(user, company):
         getattr(user, 'role', None) == 'company_admin'
         and getattr(user, 'company_id', None) == company.id
     )
+
+
+# ============================================
+# COMPANY APPLICATIONS — PUBLIC VIEWS
+# ============================================
+
+def apply_company(request):
+    """
+    Public multi-step form for a new company to apply.
+    Saves to CompanyApplication with status='pending'.
+    """
+    if request.method == 'POST':
+        # Step 1: Company Info
+        company_name = (request.POST.get('company_name') or '').strip()
+        company_pin = (request.POST.get('company_pin') or '').strip()
+        company_email = (request.POST.get('company_email') or '').strip()
+        company_phone = (request.POST.get('company_phone') or '').strip()
+        company_website = (request.POST.get('company_website') or '').strip()
+
+        # Step 2: Address
+        address = (request.POST.get('address') or '').strip()
+        city = (request.POST.get('city') or '').strip()
+        state = (request.POST.get('state') or '').strip()
+        country = (request.POST.get('country') or '').strip()
+        postal_code = (request.POST.get('postal_code') or '').strip()
+
+        # Step 3: Admin User
+        admin_first_name = (request.POST.get('admin_first_name') or '').strip()
+        admin_last_name = (request.POST.get('admin_last_name') or '').strip()
+        admin_email = (request.POST.get('admin_email') or '').strip().lower()
+        admin_phone = (request.POST.get('admin_phone') or '').strip()
+        admin_id_number = (request.POST.get('admin_id_number') or '').strip()
+
+        # Step 4: Authentication
+        password = request.POST.get('password') or ''
+        pw_confirm = request.POST.get('password_confirm') or ''
+
+        errors = []
+
+        # Basic validation
+        if not company_name:
+            errors.append("Company name is required.")
+        if not company_email:
+            errors.append("Company email is required.")
+        if not admin_first_name:
+            errors.append("Admin first name is required.")
+        if not admin_email:
+            errors.append("Admin email is required.")
+        if not password or len(password) < 8:
+            errors.append("Password must be at least 8 characters.")
+        if password != pw_confirm:
+            errors.append("Passwords do not match.")
+
+        # Check if email already exists in User or Application
+        if User.objects.filter(email__iexact=admin_email).exists():
+            errors.append("An account with this email already exists.")
+        if CompanyApplication.objects.filter(admin_email__iexact=admin_email, status='pending').exists():
+            errors.append("An application with this email is already pending review.")
+
+        if errors:
+            for e in errors:
+                messages.error(request, e)
+            return render(request, 'account/apply_company.html', {'post_data': request.POST})
+
+        try:
+            CompanyApplication.objects.create(
+                company_name=company_name,
+                company_pin=company_pin,
+                company_email=company_email,
+                company_phone=company_phone,
+                company_website=company_website,
+                address=address,
+                city=city,
+                state=state,
+                country=country,
+                postal_code=postal_code,
+                admin_first_name=admin_first_name,
+                admin_last_name=admin_last_name,
+                admin_email=admin_email,
+                admin_phone=admin_phone,
+                admin_id_number=admin_id_number,
+                password_hash=make_password(password),
+                status='pending'
+            )
+            messages.success(request, "Application submitted successfully! Our team will review it and contact you shortly.")
+            return redirect('/auth/login/')
+        except Exception as e:
+            logger.exception("Company application failed")
+            messages.error(request, f"An error occurred: {e}")
+            return render(request, 'account/apply_company.html', {'post_data': request.POST})
+
+    return render(request, 'account/apply_company.html')
+
+
+# ============================================
+# COMPANY APPLICATIONS — SUPER ADMIN APPROVAL
+# ============================================
+
+@login_required
+@staff_member_required
+def company_application_list(request):
+    """List pending company applications for super admin review."""
+    if not _is_super_admin(request.user) and not request.user.is_staff:
+        messages.error(request, "Access denied.")
+        return redirect('/dashboard/')
+
+    applications = CompanyApplication.objects.filter(
+        status='pending'
+    ).order_by('-created_at')
+
+    context = {
+        'applications': applications,
+        'page_title': 'Company Applications',
+        'page_subtitle': 'Pending reviews',
+    }
+    return render(request, 'superadmin/company_applications.html', context)
+
+
+@login_required
+@staff_member_required
+def approve_company_application(request, app_id):
+    """Approve a pending company application → create Company + User + Subscription."""
+    if not _is_super_admin(request.user) and not request.user.is_staff:
+        messages.error(request, "Access denied.")
+        return redirect('/dashboard/')
+
+    application = get_object_or_404(CompanyApplication, id=app_id)
+
+    if application.status != 'pending':
+        messages.warning(request, "This application has already been reviewed.")
+        return redirect('companies:company-application-list')
+
+    business_types = BusinessType.objects.filter(is_active=True).order_by('name')
+    plans = Plan.objects.filter(is_active=True).order_by('order', 'price')
+
+    if request.method == 'POST':
+        plan_id = request.POST.get('plan')
+        business_type_id = request.POST.get('business_type')
+        plan = _resolve_plan(plan_id)
+
+        if not plan:
+            messages.error(request, "Please select a valid plan.")
+            return redirect('companies:approve-company-application', app_id=app_id)
+
+        # Collect form data (fall back to application data if missing)
+        name = request.POST.get('name') or application.company_name
+        email = request.POST.get('email') or application.company_email
+        phone = request.POST.get('phone') or application.company_phone
+
+        try:
+            with transaction.atomic():
+                # 1. Create Company
+                company = Company.objects.create(
+                    name=name,
+                    business_type_id=business_type_id or None,
+                    registration_number=request.POST.get('registration_number', application.company_pin),
+                    address=request.POST.get('address', application.address),
+                    city=request.POST.get('city', application.city),
+                    state=request.POST.get('state', application.state),
+                    country=request.POST.get('country', application.country),
+                    postal_code=request.POST.get('postal_code', application.postal_code),
+                    email=email,
+                    phone=phone,
+                    website=request.POST.get('website', application.company_website),
+                    custom_domain=request.POST.get('custom_domain', '') or None,
+                    domain_verified=request.POST.get('domain_verified') == 'on',
+                    plan=plan,
+                    status='active',
+                    is_active=True,
+                    created_by=request.user,
+                )
+
+                # 2. Create Company Admin User
+                User.objects.create(
+                    username=application.admin_email,
+                    email=application.admin_email,
+                    first_name=application.admin_first_name,
+                    last_name=application.admin_last_name,
+                    phone=application.admin_phone,
+                    role='company_admin',
+                    company=company,
+                    password=application.password_hash,
+                    is_verified=True,
+                    is_active=True,
+                )
+
+                # 3. Create Subscription
+                start_dt = _parse_dt(request.POST.get('subscription_start')) or timezone.now()
+                end_dt = _parse_dt(request.POST.get('subscription_end'))
+                
+                if not end_dt:
+                    end_dt = _compute_end_date(plan, start_dt)
+
+                Subscription.objects.create(
+                    company=company,
+                    plan=plan,
+                    start_date=start_dt,
+                    end_date=end_dt,
+                    status=request.POST.get('subscription_status', 'active'),
+                )
+
+                # 4. Update Application Status
+                application.status = 'approved'
+                application.save(update_fields=['status'])
+
+            messages.success(
+                request,
+                f"Company '{company.name}' approved! Admin user '{application.admin_email}' created."
+            )
+            return redirect('companies:company-application-list')
+
+        except Exception as e:
+            logger.exception("Failed to approve company application")
+            messages.error(request, f"Error: {e}")
+
+    context = {
+        'application': application,
+        'business_types': business_types,
+        'plans': plans,
+        'page_title': 'Approve Application',
+        'page_subtitle': application.company_name,
+    }
+    return render(request, 'superadmin/approve_application.html', context)
+
+@login_required
+@staff_member_required
+def reject_company_application(request, app_id):
+    """Reject a pending company application."""
+    if not _is_super_admin(request.user) and not request.user.is_staff:
+        messages.error(request, "Access denied.")
+        return redirect('/dashboard/')
+
+    application = get_object_or_404(CompanyApplication, id=app_id)
+
+    if request.method == 'POST':
+        reason = (request.POST.get('reason') or '').strip()
+        application.status = 'rejected'
+        application.save(update_fields=['status'])
+        messages.success(request, f"Application from '{application.company_name}' rejected.")
+        return redirect('companies:company-application-list')
+
+    context = {
+        'application': application,
+        'page_title': 'Reject Application',
+        'page_subtitle': application.company_name,
+    }
+    return render(request, 'superadmin/reject_application.html', context)
 
 
 # ============================================
@@ -1036,10 +1285,10 @@ def company_payments(request, pk):
     }
     return render(request, 'companies/payments.html', context)
 
+
 # ============================================
 # MANUAL / OFFLINE PAYMENT — RECORD
 # ============================================
-
 
 @login_required
 @require_POST
@@ -1704,7 +1953,6 @@ def company_payments_dev_confirm(request, pk):
     return JsonResponse({'success': True, 'message': 'Marked as paid.'})
 
 
-
 # ============================================
 # COMPANY EMPLOYEES (Super Admin list)
 # ============================================
@@ -1750,8 +1998,6 @@ def company_employee_list(request, company_id):
         'page_subtitle': 'Company employees',
     }
     return render(request, 'companies/employees.html', context)
-
-
 
 
 # ============================================
@@ -1895,8 +2141,6 @@ def tenant_feedback_submit(request):
     return JsonResponse({'ok': True, 'id': fb.id})
 
 
-
-
 # ============================================
 # HUB OWNER FEEDBACK LIST + DETAIL
 # ============================================
@@ -2036,7 +2280,3 @@ def hub_feedback_detail(request, pk):
         'is_hub_owner': True,
     }
     return render(request, 'hub/feedback_detail.html', context)
-
-
-
-    

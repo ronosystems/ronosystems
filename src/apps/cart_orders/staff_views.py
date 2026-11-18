@@ -173,9 +173,8 @@ def mark_order_followed_up(request, order_id):
 @require_POST
 def confirm_order(request, order_id):
     from apps.epa_shop.models import Sale, SaleItem, Customer, BranchStock, Unit
-    from apps.epa_shop.sale_views import _snapshot_cogs  # <--- ADD THIS
+    from apps.epa_shop.sale_views import _snapshot_cogs
     from apps.epa_shop.utils import record_stock_movement
-
 
     company = _get_company(request)
     order = Order.objects.filter(id=order_id, company=company).first()
@@ -186,7 +185,8 @@ def confirm_order(request, order_id):
     try:
         data = json.loads(request.body)
         payment_status = data.get('payment_status', 'paid')
-        selected_units = data.get('selected_units', {}) # e.g. { "1": ["IMEI1", "IMEI2"] }
+        selected_units = data.get('selected_units', {})
+        submitted_quantities = data.get('quantities', {})  # <-- ADD THIS
 
         with transaction.atomic():
             customer, _ = Customer.objects.get_or_create(
@@ -194,11 +194,17 @@ def confirm_order(request, order_id):
                 defaults={'name': order.customer_name, 'email': order.customer_email, 'is_active': True},
             )
 
+            # Recalculate totals based on submitted quantities
+            new_subtotal = Decimal('0.00')
+            for oi in order.items.select_related('content_type'):
+                qty = int(submitted_quantities.get(str(oi.id), oi.quantity))
+                new_subtotal += oi.unit_price * qty
+
             sale = Sale.objects.create(
                 company=company, branch=order.branch, customer=customer,
                 customer_name=order.customer_name, customer_phone=order.customer_phone,
-                customer_email=order.customer_email, total_amount=order.subtotal,
-                net_amount=order.total_amount, payment_status=payment_status,
+                customer_email=order.customer_email, total_amount=new_subtotal,
+                net_amount=new_subtotal, payment_status=payment_status,
                 payment_method=order.payment_method, sold_by=request.user,
                 sale_date=timezone.now(),
             )
@@ -207,16 +213,22 @@ def confirm_order(request, order_id):
 
             for oi in order.items.select_related('content_type'):
                 product = oi.product
-                if product is None: continue
+                if product is None:
+                    continue
+
+                # Get the submitted quantity for this item
+                qty = int(submitted_quantities.get(str(oi.id), oi.quantity))  # <-- USE SUBMITTED QTY
 
                 cat = oi.content_type.model
-                prev_qty = product.units.filter(status='available').count() if cat in ('phone', 'electronic') else product.total_quantity_in_stock
-
+                
                 # Handle Unit selection for Phones/Electronics
                 if cat in ('phone', 'electronic'):
                     unit_ids = selected_units.get(str(oi.id), [])
-                    if len(unit_ids) != oi.quantity:
-                        raise Exception(f"Please select exactly {oi.quantity} unit(s) for {product.name}.")
+                    if len(unit_ids) != qty:  # <-- CHECK AGAINST SUBMITTED QTY
+                        raise Exception(
+                            f"Please select exactly {qty} unit(s) for {product.name}. "
+                            f"You selected {len(unit_ids)}."
+                        )
                     
                     for u_id in unit_ids:
                         unit = Unit.objects.get(id=u_id, status='available')
@@ -227,21 +239,21 @@ def confirm_order(request, order_id):
                         unit.save()
                 else:
                     # Bulk accessories
-                    product.total_quantity_in_stock = max(0, product.total_quantity_in_stock - oi.quantity)
+                    product.total_quantity_in_stock = max(0, product.total_quantity_in_stock - qty)
 
                 product.save(update_fields=['total_quantity_in_stock'])
 
                 BranchStock.objects.filter(
                     company=company, branch=order.branch,
                     content_type=oi.content_type, object_id=oi.object_id,
-                ).update(quantity_in_stock=F('quantity_in_stock') - oi.quantity)
+                ).update(quantity_in_stock=F('quantity_in_stock') - qty)  # <-- USE SUBMITTED QTY
 
-                unit_cost, line_cogs = _snapshot_cogs(product, oi.unit_price, oi.quantity)
+                unit_cost, line_cogs = _snapshot_cogs(product, oi.unit_price, qty)  # <-- USE SUBMITTED QTY
 
                 SaleItem.objects.create(
                     sale=sale, content_type=oi.content_type, object_id=oi.object_id,
-                    item_name=oi.item_name, quantity=oi.quantity,
-                    unit_price=oi.unit_price, total_price=oi.total_price,
+                    item_name=oi.item_name, quantity=qty,  # <-- USE SUBMITTED QTY
+                    unit_price=oi.unit_price, total_price=oi.unit_price * qty,  # <-- USE SUBMITTED QTY
                     unit_cost=unit_cost, cogs_amount=line_cogs,
                 )
                 running_cogs += line_cogs
@@ -259,6 +271,8 @@ def confirm_order(request, order_id):
         import traceback
         traceback.print_exc()
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
 
 # ============================================
 # 4. CANCEL ORDER — requires reason
@@ -457,7 +471,7 @@ def link_sale_page(request, order_id):
             'product': product,
             'is_serialized': oi.content_type.model in ('phone', 'electronic'),
             'available_units': available_units,
-            'available_stock': available_stock, # <--- ADDED THIS
+            'available_stock': available_stock,
         })
 
     context = {

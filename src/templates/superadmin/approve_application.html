@@ -1,0 +1,291 @@
+{% extends 'base.html' %}
+
+{% block title %}Approve Application — {{ application.company_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card { border: 2px solid #000000; border-radius: 4px; box-shadow: none; }
+    .card-body { color: #000000; }
+    .form-control, .form-select {
+        border: 2px solid #000000; border-radius: 4px; background: white; color: #000000;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #87CEEB; box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .form-label { color: #000000; font-weight: 600; }
+    .form-label.required:after { content: " *"; color: #dc3545; font-weight: bold; }
+
+    .btn-primary {
+        background-color: #87CEEB; border: 2px solid #000000;
+        color: #000000; border-radius: 4px; font-weight: 600;
+    }
+    .btn-primary:hover {
+        background-color: #7bb8d8; border-color: #000000;
+        color: #000000; transform: translateY(-2px);
+    }
+    .btn-secondary {
+        background-color: #f8f9fa; border: 2px solid #000000;
+        color: #000000; border-radius: 4px; font-weight: 600;
+    }
+    .btn-secondary:hover { background-color: #87CEEB; border-color: #000000; color: #000000; }
+
+    .form-section-title {
+        background: #87CEEB;
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 6px 12px;
+        margin: 18px 0 12px 0;
+        font-weight: 700;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .plan-preview {
+        border: 2px dashed #000000;
+        border-radius: 4px;
+        padding: 10px 14px;
+        background: #f8f9fa;
+        font-size: 13px;
+        margin-top: 6px;
+    }
+    .plan-preview .price { font-weight: 700; font-size: 15px; }
+    .plan-preview .feat-list { list-style: none; padding-left: 0; margin: 6px 0 0 0; }
+    .plan-preview .feat-list li { padding: 1px 0; }
+    .plan-preview .feat-list li i { color: #28a745; margin-right: 6px; }
+
+    .application-summary {
+        background: #fff3cd;
+        border: 2px solid #ffc107;
+        border-radius: 4px;
+        padding: 12px;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-10 mx-auto">
+        
+        <!-- Application Summary -->
+        <div class="application-summary">
+            <h5 class="mb-2"><i class="fas fa-file-signature"></i> Application Summary</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <strong>Applicant:</strong> {{ application.admin_first_name }} {{ application.admin_last_name }}<br>
+                    <strong>Email:</strong> {{ application.admin_email }}<br>
+                    <strong>Phone:</strong> {{ application.admin_phone }}
+                </div>
+                <div class="col-md-6">
+                    <strong>Company PIN:</strong> {{ application.company_pin }}<br>
+                    <strong>Applied On:</strong> {{ application.created_at|date:"M d, Y H:i" }}<br>
+                    <strong>Status:</strong> <span class="badge bg-warning text-dark">Pending</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body p-4">
+                <form method="post" id="companyForm">
+                    {% csrf_token %}
+
+                    <!-- COMPANY DETAILS -->
+                    <div class="form-section-title">
+                        <i class="fas fa-building"></i> Company Details
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">Company Name</label>
+                            <input type="text" class="form-control" name="name" value="{{ application.company_name }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Business Type</label>
+                            <select class="form-select" name="business_type">
+                                <option value="">Select Business Type...</option>
+                                {% for bt in business_types %}
+                                <option value="{{ bt.id }}">{{ bt.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Registration Number / PIN</label>
+                            <input type="text" class="form-control" name="registration_number" value="{{ application.company_pin }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="email" value="{{ application.company_email }}">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Phone</label>
+                            <input type="text" class="form-control" name="phone" value="{{ application.company_phone }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Website</label>
+                            <input type="url" class="form-control" name="website" value="{{ application.company_website }}" placeholder="https://example.com">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Address</label>
+                        <textarea class="form-control" name="address" rows="2">{{ application.address }}</textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">City</label>
+                            <input type="text" class="form-control" name="city" value="{{ application.city }}">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">State/Province</label>
+                            <input type="text" class="form-control" name="state" value="{{ application.state }}">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Country</label>
+                            <input type="text" class="form-control" name="country" value="{{ application.country }}">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Postal Code</label>
+                            <input type="text" class="form-control" name="postal_code" value="{{ application.postal_code }}">
+                        </div>
+                    </div>
+
+                    <!-- CUSTOM DOMAIN -->
+                    <div class="form-section-title">
+                        <i class="fas fa-globe"></i> Custom Domain (Optional)
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">Custom Domain</label>
+                            <input type="text" class="form-control" name="custom_domain" placeholder="e.g., clientcompany.co.ke">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label d-block">DNS Verification</label>
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" name="domain_verified" id="domainVerified">
+                                <label class="form-check-label" for="domainVerified">Verified (DNS is live)</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SUBSCRIPTION -->
+                    <div class="form-section-title">
+                        <i class="fas fa-crown"></i> Subscription & Plan
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">Plan</label>
+                            <select class="form-select" name="plan" id="planSelect" required>
+                                {% for plan in plans %}
+                                <option value="{{ plan.id }}"
+                                        data-price="{{ plan.price }}"
+                                        data-currency="{{ plan.currency }}"
+                                        data-cycle="{{ plan.get_billing_cycle_display }}"
+                                        data-desc="{{ plan.description }}"
+                                        data-max-emp="{{ plan.max_employees }}"
+                                        data-max-branch="{{ plan.max_branches }}"
+                                        data-storage="{{ plan.max_storage }}"
+                                        data-api="{{ plan.has_api_access|yesno:'1,0' }}"
+                                        data-reports="{{ plan.has_advanced_reports|yesno:'1,0' }}"
+                                        data-branding="{{ plan.has_custom_branding|yesno:'1,0' }}"
+                                        data-support="{{ plan.has_priority_support|yesno:'1,0' }}"
+                                        data-bulk="{{ plan.has_bulk_import|yesno:'1,0' }}"
+                                        data-domain="{{ plan.has_custom_domain|yesno:'1,0' }}"
+                                        data-mpesa="{{ plan.has_mpesa_integration|yesno:'1,0' }}"
+                                        {% if plan.name == 'free' %}selected{% endif %}>
+                                    {{ plan.display_name }} — {{ plan.currency }} {{ plan.price }}/{{ plan.get_billing_cycle_display }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="plan-preview" id="planPreview"></div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">Subscription Start</label>
+                            <input type="datetime-local" class="form-control" name="subscription_start" id="subStart">
+
+                            <label class="form-label mt-3">Subscription End</label>
+                            <input type="datetime-local" class="form-control" name="subscription_end" id="subEnd">
+                            <small class="text-muted">Leave blank for lifetime / auto-compute based on plan.</small>
+
+                            <label class="form-label mt-3">Status</label>
+                            <select class="form-select" name="subscription_status">
+                                <option value="active" selected>Active</option>
+                                <option value="pending">Pending</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-check-circle"></i> Approve & Create Company
+                        </button>
+                        <a href="{% url 'companies:company-application-list' %}" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const planSelect = document.getElementById('planSelect');
+    const preview = document.getElementById('planPreview');
+    const subStart = document.getElementById('subStart');
+
+    if (subStart && !subStart.value) {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        subStart.value = now.toISOString().slice(0, 16);
+    }
+
+    function renderPreview() {
+        const opt = planSelect.options[planSelect.selectedIndex];
+        if (!opt) { preview.innerHTML = ''; return; }
+
+        const price = opt.dataset.price || '0';
+        const currency = opt.dataset.currency || '';
+        const cycle = opt.dataset.cycle || '';
+        const desc = opt.dataset.desc || '';
+        const maxEmp = opt.dataset.maxEmp || '-';
+        const maxBranch = opt.dataset.maxBranch || '-';
+        const storage = opt.dataset.storage || '-';
+
+        const feats = [];
+        if (opt.dataset.api === '1') feats.push('API Access');
+        if (opt.dataset.reports === '1') feats.push('Advanced Reports');
+        if (opt.dataset.branding === '1') feats.push('Custom Branding');
+        if (opt.dataset.support === '1') feats.push('Priority Support');
+        if (opt.dataset.bulk === '1') feats.push('Bulk Import');
+        if (opt.dataset.domain === '1') feats.push('Custom Domain');
+        if (opt.dataset.mpesa === '1') feats.push('M-Pesa Integration');
+
+        let html = `
+            <div class="price">${currency} ${price} <span style="font-weight:400;">/ ${cycle}</span></div>
+            ${desc ? `<div style="margin-top:4px;">${desc}</div>` : ''}
+            <div style="margin-top:6px;">
+                <strong>Limits:</strong> ${maxEmp} employees · ${maxBranch} branches · ${storage} MB storage
+            </div>
+        `;
+        if (feats.length) {
+            html += `<ul class="feat-list">${feats.map(f => `<li><i class="fas fa-check"></i>${f}</li>`).join('')}</ul>`;
+        }
+        preview.innerHTML = html;
+    }
+
+    planSelect.addEventListener('change', renderPreview);
+    renderPreview();
+})();
+</script>
+{% endblock %}

@@ -41,6 +41,7 @@ urlpatterns = [
     # ============================================
     path('auth/', include('allauth.urls')),
     path('auth/', include('apps.accounts.web_urls', namespace='web_accounts')),
+    path('auth/apply-company/', views_guest.apply_company, name='apply_company'),
 
     # ============================================
     # WEB INTERFACE
@@ -66,9 +67,9 @@ urlpatterns = [
     path('workshop/', include('apps.workshop.urls', namespace='workshop')),
     path('mpesa/', include('apps.mpesa.urls')),
     path('ai/chatbot/', include('apps.ai_chatbot.urls')),
-    path('dashboard/contact-messages/', admin_contact_messages, name='admin_contact_messages'),
-    path('dashboard/contact-messages/delete/', views.delete_contact_messages, name='delete_contact_messages'),
-    path('dashboard/notifications/', views.notification_center, name='notification_center'),
+    path('contact-messages/', admin_contact_messages, name='admin_contact_messages'),
+    path('contact-messages/delete/', views.delete_contact_messages, name='delete_contact_messages'),
+    path('notifications/', views.notification_center, name='notification_center'),
 
     # ============================================
     # API ENDPOINTS

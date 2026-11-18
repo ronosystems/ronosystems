@@ -75,6 +75,18 @@ SETTINGS_SCHEMA = [
     {'key': 'HERO_VIDEO_POSTER', 'type': 'image', 'category': 'branding',
      'label': 'Hero Video Thumbnail', 'default': '', 'order': 9,
      'help_text': 'Optional. Shown before the hero video plays. 1280×720px.'},
+    {'key': 'SYSTEM_HERO_VIDEO', 'type': 'video', 'category': 'branding',
+     'label': 'System Hero Video (Contact Page)', 'default': '', 'order': 10,
+     'help_text': 'MP4 or WebM. Auto-plays on the main contact page.'},
+    {'key': 'SYSTEM_HERO_IMAGE', 'type': 'image', 'category': 'branding',
+     'label': 'System Hero Fallback Image', 'default': '', 'order': 11,
+     'help_text': 'JPG or PNG. Shown if the video fails to load.'},
+    {'key': 'SYSTEM_HERO_TITLE', 'type': 'text', 'category': 'branding',
+     'label': 'System Hero Title', 'default': '', 'order': 12,
+     'help_text': 'Leave blank to use System Name.'},
+    {'key': 'SYSTEM_HERO_SUBTITLE', 'type': 'text', 'category': 'branding',
+     'label': 'System Hero Subtitle', 'default': '', 'order': 13,
+     'help_text': 'Text shown below the title on the contact page.'},
 
     # --- Email ---
     {'key': 'EMAIL_HOST', 'type': 'text', 'category': 'email',

@@ -18,6 +18,15 @@ urlpatterns = [
         name='mpesa-callback',
     ),
 
+    # Public: Company Application Flow
+    path('apply/', web_views.apply_company, name='apply-company'),
+
+    # Super Admin: Review Applications
+    path('applications/', web_views.company_application_list, name='company-application-list'),
+    path('applications/<int:app_id>/approve/', web_views.approve_company_application, name='approve-company-application'),
+    path('applications/<int:app_id>/reject/', web_views.reject_company_application, name='reject-company-application'),
+
+
     # ============================================
     # COMPANY MANAGEMENT (Super Admin)
     # ============================================

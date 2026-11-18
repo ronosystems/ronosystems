@@ -1,0 +1,551 @@
+{% extends "web_base.html" %}
+{% load static %}
+
+{% block title %}Apply for Company Account{% endblock %}
+{% block marquee_text %}Register Your Business With {{ system_name|default:"RonoSystems" }}{% endblock %}
+{% block breadcrumb %}Apply{% endblock %}
+
+{% block content %}
+<div class="login-bg-panel">
+    <div class="panel-header">
+        <i class="fas fa-building me-1"></i> Company Registration
+    </div>
+    <div class="panel-body">
+
+        <!-- ALERTS -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert {% if message.tags == 'success' %}success{% elif message.tags == 'info' %}info{% endif %}">
+                    <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-circle{% else %}info-circle{% endif %}"></i>
+                    <span>{{ message }}</span>
+                    <button type="button" class="btn-close" onclick="this.parentElement.remove()">×</button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- APPLICATION CARD -->
+        <div class="login-card">
+
+            <!-- LEFT PANEL — Welcome + Login -->
+            <div class="login-left">
+                <div class="logo-wrap">
+                    {% if site_logo_url %}
+                        <img src="{{ site_logo_url }}" alt="{{ system_name|default:'RonoSystems' }}">
+                    {% else %}
+                        <i class="fas fa-rocket"></i>
+                    {% endif %}
+                </div>
+                <h1 class="welcome-title">Grow With Us</h1>
+                <p class="welcome-sub">Already have an account?</p>
+                <a href="{% url 'account_login' %}" class="btn-register">Sign In</a>
+            </div>
+
+            <!-- RIGHT PANEL — Wizard Form -->
+            <div class="login-right">
+                <h2 class="form-title" style="margin-bottom: 10px;">Apply Now</h2>
+
+                <!-- Progress Bar -->
+                <div class="progress mb-4" style="height: 8px; border-radius: 10px; background: #e5e7eb;">
+                    <div class="progress-bar" id="progressBar" role="progressbar" 
+                         style="width: 25%; background: linear-gradient(90deg, var(--nav-bg-bottom) 0%, var(--nav-bg-top) 100%); border-radius: 10px;"></div>
+                </div>
+
+                <form method="post" id="wizardForm">
+                    {% csrf_token %}
+
+                    <!-- STEP 1: Company Info -->
+                    <div class="step" id="step1">
+                        <h5 class="mb-3" style="font-size: 1rem; font-weight: 600;">Company Info</h5>
+                        
+                        <div class="login-field">
+                            <input type="text" name="company_name" placeholder="Company Name *" required value="{{ post_data.company_name|default:'' }}">
+                            <i class="fas fa-building field-icon"></i>
+                        </div>
+                        
+                        <div class="login-field">
+                            <input type="text" name="company_pin" placeholder="Registration / PIN *" required value="{{ post_data.company_pin|default:'' }}">
+                            <i class="fas fa-id-card field-icon"></i>
+                        </div>
+                        
+                        <div class="login-field">
+                            <input type="email" name="company_email" placeholder="Company Email *" required value="{{ post_data.company_email|default:'' }}">
+                            <i class="fas fa-envelope field-icon"></i>
+                        </div>
+                        
+                        <div class="login-field">
+                            <input type="tel" name="company_phone" placeholder="Phone *" required value="{{ post_data.company_phone|default:'' }}">
+                            <i class="fas fa-phone field-icon"></i>
+                        </div>
+                        
+                        <div class="login-field">
+                            <input type="url" name="company_website" placeholder="Website (Optional)" value="{{ post_data.company_website|default:'' }}">
+                            <i class="fas fa-globe field-icon"></i>
+                        </div>
+
+                        <button type="button" class="btn-login-gradient" onclick="nextStep(2)">
+                            Next <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+
+                    <!-- STEP 2: Address -->
+                    <div class="step" id="step2" style="display:none;">
+                        <h5 class="mb-3" style="font-size: 1rem; font-weight: 600;">Company Address</h5>
+                        
+                        <div class="login-field">
+                            <input type="text" name="address" placeholder="Address *" required value="{{ post_data.address|default:'' }}">
+                            <i class="fas fa-map-marker-alt field-icon"></i>
+                        </div>
+                        
+                        <div class="login-field">
+                            <input type="text" name="city" placeholder="City *" required value="{{ post_data.city|default:'' }}">
+                            <i class="fas fa-city field-icon"></i>
+                        </div>
+                        
+                        <div class="login-field">
+                            <input type="text" name="state" placeholder="State / Province *" required value="{{ post_data.state|default:'' }}">
+                            <i class="fas fa-map field-icon"></i>
+                        </div>
+                        
+                        <div class="login-field">
+                            <input type="text" name="country" placeholder="Country *" required value="{{ post_data.country|default:'' }}">
+                            <i class="fas fa-flag field-icon"></i>
+                        </div>
+                        
+                        <div class="login-field">
+                            <input type="text" name="postal_code" placeholder="Postal Code" value="{{ post_data.postal_code|default:'' }}">
+                            <i class="fas fa-mail-bulk field-icon"></i>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn-secondary-light w-50" onclick="prevStep(1)" style="border-radius: 50px; border: 1px solid #d1d5db; color: #4b5563; padding: 12px;">
+                                <i class="fas fa-arrow-left"></i> Back
+                            </button>
+                            <button type="button" class="btn-login-gradient w-50" onclick="nextStep(3)">
+                                Next <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- STEP 3: Admin User -->
+                    <div class="step" id="step3" style="display:none;">
+                        <h5 class="mb-3" style="font-size: 1rem; font-weight: 600;">Company Admin</h5>
+                        
+                        <div class="login-field">
+                            <input type="text" name="admin_first_name" placeholder="First Name *" required value="{{ post_data.admin_first_name|default:'' }}">
+                            <i class="fas fa-user field-icon"></i>
+                        </div>
+                        
+                        <div class="login-field">
+                            <input type="text" name="admin_last_name" placeholder="Last Name *" required value="{{ post_data.admin_last_name|default:'' }}">
+                            <i class="fas fa-user field-icon"></i>
+                        </div>
+                        
+                        <div class="login-field">
+                            <input type="email" name="admin_email" placeholder="Email *" required value="{{ post_data.admin_email|default:'' }}">
+                            <i class="fas fa-envelope field-icon"></i>
+                        </div>
+                        
+                        <div class="login-field">
+                            <input type="tel" name="admin_phone" placeholder="Phone *" required value="{{ post_data.admin_phone|default:'' }}">
+                            <i class="fas fa-phone field-icon"></i>
+                        </div>
+                        
+                        <div class="login-field">
+                            <input type="text" name="admin_id_number" placeholder="ID Number (Optional)" value="{{ post_data.admin_id_number|default:'' }}">
+                            <i class="fas fa-id-card field-icon"></i>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn-secondary-light w-50" onclick="prevStep(2)" style="border-radius: 50px; border: 1px solid #d1d5db; color: #4b5563; padding: 12px;">
+                                <i class="fas fa-arrow-left"></i> Back
+                            </button>
+                            <button type="button" class="btn-login-gradient w-50" onclick="nextStep(4)">
+                                Next <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- STEP 4: Authentication -->
+                    <div class="step" id="step4" style="display:none;">
+                        <h5 class="mb-3" style="font-size: 1rem; font-weight: 600;">Create Password</h5>
+                        
+                        <div class="login-field">
+                            <input type="password" name="password" id="password" placeholder="New Password *" required minlength="8">
+                            <button class="password-toggle" type="button" onclick="togglePassword('password')" tabindex="-1">
+                                <i class="fas fa-lock"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="login-field">
+                            <input type="password" name="password_confirm" id="password_confirm" placeholder="Confirm Password *" required>
+                            <button class="password-toggle" type="button" onclick="togglePassword('password_confirm')" tabindex="-1">
+                                <i class="fas fa-lock"></i>
+                            </button>
+                        </div>
+
+                        <div class="d-flex gap-2 mt-3">
+                            <button type="button" class="btn-secondary-light w-50" onclick="prevStep(3)" style="border-radius: 50px; border: 1px solid #d1d5db; color: #4b5563; padding: 12px;">
+                                <i class="fas fa-arrow-left"></i> Back
+                            </button>
+                            <button type="submit" class="btn-login-gradient w-50">
+                                <i class="fas fa-paper-plane"></i> Submit
+                            </button>
+                        </div>
+                    </div>
+
+                </form>
+            </div>
+
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+/* ============================================
+   LOGIN PANEL — with background image
+============================================ */
+.login-bg-panel {
+    position: relative;
+    background-color: #ffffff;
+    border: 1px solid var(--ff-border);
+    margin-bottom: 25px;
+    box-shadow: 0 1px 3px rgb(0, 0, 0);
+    overflow: hidden;
+    border-radius: 4px;
+}
+
+/* Background image layer */
+.login-bg-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    {% if login_background_url %}
+        background: url('{{ login_background_url }}') center center / cover no-repeat;
+    {% else %}
+        background: linear-gradient(135deg, #e8f2f7 0%, #d5e6ef 100%);
+    {% endif %}
+}
+
+/* Dimming overlay */
+.login-bg-panel::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: linear-gradient(
+        135deg,
+        rgba(240, 244, 247, 0.2) 0%,
+        rgba(240, 244, 247, 0.4) 100%
+    );
+    pointer-events: none;
+}
+
+.login-bg-panel > * {
+    position: relative;
+    z-index: 1;
+}
+
+.login-bg-panel .panel-header {
+    background: rgba(230, 230, 230, 0.92);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding: 8px 15px;
+    border-bottom: 1px solid var(--ff-border);
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    color: #333;
+}
+
+.login-bg-panel .panel-body {
+    padding: 30px 20px 40px;
+}
+
+/* ============================================
+   LOGIN CARD
+============================================ */
+.login-card {
+    display: flex;
+    width: 100%;
+    max-width: 900px;
+    min-height: 500px;
+    margin: 0 auto;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow:
+        0 20px 50px rgb(0, 0, 0),
+        0 5px 15px rgb(0, 0, 0);
+    overflow: hidden;
+    position: relative;
+    z-index: 2;
+}
+
+/* LEFT PANEL */
+.login-left {
+    flex: 1;
+    background: linear-gradient(160deg, var(--nav-bg-top) 0%, var(--nav-bg-bottom) 100%);
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 40px 30px;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+    border-top-right-radius: 55% 100%;
+    border-bottom-right-radius: 55% 100%;
+}
+
+.login-left .logo-wrap {
+    width: 90px;
+    height: 90px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 18px;
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 8px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+}
+.login-left .logo-wrap img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+.login-left .logo-wrap i {
+    font-size: 2.2rem;
+    color: var(--nav-bg-bottom);
+}
+
+.login-left .welcome-title {
+    font-size: 2.1rem;
+    font-weight: 800;
+    margin: 0 0 8px 0;
+    color: #ffffff;
+}
+
+.login-left .welcome-sub {
+    font-size: 0.95rem;
+    font-weight: 400;
+    opacity: 0.95;
+    margin-bottom: 26px;
+    color: #ffffff;
+}
+
+.login-left .btn-register {
+    display: inline-block;
+    padding: 12px 48px;
+    border: 2px solid #ffffff;
+    border-radius: 50px;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.95rem;
+    text-decoration: none;
+    background: transparent;
+    transition: all 0.25s ease;
+}
+.login-left .btn-register:hover {
+    background: var(--nav-border-green);
+    border-color: var(--nav-border-green);
+    color: var(--nav-bg-bottom);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* RIGHT PANEL */
+.login-right {
+    flex: 1;
+    padding: 50px 45px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: #ffffff;
+}
+
+.login-right .form-title {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--nav-bg-bottom);
+    text-align: center;
+    margin: 0 0 28px 0;
+}
+
+.login-field {
+    display: flex;
+    align-items: center;
+    background: #f3f4f6;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    border: 1px solid transparent;
+}
+.login-field:focus-within {
+    background: #f9fafb;
+    border-color: var(--nav-bg-top);
+    box-shadow: 0 0 0 3px rgba(45, 95, 124, 0.15);
+}
+.login-field input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-family: 'Open Sans', Arial, sans-serif;
+    font-size: 0.9rem;
+    color: #1f2937;
+    outline: none;
+    min-width: 0;
+}
+.login-field input::placeholder {
+    color: #9ca3af;
+    font-weight: 400;
+}
+.login-field .field-icon {
+    color: #4b5563;
+    font-size: 1rem;
+    margin-left: 12px;
+    flex-shrink: 0;
+}
+.login-field .password-toggle {
+    background: transparent;
+    border: none;
+    color: #4b5563;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 10px;
+    font-size: 1rem;
+}
+.login-field .password-toggle:hover { color: var(--nav-bg-bottom); }
+
+.btn-login-gradient {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 50px;
+    background: linear-gradient(90deg, var(--nav-bg-bottom) 0%, var(--nav-bg-top) 100%);
+    color: #ffffff;
+    font-family: 'Open Sans', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    text-transform: capitalize;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 6px 18px rgba(30, 78, 109, 0.25);
+    margin-top: 10px;
+}
+.btn-login-gradient:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 26px rgba(30, 78, 109, 0.35);
+}
+.btn-login-gradient:active { transform: translateY(0); }
+
+.btn-secondary-light {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px 28px;
+    border: 1px solid #d1d5db;
+    border-radius: 50px;
+    color: #4b5563;
+    font-weight: 500;
+    font-size: 0.88rem;
+    text-decoration: none;
+    background: #ffffff;
+    transition: all 0.2s ease;
+}
+.btn-secondary-light:hover {
+    border-color: var(--nav-bg-top);
+    color: var(--nav-bg-bottom);
+    background: #f0f7fa;
+}
+
+.alert {
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+.alert.success { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
+.alert.info    { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
+.alert .btn-close {
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: inherit;
+    font-size: 1rem;
+    opacity: 0.6;
+}
+.alert .btn-close:hover { opacity: 1; }
+
+@media (max-width: 768px) {
+    .login-bg-panel .panel-body { padding: 20px 12px 25px; }
+    .login-card {
+        flex-direction: column;
+        max-width: 440px;
+        min-height: auto;
+        border-radius: 22px;
+    }
+    .login-left {
+        border-top-right-radius: 22px;
+        border-top-left-radius: 22px;
+        border-bottom-right-radius: 40px;
+        border-bottom-left-radius: 40px;
+        padding: 32px 24px;
+        min-height: 240px;
+    }
+    .login-left .logo-wrap { width: 70px; height: 70px; margin-bottom: 12px; }
+    .login-left .welcome-title { font-size: 1.6rem; }
+    .login-left .welcome-sub { margin-bottom: 18px; font-size: 0.85rem; }
+    .login-left .btn-register { padding: 10px 34px; font-size: 0.85rem; }
+
+    .login-right { padding: 34px 24px; }
+    .login-right .form-title { font-size: 1.6rem; margin-bottom: 22px; }
+}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function nextStep(step) {
+        document.querySelectorAll('.step').forEach(el => el.style.display = 'none');
+        document.getElementById('step' + step).style.display = 'block';
+        document.getElementById('progressBar').style.width = (step * 25) + '%';
+    }
+
+    function prevStep(step) {
+        document.querySelectorAll('.step').forEach(el => el.style.display = 'none');
+        document.getElementById('step' + step).style.display = 'block';
+        document.getElementById('progressBar').style.width = (step * 25) + '%';
+    }
+
+    function togglePassword(inputId) {
+        const input = document.getElementById(inputId);
+        const toggleBtn = input.nextElementSibling;
+        const icon = toggleBtn.querySelector('i');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-lock');
+            icon.classList.add('fa-eye');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-lock');
+        }
+    }
+</script>
+{% endblock %}
