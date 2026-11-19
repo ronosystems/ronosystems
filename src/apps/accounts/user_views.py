@@ -223,7 +223,7 @@ def employee_create(request):
                 request,
                 f'Employee {employee.get_full_name() or employee.username} created successfully!'
             )
-            return redirect('employees:superadmin-employee-list')
+            return redirect('users:superadmin-employee-list')
 
         except Exception as e:
             messages.error(request, f'Error creating employee: {e}')
@@ -333,7 +333,7 @@ def employee_edit(request, pk):
                 request,
                 f'Employee {employee.get_full_name() or employee.username} updated successfully!'
             )
-            return redirect('employees:superadmin-employee-list')
+            return redirect('users:superadmin-employee-list')
 
         except Exception as e:
             messages.error(request, f'Error updating employee: {e}')
@@ -357,7 +357,7 @@ def employee_toggle_status(request, pk):
         # Prevent a super admin from deactivating themselves
         if employee.pk == request.user.pk:
             messages.error(request, 'You cannot change your own status.')
-            return redirect('employees:superadmin-employee-list')
+            return redirect('users:superadmin-employee-list')
 
         employee.is_active = not employee.is_active
         employee.save(update_fields=['is_active'])
@@ -367,7 +367,7 @@ def employee_toggle_status(request, pk):
             f'Employee {employee.get_full_name() or employee.username} has been {status}.'
         )
 
-    return redirect('employees:superadmin-employee-list')
+    return redirect('users:superadmin-employee-list')
 
 
 # ============================================
@@ -383,14 +383,14 @@ def employee_delete(request, pk):
     # Prevent self-deletion
     if employee.pk == request.user.pk:
         messages.error(request, 'You cannot delete your own account.')
-        return redirect('employees:superadmin-employee-list')
+        return redirect('users:superadmin-employee-list')
 
     if request.method == 'POST':
         try:
             name = employee.get_full_name() or employee.username
             employee.delete()
             messages.success(request, f'Employee {name} deleted successfully!')
-            return redirect('employees:superadmin-employee-list')
+            return redirect('users:superadmin-employee-list')
         except Exception as e:
             messages.error(request, f'Error deleting employee: {e}')
 

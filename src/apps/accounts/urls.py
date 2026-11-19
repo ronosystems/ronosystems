@@ -3,7 +3,7 @@ from django.urls import path
 from . import views
 from . import role_views
 
-app_name = 'api_accounts'   # <--- ADD THIS LINE
+app_name = 'api_accounts'  
 
 urlpatterns = [
     # AUTHENTICATION

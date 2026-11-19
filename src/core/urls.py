@@ -48,6 +48,7 @@ urlpatterns = [
     # ============================================
     path('dashboard/', include('apps.company.dashboard_urls')),
     path('company/', include('apps.company.urls_web')),
+    path('company/', include('apps.accounts.staff_urls')),
     path('epa_shop/', include('apps.epa_shop.urls_web')),
     path('cart/', include('apps.cart_orders.urls', namespace='cart-orders')),
     path('kuku_biz/', include('apps.kuku_biz.urls')),
@@ -56,7 +57,7 @@ urlpatterns = [
     path('subscription-expired/', company_views.subscription_expired, name='subscription-expired'),
     path('payments/kcb/callback/', company_views.company_payments_callback, name='kcb-callback'),
     path('companies/', include('apps.companies.web_urls')),
-    path('employees/', include('apps.employees.web_urls')),
+    path('users/', include('apps.accounts.user_urls')),
     path('losses/', include('apps.losses.urls', namespace='losses')),
     path('treasury/', include('apps.treasury.urls')),
     path('plans/', include('apps.plans.urls')),

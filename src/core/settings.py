@@ -122,7 +122,6 @@ INSTALLED_APPS = [
 
     # Custom Apps
     'apps.accounts',
-    'apps.employees',
     'apps.business_types',
     'apps.companies',
     'apps.company',
