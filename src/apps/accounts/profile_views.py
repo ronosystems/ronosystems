@@ -5,6 +5,7 @@ from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.forms import PasswordChangeForm
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth import logout
 import time
 import cloudinary
 import cloudinary.uploader
@@ -38,8 +39,15 @@ def profile_view(request):
         'page_title': 'Profile',
         'page_subtitle': 'Manage your profile',
     }
-    return render(request, 'accounts/profile.html', context)
+    return render(request, 'account/profile.html', context)
 
+
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.shortcuts import redirect
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 @login_required
 def profile_update(request):
@@ -52,9 +60,9 @@ def profile_update(request):
         email = request.POST.get('email', '').strip()
         phone = request.POST.get('phone', '').strip()
         address = request.POST.get('address', '').strip()
-        department = request.POST.get('department', '').strip()
-        position = request.POST.get('position', '').strip()
-        employee_id = request.POST.get('employee_id', '').strip()
+        
+        # ✅ FIX: Look for 'staff_id' instead of 'employee_id'
+        staff_id = request.POST.get('staff_id', '').strip()
 
         if email and email != user.email:
             if User.objects.filter(email=email).exists():
@@ -66,15 +74,17 @@ def profile_update(request):
         user.last_name = last_name
         user.phone = phone
         user.address = address
-        user.department = department
-        user.position = position
-        user.employee_id = employee_id
+        
+        # ✅ FIX: Save to the model field 'staff_id'
+        user.staff_id = staff_id
+        
         user.save()
 
         messages.success(request, 'Profile updated successfully!')
         return redirect('/profile/')
 
     return redirect('/profile/')
+
 
 
 # ============================================================
@@ -164,6 +174,19 @@ def profile_picture_remove(request):
     user.save()
 
     messages.success(request, 'Profile picture removed successfully!')
+    return redirect('/profile/')
+
+
+@login_required
+def account_delete(request):
+    """Allow a user to delete their own account."""
+    if request.method == 'POST':
+        user = request.user
+        user.delete()
+        logout(request)
+        messages.success(request, 'Your account has been deleted successfully.')
+        return redirect('home') # or your login page
+        
     return redirect('/profile/')
 
 

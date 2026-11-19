@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}Delete {{ employee.get_full_name|default:employee.username }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-lg-6 mx-auto">
+            <div class="card shadow-sm border-0" style="border-top: 4px solid #dc3545;">
+                <div class="card-header bg-white pb-0 pt-4 border-0">
+                    <h4 class="mb-0 text-danger fw-bold text-center">
+                        <i class="fas fa-exclamation-triangle me-2"></i> Confirm Deletion
+                    </h4>
+                    <p class="text-center text-muted mt-2">This action cannot be undone. All data for this user will be permanently removed.</p>
+                </div>
+                <div class="card-body p-4">
+                    
+                    <div class="alert alert-warning border-warning" style="background-color: #fffbeb;">
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <small class="text-muted d-block">Full Name</small>
+                                <strong class="text-dark">{{ employee.get_full_name|default:employee.username }}</strong>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block">Email Address</small>
+                                <strong class="text-dark">{{ employee.email }}</strong>
+                            </div>
+                            
+                            <div class="col-6">
+                                <small class="text-muted d-block">Role</small>
+                                <span class="badge bg-secondary">{{ employee.get_role_display }}</span>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block">Company</small>
+                                <strong class="text-dark">
+                                    {% if employee.company %}
+                                        {{ employee.company.name }}
+                                    {% else %}
+                                        <span class="text-muted fst-italic">System User</span>
+                                    {% endif %}
+                                </strong>
+                            </div>
+                            
+                            <div class="col-6">
+                                <small class="text-muted d-block">Account Status</small>
+                                {% if employee.is_active %}
+                                    <span class="badge bg-success">Active</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Inactive</span>
+                                {% endif %}
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block">Date Joined</small>
+                                <strong class="text-dark">{{ employee.date_joined|date:"M d, Y" }}</strong>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-flex gap-2 justify-content-center mt-4">
+                            <a href="{% url 'employees:superadmin-employee-list' %}" class="btn btn-light border px-4">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-danger px-4 fw-bold">
+                                <i class="fas fa-trash"></i> Yes, Delete User
+                            </button>
+                        </div>
+                    </form>
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

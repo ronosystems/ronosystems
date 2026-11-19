@@ -1,5 +1,5 @@
 # apps/employees/employee_views.py
-# Super Admin Employee Management
+# Super Admin Employee Management  site only
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
@@ -37,55 +37,21 @@ def get_active_branches():
     return Branch.objects.filter(is_active=True).order_by('name')
 
 
-# ============================================
-# LIST
-# ============================================
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from django.contrib.admin.views.decorators import staff_member_required
+from django.db.models import Q
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 @login_required
 @staff_member_required
 def employee_list(request):
     """List all users/employees with search and filters (Super Admin)."""
 
+    # Fetch ALL users so the JavaScript can do live filtering across the entire database
     users = User.objects.select_related('company', 'branch').order_by('-date_joined')
-
-    # ---- Search ----
-    search_query = request.GET.get('search', '').strip()
-    if search_query:
-        users = users.filter(
-            Q(first_name__icontains=search_query) |
-            Q(last_name__icontains=search_query) |
-            Q(email__icontains=search_query) |
-            Q(username__icontains=search_query) |
-            Q(phone__icontains=search_query) |
-            Q(staff_id__icontains=search_query)
-        )
-
-    # ---- Filters ----
-    role_filter = request.GET.get('role', '').strip()
-    if role_filter:
-        users = users.filter(role=role_filter)
-
-    company_filter = request.GET.get('company', '').strip()
-    if company_filter:
-        users = users.filter(company_id=company_filter)
-
-    business_type_filter = request.GET.get('business_type', '').strip()
-    if business_type_filter:
-        users = users.filter(company__business_type_id=business_type_filter)
-
-    branch_filter = request.GET.get('branch', '').strip()
-    if branch_filter:
-        users = users.filter(branch_id=branch_filter)
-
-    status_filter = request.GET.get('status', '').strip()
-    if status_filter == 'active':
-        users = users.filter(is_active=True)
-    elif status_filter == 'inactive':
-        users = users.filter(is_active=False)
-    elif status_filter == 'verified':
-        users = users.filter(is_verified=True)
-    elif status_filter == 'unverified':
-        users = users.filter(is_verified=False)
 
     # ---- Stats ----
     all_users = User.objects.all()
@@ -99,12 +65,16 @@ def employee_list(request):
     context = {
         'users': users,
         'stats': stats,
-        'search_query': search_query,
-        'role_filter': role_filter,
-        'company_filter': company_filter,
-        'business_type_filter': business_type_filter,
-        'branch_filter': branch_filter,
-        'status_filter': status_filter,
+        
+        # Note: We keep these in context so the dropdowns populate correctly, 
+        # and so the template can re-select the option if the URL has a query.
+        'search_query': request.GET.get('search', '').strip(),
+        'role_filter': request.GET.get('role', '').strip(),
+        'company_filter': request.GET.get('company', '').strip(),
+        'business_type_filter': request.GET.get('business_type', '').strip(),
+        'branch_filter': request.GET.get('branch', '').strip(),
+        'status_filter': request.GET.get('status', '').strip(),
+        
         'companies': get_active_companies(),
         'business_types': get_active_business_types(),
         'branches': get_active_branches(),
@@ -112,7 +82,7 @@ def employee_list(request):
         'page_title': 'Employees',
         'page_subtitle': 'Manage all employees across companies',
     }
-    return render(request, 'superadmin/employees/list.html', context)
+    return render(request, 'account/users_list.html', context)
 
 
 # ============================================
@@ -133,7 +103,7 @@ def employee_detail(request, pk):
         'page_title': employee.get_full_name() or employee.username,
         'page_subtitle': 'Employee details',
     }
-    return render(request, 'superadmin/employees/detail.html', context)
+    return render(request, 'account/users_detail.html', context)
 
 
 # ============================================
@@ -150,7 +120,7 @@ def employee_create(request):
     roles = get_role_choices()
 
     def _render_form():
-        return render(request, 'superadmin/employees/create.html', {
+        return render(request, 'account/users_create.html', {
             'companies': companies,
             'branches': branches,
             'roles': roles,
@@ -278,7 +248,7 @@ def employee_edit(request, pk):
     roles = get_role_choices()
 
     def _render_form():
-        return render(request, 'superadmin/employees/edit.html', {
+        return render(request, 'account/users_form.html', {
             'employee': employee,
             'companies': companies,
             'branches': branches,
@@ -429,4 +399,4 @@ def employee_delete(request, pk):
         'page_title': 'Delete Employee',
         'page_subtitle': f'Confirm deletion of {employee.get_full_name() or employee.username}',
     }
-    return render(request, 'superadmin/employees/delete.html', context)
+    return render(request, 'account/users_delete.html', context)

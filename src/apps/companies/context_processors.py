@@ -355,7 +355,7 @@ def system_website_url(request):
 
 
 # ============================================
-# UNREAD CONTACT MESSAGES (for navbar bell)
+# UNREAD CONTACT MESSAGES (for navbar bell & notification center)
 # ============================================
 def unread_messages_count(request):
     """
@@ -377,16 +377,16 @@ def unread_messages_count(request):
         from apps.companies.models import ContactMessage
         
         if company:
+            # Company domain: only their messages
             count = ContactMessage.objects.filter(company=company, is_read=False).count()
         else:
-            # Super admin on the main site sees ALL unread messages
-            count = ContactMessage.objects.filter(is_read=False).count()
+            # Super admin on the main site: ONLY system messages (company is NULL)
+            count = ContactMessage.objects.filter(company__isnull=True, is_read=False).count()
             
     except Exception:
         count = 0
 
     return {'unread_messages_count': count}
-
     
     
 
@@ -426,14 +426,16 @@ def total_notifications_count(request):
     company = _get_effective_company(request)
     role = getattr(user, 'role', '')
 
-    # 1. Unread Messages
+    # 1. Unread Messages (Fixed Isolation)
     if role in ('company_admin', 'company_manager', 'super_admin'):
         try:
             from apps.companies.models import ContactMessage
             if company:
+                # Company domain: only their messages
                 total += ContactMessage.objects.filter(company=company, is_read=False).count()
             else:
-                total += ContactMessage.objects.filter(is_read=False).count()
+                # System domain: ONLY system messages (company is NULL)
+                total += ContactMessage.objects.filter(company__isnull=True, is_read=False).count()
         except Exception:
             pass
 

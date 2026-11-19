@@ -1,0 +1,246 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Employee - {{ employee.get_full_name|default:employee.username }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-section {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        border: 1px solid #e9ecef;
+    }
+    .form-section-title {
+        font-weight: 700;
+        margin-bottom: 15px;
+        color: #1e293b;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .form-section-title i { color: #3b82f6; }
+    
+    .required:after {
+        content: " *";
+        color: #dc3545;
+        font-weight: bold;
+    }
+    
+    /* Hide sections smoothly */
+    .dynamic-section {
+        transition: all 0.3s ease;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Navigation -->
+    <div class="mb-3 d-flex justify-content-between align-items-center">
+        <div>
+            <a href="{% url 'employees:superadmin-employee-list' %}" class="btn btn-secondary btn-sm shadow-sm">
+                <i class="fas fa-arrow-left"></i> Back to Users
+            </a>
+            <a href="{% url 'employees:superadmin-employee-detail' employee.id %}" class="btn btn-info btn-sm shadow-sm text-white">
+                <i class="fas fa-eye"></i> View Details
+            </a>
+        </div>
+        
+        <!-- Quick toggle to change user type (Super Admin feature) -->
+        <div class="badge bg-dark px-3 py-2 rounded-pill shadow-sm">
+            <i class="fas fa-id-badge me-1"></i>
+            {% if employee.company %}Company User{% else %}System User{% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4">
+                    <form method="post" id="userForm">
+                        {% csrf_token %}
+                        
+                        <!-- Shared Personal Information -->
+                        <div class="form-section">
+                            <h6 class="form-section-title"><i class="fas fa-user"></i> Personal Information</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label required">First Name</label>
+                                    <input type="text" class="form-control" name="first_name" value="{{ employee.first_name|default:'' }}" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label required">Last Name</label>
+                                    <input type="text" class="form-control" name="last_name" value="{{ employee.last_name|default:'' }}" required>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label required">Email</label>
+                                    <input type="email" class="form-control" name="email" value="{{ employee.email }}" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Phone</label>
+                                    <input type="text" class="form-control" name="phone" value="{{ employee.phone|default:'' }}">
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Staff ID</label>
+                                    <input type="text" class="form-control" name="staff_id" value="{{ employee.staff_id|default:'' }}">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label required">Role</label>
+                                    <select class="form-select" name="role" id="roleSelect" required>
+                                        <!-- System Roles -->
+                                        <optgroup label="System Roles">
+                                            {% for role in roles %}
+                                                {% if role.0 in 'super_admin,site_manager' %}
+                                                <option value="{{ role.0 }}" {% if employee.role == role.0 %}selected{% endif %}>
+                                                    {{ role.1 }}
+                                                </option>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </optgroup>
+                                        <!-- Company Roles -->
+                                        <optgroup label="Company Roles">
+                                            {% for role in roles %}
+                                                {% if role.0 not in 'super_admin,site_manager,guest' %}
+                                                <option value="{{ role.0 }}" {% if employee.role == role.0 %}selected{% endif %}>
+                                                    {{ role.1 }}
+                                                </option>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </optgroup>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- COMPANY USER ONLY SECTION -->
+                        <div class="form-section dynamic-section" id="companySection">
+                            <h6 class="form-section-title"><i class="fas fa-building"></i> Company Assignment</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label required">Company</label>
+                                    <select class="form-select" name="company" id="companySelect">
+                                        <option value="">Select Company</option>
+                                        {% for company in companies %}
+                                        <option value="{{ company.id }}" {% if employee.company_id == company.id %}selected{% endif %}>
+                                            {{ company.name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Branch</label>
+                                    <select class="form-select" name="branch" id="branchSelect">
+                                        <option value="">Select Branch (Optional)</option>
+                                        {% for branch in branches %}
+                                        <option value="{{ branch.id }}" {% if employee.branch_id == branch.id %}selected{% endif %}>
+                                            {{ branch.name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SYSTEM USER ONLY SECTION -->
+                        <div class="form-section dynamic-section" id="systemSection">
+                            <h6 class="form-section-title"><i class="fas fa-network-wired"></i> System Management Details</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Department</label>
+                                    <input type="text" class="form-control" name="department" value="{{ employee.department|default:'' }}">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Position</label>
+                                    <input type="text" class="form-control" name="position" value="{{ employee.position|default:'' }}">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Hire Date</label>
+                                    <input type="date" class="form-control" name="hire_date" value="{{ employee.hire_date|date:'Y-m-d'|default:'' }}">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Account Status (Always visible) -->
+                        <div class="form-section">
+                            <h6 class="form-section-title"><i class="fas fa-shield-alt"></i> Account Status</h6>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="is_active" {% if employee.is_active %}checked{% endif %}>
+                                        <label class="form-check-label">Active</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="is_verified" {% if employee.is_verified %}checked{% endif %}>
+                                        <label class="form-check-label">Verified</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="two_factor_enabled" {% if employee.two_factor_enabled %}checked{% endif %}>
+                                        <label class="form-check-label">Two-Factor Auth</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary px-4">
+                                <i class="fas fa-save"></i> Save Changes
+                            </button>
+                            <a href="{% url 'employees:superadmin-employee-list' %}" class="btn btn-secondary">Cancel</a>
+                            <a href="{% url 'employees:superadmin-employee-delete' employee.id %}" 
+                                class="btn btn-outline-danger ms-auto" 
+                                title="Delete" 
+                                onclick="return confirm('Are you sure you want to delete {{ employee.get_full_name|default:employee.username }}?')">
+                                <i class="fas fa-trash"></i> Delete User
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const roleSelect = document.getElementById('roleSelect');
+        const companySection = document.getElementById('companySection');
+        const systemSection = document.getElementById('systemSection');
+        
+        function toggleSections() {
+            const selectedRole = roleSelect.value;
+            
+            if (selectedRole === 'super_admin' || selectedRole === 'site_manager') {
+                // System User selected: Hide company info, show system details
+                companySection.style.display = 'none';
+                systemSection.style.display = 'block';
+                
+                // Optional: Unset company requirement
+                document.getElementById('companySelect').removeAttribute('required');
+            } else {
+                // Company User selected: Show company info, hide system details
+                companySection.style.display = 'block';
+                systemSection.style.display = 'none';
+            }
+        }
+
+        // Run on load
+        toggleSections();
+
+        // Run on change
+        roleSelect.addEventListener('change', toggleSections);
+    });
+</script>
+{% endblock %}
