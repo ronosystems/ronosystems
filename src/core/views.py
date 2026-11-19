@@ -24,32 +24,41 @@ from apps.settings.models import SystemSetting
 from datetime import datetime
 
 
-
-
 @login_required
 def notification_center(request):
-    """
-    A summary hub for all system notifications.
-    """
     company = getattr(request, 'company', None) or getattr(request.user, 'company', None)
     user = request.user
     
-    context = {
-        'company': company,
-    }
+    context = {'company': company}
 
-    # ==========================================
-    # COMPANY-SPECIFIC COUNTS
-    # ==========================================
+
     if company:
         # 1. Low Stock
         try:
-            from apps.epa_shop.models import BranchStock
-            context['low_stock_count'] = BranchStock.objects.filter(
-                company=company, quantity_in_stock__lte=F('minimum_stock_level')
-            ).count()
-        except Exception:
+            from apps.epa_shop.models import Phone, Electronic, Accessory
+            # Use the exact same helpers from inventory_views.py
+            from apps.epa_shop.inventory_views import _available_phone_count, _available_electronic_count
+            
+            low_stock_count = 0
+            
+            for item in Electronic.objects.filter(company=company, is_active=True):
+                if _available_electronic_count(item) <= 5:
+                    low_stock_count += 1
+                    
+            for item in Phone.objects.filter(company=company, is_active=True):
+                if _available_phone_count(item) <= 5:
+                    low_stock_count += 1
+                    
+            for item in Accessory.objects.filter(company=company, is_active=True):
+                if item.total_quantity_in_stock <= 5:
+                    low_stock_count += 1
+                    
+            context['low_stock_count'] = low_stock_count
+            
+        except Exception as e:
+            print(f"Notification Center Low Stock Error: {e}")
             context['low_stock_count'] = 0
+
 
         # 2. Unverified Treasury Records
         try:
@@ -102,8 +111,6 @@ def notification_center(request):
             context['new_users_count'] = 0
 
     return render(request, 'companies/notification_center.html', context)
-
-
 
 # Add this helper
 def no_session(view_func):

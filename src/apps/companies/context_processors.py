@@ -9,7 +9,7 @@ raising — templates should never crash because of a missing tenant.
 
 import os
 from django.conf import settings
-
+from django.db.models import F
 from apps.companies.models import Company, CompanyJoinRequest, TenantFeedback
 from apps.business_types.business_type_registry import BusinessTypeEnum
 
@@ -388,6 +388,7 @@ def unread_messages_count(request):
     return {'unread_messages_count': count}
 
     
+    
 
 def pending_applications_count(request):
     """
@@ -412,15 +413,10 @@ def pending_applications_count(request):
 
 
 
-
-from datetime import datetime
-from django.utils import timezone
-from django.db.models import F
-
 def total_notifications_count(request):
     """
     Combines all relevant notification counts into a single integer
-    to display on the navbar bell. Matches the logic of the Notification Center.
+    to display on the navbar bell.
     """
     user = getattr(request, 'user', None)
     if not user or not user.is_authenticated:
@@ -429,10 +425,6 @@ def total_notifications_count(request):
     total = 0
     company = _get_effective_company(request)
     role = getattr(user, 'role', '')
-
-    # ==========================================
-    # COMPANY-SPECIFIC COUNTS
-    # ==========================================
 
     # 1. Unread Messages
     if role in ('company_admin', 'company_manager', 'super_admin'):
@@ -453,16 +445,31 @@ def total_notifications_count(request):
         except ImportError:
             pass
 
-    # 3. Low Stock
+    # 3. Low Stock (Bulletproof Context Processor)
     if company and role in ('company_admin', 'stock_controller', 'super_admin'):
         try:
-            from apps.epa_shop.models import BranchStock
-            total += BranchStock.objects.filter(
-                company=company,
-                quantity_in_stock__lte=F('minimum_stock_level')
-            ).count()
+            from apps.epa_shop.models import Phone, Electronic, Accessory, Unit
+            
+            count = 0
+            
+            # Check Live Units for Phones
+            for item in Phone.objects.filter(company=company, is_active=True):
+                if Unit.objects.filter(phone=item, status='available').count() <= 5:
+                    count += 1
+                    
+            # Check Live Units for Electronics
+            for item in Electronic.objects.filter(company=company, is_active=True):
+                if Unit.objects.filter(electronic=item, status='available').count() <= 5:
+                    count += 1
+                    
+            # Check Accessories
+            for item in Accessory.objects.filter(company=company, is_active=True):
+                if item.total_quantity_in_stock <= 5:
+                    count += 1
+                    
+            total += count
         except Exception as e:
-            print(f"Low stock count error: {e}")
+            print(f"Sidebar Low stock error: {e}")
 
     # 4. Pending Join Requests
     if company and role in ('company_admin', 'super_admin'):
@@ -492,36 +499,31 @@ def total_notifications_count(request):
     # SYSTEM-LEVEL COUNTS (SUPER ADMIN ONLY)
     # ==========================================
     if role == 'super_admin' and not company:
-
-        # 7. Website Visits
-
-
-        # 8. New Users
+        # 7. New Users
         try:
             from apps.accounts.models import User
+            from datetime import datetime
+            from django.utils import timezone
+            
+            today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            last_seen_iso = request.session.get('users_last_seen')
 
-            if request.path.startswith('/companies/'):
-                request.session['users_last_seen'] = timezone.now().isoformat()
-            else:
-                today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
-                last_seen_iso = request.session.get('users_last_seen')
-
-                if last_seen_iso:
-                    try:
-                        last_seen = datetime.fromisoformat(last_seen_iso)
-                        if timezone.is_naive(last_seen):
-                            last_seen = timezone.make_aware(last_seen)
-                        cutoff = max(last_seen, today_start)
-                    except (ValueError, TypeError):
-                        cutoff = today_start
-                else:
+            if last_seen_iso:
+                try:
+                    last_seen = datetime.fromisoformat(last_seen_iso)
+                    if timezone.is_naive(last_seen):
+                        last_seen = timezone.make_aware(last_seen)
+                    cutoff = max(last_seen, today_start)
+                except (ValueError, TypeError):
                     cutoff = today_start
+            else:
+                cutoff = today_start
 
-                total += User.objects.filter(created_at__gte=cutoff).count()
+            total += User.objects.filter(created_at__gte=cutoff).count()
         except Exception as e:
             print(f"Users count error: {e}")
 
-        # 9. Pending Company Applications
+        # 8. Pending Company Applications
         try:
             from apps.companies.models import CompanyApplication
             total += CompanyApplication.objects.filter(status='pending').count()

@@ -38,6 +38,22 @@ urlpatterns = [
     path('inventory/transfer/<int:transfer_id>/receive/', inventory_views.receive_transfer_view, name='receive-transfer'),
 
     # ============================================
+    # DISCONTINUED PRODUCTS
+    # ============================================
+    path('inventory/discontinued/',
+         inventory_views.discontinued_products_list,
+         name='discontinued-products'),
+    path('inventory/discontinued/<str:product_code>/reactivate/',
+         inventory_views.reactivate_product_view,
+         name='reactivate-product'),
+    path('products/<str:product_code>/discontinue/',
+         inventory_views.discontinue_product_view,
+         name='discontinue-product'),
+     path('discontinued/<int:record_id>/set-replacement/',
+         inventory_views.set_replacement_view,
+         name='set-replacement'),
+ 
+    # ============================================
     # PRODUCTS — Full CRUD (Using Product Code)
     # ============================================
     path('scanner-lookup/',                        product_views.scanner_lookup,      name='scanner_lookup'),

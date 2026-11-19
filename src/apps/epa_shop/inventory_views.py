@@ -6,7 +6,7 @@ from django.utils import timezone
 from .models import (
     Electronic, Phone, Accessory, Category,
     Sale, SaleItem, Customer, StockMovement, Supplier,
-    Unit, StockTransfer
+    Unit, StockTransfer,
 )
 from apps.companies.support_utils import (
     get_active_company,
@@ -22,9 +22,12 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from collections import Counter
 import json
-
+from django.contrib.contenttypes.models import ContentType
+from .models import DiscontinuedProduct
 
 User = get_user_model()
+
+
 
 
 # ============================================
@@ -33,8 +36,10 @@ User = get_user_model()
 def _available_phone_count(phone):
     return Unit.objects.filter(phone=phone, status='available').count()
 
+
 def _available_electronic_count(electronic):
     return Unit.objects.filter(electronic=electronic, status='available').count()
+
 
 def _available_unit_count(product, product_type):
     if product_type == 'Phone':
@@ -45,6 +50,18 @@ def _available_unit_count(product, product_type):
         return product.total_quantity_in_stock  # Accessories use cache
 
 
+def _live_stock_for(product, product_type):
+    """Single dispatch point used by both inventory_list and the discontinue guard."""
+    if product_type == 'Phone':
+        return _available_phone_count(product)
+    if product_type == 'Electronic':
+        return _available_electronic_count(product)
+    return product.total_quantity_in_stock
+
+
+# ============================================
+# INVENTORY LIST
+# ============================================
 @login_required
 def inventory_list(request):
     """Main inventory page showing all products — using live Unit counts."""
@@ -56,18 +73,25 @@ def inventory_list(request):
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
 
-    electronics = Electronic.objects.filter(company=company, is_active=True)
-    phones = Phone.objects.filter(company=company, is_active=True)
-    accessories = Accessory.objects.filter(company=company, is_active=True)
+    # Optional filter: show discontinued products too (default: hidden)
+    show_discontinued = request.GET.get('show_discontinued') == '1'
 
-    # ── Live unit counts per product ──
+    electronics_qs = Electronic.objects.filter(company=company)
+    phones_qs = Phone.objects.filter(company=company)
+    accessories_qs = Accessory.objects.filter(company=company)
+
+    if not show_discontinued:
+        electronics_qs = electronics_qs.filter(is_active=True)
+        phones_qs = phones_qs.filter(is_active=True)
+        accessories_qs = accessories_qs.filter(is_active=True)
+
     electronics_data = [
         {
             'obj': e,
             'stock': _available_electronic_count(e),
             'units': Unit.objects.filter(electronic=e).count(),
         }
-        for e in electronics
+        for e in electronics_qs
     ]
     phones_data = [
         {
@@ -75,7 +99,7 @@ def inventory_list(request):
             'stock': _available_phone_count(p),
             'units': Unit.objects.filter(phone=p).count(),
         }
-        for p in phones
+        for p in phones_qs
     ]
     accessories_data = [
         {
@@ -83,7 +107,7 @@ def inventory_list(request):
             'stock': a.total_quantity_in_stock,
             'units': a.total_quantity_in_stock,
         }
-        for a in accessories
+        for a in accessories_qs
     ]
 
     # ── Stock totals (live, available only) ──
@@ -143,7 +167,7 @@ def inventory_list(request):
     low_stock_items = []
 
     for d in electronics_data:
-        if d['stock'] <= 5:
+        if d['obj'].is_active and d['stock'] <= 5:
             item = d['obj']
             low_stock_items.append({
                 'id': item.id, 'name': f"{item.name}", 'brand': f"{item.brand}",
@@ -152,10 +176,11 @@ def inventory_list(request):
                 'type': 'Electronic', 'quantity': d['stock'], 'min_stock': 5,
                 'price': item.selling_price, 'purchase_price': item.purchase_price,
                 'product_code': item.product_code or '-',
+                'is_active': item.is_active,
             })
 
     for d in phones_data:
-        if d['stock'] <= 5:
+        if d['obj'].is_active and d['stock'] <= 5:
             item = d['obj']
             low_stock_items.append({
                 'id': item.id, 'name': f"{item.name}", 'brand': f"{item.brand}",
@@ -163,10 +188,11 @@ def inventory_list(request):
                 'type': 'Phone', 'quantity': d['stock'], 'min_stock': 5,
                 'price': item.selling_price, 'purchase_price': item.purchase_price,
                 'product_code': item.product_code or '-',
+                'is_active': item.is_active,
             })
 
     for d in accessories_data:
-        if d['stock'] <= 10:
+        if d['obj'].is_active and d['stock'] <= 10:
             item = d['obj']
             low_stock_items.append({
                 'id': item.id, 'name': f"{item.name}", 'brand': f"{item.brand}",
@@ -174,9 +200,36 @@ def inventory_list(request):
                 'type': 'Accessory', 'quantity': d['stock'], 'min_stock': 5,
                 'price': item.selling_price, 'purchase_price': item.purchase_price,
                 'product_code': item.product_code or '-',
+                'is_active': item.is_active,
             })
 
     low_stock_items.sort(key=lambda x: x['quantity'])
+
+    # ── Discontinued summary (always visible as a badge) ──
+    disc_qs = (
+        DiscontinuedProduct.objects
+        .filter(company=company)
+        .select_related('content_type')
+    )
+    discontinued_count = disc_qs.count()
+    disc_by_type = {}
+    for ct in ContentType.objects.filter(
+        app_label='epa_shop', model__in=['phone', 'electronic', 'accessory']
+    ):
+        disc_by_type[ct.model] = disc_qs.filter(content_type=ct).count()
+
+    # ── Products eligible for discontinuation (stock == 0) ──
+    eligible_to_discontinue = 0
+    if not show_discontinued:
+        for d in electronics_data:
+            if d['obj'].is_active and d['stock'] == 0:
+                eligible_to_discontinue += 1
+        for d in phones_data:
+            if d['obj'].is_active and d['stock'] == 0:
+                eligible_to_discontinue += 1
+        for d in accessories_data:
+            if d['obj'].is_active and d['stock'] == 0:
+                eligible_to_discontinue += 1
 
     context = {
         'company': company, 'total_products': total_products, 'total_stock': total_stock,
@@ -193,15 +246,22 @@ def inventory_list(request):
         'expected_profit': expected_profit,
         'expected_profit_margin': expected_profit_margin,
         'best_price_profit': best_price_profit,
+        'show_discontinued': show_discontinued,
+        'discontinued_count': discontinued_count,
+        'disc_by_type': disc_by_type,
+        'eligible_to_discontinue': eligible_to_discontinue,
         'page_title': 'Inventory',
         'page_subtitle': 'Manage your stock',
     }
     return render(request, 'epa/inventory.html', context)
 
 
+# ============================================
+# LOW STOCK
+# ============================================
 @login_required
 def low_stock(request):
-    """View all low stock items — using live Unit counts."""
+    """View all low stock items — using live Unit counts, strictly excluding discontinued items."""
     company, is_viewing_company = get_active_company(request)
 
     if not company:
@@ -211,10 +271,29 @@ def low_stock(request):
         return redirect('/dashboard/')
 
     from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+    from .models import DiscontinuedProduct
 
     low_stock_items = []
 
+    # Helper to strictly verify the product is active and NOT discontinued
+    def is_valid(item):
+        if not getattr(item, 'is_active', True):
+            return False
+            
+        # Double check the DiscontinuedProduct table just in case is_active wasn't flipped
+        ct = ContentType.objects.get_for_model(item)
+        if DiscontinuedProduct.objects.filter(
+            company=company, content_type=ct, object_id=item.id
+        ).exists():
+            return False
+            
+        return True
+
+    # 1. Electronics
     for item in Electronic.objects.filter(company=company, is_active=True):
+        if not is_valid(item):
+            continue
+            
         live = _available_electronic_count(item)
         if live <= 5:
             low_stock_items.append({
@@ -228,7 +307,11 @@ def low_stock(request):
                 'created_at': item.created_at,
             })
 
+    # 2. Phones
     for item in Phone.objects.filter(company=company, is_active=True):
+        if not is_valid(item):
+            continue
+            
         live = _available_phone_count(item)
         if live <= 5:
             low_stock_items.append({
@@ -242,7 +325,11 @@ def low_stock(request):
                 'created_at': item.created_at,
             })
 
+    # 3. Accessories
     for item in Accessory.objects.filter(company=company, is_active=True):
+        if not is_valid(item):
+            continue
+            
         live = item.total_quantity_in_stock
         if live <= 5:
             low_stock_items.append({
@@ -256,6 +343,7 @@ def low_stock(request):
                 'created_at': item.created_at,
             })
 
+    # ── Filters ──
     search_query = request.GET.get('search', '')
     if search_query:
         search_lower = search_query.lower()
@@ -280,8 +368,10 @@ def low_stock(request):
         elif stock_filter == 'medium':
             low_stock_items = [i for i in low_stock_items if 6 <= i['quantity'] <= 10]
 
+    # Sort by lowest quantity first
     low_stock_items.sort(key=lambda x: x['quantity'])
 
+    # ── Pagination ──
     per_page = int(request.GET.get('per_page', 10))
     paginator = Paginator(low_stock_items, per_page)
     page = request.GET.get('page', 1)
@@ -294,9 +384,14 @@ def low_stock(request):
         page_obj = paginator.page(paginator.num_pages)
 
     context = {
-        'company': company, 'page_obj': page_obj, 'total_count': len(low_stock_items),
-        'search_query': search_query, 'category_filter': category_filter,
-        'stock_filter': stock_filter, 'per_page': per_page,
+        'company': company, 
+        'page_obj': page_obj, 
+        'total_count': len(low_stock_items),
+        'low_stock_count': len(low_stock_items),
+        'search_query': search_query, 
+        'category_filter': category_filter,
+        'stock_filter': stock_filter, 
+        'per_page': per_page,
         'is_viewing_company': is_viewing_company,
         'page_title': 'Low Stock Items',
         'page_subtitle': 'Items that need restocking',
@@ -304,6 +399,9 @@ def low_stock(request):
     return render(request, 'epa/low_stock.html', context)
 
 
+# ============================================
+# STOCK MOVEMENT
+# ============================================
 @login_required
 def stock_movement(request):
     """View stock movement history — unchanged, movements are already immutable records."""
@@ -391,6 +489,9 @@ def stock_movement(request):
     return render(request, 'epa/stock_movement.html', context)
 
 
+# ============================================
+# CUSTOMERS
+# ============================================
 @login_required
 def customer_list(request):
     """List all customers"""
@@ -425,6 +526,7 @@ def customer_create(request):
 
     messages.info(request, 'Customer creation coming soon.')
     return redirect('/epa/customers/')
+
 
 
 # ============================================
@@ -765,3 +867,202 @@ def receive_transfer_view(request, transfer_id):
         messages.error(request, str(e))
 
     return redirect('bulk-transfer')
+
+
+# ============================================
+# DISCONTINUED PRODUCTS
+# ============================================
+
+@login_required
+def discontinue_product_view(request, product_code):
+    from .services.stock import discontinue_product
+
+    company, is_viewing_company = get_active_company(request)
+    if not company:
+        messages.error(request, 'No active company.')
+        return redirect('epa-inventory')
+
+    if not (is_viewing_company or request.user.role in (
+        'super_admin', 'company_admin', 'company_manager', 'stock_controller'
+    )):
+        messages.error(request, 'You do not have permission to discontinue products.')
+        return redirect('epa-inventory')
+
+    if request.method != 'POST':
+        return redirect('epa-inventory')
+
+    product = None
+    for model in (Phone, Electronic, Accessory):
+        product = model.objects.filter(
+            company=company, product_code=product_code
+        ).first()
+        if product:
+            break
+
+    if not product:
+        messages.error(request, f'No product found with code "{product_code}".')
+        return redirect('epa-inventory')
+
+    reason    = request.POST.get('reason', 'end_of_life')
+    notes     = request.POST.get('notes', '').strip()
+    repl_code = request.POST.get('replacement_product_code', '').strip()
+
+    try:
+        record = discontinue_product(
+            product, request.user,
+            reason=reason,
+            notes=notes,
+            replacement_code=repl_code,       # ← service resolves it
+        )
+        msg = (
+            f'"{product.name}" ({product.product_code}) marked as discontinued '
+            f'({record.get_reason_display()}).'
+        )
+        if record.replacement_product_code:
+            msg += f' Replacement: {record.replacement_product_name} '
+            msg += f'({record.replacement_product_code}).'
+        messages.success(request, msg)
+    except ValueError as e:
+        messages.error(request, str(e))
+    except Exception as e:
+        messages.error(request, f'Could not discontinue: {e}')
+
+    return redirect('epa-inventory')
+
+@login_required
+def discontinued_products_list(request):
+    """List all discontinued products for this company."""
+    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+
+    company, is_viewing_company = get_active_company(request)
+    if not company:
+        messages.warning(request, 'You are not assigned to any company.')
+        return redirect('/dashboard/')
+
+    qs = (
+        DiscontinuedProduct.objects
+        .filter(company=company)
+        .select_related('content_type', 'discontinued_by')
+        .order_by('-discontinued_at')
+    )
+
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        qs = qs.filter(
+            Q(product_name__icontains=search_query) |
+            Q(product_code__icontains=search_query) |
+            Q(notes__icontains=search_query)
+        )
+
+    reason_filter = request.GET.get('reason', '')
+    if reason_filter:
+        qs = qs.filter(reason=reason_filter)
+
+    try:
+        per_page = int(request.GET.get('per_page', 20))
+    except (ValueError, TypeError):
+        per_page = 20
+
+    paginator = Paginator(qs, per_page)
+    page = request.GET.get('page', 1)
+    try:
+        page_obj = paginator.page(page)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
+
+    context = {
+        'company': company,
+        'page_obj': page_obj,
+        'total_count': paginator.count,
+        'search_query': search_query,
+        'reason_filter': reason_filter,
+        'reason_choices': DiscontinuedProduct.REASON_CHOICES,
+        'per_page': per_page,
+        'is_viewing_company': is_viewing_company,
+        'page_title': 'Discontinued Products',
+        'page_subtitle': 'Products no longer stocked',
+    }
+    return render(request, 'epa/discontinued_products.html', context)
+
+@login_required
+@require_POST
+def set_replacement_view(request, record_id):
+    """Set, change, or clear the replacement product on a DiscontinuedProduct."""
+    company, is_viewing_company = get_active_company(request)
+    if not company:
+        messages.error(request, 'No active company.')
+        return redirect('discontinued-products')
+
+    if not (is_viewing_company or request.user.role in (
+        'super_admin', 'company_admin', 'company_manager', 'stock_controller'
+    )):
+        messages.error(request, 'You do not have permission to edit discontinued products.')
+        return redirect('discontinued-products')
+
+    record = get_object_or_404(
+        DiscontinuedProduct, pk=record_id, company=company,
+    )
+
+    code = request.POST.get('replacement_product_code', '').strip()
+
+    if not code:
+        # Empty = clear
+        record.set_replacement(None)
+        messages.success(request, f'Replacement cleared for "{record.product_name}".')
+        return redirect('discontinued-products')
+
+    # Look up the code across all three product models
+    replacement = None
+    for model in (Phone, Electronic, Accessory):
+        replacement = model.objects.filter(
+            company=company, product_code=code,
+        ).first()
+        if replacement:
+            break
+
+    if not replacement:
+        messages.error(request, f'No active product found with code "{code}".')
+        return redirect('discontinued-products')
+
+    # Guard against self-replacement
+    if (replacement.pk == record.object_id
+            and ContentType.objects.get_for_model(replacement) == record.content_type):
+        messages.error(request, 'A product cannot be its own replacement.')
+        return redirect('discontinued-products')
+
+    record.set_replacement(replacement)
+    messages.success(
+        request,
+        f'Replacement for "{record.product_name}" set to '
+        f'{replacement.name} ({replacement.product_code}).'
+    )
+    return redirect('discontinued-products')
+
+
+@login_required
+def reactivate_product_view(request, product_code):
+    """POST: undo a discontinuation."""
+    from .services.stock import reactivate_product
+
+    company, is_viewing_company = get_active_company(request)
+    if not company:
+        return redirect('epa-inventory')
+
+    if request.method != 'POST':
+        return redirect('discontinued-products')
+
+    product = None
+    for model in (Phone, Electronic, Accessory):
+        product = model.objects.filter(company=company, product_code=product_code).first()
+        if product:
+            break
+
+    if not product:
+        messages.error(request, f'No product found with code "{product_code}".')
+        return redirect('discontinued-products')
+
+    reactivate_product(product, request.user)
+    messages.success(request, f'"{product.name}" is active again.')
+    return redirect('discontinued-products')

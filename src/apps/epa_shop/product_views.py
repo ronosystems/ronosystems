@@ -10,7 +10,7 @@ from django.http import JsonResponse, HttpResponse, Http404
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
 from apps.company.models import Branch
-from .models import Electronic, Phone, Accessory, Category, Supplier, Unit, Sale, SaleItem, Customer, Owner, ProductImage
+from .models import Electronic, Phone, Accessory, DiscontinuedProduct, Category, Supplier, Unit, Sale, SaleItem, Customer, Owner, ProductImage
 from django.contrib.auth import get_user_model
 from .utils import record_stock_movement
 from django.db import transaction
@@ -1377,7 +1377,7 @@ def update_product_prices(request, product_code):
 
 @login_required
 def product_detail(request, product_code):
-    """View product details using product code"""
+    """View product details using product code."""
     company, is_viewing_company = get_active_company(request)
 
     if not company:
@@ -1392,6 +1392,7 @@ def product_detail(request, product_code):
         messages.error(request, f'Product with code "{product_code}" not found.')
         return redirect('/epa_shop/products/')
 
+    # ── Permission checks ─────────────────────────────────────────
     if not is_viewing_company:
         if is_agent(request.user):
             owner = Owner.objects.filter(company=company, phone=request.user.phone).first()
@@ -1400,12 +1401,11 @@ def product_detail(request, product_code):
                 return redirect('/epa_shop/products/')
         elif not is_admin_or_manager(request.user):
             user_branch = get_user_branch(request.user)
-            if user_branch:
-                if not product.branch_stocks.filter(branch=user_branch).exists():
-                    messages.error(request, 'You do not have permission to view products from other branches.')
-                    return redirect('/epa_shop/products/')
+            if user_branch and not product.branch_stocks.filter(branch=user_branch).exists():
+                messages.error(request, 'You do not have permission to view products from other branches.')
+                return redirect('/epa_shop/products/')
 
-    # 1. Determine the selected branch
+    # ── 1. Determine the selected branch ──────────────────────────
     all_branches_qs = Branch.objects.filter(company=company, is_active=True)
     branch_id = request.GET.get('branch')
     selected_branch = None
@@ -1414,15 +1414,11 @@ def product_detail(request, product_code):
     if not selected_branch and all_branches_qs.exists():
         selected_branch = all_branches_qs.first()
 
-    # 2. Load units for the selected branch
-    units = []
-    total_units = 0
-    available_count = 0
-    reserved_count = 0
-    repair_count = 0
-    sold_count = 0
+    # ── 2. Load units for the selected branch ─────────────────────
+    units = Unit.objects.none()
+    total_units = available_count = reserved_count = repair_count = sold_count = 0
 
-    if selected_branch and product_type in ['Phone', 'Electronic']:
+    if selected_branch and product_type in ('Phone', 'Electronic'):
         if product_type == 'Phone':
             units = Unit.objects.filter(phone=product, branch=selected_branch).order_by('-created_at')
         else:
@@ -1430,34 +1426,30 @@ def product_detail(request, product_code):
 
         if is_agent(request.user) and not is_viewing_company:
             owner = Owner.objects.filter(company=company, phone=request.user.phone).first()
-            if owner:
-                units = units.filter(owner=owner)
-            else:
-                units = units.none()
+            units = units.filter(owner=owner) if owner else units.none()
 
-        # Counts for the summary cards at the top
-        total_units = units.count()
+        total_units     = units.count()
         available_count = units.filter(status='available').count()
-        reserved_count = units.filter(status='reserved').count()
-        repair_count = units.filter(status='repair').count()
-        sold_count = units.filter(status='sold').count()
+        reserved_count  = units.filter(status='reserved').count()
+        repair_count    = units.filter(status='repair').count()
+        sold_count      = units.filter(status='sold').count()
 
+        # Attach sale info (batched to avoid N+1)
+        sale_map = {
+            si.unit_id: si.sale
+            for si in SaleItem.objects.filter(unit__in=units).select_related('sale')
+        }
         for unit in units:
-            sale_item = SaleItem.objects.filter(unit=unit).select_related('sale').first()
-            unit.sale = sale_item.sale if sale_item else None
+            unit.sale = sale_map.get(unit.id)
 
     # Accessories use the BranchStock record for the count
     if product_type == 'Accessory' and selected_branch:
         stock_obj = product.stock_at(selected_branch)
         total_units = stock_obj.quantity_in_stock if stock_obj else 0
 
-    # 3. Branch stock data — always compute live for phones/electronics
+    # ── 3. Branch stock data — live counts ────────────────────────
     branches = all_branches_qs
-    if is_agent(request.user) and not is_viewing_company:
-        user_branch = get_user_branch(request.user)
-        if user_branch:
-            branches = branches.filter(id=user_branch.id)
-    elif not is_admin_or_manager(request.user) and not is_viewing_company:
+    if not is_admin_or_manager(request.user) and not is_viewing_company:
         user_branch = get_user_branch(request.user)
         if user_branch:
             branches = branches.filter(id=user_branch.id)
@@ -1466,23 +1458,15 @@ def product_detail(request, product_code):
     actual_total_stock = 0
 
     for branch in branches:
-        if product_type in ['Phone', 'Electronic']:
-            # ✅ Count live available units per branch — not the cached total
-            if product_type == 'Phone':
-                live_count = Unit.objects.filter(
-                    phone=product, branch=branch, status='available'
-                ).count()
-            else:
-                live_count = Unit.objects.filter(
-                    electronic=product, branch=branch, status='available'
-                ).count()
+        if product_type == 'Phone':
+            live_count = Unit.objects.filter(phone=product, branch=branch, status='available').count()
+        elif product_type == 'Electronic':
+            live_count = Unit.objects.filter(electronic=product, branch=branch, status='available').count()
         else:
-            # Accessories still use BranchStock
             stock_obj = product.stock_at(branch)
             live_count = stock_obj.quantity_in_stock if stock_obj else 0
 
         actual_total_stock += live_count
-
         branch_stock_data.append({
             'id': branch.id,
             'name': branch.name,
@@ -1496,13 +1480,59 @@ def product_detail(request, product_code):
 
     branch_stock_data.sort(key=lambda x: (not x['is_primary'], -x['unit_count']))
 
-    # Current branch stock — pull from the live branch data
     current_branch_stock = 0
     if selected_branch:
         for b in branch_stock_data:
             if b['id'] == selected_branch.id:
                 current_branch_stock = b['unit_count']
                 break
+
+    # ── 4. Discontinue guard ──────────────────────────────────────
+    # live_stock = company-wide available count (across ALL branches),
+    # because "discontinue" means the product is retired everywhere.
+    live_stock = actual_total_stock
+
+    can_discontinue = (
+        product.is_active
+        and live_stock == 0
+        and (
+            is_viewing_company
+            or request.user.role in (
+                'super_admin', 'company_admin', 'company_manager', 'stock_controller'
+            )
+        )
+    )
+
+    # ── 5. Replacement-product suggestions (only when discontinue is possible) ──
+    active_products_for_replacement = []
+    if can_discontinue:
+        candidate_models = (
+            ('Phone', Phone),
+            ('Electronic', Electronic),
+            ('Accessory', Accessory),
+        )
+        for model_name, model in candidate_models:
+            qs = model.objects.filter(company=company, is_active=True)
+            # Never suggest the product being discontinued (only same-table match)
+            if model_name == product_type:
+                qs = qs.exclude(pk=product.pk)
+            active_products_for_replacement.extend(
+                qs.only('id', 'name', 'product_code')
+            )
+
+    # ── 6. Existing discontinuation record (for "already discontinued" UI) ──
+    discontinued_record = None
+    if not product.is_active:
+        discontinued_record = (
+            DiscontinuedProduct.objects
+            .filter(
+                company=company,
+                content_type=ContentType.objects.get_for_model(product),
+                object_id=product.pk,
+            )
+            .select_related('replacement_content_type', 'discontinued_by')
+            .first()
+        )
 
     context = {
         'product': product,
@@ -1517,6 +1547,10 @@ def product_detail(request, product_code):
         'total_available_units': actual_total_stock,
         'actual_total_stock': actual_total_stock,
         'current_branch_stock': current_branch_stock,
+        'live_stock': live_stock,
+        'can_discontinue': can_discontinue,
+        'discontinued_record': discontinued_record,
+        'active_products_for_replacement': active_products_for_replacement,
         'product_code': product.product_code,
         'is_viewing_company': is_viewing_company,
         'selected_branch_id': selected_branch.id if selected_branch else None,

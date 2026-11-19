@@ -651,6 +651,114 @@ class Accessory(BaseProduct):
 
 
 # ============================================
+# END LIFE PRODUCT
+# ============================================
+
+class DiscontinuedProduct(models.Model):
+    """
+    Marks a product as discontinued (e.g. Samsung A02 — replaced by A07).
+    The product row itself is NOT deleted: all units, sales, stock movements,
+    warranties and repairs remain intact and queryable.
+
+    Discontinuing sets product.is_active = False automatically, so the product
+    disappears from normal inventory / POS / storefront lists, but still shows
+    up under 'Discontinued' filters and its history stays reachable.
+    """
+    REASON_CHOICES = (
+        ('end_of_life',       'End of Life (manufacturer stopped)'),
+        ('superseded',        'Superseded by a newer model'),
+        ('recalled',          'Recalled by manufacturer'),
+        ('no_longer_stocked', 'No longer stocked by us'),
+        ('other',             'Other'),
+    )
+
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name='discontinued_products'
+    )
+    branch = models.ForeignKey(
+        'company.Branch', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='discontinued_products',
+        help_text="Optional: only discontinue for this branch.",
+    )
+
+    # Link to ANY product model (Phone / Electronic / Accessory)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField(db_index=True)
+    product = GenericForeignKey('content_type', 'object_id')
+
+    # Snapshot the name so it survives even if the product row is hard-deleted
+    product_name = models.CharField(max_length=200, editable=False)
+    product_code = models.CharField(max_length=50, blank=True, editable=False)
+
+    reason = models.CharField(max_length=20, choices=REASON_CHOICES, default='end_of_life')
+    notes = models.TextField(
+        blank=True,
+        help_text="e.g. 'Manufacturer discontinued this model; replaced by A07.'"
+    )
+
+    # Optional replacement product (same generic-link pattern)
+    replacement_content_type = models.ForeignKey(
+        ContentType, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='+',
+    )
+    replacement_object_id = models.PositiveIntegerField(null=True, blank=True)
+    replacement_product = GenericForeignKey(
+        'replacement_content_type', 'replacement_object_id'
+    )
+
+    discontinued_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True,
+        related_name='discontinued_products'
+    )
+    discontinued_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'epa_discontinued_products'
+        ordering = ['-discontinued_at']
+        indexes = [
+            models.Index(fields=['company', 'discontinued_at']),
+            models.Index(fields=['content_type', 'object_id']),
+        ]
+        # A product can only be discontinued once per company (or per branch)
+        unique_together = [['company', 'branch', 'content_type', 'object_id']]
+
+    def __str__(self):
+        return f"{self.product_name} — discontinued ({self.get_reason_display()})"
+
+    def save(self, *args, **kwargs):
+        # Snapshot name/code
+        if self.product:
+            self.product_name = getattr(self.product, 'name', '') or str(self.product)
+            self.product_code = getattr(self.product, 'product_code', '') or ''
+        super().save(*args, **kwargs)
+
+
+    # ── Replacement product helpers ──────────────────────────────
+    @property
+    def replacement_product_name(self):
+        obj = self.replacement_product
+        return getattr(obj, 'name', '') or '' if obj else ''
+
+    @property
+    def replacement_product_code(self):
+        obj = self.replacement_product
+        return getattr(obj, 'product_code', '') or '' if obj else ''
+
+    def set_replacement(self, product):
+        """Attach a replacement product (or clear it with None)."""
+        if product is None:
+            self.replacement_content_type = None
+            self.replacement_object_id = None
+        else:
+            self.replacement_content_type = ContentType.objects.get_for_model(product)
+            self.replacement_object_id = product.pk
+        self.save(update_fields=[
+            'replacement_content_type', 'replacement_object_id',
+        ])
+
+
+
+# ============================================
 # UNIT
 # ============================================
 

@@ -195,6 +195,7 @@ TEMPLATES = [
 
                 'apps.epa_shop.context_processors.user_context', 
                 'apps.epa_shop.context_processors.pending_orders_count',
+                'apps.epa_shop.context_processors.sidebar_low_stock_count',
 
                 'apps.companies.context_processors.system_website_url', 
                 'apps.company.context_processors.company_context',

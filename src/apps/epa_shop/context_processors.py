@@ -20,7 +20,40 @@ def user_context(request):
         'user_role': None,
     }
 
-
+def sidebar_low_stock_count(request):
+    """
+    Dedicated context processor to calculate low stock count for the sidebar.
+    Runs on every page.
+    """
+    from apps.companies.support_utils import get_active_company
+    from apps.epa_shop.models import Phone, Electronic, Accessory, Unit
+    
+    company, _ = get_active_company(request)
+    if not company:
+        return {'sidebar_low_stock_count': 0}
+        
+    role = getattr(request.user, 'role', '')
+    if role not in ('company_admin', 'stock_controller', 'super_admin', 'company_manager'):
+        return {'sidebar_low_stock_count': 0}
+        
+    count = 0
+    
+    # 1. Count live units for Phones
+    for item in Phone.objects.filter(company=company, is_active=True):
+        if Unit.objects.filter(phone=item, status='available').count() <= 5:
+            count += 1
+            
+    # 2. Count live units for Electronics
+    for item in Electronic.objects.filter(company=company, is_active=True):
+        if Unit.objects.filter(electronic=item, status='available').count() <= 5:
+            count += 1
+            
+    # 3. Count Accessories
+    for item in Accessory.objects.filter(company=company, is_active=True):
+        if item.total_quantity_in_stock <= 5:
+            count += 1
+            
+    return {'sidebar_low_stock_count': count}
 
 # /home/rs/ronosystems/src/apps/epa_shop/context_processors.py
 

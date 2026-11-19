@@ -1,0 +1,515 @@
+{% extends 'base.html' %}
+
+{% block title %}Discontinued Products{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       SHARED LAYOUT & BORDERS
+    ============================================ */
+    .form-section {
+        background: #f8f9fa;
+        padding: 16px 20px;
+        border-radius: 12px;
+        margin-bottom: 16px;
+        border: 3px solid #000000;
+    }
+    .form-section-title {
+        font-weight: 700;
+        margin-bottom: 12px;
+        color: #2d3436;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .form-section-title i {
+        margin-right: 6px;
+        color: #667eea;
+    }
+
+    /* ============================================
+       FILTER BAR
+    ============================================ */
+    .filter-bar {
+        background: #fff;
+        border: 3px solid #000;
+        border-radius: 12px;
+        padding: 12px 16px;
+    }
+    .filter-bar input,
+    .filter-bar select {
+        border: 2px solid #000;
+        border-radius: 6px;
+        font-weight: 600;
+    }
+
+    /* ============================================
+       STATS STRIP
+    ============================================ */
+    .stat-card {
+        background: #fff;
+        border: 3px solid #000;
+        border-radius: 10px;
+        padding: 10px 14px;
+        text-align: center;
+    }
+    .stat-card .stat-value {
+        font-size: 22px;
+        font-weight: 800;
+        line-height: 1;
+    }
+    .stat-card .stat-label {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #6c757d;
+        margin-top: 4px;
+    }
+
+    /* ============================================
+       TABLE
+    ============================================ */
+    .disc-table {
+        background: #fff;
+        border: 3px solid #000;
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 0;
+    }
+    .disc-table thead {
+        background: #f8f9fa;
+        border-bottom: 3px solid #000;
+    }
+    .disc-table thead th {
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 11px;
+        letter-spacing: 0.5px;
+        color: #2d3436;
+        padding: 12px;
+        white-space: nowrap;
+    }
+    .disc-table tbody td {
+        padding: 12px;
+        vertical-align: middle;
+        border-bottom: 1px solid #e9ecef;
+        font-size: 13px;
+    }
+    .disc-table tbody tr:hover {
+        background: #f0f3ff;
+    }
+    .disc-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+    .product-name {
+        font-weight: 700;
+        color: #2d3436;
+    }
+    .product-code {
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        color: #6c757d;
+    }
+
+    /* ============================================
+       BADGES
+    ============================================ */
+    .reason-badge {
+        padding: 3px 10px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        display: inline-block;
+        white-space: nowrap;
+    }
+    .reason-badge.end_of_life        { background: #f8d7da; color: #721c24; }
+    .reason-badge.superseded         { background: #cce5ff; color: #004085; }
+    .reason-badge.recalled           { background: #fff3cd; color: #856404; }
+    .reason-badge.no_longer_stocked  { background: #e2e3e5; color: #383d41; }
+    .reason-badge.other              { background: #e2e3e5; color: #383d41; }
+
+    .type-badge {
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 700;
+        background: #e9ecef;
+        color: #2d3436;
+        white-space: nowrap;
+    }
+
+    /* ============================================
+       EMPTY STATE
+    ============================================ */
+    .empty-state {
+        text-align: center;
+        padding: 48px 16px;
+        color: #6c757d;
+    }
+    .empty-state i {
+        font-size: 48px;
+        opacity: 0.4;
+        margin-bottom: 12px;
+    }
+
+    /* ============================================
+       PAGINATION
+    ============================================ */
+    .pagination .page-link {
+        border: 2px solid #000;
+        color: #2d3436;
+        font-weight: 700;
+    }
+    .pagination .page-item.active .page-link {
+        background: #000;
+        border-color: #000;
+        color: #fff;
+    }
+
+    /* ============================================
+       MODAL BORDERS
+    ============================================ */
+    .modal-content { border-radius: 12px; overflow: hidden; }
+    .modal-header  { border-bottom: 3px solid #000; }
+    .modal-footer  { border-top: 3px solid #000; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- ── Header ─────────────────────────────────────────── -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <h1 class="mb-0 fs-3">
+                <i class="fas fa-ban text-danger"></i> Discontinued Products
+            </h1>
+            <p class="text-muted mb-0 small">{{ page_subtitle }}</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'epa-inventory' %}"
+               class="btn btn-secondary border-dark border-2 fw-bold btn-sm">
+                <i class="fas fa-arrow-left"></i> Back to Inventory
+            </a>
+        </div>
+    </div>
+
+    <!-- ── Stats strip ────────────────────────────────────── -->
+    <div class="row g-2 mb-3">
+        <div class="col-6 col-md-3">
+            <div class="stat-card">
+                <div class="stat-value text-dark">{{ total_count }}</div>
+                <div class="stat-label">Total Discontinued</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="stat-card">
+                <div class="stat-value text-danger">
+                    {% if reason_filter %}
+                        {{ total_count }}
+                    {% else %}
+                        {{ total_count }}
+                    {% endif %}
+                </div>
+                <div class="stat-label">Matching Filter</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="stat-card">
+                <div class="stat-value text-primary">
+                    {{ page_obj.paginator.num_pages }}
+                </div>
+                <div class="stat-label">Pages</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="stat-card">
+                <div class="stat-value text-success">
+                    {{ page_obj.start_index|default:0 }}–{{ page_obj.end_index|default:0 }}
+                </div>
+                <div class="stat-label">Showing</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Filter bar ─────────────────────────────────────── -->
+    <div class="filter-bar mb-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-5">
+                <label class="price-label mb-1">Search</label>
+                <input type="text" name="search" value="{{ search_query }}"
+                       class="form-control form-control-sm"
+                       placeholder="Name, code, or notes...">
+            </div>
+            <div class="col-md-4">
+                <label class="price-label mb-1">Reason</label>
+                <select name="reason" class="form-select form-select-sm">
+                    <option value="">All reasons</option>
+                    {% for value, label in reason_choices %}
+                        <option value="{{ value }}" {% if value == reason_filter %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit"
+                        class="btn btn-primary border-dark border-2 fw-bold btn-sm flex-grow-1">
+                    <i class="fas fa-filter"></i> Filter
+                </button>
+                <a href="{% url 'discontinued-products' %}"
+                   class="btn btn-outline-secondary border-dark border-2 fw-bold btn-sm"
+                   title="Clear filters">
+                    <i class="fas fa-times"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- ── Results summary ───────────────────────────────── -->
+    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+        <div class="text-muted small fw-bold">
+            {{ total_count }} discontinued product{{ total_count|pluralize }}
+            {% if search_query %} matching "<em>{{ search_query }}</em>"{% endif %}
+            {% if reason_filter %}
+                · reason:
+                {% for value, label in reason_choices %}
+                    {% if value == reason_filter %}<em>{{ label }}</em>{% endif %}
+                {% endfor %}
+            {% endif %}
+        </div>
+        <div class="text-muted small">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+        </div>
+    </div>
+
+    <!-- ── Table ─────────────────────────────────────────── -->
+    <div class="table-responsive">
+        <table class="table disc-table align-middle">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Type</th>
+                    <th>Reason</th>
+                    <th>Replacement</th>
+                    <th>Discontinued By</th>
+                    <th>Date</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in page_obj %}
+                <tr>
+                    <!-- Product -->
+                    <td>
+                        <div class="product-name">{{ record.product_name }}</div>
+                        <div class="product-code">{{ record.product_code }}</div>
+                        {% if record.notes %}
+                            <div class="small text-muted mt-1" title="{{ record.notes }}">
+                                <i class="fas fa-sticky-note"></i>
+                                {{ record.notes|truncatechars:60 }}
+                            </div>
+                        {% endif %}
+                    </td>
+
+                    <!-- Type -->
+                    <td>
+                        <span class="type-badge">{{ record.content_type.model|title }}</span>
+                    </td>
+
+                    <!-- Reason -->
+                    <td>
+                        <span class="reason-badge {{ record.reason }}">
+                            {{ record.get_reason_display }}
+                        </span>
+                    </td>
+
+                    <!-- Replacement -->
+                    <td>
+                        {% if record.replacement_product %}
+                            <div class="small fw-bold">{{ record.replacement_product_name }}</div>
+                            <div class="product-code">{{ record.replacement_product_code }}</div>
+                        {% else %}
+                            <span class="text-muted small">—</span>
+                        {% endif %}
+                        <button type="button"
+                                class="btn btn-link btn-sm p-0 mt-1 d-block text-decoration-none"
+                                data-bs-toggle="modal"
+                                data-bs-target="#replacementModal"
+                                data-record-id="{{ record.pk }}"
+                                data-product-name="{{ record.product_name|escapejs }}"
+                                data-current-code="{{ record.replacement_product_code }}">
+                            <i class="fas fa-edit"></i>
+                            {% if record.replacement_product %}Change{% else %}Set{% endif %}
+                        </button>
+                    </td>
+
+                    <!-- Discontinued by -->
+                    <td>
+                        {% if record.discontinued_by %}
+                            {{ record.discontinued_by.get_full_name|default:record.discontinued_by.username }}
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Date -->
+                    <td>
+                        <div class="small">{{ record.discontinued_at|date:"Y-m-d" }}</div>
+                        <div class="small text-muted">{{ record.discontinued_at|time:"H:i" }}</div>
+                    </td>
+
+                    <!-- Actions -->
+                    <td class="text-end">
+                        <form method="post"
+                              action="{% url 'reactivate-product' record.product_code %}"
+                              class="d-inline"
+                              onsubmit="return confirm('Reactivate &quot;{{ record.product_name|escapejs }}&quot;? It will reappear in inventory, Low Stock, POS and the storefront.');">
+                            {% csrf_token %}
+                            <button type="submit"
+                                    class="btn btn-success btn-sm border-dark border-2 fw-bold">
+                                <i class="fas fa-undo"></i> Reactivate
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7">
+                        <div class="empty-state">
+                            <i class="fas fa-check-circle d-block"></i>
+                            <h5 class="fw-bold mb-1">No discontinued products</h5>
+                            <p class="mb-0 small">
+                                {% if search_query or reason_filter %}
+                                    No products match your filters.
+                                    <a href="{% url 'discontinued-products' %}">Clear filters</a>
+                                {% else %}
+                                    Every product is still active. Discontinued products will appear here.
+                                {% endif %}
+                            </p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ── Pagination ────────────────────────────────────── -->
+    {% if page_obj.has_other_pages %}
+    <nav class="mt-3">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link"
+                       href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if reason_filter %}&reason={{ reason_filter }}{% endif %}">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                </li>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+                {% if num == page_obj.number %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ num }}</span>
+                    </li>
+                {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+                    <li class="page-item">
+                        <a class="page-link"
+                           href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if reason_filter %}&reason={{ reason_filter }}{% endif %}">
+                            {{ num }}
+                        </a>
+                    </li>
+                {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link"
+                       href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if reason_filter %}&reason={{ reason_filter }}{% endif %}">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+
+</div>
+
+<!-- ── Replacement modal ──────────────────────────────── -->
+<div class="modal fade" id="replacementModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="post" id="replacementForm">
+            {% csrf_token %}
+            <div class="modal-content border-dark border-3">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-exchange-alt"></i> Replacement Product
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-3">
+                        Set or change the replacement for
+                        <strong id="replacementProductName">—</strong>.
+                    </p>
+
+                    <label class="price-label">Replacement Product Code</label>
+                    <input type="text"
+                           name="replacement_product_code"
+                           id="replacementCodeInput"
+                           class="form-control border-dark border-2 font-monospace"
+                           placeholder="e.g. A000123"
+                           autocomplete="off">
+                    <div class="form-text small mt-1">
+                        Leave blank and submit to <strong>clear</strong> the current replacement.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-secondary border-dark border-2 fw-bold"
+                            data-bs-dismiss="modal">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="btn btn-success border-dark border-2 fw-bold">
+                        <i class="fas fa-save"></i> Save Replacement
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const modalEl = document.getElementById('replacementModal');
+    if (!modalEl) return;
+
+    modalEl.addEventListener('show.bs.modal', function (event) {
+        const btn         = event.relatedTarget;
+        const recordId    = btn.getAttribute('data-record-id');
+        const productName = btn.getAttribute('data-product-name');
+        const currentCode = btn.getAttribute('data-current-code') || '';
+
+        document.getElementById('replacementProductName').textContent = productName;
+        document.getElementById('replacementCodeInput').value = currentCode;
+        document.getElementById('replacementForm').action =
+            '/epa_shop/discontinued/' + recordId + '/set-replacement/';
+    });
+
+    // Focus the input when the modal finishes animating
+    modalEl.addEventListener('shown.bs.modal', function () {
+        document.getElementById('replacementCodeInput').focus();
+    });
+})();
+</script>
+{% endblock %}

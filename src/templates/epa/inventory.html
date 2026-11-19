@@ -31,7 +31,7 @@
         color: #000000;
     }
     .table-excel tbody tr:hover td { background-color: #f5f5f5; }
-    
+
     /* ============================================
        DASHBOARD LAYOUT (CHART + FINANCE)
     ============================================ */
@@ -151,7 +151,7 @@
         border: 2px solid #000000;
         margin-bottom: 20px;
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(5, 1fr);
         gap: 10px;
         align-items: center;
     }
@@ -171,14 +171,53 @@
         width: 100%;
         background: #f8f9fa;
         color: #000;
+        position: relative;
     }
     .actions-bar .action-btn:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         background: #87CEEB;
     }
+    .actions-bar .action-btn.danger-link:hover {
+        background: #f8d7da;
+    }
+    .actions-bar .action-btn .badge-count {
+        background: #dc3545;
+        color: white;
+        padding: 1px 7px;
+        border-radius: 20px;
+        font-size: 0.65rem;
+        font-weight: 700;
+        border: 1px solid #000000;
+        margin-left: 4px;
+    }
     @media (max-width: 768px) {
         .actions-bar { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    /* ============================================
+       DISCONTINUE REVIEW BANNER
+    ============================================ */
+    .discontinue-banner {
+        background: #fffbeb;
+        border: 3px solid #000;
+        border-radius: 6px;
+        padding: 12px 16px;
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .discontinue-banner .banner-text {
+        font-size: 13px;
+        font-weight: 600;
+        color: #000;
+    }
+    .discontinue-banner .banner-text i {
+        color: #d69e2e;
+        margin-right: 6px;
     }
 
     /* ============================================
@@ -240,7 +279,7 @@
     }
     .stock-badge.danger { background: #fed7d7; color: #9b2c2c; }
     .stock-badge.warning { background: #fef3c7; color: #92400e; }
-    
+
     .product-code {
         font-family: 'Courier New', monospace;
         font-size: 11px;
@@ -250,6 +289,22 @@
         padding: 2px 8px;
         border-radius: 4px;
         border: 1px solid #000000;
+    }
+
+    /* Small badge in chart panel title */
+    .title-pill {
+        font-size: 0.7rem;
+        background: #eee;
+        padding: 2px 8px;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+        font-weight: 700;
+    }
+    .title-pill.danger {
+        background: #f8d7da;
+        color: #721c24;
+        border-color: #000;
+        text-decoration: none;
     }
 </style>
 {% endblock %}
@@ -262,12 +317,19 @@
         <!-- DASHBOARD: CHART & FINANCE                   -->
         <!-- ============================================ -->
         <div class="dashboard-grid">
-            
+
             <!-- Left: Inventory Chart -->
             <div class="card-panel">
                 <div class="card-panel-title">
                     <span>Stock Distribution</span>
-                    <span style="font-size: 0.7rem; background: #eee; padding: 2px 8px; border-radius: 4px; border: 1px solid #ccc;">{{ total_products }} Products</span>
+                    <div class="d-flex gap-2">
+                        <span class="title-pill">{{ total_products }} Products</span>
+                        {% if discontinued_count %}
+                        <a href="{% url 'discontinued-products' %}" class="title-pill danger">
+                            <i class="fas fa-ban"></i> {{ discontinued_count }} discontinued
+                        </a>
+                        {% endif %}
+                    </div>
                 </div>
                 <div class="chart-container">
                     <canvas id="inventoryChart"></canvas>
@@ -289,7 +351,7 @@
                         <div class="finance-value">KSh {{ total_purchase_value|floatformat:0|default:"0" }}</div>
                         <div class="finance-sub">Cost of goods in stock</div>
                     </div>
-                    
+
                     <div class="finance-card" style="border-color: #28a745;">
                         <div class="finance-label">Expected Profit</div>
                         <div class="finance-value" style="color: #28a745;">KSh {{ expected_profit|floatformat:0|default:"0" }}</div>
@@ -321,7 +383,14 @@
             <a href="/epa_shop/categories/" class="action-btn">
                 <i class="fas fa-tags"></i> Categories
             </a>
+            <a href="{% url 'discontinued-products' %}" class="action-btn danger-link">
+                <i class="fas fa-ban"></i> Discontinued
+                {% if discontinued_count %}
+                    <span class="badge-count">{{ discontinued_count }}</span>
+                {% endif %}
+            </a>
         </div>
+
 
         <!-- ============================================ -->
         <!-- LOW STOCK ITEMS TABLE                        -->
@@ -394,7 +463,7 @@
             <p style="color: #555;">No items are currently below minimum stock level.</p>
         </div>
         {% endif %}
-        
+
     </div>
 </div>
 
@@ -403,9 +472,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const ctx = document.getElementById('inventoryChart').getContext('2d');
-    
-    // These variables should come from your Django view context
-    // If you don't have exact numbers, we can estimate based on total types
+
     const phonesCount = {{ phones_unit_count|default:0 }};
     const electronicsCount = {{ electronics_unit_count|default:0 }};
     const accessoriesCount = {{ accessories_unit_count|default:0 }};
@@ -417,9 +484,9 @@ document.addEventListener('DOMContentLoaded', function() {
             datasets: [{
                 data: [phonesCount, electronicsCount, accessoriesCount],
                 backgroundColor: [
-                    '#87CEEB', // Light Blue for Phones
-                    '#28a745', // Green for Electronics
-                    '#ffc107'  // Yellow for Accessories
+                    '#87CEEB',
+                    '#28a745',
+                    '#ffc107'
                 ],
                 borderColor: '#000000',
                 borderWidth: 2,
@@ -429,7 +496,7 @@ document.addEventListener('DOMContentLoaded', function() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            cutout: '75%', // Makes it a thin doughnut
+            cutout: '75%',
             plugins: {
                 legend: {
                     position: 'bottom',
@@ -453,37 +520,37 @@ document.addEventListener('DOMContentLoaded', function() {
     // Sort functionality for low stock table
     const table = document.getElementById('lowStockTable');
     if (!table) return;
-    
+
     const headers = table.querySelectorAll('thead th');
     headers.forEach((header, index) => {
         if (index === headers.length - 1) return;  // Skip Actions column
         header.style.cursor = 'pointer';
         header.title = 'Click to sort';
-        
+
         header.addEventListener('click', function() {
             const tbody = table.querySelector('tbody');
             const rows = Array.from(tbody.querySelectorAll('tr'));
             if (rows.length === 0) return;
-            
+
             const isAsc = this.classList.contains('asc');
             headers.forEach(h => { h.classList.remove('asc', 'desc'); });
             this.classList.add(isAsc ? 'desc' : 'asc');
-            
+
             rows.sort((a, b) => {
                 let valueA = a.cells[index].textContent.trim();
                 let valueB = b.cells[index].textContent.trim();
-                
-                if (index === 6 || index === 7) { 
+
+                if (index === 6 || index === 7) {
                     valueA = parseInt(valueA.match(/\d+/)) || 0;
                     valueB = parseInt(valueB.match(/\d+/)) || 0;
                     return isAsc ? valueA - valueB : valueB - valueA;
                 }
-                if (index === 8 || index === 9) { 
+                if (index === 8 || index === 9) {
                     valueA = parseFloat(valueA.replace(/[^0-9.]/g, '')) || 0;
                     valueB = parseFloat(valueB.replace(/[^0-9.]/g, '')) || 0;
                     return isAsc ? valueA - valueB : valueB - valueA;
                 }
-                
+
                 valueA = valueA.toLowerCase();
                 valueB = valueB.toLowerCase();
                 if (valueA < valueB) return isAsc ? -1 : 1;
