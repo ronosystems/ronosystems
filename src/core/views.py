@@ -23,7 +23,6 @@ from django.db.models import F
 from apps.settings.models import SystemSetting
 from datetime import datetime
 
-
 @login_required
 def notification_center(request):
     company = getattr(request, 'company', None) or getattr(request.user, 'company', None)
@@ -365,7 +364,7 @@ def admin_contact_messages(request):
     
     Security Note: 
     - Company Admins only see messages for THEIR company.
-    - Super Admins on the main system domain see ALL messages.
+    - Super Admins on the main system domain see ONLY system-level messages (no company).
     - Emails are sent FROM the company's email, not the system default.
     """
     # ==========================================
@@ -399,7 +398,9 @@ def admin_contact_messages(request):
     if company:
         contact_messages = ContactMessage.objects.filter(company=company).order_by('-created_at')
     else:
-        contact_messages = ContactMessage.objects.all().order_by('-created_at')
+        # On system domain, exclude messages meant for specific companies.
+        # Only fetch messages where company is NULL.
+        contact_messages = ContactMessage.objects.filter(company__isnull=True).order_by('-created_at')
 
     # ==========================================
     # 4. HANDLE REPLY SUBMISSION (POST)
@@ -414,6 +415,11 @@ def admin_contact_messages(request):
         # STRICT SECURITY: Ensure a company admin can only reply to THEIR messages
         if company and msg.company != company:
             messages.error(request, "Invalid message selected. You do not own this message.")
+            return redirect('admin_contact_messages')
+
+        # STRICT SECURITY: Prevent super admin from replying to company messages via POST
+        if not company and msg.company is not None:
+            messages.error(request, "You cannot reply to company-specific messages from the system domain.")
             return redirect('admin_contact_messages')
 
         if not reply_text:
@@ -536,6 +542,7 @@ def admin_contact_messages(request):
         'contact_messages': contact_messages,
         'current_company': company,
     })
+
 
 @login_required
 def delete_contact_messages(request):

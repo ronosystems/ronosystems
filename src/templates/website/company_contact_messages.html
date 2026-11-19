@@ -6,37 +6,156 @@
 {% block content %}
 <style>
     /* ============================================
-       PROFESSIONAL CONTACT MESSAGES STYLES
+       ROW LIST LAYOUT STYLES
     ============================================ */
     
-    /* Table Styles */
-    .msg-table th {
-        background-color: #f8f9fa;
-        font-size: 11px;
-        text-transform: uppercase;
+    .msg-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .msg-card {
+        background: #ffffff;
+        border: 2px solid #000000;
+        border-radius: 8px;
+        padding: 16px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        transition: all 0.2s;
+        position: relative;
+    }
+
+    .msg-card:hover {
+        box-shadow: 0 4px 12px rgb(0, 0, 0);
+        border-color: #000000;
+    }
+
+    /* Unread Accent */
+    .msg-card.unread {
+        background-color: #ebd580;
+        border-left: 4px solid #0004fc;
+    }
+
+    /* Left Side: Details */
+    .msg-content-left {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        flex-grow: 1;
+        min-width: 0;
+    }
+
+    .msg-main-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 180px;
+    }
+
+    .msg-sender {
         font-weight: 700;
-        letter-spacing: 0.5px;
-        color: #555;
-        border-bottom: 2px solid #dee2e6;
-        padding: 12px 15px;
+        font-size: 0.95rem;
+        color: #1e293b;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .msg-company {
+        font-size: 0.75rem;
+        color: #003c91;
+        font-weight: normal;
+    }
+
+    /* Middle: Contact Info */
+    .msg-contact-info {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        font-size: 0.8rem;
+        flex-wrap: wrap;
+    }
+
+    .msg-contact-link {
+        color: #000000;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
         white-space: nowrap;
     }
-    .msg-table td {
-        font-size: 13px;
-        vertical-align: middle;
-        padding: 12px 15px;
-        border-bottom: 1px solid #eee;
+
+    .msg-contact-link:hover {
+        color: #0d6efd;
     }
-    .msg-unread {
-        background-color: #fff3cd !important;
-        font-weight: 600;
+
+    .msg-contact-link i {
+        color: #000000;
     }
-    
+
+    /* Right Side: Actions */
+    .msg-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-shrink: 0;
+    }
+
+    .msg-date {
+        font-size: 0.75rem;
+        color: #000000;
+        white-space: nowrap;
+        text-align: right;
+        margin-right: 15px;
+    }
+
     /* Status Badges */
-    .badge-replied { background-color: #198754; color: #fff; }
-    .badge-read { background-color: #0dcaf0; color: #000; }
-    .badge-unread { background-color: #dc3545; color: #fff; }
+    .badge-replied { background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .badge-read { background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+    .badge-unread { background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
     
+    .status-badge {
+        padding: 4px 10px;
+        border-radius: 50px;
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+    }
+
+    /* ============================================
+       RESPONSIVE MOBILE (Stack vertically)
+    ============================================ */
+    @media (max-width: 992px) {
+        .msg-card {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 15px;
+        }
+        .msg-content-left {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        .msg-actions {
+            justify-content: space-between;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 15px;
+        }
+        .msg-date {
+            text-align: left;
+            margin: 0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+    }
+
     /* Modal & Reply Styles */
     .modal-body pre {
         white-space: pre-wrap;
@@ -55,16 +174,11 @@
         margin-top: 15px;
         border-radius: 4px;
     }
-    .contact-icon {
-        width: 20px;
-        text-align: center;
-        display: inline-block;
-    }
 
     /* Checkbox Styling for Multi-Send */
     .method-checkbox-container {
         display: flex;
-        gap: 15px;
+        gap: 10px;
         flex-wrap: wrap;
         align-items: center;
         margin-top: 8px;
@@ -98,271 +212,198 @@
 </style>
 
 <div class="container-fluid py-4">
-    
-    <!-- Page Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <div>
-            <h2 class="h3 mb-0 text-gray-800 fw-bold">
-                <i class="fas fa-envelope text-primary me-2"></i> 
-                {{ current_company.display_name|default:current_company.name }} Messages
-            </h2>
-            <p class="text-muted mb-0" style="font-size: 13px;">Manage and reply to customer inquiries.</p>
-        </div>
-        <div>
-            <a href="{% url 'contact' %}" class="btn btn-outline-secondary btn-sm" target="_blank">
-                <i class="fas fa-external-link-alt"></i> View Public Page
-            </a>
-        </div>
-    </div>
 
-    <!-- Messages Table Card -->
-    <div class="card shadow-sm border-0">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0 msg-table">
-                    <thead>
-                        <tr>
-                            <th class="ps-4">Date</th>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>Phone</th>
-                            <th>WhatsApp</th>
-                            <th>Subject</th>
-                            <th>Status</th>
-                            <th class="text-end pe-4">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for msg in contact_messages %}
-                        <tr class="{% if not msg.is_read %}msg-unread{% endif %}">
-                            <!-- Date -->
-                            <td class="ps-4" style="white-space: nowrap;">
-                                {{ msg.created_at|date:"M d, Y" }}<br>
-                                <small class="text-muted">{{ msg.created_at|date:"H:i" }}</small>
-                            </td>
-                            
-                            <!-- Name -->
-                            <td>
-                                <div class="fw-bold text-dark">{{ msg.name }}</div>
-                                {% if msg.company %}
-                                <small class="text-muted" style="font-size:10px;">({{ msg.company.name }})</small>
-                                {% endif %}
-                            </td>
-                            
-                            <!-- Email -->
-                            <td>
-                                {% if msg.email %}
-                                <a href="mailto:{{ msg.email }}" class="text-decoration-none text-dark">
-                                    <i class="fas fa-envelope text-muted contact-icon"></i> {{ msg.email }}
-                                </a>
-                                {% else %}
-                                <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            
-                            <!-- Phone -->
-                            <td>
-                                {% if msg.phone %}
-                                <a href="tel:{{ msg.phone }}" class="text-decoration-none text-dark">
-                                    <i class="fas fa-phone text-muted contact-icon"></i> {{ msg.phone }}
-                                </a>
-                                {% else %}
-                                <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            
-                            <!-- WhatsApp -->
-                            <td>
-                                {% if msg.whatsapp_number %}
-                                <a href="https://wa.me/{{ msg.get_formatted_whatsapp }}" target="_blank" class="text-decoration-none text-success">
-                                    <i class="fab fa-whatsapp contact-icon"></i> {{ msg.whatsapp_number }}
-                                </a>
-                                {% else %}
-                                <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            
-                            <!-- Subject -->
-                            <td>
-                                <span class="text-dark">{{ msg.subject|default:"<em class='text-muted'>No Subject</em>"|safe }}</span>
-                            </td>
-                            
-                            <!-- Status -->
-                            <td>
-                                {% if msg.admin_reply %}
-                                    <span class="badge badge-replied rounded-pill px-3 py-2">Replied</span>
-                                {% elif msg.is_read %}
-                                    <span class="badge badge-read rounded-pill px-3 py-2">Read</span>
-                                {% else %}
-                                    <span class="badge badge-unread rounded-pill px-3 py-2">Unread</span>
-                                {% endif %}
-                            </td>
-                            
-                            <!-- Action -->
-                            <td class="text-end pe-4">
-                                <div class="d-flex justify-content-end gap-2">
-                                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#msgModal{{ msg.id }}">
-                                        <i class="fas fa-eye"></i> View
-                                    </button>
-                                    
-                                    <!-- Direct Delete Button -->
-                                    <form method="post" action="{% url 'delete_contact_messages' %}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this message?');">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="message_ids" value="{{ msg.id }}">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Message">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </form>
+    <!-- Messages List -->
+    <div class="msg-list">
+        {% for msg in contact_messages %}
+        <div class="msg-card {% if not msg.is_read %}unread{% endif %}">
+            
+            <!-- Left side: Main Info & Contacts -->
+            <div class="msg-content-left">
+                <div class="msg-main-info">
+                    <h5 class="msg-sender">
+                        {{ msg.name }}
+                        {% if msg.company %}
+                        <span class="msg-company">({{ msg.company.name }})</span>
+                        {% endif %}
+                    </h5>
+                    <div>
+                        {% if msg.admin_reply %}
+                            <span class="status-badge badge-replied">Replied</span>
+                        {% elif msg.is_read %}
+                            <span class="status-badge badge-read">Read</span>
+                        {% else %}
+                            <span class="status-badge badge-unread">Unread</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="msg-contact-info">
+                    {% if msg.email %}
+                    <a href="mailto:{{ msg.email }}" class="msg-contact-link">
+                        <i class="fas fa-envelope"></i> {{ msg.email }}
+                    </a>
+                    {% endif %}
+                    
+                    {% if msg.phone %}
+                    <a href="tel:{{ msg.phone }}" class="msg-contact-link">
+                        <i class="fas fa-phone"></i> {{ msg.phone }}
+                    </a>
+                    {% endif %}
+                    
+                    {% if msg.whatsapp_number %}
+                    <a href="https://wa.me/{{ msg.get_formatted_whatsapp }}" target="_blank" class="msg-contact-link text-success">
+                        <i class="fab fa-whatsapp"></i> {{ msg.whatsapp_number }}
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Right side: Date & Actions -->
+            <div class="msg-actions">
+                <div class="msg-date">
+                    {{ msg.created_at|date:"M d, Y" }} <br class="d-none d-lg-block"> {{ msg.created_at|date:"H:i" }}
+                </div>
+                
+                <button class="btn btn-primary btn-sm px-3" data-bs-toggle="modal" data-bs-target="#msgModal{{ msg.id }}">
+                    <i class="fas fa-eye me-1"></i> View & Reply
+                </button>
+                
+                <form method="post" action="{% url 'delete_contact_messages' %}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this message?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="message_ids" value="{{ msg.id }}">
+                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete Message">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </form>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- MODAL: VIEW & REPLY                        -->
+            <!-- ========================================== -->
+            <div class="modal fade" id="msgModal{{ msg.id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                    <div class="modal-content border-0 shadow-lg">
+                        
+                        <div class="modal-header bg-light border-bottom">
+                            <h5 class="modal-title fw-bold">
+                                <i class="fas fa-envelope-open-text me-2 text-primary"></i>
+                                Message from {{ msg.name }}
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        
+                        <div class="modal-body">
+                            <div class="row mb-3 bg-light p-3 rounded border">
+                                <div class="col-md-4 mb-2">
+                                    <small class="text-muted d-block">Email</small>
+                                    <strong><a href="mailto:{{ msg.email }}">{{ msg.email|default:"—" }}</a></strong>
                                 </div>
-                            </td>
-                        </tr>
-
-                        <!-- ========================================== -->
-                        <!-- MODAL: VIEW & REPLY                        -->
-                        <!-- ========================================== -->
-                        <div class="modal fade" id="msgModal{{ msg.id }}" tabindex="-1" aria-hidden="true">
-                            <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                                <div class="modal-content border-0 shadow-lg">
-                                    
-                                    <!-- Modal Header -->
-                                    <div class="modal-header bg-light border-bottom">
-                                        <h5 class="modal-title fw-bold">
-                                            <i class="fas fa-envelope-open-text me-2 text-primary"></i>
-                                            Message from {{ msg.name }}
-                                        </h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                    </div>
-                                    
-                                    <!-- Modal Body -->
-                                    <div class="modal-body">
-                                        <!-- Sender Details -->
-                                        <div class="row mb-3 bg-light p-3 rounded border">
-                                            <div class="col-md-4 mb-2">
-                                                <small class="text-muted d-block">Email</small>
-                                                <strong><a href="mailto:{{ msg.email }}">{{ msg.email|default:"—" }}</a></strong>
-                                            </div>
-                                            <div class="col-md-4 mb-2">
-                                                <small class="text-muted d-block">Phone</small>
-                                                <strong>{{ msg.phone|default:"—" }}</strong>
-                                            </div>
-                                            <div class="col-md-4 mb-2">
-                                                <small class="text-muted d-block">WhatsApp</small>
-                                                <strong>{{ msg.whatsapp_number|default:"—" }}</strong>
-                                            </div>
-                                            <div class="col-md-12 mt-2">
-                                                <small class="text-muted d-block">Subject</small>
-                                                <strong>{{ msg.subject|default:"No Subject" }}</strong>
-                                            </div>
-                                        </div>
-
-                                        <!-- Original Message -->
-                                        <div class="mb-3">
-                                            <h6 class="fw-bold text-dark mb-2">Message:</h6>
-                                            <pre class="mb-0">{{ msg.message }}</pre>
-                                        </div>
-
-                                        <!-- Previous Reply (If exists) -->
-                                        {% if msg.admin_reply %}
-                                        <div class="reply-box">
-                                            <strong class="text-primary">
-                                                <i class="fas fa-reply"></i> 
-                                                Replied on {{ msg.replied_at|date:"M d, Y H:i" }}
-                                            </strong>
-                                            <div class="mt-2">
-                                                <small class="text-muted">Sent via: 
-                                                    <span class="badge bg-secondary">{{ msg.reply_method|upper }}</span>
-                                                </small>
-                                            </div>
-                                            <pre class="mb-0 mt-2" style="background:transparent; border:none; padding:0;">{{ msg.admin_reply }}</pre>
-                                        </div>
-                                        {% endif %}
-                                    </div>
-
-                                    <!-- Modal Footer / Reply Form -->
-                                    <div class="modal-footer flex-column align-items-stretch bg-white border-top">
-                                        
-                                        {% if not msg.admin_reply %}
-                                        <form method="post" action="{% url 'admin_contact_messages' %}" class="w-100">
-                                            {% csrf_token %}
-                                            <input type="hidden" name="message_id" value="{{ msg.id }}">
-                                            
-                                            <!-- Reply Textarea -->
-                                            <div class="mb-3">
-                                                <label class="form-label fw-bold text-dark">Your Reply</label>
-                                                <textarea name="reply_text" class="form-control" rows="4" required placeholder="Type your response here..."></textarea>
-                                            </div>
-                                            
-                                            <!-- Send Options (Checkboxes for multi-send) -->
-                                            <div class="mb-3">
-                                                <span class="fw-bold text-dark me-2" style="font-size: 13px;">Send via:</span>
-                                                <div class="method-checkbox-container">
-                                                    
-                                                    {% if msg.email %}
-                                                    <label class="method-checkbox">
-                                                        <!-- REMOVED 'checked' ATTRIBUTE HERE -->
-                                                        <input type="checkbox" name="reply_methods" value="email">
-                                                        <i class="fas fa-envelope text-primary"></i> Email
-                                                    </label>
-                                                    {% endif %}
-                                                    
-                                                    {% if msg.has_phone %}
-                                                    <label class="method-checkbox">
-                                                        <!-- REMOVED 'checked' ATTRIBUTE HERE -->
-                                                        <input type="checkbox" name="reply_methods" value="sms">
-                                                        <i class="fas fa-sms text-info"></i> SMS
-                                                    </label>
-                                                    {% endif %}
-
-                                                    {% if msg.has_whatsapp %}
-                                                    <label class="method-checkbox">
-                                                        <!-- REMOVED 'checked' ATTRIBUTE HERE -->
-                                                        <input type="checkbox" name="reply_methods" value="whatsapp">
-                                                        <i class="fab fa-whatsapp text-success"></i> WhatsApp
-                                                    </label>
-                                                    {% endif %}
-                                                </div>
-                                                <small class="text-muted d-block mt-1" style="font-size: 11px;">
-                                                    <i class="fas fa-info-circle"></i> Select at least one channel to send the reply.
-                                                </small>
-                                            </div>
-                                            
-                                            <!-- Action Buttons -->
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
-                                                <button type="submit" name="reply_message" value="1" class="btn btn-primary px-4 fw-bold">
-                                                    <i class="fas fa-paper-plane me-1"></i> Send Reply
-                                                </button>
-                                            </div>
-                                        </form>
-                                        {% else %}
-                                        <div class="text-end w-100">
-                                            <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
-                                        </div>
-                                        {% endif %}
-                                        
-                                    </div>
-
+                                <div class="col-md-4 mb-2">
+                                    <small class="text-muted d-block">Phone</small>
+                                    <strong>{{ msg.phone|default:"—" }}</strong>
+                                </div>
+                                <div class="col-md-4 mb-2">
+                                    <small class="text-muted d-block">WhatsApp</small>
+                                    <strong>{{ msg.whatsapp_number|default:"—" }}</strong>
+                                </div>
+                                <div class="col-md-12 mt-2">
+                                    <small class="text-muted d-block">Subject</small>
+                                    <strong>{{ msg.subject|default:"No Subject" }}</strong>
                                 </div>
                             </div>
-                        </div>
-                        <!-- END MODAL -->
 
-                        {% empty %}
-                        <!-- Empty State -->
-                        <tr>
-                            <td colspan="8" class="text-center py-5">
-                                <div class="d-flex flex-column align-items-center justify-content-center">
-                                    <i class="fas fa-inbox text-muted mb-3" style="font-size: 4rem; opacity: 0.5;"></i>
-                                    <h5 class="text-muted fw-bold">No messages yet</h5>
-                                    <p class="text-muted mb-0">When customers submit the contact form, they will appear here.</p>
+                            <div class="mb-3">
+                                <h6 class="fw-bold text-dark mb-2">Message:</h6>
+                                <pre class="mb-0">{{ msg.message }}</pre>
+                            </div>
+
+                            {% if msg.admin_reply %}
+                            <div class="reply-box">
+                                <strong class="text-primary">
+                                    <i class="fas fa-reply"></i> 
+                                    Replied on {{ msg.replied_at|date:"M d, Y H:i" }}
+                                </strong>
+                                <div class="mt-2">
+                                    <small class="text-muted">Sent via: 
+                                        <span class="badge bg-secondary">{{ msg.reply_method|upper }}</span>
+                                    </small>
                                 </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                                <pre class="mb-0 mt-2" style="background:transparent; border:none; padding:0;">{{ msg.admin_reply }}</pre>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="modal-footer flex-column align-items-stretch bg-white border-top">
+                            {% if not msg.admin_reply %}
+                            <form method="post" action="{% url 'admin_contact_messages' %}" class="w-100">
+                                {% csrf_token %}
+                                <input type="hidden" name="message_id" value="{{ msg.id }}">
+                                
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold text-dark">Your Reply</label>
+                                    <textarea name="reply_text" class="form-control" rows="4" required placeholder="Type your response here..."></textarea>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <span class="fw-bold text-dark me-2" style="font-size: 13px;">Send via:</span>
+                                    <div class="method-checkbox-container">
+                                        {% if msg.email %}
+                                        <label class="method-checkbox">
+                                            <input type="checkbox" name="reply_methods" value="email">
+                                            <i class="fas fa-envelope text-primary"></i> Email
+                                        </label>
+                                        {% endif %}
+                                        
+                                        {% if msg.has_phone %}
+                                        <label class="method-checkbox">
+                                            <input type="checkbox" name="reply_methods" value="sms">
+                                            <i class="fas fa-sms text-info"></i> SMS
+                                        </label>
+                                        {% endif %}
+
+                                        {% if msg.has_whatsapp %}
+                                        <label class="method-checkbox">
+                                            <input type="checkbox" name="reply_methods" value="whatsapp">
+                                            <i class="fab fa-whatsapp text-success"></i> WhatsApp
+                                        </label>
+                                        {% endif %}
+                                    </div>
+                                    <small class="text-muted d-block mt-1" style="font-size: 11px;">
+                                        <i class="fas fa-info-circle"></i> Select at least one channel to send the reply.
+                                    </small>
+                                </div>
+                                
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" name="reply_message" value="1" class="btn btn-primary px-4 fw-bold">
+                                        <i class="fas fa-paper-plane me-1"></i> Send Reply
+                                    </button>
+                                </div>
+                            </form>
+                            {% else %}
+                            <div class="text-end w-100">
+                                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+            <!-- END MODAL -->
+
+        </div>
+        {% empty %}
+        <!-- Empty State -->
+        <div class="w-100 text-center" style="padding: 60px 20px; background: #fff; border-radius: 12px; border: 1px dashed #cbd5e1;">
+            <div class="d-flex flex-column align-items-center justify-content-center">
+                <i class="fas fa-inbox text-muted mb-3" style="font-size: 4rem; opacity: 0.5;"></i>
+                <h5 class="text-muted fw-bold">No messages yet</h5>
+                <p class="text-muted mb-0">When customers submit the contact form, they will appear here.</p>
             </div>
         </div>
+        {% endfor %}
     </div>
 </div>
 {% endblock %}
