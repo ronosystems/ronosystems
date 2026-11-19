@@ -1,4 +1,4 @@
-# apps/company/employee_views.py
+# apps/accounts/staff_views.py
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
@@ -17,7 +17,6 @@ from apps.companies.support_utils import (
 
 User = get_user_model()
 
-
 # ============================================
 # HELPER FUNCTIONS
 # ============================================
@@ -34,7 +33,6 @@ def get_roles():
         ('mpesa_agent', 'M-Pesa Agent'),
     ]
 
-
 def get_branches(company):
     """Get branches for the company"""
     return Branch.objects.filter(company=company, is_active=True)
@@ -43,9 +41,6 @@ def get_branches(company):
 @login_required
 def employee_list(request):
     """List employees for the logged-in user's company"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
     
     if not company:
@@ -54,7 +49,6 @@ def employee_list(request):
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
     
-    # Check if user is authorized (support mode = always authorized)
     is_authorized = (
         is_viewing_company or
         request.user.is_company_admin or 
@@ -68,14 +62,12 @@ def employee_list(request):
         messages.error(request, 'You do not have permission to view employees.')
         return redirect('/dashboard/')
     
-    # Get employees for this company
     employees = User.objects.filter(
         company=company
     ).exclude(
         role='super_admin'
     ).order_by('-created_at')
     
-    # Search functionality
     search_query = request.GET.get('search', '')
     if search_query:
         employees = employees.filter(
@@ -86,17 +78,14 @@ def employee_list(request):
             Q(staff_id__icontains=search_query)
         )
     
-    # Filter by role
     role_filter = request.GET.get('role', '')
     if role_filter:
         employees = employees.filter(role=role_filter)
     
-    # Filter by branch
     branch_filter = request.GET.get('branch', '')
     if branch_filter:
         employees = employees.filter(branch_id=branch_filter)
     
-    # Stats
     stats = {
         'total_employees': User.objects.filter(company=company).count(),
         'managers': User.objects.filter(company=company, role='company_manager').count(),
@@ -107,7 +96,6 @@ def employee_list(request):
         'mpesa_agents': User.objects.filter(company=company, role='mpesa_agent').count(),
     }
     
-    # Get branches for filter
     branches = Branch.objects.filter(company=company, is_active=True)
     
     context = {
@@ -128,16 +116,7 @@ def employee_list(request):
 
 @login_required
 def employee_detail(request, pk):
-    """
-    View employee details for the active company.
-
-    - Company admin/manager: sees employees of their own company.
-    - Super admin in support mode: sees employees of the active company.
-    - Unauthorized roles: redirected back to the list.
-    """
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
+    """View employee details for the active company."""
     company, is_viewing_company = get_active_company(request)
 
     if not company:
@@ -146,7 +125,6 @@ def employee_detail(request, pk):
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
 
-    # ---- Authorization ----
     is_authorized = (
         is_viewing_company or
         request.user.is_company_admin or
@@ -158,9 +136,8 @@ def employee_detail(request, pk):
 
     if not is_authorized:
         messages.error(request, 'You do not have permission to view employee details.')
-        return redirect('employee-list')
+        return redirect('staff:employee-list')
 
-    # ---- Fetch employee scoped to the active company ----
     employee = get_object_or_404(
         User.objects.select_related('company', 'branch'),
         pk=pk,
@@ -180,9 +157,6 @@ def employee_detail(request, pk):
 @login_required
 def employee_create(request):
     """Add a new employee to the company"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
     
     if not company:
@@ -191,7 +165,6 @@ def employee_create(request):
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
     
-    # Check if user is authorized (support mode = always authorized)
     is_authorized = (
         is_viewing_company or
         request.user.is_company_admin or 
@@ -203,7 +176,7 @@ def employee_create(request):
     
     if not is_authorized:
         messages.error(request, 'You do not have permission to add employees.')
-        return redirect('employee-list')
+        return redirect('staff:employee-list')
     
     if request.method == 'POST':
         try:
@@ -217,10 +190,10 @@ def employee_create(request):
             position = request.POST.get('position', '').strip()
             staff_id = request.POST.get('staff_id', '').strip()
             branch_id = request.POST.get('branch_id', '')
+            hire_date = request.POST.get('hire_date', '').strip()
             password = request.POST.get('password', '')
             confirm_password = request.POST.get('confirm_password', '')
             
-            # Validation
             if not all([first_name, last_name, email, username, password, confirm_password]):
                 messages.error(request, 'Please fill in all required fields.')
                 return render(request, 'company/employees/form.html', {
@@ -265,7 +238,6 @@ def employee_create(request):
                     'page_subtitle': 'Add a new employee to your company',
                 })
             
-            # Validate password
             try:
                 validate_password(password)
             except ValidationError as e:
@@ -279,7 +251,6 @@ def employee_create(request):
                     'page_subtitle': 'Add a new employee to your company',
                 })
             
-            # Create employee
             user = User.objects.create_user(
                 username=username,
                 email=email,
@@ -293,12 +264,13 @@ def employee_create(request):
                 position=position,
                 staff_id=staff_id,
                 branch_id=branch_id if branch_id else None,
+                hire_date=hire_date if hire_date else None,
                 is_active=True,
                 is_verified=True,
             )
             
             messages.success(request, f'Employee {user.get_full_name()} created successfully!')
-            return redirect('employee-list')
+            return redirect('staff:employee-list')
             
         except Exception as e:
             messages.error(request, f'Error creating employee: {str(e)}')
@@ -311,7 +283,6 @@ def employee_create(request):
                 'page_subtitle': 'Add a new employee to your company',
             })
     
-    # GET request - show form
     context = {
         'company': company,
         'roles': get_roles(),
@@ -326,9 +297,6 @@ def employee_create(request):
 @login_required
 def employee_edit(request, pk):
     """Edit employee details"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
     
     if not company:
@@ -337,7 +305,6 @@ def employee_edit(request, pk):
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
     
-    # Check if user is authorized (support mode = always authorized)
     is_authorized = (
         is_viewing_company or
         request.user.is_company_admin or 
@@ -349,7 +316,7 @@ def employee_edit(request, pk):
     
     if not is_authorized:
         messages.error(request, 'You do not have permission to edit employees.')
-        return redirect('employee-list')
+        return redirect('staff:employee-list')
     
     employee = get_object_or_404(User, pk=pk, company=company)
     
@@ -365,10 +332,13 @@ def employee_edit(request, pk):
             employee.branch_id = request.POST.get('branch_id', None) or None
             employee.is_active = request.POST.get('is_active') == 'on'
             
+            hire_date = request.POST.get('hire_date', '').strip()
+            employee.hire_date = hire_date if hire_date else None
+            
             employee.save()
             
             messages.success(request, f'Employee {employee.get_full_name()} updated successfully!')
-            return redirect('employee-list')
+            return redirect('staff:employee-list')
             
         except Exception as e:
             messages.error(request, f'Error updating employee: {str(e)}')
@@ -388,9 +358,6 @@ def employee_edit(request, pk):
 @login_required
 def employee_delete(request, pk):
     """Delete employee"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
     
     if not company:
@@ -399,7 +366,6 @@ def employee_delete(request, pk):
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
     
-    # Check if user is authorized (support mode = always authorized)
     is_authorized = (
         is_viewing_company or
         request.user.is_company_admin or 
@@ -411,21 +377,20 @@ def employee_delete(request, pk):
     
     if not is_authorized:
         messages.error(request, 'You do not have permission to delete employees.')
-        return redirect('employee-list')
+        return redirect('staff:employee-list')
     
     employee = get_object_or_404(User, pk=pk, company=company)
     
-    # Prevent self-deletion (except super admin in support mode)
     if employee.id == request.user.id and not is_viewing_company:
         messages.error(request, 'You cannot delete your own account.')
-        return redirect('employee-list')
+        return redirect('staff:employee-list')
     
     if request.method == 'POST':
         try:
             name = employee.get_full_name()
             employee.delete()
             messages.success(request, f'Employee {name} deleted successfully!')
-            return redirect('employee-list')
+            return redirect('staff:employee-list')
         except Exception as e:
             messages.error(request, f'Error deleting employee: {str(e)}')
     
@@ -442,9 +407,6 @@ def employee_delete(request, pk):
 @login_required
 def employee_toggle_status(request, pk):
     """Toggle employee active status"""
-    # ============================================
-    # SUPPORT MODE: Get active company
-    # ============================================
     company, is_viewing_company = get_active_company(request)
     
     if not company:
@@ -453,7 +415,6 @@ def employee_toggle_status(request, pk):
         messages.warning(request, 'You are not assigned to any company.')
         return redirect('/dashboard/')
     
-    # Check if user is authorized (support mode = always authorized)
     is_authorized = (
         is_viewing_company or
         request.user.is_company_admin or 
@@ -465,20 +426,19 @@ def employee_toggle_status(request, pk):
     
     if not is_authorized:
         messages.error(request, 'You do not have permission to change employee status.')
-        return redirect('employee-list')
+        return redirect('staff:employee-list')
     
     employee = get_object_or_404(User, pk=pk, company=company)
     
-    # Prevent self-status change (except super admin in support mode)
     if employee.id == request.user.id and not is_viewing_company:
         messages.error(request, 'You cannot change your own status.')
-        return redirect('employee-list')
+        return redirect('staff:employee-list')
     
     if request.method == 'POST':
         employee.is_active = not employee.is_active
         employee.save()
         status = 'activated' if employee.is_active else 'deactivated'
         messages.success(request, f'Employee {employee.get_full_name()} has been {status}.')
-        return redirect('employee-list')
+        return redirect('staff:employee-list')
     
-    return redirect('employee-list')
+    return redirect('staff:employee-list')
