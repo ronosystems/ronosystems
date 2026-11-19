@@ -297,6 +297,34 @@ def settings_company(request):
                 company.about_story = about_story
                 text_changed = True
 
+                
+            # --- NEW: Social Media Links ---
+            facebook_url    = request.POST.get('facebook_url', '').strip()
+            twitter_url     = request.POST.get('twitter_url', '').strip()
+            instagram_url   = request.POST.get('instagram_url', '').strip()
+            linkedin_url    = request.POST.get('linkedin_url', '').strip()
+            telegram_url    = request.POST.get('telegram_url', '').strip()
+            whatsapp_number = request.POST.get('whatsapp_number', '').strip()
+
+            if company.facebook_url != facebook_url:
+                company.facebook_url = facebook_url
+                text_changed = True
+            if company.twitter_url != twitter_url:
+                company.twitter_url = twitter_url
+                text_changed = True
+            if company.instagram_url != instagram_url:
+                company.instagram_url = instagram_url
+                text_changed = True
+            if company.linkedin_url != linkedin_url:
+                company.linkedin_url = linkedin_url
+                text_changed = True
+            if company.telegram_url != telegram_url:
+                company.telegram_url = telegram_url
+                text_changed = True
+            if company.whatsapp_number != whatsapp_number:
+                company.whatsapp_number = whatsapp_number
+                text_changed = True
+
             # Safe integer parsing
             try:
                 new_founded = int(founded_year_raw) if founded_year_raw else None

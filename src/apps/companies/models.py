@@ -113,9 +113,6 @@ class BusinessType(models.Model):
         ordering = ['name']
 
 
-
-
-
 class CompanyApplication(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending Review'),
@@ -157,9 +154,6 @@ class CompanyApplication(models.Model):
 
     def __str__(self):
         return f"{self.company_name} - {self.admin_email} ({self.status})"
-
-
-
 
 
 # ============================================
@@ -337,6 +331,13 @@ class Company(models.Model):
         help_text="Display name override for the sidebar and page titles "
                   "(defaults to `name` if blank).",
     )
+
+    facebook_url = models.URLField(blank=True, null=True)
+    twitter_url = models.URLField(blank=True, null=True)
+    instagram_url = models.URLField(blank=True, null=True)
+    linkedin_url = models.URLField(blank=True, null=True)
+    telegram_url = models.URLField(blank=True, null=True)
+    whatsapp_number = models.CharField(max_length=20, blank=True, null=True)
 
     # ---------- Custom Domain ----------
     custom_domain = models.CharField(
@@ -1075,8 +1076,6 @@ class SupportSession(models.Model):
         self.is_active = False
         self.ended_at = timezone.now()
         self.save(update_fields=['is_active', 'ended_at'])
-
-
 
 
 # ============================================
