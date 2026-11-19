@@ -279,21 +279,21 @@ def low_stock(request):
     def is_valid(item):
         if not getattr(item, 'is_active', True):
             return False
-            
+
         # Double check the DiscontinuedProduct table just in case is_active wasn't flipped
         ct = ContentType.objects.get_for_model(item)
         if DiscontinuedProduct.objects.filter(
             company=company, content_type=ct, object_id=item.id
         ).exists():
             return False
-            
+
         return True
 
     # 1. Electronics
     for item in Electronic.objects.filter(company=company, is_active=True):
         if not is_valid(item):
             continue
-            
+
         live = _available_electronic_count(item)
         if live <= 5:
             low_stock_items.append({
@@ -302,16 +302,17 @@ def low_stock(request):
                 'brand': item.brand or '-', 'model': item.model_number or '-',
                 'specs': f"{item.ram} {item.storage}".strip() or '-',
                 'quantity': live, 'min_stock': 5,
-                'price': item.selling_price, 'purchase_price': item.purchase_price,
+                'price': float(item.selling_price or 0),
+                'purchase_price': float(item.purchase_price or 0),
                 'sku': item.model_number or '-', 'is_active': item.is_active,
-                'created_at': item.created_at,
+                'created_at': item.created_at.isoformat() if item.created_at else None,
             })
 
     # 2. Phones
     for item in Phone.objects.filter(company=company, is_active=True):
         if not is_valid(item):
             continue
-            
+
         live = _available_phone_count(item)
         if live <= 5:
             low_stock_items.append({
@@ -320,16 +321,17 @@ def low_stock(request):
                 'brand': item.brand or '-', 'model': item.model or '-',
                 'specs': f"{item.ram} {item.storage_capacity}".strip() or '-',
                 'quantity': live, 'min_stock': 5,
-                'price': item.selling_price, 'purchase_price': item.purchase_price,
+                'price': float(item.selling_price or 0),
+                'purchase_price': float(item.purchase_price or 0),
                 'sku': item.imei or '-', 'is_active': item.is_active,
-                'created_at': item.created_at,
+                'created_at': item.created_at.isoformat() if item.created_at else None,
             })
 
     # 3. Accessories
     for item in Accessory.objects.filter(company=company, is_active=True):
         if not is_valid(item):
             continue
-            
+
         live = item.total_quantity_in_stock
         if live <= 5:
             low_stock_items.append({
@@ -338,21 +340,25 @@ def low_stock(request):
                 'brand': item.brand or '-', 'model': item.model or '-',
                 'specs': item.accessory_type or '-',
                 'quantity': live, 'min_stock': 5,
-                'price': item.selling_price, 'purchase_price': item.purchase_price,
+                'price': float(item.selling_price or 0),
+                'purchase_price': float(item.purchase_price or 0),
                 'sku': item.model or '-', 'is_active': item.is_active,
-                'created_at': item.created_at,
+                'created_at': item.created_at.isoformat() if item.created_at else None,
             })
 
-    # ── Filters ──
+    # Sort by lowest quantity first
+    low_stock_items.sort(key=lambda x: x['quantity'])
+
+    # ── Filters (server-side, kept for direct URL links / bookmarks) ──
     search_query = request.GET.get('search', '')
     if search_query:
-        search_lower = search_query.lower()
+        s = search_query.lower()
         low_stock_items = [
             i for i in low_stock_items
-            if search_lower in i['name'].lower()
-            or search_lower in i['brand'].lower()
-            or search_lower in i['model'].lower()
-            or search_lower in i['product_code'].lower()
+            if s in i['name'].lower()
+            or s in i['brand'].lower()
+            or s in i['model'].lower()
+            or s in i['product_code'].lower()
         ]
 
     category_filter = request.GET.get('category', '')
@@ -368,35 +374,39 @@ def low_stock(request):
         elif stock_filter == 'medium':
             low_stock_items = [i for i in low_stock_items if 6 <= i['quantity'] <= 10]
 
-    # Sort by lowest quantity first
-    low_stock_items.sort(key=lambda x: x['quantity'])
+    # ── Pagination (server-side, kept for initial HTML snapshot) ──
+    per_page_raw = request.GET.get('per_page', '10')
+    per_page = per_page_raw if per_page_raw == 'all' else int(per_page_raw or 10)
 
-    # ── Pagination ──
-    per_page = int(request.GET.get('per_page', 10))
-    paginator = Paginator(low_stock_items, per_page)
-    page = request.GET.get('page', 1)
-
-    try:
-        page_obj = paginator.page(page)
-    except PageNotAnInteger:
-        page_obj = paginator.page(1)
-    except EmptyPage:
-        page_obj = paginator.page(paginator.num_pages)
+    if per_page == 'all':
+        page_obj = None  # client-side JS handles it
+    else:
+        paginator = Paginator(low_stock_items, per_page)
+        page = request.GET.get('page', 1)
+        try:
+            page_obj = paginator.page(page)
+        except PageNotAnInteger:
+            page_obj = paginator.page(1)
+        except EmptyPage:
+            page_obj = paginator.page(paginator.num_pages)
 
     context = {
-        'company': company, 
-        'page_obj': page_obj, 
+        'company': company,
+        'page_obj': page_obj,
         'total_count': len(low_stock_items),
         'low_stock_count': len(low_stock_items),
-        'search_query': search_query, 
+        'search_query': search_query,
         'category_filter': category_filter,
-        'stock_filter': stock_filter, 
-        'per_page': per_page,
+        'stock_filter': stock_filter,
+        'per_page': per_page if per_page != 'all' else 10,
         'is_viewing_company': is_viewing_company,
         'page_title': 'Low Stock Items',
         'page_subtitle': 'Items that need restocking',
+        # ✅ NEW: full list as JSON string for client-side filtering
+        'all_low_stock_json': json.dumps(low_stock_items, default=str),
     }
     return render(request, 'epa/low_stock.html', context)
+
 
 
 # ============================================

@@ -93,6 +93,7 @@
         font-weight: 600;
         border: 1px solid #000000;
         white-space: nowrap;
+        display: inline-block;
     }
     .stock-critical {
         background: #dc3545;
@@ -180,7 +181,6 @@
         border-radius: 0 !important;
     }
 
-    /* Two-row header layout for clean spacing */
     .card-header-inner {
         display: flex;
         flex-direction: column;
@@ -237,7 +237,6 @@
         flex-shrink: 0;
     }
 
-    /* Header select controls */
     .card-header-actions-row .header-select {
         padding: 5px 10px;
         border: 2px solid #000000;
@@ -258,7 +257,6 @@
         box-shadow: 0 0 0 3px rgba(3, 106, 119, 0.25);
     }
 
-    /* Spacer to push Back/Products right on wide screens */
     .card-header-actions-row .action-spacer {
         flex: 1 1 auto;
     }
@@ -529,9 +527,8 @@
     ============================================ */
     .stock-level {
         display: flex;
-        flex-direction: column;
+        justify-content: center;
         align-items: center;
-        gap: 4px;
     }
     .stock-quantity {
         font-weight: 700;
@@ -610,7 +607,6 @@
        RESPONSIVE — MOBILE (≤768px)
     ============================================ */
     @media (max-width: 768px) {
-        /* Force table to scroll horizontally */
         .table-responsive {
             overflow-x: auto !important;
             -webkit-overflow-scrolling: touch;
@@ -618,7 +614,7 @@
 
         .table-excel {
             table-layout: auto;
-            min-width: 720px;
+            min-width: 850px; /* Increased min-width to fit new column */
             width: 100%;
         }
 
@@ -663,7 +659,6 @@
             font-size: 13px;
         }
 
-        /* Card header */
         .card-header { padding: 8px 10px; }
         .card-header-title-row h5 { font-size: 0.88rem; }
         .card-header-actions-row { gap: 4px; }
@@ -679,7 +674,6 @@
             max-width: 120px;
         }
 
-        /* Filter bar — one row */
         .filter-bar {
             grid-template-columns: 6fr 2fr 2fr 2fr;
             gap: 4px;
@@ -706,7 +700,6 @@
             font-size: 10px;
         }
 
-        /* Pagination — one row */
         .pagination-container {
             padding: 8px 10px;
             gap: 6px;
@@ -748,7 +741,7 @@
     ============================================ */
     @media (max-width: 480px) {
         .table-excel {
-            min-width: 680px;
+            min-width: 800px; /* Increased min-width */
         }
         .table-excel th,
         .table-excel td {
@@ -785,7 +778,6 @@
             padding: 2px 6px;
         }
 
-        /* Card header — tighter */
         .card-header { padding: 8px 10px; }
         .card-header-title-row h5 { font-size: 0.78rem; }
         .card-header-actions-row { gap: 3px; }
@@ -801,7 +793,6 @@
             max-width: 100px;
         }
 
-        /* Filter bar — same 6:2:2:2, tighter */
         .filter-bar {
             grid-template-columns: 6fr 2fr 2fr 2fr;
             gap: 3px;
@@ -830,7 +821,6 @@
             font-size: 9px;
         }
 
-        /* Pagination — one row */
         .pagination-container {
             padding: 6px 8px;
             gap: 4px;
@@ -883,7 +873,7 @@
             <div class="filter-field">
                 <label>Search</label>
                 <input type="text" class="search-input" placeholder="Search name, brand, code..."
-                       id="searchInput" value="{{ search_query }}">
+                       id="searchInput" value="{{ search_query }}" autocomplete="off">
             </div>
 
             <div class="filter-field">
@@ -910,36 +900,32 @@
 
         <!-- ============================================ -->
         <!-- LOW STOCK TABLE                              -->
-        <!-- Header: title on top row, controls on 2nd row -->
         <!-- ============================================ -->
         <div class="card">
             <div class="card-header">
                 <div class="card-header-inner">
-                    <!-- Row 1: Title -->
                     <div class="card-header-title-row">
                         <h5>
                             <i class="fas fa-exclamation-triangle"></i>
-                            Low Stock Items ({{ total_count }})
+                            Low Stock Items (<span id="headerTotalCount">{{ total_count|default:0 }}</span>)
                         </h5>
                     </div>
 
-                    <!-- Row 2: Filters + Actions -->
                     <div class="card-header-actions-row">
                         <select class="header-select" id="categoryFilter">
                             <option value="">📁 All Categories</option>
-                            <option value="Phone" {% if category_filter == 'Phone' %}selected{% endif %}>📱 Phones</option>
-                            <option value="Electronic" {% if category_filter == 'Electronic' %}selected{% endif %}>💻 Electronics</option>
-                            <option value="Accessory" {% if category_filter == 'Accessory' %}selected{% endif %}>🎧 Accessories</option>
+                            <option value="Phone">📱 Phones</option>
+                            <option value="Electronic">💻 Electronics</option>
+                            <option value="Accessory">🎧 Accessories</option>
                         </select>
 
                         <select class="header-select" id="stockFilter">
                             <option value="">📊 All Stock</option>
-                            <option value="critical" {% if stock_filter == 'critical' %}selected{% endif %}>🔴 Critical (0)</option>
-                            <option value="low" {% if stock_filter == 'low' %}selected{% endif %}>🟡 Low (1-5)</option>
-                            <option value="medium" {% if stock_filter == 'medium' %}selected{% endif %}>🟠 Medium (6-10)</option>
+                            <option value="critical">🔴 Critical (0)</option>
+                            <option value="low">🟡 Low (1-5)</option>
+                            <option value="medium">🟠 Medium (6-10)</option>
                         </select>
 
-                        <!-- Spacer pushes the Back/Products buttons right on wide screens -->
                         <span class="action-spacer"></span>
 
                         <a href="/epa_shop/inventory/" class="btn btn-secondary" title="Back to Inventory">
@@ -959,7 +945,7 @@
                     <table class="table-excel table-hover mb-0" id="lowStockTable">
                         <thead>
                             <tr>
-                                <th class="sortable-header" data-sort="id" onclick="sortTable('id')">
+                                <th class="sortable-header text-center" data-sort="id" onclick="sortTable('id')">
                                     # <span class="sort-icon"></span>
                                 </th>
                                 <th class="sortable-header" data-sort="sku" onclick="sortTable('sku')">
@@ -977,10 +963,15 @@
                                 <th class="sortable-header" data-sort="model" onclick="sortTable('model')">
                                     Model <span class="sort-icon"></span>
                                 </th>
-                                <th class="sortable-header" data-sort="stock" onclick="sortTable('stock')">
+                                <!-- ✅ NEW: Split Stock Level and Status into two columns -->
+                                <th class="sortable-header text-center" data-sort="stock" onclick="sortTable('stock')">
                                     Stock Level <span class="sort-icon"></span>
                                 </th>
-                                <th class="sortable-header" data-sort="minstock" onclick="sortTable('minstock')">
+                                <th class="text-center">
+                                    Status
+                                </th>
+                                <!-- ✅ -->
+                                <th class="sortable-header text-center" data-sort="minstock" onclick="sortTable('minstock')">
                                     Min Stock <span class="sort-icon"></span>
                                 </th>
                                 <th class="sortable-header" data-sort="price" onclick="sortTable('price')">
@@ -989,83 +980,8 @@
                                 <th class="text-center">Action</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {% for item in page_obj %}
-                            <tr data-product-code="{{ item.product_code }}" 
-                                data-product-type="{{ item.type }}"
-                                data-id="{{ forloop.counter|add:page_obj.start_index|add:-1 }}"
-                                data-sku="{{ item.product_code }}"
-                                data-name="{{ item.name }}"
-                                data-category="{{ item.type }}"
-                                data-brand="{{ item.brand }}"
-                                data-model="{{ item.model }}"
-                                data-stock="{{ item.quantity }}"
-                                data-minstock="{{ item.min_stock }}"
-                                data-price="{{ item.price }}">
-                                <td>
-                                    <span style="color: #000000;">#{{ forloop.counter|add:page_obj.start_index|add:-1 }}</span>
-                                </td>
-                                <td>
-                                    <span class="product-code" onclick="copyToClipboard('{{ item.product_code }}')" title="Click to copy product code">
-                                        {{ item.product_code }}
-                                    </span>
-                                </td>
-                                <td>
-                                    <div class="product-name-cell">
-                                        <span class="product-name">{{ item.name }}</span>
-                                    </div>
-                                </td>
-                                <td>
-                                    <span class="category-badge category-{{ item.type|lower }}">
-                                        {{ item.type }}
-                                    </span>
-                                </td>
-                                <td>{{ item.brand }}</td>
-                                <td>{{ item.model }}</td>
-                                <td>
-                                    <div class="stock-level">
-                                        <span class="stock-quantity 
-                                            {% if item.quantity <= 0 %}critical
-                                            {% elif item.quantity <= 5 %}low
-                                            {% else %}medium{% endif %}">
-                                            {{ item.quantity }}
-                                        </span>
-                                        {% if item.quantity <= 0 %}
-                                            <span class="stock-badge stock-critical">Out of Stock</span>
-                                        {% elif item.quantity <= 5 %}
-                                            <span class="stock-badge stock-low">Very Low</span>
-                                        {% else %}
-                                            <span class="stock-badge stock-medium">Low</span>
-                                        {% endif %}
-                                    </div>
-                                </td>
-                                <td>{{ item.min_stock }}</td>
-                                <td class="price-cell">KSh {{ item.price|floatformat:0 }}</td>
-                                <td class="text-center">
-                                    <div class="btn-group btn-group-sm">
-                                        <a href="/epa_shop/products/{{ item.product_code }}/restock/" class="btn btn-primary" title="Restock">
-                                            <i class="fas fa-boxes"></i> Restock
-                                        </a>
-                                        <a href="/epa_shop/products/{{ item.product_code }}/" class="btn btn-outline-info" title="View">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="10" class="text-center py-4">
-                                    <div class="empty-state">
-                                        <span class="empty-icon">✅</span>
-                                        <h3>All Products Are Well Stocked!</h3>
-                                        <p>No items are currently below minimum stock level.</p>
-                                        <a href="/epa_shop/inventory/" class="btn btn-primary">
-                                            <i class="fas fa-arrow-left"></i> Back to Inventory
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
+                        <tbody id="lowStockTbody">
+                            <!-- Rendered client-side by JS -->
                         </tbody>
                     </table>
                 </div>
@@ -1075,72 +991,19 @@
             <!-- PAGINATION — ENTRIES LEFT · PAGER RIGHT       -->
             <!-- ============================================ -->
             <div class="pagination-container">
-                <div class="entries-info">
-                    Showing <strong>{{ page_obj.start_index }}</strong>–<strong>{{ page_obj.end_index }}</strong> of <strong>{{ total_count }}</strong>
-                </div>
+                <div class="entries-info">Showing <strong>0</strong> of <strong>0</strong></div>
                 <div class="pagination-controls">
                     <span class="pagination-label">Show</span>
-                    <select class="per-page-select" id="perPageSelect" onchange="changePerPage(this.value)">
+                    <select class="per-page-select" id="perPageSelect">
                         <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
                         <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
                         <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
                         <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                        <option value="all">All</option>
                     </select>
 
                     <nav aria-label="Page navigation">
-                        <ul class="pagination">
-                            {% if page_obj.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if stock_filter %}&stock={{ stock_filter }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}" aria-label="First">
-                                    <i class="fas fa-angle-double-left"></i>
-                                </a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if stock_filter %}&stock={{ stock_filter }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}" aria-label="Previous">
-                                    <i class="fas fa-angle-left"></i>
-                                </a>
-                            </li>
-                            {% else %}
-                            <li class="page-item disabled">
-                                <span class="page-link"><i class="fas fa-angle-double-left"></i></span>
-                            </li>
-                            <li class="page-item disabled">
-                                <span class="page-link"><i class="fas fa-angle-left"></i></span>
-                            </li>
-                            {% endif %}
-                            
-                            {% for num in page_obj.paginator.page_range %}
-                                {% if num == page_obj.number %}
-                                <li class="page-item active">
-                                    <span class="page-link">{{ num }}</span>
-                                </li>
-                                {% elif num > page_obj.number|add:-3 and num < page_obj.number|add:3 %}
-                                <li class="page-item">
-                                    <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if stock_filter %}&stock={{ stock_filter }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}">{{ num }}</a>
-                                </li>
-                                {% endif %}
-                            {% endfor %}
-                            
-                            {% if page_obj.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if stock_filter %}&stock={{ stock_filter }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}" aria-label="Next">
-                                    <i class="fas fa-angle-right"></i>
-                                </a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if stock_filter %}&stock={{ stock_filter }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}" aria-label="Last">
-                                    <i class="fas fa-angle-double-right"></i>
-                                </a>
-                            </li>
-                            {% else %}
-                            <li class="page-item disabled">
-                                <span class="page-link"><i class="fas fa-angle-right"></i></span>
-                            </li>
-                            <li class="page-item disabled">
-                                <span class="page-link"><i class="fas fa-angle-double-right"></i></span>
-                            </li>
-                            {% endif %}
-                        </ul>
+                        <ul class="pagination" id="paginationUl"></ul>
                     </nav>
                 </div>
             </div>
@@ -1151,209 +1014,354 @@
 <!-- Copy Tooltip -->
 <div class="copy-tooltip" id="copyTooltip">Copied!</div>
 
-<script>
-// Sorting state
-let sortState = {
-    column: null,
-    direction: 'asc'
-};
+<!-- ============================================================ -->
+<!-- ALL LOW-STOCK ITEMS AS JSON (from Django context)            -->
+<!-- ============================================================ -->
+{{ all_low_stock_json|safe|default:"[]"|json_script:"allLowStockData" }}
 
-// Sort table function
-function sortTable(column) {
-    const table = document.getElementById('lowStockTable');
-    if (!table) return;
-    
-    const tbody = table.querySelector('tbody');
-    const rows = Array.from(tbody.querySelectorAll('tr'));
-    
-    if (rows.length === 0 || rows[0].cells.length === 1) return;
-    
-    let direction = 'asc';
-    if (sortState.column === column) {
-        direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+<script>
+// ============================================================
+// LOW STOCK — CLIENT-SIDE FILTERING
+// Behaves like the Products page: search never clears, no reload
+// ============================================================
+
+function parseLowStock() {
+    const el = document.getElementById('allLowStockData');
+    if (!el) { console.error('❌ #allLowStockData missing'); return []; }
+    let value = el.textContent;
+    for (let attempt = 0; attempt < 3; attempt++) {
+        try { value = JSON.parse(value); }
+        catch (e) { console.error('JSON.parse failed:', e); break; }
+        if (Array.isArray(value)) return value;
+        if (value && typeof value === 'object') {
+            if (Array.isArray(value.items)) return value.items;
+            if (Array.isArray(value.products)) return value.products;
+        }
+        if (typeof value !== 'string') break;
     }
-    sortState.column = column;
-    sortState.direction = direction;
-    
-    table.querySelectorAll('.sortable-header').forEach(header => {
-        header.classList.remove('active', 'asc', 'desc');
-        const icon = header.querySelector('.sort-icon');
-        if (header.dataset.sort === column) {
-            header.classList.add('active', direction);
-        } else {
-            icon.textContent = '';
-        }
-    });
-    
-    rows.sort((a, b) => {
-        let valueA, valueB;
-        
-        switch(column) {
-            case 'id':
-                valueA = parseInt(a.dataset.id) || 0;
-                valueB = parseInt(b.dataset.id) || 0;
-                break;
-            case 'sku':
-                valueA = a.dataset.sku || '';
-                valueB = b.dataset.sku || '';
-                break;
-            case 'name':
-                valueA = a.dataset.name || '';
-                valueB = b.dataset.name || '';
-                break;
-            case 'category':
-                valueA = a.dataset.category || '';
-                valueB = b.dataset.category || '';
-                break;
-            case 'brand':
-                valueA = a.dataset.brand || '';
-                valueB = b.dataset.brand || '';
-                break;
-            case 'model':
-                valueA = a.dataset.model || '';
-                valueB = b.dataset.model || '';
-                break;
-            case 'stock':
-                valueA = parseInt(a.dataset.stock) || 0;
-                valueB = parseInt(b.dataset.stock) || 0;
-                break;
-            case 'minstock':
-                valueA = parseInt(a.dataset.minstock) || 0;
-                valueB = parseInt(b.dataset.minstock) || 0;
-                break;
-            case 'price':
-                valueA = parseFloat(a.dataset.price) || 0;
-                valueB = parseFloat(b.dataset.price) || 0;
-                break;
-            default:
-                return 0;
-        }
-        
-        let comparison = 0;
-        if (typeof valueA === 'number' && typeof valueB === 'number') {
-            comparison = valueA - valueB;
-        } else {
-            comparison = String(valueA).localeCompare(String(valueB), undefined, { sensitivity: 'base' });
-        }
-        
-        return direction === 'asc' ? comparison : -comparison;
-    });
-    
-    rows.forEach(row => tbody.appendChild(row));
+    console.error('❌ Could not extract array from allLowStockData');
+    return [];
 }
 
-// Copy to clipboard
+const ALL_ITEMS = parseLowStock();
+let filteredItems = [...ALL_ITEMS];
+let currentPage = 1;
+let perPage = {{ per_page|default:10 }};
+let sortState = { column: 'stock', direction: 'asc' };
+
+const tbody = document.getElementById('lowStockTbody');
+const searchInput = document.getElementById('searchInput');
+const categoryFilter = document.getElementById('categoryFilter');
+const stockFilter = document.getElementById('stockFilter');
+const perPageSelect = document.getElementById('perPageSelect');
+const entriesInfo = document.querySelector('.entries-info');
+const paginationUl = document.getElementById('paginationUl');
+const headerTotalCount = document.getElementById('headerTotalCount');
+
+if (headerTotalCount) headerTotalCount.textContent = ALL_ITEMS.length;
+
+// ============================================================
+// UTILITIES
+// ============================================================
+function esc(s) {
+    if (s === null || s === undefined) return '';
+    return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function fmtKsh(n) {
+    return 'KSh ' + Math.round(parseFloat(n) || 0).toLocaleString();
+}
+
+function stockClass(qty) {
+    if (qty <= 0) return 'critical';
+    if (qty <= 5) return 'low';
+    return 'medium';
+}
+
+function stockBadge(qty) {
+    if (qty <= 0) return '<span class="stock-badge stock-critical">Out of Stock</span>';
+    if (qty <= 5) return '<span class="stock-badge stock-low">Very Low</span>';
+    return '<span class="stock-badge stock-medium">Low</span>';
+}
+
+// ============================================================
+// RENDER ROW
+// ============================================================
+function renderRow(item, idx) {
+    const qty = parseInt(item.quantity) || 0;
+    const code = esc(item.product_code);
+    const name = esc(item.name);
+    const type = esc(item.type);
+    const typeClass = (item.type || '').toLowerCase();
+    const minStock = parseInt(item.min_stock) || 0;
+    const price = fmtKsh(item.price);
+
+    return '<tr data-id="' + idx + '"' +
+        ' data-product-code="' + code + '"' +
+        ' data-product-type="' + type + '"' +
+        ' data-sku="' + code + '"' +
+        ' data-name="' + name + '"' +
+        ' data-category="' + type + '"' +
+        ' data-brand="' + esc(item.brand) + '"' +
+        ' data-model="' + esc(item.model) + '"' +
+        ' data-stock="' + qty + '"' +
+        ' data-minstock="' + minStock + '"' +
+        ' data-price="' + (parseFloat(item.price) || 0) + '">' +
+        '<td class="text-center"><span style="color:#000;">#' + idx + '</span></td>' +
+        '<td><span class="product-code" onclick="copyToClipboard(\'' + code + '\')" title="Click to copy product code">' + code + '</span></td>' +
+        '<td><div class="product-name-cell"><span class="product-name">' + name + '</span></div></td>' +
+        '<td><span class="category-badge category-' + typeClass + '">' + type + '</span></td>' +
+        '<td>' + esc(item.brand) + '</td>' +
+        '<td>' + esc(item.model) + '</td>' +
+        
+        // ✅ NEW: Stock Level (Number) in its own cell
+        '<td class="text-center">' +
+            '<div class="stock-level">' +
+                '<span class="stock-quantity ' + stockClass(qty) + '">' + qty + '</span>' +
+            '</div>' +
+        '</td>' +
+        
+        // ✅ NEW: Status (Badge) in its own cell
+        '<td class="text-center">' + stockBadge(qty) + '</td>' +
+
+        '<td class="text-center">' + minStock + '</td>' +
+        '<td class="price-cell">' + price + '</td>' +
+        '<td class="text-center"><div class="btn-group btn-group-sm">' +
+            '<a href="/epa_shop/products/' + code + '/restock/" class="btn btn-primary" title="Restock"><i class="fas fa-boxes"></i> Restock</a>' +
+            '<a href="/epa_shop/products/' + code + '/" class="btn btn-outline-info" title="View"><i class="fas fa-eye"></i></a>' +
+        '</div></td>' +
+    '</tr>';
+}
+
+// ============================================================
+// RENDER TABLE
+// ============================================================
+function renderTable() {
+    // Sort
+    filteredItems.sort(function (a, b) {
+        const col = sortState.column;
+        let va, vb;
+        if (col === 'id')             { va = a._idx || 0; vb = b._idx || 0; }
+        else if (col === 'sku')       { va = a.product_code || ''; vb = b.product_code || ''; }
+        else if (col === 'name')      { va = a.name || ''; vb = b.name || ''; }
+        else if (col === 'category')  { va = a.type || ''; vb = b.type || ''; }
+        else if (col === 'brand')     { va = a.brand || ''; vb = b.brand || ''; }
+        else if (col === 'model')     { va = a.model || ''; vb = b.model || ''; }
+        else if (col === 'stock')     { va = parseInt(a.quantity) || 0; vb = parseInt(b.quantity) || 0; }
+        else if (col === 'minstock')  { va = parseInt(a.min_stock) || 0; vb = parseInt(b.min_stock) || 0; }
+        else if (col === 'price')     { va = parseFloat(a.price) || 0; vb = parseFloat(b.price) || 0; }
+
+        let cmp = 0;
+        if (typeof va === 'number' && typeof vb === 'number') cmp = va - vb;
+        else cmp = String(va).localeCompare(String(vb), undefined, { sensitivity: 'base' });
+        return sortState.direction === 'asc' ? cmp : -cmp;
+    });
+
+    const total = filteredItems.length;
+    let start, end;
+    if (perPage === 'all') { start = 0; end = total; }
+    else { start = (currentPage - 1) * perPage; end = Math.min(start + perPage, total); }
+    const pageItems = filteredItems.slice(start, end);
+
+    let html = '';
+    if (pageItems.length === 0) {
+        // ✅ NEW: Colspan increased to 11 to account for the extra column
+        html = '<tr><td colspan="11" class="text-center py-4">' +
+            '<div class="empty-state">' +
+                '<span class="empty-icon">✅</span>' +
+                '<h3>No matching low-stock items</h3>' +
+                '<p>Try a different search term or clear the filters.</p>' +
+                '<a href="/epa_shop/inventory/" class="btn btn-primary"><i class="fas fa-arrow-left"></i> Back to Inventory</a>' +
+            '</div></td></tr>';
+    } else {
+        pageItems.forEach(function (item, i) { html += renderRow(item, start + i + 1); });
+    }
+    tbody.innerHTML = html;
+
+    // Entries info
+    if (entriesInfo) {
+        entriesInfo.innerHTML = (total === 0)
+            ? 'Showing <strong>0</strong> of <strong>0</strong>'
+            : 'Showing <strong>' + (start + 1) + '</strong>–<strong>' + end + '</strong> of <strong>' + total + '</strong>';
+    }
+
+    renderPagination(Math.ceil(total / (perPage === 'all' ? (total || 1) : perPage)));
+}
+
+// ============================================================
+// PAGINATION
+// ============================================================
+function renderPagination(totalPages) {
+    if (!paginationUl) return;
+    if (perPage === 'all' || totalPages <= 1) { paginationUl.innerHTML = ''; return; }
+
+    let html = '';
+    function addLink(label, page, disabled, active) {
+        if (disabled) {
+            html += '<li class="page-item disabled"><span class="page-link">' + label + '</span></li>';
+        } else if (active) {
+            html += '<li class="page-item active"><span class="page-link">' + label + '</span></li>';
+        } else {
+            html += '<li class="page-item"><a class="page-link" href="#" onclick="goToPage(' + page + ');return false;">' + label + '</a></li>';
+        }
+    }
+
+    addLink('<i class="fas fa-angle-double-left"></i>', 1, currentPage === 1, false);
+    addLink('<i class="fas fa-angle-left"></i>', currentPage - 1, currentPage === 1, false);
+
+    const s = Math.max(1, currentPage - 2);
+    const e = Math.min(totalPages, currentPage + 2);
+    for (let n = s; n <= e; n++) addLink(n, n, false, n === currentPage);
+
+    addLink('<i class="fas fa-angle-right"></i>', currentPage + 1, currentPage === totalPages, false);
+    addLink('<i class="fas fa-angle-double-right"></i>', totalPages, currentPage === totalPages, false);
+
+    paginationUl.innerHTML = html;
+}
+
+function goToPage(n) {
+    const total = perPage === 'all' ? 1 : Math.ceil(filteredItems.length / perPage);
+    if (n < 1 || n > total) return;
+    currentPage = n;
+    renderTable();
+    document.querySelector('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ============================================================
+// FILTERS — CLIENT-SIDE, SEARCH FIELD NEVER CLEARED
+// ============================================================
+function applyFilters() {
+    const term = (searchInput.value || '').trim().toLowerCase();
+    const category = categoryFilter.value || '';
+    const stockStatus = stockFilter.value || '';
+
+    filteredItems = ALL_ITEMS.filter(function (item) {
+        const haystack = [
+            item.product_code || '', item.name || '', item.brand || '',
+            item.model || '', item.type || '',
+        ].join(' ').toLowerCase();
+
+        const matchesSearch = !term || haystack.includes(term);
+        const matchesCategory = !category || item.type === category;
+
+        const qty = parseInt(item.quantity) || 0;
+        let matchesStock = true;
+        if (stockStatus === 'critical') matchesStock = qty <= 0;
+        else if (stockStatus === 'low') matchesStock = qty > 0 && qty <= 5;
+        else if (stockStatus === 'medium') matchesStock = qty > 5 && qty <= 10;
+
+        return matchesSearch && matchesCategory && matchesStock;
+    });
+
+    currentPage = 1;
+    renderTable();
+}
+
+function clearFilters() {
+    searchInput.value = '';
+    categoryFilter.value = '';
+    stockFilter.value = '';
+    applyFilters();
+    searchInput.focus();
+}
+
+// ============================================================
+// SORTING
+// ============================================================
+function sortTable(column) {
+    if (sortState.column === column) {
+        sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortState.column = column;
+        sortState.direction = 'asc';
+    }
+    document.querySelectorAll('.sortable-header').forEach(function (h) {
+        h.classList.remove('active', 'asc', 'desc');
+        const icon = h.querySelector('.sort-icon');
+        if (icon) icon.textContent = '';
+        if (h.dataset.sort === column) h.classList.add('active', sortState.direction);
+    });
+    renderTable();
+}
+
+// ============================================================
+// COPY TO CLIPBOARD
+// ============================================================
 function copyToClipboard(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(() => {
-            showCopyTooltip('Copied: ' + text);
-        }).catch(() => {
-            fallbackCopy(text);
-        });
+        navigator.clipboard.writeText(text)
+            .then(function () { showCopyTooltip('Copied: ' + text); })
+            .catch(function () { fallbackCopy(text); });
     } else {
         fallbackCopy(text);
     }
 }
-
 function fallbackCopy(text) {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    document.body.appendChild(textarea);
-    textarea.select();
-    try {
-        document.execCommand('copy');
-        showCopyTooltip('Copied: ' + text);
-    } catch (err) {
-        showCopyTooltip('Failed to copy');
-    }
-    document.body.removeChild(textarea);
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showCopyTooltip('Copied: ' + text); }
+    catch (e) { showCopyTooltip('Failed to copy'); }
+    document.body.removeChild(ta);
+}
+function showCopyTooltip(msg) {
+    const t = document.getElementById('copyTooltip');
+    t.textContent = msg;
+    t.classList.add('show');
+    t.style.left = '50%';
+    t.style.top = '50%';
+    t.style.transform = 'translate(-50%, -50%)';
+    clearTimeout(t._timeout);
+    t._timeout = setTimeout(function () { t.classList.remove('show'); }, 2000);
 }
 
-function showCopyTooltip(message) {
-    const tooltip = document.getElementById('copyTooltip');
-    tooltip.textContent = message;
-    tooltip.classList.add('show');
-    tooltip.style.left = '50%';
-    tooltip.style.top = '50%';
-    tooltip.style.transform = 'translate(-50%, -50%)';
-    
-    clearTimeout(tooltip._timeout);
-    tooltip._timeout = setTimeout(() => {
-        tooltip.classList.remove('show');
-    }, 2000);
-}
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', function () {
+    ALL_ITEMS.forEach(function (item, i) { item._idx = i + 1; });
+    filteredItems = [...ALL_ITEMS];
 
-// Apply filters
-function applyFilters() {
-    const search = document.getElementById('searchInput').value;
-    const category = document.getElementById('categoryFilter').value;
-    const stock = document.getElementById('stockFilter').value;
-    const currentUrl = new URL(window.location.href);
-    
-    if (search) currentUrl.searchParams.set('search', search);
-    else currentUrl.searchParams.delete('search');
-    
-    if (category) currentUrl.searchParams.set('category', category);
-    else currentUrl.searchParams.delete('category');
-    
-    if (stock) currentUrl.searchParams.set('stock', stock);
-    else currentUrl.searchParams.delete('stock');
-    
-    currentUrl.searchParams.set('page', 1);
-    window.location.href = currentUrl.toString();
-}
+    // Debounced search — 300ms. Search field NEVER cleared. No reload.
+    let debounceTimer;
+    searchInput.addEventListener('input', function () {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(applyFilters, 300);
+    });
 
-function clearFilters() {
-    window.location.href = window.location.pathname;
-}
+    // Dropdowns — instant filter (no reload)
+    categoryFilter.addEventListener('change', applyFilters);
+    stockFilter.addEventListener('change', applyFilters);
 
-function changePerPage(value) {
-    const currentUrl = new URL(window.location.href);
-    currentUrl.searchParams.set('per_page', value);
-    currentUrl.searchParams.set('page', 1);
-    window.location.href = currentUrl.toString();
-}
-
-// Init
-document.addEventListener('DOMContentLoaded', function() {
-    const searchInput = document.getElementById('searchInput');
-    const categoryFilter = document.getElementById('categoryFilter');
-    const stockFilter = document.getElementById('stockFilter');
-    let searchTimeout;
-    
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(applyFilters, 500);
+    // Per-page selector — client-side
+    if (perPageSelect) {
+        perPageSelect.addEventListener('change', function () {
+            perPage = this.value === 'all' ? 'all' : parseInt(this.value);
+            currentPage = 1;
+            renderTable();
         });
     }
-    
-    if (categoryFilter) categoryFilter.addEventListener('change', applyFilters);
-    if (stockFilter) stockFilter.addEventListener('change', applyFilters);
-    
-    // Default sort by stock ascending (lowest first)
-    const table = document.getElementById('lowStockTable');
-    if (table) {
-        sortState.column = 'stock';
-        sortState.direction = 'asc';
-        const stockHeader = table.querySelector('[data-sort="stock"]');
-        if (stockHeader) {
-            stockHeader.classList.add('active', 'asc');
-            const icon = stockHeader.querySelector('.sort-icon');
-            icon.textContent = '▲';
-        }
-        sortTable('stock');
-    }
-});
 
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput && document.activeElement === searchInput) {
+    // Escape clears search only
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && document.activeElement === searchInput) {
             searchInput.value = '';
             applyFilters();
         }
+    });
+
+    // Default sort indicator on Stock Level (ascending = lowest first)
+    const stockHeader = document.querySelector('.sortable-header[data-sort="stock"]');
+    if (stockHeader) {
+        stockHeader.classList.add('active', 'asc');
+        const icon = stockHeader.querySelector('.sort-icon');
+        if (icon) icon.textContent = '▲';
     }
+
+    renderTable();
 });
 </script>
 {% endblock %}
