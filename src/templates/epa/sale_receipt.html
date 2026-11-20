@@ -30,7 +30,7 @@
         padding: 20px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.08);
         position: relative;
-        overflow: visible; /* Changed from hidden so the watermark isn't clipped */
+        overflow: visible;
     }
 
     .etr-receipt {
@@ -96,11 +96,11 @@
     /* Faded watermark variant */
     .payment-stamp-wrap.is-watermark {
         position: absolute;
-        top: 45%;
+        top: 50%;
         left: 50%;
         transform: translate(-50%, -50%) rotate(-20deg);
         z-index: 0;
-        opacity: 0.30; 
+        opacity: 0.20; 
         margin: 0;
     }
     .payment-stamp-wrap.is-watermark .payment-stamp {
@@ -110,11 +110,12 @@
         transform: none;
         opacity: 1;
     }
+    
+    /* Ensure content sits above the watermark */
     .etr-receipt > *:not(.payment-stamp-wrap.is-watermark) {
         position: relative;
         z-index: 1;
     }
-
 
     /* ============================================ */
     /* HEADER                                        */
@@ -479,21 +480,25 @@
     /* ============================================ */
     .action-buttons {
         display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
+        gap: 8px; /* Reduced gap slightly to fit better */
+        flex-wrap: nowrap; /* Forces everything onto 1 row */
         margin-top: 20px;
         justify-content: center;
     }
 
     .action-buttons .btn {
-        padding: 10px 24px;
+        padding: 10px 12px; /* Reduced left/right padding so they fit */
         font-weight: 600;
         border-radius: 4px;
         border: 2px solid #2d3436;
-        font-size: 14px;
+        font-size: 13px; /* Slightly smaller font */
         text-decoration: none;
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
         cursor: pointer;
+        white-space: nowrap; /* Prevents text from wrapping inside the button */
     }
 
     .btn-print { background: #036a77; color: white; border-color: #036a77 !important; }
@@ -505,6 +510,11 @@
     .btn-back-dashboard:hover { background: #02515b; color: white; }
     .btn-success { background: #28a745; color: white; border-color: #28a745 !important; }
     .btn-success:hover { background: #218838; color: white; }
+    
+    /* PDF Button */
+    .btn-pdf { background: #dc3545; color: white; border-color: #dc3545 !important; }
+    .btn-pdf:hover { background: #c82333; color: white; }
+    .btn-pdf:disabled { opacity: 0.6; cursor: wait; }
 
     /* ============================================ */
     /* UNAUTHORIZED                                  */
@@ -540,14 +550,12 @@
             background: #ffffff !important;
         }
 
-        /* 1. Hide EVERYTHING (chat widget, navbar, sidebar, footer, etc.) */
         body * {
             visibility: hidden !important;
             box-shadow: none !important;
             background: transparent !important;
         }
 
-        /* 2. Re-show only the receipt wrapper + its children */
         html, body,
         .receipt-wrapper,
         .receipt-wrapper *,
@@ -557,7 +565,6 @@
             background: #ffffff !important;
         }
 
-        /* 3. Pin the receipt to the top-left of the 80mm page */
         .receipt-wrapper {
             position: absolute !important;
             top: 0 !important;
@@ -581,7 +588,6 @@
             box-sizing: border-box !important;
         }
 
-        /* 4. Hide common floating widgets + app chrome */
         .action-buttons, .btn, .alert, .breadcrumb,
         .navbar, .sidebar, .sidebar-overlay, .sidebar-footer,
         .sidebar-toggle-btn, .top-navbar, .footer,
@@ -597,7 +603,6 @@
             visibility: hidden !important;
         }
 
-        /* 5. Pure black on white inside the receipt */
         .etr-receipt, .etr-receipt * {
             border-color: #000000 !important;
             color: #000000 !important;
@@ -618,18 +623,17 @@
             color: #000000 !important;
         }
 
-        /* 6. Stamp stays opaque on print (no transparency) */
         .payment-stamp-wrap.is-watermark {
             position: absolute !important;
             left: 50% !important;
-            top: 38mm !important; /* Moves it up over RCPT NO. */
+            top: 50% !important; 
             transform: translate(-50%, -50%) rotate(-20deg) !important;
             margin: 0 !important;
-            opacity: 0.30 !important;
+            opacity: 0.20 !important;
         }
         .payment-stamp-wrap.is-watermark .payment-stamp {
-            width: 45mm !important;  /* Perfect circle, 45mm x 45mm */
-            height: 45mm !important;
+            width: 40mm !important;  
+            height: 40mm !important;
             transform: none !important;
             opacity: 1 !important;
         }
@@ -657,8 +661,6 @@
         .payment-stamp .stamp-main { font-size: 28px; }
         .payment-stamp .stamp-sub  { font-size: 9px; }
         .payment-stamp .stamp-date { font-size: 8px; }
-
-        /* Note: Watermark rules removed from here to prevent overriding print settings */
     }
 </style>
 {% if receipt_settings.custom_css %}
@@ -668,9 +670,7 @@
 
 
 {% block content %}
-{# Detect embed mode from the query string #}
 {% with is_embed=request.GET.embed %}
-{# Prepare variables for the curved stamp text #}
 {% with stamp_top=sale.company.name|upper stamp_bottom=receipt_settings.receipt_address|default:sale.company.address|default:sale.company.phone|default:"KENYA" %}
 
 {% if not sale or sale.company != company %}
@@ -687,81 +687,6 @@
 <div class="receipt-wrapper{% if is_embed %} embed{% endif %}">
     <div class="receipt-container" id="receiptContainer">
         <div class="etr-receipt">
-
-            <!-- ============================================ -->
-            <!-- WATERMARK STAMP (behind content, optional)    -->
-            <!-- ============================================ -->
-            {% if receipt_settings.show_payment_stamp and receipt_settings.stamp_style == 'watermark' %}
-                <div class="payment-stamp-wrap is-watermark">
-                    {% if sale.payment_status == 'paid' %}
-                        <div class="payment-stamp stamp-paid" title="Paid">
-                            <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
-                                <!-- dy="10" pulls the upper text downward into the center gap -->
-                                <defs>
-                                    <path id="arc-top" d="M 38,150 A 112,112 0 0,1 262,150" fill="none" />
-                                    <path id="arc-bot" d="M 38,150 A 112,112 0 0,0 262,150" fill="none" />
-                                </defs>
-                                <circle cx="150" cy="150" r="125" fill="none" stroke="currentColor" stroke-width="6"/>
-                                <circle cx="150" cy="150" r="95" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="6 4"/>
-                                <text font-size="20" font-weight="700" letter-spacing="2" fill="currentColor" dy="10"><textPath href="#arc-top" startOffset="50%" text-anchor="middle">{{ stamp_top }}</textPath></text>
-                                <text font-size="14" font-weight="600" letter-spacing="1.5" fill="currentColor"><textPath href="#arc-bot" startOffset="50%" text-anchor="middle">{{ stamp_bottom|truncatechars:28 }}</textPath></text>
-                                <text x="150" y="140" text-anchor="middle" class="stamp-main">PAID</text>
-                                <text x="150" y="165" text-anchor="middle" class="stamp-sub">{{ sale.get_payment_method_display|upper }}</text>
-                                {% if receipt_settings.stamp_show_date %}<text x="150" y="185" text-anchor="middle" class="stamp-date">{{ sale.sale_date|date:"d M Y" }}</text>{% endif %}
-                            </svg>
-                        </div>
-                    {% elif sale.payment_status == 'pending' %}
-                        <div class="payment-stamp stamp-unpaid" title="Unpaid">
-                            <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
-                                <defs>
-                                    <path id="arc-top" d="M 38,150 A 112,112 0 0,1 262,150" fill="none" />
-                                    <path id="arc-bot" d="M 38,150 A 112,112 0 0,0 262,150" fill="none" />
-                                </defs>
-                                <circle cx="150" cy="150" r="125" fill="none" stroke="currentColor" stroke-width="6"/>
-                                <circle cx="150" cy="150" r="95" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="6 4"/>
-                                <text font-size="20" font-weight="700" letter-spacing="2" fill="currentColor" dy="10"><textPath href="#arc-top" startOffset="50%" text-anchor="middle">{{ stamp_top }}</textPath></text>
-                                <text font-size="14" font-weight="600" letter-spacing="1.5" fill="currentColor"><textPath href="#arc-bot" startOffset="50%" text-anchor="middle">{{ stamp_bottom|truncatechars:28 }}</textPath></text>
-                                <text x="150" y="140" text-anchor="middle" class="stamp-main">UNPAID</text>
-                                <text x="150" y="165" text-anchor="middle" class="stamp-sub">PENDING</text>
-                                {% if receipt_settings.stamp_show_date %}<text x="150" y="185" text-anchor="middle" class="stamp-date">{{ sale.sale_date|date:"d M Y" }}</text>{% endif %}
-                            </svg>
-                        </div>
-                    {% elif sale.payment_status == 'partially_paid' %}
-                        <div class="payment-stamp stamp-partial" title="Partially Paid">
-                            <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
-                                <defs>
-                                    <path id="arc-top" d="M 38,150 A 112,112 0 0,1 262,150" fill="none" />
-                                    <path id="arc-bot" d="M 38,150 A 112,112 0 0,0 262,150" fill="none" />
-                                </defs>
-                                <circle cx="150" cy="150" r="125" fill="none" stroke="currentColor" stroke-width="6"/>
-                                <circle cx="150" cy="150" r="95" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="6 4"/>
-                                <text font-size="20" font-weight="700" letter-spacing="2" fill="currentColor" dy="10"><textPath href="#arc-top" startOffset="50%" text-anchor="middle">{{ stamp_top }}</textPath></text>
-                                <text font-size="14" font-weight="600" letter-spacing="1.5" fill="currentColor"><textPath href="#arc-bot" startOffset="50%" text-anchor="middle">{{ stamp_bottom|truncatechars:28 }}</textPath></text>
-                                <text x="150" y="140" text-anchor="middle" class="stamp-main">PARTIAL</text>
-                                <text x="150" y="165" text-anchor="middle" class="stamp-sub">PAYMENT</text>
-                                {% if receipt_settings.stamp_show_date %}<text x="150" y="185" text-anchor="middle" class="stamp-date">{{ sale.sale_date|date:"d M Y" }}</text>{% endif %}
-                            </svg>
-                        </div>
-                    {% elif sale.payment_status == 'refunded' %}
-                        <div class="payment-stamp stamp-refund" title="Refunded">
-                            <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
-                                <defs>
-                                    <path id="arc-top" d="M 38,150 A 112,112 0 0,1 262,150" fill="none" />
-                                    <path id="arc-bot" d="M 38,150 A 112,112 0 0,0 262,150" fill="none" />
-                                </defs>
-                                <circle cx="150" cy="150" r="125" fill="none" stroke="currentColor" stroke-width="6"/>
-                                <circle cx="150" cy="150" r="95" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="6 4"/>
-                                <text font-size="20" font-weight="700" letter-spacing="2" fill="currentColor" dy="10"><textPath href="#arc-top" startOffset="50%" text-anchor="middle">{{ stamp_top }}</textPath></text>
-                                <text font-size="14" font-weight="600" letter-spacing="1.5" fill="currentColor"><textPath href="#arc-bot" startOffset="50%" text-anchor="middle">{{ stamp_bottom|truncatechars:28 }}</textPath></text>
-                                <text x="150" y="140" text-anchor="middle" class="stamp-main" style="font-size: 26px;">REFUNDED</text>
-                                <text x="150" y="165" text-anchor="middle" class="stamp-sub">VOID</text>
-                                {% if receipt_settings.stamp_show_date %}<text x="150" y="185" text-anchor="middle" class="stamp-date">{{ sale.sale_date|date:"d M Y" }}</text>{% endif %}
-                            </svg>
-                        </div>
-                    {% endif %}
-                </div>
-            {% endif %}
-
 
             <!-- ============================================ -->
             <!-- HEADER                                        -->
@@ -822,7 +747,80 @@
             <!-- RECEIPT INFO — RCPT No. / Date / User / Time  -->
             <!-- ============================================ -->
             {% if receipt_settings.show_receipt_info %}
-            <div class="etr-receipt-info">
+            <div class="etr-receipt-info" style="position: relative;">
+                
+                <!-- WATERMARK STAMP ANCHORED HERE -->
+                {% if receipt_settings.show_payment_stamp and receipt_settings.stamp_style == 'watermark' %}
+                    <div class="payment-stamp-wrap is-watermark">
+                        {% if sale.payment_status == 'paid' %}
+                            <div class="payment-stamp stamp-paid" title="Paid">
+                                <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+                                    <defs>
+                                        <path id="arc-top" d="M 38,150 A 112,112 0 0,1 262,150" fill="none" />
+                                        <path id="arc-bot" d="M 38,150 A 112,112 0 0,0 262,150" fill="none" />
+                                    </defs>
+                                    <circle cx="150" cy="150" r="125" fill="none" stroke="currentColor" stroke-width="6"/>
+                                    <circle cx="150" cy="150" r="95" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="6 4"/>
+                                    <text font-size="20" font-weight="700" letter-spacing="2" fill="currentColor" dy="10"><textPath href="#arc-top" startOffset="50%" text-anchor="middle">{{ stamp_top }}</textPath></text>
+                                    <text font-size="14" font-weight="600" letter-spacing="1.5" fill="currentColor"><textPath href="#arc-bot" startOffset="50%" text-anchor="middle">{{ stamp_bottom|truncatechars:28 }}</textPath></text>
+                                    <text x="150" y="140" text-anchor="middle" class="stamp-main">PAID</text>
+                                    <text x="150" y="165" text-anchor="middle" class="stamp-sub">{{ sale.get_payment_method_display|upper }}</text>
+                                    {% if receipt_settings.stamp_show_date %}<text x="150" y="185" text-anchor="middle" class="stamp-date">{{ sale.sale_date|date:"d M Y" }}</text>{% endif %}
+                                </svg>
+                            </div>
+                        {% elif sale.payment_status == 'pending' %}
+                            <div class="payment-stamp stamp-unpaid" title="Unpaid">
+                                <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+                                    <defs>
+                                        <path id="arc-top" d="M 38,150 A 112,112 0 0,1 262,150" fill="none" />
+                                        <path id="arc-bot" d="M 38,150 A 112,112 0 0,0 262,150" fill="none" />
+                                    </defs>
+                                    <circle cx="150" cy="150" r="125" fill="none" stroke="currentColor" stroke-width="6"/>
+                                    <circle cx="150" cy="150" r="95" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="6 4"/>
+                                    <text font-size="20" font-weight="700" letter-spacing="2" fill="currentColor" dy="10"><textPath href="#arc-top" startOffset="50%" text-anchor="middle">{{ stamp_top }}</textPath></text>
+                                    <text font-size="14" font-weight="600" letter-spacing="1.5" fill="currentColor"><textPath href="#arc-bot" startOffset="50%" text-anchor="middle">{{ stamp_bottom|truncatechars:28 }}</textPath></text>
+                                    <text x="150" y="140" text-anchor="middle" class="stamp-main">UNPAID</text>
+                                    <text x="150" y="165" text-anchor="middle" class="stamp-sub">PENDING</text>
+                                    {% if receipt_settings.stamp_show_date %}<text x="150" y="185" text-anchor="middle" class="stamp-date">{{ sale.sale_date|date:"d M Y" }}</text>{% endif %}
+                                </svg>
+                            </div>
+                        {% elif sale.payment_status == 'partially_paid' %}
+                            <div class="payment-stamp stamp-partial" title="Partially Paid">
+                                <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+                                    <defs>
+                                        <path id="arc-top" d="M 38,150 A 112,112 0 0,1 262,150" fill="none" />
+                                        <path id="arc-bot" d="M 38,150 A 112,112 0 0,0 262,150" fill="none" />
+                                    </defs>
+                                    <circle cx="150" cy="150" r="125" fill="none" stroke="currentColor" stroke-width="6"/>
+                                    <circle cx="150" cy="150" r="95" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="6 4"/>
+                                    <text font-size="20" font-weight="700" letter-spacing="2" fill="currentColor" dy="10"><textPath href="#arc-top" startOffset="50%" text-anchor="middle">{{ stamp_top }}</textPath></text>
+                                    <text font-size="14" font-weight="600" letter-spacing="1.5" fill="currentColor"><textPath href="#arc-bot" startOffset="50%" text-anchor="middle">{{ stamp_bottom|truncatechars:28 }}</textPath></text>
+                                    <text x="150" y="140" text-anchor="middle" class="stamp-main">PARTIAL</text>
+                                    <text x="150" y="165" text-anchor="middle" class="stamp-sub">PAYMENT</text>
+                                    {% if receipt_settings.stamp_show_date %}<text x="150" y="185" text-anchor="middle" class="stamp-date">{{ sale.sale_date|date:"d M Y" }}</text>{% endif %}
+                                </svg>
+                            </div>
+                        {% elif sale.payment_status == 'refunded' %}
+                            <div class="payment-stamp stamp-refund" title="Refunded">
+                                <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+                                    <defs>
+                                        <path id="arc-top" d="M 38,150 A 112,112 0 0,1 262,150" fill="none" />
+                                        <path id="arc-bot" d="M 38,150 A 112,112 0 0,0 262,150" fill="none" />
+                                    </defs>
+                                    <circle cx="150" cy="150" r="125" fill="none" stroke="currentColor" stroke-width="6"/>
+                                    <circle cx="150" cy="150" r="95" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="6 4"/>
+                                    <text font-size="20" font-weight="700" letter-spacing="2" fill="currentColor" dy="10"><textPath href="#arc-top" startOffset="50%" text-anchor="middle">{{ stamp_top }}</textPath></text>
+                                    <text font-size="14" font-weight="600" letter-spacing="1.5" fill="currentColor"><textPath href="#arc-bot" startOffset="50%" text-anchor="middle">{{ stamp_bottom|truncatechars:28 }}</textPath></text>
+                                    <text x="150" y="140" text-anchor="middle" class="stamp-main" style="font-size: 26px;">REFUNDED</text>
+                                    <text x="150" y="165" text-anchor="middle" class="stamp-sub">VOID</text>
+                                    {% if receipt_settings.stamp_show_date %}<text x="150" y="185" text-anchor="middle" class="stamp-date">{{ sale.sale_date|date:"d M Y" }}</text>{% endif %}
+                                </svg>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endif %}
+                <!-- END WATERMARK -->
+
                 <div class="etr-info-cell etr-align-left">
                     <span class="etr-info-label">RCPT No.</span>
                     <span class="etr-info-value">#{{ sale.company_sale_id }}</span>
@@ -1139,6 +1137,11 @@
         <button class="btn btn-print" id="btnPrintEtr" onclick="window.print()">
             <i class="fas fa-print"></i> <span id="btnPrintLabel">Print ETR</span>
         </button>
+
+        <!-- ADDED DOWNLOAD PDF BUTTON -->
+        <button class="btn btn-pdf" id="btnDownloadPdf" onclick="downloadReceiptPdf()">
+            <i class="fas fa-file-pdf"></i> Download PDF
+        </button>
     </div>
     {% endif %}
 
@@ -1152,6 +1155,8 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<!-- HTML2PDF LIBRARY -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
 
@@ -1195,6 +1200,33 @@ document.addEventListener('DOMContentLoaded', function () {
             b.style.display = 'none';
         });
     }
+
+    // ---- Download PDF Function ----
+    window.downloadReceiptPdf = function() {
+        var element = document.getElementById('receiptContainer');
+        var btn = document.getElementById('btnDownloadPdf');
+        
+        // Change button state to show loading
+        var originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+        btn.disabled = true;
+
+        // Options for html2pdf to match the 80mm thermal structure
+        var opt = {
+            margin:       0,
+            filename:     'Receipt_{{ sale.company_sale_id }}.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true }, // scale: 2 provides high resolution text
+            jsPDF:        { unit: 'mm', format: [80, 200], orientation: 'portrait' }
+        };
+
+        // Generate and save
+        html2pdf().set(opt).from(element).save().then(function() {
+            // Restore button state
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        });
+    };
 });
 </script>
 {% endblock %}
