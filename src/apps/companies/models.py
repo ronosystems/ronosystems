@@ -1394,3 +1394,47 @@ class ContactMessage(models.Model):
         return phone # Return as-is if we don't know the format
 
 
+
+
+
+
+
+# apps/companies/models.py
+
+class Gallery(models.Model):
+    """
+    Centralized Gallery model for any company/business type.
+    Used by Chama, Electronic Shops, Poultry, etc. to showcase images.
+    """
+    company = models.ForeignKey(
+        'Company', 
+        on_delete=models.CASCADE, 
+        related_name='gallery_images'
+    )
+    title = models.CharField(max_length=200, help_text="e.g., Annual Meeting, New Arrivals")
+    description = models.TextField(blank=True, null=True)
+    
+    # We store Cloudinary public_ids as strings, just like your logo/hero fields
+    image = models.CharField(
+        max_length=255, 
+        help_text="Cloudinary public_id for the image."
+    )
+    
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'rono_company_gallery'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.title} - {self.company.name}"
+
+    @property
+    def image_url(self):
+        """Reuse the Company's static media URL builder."""
+        return Company._build_media_url(self.image)
+
+
+
+        

@@ -5,7 +5,7 @@ import logging
 import cloudinary
 import cloudinary.uploader
 
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.files.storage import default_storage
@@ -19,7 +19,7 @@ from apps.companies.support_utils import (
     is_effective_admin,
     get_effective_branch,
 )
-from apps.companies.models import Company
+from apps.companies.models import Company, Gallery # 👈 Import the new Gallery model
 from apps.company.models import Branch
 
 logger = logging.getLogger(__name__)
@@ -136,6 +136,10 @@ def _handle_media_remove(request, company, field_name, post_remove_key, resource
     return True
 
 
+
+
+
+
 # ============================================
 # DASHBOARD
 # ============================================
@@ -163,7 +167,6 @@ def settings_dashboard(request):
     return render(request, 'company/settings/dashboard.html', context)
 
 
-
 # ============================================
 # COMPANY SETTINGS
 # ============================================
@@ -171,7 +174,7 @@ def settings_dashboard(request):
 def settings_company(request):
     """
     Company settings — update company info, logo, favicon, login background, receipt logo,
-    hero media (video/image), hero text, and about page content.
+    hero media (video/image), hero text, gallery, and about page content.
     """
     company, is_viewing_company = get_active_company(request)
 
@@ -211,6 +214,7 @@ def settings_company(request):
             uploaded_receipt_logo = False
             uploaded_hero_video = False
             uploaded_hero_image = False
+            uploaded_gallery = False
 
             try:
                 if not removed_logo:
@@ -232,6 +236,26 @@ def settings_company(request):
                         request, company, 'hero_image', 'company_hero_image'
                     )
 
+                # 👈 NEW: Gallery Upload
+                gallery_photo = request.FILES.get('gallery_photo')
+                gallery_title = request.POST.get('gallery_title', '').strip()
+                gallery_desc = request.POST.get('gallery_description', '').strip()
+
+                if gallery_photo and gallery_title:
+                    public_id = _upload_company_media(
+                        gallery_photo, 
+                        company.id, 
+                        'gallery', 
+                        resource_type='image'
+                    )
+                    Gallery.objects.create(
+                        company=company,
+                        title=gallery_title,
+                        description=gallery_desc,
+                        image=public_id
+                    )
+                    uploaded_gallery = True
+
             except ValueError as e:
                 messages.error(request, str(e))
                 return redirect('company-settings-company')
@@ -242,6 +266,7 @@ def settings_company(request):
             if uploaded_receipt_logo: messages.success(request, 'Receipt logo updated.')
             if uploaded_hero_video: messages.success(request, 'Hero video updated.')
             if uploaded_hero_image: messages.success(request, 'Hero image updated.')
+            if uploaded_gallery: messages.success(request, 'Gallery photo uploaded.')
 
             # ---------- 3) Text fields ----------
             company_name = request.POST.get('company_name')
@@ -352,7 +377,7 @@ def settings_company(request):
             if not any([removed_logo, removed_favicon, removed_bg, removed_receipt_logo,
                         removed_hero_video, removed_hero_image,
                         uploaded_logo, uploaded_favicon, uploaded_bg, uploaded_receipt_logo,
-                        uploaded_hero_video, uploaded_hero_image,
+                        uploaded_hero_video, uploaded_hero_image, uploaded_gallery,
                         text_changed]):
                 messages.info(request, 'No changes.')
             else:
@@ -365,16 +390,43 @@ def settings_company(request):
 
     settings_data = get_company_settings(company)
 
+    # 👈 Fetch gallery images for the template
+    gallery_images = Gallery.objects.filter(company=company).order_by('-created_at')
+
     context = {
         'company': company,
         'settings': settings_data,
         'is_settings': True,
         'active_tab': 'company',
         'is_viewing_company': is_viewing_company,
+        'gallery_images': gallery_images,
     }
     return render(request, 'company/settings/dashboard.html', context)
 
 
+
+
+
+# ============================================
+# GALLERY DELETE
+# ============================================
+@login_required
+def settings_gallery_delete(request, pk):
+    """Delete a gallery image."""
+    company, _ = get_active_company(request)
+    if not company:
+        return redirect('/dashboard/')
+
+    gallery_item = get_object_or_404(Gallery, pk=pk, company=company)
+    
+    # Delete from Cloudinary first
+    if gallery_item.image:
+        _delete_company_media(gallery_item.image)
+    
+    # Delete from DB
+    gallery_item.delete()
+    messages.success(request, 'Gallery photo removed.')
+    return redirect('company-settings-company')
     
 
 # ============================================
