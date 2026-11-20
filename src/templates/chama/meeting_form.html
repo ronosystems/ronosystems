@@ -1,20 +1,77 @@
 {% extends 'chama_base.html' %}
 {% block title %}{% if mode == 'create' %}New Meeting{% else %}Edit Meeting{% endif %}{% endblock %}
-{% block page_title %}{% if mode == 'create' %}Schedule Meeting{% else %}Edit: {{ meeting.title }}{% endif %}{% endblock %}
 {% block content %}
 <div class="container-fluid py-2">
     <div class="card" style="border:2px solid #000; border-radius:4px; max-width:700px; margin:0 auto;">
         <div class="card-body p-4">
+            <h5 class="fw-bold mb-4"><i class="fas fa-calendar-plus me-2"></i> Schedule Meeting</h5>
             <form method="post">
                 {% csrf_token %}
-                <div class="mb-3"><label class="fw-bold">Title</label>{{ form.title }}</div>
-                <div class="mb-3"><label class="fw-bold">Date & Time</label>{{ form.scheduled_for }}</div>
-                <div class="mb-3"><label class="fw-bold">Location</label>{{ form.location }}</div>
-                <div class="mb-3"><label class="fw-bold">Agenda</label>{{ form.agenda }}</div>
-                <button type="submit" class="btn btn-dark fw-bold mt-3" style="border:2px solid #000;">Save</button>
+                
+                <div class="mb-3">
+                    <label class="fw-bold">Title</label>
+                    {{ form.title }}
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="fw-bold">Date</label>
+                        {{ form.scheduled_for }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="fw-bold">Start Time</label>
+                        {{ form.start_time }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="fw-bold">End Time</label>
+                        {{ form.end_time }}
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="fw-bold">Meeting Type</label>
+                        {{ form.meeting_type }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="fw-bold">Target Audience</label>
+                        {{ form.target_audience }}
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="fw-bold" id="location-label">Venue / Location</label>
+                    {{ form.location }}
+                </div>
+
+                <div class="mb-3">
+                    <label class="fw-bold">Agenda (What to be discussed)</label>
+                    {{ form.agenda }}
+                </div>
+
+                <button type="submit" class="btn btn-dark fw-bold mt-3" style="border:2px solid #000;">Save Meeting</button>
                 <a href="{% url 'chama:meeting_list' %}" class="btn btn-outline-dark mt-3" style="border:2px solid #000;">Cancel</a>
             </form>
         </div>
     </div>
 </div>
+
+<script>
+    // Dynamically change the Location label based on meeting type
+    document.addEventListener('DOMContentLoaded', function() {
+        const typeSelect = document.querySelector('#id_meeting_type');
+        const locationLabel = document.querySelector('#location-label');
+        
+        function updateLabel() {
+            if (typeSelect.value === 'online') {
+                locationLabel.textContent = 'Meeting Link (Zoom, Google Meet, etc.)';
+            } else {
+                locationLabel.textContent = 'Venue / Physical Location';
+            }
+        }
+        
+        typeSelect.addEventListener('change', updateLabel);
+        updateLabel(); // Run on page load
+    });
+</script>
 {% endblock %}

@@ -366,12 +366,19 @@ class LoanRepaymentForm(forms.ModelForm):
 class MeetingForm(forms.ModelForm):
     class Meta:
         model = Meeting
-        fields = ['title', 'scheduled_for', 'location', 'agenda']
+        fields = [
+            'title', 'scheduled_for', 'start_time', 'end_time', 
+            'meeting_type', 'target_audience', 'location', 'agenda'
+        ]
         widgets = {
-            'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. Monthly General Meeting'}),
-            'scheduled_for': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
-            'location': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. Main Hall'}),
+            'scheduled_for': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'start_time': forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
+            'end_time': forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
+            'title': forms.TextInput(attrs={'class': 'form-control'}),
+            'location': forms.TextInput(attrs={'class': 'form-control'}),
             'agenda': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'meeting_type': forms.Select(attrs={'class': 'form-control'}),
+            'target_audience': forms.Select(attrs={'class': 'form-control'}),
         }
 
 class AttendanceForm(forms.ModelForm):

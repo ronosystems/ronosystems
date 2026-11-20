@@ -534,14 +534,33 @@ class Expense(TimeStampedModel):
 # ============================================================
 # MEETINGS
 # ============================================================
+
 class Meeting(TimeStampedModel):
+    MEETING_TYPE_CHOICES = [
+        ('physical', 'Physical Meeting'),
+        ('online', 'Online Meeting'),
+    ]
+    
+    TARGET_AUDIENCE_CHOICES = [
+        ('all', 'All Members'),
+        ('executive', 'Executive Committee'),
+        ('department', 'Department Committee'),
+        ('treasurer', 'Treasury Committee'),
+    ]
+
     company = models.ForeignKey(
         'companies.Company', on_delete=models.CASCADE,
         related_name='chama_meetings',
     )
     title = models.CharField(max_length=200)
-    scheduled_for = models.DateTimeField()
-    location = models.CharField(max_length=200, blank=True)
+    scheduled_for = models.DateTimeField(help_text="Meeting Date")
+    start_time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
+    
+    meeting_type = models.CharField(max_length=20, choices=MEETING_TYPE_CHOICES, default='physical')
+    target_audience = models.CharField(max_length=30, choices=TARGET_AUDIENCE_CHOICES, default='all')
+    
+    location = models.CharField(max_length=200, blank=True, help_text="Physical location or online link")
     agenda = models.TextField(blank=True)
     minutes = models.TextField(blank=True)
 

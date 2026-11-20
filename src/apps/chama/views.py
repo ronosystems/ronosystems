@@ -13,6 +13,9 @@ import cloudinary.uploader
 from apps.companies.models import Company
 from functools import wraps
 from django.http import HttpResponseForbidden
+from django.utils import timezone
+from datetime import datetime
+
 from .forms import (
     MemberForm, MembershipTypeForm,
     SavingsForm, ContributionForm, FineForm,
@@ -235,6 +238,7 @@ def _send_chama_stk_push(company, phone, amount, account_reference, description)
     )
     
 
+
 # ============================================================
 # DASHBOARD
 # ============================================================
@@ -244,25 +248,21 @@ def dashboard(request):
     ctx = {'company': company}
     
     if company:
-        # --- 1. Calculate correct Outstanding Balance ---
         active_loans_qs = Loan.objects.filter(company=company, status__in=['approved', 'disbursed'])
-        
-        # Sum of (Total Repayable - Total Repaid) for every active loan
         loans_outstanding = sum(loan.balance_remaining for loan in active_loans_qs)
 
         ctx.update({
             'members_count': Member.objects.filter(company=company, status='active').count(),
+            'announcements': Announcement.objects.filter(company=company, is_active=True).order_by('-created_at')[:3],
             'savings_total': Savings.objects.filter(company=company).aggregate(t=Sum('amount'))['t'] or 0,
             'loans_active': active_loans_qs.count(),
-            'loans_outstanding': loans_outstanding, # 👈 Now shows the true remaining balance
+            'loans_outstanding': loans_outstanding,
             'pending_registrations': Registration.objects.filter(company=company, status='pending').count(),
             'pending_loans': Loan.objects.filter(company=company, status='pending').count(),
-            'meetings_upcoming': Meeting.objects.filter(company=company).order_by('-scheduled_for')[:5],
             'contributions_total': Contribution.objects.filter(company=company, paid=True).aggregate(t=Sum('amount'))['t'] or 0,
             'fines_total': Fine.objects.filter(company=company, is_paid=False).aggregate(t=Sum('amount'))['t'] or 0,
         })
 
-        # --- 2. Individual Stats for Members ---
         current_member = _get_current_member(request, company)
         if current_member and request.user.role not in ['company_admin', 'chairperson', 'super_admin']:
             current_month = timezone.localdate().strftime('%Y-%m')
@@ -292,9 +292,6 @@ def dashboard(request):
             })
 
     return render(request, 'chama/dashboard.html', ctx)
-
-
-
 
 # ============================================================
 # MEMBERS

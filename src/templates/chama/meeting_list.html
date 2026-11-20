@@ -2,8 +2,6 @@
 {% load static %}
 
 {% block title %}Meetings{% endblock %}
-{% block page_title %}Meetings{% endblock %}
-{% block page_subtitle %}Manage Chama meetings and agenda{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-2">
@@ -17,27 +15,87 @@
 
     <div class="card" style="border:2px solid #000; border-radius:4px;">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0 align-middle">
                 <thead class="table-light">
                     <tr>
-                        <th style="border-bottom:2px solid #000;">Title</th>
+                        <th style="border-bottom:2px solid #000;">Title & Agenda</th>
                         <th style="border-bottom:2px solid #000;">Date & Time</th>
-                        <th style="border-bottom:2px solid #000;">Location</th>
+                        <th style="border-bottom:2px solid #000;">Type</th>
+                        <th style="border-bottom:2px solid #000;">Target Audience</th>
+                        <th style="border-bottom:2px solid #000;">Location / Link</th>
                         <th style="border-bottom:2px solid #000;" class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for m in meetings %}
                     <tr>
-                        <td class="fw-bold">{{ m.title }}</td>
-                        <td>{{ m.scheduled_for|date:"M d, Y H:i" }}</td>
-                        <td>{{ m.location|default:"—" }}</td>
+                        <!-- Title & Agenda -->
+                        <td>
+                            <div class="fw-bold">{{ m.title }}</div>
+                            {% if m.agenda %}
+                            <small class="text-muted d-inline-block text-truncate" style="max-width: 200px;" title="{{ m.agenda }}">
+                                {{ m.agenda }}
+                            </small>
+                            {% endif %}
+                        </td>
+
+                        <!-- Date & Time -->
+                        <td>
+                            <div class="fw-bold">{{ m.scheduled_for|date:"M d, Y" }}</div>
+                            <small class="text-muted">
+                                {% if m.start_time %}
+                                    {{ m.start_time|time:"H:i A" }}
+                                    {% if m.end_time %} - {{ m.end_time|time:"H:i A" }}{% endif %}
+                                {% else %}
+                                    {{ m.scheduled_for|time:"H:i A" }}
+                                {% endif %}
+                            </small>
+                        </td>
+
+                        <!-- Meeting Type -->
+                        <td>
+                            {% if m.meeting_type == 'online' %}
+                                <span class="badge bg-primary" style="border:1px solid #000;">Online</span>
+                            {% else %}
+                                <span class="badge bg-secondary" style="border:1px solid #000;">Physical</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Target Audience -->
+                        <td>
+                            <span class="badge bg-light text-dark" style="border:1px solid #000;">
+                                {{ m.get_target_audience_display }}
+                            </span>
+                        </td>
+
+                        <!-- Location -->
+                        <td>
+                            {% if m.meeting_type == 'online' and m.location %}
+                                <a href="{{ m.location }}" target="_blank" class="text-decoration-none fw-bold">
+                                    <i class="fas fa-video text-primary"></i> Join Link
+                                </a>
+                            {% elif m.location %}
+                                <span class="text-muted"><i class="fas fa-map-marker-alt"></i> {{ m.location }}</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Actions -->
                         <td class="text-end">
+                            <!-- View Button (visible to everyone) -->
                             <a href="{% url 'chama:meeting_detail' m.pk %}" class="btn btn-sm btn-outline-dark" style="border:2px solid #000;">View</a>
+                            
+                            <!-- Edit Button (visible ONLY to super_admin, company_admin, Chairperson and Secretary) -->
+                            {% if user.role == 'chairperson' or user.role == 'secretary' or user.role == 'company_admin' or user.role == 'super_admin' %}
+                            <a href="{% url 'chama:meeting_edit' m.pk %}" class="btn btn-sm btn-primary-custom ms-1" style="border:2px solid #000; background: var(--primary-color); color: #fff;">
+                                <i class="fas fa-edit"></i> Edit
+                            </a>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="4" class="text-center py-4 text-muted">No meetings scheduled yet.</td></tr>
+                    <tr><td colspan="6" class="text-center py-4 text-muted">No meetings scheduled yet.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
