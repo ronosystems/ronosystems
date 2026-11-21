@@ -12,7 +12,7 @@ from django.views.decorators.cache import never_cache
 from apps.epa_shop.storefront import get_epa_products
 from apps.business_types.business_type_registry import BusinessTypeEnum
 from django.contrib.auth.decorators import login_required
-from apps.companies.models import ContactMessage 
+from apps.companies.models import ContactMessage, Gallery
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
@@ -175,10 +175,15 @@ def home(request):
         cart = request.session.get('cart_orders_cart', {})
         cart_count = sum(item['quantity'] for item in cart.values())
 
+        # 2. Fetch Gallery Images for the public page
+        from apps.companies.models import Gallery
+        gallery_images = Gallery.objects.filter(company=company).order_by('-created_at')[:6]
+
         context = {
             'company': company,
             'business_type_slug': bt_slug,
             'cart_count': cart_count, # Pass this to the template
+            'gallery_images': gallery_images, 
         }
 
         if bt_slug == 'epa-shop':

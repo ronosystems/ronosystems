@@ -34,6 +34,39 @@ def profile_view(request):
     """View and edit user profile"""
     user = request.user
 
+    # 👇 Sync data from the Chama Member profile (if linked)
+    try:
+        from apps.chama.models import Member
+        
+        member_record = Member.objects.filter(user=user).first()
+        
+        if member_record:
+            updated = False
+            
+            # Sync phone number
+            if not user.phone and member_record.phone:
+                user.phone = member_record.phone
+                updated = True
+                
+            # Sync first/last name
+            if not user.first_name and member_record.full_name:
+                parts = member_record.full_name.split(' ', 1)
+                user.first_name = parts[0]
+                if len(parts) > 1:
+                    user.last_name = parts[1]
+                updated = True
+                
+            # 👇 NEW: Sync National ID to Staff ID field
+            if member_record.national_id and user.staff_id != member_record.national_id:
+                user.staff_id = member_record.national_id
+                updated = True
+                
+            if updated:
+                user.save()
+                
+    except Exception as e:
+        pass
+
     context = {
         'user': user,
         'page_title': 'Profile',
@@ -41,13 +74,6 @@ def profile_view(request):
     }
     return render(request, 'account/profile.html', context)
 
-
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from django.shortcuts import redirect
-from django.contrib.auth import get_user_model
-
-User = get_user_model()
 
 @login_required
 def profile_update(request):
@@ -61,7 +87,6 @@ def profile_update(request):
         phone = request.POST.get('phone', '').strip()
         address = request.POST.get('address', '').strip()
         
-        # ✅ FIX: Look for 'staff_id' instead of 'employee_id'
         staff_id = request.POST.get('staff_id', '').strip()
 
         if email and email != user.email:
@@ -74,17 +99,24 @@ def profile_update(request):
         user.last_name = last_name
         user.phone = phone
         user.address = address
-        
-        # ✅ FIX: Save to the model field 'staff_id'
         user.staff_id = staff_id
         
         user.save()
+
+        # 👇 NEW: Also sync the phone number back to the Chama Member profile
+        try:
+            from apps.chama.models import Member
+            member_record = Member.objects.filter(user=user).first()
+            if member_record and phone:
+                member_record.phone = phone
+                member_record.save(update_fields=['phone'])
+        except Exception:
+            pass
 
         messages.success(request, 'Profile updated successfully!')
         return redirect('/profile/')
 
     return redirect('/profile/')
-
 
 
 # ============================================================
@@ -101,31 +133,27 @@ def profile_picture_upload(request):
 
     profile_pic = request.FILES['profile_picture']
 
-    # Validate file type
     allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
     if profile_pic.content_type not in allowed_types:
         messages.error(request, 'Please upload a valid image file (JPEG, PNG, GIF, WEBP).')
         return redirect('/profile/')
 
-    # Validate file size (max 5MB)
     if profile_pic.size > 5 * 1024 * 1024:
         messages.error(request, 'Image size must be less than 5MB.')
         return redirect('/profile/')
 
-    # Remember the current key so we can delete it AFTER a successful upload
     old_key = ''
     if user.profile_picture:
         old_key = getattr(user.profile_picture, 'name', '') or str(user.profile_picture)
         old_key = old_key.strip().lstrip('/')
 
-    # Upload to Cloudinary — unique public_id every time
     try:
         _cloudinary_configure()
         public_id = f"profiles/user_{user.id}_{int(time.time())}"
         result = cloudinary.uploader.upload(
             profile_pic,
             public_id=public_id,
-            overwrite=False,           # unique ID means nothing to overwrite
+            overwrite=False,
             resource_type='image',
         )
         new_key = result.get('public_id') or public_id
@@ -133,11 +161,9 @@ def profile_picture_upload(request):
         messages.error(request, f'Upload failed: {e}')
         return redirect('/profile/')
 
-    # Save the new key on the user
     user.profile_picture = new_key
     user.save()
 
-    # Delete the previous asset (best-effort, silent on failure)
     if old_key and old_key != new_key:
         try:
             _cloudinary_configure()
@@ -185,7 +211,7 @@ def account_delete(request):
         user.delete()
         logout(request)
         messages.success(request, 'Your account has been deleted successfully.')
-        return redirect('home') # or your login page
+        return redirect('home')
         
     return redirect('/profile/')
 

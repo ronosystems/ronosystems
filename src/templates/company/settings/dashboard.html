@@ -4,8 +4,6 @@
 {% block title %}Dashboard Settings{% endblock %}
 
 {% block extra_css %}
-
-
 <style>
     /* ============================================ */
     /* BASE / DESKTOP STYLES                        */
@@ -719,7 +717,7 @@
 
                     <!-- CONTENT -->
                     <div class="col-lg-10 col-md-9 settings-content-col">
-                        <form method="post" action="{% url 'company-settings-company' %}" enctype="multipart/form-data">
+                        <form method="post" action="{% url 'company-settings-company' %}" enctype="multipart/form-data" id="companySettingsForm">
                             {% csrf_token %}
                             <div class="tab-content" id="companySubContent">
 
@@ -732,7 +730,8 @@
                                                 <div class="col-md-8">
                                                     <div class="form-group">
                                                         <label class="form-label required">Company Name</label>
-                                                        <input type="text" class="form-control" name="company_name" value="{{ company.name }}" required>
+                                                        <!-- REMOVED required here so it doesn't block submit -->
+                                                        <input type="text" class="form-control" name="company_name" value="{{ company.name }}">
                                                     </div>
                                                 </div>
                                                 <div class="col-md-4">
@@ -880,68 +879,63 @@
                                                             </div>
                                                         </div>
                                                     </div>
-                                                </div>                             
-                                            </div>
-
-
-                                    <!-- 👈 ADD THIS BLOCK RIGHT HERE -->
-                                    <div class="dashed-line" style="margin: 24px 0;"></div>
-
-                                    <h6 class="mb-3 fw-bold"><i class="fas fa-images me-2"></i> Company Gallery</h6>
-                                    
-                                    <div class="row">
-                                        <!-- Upload Form -->
-                                        <div class="col-md-4">
-                                            <div class="branding-item" style="height: auto; background: #f8f9fa;">
-                                                <div class="branding-label"><i class="fas fa-cloud-upload-alt"></i> Add New Photo</div>
-                                                <div class="branding-actions" style="margin-top: 0;">
-                                                    <div class="form-group mb-2">
-                                                        <input type="text" name="gallery_title" class="form-control" placeholder="Photo Title (e.g. AGM 2026)" required>
-                                                    </div>
-                                                    <div class="form-group mb-2">
-                                                        <input type="text" name="gallery_description" class="form-control" placeholder="Description (Optional)">
-                                                    </div>
-                                                    <div class="form-group mb-3">
-                                                        <input type="file" name="gallery_photo" class="form-control" accept="image/*" required>
-                                                    </div>
-                                                    <button type="submit" class="btn btn-primary w-100 fw-bold" style="font-size: 0.85rem;">
-                                                        <i class="fas fa-upload"></i> Upload to Gallery
-                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
 
-                                        <!-- Existing Photos Grid -->
-                                        <div class="col-md-8">
-                                            <div class="row g-3">
-                                                {% for photo in gallery_images %}
-                                                <div class="col-6 col-lg-4">
-                                                    <div class="card h-100" style="border: 2px solid #000; border-radius: 4px; overflow: hidden;">
-                                                        <img src="{{ photo.image_url }}" class="card-img-top" style="height: 100px; object-fit: cover; border-bottom: 2px solid #000;">
-                                                        <div class="card-body p-2 text-center d-flex flex-column justify-content-between">
-                                                            <small class="fw-bold d-block text-truncate mb-2" title="{{ photo.title }}">{{ photo.title }}</small>
-                                                            <a href="{% url 'company-gallery-delete' photo.pk %}" class="btn btn-sm btn-outline-danger w-100" style="font-size: 0.7rem; border-width: 2px;" onclick="return confirm('Delete this photo?');">
-                                                                <i class="fas fa-trash"></i> Remove
-                                                            </a>
+                                    <!-- GALLERY SECTION (Inside main form, but WITHOUT 'required' attributes) -->
+                                    <div class="card settings-card">
+                                        <div class="card-header"><h6><i class="fas fa-images"></i> Company Gallery</h6></div>
+                                        <div class="card-body">
+                                            <div class="row">
+                                                <!-- Upload Form -->
+                                                <div class="col-md-4">
+                                                    <div class="branding-item" style="height: auto; background: #f8f9fa;">
+                                                        <div class="branding-label"><i class="fas fa-cloud-upload-alt"></i> Add New Photo</div>
+                                                        <div class="branding-actions" style="margin-top: 0;">
+                                                            <div class="form-group mb-2">
+                                                                <!-- REMOVED required -->
+                                                                <input type="text" name="gallery_title" class="form-control" placeholder="Photo Title (e.g. AGM 2026)">
+                                                            </div>
+                                                            <div class="form-group mb-2">
+                                                                <input type="text" name="gallery_description" class="form-control" placeholder="Description (Optional)">
+                                                            </div>
+                                                            <div class="form-group mb-3">
+                                                                <!-- REMOVED required -->
+                                                                <input type="file" name="gallery_photo" class="form-control" accept="image/*">
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                                {% empty %}
-                                                <div class="col-12 text-center text-muted py-4" style="border: 2px dashed #ccc; border-radius: 4px;">
-                                                    <i class="fas fa-images fa-2x mb-2" style="opacity: 0.3;"></i>
-                                                    <p class="mb-0">No gallery photos uploaded yet.</p>
+
+                                                <!-- Existing Photos Grid -->
+                                                <div class="col-md-8">
+                                                    <div class="row g-3">
+                                                        {% for photo in gallery_images %}
+                                                        <div class="col-6 col-lg-4">
+                                                            <div class="card h-100" style="border: 2px solid #000; border-radius: 4px; overflow: hidden;">
+                                                                <img src="{{ photo.image_url }}" class="card-img-top" style="height: 100px; object-fit: cover; border-bottom: 2px solid #000;">
+                                                                <div class="card-body p-2 text-center d-flex flex-column justify-content-between">
+                                                                    <small class="fw-bold d-block text-truncate mb-2" title="{{ photo.title }}">{{ photo.title }}</small>
+                                                                    <a href="{% url 'company-gallery-delete' photo.pk %}" class="btn btn-sm btn-outline-danger w-100" style="font-size: 0.7rem; border-width: 2px;" onclick="return confirm('Delete this photo?');">
+                                                                        <i class="fas fa-trash"></i> Remove
+                                                                    </a>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        {% empty %}
+                                                        <div class="col-12 text-center text-muted py-4" style="border: 2px dashed #ccc; border-radius: 4px;">
+                                                            <i class="fas fa-images fa-2x mb-2" style="opacity: 0.3;"></i>
+                                                            <p class="mb-0">No gallery photos uploaded yet.</p>
+                                                        </div>
+                                                        {% endfor %}
+                                                    </div>
                                                 </div>
-                                                {% endfor %}
                                             </div>
                                         </div>
                                     </div>
-                                    <!-- 👈 END OF GALLERY BLOCK -->
-
-                                        
-
-
-                                        </div>
-                                    </div>
+                                    
                                     {% else %}
                                     <div class="alert alert-info border-2 border-dark">
                                         <i class="fas fa-info-circle me-2"></i> Custom branding is not enabled on your current plan.
@@ -1135,7 +1129,8 @@
 
                             <div class="settings-actions">
                                 <div class="d-flex flex-wrap gap-2">
-                                    <button type="submit" class="btn btn-primary w-100 w-md-auto"><i class="fas fa-save"></i> Save Company Settings</button>
+                                    <!-- Added formnovalidate to guarantee click works -->
+                                    <button type="submit" formnovalidate class="btn btn-primary w-100 w-md-auto"><i class="fas fa-save"></i> Save Company Settings</button>
                                 </div>
                             </div>
                         </form>
@@ -1566,7 +1561,7 @@
 
                                     <div class="settings-actions">
                                         <div class="d-flex flex-wrap gap-2">
-                                            <button type="submit" class="btn btn-primary w-100 w-md-auto"><i class="fas fa-save"></i> Save Payment Settings</button>
+                                            <button type="submit" formnovalidate class="btn btn-primary w-100 w-md-auto"><i class="fas fa-save"></i> Save Payment Settings</button>
                                         </div>
                                     </div>
                                 </div>
@@ -1923,7 +1918,7 @@
 
                                     <div class="settings-actions">
                                         <div class="d-flex flex-wrap gap-2">
-                                            <button type="submit" class="btn btn-primary w-100 w-md-auto"><i class="fas fa-save"></i> Save Receipt Settings</button>
+                                            <button type="submit" formnovalidate class="btn btn-primary w-100 w-md-auto"><i class="fas fa-save"></i> Save Receipt Settings</button>
                                         </div>
                                     </div>
                                 </div>
@@ -2124,7 +2119,7 @@
                             </div>
                             <div class="settings-actions">
                                 <div class="d-flex flex-wrap gap-2">
-                                    <button type="submit" class="btn btn-primary w-100 w-md-auto"><i class="fas fa-save"></i> Save Kuku Biz Settings</button>
+                                    <button type="submit" formnovalidate class="btn btn-primary w-100 w-md-auto"><i class="fas fa-save"></i> Save Kuku Biz Settings</button>
                                 </div>
                             </div>
                         </form>
@@ -2169,348 +2164,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (e.target === toggle) return;
             group.classList.toggle('is-open');
         });
-        toggle.addEventListener('change', function () {
-            if (toggle.checked) {
-                group.classList.add('is-enabled');
-                group.classList.add('is-open');
-            } else {
-                group.classList.remove('is-enabled');
-            }
-        });
-    });
-
-    /* Receipt preview bindings */
-    var receiptForm = document.getElementById('receiptSettingsForm');
-    var preview = document.getElementById('receiptPreview');
-    if (receiptForm && preview) {
-        receiptForm.querySelectorAll('input[type="checkbox"][name^="show_"], input[type="checkbox"][name="include_barcode"]').forEach(function (cb) {
-            var targets = preview.querySelectorAll('[data-preview="' + cb.name + '"]');
-            if (!targets.length) return;
-            function apply() {
-                targets.forEach(function (el) {
-                    if (el.id !== 'pvWatermarkStamp' && el.id !== 'pvInlineStamp') {
-                        el.style.display = cb.checked ? '' : 'none';
-                    }
-                });
-            }
-            cb.addEventListener('change', apply);
-            apply();
-        });
-
-        function bindText(inputName, elId, prefix) {
-            var input = receiptForm.querySelector('[name="' + inputName + '"]');
-            var el = document.getElementById(elId);
-            if (!input || !el) return;
-            input.addEventListener('input', function () {
-                var v = input.value.trim() || input.getAttribute('placeholder') || '';
-                el.textContent = prefix ? (prefix + v) : v;
-            });
-        }
-        bindText('receipt_title',        'pvTitle');
-        bindText('thank_you_message',    'pvThankYou');
-        bindText('receipt_footer',       'pvFooterText');
-        bindText('receipt_header',       'pvHeaderText');
-        bindText('receipt_company_name', 'pvCompanyName');
-        bindText('receipt_phone',        'pvCompanyPhone', 'Tel: ');
-        bindText('receipt_address',      'pvCompanyAddress');
-        bindText('receipt_email',        'pvCompanyEmail', 'Email: ');
-
-        (function bindStamp() {
-            var inlineStamp = document.getElementById('pvInlineStamp');
-            var watermarkStamp = document.getElementById('pvWatermarkStamp');
-            var styleSelect = receiptForm.querySelector('[name="stamp_style"]');
-            var dateToggle = receiptForm.querySelector('[name="stamp_show_date"]');
-            var dateEl = document.getElementById('pvStampDate');
-            var showStampChk = receiptForm.querySelector('[name="show_payment_stamp"]');
-
-            function updateStampStyle() {
-                var show = showStampChk ? showStampChk.checked : false;
-                var style = styleSelect ? styleSelect.value : 'inline';
-
-                if (!show) {
-                    if (inlineStamp) inlineStamp.style.display = 'none';
-                    if (watermarkStamp) watermarkStamp.style.display = 'none';
-                    return;
-                }
-
-                if (style === 'watermark') {
-                    if (inlineStamp) inlineStamp.style.display = 'none';
-                    if (watermarkStamp) watermarkStamp.style.display = 'block';
-                } else {
-                    if (inlineStamp) inlineStamp.style.display = 'flex';
-                    if (watermarkStamp) watermarkStamp.style.display = 'none';
-                }
-            }
-
-            function updateDate() {
-                if (!dateEl) return;
-                dateEl.style.display = (dateToggle && dateToggle.checked) ? '' : 'none';
-            }
-
-            if (styleSelect) styleSelect.addEventListener('change', updateStampStyle);
-            if (showStampChk) showStampChk.addEventListener('change', updateStampStyle);
-            if (dateToggle) dateToggle.addEventListener('change', updateDate);
-
-            updateStampStyle();
-            updateDate();
-        })();
-    }
-
-    /* Payment preview bindings */
-    var payForm = document.getElementById('paymentSettingsForm');
-    if (payForm) {
-        function bindPayText(inputName, elId, transform) {
-            var input = payForm.querySelector('[name="' + inputName + '"]');
-            var el = document.getElementById(elId);
-            if (!input || !el) return;
-            function apply() {
-                var v = input.value;
-                if (transform) v = transform(v);
-                el.textContent = v || '—';
-            }
-            input.addEventListener('input', apply); apply();
-        }
-
-        bindPayText('currency',        'pvCurrency');
-        bindPayText('currency_symbol', 'pvSymbol');
-        bindPayText('decimal_places',  'pvDecimals');
-
-        (function bindSample() {
-            var symEl = payForm.querySelector('[name="currency_symbol"]');
-            var decEl = payForm.querySelector('[name="decimal_places"]');
-            var out   = document.getElementById('pvSample');
-            if (!symEl || !decEl || !out) return;
-            function apply() {
-                var sym = symEl.value || '';
-                var dec = parseInt(decEl.value) || 0;
-                var sample = (1250).toLocaleString('en-KE', { minimumFractionDigits: dec, maximumFractionDigits: dec });
-                out.textContent = sym + ' ' + sample;
-            }
-            symEl.addEventListener('input', apply); decEl.addEventListener('change', apply); apply();
-        })();
-
-        (function bindStk() {
-            var chk       = payForm.querySelector('[name="enable_mpesa_stk"]');
-            var body      = document.getElementById('pvBody-stk');
-            var status    = document.getElementById('pvStatus-stk');
-            var provSel   = payForm.querySelector('[name="mpesa_provider"]');
-            var branchSel = payForm.querySelector('[name="mpesa_branch"]');
-
-            var scInput = payForm.querySelector('[name="mpesa_stk_shortcode"]');
-            var envSel  = payForm.querySelector('[name="mpesa_environment"]');
-            var typeSel = payForm.querySelector('[name="mpesa_shortcode_type"]');
-            var cbInput = payForm.querySelector('[name="mpesa_callback_url"]');
-            var kkTill  = payForm.querySelector('[name="kopokopo_till_number"]');
-            var kkCb    = payForm.querySelector('[name="kopokopo_callback_url"]');
-
-            var vProv = document.getElementById('pvVal-stk-provider');
-            var vSc   = document.getElementById('pvVal-stk-shortcode');
-            var vEnv  = document.getElementById('pvVal-stk-env');
-            var vTyp  = document.getElementById('pvVal-stk-type');
-            var vCb   = document.getElementById('pvVal-stk-callback');
-
-            function applyProviderVisibility() {
-                var prov = provSel ? provSel.value : 'daraja';
-                payForm.querySelectorAll('.provider-fields').forEach(function (el) {
-                    var match = el.getAttribute('data-provider') === prov;
-                    el.classList.toggle('is-hidden', !match);
-                });
-            }
-
-            function setStatus(on) {
-                status.textContent = on ? 'On' : 'Off';
-                status.className = 'pv-method-status ' + (on ? 'pv-active' : '');
-                body.style.display = on ? 'block' : 'none';
-            }
-
-            function refreshVals() {
-                var prov = provSel ? provSel.value : 'daraja';
-                if (vProv) vProv.textContent = prov === 'kopokopo' ? 'Kopokopo' : 'Daraja';
-                if (prov === 'kopokopo') {
-                    if (vSc)  vSc.textContent  = kkTill && kkTill.value ? kkTill.value : '—';
-                    if (vEnv) vEnv.textContent = 'webhook';
-                    if (vTyp) vTyp.textContent = 'till';
-                    if (vCb)  vCb.textContent  = kkCb && kkCb.value ? kkCb.value : '—';
-                } else {
-                    if (vSc)  vSc.textContent  = scInput && scInput.value ? scInput.value : '—';
-                    if (vEnv) vEnv.textContent = envSel && envSel.value ? envSel.value : '—';
-                    if (vTyp) vTyp.textContent = typeSel && typeSel.value ? typeSel.value : '—';
-                    if (vCb)  vCb.textContent  = cbInput && cbInput.value ? cbInput.value : '—';
-                }
-            }
-
-            chk.addEventListener('change', function () { setStatus(chk.checked); });
-            if (provSel) provSel.addEventListener('change', function () { applyProviderVisibility(); refreshVals(); });
-            [scInput, envSel, typeSel, cbInput, kkTill, kkCb].forEach(function (el) {
-                if (!el) return;
-                el.addEventListener('input', refreshVals);
-                el.addEventListener('change', refreshVals);
-            });
-
-            setStatus(chk.checked);
-            applyProviderVisibility();
-            refreshVals();
-
-            if (branchSel) {
-                branchSel.addEventListener('change', function() {
-                    var branchId = this.value;
-                    var fields = [
-                        'mpesa_stk_shortcode', 'mpesa_stk_passkey', 'mpesa_consumer_key',
-                        'mpesa_consumer_secret', 'mpesa_callback_url', 'mpesa_account_reference',
-                        'kopokopo_client_id', 'kopokopo_client_secret', 'kopokopo_till_number',
-                        'kopokopo_webhook_secret', 'kopokopo_callback_url'
-                    ];
-                    fields.forEach(function(f) {
-                        var el = payForm.querySelector('[name="' + f + '"]');
-                        if (el) el.value = '';
-                    });
-
-                    if (!branchId) {
-                        if (provSel) provSel.value = 'daraja';
-                        applyProviderVisibility();
-                        refreshVals();
-                        return;
-                    }
-
-                    fetch('/company/settings/api/branch-mpesa/?branch_id=' + branchId)
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.provider && provSel) provSel.value = data.provider;
-                            if (data.mpesa_stk_shortcode) payForm.querySelector('[name="mpesa_stk_shortcode"]').value = data.mpesa_stk_shortcode;
-                            if (data.mpesa_stk_passkey) payForm.querySelector('[name="mpesa_stk_passkey"]').value = data.mpesa_stk_passkey;
-                            if (data.mpesa_consumer_key) payForm.querySelector('[name="mpesa_consumer_key"]').value = data.mpesa_consumer_key;
-                            if (data.mpesa_consumer_secret) payForm.querySelector('[name="mpesa_consumer_secret"]').value = data.mpesa_consumer_secret;
-                            if (data.mpesa_environment && envSel) envSel.value = data.mpesa_environment;
-                            if (data.mpesa_shortcode_type && typeSel) typeSel.value = data.mpesa_shortcode_type;
-                            if (data.mpesa_account_reference) payForm.querySelector('[name="mpesa_account_reference"]').value = data.mpesa_account_reference;
-                            if (data.mpesa_callback_url) payForm.querySelector('[name="mpesa_callback_url"]').value = data.mpesa_callback_url;
-                            if (data.kopokopo_client_id) payForm.querySelector('[name="kopokopo_client_id"]').value = data.kopokopo_client_id;
-                            if (data.kopokopo_client_secret) payForm.querySelector('[name="kopokopo_client_secret"]').value = data.kopokopo_client_secret;
-                            if (data.kopokopo_till_number) payForm.querySelector('[name="kopokopo_till_number"]').value = data.kopokopo_till_number;
-                            if (data.kopokopo_webhook_secret) payForm.querySelector('[name="kopokopo_webhook_secret"]').value = data.kopokopo_webhook_secret;
-                            if (data.kopokopo_callback_url) payForm.querySelector('[name="kopokopo_callback_url"]').value = data.kopokopo_callback_url;
-                            applyProviderVisibility();
-                            refreshVals();
-                        })
-                        .catch(err => console.error('Error fetching branch config:', err));
-                });
-            }
-        })();
-
-        (function bindBuy() {
-            var chk = payForm.querySelector('[name="enable_buy_goods"]');
-            var body = document.getElementById('pvBody-buy_goods');
-            var status = document.getElementById('pvStatus-buy_goods');
-            var till = payForm.querySelector('[name="buy_goods_till"]');
-            var name = payForm.querySelector('[name="buy_goods_name"]');
-            var vTill = document.getElementById('pvVal-buy-till');
-            var vName = document.getElementById('pvVal-buy-name');
-            function setStatus(on) { status.textContent = on ? 'On' : 'Off'; status.className = 'pv-method-status ' + (on ? 'pv-active' : ''); body.style.display = on ? 'block' : 'none'; }
-            function refresh() { if (vTill) vTill.textContent = till && till.value ? till.value : '—'; if (vName) vName.textContent = name && name.value ? name.value : '—'; }
-            chk.addEventListener('change', function () { setStatus(chk.checked); });
-            [till, name].forEach(function (el) { if (el) el.addEventListener('input', refresh); });
-            setStatus(chk.checked); refresh();
-        })();
-
-        (function bindPb() {
-            var chk = payForm.querySelector('[name="enable_paybill"]');
-            var body = document.getElementById('pvBody-paybill');
-            var status = document.getElementById('pvStatus-paybill');
-            var num = payForm.querySelector('[name="paybill_number"]');
-            var acc = payForm.querySelector('[name="paybill_account"]');
-            var name = payForm.querySelector('[name="paybill_name"]');
-            var vNum = document.getElementById('pvVal-pb-number');
-            var vAcc = document.getElementById('pvVal-pb-account');
-            var vName = document.getElementById('pvVal-pb-name');
-            function setStatus(on) { status.textContent = on ? 'On' : 'Off'; status.className = 'pv-method-status ' + (on ? 'pv-active' : ''); body.style.display = on ? 'block' : 'none'; }
-            function refresh() { if (vNum) vNum.textContent = num && num.value ? num.value : '—'; if (vAcc) vAcc.textContent = acc && acc.value ? acc.value : '—'; if (vName) vName.textContent = name && name.value ? name.value : '—'; }
-            chk.addEventListener('change', function () { setStatus(chk.checked); });
-            [num, acc, name].forEach(function (el) { if (el) el.addEventListener('input', refresh); });
-            setStatus(chk.checked); refresh();
-        })();
-
-        (function bindBank() {
-            var chk = payForm.querySelector('[name="enable_bank"]');
-            var body = document.getElementById('pvBody-bank');
-            var status = document.getElementById('pvStatus-bank');
-            var bName = payForm.querySelector('[name="bank_name"]');
-            var bAcc = payForm.querySelector('[name="bank_account"]');
-            var bBr = payForm.querySelector('[name="bank_branch"]');
-            var bSw = payForm.querySelector('[name="bank_swift"]');
-            var vName = document.getElementById('pvVal-bank-name');
-            var vAcc = document.getElementById('pvVal-bank-account');
-            var vBr = document.getElementById('pvVal-bank-branch');
-            var vSw = document.getElementById('pvVal-bank-swift');
-            function setStatus(on) { status.textContent = on ? 'On' : 'Off'; status.className = 'pv-method-status ' + (on ? 'pv-active' : ''); body.style.display = on ? 'block' : 'none'; }
-            function refresh() { if (vName) vName.textContent = bName && bName.value ? bName.value : '—'; if (vAcc) vAcc.textContent = bAcc && bAcc.value ? bAcc.value : '—'; if (vBr) vBr.textContent = bBr && bBr.value ? bBr.value : '—'; if (vSw) vSw.textContent = bSw && bSw.value ? bSw.value : '—'; }
-            chk.addEventListener('change', function () { setStatus(chk.checked); });
-            [bName, bAcc, bBr, bSw].forEach(function (el) { if (el) el.addEventListener('input', refresh); });
-            setStatus(chk.checked); refresh();
-        })();
-
-        (function bindTax() {
-            var chk = payForm.querySelector('[name="enable_tax"]');
-            var status = document.getElementById('pvStatus-tax');
-            var rate = payForm.querySelector('[name="default_tax_rate"]');
-            var vRate = document.getElementById('pvVal-taxrate');
-            function setStatus() { status.textContent = chk.checked ? 'On' : 'Off'; status.className = 'pv-method-status ' + (chk.checked ? 'pv-active' : ''); }
-            function refreshRate() { var v = parseFloat(rate.value) || 0; if (vRate) vRate.textContent = v + '%'; }
-            chk.addEventListener('change', setStatus); rate.addEventListener('input', refreshRate); setStatus(); refreshRate();
-        })();
-
-        (function bindDisc() {
-            var chk = payForm.querySelector('[name="enable_discount"]');
-            var status = document.getElementById('pvStatus-discount');
-            function setStatus() { status.textContent = chk.checked ? 'On' : 'Off'; status.className = 'pv-method-status ' + (chk.checked ? 'pv-active' : ''); }
-            chk.addEventListener('change', setStatus); setStatus();
-        })();
-
-        (function bindCredit() {
-            var chk = payForm.querySelector('[name="enable_credit"]');
-            var status = document.getElementById('pvStatus-credit');
-            var limit = payForm.querySelector('[name="credit_limit"]');
-            var terms = payForm.querySelector('[name="payment_terms"]');
-            var vLim = document.getElementById('pvVal-creditlimit');
-            var vTerm = document.getElementById('pvVal-terms');
-            function setStatus() { status.textContent = chk.checked ? 'On' : 'Off'; status.className = 'pv-method-status ' + (chk.checked ? 'pv-active' : ''); }
-            function refresh() { if (vLim) vLim.textContent = limit && limit.value ? limit.value : '0'; if (vTerm) vTerm.textContent = (terms && terms.value ? terms.value : '30') + ' days'; }
-            chk.addEventListener('change', setStatus); [limit, terms].forEach(function (el) { if (el) el.addEventListener('input', refresh); }); setStatus(); refresh();
-        })();
-
-        (function bindPartial() {
-            var chk = payForm.querySelector('[name="enable_partial_payment"]');
-            var status = document.getElementById('pvStatus-partial');
-            function setStatus() { status.textContent = chk.checked ? 'On' : 'Off'; status.className = 'pv-method-status ' + (chk.checked ? 'pv-active' : ''); }
-            chk.addEventListener('change', setStatus); setStatus();
-        })();
-    }
-});
-
-
-// =========================================================
-// SAVE BUTTON LOADING SPINNER
-// =========================================================
-document.addEventListener('DOMContentLoaded', function () {
-    // Find all forms on the page
-    var forms = document.querySelectorAll('form');
-    
-    forms.forEach(function(form) {
-        form.addEventListener('submit', function() {
-            // Find the submit button inside this specific form
-            var submitBtn = form.querySelector('button[type="submit"]');
-            
-            if (submitBtn && !submitBtn.classList.contains('btn-loading')) {
-                // Add the loading class which triggers the CSS spinner and text change
-                submitBtn.classList.add('btn-loading');
-                
-                // Optional: Disable the button to prevent double submission
-                submitBtn.disabled = true;
-            }
-        });
     });
 });
-
-
-
 </script>
 {% endblock %}

@@ -4,7 +4,7 @@ import json
 import logging
 import cloudinary
 import cloudinary.uploader
-
+from django.views.decorators.http import require_POST
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -167,6 +167,8 @@ def settings_dashboard(request):
     return render(request, 'company/settings/dashboard.html', context)
 
 
+
+
 # ============================================
 # COMPANY SETTINGS
 # ============================================
@@ -199,13 +201,6 @@ def settings_company(request):
             removed_hero_image = _handle_media_remove(
                 request, company, 'hero_image', 'remove_hero_image'
             )
-
-            if removed_logo: messages.success(request, 'Company logo removed.')
-            if removed_favicon: messages.success(request, 'Favicon removed.')
-            if removed_bg: messages.success(request, 'Login background removed.')
-            if removed_receipt_logo: messages.success(request, 'Receipt logo removed.')
-            if removed_hero_video: messages.success(request, 'Hero video removed.')
-            if removed_hero_image: messages.success(request, 'Hero image removed.')
 
             # ---------- 2) Media uploads ----------
             uploaded_logo = False
@@ -259,14 +254,6 @@ def settings_company(request):
             except ValueError as e:
                 messages.error(request, str(e))
                 return redirect('company-settings-company')
-
-            if uploaded_logo: messages.success(request, 'Company logo updated.')
-            if uploaded_favicon: messages.success(request, 'Favicon updated.')
-            if uploaded_bg: messages.success(request, 'Login background updated.')
-            if uploaded_receipt_logo: messages.success(request, 'Receipt logo updated.')
-            if uploaded_hero_video: messages.success(request, 'Hero video updated.')
-            if uploaded_hero_image: messages.success(request, 'Hero image updated.')
-            if uploaded_gallery: messages.success(request, 'Gallery photo uploaded.')
 
             # ---------- 3) Text fields ----------
             company_name = request.POST.get('company_name')
@@ -374,14 +361,7 @@ def settings_company(request):
             save_company_settings(company, request.POST)
 
             # ---------- 5) Final message ----------
-            if not any([removed_logo, removed_favicon, removed_bg, removed_receipt_logo,
-                        removed_hero_video, removed_hero_image,
-                        uploaded_logo, uploaded_favicon, uploaded_bg, uploaded_receipt_logo,
-                        uploaded_hero_video, uploaded_hero_image, uploaded_gallery,
-                        text_changed]):
-                messages.info(request, 'No changes.')
-            else:
-                messages.success(request, 'Company settings updated successfully!')
+            messages.success(request, 'Company settings updated successfully!')
 
             return redirect('company-settings-company')
 
@@ -405,6 +385,29 @@ def settings_company(request):
 
 
 
+
+
+
+@login_required
+@require_POST
+def company_gallery_upload(request):
+    company = request.user.company  # adjust to your model
+    title = request.POST.get("gallery_title", "").strip()
+    description = request.POST.get("gallery_description", "").strip()
+    photo = request.FILES.get("gallery_photo")
+
+    if not title or not photo:
+        messages.error(request, "Title and photo are required.")
+        return redirect(request.META.get("HTTP_REFERER", "company-settings-company"))
+
+    CompanyGallery.objects.create(
+        company=company,
+        title=title,
+        description=description,
+        image=photo,
+    )
+    messages.success(request, "Photo uploaded to gallery.")
+    return redirect(request.META.get("HTTP_REFERER", "company-settings-company"))
 
 
 # ============================================

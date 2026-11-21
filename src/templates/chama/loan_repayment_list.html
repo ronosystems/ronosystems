@@ -3,35 +3,133 @@
 
 {% block title %}Loan Repayments{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* Custom Table Styling */
+    .table-custom th {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #000;
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.5px;
+        padding: 12px 15px;
+    }
+    .table-custom td {
+        vertical-align: middle;
+        padding: 12px 15px;
+        font-size: 0.9rem;
+    }
+    .table-custom tbody tr:hover {
+        background-color: var(--soft-tint-hover, #f4f7f9);
+    }
+    
+    /* Summary Card */
+    .summary-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 4px;
+        padding: 15px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .summary-card .title {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        font-weight: 700;
+        color: #555;
+        letter-spacing: 1px;
+    }
+    .summary-card .value {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #28a745;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-2">
+
+    <!-- ============================================ -->
+    <!-- SUMMARY HEADER                               -->
+    <!-- ============================================ -->
+    <div class="row mb-3">
+        <div class="col-md-6 col-lg-4">
+            <div class="summary-card shadow-sm">
+                <div>
+                    <div class="title">Total Repaid</div>
+                    <div class="value">KES {{ total_repaid|default:0|floatformat:2 }}</div>
+                </div>
+                <i class="fas fa-check-circle text-success" style="font-size: 2.5rem; opacity: 0.3;"></i>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4 mt-3 mt-md-0">
+            <div class="d-flex h-100 align-items-center justify-content-end">
+                {% if is_officer %}
+                <a href="{% url 'chama:loan_list' %}" class="btn btn-outline-dark fw-bold" style="border: 2px solid #000;">
+                    <i class="fas fa-arrow-left me-1"></i> Back to Loans
+                </a>
+                {% else %}
+                <a href="{% url 'chama:dashboard' %}" class="btn btn-outline-dark fw-bold" style="border: 2px solid #000;">
+                    <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- REPAYMENTS TABLE                             -->
+    <!-- ============================================ -->
     <div class="dash-panel" style="background:#fff; border:2px solid #000; border-radius:4px;">
         <div class="table-responsive">
             <table class="table table-hover table-custom mb-0">
                 <thead>
                     <tr>
                         <th>Date</th>
-                        <th>Loan</th>
+                        <th>Loan #</th>
                         {% if is_officer %}<th>Member</th>{% endif %}
                         <th>Reference</th>
-                        <th class="text-end">Amount</th>
+                        <th class="text-end">Amount (KES)</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for r in repayments %}
                     <tr>
-                        <td>{{ r.date|date:"M d, Y" }}</td>
-                        <td><a href="{% url 'chama:loan_detail' r.loan.pk %}">#{{ r.loan.id }}</a></td>
+                        <td>
+                            <span class="fw-bold">{{ r.date|date:"M d, Y" }}</span>
+                            <div class="text-muted" style="font-size: 0.7rem;">{{ r.date|time:"H:i" }}</div>
+                        </td>
+                        <td>
+                            <a href="{% url 'chama:loan_detail' r.loan.pk %}" class="fw-bold text-decoration-none text-dark">
+                                #{{ r.loan.id }}
+                            </a>
+                        </td>
                         {% if is_officer %}
-                        <td>{{ r.loan.member.full_name }}</td>
+                        <td>
+                            {{ r.loan.member.full_name }}
+                            <div class="text-muted" style="font-size: 0.7rem;">{{ r.loan.member.member_number }}</div>
+                        </td>
                         {% endif %}
-                        <td>{{ r.reference|default:"—" }}</td>
-                        <td class="text-end fw-bold">KES {{ r.amount|floatformat:2 }}</td>
+                        <td>
+                            {% if r.reference %}
+                                <span class="badge bg-light text-dark border border-dark">{{ r.reference }}</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end fw-bold text-success">
+                            {{ r.amount|floatformat:2 }}
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="{% if is_officer %}5{% else %}4{% endif %}" class="text-center py-5 text-muted">
-                            No repayments recorded yet.
+                        <td colspan="{% if is_officer %}5{% else %}4{% endif %}" class="text-center py-5">
+                            <i class="fas fa-receipt text-muted mb-3" style="font-size: 2.5rem; opacity: 0.3;"></i>
+                            <h5 class="text-muted fw-bold">No repayments recorded yet</h5>
+                            <p class="text-muted mb-0" style="font-size: 0.85rem;">Repayments will appear here once they are made.</p>
                         </td>
                     </tr>
                     {% endfor %}
@@ -39,5 +137,6 @@
             </table>
         </div>
     </div>
+
 </div>
 {% endblock %}

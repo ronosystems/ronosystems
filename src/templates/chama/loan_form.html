@@ -5,51 +5,218 @@
     {% if mode == 'request' %}Request Loan{% elif mode == 'create' %}New Loan{% else %}Edit Loan{% endif %}
 {% endblock %}
 
+{% block extra_css %}
+<style>
+    .limit-card {
+        background: #fff;
+        border: 2px solid #000;
+        border-radius: 4px;
+        padding: 20px;
+        height: 100%;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .limit-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+        border-color: #28a745;
+    }
+    .limit-value {
+        font-size: 1.8rem;
+        font-weight: 800;
+        color: #28a745;
+        line-height: 1.2;
+    }
+    .limit-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #666;
+    }
+    .history-table th {
+        background: #f8f9fa;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        border-bottom: 2px solid #000 !important;
+        padding: 10px 12px;
+    }
+    .history-table td {
+        font-size: 0.85rem;
+        padding: 10px 12px;
+        vertical-align: middle;
+    }
+    .badge-status {
+        padding: 3px 8px;
+        border-radius: 50px;
+        font-weight: 700;
+        font-size: 0.65rem;
+        border: 1px solid #000;
+        text-transform: uppercase;
+    }
+    .badge-pending { background: #fff3cd; color: #856404; }
+    .badge-approved { background: #cce5ff; color: #004085; }
+    .badge-disbursed { background: #d1ecf1; color: #0c5460; }
+    .badge-closed { background: #d4edda; color: #155724; }
+    .badge-rejected { background: #f8d7da; color: #721c24; }
+    
+    /* Modal Styling */
+    .modal-content { border: 2px solid #000; border-radius: 4px; }
+    .modal-header { background: #f8f9fa; border-bottom: 2px solid #000; }
+    .modal-footer { border-top: 2px solid #000; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-2">
-    <div class="card" style="border:2px solid #000; border-radius:4px; max-width:800px; margin:0 auto;">
-        <div class="card-header" style="background:#f8f9fa; border-bottom:2px solid #000; padding:14px 24px; font-weight:700;">
-            <i class="fas fa-file-invoice-dollar me-2"></i>
-            {% if mode == 'request' %}Loan Application{% elif mode == 'create' %}Record New Loan{% else %}Update Loan{% endif %}
-        </div>
-        <div class="card-body p-4">
 
-            <!-- ═══════════════════════════════════════════════════════ -->
-            <!-- LOAN ELIGIBILITY BOX (only for member self-service)     -->
-            <!-- ═══════════════════════════════════════════════════════ -->
-            {% if mode == 'request' %}
-            <div class="mb-4 p-3" style="background:#eaf2f8; border:2px solid #000; border-radius:4px;">
-                <h6 class="fw-bold mb-3" style="color:#2d5f7c;">
-                    <i class="fas fa-calculator me-2"></i> Your Loan Eligibility
-                </h6>
-                <div class="row text-center">
-                    <div class="col-md-4 mb-2 mb-md-0">
-                        <div class="small text-muted text-uppercase fw-bold">Total Contributions</div>
-                        <div class="fw-bold" style="font-size:1.15rem; color:#000;">
-                            KES {{ total_contributions|floatformat:2 }}
-                        </div>
-                    </div>
-                    <div class="col-md-4 mb-2 mb-md-0">
-                        <div class="small text-muted text-uppercase fw-bold">Outstanding Loans</div>
-                        <div class="fw-bold" style="font-size:1.15rem; color:#856404;">
-                            KES {{ active_loans|floatformat:2 }}
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="small text-muted text-uppercase fw-bold">You Can Borrow Up To</div>
-                        <div class="fw-bold" style="font-size:1.15rem; color:#155724;">
-                            KES {{ eligible_limit|floatformat:2 }}
-                        </div>
-                    </div>
-                </div>
-                <div class="small text-muted mt-3 text-center" style="border-top:1px dashed #999; padding-top:8px;">
-                    <i class="fas fa-info-circle"></i>
-                    Your limit is <strong>3× your contributions</strong>, minus any outstanding loans.
+    {% if mode == 'request' and current_member %}
+    <!-- ============================================================ -->
+    <!-- MEMBER VIEW: LOAN LIMIT + HISTORY + APPLICATION FORM         -->
+    <!-- ============================================================ -->
+
+    <div class="row g-3 mb-4">
+        <!-- Clickable Loan Limit Card -->
+        <div class="col-md-4">
+            <div class="limit-card" style="border-left: 6px solid #28a745;" 
+                 data-bs-toggle="modal" 
+                 data-bs-target="#loanModal">
+                <div class="limit-label">Your Available Borrowing Power</div>
+                <div class="limit-value mt-2">KES {{ eligible_limit|floatformat:2 }}</div>
+                <div class="small text-muted mt-2">
+                    Click here to apply for a loan up to this amount.
                 </div>
             </div>
-            {% endif %}
+        </div>
 
-            <!-- Error summary -->
+        <!-- Eligibility Requirement Card -->
+        <div class="col-md-8">
+            <div class="limit-card" style="border-left: 6px solid #007bff;">
+                <div class="limit-label">Loan Eligibility Requirements</div>
+                <ul class="mb-0 mt-2 small" style="line-height: 1.8;">
+                    <li>✅ Must be an active Chama member</li>
+                    <li>✅ Current month's contribution must be paid</li>
+                    <li>✅ All past contributions must be on time</li>
+                    <li>✅ No outstanding loans</li>
+                    <li>✅ Loan amount cannot exceed your borrowing power</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loan History Table -->
+    <div class="card mb-4" style="border: 2px solid #000; border-radius: 4px;">
+        <div class="card-header" style="background: #f8f9fa; border-bottom: 2px solid #000; padding: 10px 15px; font-weight: 700;">
+            <i class="fas fa-history me-2"></i> My Loan History
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover history-table mb-0">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Amount Taken</th>
+                        <th>Date Taken</th>
+                        <th>Amount Repaid</th>
+                        <th>Last Repayment Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for loan in my_loans %}
+                    <tr>
+                        <td><strong>#{{ loan.id }}</strong></td>
+                        <td class="fw-bold">KES {{ loan.principal|floatformat:2 }}</td>
+                        <td>{{ loan.requested_on|date:"M d, Y" }}</td>
+                        <td class="fw-bold text-success">KES {{ loan.total_repaid|floatformat:2 }}</td>
+                        <td>
+                            {% with last_repayment=loan.repayments.last %}
+                                {% if last_repayment %}
+                                    {{ last_repayment.date|date:"M d, Y" }}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td>
+                            <span class="badge-status badge-{{ loan.status }}">{{ loan.get_status_display }}</span>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-muted">
+                            <i class="fas fa-file-invoice-dollar fa-2x mb-2" style="opacity: 0.2;"></i>
+                            <p class="mb-0">You have no loan history yet.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- LOAN APPLICATION MODAL                                        -->
+    <!-- ============================================================ -->
+    <div class="modal fade" id="loanModal" tabindex="-1" aria-labelledby="loanModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="loanModalLabel">
+                        <i class="fas fa-file-signature me-2"></i> Apply for a Loan
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="modal-body">
+                        <div class="alert alert-info" style="border: 2px solid #000;">
+                            <i class="fas fa-info-circle me-2"></i>
+                            You can borrow up to <strong>KES {{ eligible_limit|floatformat:2 }}</strong>.
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Loan Type <span class="text-danger">*</span></label>
+                            {{ form.loan_type }}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Amount (KES) <span class="text-danger">*</span></label>
+                            {{ form.principal }}
+                            <small class="text-muted d-block mt-1">Max: KES {{ eligible_limit|floatformat:2 }}</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Term (Months) <span class="text-danger">*</span></label>
+                            {{ form.term_months }}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Purpose</label>
+                            {{ form.purpose }}
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-dark fw-bold" data-bs-dismiss="modal" style="border:2px solid #000;">Cancel</button>
+                        <button type="submit" class="btn btn-dark fw-bold" style="border:2px solid #000;">
+                            <i class="fas fa-paper-plane me-1"></i> Submit Application
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- ============================================================ -->
+    <!-- OFFICER VIEW: MANUAL LOAN ENTRY OR EDIT                      -->
+    <!-- ============================================================ -->
+    
+    <div class="card" style="border: 2px solid #000; border-radius: 4px; max-width: 700px; margin: 0 auto;">
+        <div class="card-header" style="background: #f8f9fa; border-bottom: 2px solid #000; padding: 14px 24px; font-weight: 700;">
+            <i class="fas fa-file-signature me-2"></i>
+            {% if mode == 'create' %}Record New Loan{% else %}Edit Loan #{{ loan.id }}{% endif %}
+        </div>
+        <div class="card-body p-4">
             {% if form.errors %}
             <div class="alert alert-danger" style="border:2px solid #000;">
                 <ul class="mb-0">
@@ -62,43 +229,23 @@
 
             <form method="post">
                 {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Select Member <span class="text-danger">*</span></label>
+                    {{ form.member }}
+                </div>
 
-                {% if mode == 'request' %}
-                <!-- Member self-service -->
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Loan Type <span class="text-danger">*</span></label>
-                    {{ form.loan_type }}
-                </div>
                 <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label fw-bold">Amount (KES) <span class="text-danger">*</span></label>
-                        {{ form.principal }}
-                        <small class="text-muted d-block mt-1">
-                            <i class="fas fa-lightbulb"></i>
-                            Maximum: <strong>KES {{ eligible_limit|floatformat:2 }}</strong>
-                        </small>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label fw-bold">Term (Months) <span class="text-danger">*</span></label>
-                        {{ form.term_months }}
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Purpose</label>
-                    {{ form.purpose }}
-                </div>
-                {% else %}
-                <!-- Officer manual -->
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label fw-bold">Member <span class="text-danger">*</span></label>
-                        {{ form.member }}
-                    </div>
                     <div class="col-md-6">
                         <label class="form-label fw-bold">Loan Type</label>
                         {{ form.loan_type }}
                     </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Status <span class="text-danger">*</span></label>
+                        {{ form.status }}
+                    </div>
                 </div>
+
                 <div class="row mb-3">
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Principal (KES) <span class="text-danger">*</span></label>
@@ -113,31 +260,28 @@
                         {{ form.term_months }}
                     </div>
                 </div>
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label fw-bold">Status</label>
-                        {{ form.status }}
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label fw-bold">Requested On</label>
-                        {{ form.requested_on }}
-                    </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Requested On</label>
+                    {{ form.requested_on }}
                 </div>
+
                 <div class="mb-3">
                     <label class="form-label fw-bold">Purpose</label>
                     {{ form.purpose }}
                 </div>
-                {% endif %}
 
                 <div class="d-flex gap-2 mt-4 pt-3" style="border-top:2px solid #000;">
                     <button type="submit" class="btn btn-dark fw-bold" style="border:2px solid #000;">
-                        <i class="fas fa-save me-1"></i>
-                        {% if mode == 'request' %}Submit Application{% elif mode == 'create' %}Save Loan{% else %}Save Changes{% endif %}
+                        <i class="fas fa-save me-1"></i> 
+                        {% if mode == 'create' %}Save Loan{% else %}Save Changes{% endif %}
                     </button>
                     <a href="{% url 'chama:loan_list' %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;">Cancel</a>
                 </div>
             </form>
         </div>
     </div>
+    {% endif %}
+
 </div>
 {% endblock %}

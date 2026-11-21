@@ -1,254 +1,109 @@
 {% extends 'chama_base.html' %}
 {% load static %}
 
-{% block title %}Contributions {% endblock %}
-
-{% block extra_css %}
-<style>
-    .dash-panel { background:#fff; border:2px solid #000; border-radius:4px; }
-    .table-custom th { border-bottom:2px solid #000 !important; background:#f8f9fa; font-weight:700; font-size:0.8rem; text-transform:uppercase; padding:12px 20px; }
-    .table-custom td { padding:12px 20px; font-size:0.9rem; border-bottom:1px solid #dee2e6; vertical-align:middle; }
-    .table-custom tbody tr:hover { background:#f8f9fa; }
-    .filter-bar { background:#fff; border:2px solid #000; border-radius:4px; padding:10px 15px; margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-    .filter-bar input, .filter-bar select { border:2px solid #ccc; border-radius:4px; padding:6px 10px; font-size:0.85rem; }
-    .btn-custom { border:2px solid #000; border-radius:4px; font-weight:700; font-size:0.85rem; padding:6px 15px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
-    .btn-primary-custom { background:var(--primary-color); color:#fff; }
-    .btn-primary-custom:hover { background:color-mix(in srgb, var(--primary-color) 85%, #000); color:#fff; }
-    .btn-outline-custom { background:#fff; color:#000; }
-    .stat-box { background:#fff; border:2px solid #000; border-radius:4px; padding:15px; text-align:center; }
-    .stat-box .stat-value { font-size:1.5rem; font-weight:800; color:#000; }
-    .stat-box .stat-label { font-size:0.75rem; text-transform:uppercase; color:#666; font-weight:700; margin-bottom:5px; }
-    .badge-status { padding:4px 10px; border-radius:50px; font-weight:700; font-size:0.7rem; border:1px solid #000; }
-    .badge-paid { background:#d4edda; color:#155724; }
-    .badge-unpaid { background:#f8d7da; color:#721c24; }
-    .action-icon { color:#000; font-size:1rem; margin:0 4px; text-decoration:none; }
-    .action-icon:hover { color:var(--primary-color); }
-    .action-icon.danger:hover { color:#dc3545; }
-
-    /* SELF-SERVICE BANNER */
-    .self-service-banner {
-        background: linear-gradient(135deg, #f0f7fa 0%, #eaf2f8 100%);
-        border: 2px solid #000;
-        border-radius: 4px;
-        padding: 24px;
-        margin-bottom: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 20px;
-    }
-    .self-service-banner .info-block {
-        flex: 1;
-        min-width: 200px;
-    }
-    .self-service-banner .label {
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #666;
-        font-weight: 700;
-        margin-bottom: 4px;
-    }
-    .self-service-banner .value {
-        font-size: 1.4rem;
-        font-weight: 800;
-        color: #000;
-    }
-    .self-service-banner .value.success { color: #155724; }
-    .self-service-banner .value.warning { color: #856404; }
-    .self-service-banner .value.danger { color: #721c24; }
-    
-    .self-service-banner .divider-vertical {
-        width: 2px;
-        height: 50px;
-        background: #000;
-        opacity: 0.15;
-    }
-
-    .btn-contribute {
-        background: #000;
-        color: #fff;
-        border: 2px solid #000;
-        border-radius: 4px;
-        padding: 14px 30px;
-        font-weight: 700;
-        font-size: 1rem;
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-        transition: all 0.2s;
-    }
-    .btn-contribute:hover {
-        background: #333;
-        color: #fff;
-        transform: translateY(-2px);
-    }
-    .btn-contribute:disabled {
-        background: #ccc;
-        color: #666;
-        border-color: #999;
-        cursor: not-allowed;
-        transform: none;
-    }
-
-    @media (max-width: 768px) {
-        .self-service-banner {
-            flex-direction: column;
-            align-items: stretch;
-        }
-        .self-service-banner .divider-vertical {
-            display: none;
-        }
-    }
-</style>
-{% endblock %}
+{% block title %}Contributions{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-2">
 
     {% if is_officer %}
-    <!-- ── OFFICER VIEW (Totals + Add button) ── -->
-    <div class="row g-3 mb-4">
-        <div class="col-md-3">
-            <div class="stat-box" style="background:#d4edda;">
-                <div class="stat-label">Total Paid</div>
-                <div class="stat-value">KES {{ total_paid|floatformat:2 }}</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="stat-box" style="background:#f8d7da;">
-                <div class="stat-label">Total Unpaid</div>
-                <div class="stat-value">KES {{ total_unpaid|floatformat:2 }}</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="stat-box" style="background:#f8f9fa;">
-                <div class="stat-label">Records</div>
-                <div class="stat-value">{{ total_count }}</div>
-            </div>
-        </div>
-        <div class="col-md-3 d-flex align-items-center">
-            <a href="{% url 'chama:contribution_create' %}" class="btn-custom btn-primary-custom w-100 justify-content-center py-2">
-                <i class="fas fa-plus"></i> New Contribution
-            </a>
-        </div>
-    </div>
+    <!-- ============================================================ -->
+    <!-- TREASURER VIEW: MONTHLY COLLECTION SHEET                     -->
+    <!-- ============================================================ -->
+    
+    <!-- Top Control Bar: Month Selector & Summary -->
+    <div class="card mb-4" style="border: 2px solid #000; border-radius: 4px;">
+        <div class="card-body p-3 d-flex flex-wrap justify-content-between align-items-center" style="background: #f8f9fa;">
+            
+            <!-- DYNAMIC Month Selector Form -->
+            <form method="get" class="d-flex align-items-center gap-2 mb-2 mb-md-0">
+                <label class="fw-bold mb-0 text-nowrap">Select Month:</label>
+                <select name="month" class="form-control fw-bold" style="width: 220px; border: 2px solid #000;" onchange="this.form.submit()">
+                    {% for m in month_choices %}
+                        <option value="{{ m.value }}" {% if m.is_selected %}selected{% endif %}>
+                            {{ m.label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
 
-    <form method="get" class="filter-bar">
-        <div class="flex-grow-1" style="min-width:200px;">
-            <input type="text" name="q" class="w-100" placeholder="Search by member or period..." value="{{ request.GET.q|default:'' }}">
-        </div>
-        <div>
-            <select name="paid">
-                <option value="">All</option>
-                <option value="yes" {% if request.GET.paid == 'yes' %}selected{% endif %}>Paid Only</option>
-                <option value="no" {% if request.GET.paid == 'no' %}selected{% endif %}>Unpaid Only</option>
-            </select>
-        </div>
-        <button type="submit" class="btn-custom btn-primary-custom">
-            <i class="fas fa-search"></i> Filter
-        </button>
-        {% if request.GET.q or request.GET.paid %}
-        <a href="{% url 'chama:contribution_list' %}" class="btn-custom btn-outline-custom">
-            <i class="fas fa-times"></i> Clear
-        </a>
-        {% endif %}
-    </form>
-
-    {% else %}
-    <!-- ── MEMBER SELF-SERVICE BANNER ── -->
-    <div class="self-service-banner">
-        <div class="info-block">
-            <div class="label">Required This Month ({{ current_month }})</div>
-            <div class="value">KES {{ required_amount|floatformat:2 }}</div>
-        </div>
-        
-        <div class="divider-vertical"></div>
-
-        <div class="info-block">
-            <div class="label">Already Contributed</div>
-            <div class="value success">KES {{ contributed_this_month|floatformat:2 }}</div>
-        </div>
-
-        <div class="divider-vertical"></div>
-
-        <div class="info-block">
-            <div class="label">Remaining to Pay</div>
-            {% if remaining_amount <= 0 %}
-                <div class="value success">
-                    <i class="fas fa-check-circle"></i> Fully Paid
+            <!-- Totals Summary -->
+            <div class="d-flex gap-4 align-items-center">
+                <div>
+                    <div class="text-muted small fw-bold text-uppercase">Expected</div>
+                    <div class="fw-bold fs-5">KES {{ total_expected|floatformat:2 }}</div>
                 </div>
-            {% else %}
-                <div class="value danger">KES {{ remaining_amount|floatformat:2 }}</div>
-            {% endif %}
-        </div>
-
-        <div class="info-block" style="text-align: right;">
-            {% if remaining_amount > 0 %}
-                <a href="{% url 'chama:contribution_create' %}" class="btn-contribute">
-                    <i class="fas fa-hand-holding-usd"></i> Contribute Now
-                </a>
-            {% else %}
-                <button class="btn-contribute" disabled>
-                    <i class="fas fa-check"></i> Contribution Complete
-                </button>
-            {% endif %}
+                <div>
+                    <div class="text-muted small fw-bold text-uppercase">Collected</div>
+                    <div class="fw-bold fs-5 text-success">KES {{ total_collected|floatformat:2 }}</div>
+                </div>
+                <div>
+                    <a href="{% url 'chama:contribution_create' %}" class="btn btn-dark fw-bold" style="border:2px solid #000;">
+                        <i class="fas fa-plus"></i> Manual Record
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
-    {% endif %}
 
-    <!-- ── TABLE ── -->
-    <div class="dash-panel">
+    <!-- Members Table -->
+    <div class="card" style="border: 2px solid #000; border-radius: 4px;">
         <div class="table-responsive">
-            <table class="table table-hover table-custom mb-0">
-                <thead>
+            <table class="table table-hover mb-0 align-middle">
+                <thead style="background: #000; color: #fff;">
                     <tr>
-                        <th>Period</th>
-                        {% if is_officer %}<th>Member</th>{% endif %}
-                        <th class="text-end">Amount</th>
-                        <th>Status</th>
-                        <th class="text-end">Actions</th>
+                        <th class="ps-3 py-3">Member No.</th>
+                        <th class="py-3">Full Name</th>
+                        <th class="py-3">Membership Type</th>
+                        <th class="py-3">Required Amount</th>
+                        <th class="py-3">Status</th>
+                        <th class="text-end pe-3 py-3">Action</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for c in contributions %}
+                    {% for member in members %}
+                    {% with contrib=member.current_contrib %}
                     <tr>
-                        <td>{{ c.period|default:"—" }}</td>
-                        {% if is_officer %}
+                        <td class="ps-3 fw-bold">{{ member.member_number }}</td>
+                        <td>{{ member.full_name }}</td>
+                        <td>{{ member.membership_type|default:"—" }}</td>
+                        <td class="fw-bold">KES {{ member.membership_type.monthly_contribution|default:"0.00"|floatformat:2 }}</td>
+                        
+                        <!-- Status Badge -->
                         <td>
-                            <div class="fw-bold">{{ c.member.full_name }}</div>
-                            <small class="text-muted">{{ c.member.member_number }}</small>
-                        </td>
-                        {% endif %}
-                        <td class="text-end fw-bold">KES {{ c.amount|floatformat:2 }}</td>
-                        <td>
-                            {% if c.paid %}
-                                <span class="badge-status badge-paid">Paid</span>
+                            {% if contrib and contrib.paid %}
+                                <span class="badge bg-success" style="border:1px solid #000;">Paid</span>
+                                <div class="small text-muted mt-1" style="font-size:0.7rem;">{{ contrib.date|date:"M d, Y" }}</div>
                             {% else %}
-                                <span class="badge-status badge-unpaid">Unpaid</span>
+                                <span class="badge bg-danger" style="border:1px solid #000;">Unpaid</span>
                             {% endif %}
                         </td>
-                        <td class="text-end">
-                            {% if not c.paid %}
-                                <a href="{% url 'chama:contribution_pay' c.pk %}" class="btn btn-sm btn-dark fw-bold" style="border:2px solid #000;">
-                                    <i class="fas fa-mobile-alt"></i> Pay Now
-                                </a>
-                            {% endif %}
-                            {% if is_officer %}
-                                <a href="{% url 'chama:contribution_edit' c.pk %}" class="action-icon" title="Edit"><i class="fas fa-edit"></i></a>
-                                <a href="{% url 'chama:contribution_delete' c.pk %}" class="action-icon danger" title="Delete" onclick="return confirm('Delete this contribution?');"><i class="fas fa-trash"></i></a>
+                        
+                        <!-- Action Button -->
+                        <td class="text-end pe-3">
+                            {% if not contrib or not contrib.paid %}
+                            <form method="post" class="d-inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="mark_paid" value="1">
+                                <input type="hidden" name="member_id" value="{{ member.id }}">
+                                <input type="hidden" name="amount" value="{{ member.membership_type.monthly_contribution|default:0 }}">
+                                <button type="submit" class="btn btn-sm btn-outline-success fw-bold" style="border: 2px solid #28a745;">
+                                    <i class="fas fa-check"></i> Mark Paid
+                                </button>
+                            </form>
+                            {% else %}
+                                <button class="btn btn-sm btn-light text-success fw-bold border" style="border-color: #28a745 !important;" disabled>
+                                    <i class="fas fa-check-circle"></i> Cleared
+                                </button>
                             {% endif %}
                         </td>
                     </tr>
+                    {% endwith %}
                     {% empty %}
                     <tr>
-                        <td colspan="{% if is_officer %}5{% else %}4{% endif %}" class="text-center py-5">
-                            <i class="fas fa-hand-holding-usd fa-3x text-muted mb-3" style="opacity:0.3;"></i>
-                            <h6 class="fw-bold text-muted">
-                                {% if is_officer %}No contributions recorded yet{% else %}You have no contributions yet{% endif %}
-                            </h6>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <i class="fas fa-users fa-3x mb-3" style="opacity: 0.2;"></i>
+                            <p class="mb-0">No active members found for this company.</p>
                         </td>
                     </tr>
                     {% endfor %}
@@ -256,5 +111,57 @@
             </table>
         </div>
     </div>
+
+    {% else %}
+    <!-- ============================================================ -->
+    <!-- MEMBER VIEW: MY CONTRIBUTIONS                                -->
+    <!-- ============================================================ -->
+    
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="fw-bold mb-0"><i class="fas fa-hand-holding-usd me-2"></i> My Contributions</h4>
+        <a href="{% url 'chama:contribution_pay_self_service' %}" class="btn btn-dark fw-bold" style="border:2px solid #000;">
+            <i class="fas fa-paper-plane"></i> Make a Payment
+        </a>
+    </div>
+
+    <div class="card" style="border: 2px solid #000; border-radius: 4px;">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead style="background: #f8f9fa;">
+                    <tr>
+                        <th class="ps-3 py-3">Month</th>
+                        <th class="py-3">Amount</th>
+                        <th class="py-3">Date Paid</th>
+                        <th class="py-3">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in contributions %}
+                    <tr>
+                        <td class="ps-3 fw-bold">{{ c.period }}</td>
+                        <td>KES {{ c.amount|floatformat:2 }}</td>
+                        <td>{{ c.date|date:"M d, Y"|default:"—" }}</td>
+                        <td>
+                            {% if c.paid %}
+                                <span class="badge bg-success" style="border:1px solid #000;">Paid</span>
+                            {% else %}
+                                <span class="badge bg-danger" style="border:1px solid #000;">Unpaid</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center py-5 text-muted">
+                            <i class="fas fa-file-invoice-dollar fa-3x mb-3" style="opacity: 0.2;"></i>
+                            <p class="mb-0">You have no contribution records yet.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
 </div>
 {% endblock %}

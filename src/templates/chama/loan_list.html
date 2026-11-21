@@ -110,7 +110,7 @@
     {% if is_officer %}
     <form method="get" class="filter-bar">
         <div class="flex-grow-1" style="min-width:200px;">
-            <input type="text" name="q" class="w-100" placeholder="Search by member..." value="{{ request.GET.q|default:'' }}">
+            <input type="text" name="q" class="w-100" placeholder="Search by member or guest..." value="{{ request.GET.q|default:'' }}">
         </div>
         <div>
             <select name="status">
@@ -122,10 +122,17 @@
                 <option value="rejected" {% if request.GET.status == 'rejected' %}selected{% endif %}>Rejected</option>
             </select>
         </div>
+        <div>
+            <select name="category">
+                <option value="">All Categories</option>
+                <option value="internal" {% if request.GET.category == 'internal' %}selected{% endif %}>Internal (Members)</option>
+                <option value="external" {% if request.GET.category == 'external' %}selected{% endif %}>External (Guests)</option>
+            </select>
+        </div>
         <button type="submit" class="btn-custom btn-primary-custom">
             <i class="fas fa-search"></i> Filter
         </button>
-        {% if request.GET.q or request.GET.status %}
+        {% if request.GET.q or request.GET.status or request.GET.category %}
         <a href="{% url 'chama:loan_list' %}" class="btn-custom btn-outline-custom">
             <i class="fas fa-times"></i> Clear
         </a>
@@ -140,7 +147,7 @@
                 <thead>
                     <tr>
                         <th>#</th>
-                        {% if is_officer %}<th>Member</th>{% endif %}
+                        {% if is_officer %}<th>Borrower</th>{% endif %}
                         <th>Type</th>
                         <th class="text-end">Principal</th>
                         <th class="text-end">Total</th>
@@ -158,12 +165,22 @@
                     {% for l in loans %}
                     <tr>
                         <td><strong>#{{ l.id }}</strong></td>
+                        
                         {% if is_officer %}
                         <td>
-                            <div class="fw-bold">{{ l.member.full_name }}</div>
-                            <small class="text-muted">{{ l.member.member_number }}</small>
+                            <!-- 👇 NEW: Dynamic Borrower Display -->
+                            {% if l.loan_category == 'external' %}
+                                <span class="badge bg-warning text-dark mb-1" style="font-size: 0.65rem;">EXTERNAL</span>
+                                <div class="fw-bold">{{ l.guest.full_name }}</div>
+                                <small class="text-muted">{{ l.guest.phone }}</small>
+                            {% else %}
+                                <span class="badge bg-primary text-white mb-1" style="font-size: 0.65rem;">INTERNAL</span>
+                                <div class="fw-bold">{{ l.member.full_name }}</div>
+                                <small class="text-muted">{{ l.member.member_number }}</small>
+                            {% endif %}
                         </td>
                         {% endif %}
+                        
                         <td>{{ l.loan_type.name|default:"—" }}</td>
                         <td class="text-end fw-bold">KES {{ l.principal|floatformat:2 }}</td>
                         <td class="text-end">
@@ -217,7 +234,7 @@
                                 <i class="fas fa-eye"></i>
                             </a>
                             {% if is_officer and l.status == 'approved' %}
-                            <form method="post" action="{% url 'chama:loan_disburse' l.pk %}" style="display:inline;" onsubmit="return confirm('Release KES {{ l.principal }} to {{ l.member.full_name }}?');">
+                            <form method="post" action="{% url 'chama:loan_disburse' l.pk %}" style="display:inline;" onsubmit="return confirm('Release KES {{ l.principal }}?');">
                                 {% csrf_token %}
                                 <button type="submit" class="action-icon success" title="Release Funds" style="background:none;border:none;padding:0;">
                                     <i class="fas fa-money-bill-wave"></i>
@@ -233,9 +250,6 @@
                             <h6 class="fw-bold text-muted">
                                 {% if is_officer %}No loans recorded yet{% else %}You have no loans yet{% endif %}
                             </h6>
-                            {% if not is_officer %}
-                            <p class="small text-muted mb-3">Apply for your first loan using the button above.</p>
-                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}

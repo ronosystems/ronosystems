@@ -51,12 +51,32 @@ class TimeStampedModel(models.Model):
 # ============================================================
 # MEMBERS
 # ============================================================
+
 class MembershipType(TimeStampedModel):
+    
+    # Define the exact choices allowed for Chama membership
+    TYPE_CHOICES = [
+        ('regular', 'Regular Member'),
+        ('executive', 'Executive Member'),
+        ('student', 'Student Member'),
+        ('honorary', 'Honorary Member'),
+        ('corporate', 'Corporate Member'),
+        ('youth', 'Youth Member'),
+        ('women', 'Women Representative'),
+    ]
+
     company = models.ForeignKey(
         'companies.Company', on_delete=models.CASCADE,
         related_name='chama_membership_types',
     )
-    name = models.CharField(max_length=100)
+    
+    # Changed from CharField to use choices
+    name = models.CharField(
+        max_length=100,
+        choices=TYPE_CHOICES,
+        help_text="Select the category for this membership tier."
+    )
+    
     description = models.TextField(blank=True)
     monthly_contribution = models.DecimalField(
         max_digits=12, decimal_places=2, default=0,
@@ -68,10 +88,11 @@ class MembershipType(TimeStampedModel):
 
     class Meta:
         ordering = ['name']
+        # Ensures a company doesn't create the same type twice
         unique_together = [('company', 'name')]
 
     def __str__(self):
-        return self.name
+        return self.get_name_display()
 
 
 class Member(TimeStampedModel):
@@ -247,6 +268,10 @@ class Contribution(TimeStampedModel):
     period = models.CharField(max_length=20, blank=True, help_text='e.g. 2026-10')
     date = models.DateField(default=timezone.localdate)
     paid = models.BooleanField(default=False)
+    paid_on_time = models.BooleanField(
+        default=True,
+        help_text="Uncheck if paid after the deadline.",
+    )
 
     class Meta:
         ordering = ['-date', '-created_at']
@@ -275,21 +300,46 @@ class Fine(TimeStampedModel):
         return f'{self.member} — {self.reason} ({self.amount})'
 
 
+
 # ============================================================
-# LOANS
+# LOAN TYPES
 # ============================================================
 class LoanType(TimeStampedModel):
+    LOAN_NAME_CHOICES = [
+        ('emergency', 'Emergency Loan'),
+        ('development', 'Development Loan'),
+        ('school_fees', 'School Fees Loan'),
+        ('business', 'Business Loan'),
+        ('agriculture', 'Agriculture Loan'),
+    ]
+
     company = models.ForeignKey(
-        'companies.Company', on_delete=models.CASCADE,
+        'companies.Company', 
+        on_delete=models.CASCADE,
         related_name='chama_loan_types',
     )
-    name = models.CharField(max_length=100)
+    name = models.CharField(
+        max_length=100,
+        choices=LOAN_NAME_CHOICES,
+        help_text="Select the type of loan (e.g., Emergency, Development).",
+    )
     interest_rate = models.DecimalField(
         max_digits=5, decimal_places=2, default=10,
-        help_text='Annual interest rate (%)',
+        help_text='Interest rate (%) charged on the principal amount.',
     )
-    max_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    max_term_months = models.PositiveIntegerField(default=12)
+    processing_fee_percentage = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0,
+        help_text='Processing fee (%) deducted from the loan at disbursement.',
+    )
+    max_term_months = models.PositiveIntegerField(
+        default=12,
+        help_text='Maximum term allowed for this loan type (in months).',
+    )
+    max_amount = models.DecimalField(
+        max_digits=12, decimal_places=2,
+        null=True, blank=True,
+        help_text='Maximum principal allowed for this loan type (optional).',
+    )
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -297,9 +347,53 @@ class LoanType(TimeStampedModel):
         unique_together = [('company', 'name')]
 
     def __str__(self):
-        return self.name
+        return self.get_name_display()
 
 
+
+# ============================================================
+# GUEST MODEL (For External Loans)
+# ============================================================
+class Guest(TimeStampedModel):
+    """
+    External borrowers who are not Chama members.
+    They must provide full KYC and a valid M-Pesa statement.
+    """
+    company = models.ForeignKey(
+        'companies.Company', on_delete=models.CASCADE,
+        related_name='chama_guests',
+    )
+    full_name = models.CharField(max_length=200)
+    phone = models.CharField(max_length=30)
+    email = models.EmailField(blank=True)
+    national_id = models.CharField(max_length=50, unique=True)
+    address = models.TextField(blank=True)
+
+    # KYC Documents
+    passport_photo = models.ImageField(upload_to='chama/guests/passport/', null=True, blank=True)
+    id_front = models.ImageField(upload_to='chama/guests/id_front/', null=True, blank=True)
+    id_back = models.ImageField(upload_to='chama/guests/id_back/', null=True, blank=True)
+    mpesa_statement = models.FileField(upload_to='chama/guests/mpesa_statement/', null=True, blank=True)
+
+    status = models.CharField(
+        max_length=20,
+        choices=[('pending', 'Pending'), ('approved', 'Approved'), ('blacklisted', 'Blacklisted')],
+        default='pending',
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+    )
+
+    class Meta:
+        ordering = ['full_name']
+
+    def __str__(self):
+        return f'{self.full_name} ({self.national_id})'
+
+
+# ============================================================
+# LOANS
+# ============================================================
 class Loan(TimeStampedModel):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -309,13 +403,34 @@ class Loan(TimeStampedModel):
         ('closed', 'Closed'),
     ]
 
+    LOAN_CATEGORY_CHOICES = [
+        ('internal', 'Internal Loan (Chama Member)'),
+        ('external', 'External Loan (Guest)'),
+    ]
+
     company = models.ForeignKey(
         'companies.Company', on_delete=models.CASCADE,
         related_name='chama_loans',
     )
+    
+    # 👇 NEW: Category field
+    loan_category = models.CharField(
+        max_length=20, choices=LOAN_CATEGORY_CHOICES, default='internal',
+        help_text="Internal = for Chama members. External = for guests.",
+    )
+    
+    # Member (for Internal Loans)
     member = models.ForeignKey(
         Member, on_delete=models.CASCADE, related_name='loans',
+        null=True, blank=True,
     )
+    
+    # Guest (for External Loans)
+    guest = models.ForeignKey(
+        Guest, on_delete=models.CASCADE, related_name='loans',
+        null=True, blank=True,
+    )
+    
     loan_type = models.ForeignKey(
         LoanType, on_delete=models.SET_NULL, null=True, blank=True,
     )
@@ -345,7 +460,8 @@ class Loan(TimeStampedModel):
         ordering = ['-requested_on', '-created_at']
 
     def __str__(self):
-        return f'Loan #{self.pk} — {self.member} ({self.get_status_display()})'
+        borrower = self.member.full_name if self.member else (self.guest.full_name if self.guest else 'Unknown')
+        return f'Loan #{self.pk} — {borrower} ({self.get_status_display()})'
 
     # ============================================================
     # REPAYMENT TRACKING
@@ -364,8 +480,6 @@ class Loan(TimeStampedModel):
         """
         Total interest owed on this loan (flat rate).
         Formula: Principal × (Interest Rate / 100)
-
-        Example: KES 5,000 at 5% → KES 250 interest
         """
         from decimal import Decimal
         return self.principal * (self.interest_rate / Decimal('100'))
@@ -380,8 +494,6 @@ class Loan(TimeStampedModel):
         """
         Fixed monthly repayment amount.
         Formula: Total Repayable / Term in Months
-
-        Example: KES 5,250 / 3 months → KES 1,750/month
         """
         if not self.term_months or self.term_months <= 0:
             return self.total_repayable
@@ -426,9 +538,8 @@ class LoanRepayment(TimeStampedModel):
         return f'{self.loan} — {self.amount}'
 
 
-
 # ============================================================
-# ACCOUNTS (Bank, Cash, M-Pesa)
+# ACCOUNTS (Bank, Cash, M-Pesa, Welfare, Loans, Projects)
 # ============================================================
 class Account(TimeStampedModel):
     ACCOUNT_TYPES = [
@@ -437,12 +548,29 @@ class Account(TimeStampedModel):
         ('mpesa', 'M-Pesa'),
     ]
 
+    PURPOSE_CHOICES = [
+        ('pool', 'General / Pool Account'),   
+        ('welfare', 'Welfare Fund'),
+        ('loans', 'Loan Fund'),
+        ('projects', 'Project Fund'),
+        ('emergency', 'Emergency Fund'),
+        ('general', 'Other Operational Expense'),
+    ]
+
     company = models.ForeignKey(
         'companies.Company', on_delete=models.CASCADE,
         related_name='chama_accounts',
     )
     name = models.CharField(max_length=100)
     account_type = models.CharField(max_length=20, choices=ACCOUNT_TYPES, default='cash')
+    
+    purpose = models.CharField(
+        max_length=20, 
+        choices=PURPOSE_CHOICES, 
+        default='pool', # Default to pool for new accounts
+        help_text="Determines what this account is used for (e.g., Pool, Welfare, Loans)."
+    )
+    
     opening_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     is_active = models.BooleanField(default=True)
 
@@ -451,7 +579,18 @@ class Account(TimeStampedModel):
         unique_together = [('company', 'name')]
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.get_purpose_display()})"
+
+    @property
+    def current_balance(self):
+        from django.db.models import Sum
+        
+        # Sum of Money In
+        total_in = self.transactions.filter(transaction_type='in').aggregate(Sum('amount'))['amount__sum'] or 0
+        # Sum of Money Out
+        total_out = self.transactions.filter(transaction_type='out').aggregate(Sum('amount'))['amount__sum'] or 0
+        
+        return self.opening_balance + total_in - total_out
 
 # ============================================================
 # PROJECTS (New Feature)
@@ -652,4 +791,6 @@ class Announcement(TimeStampedModel):
 
     def __str__(self):
         return self.title
+
+
 

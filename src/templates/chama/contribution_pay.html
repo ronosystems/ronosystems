@@ -4,46 +4,94 @@
 {% block title %}Pay Contribution{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-2">
-    <div class="card" style="border:2px solid #000; border-radius:4px; max-width:600px; margin:0 auto;">
-        <div class="card-header" style="background:#d4edda; border-bottom:2px solid #000; padding:14px 24px; font-weight:700;">
-            <i class="fas fa-mobile-alt me-2"></i> M-Pesa Payment
-        </div>
-        <div class="card-body p-4">
-            <div class="mb-4 p-3" style="background:#f8f9fa; border:2px solid #000; border-radius:4px;">
-                <div class="row">
-                    <div class="col-6">
-                        <small class="text-muted d-block">Amount</small>
-                        <strong style="font-size:1.3rem;">KES {{ contribution.amount|floatformat:2 }}</strong>
-                    </div>
-                    <div class="col-6">
-                        <small class="text-muted d-block">Period</small>
-                        <strong>{{ contribution.period|default:"N/A" }}</strong>
+<div class="container-fluid py-4">
+    
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            
+            <!-- BANNER: Contribution Status -->
+            <div class="alert {% if remaining_amount > 0 %}alert-warning{% else %}alert-success{% endif %} mb-4" style="border: 2px solid #000; border-radius: 4px;">
+                <div class="d-flex align-items-center">
+                    <i class="fas {% if remaining_amount > 0 %}fa-exclamation-circle text-warning{% else %}fa-check-circle text-success{% endif %} fa-2x me-3"></i>
+                    <div>
+                        <h5 class="fw-bold mb-1">
+                            {% if remaining_amount > 0 %}
+                                Contribution Pending
+                            {% else %}
+                                Fully Paid for {{ current_month }}
+                            {% endif %}
+                        </h5>
+                        <p class="mb-0 text-dark">
+                            {% if remaining_amount > 0 %}
+                                You have an outstanding balance of <strong>KES {{ remaining_amount|floatformat:2 }}</strong> for <strong>{{ current_month }}</strong>.
+                            {% else %}
+                                Thank you! Your contribution for <strong>{{ current_month }}</strong> has been fully paid.
+                            {% endif %}
+                        </p>
                     </div>
                 </div>
-                <hr style="border-top:2px solid #000;">
-                <small class="text-muted d-block">For</small>
-                <strong>{{ contribution.member.full_name }}</strong>
             </div>
 
-            <form method="post">
-                {% csrf_token %}
-
-                <div class="mb-3">
-                    <label class="form-label fw-bold">M-Pesa Phone Number</label>
-                    <input type="text" name="phone" class="form-control" style="border:2px solid #000; padding:10px; font-size:1rem;" value="{{ default_phone }}" required>
-                    <small class="text-muted d-block mt-1">
-                        <i class="fas fa-info-circle"></i> You'll receive an STK Push prompt to enter your PIN.
-                    </small>
+            <!-- Payment Card -->
+            <div class="card" style="border: 2px solid #000; border-radius: 4px;">
+                <div class="card-header" style="background: #f8f9fa; border-bottom: 2px solid #000; padding: 14px 24px; font-weight: 700;">
+                    <i class="fas fa-mobile-alt me-2"></i> Pay via M-Pesa
                 </div>
+                <div class="card-body p-4">
 
-                <div class="d-flex gap-2 mt-4 pt-3" style="border-top:2px solid #000;">
-                    <button type="submit" class="btn btn-dark fw-bold flex-grow-1" style="border:2px solid #000; padding:10px;">
-                        <i class="fas fa-paper-plane me-1"></i> Send STK Push
-                    </button>
-                    <a href="{% url 'chama:contribution_list' %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;">Cancel</a>
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <!-- Read-only Member Info -->
+                        <div class="mb-3 p-3" style="background: #f1f1f1; border: 1px solid #ccc; border-radius: 4px;">
+                            <div class="row">
+                                <div class="col-6">
+                                    <small class="text-muted d-block fw-bold">MEMBER NAME</small>
+                                    <span class="fw-bold">{{ member.full_name }}</span>
+                                </div>
+                                <div class="col-6 text-end">
+                                    <small class="text-muted d-block fw-bold">MEMBER NO.</small>
+                                    <span class="fw-bold">{{ member.member_number }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Read-only Amount -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Amount to Pay (KES)</label>
+                            <input type="text" class="form-control form-control-lg fw-bold" value="{{ remaining_amount|floatformat:2 }}" readonly style="background: #e9ecef; border: 2px solid #000;">
+                            <small class="text-muted mt-1 d-block">
+                                <i class="fas fa-lock"></i> This is your fixed monthly contribution for {{ current_month }}.
+                            </small>
+                        </div>
+
+                        <!-- Phone Number -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">M-Pesa Phone Number <span class="text-danger">*</span></label>
+                            <input type="text" name="phone" class="form-control form-control-lg fw-bold" value="{{ member.phone|default:'' }}" placeholder="07XXXXXXXX" required style="border: 2px solid #000;">
+                            <small class="text-muted mt-1 d-block">
+                                <i class="fas fa-info-circle"></i> Enter the Safaricom number that will receive the STK Push.
+                            </small>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-dark btn-lg fw-bold" style="border:2px solid #000;">
+                                <i class="fas fa-paper-plane me-2"></i> Pay Now via M-Pesa
+                            </button>
+                        </div>
+                    </form>
+                    
                 </div>
-            </form>
+            </div>
+            
+            <!-- Help Text -->
+            <div class="text-center mt-3">
+                <small class="text-muted">
+                    <i class="fas fa-shield-alt me-1"></i> All payments are securely processed via Safaricom Daraja.
+                </small>
+            </div>
+
         </div>
     </div>
 </div>

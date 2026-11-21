@@ -32,9 +32,11 @@ urlpatterns = [
     # Contributions
     path('contributions/', views.contribution_list, name='contribution_list'),
     path('contributions/<int:pk>/pay/', views.contribution_pay, name='contribution_pay'),
+    path('contributions/pay/', views.contribution_pay_self_service, name='contribution_pay_self_service'),
     path('contributions/create/', views.contribution_create, name='contribution_create'),
     path('contributions/<int:pk>/edit/', views.contribution_edit, name='contribution_edit'),
     path('contributions/<int:pk>/delete/', views.contribution_delete, name='contribution_delete'),
+
 
     # Fines
     path('fines/', views.fine_list, name='fine_list'),
@@ -59,6 +61,8 @@ urlpatterns = [
     path('loans/<int:pk>/reject/', views.loan_reject, name='loan_reject'),
     path('loans/<int:pk>/disburse/', views.loan_disburse, name='loan_disburse'),
     path('loans/<int:loan_pk>/pay/', views.loan_repayment_pay, name='loan_repayment_pay'),
+    path('guests/create/', views.guest_create, name='guest_create'),
+    path('guests/<int:guest_pk>/loan/create/', views.loan_create_external, name='loan_create_external'),
 
     # Loan Repayments
     path('loan-repayments/', views.loan_repayment_list, name='loan_repayment_list'),
@@ -75,6 +79,10 @@ urlpatterns = [
     # Accounts
     path('accounts/', views.account_list, name='account_list'),
     path('accounts/create/', views.account_create, name='account_create'),
+    path('accounts/<int:pk>/edit/', views.account_edit, name='account_edit'),
+    path('accounts/<int:pk>/delete/', views.account_delete, name='account_delete'), 
+    path('accounts/transfer/', views.account_transfer, name='account_transfer'),
+    path('accounts/transfer/confirm/', views.account_transfer_confirm, name='account_transfer_confirm'),
 
     # Projects
     path('projects/', views.project_list, name='project_list'),

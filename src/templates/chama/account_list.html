@@ -4,17 +4,100 @@
 
 {% block content %}
 <div class="container-fluid py-2">
-    <div class="mb-3 text-end"><a href="{% url 'chama:account_create' %}" class="btn btn-dark">+ Add Account</a></div>
-    <div class="row g-3">
-        {% for a in accounts %}
+    
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="fw-bold mb-0"><i class="fas fa-university me-2"></i> Chama Accounts</h4>
+        <div class="d-flex gap-2">
+            <a href="{% url 'chama:account_transfer' %}" class="btn btn-outline-dark fw-bold" style="border: 2px solid #000;">
+                <i class="fas fa-exchange-alt me-1"></i> Transfer Funds
+            </a>
+            <a href="{% url 'chama:account_create' %}" class="btn btn-dark fw-bold" style="border: 2px solid #000;">
+                <i class="fas fa-plus me-1"></i> Add Account
+            </a>
+        </div>
+    </div>
+
+    <!-- SUMMARY CARDS -->
+    <div class="row g-3 mb-4">
         <div class="col-md-4">
-            <div class="card p-3" style="border:2px solid #000;">
-                <h5 class="fw-bold">{{ a.name }}</h5>
-                <span class="badge bg-secondary mb-2">{{ a.get_account_type_display }}</span>
-                <p class="mb-0">Opening Balance: <strong>KES {{ a.opening_balance|floatformat:2 }}</strong></p>
+            <div class="card p-3 text-center" style="border: 2px solid #000; background: #e3f2fd;">
+                <h6 class="text-uppercase text-muted fw-bold">Total Cash on Hand</h6>
+                <h3 class="fw-bold mb-0">KES {{ total_cash|floatformat:2 }}</h3>
             </div>
         </div>
-        {% empty %}<div class="col-12 text-center text-muted">No accounts setup yet.</div>{% endfor %}
+        <div class="col-md-4">
+            <div class="card p-3 text-center" style="border: 2px solid #000; background: #fff3e0;">
+                <h6 class="text-uppercase text-muted fw-bold">Unallocated Pool</h6>
+                <h3 class="fw-bold mb-0 text-warning">KES {{ pool_balance|floatformat:2 }}</h3>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card p-3 text-center" style="border: 2px solid #000; background: #e8f5e9;">
+                <h6 class="text-uppercase text-muted fw-bold">Total Allocated Funds</h6>
+                <h3 class="fw-bold mb-0 text-success">KES {{ allocated_total|floatformat:2 }}</h3>
+            </div>
+        </div>
+    </div>
+
+    <!-- Accounts Grid -->
+    <div class="row g-3">
+        {% for a in accounts %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100" style="border: 2px solid #000; border-radius: 4px;">
+                <div class="card-header bg-light" style="border-bottom: 2px solid #000; padding: 10px 15px;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="fw-bold mb-0">{{ a.name }}</h5>
+                        
+                        <!-- Purpose Badge -->
+                        {% if a.purpose == 'pool' %}
+                            <span class="badge bg-warning text-dark" style="border:1px solid #000;">Pool</span>
+                        {% elif a.purpose == 'welfare' %}
+                            <span class="badge bg-success text-white" style="border:1px solid #000;">Welfare</span>
+                        {% elif a.purpose == 'loans' %}
+                            <span class="badge bg-primary text-white" style="border:1px solid #000;">Loans</span>
+                        {% elif a.purpose == 'projects' %}
+                            <span class="badge bg-info text-dark" style="border:1px solid #000;">Projects</span>
+                        {% elif a.purpose == 'emergency' %}
+                            <span class="badge bg-danger text-white" style="border:1px solid #000;">Emergency</span>
+                        {% else %}
+                            <span class="badge bg-secondary text-white" style="border:1px solid #000;">General</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted small fw-bold">Account Type:</span>
+                        <span class="fw-bold">{{ a.get_account_type_display }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3">
+                        <span class="text-muted small fw-bold">Opening Balance:</span>
+                        <span class="fw-bold">KES {{ a.opening_balance|floatformat:2 }}</span>
+                    </div>
+                    
+                    <div class="dashed-line" style="border-top: 2px dashed #ccc; margin: 10px 0;"></div>
+                    
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted small fw-bold">Current Balance:</span>
+                        <h5 class="fw-bold mb-0 text-success">KES {{ a.current_balance|floatformat:2 }}</h5>
+                    </div>
+                </div>
+                <div class="card-footer bg-white border-top-0 text-end">
+                    <a href="{% url 'chama:account_edit' a.pk %}" class="btn btn-sm btn-outline-dark fw-bold" style="border:2px solid #000;">
+                        <i class="fas fa-edit"></i> Edit
+                    </a>
+                    <a href="{% url 'chama:transaction_list' %}?account={{ a.pk }}" class="btn btn-sm btn-dark fw-bold" style="border:2px solid #000;">
+                        <i class="fas fa-list"></i> Transactions
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center py-5 text-muted" style="border: 2px dashed #ccc; border-radius: 4px;">
+            <i class="fas fa-university fa-3x mb-3" style="opacity: 0.3;"></i>
+            <h5>No accounts set up yet.</h5>
+            <p>Click "Add Account" to create your first account (e.g., Pool Account, Welfare Fund).</p>
+        </div>
+        {% endfor %}
     </div>
 </div>
 {% endblock %}

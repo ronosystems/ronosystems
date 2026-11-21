@@ -1,0 +1,70 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}Transfer Funds{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+    <div class="card" style="border:2px solid #000; border-radius:4px; max-width:650px; margin:0 auto;">
+        <div class="card-header" style="background:#f8f9fa; border-bottom:2px solid #000; padding:14px 24px; font-weight:700;">
+            <i class="fas fa-exchange-alt me-2"></i> Transfer Funds Between Accounts
+        </div>
+        <div class="card-body p-4">
+            <div class="alert alert-info" style="border: 2px solid #000;">
+                <i class="fas fa-info-circle me-1"></i>
+                Move money from your <strong>General Pool Account</strong> to specific funds (Welfare, Loans, Projects, etc.).
+            </div>
+
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">From Account (Source) <span class="text-danger">*</span></label>
+                    <select name="from_account" class="form-control" required>
+                        <option value="">— Select Source Account —</option>
+                        {% for acc in accounts %}
+                        <option value="{{ acc.pk }}">
+                            {{ acc.name }} ({{ acc.get_purpose_display }}) — KES {{ acc.current_balance|floatformat:2 }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3 text-center">
+                    <i class="fas fa-arrow-down fa-2x text-muted"></i>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">To Account (Destination) <span class="text-danger">*</span></label>
+                    <select name="to_account" class="form-control" required>
+                        <option value="">— Select Destination Account —</option>
+                        {% for acc in accounts %}
+                        <option value="{{ acc.pk }}">
+                            {{ acc.name }} ({{ acc.get_purpose_display }}) — KES {{ acc.current_balance|floatformat:2 }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Amount (KES) <span class="text-danger">*</span></label>
+                        <input type="number" step="0.01" name="amount" class="form-control" required placeholder="0.00">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Description / Reason</label>
+                        <input type="text" name="description" class="form-control" placeholder="e.g. October allocation">
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mt-4 pt-3" style="border-top:2px solid #000;">
+                    <button type="submit" class="btn btn-dark fw-bold" style="border:2px solid #000;" onclick="return confirm('Are you sure you want to transfer these funds?');">
+                        <i class="fas fa-paper-plane me-1"></i> Process Transfer
+                    </button>
+                    <a href="{% url 'chama:account_list' %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

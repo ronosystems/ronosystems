@@ -23,7 +23,7 @@ from .forms import (
     LoanTypeForm, LoanForm, SelfServiceLoanForm, LoanRepaymentForm,
     MeetingForm, AttendanceForm, AnnouncementForm,
     AccountForm, TransactionForm, ExpenseForm, ProjectForm,
-    CommitteeForm, CommitteeMemberForm,
+    CommitteeForm, CommitteeMemberForm, GuestForm,
 )
 
 from .models import (
@@ -41,6 +41,21 @@ User = get_user_model()
 
 
 
+
+# ============================================================
+# GLOBAL CONSTANTS
+# ============================================================
+ADMIN_ROLES = [
+    'super_admin', 'company_admin', 'company_manager',
+    'chairperson', 'vice_chairperson', 'treasurer', 'secretary',
+    'vice_secretary', 'loan_officer',
+]
+
+
+
+# ============================================================
+#  HELPERS
+# ============================================================
 
 def _require_loan_policy_setter(view_func):
     """
@@ -60,7 +75,6 @@ def _require_loan_policy_setter(view_func):
             return redirect('chama:loan_type_list')
         return view_func(request, *args, **kwargs)
     return _wrapped
-
 
 def _require_officer(view_func):
     """
@@ -104,10 +118,6 @@ def _generate_default_password(company):
 
     return f"{first_word}@12345"
 
-
-# ============================================================
-# CLOUDINARY HELPERS
-# ============================================================
 def _cloudinary_configure():
     """Match the pattern used in epa_shop views."""
     cfg = getattr(settings, 'CLOUDINARY_STORAGE', {})
@@ -117,7 +127,6 @@ def _cloudinary_configure():
         api_secret=cfg.get('API_SECRET', ''),
         secure=True,
     )
-
 
 def _upload_to_cloudinary(uploaded_file, folder='chama/members'):
     """
@@ -150,7 +159,6 @@ def _upload_to_cloudinary(uploaded_file, folder='chama/members'):
         traceback.print_exc()
         return None
 
-
 def _get_company(request):
     """Resolve the active company for the current request."""
     company = getattr(request, 'company', None) or getattr(request, 'current_company', None)
@@ -163,7 +171,6 @@ def _get_company(request):
         return Company.objects.filter(pk=company_id).first()
     return None
 
-
 def _company_queryset(request, model, **filters):
     company = _get_company(request)
     qs = model.objects.all()
@@ -172,7 +179,6 @@ def _company_queryset(request, model, **filters):
     else:
         qs = qs.filter(**filters)
     return qs
-
 
 def _next_member_number(company):
     """Generate the next sequential member number for a company."""
@@ -192,9 +198,6 @@ def _next_member_number(company):
     except (ValueError, IndexError):
         return "M-00001"
 
-# ============================================================
-# HELPER: Get member from user
-# ============================================================
 def _get_current_member(request, company):
     """
     Get the Member record linked to the current logged-in user.
@@ -204,10 +207,6 @@ def _get_current_member(request, company):
         return None
     return Member.objects.filter(company=company, user=request.user).first()
 
-
-# ============================================================
-# MPESA HELPER: Send STK Push via company's M-Pesa config
-# ============================================================
 def _send_chama_stk_push(company, phone, amount, account_reference, description):
     """
     Wrapper around apps.mpesa.services.send_stk_push.
@@ -237,6 +236,44 @@ def _send_chama_stk_push(company, phone, amount, account_reference, description)
         description=(description or 'Chama payment')[:13],
     )
     
+def _post_contribution_to_pool(contribution):
+    """
+    Helper function: Automatically creates a Money-In transaction 
+    in the General Pool Account when a contribution is marked as paid.
+    """
+    company = contribution.company
+    
+    # Check if this contribution has already been posted
+    existing = Transaction.objects.filter(
+        company=company,
+        reference=f"CONT-{contribution.pk}"
+    ).exists()
+    if existing:
+        return False  # Already posted, skip
+        
+    pool_account = Account.objects.filter(
+        company=company, 
+        purpose='pool', 
+        is_active=True
+    ).first()
+
+    if pool_account:
+        Transaction.objects.create(
+            company=company,
+            account=pool_account,
+            transaction_type='in',
+            amount=contribution.amount,
+            date=contribution.date,
+            description=f"Contribution for {contribution.period} — {contribution.member.full_name}",
+            reference=f"CONT-{contribution.pk}"
+        )
+        return True
+    return False
+
+
+
+
+
 
 
 # ============================================================
@@ -247,30 +284,98 @@ def dashboard(request):
     company = _get_company(request)
     ctx = {'company': company}
     
+    # 1. Define who gets to see the global financials
+    ADMIN_ROLES = [
+        'company_admin', 'super_admin', 'chairperson', 'vice_chairperson',
+        'secretary', 'vice_secretary', 'treasurer', 'loan_officer'
+    ]
+    
     if company:
-        active_loans_qs = Loan.objects.filter(company=company, status__in=['approved', 'disbursed'])
-        loans_outstanding = sum(loan.balance_remaining for loan in active_loans_qs)
+        # ============================================================
+        # GLOBAL VIEW (Admins & Committee Members Only)
+        # ============================================================
+        if request.user.role in ADMIN_ROLES:
+            
+            # --- Accounts Logic ---
+            accounts = Account.objects.filter(company=company, is_active=True)
+            
+            pool_balance = sum(a.current_balance for a in accounts if a.purpose == 'pool')
+            welfare_funds = sum(a.current_balance for a in accounts if a.purpose == 'welfare')
+            project_funds = sum(a.current_balance for a in accounts if a.purpose == 'projects')
+            loan_funds = sum(a.current_balance for a in accounts if a.purpose == 'loans')
+            total_cash = sum(a.current_balance for a in accounts)
 
-        ctx.update({
-            'members_count': Member.objects.filter(company=company, status='active').count(),
-            'announcements': Announcement.objects.filter(company=company, is_active=True).order_by('-created_at')[:3],
-            'savings_total': Savings.objects.filter(company=company).aggregate(t=Sum('amount'))['t'] or 0,
-            'loans_active': active_loans_qs.count(),
-            'loans_outstanding': loans_outstanding,
-            'pending_registrations': Registration.objects.filter(company=company, status='pending').count(),
-            'pending_loans': Loan.objects.filter(company=company, status='pending').count(),
-            'contributions_total': Contribution.objects.filter(company=company, paid=True).aggregate(t=Sum('amount'))['t'] or 0,
-            'fines_total': Fine.objects.filter(company=company, is_paid=False).aggregate(t=Sum('amount'))['t'] or 0,
-        })
+            # --- Loans Logic ---
+            active_loans_qs = Loan.objects.filter(company=company, status__in=['approved', 'disbursed'])
+            loans_outstanding = sum(loan.balance_remaining for loan in active_loans_qs)
+            
+            loans_disbursed = Loan.objects.filter(company=company, status__in=['disbursed', 'closed']).aggregate(t=Sum('principal'))['t'] or 0
+            loans_repaid = LoanRepayment.objects.filter(loan__company=company).aggregate(t=Sum('amount'))['t'] or 0
+            
+            ninety_days_ago = timezone.now().date() - timezone.timedelta(days=90)
+            non_performing_qs = Loan.objects.filter(
+                company=company, 
+                status='disbursed',
+                disbursed_on__lt=ninety_days_ago,
+            )
+            loans_non_performing = sum(loan.balance_remaining for loan in non_performing_qs if loan.balance_remaining > 0)
 
+            # --- Projects & Contributions Logic ---
+            projects_count = Project.objects.filter(company=company).count()
+            
+            current_year = timezone.now().year
+            contributions_this_year = Contribution.objects.filter(
+                company=company, 
+                paid=True, 
+                date__year=current_year
+            ).aggregate(t=Sum('amount'))['t'] or 0
+
+            # --- Update Context ---
+            ctx.update({
+                'members_count': Member.objects.filter(company=company, status='active').count(),
+                'announcements': Announcement.objects.filter(company=company, is_active=True).order_by('-created_at')[:3],
+                'savings_total': Savings.objects.filter(company=company).aggregate(t=Sum('amount'))['t'] or 0,
+                
+                'total_cash': total_cash,
+                'pool_balance': pool_balance,
+                'welfare_funds': welfare_funds,
+                'project_funds': project_funds,
+                'loan_funds': loan_funds,
+                
+                'loans_active': active_loans_qs.count(),
+                'loans_outstanding': loans_outstanding,
+                'loans_disbursed': loans_disbursed,
+                'loans_repaid': loans_repaid,
+                'loans_non_performing': loans_non_performing,
+                
+                'projects_count': projects_count,
+                'contributions_this_year': contributions_this_year,
+                'current_year': current_year,
+
+                'pending_registrations': Registration.objects.filter(company=company, status='pending').count(),
+                'pending_loans': Loan.objects.filter(company=company, status='pending').count(),
+                'contributions_total': Contribution.objects.filter(company=company, paid=True).aggregate(t=Sum('amount'))['t'] or 0,
+                'fines_total': Fine.objects.filter(company=company, is_paid=False).aggregate(t=Sum('amount'))['t'] or 0,
+            })
+
+        # ============================================================
+        # INDIVIDUAL VIEW
+        # ============================================================
         current_member = _get_current_member(request, company)
-        if current_member and request.user.role not in ['company_admin', 'chairperson', 'super_admin']:
+        if current_member:
             current_month = timezone.localdate().strftime('%Y-%m')
             required = (
                 current_member.membership_type.monthly_contribution
                 if current_member.membership_type else 0
             )
-            contributed = Contribution.objects.filter(
+            
+            # 👇 NEW: Calculate TOTAL contributions (lifetime) for the big number
+            contributed_total = Contribution.objects.filter(
+                member=current_member, paid=True
+            ).aggregate(t=Sum('amount'))['t'] or 0
+            
+            # 👇 NEW: Calculate just for this month to see if they are up to date
+            contributed_this_month = Contribution.objects.filter(
                 member=current_member, period=current_month, paid=True
             ).aggregate(t=Sum('amount'))['t'] or 0
             
@@ -284,14 +389,18 @@ def dashboard(request):
 
             ctx.update({
                 'member_profile': current_member,
-                'my_contributions': contributed,
+                'my_contributions': contributed_total, # 👈 Shows lifetime total
+                'contributed_this_month': contributed_this_month, # 👈 Shows if current month is paid
                 'my_required_contribution': required,
                 'my_loan_balance': loan_balance,
                 'my_fines_unpaid': fines_unpaid,
                 'my_recent_loans': recent_loans,
+                'current_month': current_month,
             })
 
     return render(request, 'chama/dashboard.html', ctx)
+
+
 
 # ============================================================
 # MEMBERS
@@ -680,7 +789,6 @@ def registration_list(request):
         'pending_count': pending_count,
     })
 
-
 @login_required
 @transaction.atomic
 def registration_approve(request, pk):
@@ -762,6 +870,402 @@ def registration_reject(request, pk):
 
     messages.info(request, f'{reg.full_name}\'s application was rejected.')
     return redirect('chama:registration_list')
+
+
+
+
+# ============================================================
+# CONTRIBUTIONS
+# ============================================================
+import datetime
+from calendar import month_name
+
+@login_required
+def contribution_list(request):
+    company = _get_company(request)
+    
+    if not company:
+        return redirect('home')
+
+    # 1. Define authorized roles
+    is_officer = request.user.role in [
+        'super_admin', 'company_admin', 'company_manager',
+        'chairperson', 'vice_chairperson', 'treasurer', 'secretary',
+    ]
+
+    # 2. Get the selected month (default to current month)
+    today = timezone.localdate()
+    current_month = today.strftime('%Y-%m')
+    selected_month = request.GET.get('month', current_month)
+
+    # 3. GENERATE MONTH CHOICES DYNAMICALLY (Last 12 months + Next 3 months)
+    month_choices = []
+    
+    # Start from 12 months ago
+    start_date = today.replace(day=1) - datetime.timedelta(days=365)
+    start_year, start_month = start_date.year, start_date.month
+    
+    # Loop through 16 months total (12 back + current + 3 forward)
+    for i in range(16):
+        # Calculate year and month
+        month_index = (start_month - 1) + i
+        year = start_year + (month_index // 12)
+        month = (month_index % 12) + 1
+        
+        # Format: '2026-11' and 'November 2026'
+        value = f"{year}-{month:02d}"
+        label = f"{month_name[month]} {year}"
+        
+        month_choices.append({
+            'value': value,
+            'label': label,
+            'is_selected': value == selected_month
+        })
+
+    # 4. Handle ONE-CLICK "Mark as Paid" (Treasurer action)
+    if request.method == 'POST' and 'mark_paid' in request.POST and is_officer:
+        member_id = request.POST.get('member_id')
+        amount = request.POST.get('amount')
+        
+        member = get_object_or_404(Member, pk=member_id, company=company)
+        
+        contrib, created = Contribution.objects.get_or_create(
+            company=company,
+            member=member,
+            period=selected_month,
+            defaults={
+                'amount': amount,
+                'paid': True,
+                'date': timezone.localdate(),
+                'membership_type': member.membership_type
+            }
+        )
+        
+        if not created and not contrib.paid:
+            contrib.paid = True
+            contrib.date = timezone.localdate()
+            contrib.amount = amount
+            contrib.save()
+            
+        posted = _post_contribution_to_pool(contrib)
+        if posted:
+            messages.success(request, f"Marked {member.full_name} as paid and updated Pool Account.")
+        else:
+            messages.warning(request, f"Marked {member.full_name} as paid, but no Pool Account exists.")
+            
+        return redirect(f"{request.path}?month={selected_month}")
+
+    # 5. Fetch data based on role
+    if is_officer:
+        members = Member.objects.filter(company=company, status='active').order_by('full_name')
+        
+        contributions_qs = Contribution.objects.filter(
+            company=company, period=selected_month
+        )
+        
+        contrib_map = {c.member_id: c for c in contributions_qs}
+        for m in members:
+            m.current_contrib = contrib_map.get(m.id)
+        
+        total_collected = sum(c.amount for c in contrib_map.values() if c.paid)
+        total_expected = sum(
+            (m.membership_type.monthly_contribution if m.membership_type else 0) 
+            for m in members
+        )
+        
+        context = {
+            'is_officer': True,
+            'members': members,
+            'selected_month': selected_month,
+            'month_choices': month_choices, # <-- PASS DYNAMIC MONTHS
+            'total_collected': total_collected,
+            'total_expected': total_expected,
+        }
+    else:
+        current_member = _get_current_member(request, company)
+        if current_member:
+            contributions_qs = Contribution.objects.filter(
+                member=current_member
+            ).order_by('-date', '-created_at')
+        else:
+            contributions_qs = Contribution.objects.none()
+            
+        context = {
+            'is_officer': False,
+            'contributions': contributions_qs,
+            'current_member': current_member,
+            'selected_month': selected_month,
+        }
+
+    return render(request, 'chama/contribution_list.html', context)
+    
+    
+@login_required
+def contribution_create(request):
+    company = _get_company(request)
+    
+    if request.method == 'POST':
+        form = ContributionForm(request.POST, company=company)
+        if form.is_valid():
+            contribution = form.save(commit=False)
+            contribution.company = company
+            
+            # 👇 NEW: Automatically assign the membership type from the member
+            if contribution.member and contribution.member.membership_type:
+                contribution.membership_type = contribution.member.membership_type
+                
+            contribution.save()
+
+            if contribution.paid:
+                posted = _post_contribution_to_pool(contribution)
+                if posted:
+                    messages.success(request, 'Contribution saved and posted to Pool Account.')
+                else:
+                    messages.warning(
+                        request, 
+                        'Contribution saved, but no General Pool Account exists. '
+                        'Please create a Pool account to track cash flow.'
+                    )
+            else:
+                messages.success(request, 'Contribution saved (not yet paid).')
+            
+            return redirect('chama:contribution_list')
+    else:
+        form = ContributionForm(company=company)
+    
+    return render(request, 'chama/contribution_form.html', {
+        'form': form, 
+        'mode': 'create'
+    })
+
+
+@login_required
+def contribution_edit(request, pk):
+    company = _get_company(request)
+    obj = get_object_or_404(Contribution, pk=pk, company=company)
+    
+    # Store the original paid status
+    was_paid = obj.paid
+
+    if request.method == 'POST':
+        form = ContributionForm(request.POST, instance=obj, company=company)
+        if form.is_valid():
+            contribution = form.save()
+            
+            # If it was unpaid and is now paid, post to pool
+            if not was_paid and contribution.paid:
+                posted = _post_contribution_to_pool(contribution)
+                if posted:
+                    messages.success(request, 'Contribution updated and posted to Pool Account.')
+                else:
+                    messages.warning(request, 'Contribution updated, but no Pool Account exists.')
+            else:
+                messages.success(request, 'Contribution record updated.')
+                
+            return redirect('chama:contribution_list')
+    else:
+        form = ContributionForm(instance=obj, company=company)
+
+    return render(request, 'chama/contribution_form.html', {
+        'form': form,
+        'mode': 'edit',
+        'contribution': obj,
+    })
+
+
+@login_required
+def contribution_delete(request, pk):
+    company = _get_company(request)
+    obj = get_object_or_404(Contribution, pk=pk, company=company)
+    
+    name = obj.member.full_name
+    amount = obj.amount
+    
+    # If this contribution had been posted to Pool, reverse it
+    posted_txn = Transaction.objects.filter(
+        company=company,
+        reference=f"CONT-{obj.pk}"
+    ).first()
+    
+    if posted_txn:
+        # Create a reversal transaction (Money Out) so the pool balance corrects
+        Transaction.objects.create(
+            company=company,
+            account=posted_txn.account,
+            transaction_type='out',
+            amount=posted_txn.amount,
+            date=timezone.localdate(),
+            description=f"REVERSAL: Deleted contribution for {obj.period} — {name}",
+            reference=f"CONT-{obj.pk}-REVERSAL"
+        )
+        messages.info(request, 'Contribution was linked to Pool Account. Reversal transaction created.')
+        
+    obj.delete()
+    messages.success(request, f'Deleted contribution of KES {amount} for {name}.')
+    return redirect('chama:contribution_list')
+
+
+@login_required
+def contribution_pay(request):
+    company = _get_company(request)
+    current_member = _get_current_member(request, company)
+    
+    if not current_member:
+        messages.error(request, "You are not registered as a Chama member.")
+        return redirect('chama:contribution_list')
+
+    # 1. Calculate required amount for current month
+    current_month = timezone.localdate().strftime('%Y-%m')
+    required_amount = (
+        current_member.membership_type.monthly_contribution 
+        if current_member.membership_type else 0
+    )
+    
+    # 2. Calculate already paid and remaining
+    contributed_this_month = Contribution.objects.filter(
+        member=current_member,
+        period=current_month,
+        paid=True
+    ).aggregate(t=Sum('amount'))['t'] or 0
+    
+    remaining_amount = max(0, required_amount - contributed_this_month)
+
+    # 3. Handle POST Request (Trigger M-Pesa STK Push)
+    if request.method == 'POST':
+        phone = request.POST.get('phone', '').strip()
+        
+        if not phone:
+            messages.error(request, "Phone number is required.")
+        elif remaining_amount <= 0:
+            messages.info(request, "You have already paid for this month.")
+            return redirect('chama:contribution_list')
+        else:
+            try:
+                # Trigger the STK Push using your helper function
+                response = _send_chama_stk_push(
+                    company=company,
+                    phone=phone,
+                    amount=int(remaining_amount),
+                    account_reference=f"C-{current_member.member_number}",
+                    description=f"Chama Contribution {current_month}",
+                )
+                
+                if str(response.get('ResponseCode')) == '0':
+                    messages.success(
+                        request,
+                        f"✅ STK Push sent to {phone}. Please enter your M-Pesa PIN to complete the payment."
+                    )
+                    
+                    # NOTE: The actual marking as "Paid" happens when Safaricom 
+                    # confirms the transaction via the M-Pesa Callback URL.
+                    # If you are testing without callbacks, you can uncomment the lines below:
+                    
+                    # contribution, created = Contribution.objects.get_or_create(
+                    #     company=company, member=current_member, period=current_month,
+                    #     defaults={'amount': remaining_amount, 'paid': True, 'date': timezone.localdate(), 'membership_type': current_member.membership_type}
+                    # )
+                    # if not created:
+                    #     contribution.paid = True
+                    #     contribution.save()
+                    # _post_contribution_to_pool(contribution)
+                    
+                    return redirect('chama:contribution_list')
+                else:
+                    messages.error(
+                        request,
+                        response.get('ResponseDescription') or 'STK Push failed. Please try again.'
+                    )
+            except Exception as e:
+                messages.error(request, f"Payment error: {e}")
+
+    # 4. Render the Template
+    context = {
+        'member': current_member,
+        'current_month': current_month,
+        'required_amount': required_amount,
+        'contributed_this_month': contributed_this_month,
+        'remaining_amount': remaining_amount,
+    }
+    return render(request, 'chama/contribution_pay.html', context)
+
+@login_required
+def contribution_pay_self_service(request):
+    company = _get_company(request)
+    current_member = _get_current_member(request, company)
+    
+    is_officer = request.user.role in [
+        'super_admin', 'company_admin', 'company_manager',
+        'chairperson', 'vice_chairperson', 'treasurer', 'secretary',
+    ]
+    
+    if not current_member:
+        if is_officer:
+            messages.info(request, "As an officer, you manage contributions from the main Contributions page.")
+            return redirect('chama:contribution_list')
+        else:
+            messages.error(request, "You are not registered as a Chama member.")
+            return redirect('chama:contribution_list')
+
+    # 1. Calculate required amount for current month
+    current_month = timezone.localdate().strftime('%Y-%m')
+    required_amount = (
+        current_member.membership_type.monthly_contribution 
+        if current_member.membership_type else 0
+    )
+    
+    # 2. Calculate already paid and remaining
+    contributed_this_month = Contribution.objects.filter(
+        member=current_member,
+        period=current_month,
+        paid=True
+    ).aggregate(t=Sum('amount'))['t'] or 0
+    
+    remaining_amount = max(0, required_amount - contributed_this_month)
+
+    # 3. Handle POST Request (Trigger M-Pesa STK Push)
+    if request.method == 'POST':
+        phone = request.POST.get('phone', '').strip()
+        
+        if not phone:
+            messages.error(request, "Phone number is required.")
+        elif remaining_amount <= 0:
+            messages.info(request, "You have already paid for this month.")
+            return redirect('chama:contribution_list')
+        else:
+            try:
+                # Trigger the STK Push using your helper function
+                response = _send_chama_stk_push(
+                    company=company,
+                    phone=phone,
+                    amount=int(remaining_amount),
+                    account_reference=f"C-{current_member.member_number}",
+                    description=f"Chama Contribution {current_month}",
+                )
+                
+                if str(response.get('ResponseCode')) == '0':
+                    messages.success(
+                        request,
+                        f"✅ STK Push sent to {phone}. Please enter your M-Pesa PIN to complete the payment."
+                    )
+                    return redirect('chama:contribution_list')
+                else:
+                    messages.error(
+                        request,
+                        response.get('ResponseDescription') or 'STK Push failed. Please try again.'
+                    )
+            except Exception as e:
+                messages.error(request, f"Payment error: {e}")
+
+    # 4. Render the Template
+    context = {
+        'member': current_member,
+        'current_month': current_month,
+        'required_amount': required_amount,
+        'contributed_this_month': contributed_this_month,
+        'remaining_amount': remaining_amount,
+    }
+    return render(request, 'chama/contribution_pay.html', context)
+
 
 
 # ============================================================
@@ -865,291 +1369,6 @@ def savings_delete(request, pk):
     messages.info(request, f'🗑️ Deleted savings of KES {amount} for {member_name}.')
     return redirect('chama:savings_list')
 
-
-# ============================================================
-# CONTRIBUTIONS
-# ============================================================
-@login_required
-def contribution_list(request):
-    company = _get_company(request)
-    qs = _company_queryset(request, Contribution).select_related('member', 'membership_type')
-
-    # Role-based filtering
-    is_officer = request.user.role in [
-        'super_admin', 'company_admin', 'company_manager',
-        'chairperson', 'vice_chairperson', 'treasurer', 'secretary',
-    ]
-    
-    current_member = None
-    if not is_officer:
-        current_member = _get_current_member(request, company)
-        if current_member:
-            qs = qs.filter(member=current_member)
-        else:
-            qs = qs.none()
-
-    # Search & filter
-    q = request.GET.get('q', '').strip()
-    if q and is_officer:
-        qs = qs.filter(
-            models.Q(member__full_name__icontains=q) |
-            models.Q(member__member_number__icontains=q) |
-            models.Q(period__icontains=q)
-        )
-
-    paid_filter = request.GET.get('paid', '').strip()
-    if paid_filter == 'yes':
-        qs = qs.filter(paid=True)
-    elif paid_filter == 'no':
-        qs = qs.filter(paid=False)
-
-    qs = qs.order_by('-date', '-created_at')
-
-    total_paid = qs.filter(paid=True).aggregate(t=Sum('amount'))['t'] or 0
-    total_unpaid = qs.filter(paid=False).aggregate(t=Sum('amount'))['t'] or 0
-
-    # ── SELF-SERVICE STATS FOR MEMBERS ──
-    current_month = timezone.localdate().strftime('%Y-%m')
-    required_amount = 0
-    contributed_this_month = 0
-    remaining_amount = 0
-
-    if not is_officer and current_member:
-        # 1. Get required amount from Membership Type
-        if current_member.membership_type:
-            required_amount = current_member.membership_type.monthly_contribution
-
-        # 2. Calculate contributed this month (only paid contributions)
-        contributed_this_month = Contribution.objects.filter(
-            member=current_member,
-            period=current_month,
-            paid=True
-        ).aggregate(t=Sum('amount'))['t'] or 0
-
-        # 3. Calculate remaining
-        remaining_amount = max(0, required_amount - contributed_this_month)
-
-    return render(request, 'chama/contribution_list.html', {
-        'contributions': qs,
-        'total_paid': total_paid,
-        'total_unpaid': total_unpaid,
-        'total_count': qs.count(),
-        'is_officer': is_officer,
-        'current_member': current_member,
-        # Self-service stats
-        'current_month': current_month,
-        'required_amount': required_amount,
-        'contributed_this_month': contributed_this_month,
-        'remaining_amount': remaining_amount,
-    })
-
-@login_required
-def contribution_pay(request, pk):
-    """
-    Pay a pending contribution via M-Pesa STK Push.
-    """
-    company = _get_company(request)
-    contribution = get_object_or_404(Contribution, pk=pk, company=company)
-
-    # Ensure the member owns the contribution
-    current_member = _get_current_member(request, company)
-    is_officer = request.user.role in [
-        'super_admin', 'company_admin', 'company_manager',
-        'chairperson', 'vice_chairperson', 'treasurer', 'secretary',
-    ]
-    if not is_officer and (not current_member or contribution.member != current_member):
-        messages.error(request, 'You do not have permission to pay this contribution.')
-        return redirect('chama:contribution_list')
-
-    if contribution.paid:
-        messages.info(request, 'This contribution is already paid.')
-        return redirect('chama:contribution_list')
-
-    # ── Handle POST (initiate payment) ──
-    if request.method == 'POST':
-        phone = request.POST.get('phone', '').strip()
-        if not phone:
-            messages.error(request, 'Phone number is required.')
-            return render(request, 'chama/contribution_pay.html', {
-                'contribution': contribution,
-                'default_phone': contribution.member.phone,
-            })
-
-        try:
-            response = _send_chama_stk_push(
-                company=company,
-                phone=phone,
-                amount=int(contribution.amount),
-                account_reference=f"C-{contribution.member.member_number}",
-                description=f"Chama contrib",
-            )
-            if str(response.get('ResponseCode')) == '0':
-                messages.success(
-                    request,
-                    f'✅ STK Push sent to {phone}. Enter your PIN to complete payment.'
-                )
-                return redirect('chama:contribution_list')
-            else:
-                messages.error(
-                    request,
-                    response.get('ResponseDescription') or 'STK Push failed.'
-                )
-        except Exception as e:
-            messages.error(request, f'Payment error: {e}')
-
-
-    return render(request, 'chama/contribution_pay.html', {
-        'contribution': contribution,
-        'default_phone': contribution.member.phone,
-    })
-
-# ============================================================
-# CONTRIBUTION CREATE (Role-aware)
-# ============================================================
-@login_required
-@transaction.atomic
-def contribution_create(request):
-    company = _get_company(request)
-    if not company:
-        messages.error(request, 'No company assigned.')
-        return redirect('chama:contribution_list')
-
-    is_officer = request.user.role in [
-        'super_admin', 'company_admin', 'company_manager',
-        'chairperson', 'vice_chairperson', 'treasurer', 'secretary',
-    ]
-    current_member = _get_current_member(request, company)
-    current_month = timezone.localdate().strftime('%Y-%m')
-
-    # ────────────────────────────────────────────────
-    # MEMBER SELF-SERVICE FLOW
-    # ────────────────────────────────────────────────
-    if not is_officer:
-        if not current_member:
-            messages.error(request, 'You are not linked to a Chama member record.')
-            return redirect('chama:contribution_list')
-
-        # Calculate current month stats
-        required = (
-            current_member.membership_type.monthly_contribution
-            if current_member.membership_type else 0
-        )
-        contributed = Contribution.objects.filter(
-            member=current_member, period=current_month, paid=True
-        ).aggregate(t=Sum('amount'))['t'] or 0
-        remaining = max(0, required - contributed)
-
-        if request.method == 'POST':
-            form = SelfServiceContributionForm(request.POST)
-            if form.is_valid():
-                amount = form.cleaned_data['amount']
-                phone = form.cleaned_data['phone'].strip()
-
-                if amount <= 0:
-                    messages.error(request, 'Amount must be greater than zero.')
-                else:
-                    try:
-                        response = _send_chama_stk_push(
-                            company=company,
-                            phone=phone,
-                            amount=int(amount),
-                            account_reference=f"C-{current_member.member_number}",
-                            description=f"Chama contrib",
-                        )
-                        if str(response.get('ResponseCode')) == '0':
-                            Contribution.objects.create(
-                                company=company,
-                                member=current_member,
-                                membership_type=current_member.membership_type,
-                                amount=amount,
-                                period=current_month,
-                                date=timezone.localdate(),
-                                paid=False,
-                            )
-                            messages.success(
-                                request,
-                                f'✅ STK Push sent to {phone}. Enter your PIN to complete payment.'
-                            )
-                            return redirect('chama:contribution_list')
-                        else:
-                            messages.error(
-                                request,
-                                response.get('ResponseDescription') or 'STK Push failed.'
-                            )
-                    except Exception as e:
-                        messages.error(request, f'Payment error: {e}')
-        else:
-            form = SelfServiceContributionForm(initial={
-                'amount': remaining if remaining > 0 else required,
-                'phone': current_member.phone,
-            })
-
-        return render(request, 'chama/contribution_form.html', {
-            'form': form,
-            'mode': 'pay',  # 👈 special flag for template
-            'current_member': current_member,
-            'current_month': current_month,
-            'required': required,
-            'contributed': contributed,
-            'remaining': remaining,
-        })
-
-    # ────────────────────────────────────────────────
-    # TREASURER / OFFICER MANUAL FLOW (existing logic)
-    # ────────────────────────────────────────────────
-    if request.method == 'POST':
-        form = ContributionForm(request.POST, company=company)
-        if form.is_valid():
-            obj = form.save(commit=False)
-            obj.company = company
-            obj.save()
-            messages.success(
-                request,
-                f'✅ Contribution of KES {obj.amount} recorded for {obj.member.full_name}.'
-            )
-            return redirect('chama:contribution_list')
-    else:
-        form = ContributionForm(
-            company=company,
-            initial={'date': timezone.localdate(), 'period': current_month},
-        )
-
-    return render(request, 'chama/contribution_form.html', {
-        'form': form,
-        'mode': 'create',
-        'is_officer': True,
-    })
-
-@login_required
-def contribution_edit(request, pk):
-    company = _get_company(request)
-    obj = get_object_or_404(Contribution, pk=pk, company=company)
-
-    if request.method == 'POST':
-        form = ContributionForm(request.POST, instance=obj, company=company)
-        if form.is_valid():
-            form.save()
-            messages.success(request, '✅ Contribution record updated.')
-            return redirect('chama:contribution_list')
-    else:
-        form = ContributionForm(instance=obj, company=company)
-
-    return render(request, 'chama/contribution_form.html', {
-        'form': form,
-        'mode': 'edit',
-        'contribution': obj,
-    })
-
-
-@login_required
-def contribution_delete(request, pk):
-    company = _get_company(request)
-    obj = get_object_or_404(Contribution, pk=pk, company=company)
-    name = obj.member.full_name
-    amount = obj.amount
-    obj.delete()
-    messages.info(request, f'🗑️ Deleted contribution of KES {amount} for {name}.')
-    return redirect('chama:contribution_list')
 
 
 
@@ -1323,6 +1542,9 @@ def fine_delete(request, pk):
 
 
 
+
+
+
 # ============================================================
 # LOAN TYPES
 # ============================================================
@@ -1388,6 +1610,69 @@ def loan_type_delete(request, pk):
     obj.delete()
     messages.info(request, f'🗑️ Loan Type "{name}" deleted.')
     return redirect('chama:loan_type_list')
+
+
+
+
+@login_required
+@_require_officer
+def guest_create(request):
+    """Officer registers a guest for an external loan."""
+    company = _get_company(request)
+    if request.method == 'POST':
+        form = GuestForm(request.POST, request.FILES)
+        if form.is_valid():
+            guest = form.save(commit=False)
+            guest.company = company
+            guest.created_by = request.user
+            guest.save()
+            messages.success(request, f'✅ Guest "{guest.full_name}" registered successfully.')
+            return redirect('chama:loan_create_external', guest_pk=guest.pk)
+    else:
+        form = GuestForm()
+    return render(request, 'chama/guest_form.html', {'form': form})
+
+
+@login_required
+@_require_officer
+def loan_create_external(request, guest_pk):
+    """Create an external loan for a registered guest."""
+    company = _get_company(request)
+    guest = get_object_or_404(Guest, pk=guest_pk, company=company)
+
+    if request.method == 'POST':
+        # Custom form for external loans
+        loan_type_id = request.POST.get('loan_type')
+        principal = request.POST.get('principal')
+        term = request.POST.get('term_months')
+        purpose = request.POST.get('purpose', '')
+
+        try:
+            lt = LoanType.objects.get(pk=loan_type_id, company=company)
+            Loan.objects.create(
+                company=company,
+                loan_category='external',
+                guest=guest,
+                loan_type=lt,
+                principal=principal,
+                interest_rate=lt.interest_rate,
+                term_months=term,
+                purpose=purpose,
+                status='pending',
+                requested_on=timezone.localdate(),
+            )
+            messages.success(request, f'✅ External loan application created for {guest.full_name}.')
+            return redirect('chama:loan_list')
+        except Exception as e:
+            messages.error(request, f'Error: {e}')
+
+    loan_types = LoanType.objects.filter(company=company, is_active=True)
+    return render(request, 'chama/loan_external_form.html', {
+        'guest': guest,
+        'loan_types': loan_types,
+    })
+
+
 
 
 # ============================================================
@@ -1478,33 +1763,70 @@ def loan_detail(request, pk):
         'current_member': current_member,  # 👈 Pass it to the template
     })
 
+def check_internal_loan_eligibility(member):
+    """
+    Returns (is_eligible: bool, reason: str)
+    Checks if a member can apply for an internal loan.
+    """
+    if not member:
+        return False, "You are not registered as a Chama member."
+    
+    if member.status != 'active':
+        return False, "Your membership is not active."
+
+    current_month = timezone.localdate().strftime('%Y-%m')
+    current_month_paid = Contribution.objects.filter(
+        member=member, period=current_month, paid=True
+    ).exists()
+    if not current_month_paid:
+        return False, f"You must pay your {current_month} contribution before applying for a loan."
+
+    late_contributions = Contribution.objects.filter(
+        member=member, paid=True, paid_on_time=False
+    ).count()
+    if late_contributions > 0:
+        return False, "You have late contributions on record. Please clear all late payments first."
+
+    outstanding_loans = Loan.objects.filter(
+        member=member, status__in=['approved', 'disbursed']
+    )
+    if outstanding_loans.exists():
+        return False, "You have an outstanding loan. Please repay it before applying for a new one."
+
+    if member.available_borrowing_power <= 0:
+        return False, "Your borrowing limit is zero. Increase your contributions to unlock more borrowing power."
+
+    return True, "Eligible"
+
 @login_required
 def loan_create(request):
-    """Officer manual loan entry, or member self-service request."""
     company = _get_company(request)
     if not company:
         messages.error(request, 'No company assigned.')
         return redirect('chama:loan_list')
 
-    is_officer = request.user.role in [
-        'super_admin', 'company_admin', 'company_manager',
-        'chairperson', 'vice_chairperson', 'treasurer', 'loan_officer',
-    ]
+    is_officer = request.user.role in ADMIN_ROLES
     current_member = _get_current_member(request, company)
 
-    # ────────────────────────────────────────────────
-    # MEMBER SELF-SERVICE FLOW
-    # ────────────────────────────────────────────────
+    # ============================================================
+    # MEMBER SELF-SERVICE FLOW (from Modal)
+    # ============================================================
     if not is_officer:
         if not current_member:
             messages.error(request, 'You are not linked to a Chama member record.')
+            return redirect('chama:loan_list')
+
+        # Eligibility Check
+        is_eligible, reason = check_internal_loan_eligibility(current_member)
+        if not is_eligible:
+            messages.error(request, reason)
             return redirect('chama:loan_list')
 
         if request.method == 'POST':
             form = SelfServiceLoanForm(
                 request.POST,
                 company=company,
-                member=current_member,   # 👈 pass member to enable validation
+                member=current_member,
             )
             if form.is_valid():
                 lt = form.cleaned_data['loan_type']
@@ -1512,19 +1834,10 @@ def loan_create(request):
                 term = form.cleaned_data['term_months']
                 purpose = form.cleaned_data['purpose']
 
-                # ── SAFETY CHECKS (belt + suspenders) ──
                 if term > (lt.max_term_months or 999):
-                    messages.error(
-                        request,
-                        f'Term exceeds max for {lt.name} '
-                        f'({lt.max_term_months} months).'
-                    )
+                    messages.error(request, f'Term exceeds max for {lt.name} ({lt.max_term_months} months).')
                 elif principal > current_member.available_borrowing_power:
-                    messages.error(
-                        request,
-                        f'Amount exceeds your borrowing limit of '
-                        f'KES {current_member.available_borrowing_power:,.2f}.'
-                    )
+                    messages.error(request, f'Amount exceeds your borrowing limit of KES {current_member.available_borrowing_power:,.2f}.')
                 else:
                     Loan.objects.create(
                         company=company,
@@ -1537,14 +1850,15 @@ def loan_create(request):
                         status='pending',
                         requested_on=timezone.localdate(),
                     )
-                    messages.success(
-                        request,
-                        f'✅ Loan application of KES {principal:,.2f} submitted. '
-                        f'Wait for officer approval.'
-                    )
+                    messages.success(request, f'✅ Loan application of KES {principal:,.2f} submitted for review.')
                     return redirect('chama:loan_list')
         else:
             form = SelfServiceLoanForm(company=company, member=current_member)
+
+        # Fetch loan history for the member
+        my_loans = Loan.objects.filter(
+            company=company, member=current_member
+        ).prefetch_related('repayments').order_by('-requested_on')
 
         return render(request, 'chama/loan_form.html', {
             'form': form,
@@ -1553,33 +1867,29 @@ def loan_create(request):
             'eligible_limit': current_member.available_borrowing_power,
             'total_contributions': current_member.total_contributions_paid,
             'active_loans': current_member.active_loans_total,
+            'my_loans': my_loans,
         })
 
-    # ────────────────────────────────────────────────
-    # OFFICER MANUAL ENTRY FLOW
-    # ────────────────────────────────────────────────
+    # ============================================================
+    # OFFICER MANUAL ENTRY FLOW (unchanged)
+    # ============================================================
     if request.method == 'POST':
         form = LoanForm(request.POST, company=company)
         if form.is_valid():
             obj = form.save(commit=False)
             obj.company = company
             obj.save()
-            messages.success(
-                request,
-                f'✅ Loan #{obj.id} recorded for {obj.member.full_name}.'
-            )
+            messages.success(request, f'✅ Loan #{obj.id} recorded for {obj.member.full_name}.')
             return redirect('chama:loan_list')
     else:
-        form = LoanForm(
-            company=company,
-            initial={'requested_on': timezone.localdate()},
-        )
+        form = LoanForm(company=company, initial={'requested_on': timezone.localdate()})
 
     return render(request, 'chama/loan_form.html', {
         'form': form,
         'mode': 'create',
         'is_officer': True,
     })
+
 
 @login_required
 def loan_edit(request, pk):
@@ -1888,6 +2198,172 @@ def account_create(request):
     else:
         form = AccountForm()
     return render(request, 'chama/account_form.html', {'form': form, 'mode': 'create'})
+
+@login_required
+def account_edit(request, pk):
+    company = _get_company(request)
+    account = get_object_or_404(Account, pk=pk, company=company)
+    
+    if request.method == 'POST':
+        form = AccountForm(request.POST, instance=account)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Account updated successfully.')
+            return redirect('chama:account_list')
+    else:
+        form = AccountForm(instance=account)
+    
+    return render(request, 'chama/account_form.html', {'form': form, 'account': account})
+
+@login_required
+def account_delete(request, pk):
+    company = _get_company(request)
+    account = get_object_or_404(Account, pk=pk, company=company)
+    
+    if request.method == 'POST':
+        account.delete()
+        messages.success(request, 'Account deleted.')
+        return redirect('chama:account_list')
+    
+    return render(request, 'chama/account_confirm_delete.html', {'account': account})
+
+# ============================================================
+# ACCOUNT TRANSFER (POOL -> SUB-ACCOUNTS)
+# ============================================================
+@login_required
+def account_transfer(request):
+    company = _get_company(request)
+    if not company:
+        return redirect('home')
+
+    accounts = Account.objects.filter(company=company, is_active=True)
+
+    if request.method == 'POST':
+        from_id = request.POST.get('from_account')
+        to_id = request.POST.get('to_account')
+        amount_raw = request.POST.get('amount')
+        description = request.POST.get('description', 'Internal Transfer')
+
+        # --- VALIDATION ---
+        try:
+            amount = Decimal(amount_raw)
+            if amount <= 0:
+                raise ValueError("Amount must be greater than zero.")
+        except (ValueError, TypeError):
+            messages.error(request, "Please enter a valid amount.")
+            return render(request, 'chama/account_transfer.html', {'accounts': accounts})
+
+        if from_id == to_id:
+            messages.error(request, "Source and destination accounts must be different.")
+            return render(request, 'chama/account_transfer.html', {'accounts': accounts})
+
+        from_account = get_object_or_404(Account, pk=from_id, company=company)
+        to_account = get_object_or_404(Account, pk=to_id, company=company)
+
+        # Check if the source account has enough funds
+        if from_account.current_balance < amount:
+            messages.error(
+                request, 
+                f"Insufficient funds in {from_account.name}. "
+                f"Available: KES {from_account.current_balance:,.2f}, "
+                f"Requested: KES {amount:,.2f}"
+            )
+            return render(request, 'chama/account_transfer.html', {'accounts': accounts})
+
+        # --- PROCESS TRANSFER ---
+        # 1. Money Out from source
+        Transaction.objects.create(
+            company=company,
+            account=from_account,
+            transaction_type='out',
+            amount=amount,
+            description=f"Transfer to {to_account.name} — {description}",
+            date=timezone.localdate()
+        )
+
+        # 2. Money In to destination
+        Transaction.objects.create(
+            company=company,
+            account=to_account,
+            transaction_type='in',
+            amount=amount,
+            description=f"Transfer from {from_account.name} — {description}",
+            date=timezone.localdate()
+        )
+
+        messages.success(
+            request, 
+            f"✅ Successfully transferred KES {amount:,.2f} from {from_account.name} to {to_account.name}."
+        )
+        return redirect('chama:account_list')
+
+    return render(request, 'chama/account_transfer.html', {'accounts': accounts})
+
+
+# ============================================================
+# STEP 2: CONFIRM AND PROCESS TRANSFER
+# ============================================================
+@login_required
+def account_transfer_confirm(request):
+    company = _get_company(request)
+    if not company:
+        return redirect('home')
+
+    pending = request.session.get('pending_transfer')
+    if not pending:
+        messages.error(request, "No pending transfer found. Please start again.")
+        return redirect('chama:account_transfer')
+
+    from_account = get_object_or_404(Account, pk=pending['from_id'], company=company)
+    to_account = get_object_or_404(Account, pk=pending['to_id'], company=company)
+    amount = Decimal(pending['amount'])
+    description = pending['description']
+
+    if request.method == 'POST':
+        # Re-check the balance (in case another user withdrew money in the meantime)
+        if from_account.current_balance < amount:
+            messages.error(request, "Insufficient funds. Transfer cancelled.")
+            del request.session['pending_transfer']
+            return redirect('chama:account_transfer')
+
+        # 1. Money Out from source
+        Transaction.objects.create(
+            company=company,
+            account=from_account,
+            transaction_type='out',
+            amount=amount,
+            description=f"Transfer to {to_account.name} — {description}",
+            date=timezone.localdate()
+        )
+
+        # 2. Money In to destination
+        Transaction.objects.create(
+            company=company,
+            account=to_account,
+            transaction_type='in',
+            amount=amount,
+            description=f"Transfer from {from_account.name} — {description}",
+            date=timezone.localdate()
+        )
+
+        # Clear session
+        del request.session['pending_transfer']
+
+        messages.success(
+            request, 
+            f"✅ Successfully transferred KES {amount:,.2f} from {from_account.name} to {to_account.name}."
+        )
+        return redirect('chama:account_list')
+
+    # If GET, show the confirmation page
+    context = {
+        'from_account': from_account,
+        'to_account': to_account,
+        'amount': amount,
+        'description': description,
+    }
+    return render(request, 'chama/account_transfer_confirm.html', context)
+
 
 
 # ============================================================
