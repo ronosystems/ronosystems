@@ -697,11 +697,6 @@ def manifest_view(request):
             "client_mode": "focus-existing"
         },
         
-        # --- Scope Extensions (Allows navigating to external subdomains) ---
-        "scope_extensions": [
-            {"type": "origin", "value": "https://ronosystems.com"},
-            {"type": "origin", "value": "https://fieldmax.shop"}
-        ],
         
         # --- File Handlers (Allows users to open files with your PWA) ---
         "file_handlers": [
