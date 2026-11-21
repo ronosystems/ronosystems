@@ -1,0 +1,361 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}External Loan Limits{% endblock %}
+
+{% block extra_css %}
+<style>
+    @media (max-width: 767.98px) {
+        .table-responsive { overflow-x: hidden; }
+        .mobile-card-table thead { display: none; }
+        .mobile-card-table tbody tr {
+            display: block; border: 2px solid #000; border-radius: 6px;
+            margin-bottom: 15px; padding: 10px; background: #fff;
+        }
+        .mobile-card-table tbody td {
+            display: block; text-align: right; padding: 8px 0;
+            border-bottom: 1px dashed #eee;
+        }
+        .mobile-card-table tbody td:last-child { border-bottom: none; padding-top: 15px; }
+        .mobile-card-table tbody td::before {
+            content: attr(data-label); float: left; font-weight: 700;
+            text-transform: uppercase; font-size: 0.75rem; color: #666; margin-top: 2px;
+        }
+        .mobile-card-table .d-flex.gap-2 { flex-direction: column; }
+        .mobile-card-table .btn { width: 100%; justify-content: center; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold mb-1">
+                <i class="fas fa-user-shield me-2"></i> External Loan Limits
+            </h4>
+            <p class="text-muted small mb-0">
+                Manage borrowing limits for registered customers.
+            </p>
+        </div>
+        <a href="{% url 'chama:customer_list' %}" class="btn btn-outline-dark fw-bold" style="border: 2px solid #000;">
+            <i class="fas fa-users"></i> View All Customers
+        </a>
+    </div>
+
+    <!-- 👇 PENDING REQUESTS BANNER -->
+    {% if pending_count > 0 %}
+    <div class="alert alert-warning d-flex justify-content-between align-items-center mb-4 shadow-sm" style="border: 2px solid #000;">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-bell fa-2x me-3 text-dark"></i>
+            <div>
+                <h5 class="fw-bold mb-0 text-dark">You have {{ pending_count }} Pending Loan Request{{ pending_count|pluralize }}</h5>
+                <p class="small mb-0 text-dark">Review the requests, approve them, and they will be ready for the Treasurer to disburse.</p>
+            </div>
+        </div>
+        <!-- Button to open modal -->
+        <button type="button" class="btn btn-dark fw-bold px-4" style="border: 2px solid #000;" data-bs-toggle="modal" data-bs-target="#pendingRequestsModal">
+            <i class="fas fa-list-check"></i> Review Requests
+        </button>
+    </div>
+    {% endif %}
+
+    <!-- Table -->
+    <div class="card" style="border: 2px solid #000; border-radius: 4px;">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle mobile-card-table">
+                <thead style="background: #000; color: #fff;">
+                    <tr>
+                        <th class="ps-3 py-3">Customer Name</th>
+                        <th class="py-3">Phone Number</th>
+                        <th class="py-3">Current Limit</th>
+                        <th class="py-3">Active Loans</th>
+                        <th class="text-end pe-3 py-3">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        <td class="ps-3" data-label="Customer">
+                            <div class="fw-bold">{{ row.customer.full_name }}</div>
+                            <div class="small text-muted">{{ row.customer.email|default:"No email" }}</div>
+                        </td>
+
+                        <td data-label="Phone">
+                            {{ row.customer.phone_number }}
+                        </td>
+
+                        <td data-label="Limit">
+                            {% if row.custom_limit > 0 %}
+                                <div class="fw-bold text-primary">
+                                    KES {{ row.custom_limit|floatformat:2 }}
+                                </div>
+                            {% else %}
+                                <span class="badge bg-secondary" style="border:1px solid #000;">No Limit Set</span>
+                            {% endif %}
+                        </td>
+
+                        <td data-label="Active Loans">
+                            <span class="fw-bold text-danger">KES {{ row.active_loans_total|floatformat:2 }}</span>
+                        </td>
+
+                        <td class="text-end pe-3" data-label="Actions">
+                            <div class="d-flex justify-content-end gap-2 flex-wrap">
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-dark fw-bold"
+                                        style="border: 2px solid #000;"
+                                        onclick="openHistoryModal({{ row.customer.pk }})">
+                                    <i class="fas fa-clock-rotate-left"></i> Review History
+                                </button>
+                                <a href="{% url 'chama:customer_review' row.customer.pk %}" 
+                                class="btn btn-sm btn-dark fw-bold" 
+                                style="border: 2px solid #000;">
+                                    <i class="fas fa-search"></i> Review Customer
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-5 text-muted">
+                            <i class="fas fa-users fa-3x mb-3" style="opacity:0.2;"></i>
+                            <p class="mb-0">No customers registered yet.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 👇 NEW MODAL: PENDING REQUESTS -->
+<div class="modal fade" id="pendingRequestsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content" style="border: 2px solid #000; border-radius: 4px;">
+            <div class="modal-header" style="background:#000; color:#fff;">
+                <h5 class="modal-title fw-bold"><i class="fas fa-list-check me-2"></i> Pending Loan Requests</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead style="background: #f8f9fa;">
+                            <tr>
+                                <th>Customer</th>
+                                <th>Loan Details</th>
+                                <th>Requested On</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for loan in pending_loans %}
+                            <tr>
+                                <td class="fw-bold">{{ loan.guest.full_name }}</td>
+                                <td>
+                                    <strong>KES {{ loan.principal|floatformat:2 }}</strong><br>
+                                    <small class="text-muted">{{ loan.loan_type.name|default:"Loan" }} ({{ loan.term_months }} months)</small>
+                                </td>
+                                <td>{{ loan.requested_on|date:"M d, Y" }}</td>
+                                <td class="text-end">
+                                    <form method="POST" action="{% url 'chama:loan_approve' loan.pk %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-success fw-bold" onclick="return confirm('Are you sure you want to approve this loan? Once approved, the treasurer can release the funds.');">
+                                            <i class="fas fa-check-circle"></i> Approve
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-dark fw-bold" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL 1: REVIEW HISTORY -->
+<div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content" style="border: 2px solid #000; border-radius: 4px;">
+            <div class="modal-header" style="background:#000; color:#fff;">
+                <h5 class="modal-title fw-bold">
+                    <i class="fas fa-clock-rotate-left me-2"></i> Review History —
+                    <span id="historyMemberName"></span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="historyModalBody">
+                <div class="text-center py-5">
+                    <div class="spinner-border" role="status"></div>
+                    <p class="mt-2 text-muted">Loading history…</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-dark fw-bold" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL 2: ADJUST LOAN LIMIT -->
+<div class="modal fade" id="limitModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border: 2px solid #000; border-radius: 4px;">
+            <div class="modal-header" style="background:#000; color:#fff;">
+                <h5 class="modal-title fw-bold">
+                    <i class="fas fa-sliders me-2"></i> Adjust External Limit
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="limitForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <p class="mb-1"><strong>Customer:</strong> <span id="limitMemberName"></span></p>
+                    <p class="mb-3 text-muted small">
+                        Set a custom limit for this external borrower. Enter <code>0</code> to remove the limit.
+                    </p>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Custom Loan Limit (KES)</label>
+                        <input type="number" step="0.01" min="0"
+                               class="form-control fw-bold"
+                               style="border: 2px solid #000; font-size: 1.1rem;"
+                               id="customLimitInput" name="custom_limit" required>
+                    </div>
+
+                    <div class="bg-light p-3 rounded" style="border:1px solid #000;">
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted small fw-bold text-uppercase">Available Power</span>
+                            <span class="fw-bold text-success" id="limitAvailable">—</span>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-danger mt-3 d-none" id="limitError"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-dark fw-bold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-dark fw-bold" style="border:2px solid #000;" id="limitSaveBtn">
+                        <i class="fas fa-save"></i> Save Limit
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// REVIEW HISTORY MODAL
+let historyModal = null;
+
+function openHistoryModal(customerPk) {
+    const body = document.getElementById('historyModalBody');
+    body.innerHTML = `<div class="text-center py-5"><div class="spinner-border" role="status"></div></div>`;
+
+    if (!historyModal) {
+        historyModal = new bootstrap.Modal(document.getElementById('historyModal'));
+    }
+    historyModal.show();
+
+    fetch(`/chama/external-loans/limits/${customerPk}/history/`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            body.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+            return;
+        }
+        document.getElementById('historyMemberName').textContent = data.member.full_name;
+        body.innerHTML = `
+            <div class="text-center py-4">
+                <i class="fas fa-info-circle text-muted fa-3x mb-3"></i>
+                <h5 class="fw-bold">No Loan History</h5>
+                <p class="text-muted">This external customer hasn't taken any loans yet.</p>
+            </div>
+        `;
+    })
+    .catch(err => {
+        body.innerHTML = `<div class="alert alert-danger">Failed to load history: ${err}</div>`;
+    });
+}
+
+// ADJUST LIMIT MODAL
+let limitModal = null;
+let currentLimitCustomerId = null;
+
+function openLimitModal(customerPk, fullName, customLimit, available) {
+    currentLimitCustomerId = customerPk;
+
+    document.getElementById('limitMemberName').textContent = fullName;
+    document.getElementById('customLimitInput').value = customLimit;
+    document.getElementById('limitAvailable').textContent = 'KES ' + Number(available).toLocaleString('en-KE', { minimumFractionDigits: 2 });
+    document.getElementById('limitError').classList.add('d-none');
+
+    if (!limitModal) {
+        limitModal = new bootstrap.Modal(document.getElementById('limitModal'));
+    }
+    limitModal.show();
+}
+
+document.getElementById('limitForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('limitSaveBtn');
+    const errBox = document.getElementById('limitError');
+    const raw = document.getElementById('customLimitInput').value;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving…';
+    errBox.classList.add('d-none');
+
+    fetch(`/chama/external-loans/limits/${currentLimitCustomerId}/adjust/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify({ custom_limit: raw }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            errBox.textContent = data.error;
+            errBox.classList.remove('d-none');
+        } else {
+            limitModal.hide();
+            window.location.reload();
+        }
+    })
+    .catch(err => {
+        errBox.textContent = 'Request failed: ' + err;
+        errBox.classList.remove('d-none');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> Save Limit';
+    });
+});
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

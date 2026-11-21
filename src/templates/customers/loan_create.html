@@ -1,0 +1,93 @@
+{% extends "customer_base.html" %}
+{% load static %}
+
+{% block title %}Apply for Loan{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+
+            <div class="d-flex align-items-center mb-4">
+                <a href="{% url 'customers:dashboard' %}" class="text-muted text-decoration-none me-3">
+                    <i class="fas fa-arrow-left fa-lg"></i>
+                </a>
+                <h4 class="fw-bold mb-0">Apply for a Loan</h4>
+            </div>
+
+            <div class="card border-0 shadow-sm" style="border-radius: 12px;">
+                <div class="card-body p-4">
+
+                    <!-- ✅ STATUS BANNER -->
+                    {% if latest_loan %}
+                        {% if latest_loan.status == 'pending' %}
+                            <div class="alert alert-warning mb-4" style="border-radius: 8px;">
+                                <i class="fas fa-clock me-2"></i>
+                                <strong>Application Pending:</strong>
+                                Your loan of KES {{ latest_loan.principal|floatformat:2 }}
+                                ({{ latest_loan.loan_type.get_name_display }}) is awaiting approval.
+                                Submitted on {{ latest_loan.created_at|date:"M d, Y H:i" }}.
+                            </div>
+                        {% elif latest_loan.status == 'approved' %}
+                            <div class="alert alert-success mb-4" style="border-radius: 8px;">
+                                <i class="fas fa-check-circle me-2"></i>
+                                <strong>Approved!</strong>
+                                Your loan of KES {{ latest_loan.principal|floatformat:2 }} has been approved.
+                            </div>
+                        {% elif latest_loan.status == 'rejected' %}
+                            <div class="alert alert-danger mb-4" style="border-radius: 8px;">
+                                <i class="fas fa-times-circle me-2"></i>
+                                <strong>Rejected:</strong>
+                                Your previous loan application was rejected. You may apply again.
+                            </div>
+                        {% endif %}
+                    {% endif %}
+
+                    <div class="alert alert-success mb-4" style="border-radius: 8px;">
+                        <i class="fas fa-check-circle me-2"></i>
+                        You have an approved limit of <strong>KES {{ customer.custom_loan_limit|floatformat:2 }}</strong>.
+                    </div>
+
+                    <!-- ✅ DISABLE FORM IF PENDING -->
+                    {% if latest_loan.status == 'pending' %}
+                        <button class="btn btn-secondary w-100 fw-bold py-2" disabled style="border-radius: 8px;">
+                            <i class="fas fa-hourglass-half me-2"></i> Application Pending
+                        </button>
+                    {% else %}
+                        <form method="POST">
+                            {% csrf_token %}
+                            <!-- ... your existing fields ... -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Loan Type</label>
+                                <select name="loan_type" class="form-select" required style="border-radius: 8px;">
+                                    <option value="">Select a loan type...</option>
+                                    {% for lt in loan_types %}
+                                        <option value="{{ lt.pk }}">{{ lt.get_name_display }} ({{ lt.interest_rate }}% interest)</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Amount (KES)</label>
+                                <input type="number" name="amount" class="form-control" max="{{ customer.custom_loan_limit }}" min="1" required placeholder="e.g. 5000" style="border-radius: 8px;">
+                                <small class="text-muted">Max limit: KES {{ customer.custom_loan_limit|floatformat:2 }}</small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Term (Months)</label>
+                                <input type="number" name="term_months" class="form-control" min="1" required value="1" style="border-radius: 8px;">
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">Purpose</label>
+                                <textarea name="purpose" class="form-control" rows="3" required placeholder="Explain what you need the loan for..." style="border-radius: 8px;"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100 fw-bold py-2" style="border-radius: 8px;">
+                                Submit Application
+                            </button>
+                        </form>
+                    {% endif %}
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

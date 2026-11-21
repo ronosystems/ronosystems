@@ -1,0 +1,234 @@
+{% extends "customer_base.html" %}
+{% load static %}
+
+{% block title %}My Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+
+    <!-- 👇 REVIEWER FEEDBACK BANNER -->
+    {% if request.user.customer_profile.reviewer_comment %}
+    <div class="alert alert-danger d-flex align-items-center mb-4 shadow-sm" style="border: 2px solid #dc3545; border-radius: 8px;">
+        <i class="fas fa-exclamation-circle fa-2x me-3 text-danger"></i>
+        <div>
+            <h6 class="fw-bold mb-1 text-danger">Action Required from Committee</h6>
+            <p class="mb-0 text-dark">{{ request.user.customer_profile.reviewer_comment }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- GREETINGS BANNER -->
+    <div class="card border-0 shadow-sm mb-4" style="background: linear-gradient(135deg, var(--sidebar-bg, #1e4e6d) 0%, var(--primary-color, #2d5f7c) 100%); border-radius: 12px; overflow: hidden; position: relative;">
+        
+        <!-- Decorative Background Circles -->
+        <div style="position: absolute; top: -50px; right: -50px; width: 200px; height: 200px; background: rgba(255,255,255,0.05); border-radius: 50%;"></div>
+        <div style="position: absolute; bottom: -30px; left: 20%; width: 100px; height: 100px; background: rgba(255,255,255,0.05); border-radius: 50%;"></div>
+
+        <div class="card-body p-4 p-md-5 position-relative z-1">
+            <div class="row align-items-center">
+                <div class="col-lg-8 text-center text-lg-start mb-4 mb-lg-0">
+                    <h2 class="fw-bold text-white mb-3" style="font-size: 2rem;">
+                        Hello, {{ request.user.customer_profile.full_name|default:request.user.username }}! 👋
+                    </h2>
+                    <p class="text-white-50 mb-0" style="font-size: 1.05rem; max-width: 600px;">
+                        Welcome back to your portal. We're glad to see you here. 
+                        This is your personal space to manage everything related to <strong>{{ current_company.display_name|default:"our company" }}</strong>.
+                    </p>
+                </div>
+                <div class="col-lg-4 text-center d-none d-lg-block">
+                    <i class="fas fa-hand-sparkles" style="font-size: 6rem; color: rgba(255,255,255,0.15);"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHAMA BIZ SECTION -->
+    {% if 'chama' in current_company.business_type.name.lower %}
+    
+    <div class="row g-4 mb-4">
+        
+        <!-- LEFT: Profile Completion Checklist -->
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm h-100" style="border-radius: 12px;">
+                <div class="card-header bg-white border-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold mb-0">
+                        <i class="fas fa-id-card text-primary me-2"></i> Unlock Chama Loan Limits
+                    </h5>
+                    <a href="{% url 'customers:profile' %}" class="btn btn-sm btn-outline-dark fw-bold" style="border-radius: 6px;">
+                        <i class="fas fa-edit me-1"></i> Update Profile
+                    </a>
+                </div>
+                <div class="card-body p-4">
+                    <p class="text-muted mb-3 small">
+                        To qualify for loans, please ensure you have uploaded all required KYC documents and filled in your personal details.
+                    </p>
+
+                    <div class="row g-2">
+                        <!-- ID Front -->
+                        <div class="col-sm-6 col-md-4">
+                            <div class="d-flex align-items-center p-2 rounded" style="background: #f8f9fa; border: 1px solid #e9ecef;">
+                                <div class="me-2">
+                                    {% if request.user.customer_profile.id_front_url %}
+                                        <i class="fas fa-check-circle fa-lg text-success"></i>
+                                    {% else %}
+                                        <i class="fas fa-times-circle fa-lg text-danger"></i>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold" style="font-size: 0.85rem;">ID Front</h6>
+                                    <small class="text-muted" style="font-size: 0.7rem;">{% if request.user.customer_profile.id_front_url %}Uploaded{% else %}Pending{% endif %}</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ID Back -->
+                        <div class="col-sm-6 col-md-4">
+                            <div class="d-flex align-items-center p-2 rounded" style="background: #f8f9fa; border: 1px solid #e9ecef;">
+                                <div class="me-2">
+                                    {% if request.user.customer_profile.id_back_url %}
+                                        <i class="fas fa-check-circle fa-lg text-success"></i>
+                                    {% else %}
+                                        <i class="fas fa-times-circle fa-lg text-danger"></i>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold" style="font-size: 0.85rem;">ID Back</h6>
+                                    <small class="text-muted" style="font-size: 0.7rem;">{% if request.user.customer_profile.id_back_url %}Uploaded{% else %}Pending{% endif %}</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Good Conduct -->
+                        <div class="col-sm-6 col-md-4">
+                            <div class="d-flex align-items-center p-2 rounded" style="background: #f8f9fa; border: 1px solid #e9ecef;">
+                                <div class="me-2">
+                                    {% if request.user.customer_profile.good_conduct_url %}
+                                        <i class="fas fa-check-circle fa-lg text-success"></i>
+                                    {% else %}
+                                        <i class="fas fa-times-circle fa-lg text-danger"></i>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold" style="font-size: 0.85rem;">Good Conduct</h6>
+                                    <small class="text-muted" style="font-size: 0.7rem;">{% if request.user.customer_profile.good_conduct_url %}Uploaded{% else %}Pending{% endif %}</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- KRA PIN -->
+                        <div class="col-sm-6 col-md-4">
+                            <div class="d-flex align-items-center p-2 rounded" style="background: #f8f9fa; border: 1px solid #e9ecef;">
+                                <div class="me-2">
+                                    {% if request.user.customer_profile.kra_pin_url %}
+                                        <i class="fas fa-check-circle fa-lg text-success"></i>
+                                    {% else %}
+                                        <i class="fas fa-times-circle fa-lg text-danger"></i>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold" style="font-size: 0.85rem;">KRA PIN</h6>
+                                    <small class="text-muted" style="font-size: 0.7rem;">{% if request.user.customer_profile.kra_pin_url %}Uploaded{% else %}Pending{% endif %}</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CV -->
+                        <div class="col-sm-6 col-md-4">
+                            <div class="d-flex align-items-center p-2 rounded" style="background: #f8f9fa; border: 1px solid #e9ecef;">
+                                <div class="me-2">
+                                    {% if request.user.customer_profile.cv_url %}
+                                        <i class="fas fa-check-circle fa-lg text-success"></i>
+                                    {% else %}
+                                        <i class="fas fa-times-circle fa-lg text-danger"></i>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold" style="font-size: 0.85rem;">CV</h6>
+                                    <small class="text-muted" style="font-size: 0.7rem;">{% if request.user.customer_profile.cv_url %}Uploaded{% else %}Pending{% endif %}</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Next of Kin -->
+                        <div class="col-sm-6 col-md-4">
+                            <div class="d-flex align-items-center p-2 rounded" style="background: #f8f9fa; border: 1px solid #e9ecef;">
+                                <div class="me-2">
+                                    {% if request.user.customer_profile.next_of_kin_name %}
+                                        <i class="fas fa-check-circle fa-lg text-success"></i>
+                                    {% else %}
+                                        <i class="fas fa-times-circle fa-lg text-danger"></i>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold" style="font-size: 0.85rem;">Next of Kin</h6>
+                                    <small class="text-muted" style="font-size: 0.7rem;">{% if request.user.customer_profile.next_of_kin_name %}Provided{% else %}Pending{% endif %}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 👇 RIGHT: Approved Loan Limit Card (NOW CLICKABLE) -->
+        <div class="col-lg-5">
+            <!-- Changed to <a> tag to make it clickable -->
+            <a href="{% url 'customers:loan_create' %}" class="card border-0 shadow-sm h-100 text-decoration-none" style="border-radius: 12px; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); transition: transform 0.2s;">
+                <div class="card-body d-flex flex-column justify-content-center text-center p-4">
+                    
+                    {% if request.user.customer_profile.custom_loan_limit > 0 %}
+                        <!-- Approved State -->
+                        <div class="mb-3">
+                            <div class="d-inline-flex align-items-center justify-content-center bg-success bg-opacity-10 rounded-circle mb-2" style="width: 70px; height: 70px;">
+                                <i class="fas fa-check-circle fa-3x text-success"></i>
+                            </div>
+                        </div>
+                        <h6 class="text-muted fw-bold text-uppercase letter-spacing-1">Approved Loan Limit</h6>
+                        <h2 class="fw-bold mb-2" style="color: var(--sidebar-bg); font-size: 2.5rem;">
+                            KES {{ request.user.customer_profile.custom_loan_limit|floatformat:2 }}
+                        </h2>
+                        <p class="text-muted small mb-0">
+                            Congratulations! You qualify to borrow up to this amount. <strong>Click here to apply for a loan.</strong>
+                        </p>
+                    
+                    {% else %}
+                        <!-- Pending State -->
+                        <div class="mb-3">
+                            <div class="d-inline-flex align-items-center justify-content-center bg-warning bg-opacity-10 rounded-circle mb-2" style="width: 70px; height: 70px;">
+                                <i class="fas fa-hourglass-half fa-3x text-warning"></i>
+                            </div>
+                        </div>
+                        <h6 class="text-muted fw-bold text-uppercase letter-spacing-1">Loan Limit</h6>
+                        <h2 class="fw-bold mb-2" style="color: #6c757d; font-size: 2.5rem;">
+                            KES 0.00
+                        </h2>
+                        <p class="text-muted small mb-0">
+                            Your limit is currently under review. Please complete all KYC requirements above to unlock your borrowing power.
+                        </p>
+                    {% endif %}
+
+                </div>
+            </a>
+        </div>
+
+    </div>
+    {% endif %}
+
+    <!-- ADD YOUR NEW SECTIONS BELOW HERE -->
+    <div class="text-center py-5 text-muted">
+        <i class="fas fa-layer-group fa-3x mb-3" style="opacity: 0.2;"></i>
+        <h5>More sections coming soon...</h5>
+        <p class="small">You can add your orders, chama contributions, or recent activity here.</p>
+    </div>
+
+</div>
+
+<style>
+    /* Add hover effect to the clickable card */
+    a.card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}

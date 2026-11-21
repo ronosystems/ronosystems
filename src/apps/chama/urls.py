@@ -1,6 +1,8 @@
 from django.urls import path
 
 from . import views
+from . import client_views
+
 
 app_name = 'chama'
 
@@ -73,6 +75,12 @@ urlpatterns = [
     path('internal-loans/limits/<int:member_pk>/history/', views.member_loan_history, name='member_loan_history'),
     path('internal-loans/limits/<int:member_pk>/adjust/', views.member_loan_limit_adjust, name='member_loan_limit_adjust'),
 
+    # External Loans Limits
+    path('external-loans/limits/', client_views.external_loan_limits, name='external_loan_limits'),
+    path('external-loans/limits/<int:customer_pk>/history/', client_views.customer_loan_history, name='customer_loan_history'),
+    path('external-loans/limits/<int:customer_pk>/adjust/', client_views.customer_loan_limit_adjust, name='customer_loan_limit_adjust'),
+    path('external-loans/review/<int:customer_pk>/', client_views.customer_review_view, name='customer_review'),
+
     # Transactions
     path('transactions/', views.transaction_list, name='transaction_list'),
     path('transactions/create/', views.transaction_create, name='transaction_create'),
@@ -120,4 +128,6 @@ urlpatterns = [
 
     # Reports
     path('reports/', views.reports, name='reports'),
+
+    path('customers/', client_views.chama_customer_list, name='customer_list'),
 ]

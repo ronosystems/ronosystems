@@ -1,0 +1,238 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}Review Customer — {{ customer.full_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <a href="{% url 'chama:external_loan_limits' %}" class="text-muted text-decoration-none small mb-1 d-block">
+                <i class="fas fa-arrow-left"></i> Back to External Loans
+            </a>
+            <h4 class="fw-bold mb-0">
+                <i class="fas fa-user-check me-2"></i> Customer Review
+            </h4>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        
+        <!-- LEFT COLUMN: Profile Photo, Details & Limit Form -->
+        <div class="col-lg-5">
+
+            <!-- Profile Photo Card -->
+            <div class="card mb-4" style="border: 2px solid #000; border-radius: 4px;">
+                <div class="card-body text-center p-4">
+                    {% if customer.profile_photo_url %}
+                        <img src="{{ customer.profile_photo_url }}" alt="Profile Photo" class="rounded-circle shadow-sm mb-3" style="width: 130px; height: 130px; object-fit: cover; border: 3px solid #000;">
+                    {% else %}
+                        <div class="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto shadow-sm mb-3" style="width: 130px; height: 130px; border: 3px solid #000;">
+                            <i class="fas fa-user fa-4x text-muted"></i>
+                        </div>
+                        <p class="text-muted small mb-2">No profile photo uploaded</p>
+                    {% endif %}
+                    <h5 class="fw-bold mb-0">{{ customer.full_name }}</h5>
+                    <p class="text-muted small mb-0">Joined {{ customer.created_at|date:"M d, Y" }}</p>
+                </div>
+            </div>
+
+            <!-- Customer Details Card -->
+            <div class="card mb-4" style="border: 2px solid #000; border-radius: 4px;">
+                <div class="card-header" style="background: #000; color: #fff;">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-id-card me-2"></i> Customer Details</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-1"><strong>Name:</strong> {{ customer.full_name }}</p>
+                    <p class="mb-1"><strong>Phone:</strong> {{ customer.phone_number }}</p>
+                    <p class="mb-1"><strong>Email:</strong> {{ customer.email|default:"—" }}</p>
+                    <p class="mb-1"><strong>ID Number:</strong> {{ customer.national_id|default:"—" }}</p>
+                    <p class="mb-1"><strong>Location:</strong> {{ customer.location|default:"—" }}</p>
+                    <hr>
+                    <h6 class="fw-bold mt-3 mb-2">Next of Kin</h6>
+                    <p class="mb-1"><strong>Name:</strong> {{ customer.next_of_kin_name|default:"—" }}</p>
+                    <p class="mb-1"><strong>Phone:</strong> {{ customer.next_of_kin_phone|default:"—" }}</p>
+                </div>
+            </div>
+
+            <!-- Limit Assignment & Comment Form -->
+            <div class="card" style="border: 2px solid #000; border-radius: 4px;">
+                <div class="card-header" style="background: #000; color: #fff;">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-sliders me-2"></i> Assign Loan Limit</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Custom Loan Limit (KES)</label>
+                            <input type="number" step="0.01" min="0" name="custom_limit" 
+                                   class="form-control fw-bold" 
+                                   style="border: 2px solid #000; font-size: 1.1rem;"
+                                   value="{{ customer.custom_loan_limit|floatformat:2 }}" required>
+                        </div>
+
+                        <!-- 👇 NEW: Committee Comment Field -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Reviewer Notes (Optional)</label>
+                            <textarea name="reviewer_comment" class="form-control" rows="3" 
+                                      placeholder="e.g. Details not matching, kindly do correction..."
+                                      style="border: 2px solid #000;">{{ customer.reviewer_comment|default:'' }}</textarea>
+                            <small class="text-muted">This message will be shown to the customer on their dashboard if they need to make corrections.</small>
+                        </div>
+
+                        <button type="submit" class="btn btn-dark fw-bold w-100" style="border:2px solid #000;">
+                            <i class="fas fa-save"></i> Save Limit & Comment
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: KYC Documents -->
+        <div class="col-lg-7">
+            <div class="card" style="border: 2px solid #000; border-radius: 4px;">
+                <div class="card-header" style="background: #000; color: #fff;">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-file-alt me-2"></i> Uploaded Documents</h5>
+                </div>
+                <div class="card-body">
+
+                    <!-- ID Front -->
+                    <div class="mb-3 p-3 bg-light rounded" style="border: 1px solid #ddd;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-bold">National ID (Front)</span>
+                            {% if customer.id_front_url %}
+                                <span class="badge bg-success"><i class="fas fa-check"></i> Uploaded</span>
+                            {% else %}
+                                <span class="badge bg-danger">Missing</span>
+                            {% endif %}
+                        </div>
+                        {% if customer.id_front_url %}
+                            <a href="{{ customer.id_front_url }}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye"></i> View File
+                            </a>
+                        {% endif %}
+                    </div>
+
+                    <!-- ID Back -->
+                    <div class="mb-3 p-3 bg-light rounded" style="border: 1px solid #ddd;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-bold">National ID (Back)</span>
+                            {% if customer.id_back_url %}
+                                <span class="badge bg-success"><i class="fas fa-check"></i> Uploaded</span>
+                            {% else %}
+                                <span class="badge bg-danger">Missing</span>
+                            {% endif %}
+                        </div>
+                        {% if customer.id_back_url %}
+                            <a href="{{ customer.id_back_url }}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye"></i> View File
+                            </a>
+                        {% endif %}
+                    </div>
+
+                    <!-- Good Conduct -->
+                    <div class="mb-3 p-3 bg-light rounded" style="border: 1px solid #ddd;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-bold">Good Conduct</span>
+                            {% if customer.good_conduct_url %}
+                                <span class="badge bg-success"><i class="fas fa-check"></i> Uploaded</span>
+                            {% else %}
+                                <span class="badge bg-danger">Missing</span>
+                            {% endif %}
+                        </div>
+                        {% if customer.good_conduct_url %}
+                            <a href="{{ customer.good_conduct_url }}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye"></i> View File
+                            </a>
+                        {% endif %}
+                    </div>
+
+                    <!-- KRA PIN -->
+                    <div class="mb-3 p-3 bg-light rounded" style="border: 1px solid #ddd;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-bold">KRA PIN Certificate</span>
+                            {% if customer.kra_pin_url %}
+                                <span class="badge bg-success"><i class="fas fa-check"></i> Uploaded</span>
+                            {% else %}
+                                <span class="badge bg-danger">Missing</span>
+                            {% endif %}
+                        </div>
+                        {% if customer.kra_pin_url %}
+                            <a href="{{ customer.kra_pin_url }}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye"></i> View File
+                            </a>
+                        {% endif %}
+                    </div>
+
+                    <!-- CV -->
+                    <div class="mb-3 p-3 bg-light rounded" style="border: 1px solid #ddd;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-bold">Curriculum Vitae (CV)</span>
+                            {% if customer.cv_url %}
+                                <span class="badge bg-success"><i class="fas fa-check"></i> Uploaded</span>
+                            {% else %}
+                                <span class="badge bg-danger">Missing</span>
+                            {% endif %}
+                        </div>
+                        {% if customer.cv_url %}
+                            <a href="{{ customer.cv_url }}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye"></i> View File
+                            </a>
+                        {% endif %}
+                    </div>
+
+                    <!-- CRB / Loan Validator Section (Placeholder) -->
+                    <div class="mt-4 p-3 bg-warning bg-opacity-10 rounded" style="border: 1px dashed #ffc107;">
+                        <h6 class="fw-bold text-warning mb-2"><i class="fas fa-shield-alt me-2"></i> CRB & Loan Status Validation</h6>
+                        <p class="small text-muted mb-0">
+                            This section is reserved for future integration with CRB checks and internal loan history validation.
+                        </p>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- 👇 NEW: Last Engagement Section -->
+            {% if customer.reviewer_comment %}
+            <div class="card mt-4" style="border: 2px solid #000; border-radius: 4px;">
+                <div class="card-header" style="background: #f8f9fa; border-bottom: 2px solid #000;">
+                    <h5 class="modal-title fw-bold text-dark"><i class="fas fa-comment-dots me-2"></i> Last Engagement</h5>
+                </div>
+                <div class="card-body bg-white">
+                    <div class="d-flex align-items-start">
+                        <div class="me-3">
+                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
+                                <i class="fas fa-user-tie"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <h6 class="fw-bold mb-0">
+                                    {% if customer.reviewed_by %}
+                                        {{ customer.reviewed_by.get_full_name|default:customer.reviewed_by.username }}
+                                    {% else %}
+                                        Committee
+                                    {% endif %}
+                                </h6>
+                                <small class="text-muted">
+                                    {% if customer.reviewed_at %}
+                                        {{ customer.reviewed_at|date:"M d, Y" }} at {{ customer.reviewed_at|time:"H:i" }}
+                                    {% endif %}
+                                </small>
+                            </div>
+                            <p class="text-muted mb-0" style="font-size: 0.95rem;">
+                                "{{ customer.reviewer_comment }}"
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}

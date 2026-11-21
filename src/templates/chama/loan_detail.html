@@ -143,7 +143,8 @@
     <div class="eligibility-box">
         <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap">
             <h6 class="fw-bold mb-0" style="color:#2d5f7c;">
-                <i class="fas fa-calculator me-2"></i> {{ loan.member.full_name }}'s Loan Limits
+                <i class="fas fa-calculator me-2"></i> 
+                {{ borrower_name }}'s Loan Limits
             </h6>
             <div class="d-flex align-items-center gap-2">
                 <span class="badge-status badge-{{ loan.status }}">{{ loan.get_status_display }}</span>
@@ -171,25 +172,25 @@
             <!-- 1. Total Limit -->
             <div class="col-6 col-md-3 eligibility-col">
                 <div class="eligibility-label">Total Limit</div>
-                <div class="eligibility-value text-primary">KES {{ loan.member.eligible_loan_limit|floatformat:2 }}</div>
+                <div class="eligibility-value text-primary">KES {{ display_limit|floatformat:2 }}</div>
             </div>
             
             <!-- 2. Total Taken (Principal) -->
             <div class="col-6 col-md-3 eligibility-col">
                 <div class="eligibility-label">Total Taken</div>
-                <div class="eligibility-value text-warning">KES {{ loan.member.total_principal_taken|floatformat:2 }}</div>
+                <div class="eligibility-value text-warning">KES {{ display_taken|floatformat:2 }}</div>
             </div>
             
             <!-- 3. Remaining Limit -->
             <div class="col-6 col-md-3 eligibility-col">
                 <div class="eligibility-label">Remaining Limit</div>
-                <div class="eligibility-value text-success">KES {{ loan.member.available_borrowing_power|floatformat:2 }}</div>
+                <div class="eligibility-value text-success">KES {{ true_available_power|floatformat:2 }}</div>
             </div>
             
             <!-- 4. Active Loan (Debt = Principal + Interest) -->
             <div class="col-6 col-md-3 eligibility-col">
                 <div class="eligibility-label">Active Loan (Debt)</div>
-                <div class="eligibility-value text-danger">KES {{ loan.member.active_loans_total|floatformat:2 }}</div>
+                <div class="eligibility-value text-danger">KES {{ display_active_debt|floatformat:2 }}</div>
             </div>
         </div>
     </div>
@@ -205,9 +206,15 @@
                 <div class="card-body p-4">
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <div class="info-label">Member</div>
-                            <div class="info-value">{{ loan.member.full_name }}</div>
-                            <small class="text-muted">{{ loan.member.member_number }}</small>
+                            <div class="info-label">Member / Guest</div>
+                            <div class="info-value">{{ borrower_name }}</div>
+                            <small class="text-muted">
+                                {% if loan.member %}
+                                    {{ loan.member.member_number }}
+                                {% elif loan.guest %}
+                                    {{ loan.guest.national_id }}
+                                {% endif %}
+                            </small>
                         </div>
                         <div class="col-md-6 mb-3">
                             <div class="info-label">Loan Type</div>
@@ -387,10 +394,9 @@
                     {% if loan.status == 'approved' %}
                         {% if is_officer %}
                             
-                            <!-- 👇 USE true_available_power HERE -->
-                            {% if true_available_power >= loan.principal %}
+                            <!-- Added |add:"0.01" to prevent floating-point evaluation errors -->
+                            {% if true_available_power|add:"0.01" >= loan.principal %}
                                 
-                                <!-- Trigger Modal for Release Funds -->
                                 <button type="button" 
                                         class="action-btn disburse" 
                                         data-bs-toggle="modal" 
@@ -404,12 +410,14 @@
 
                             {% else %}
                                 
-                                <!-- Limit is 0: Hide release button, show strict warning -->
+                                <!-- Limit is insufficient -->
                                 <div class="alert alert-danger mb-2 p-2 text-center" style="border:2px solid #000;">
                                     <i class="fas fa-ban text-danger mb-1" style="font-size:1.5rem;"></i>
-                                    <h6 class="fw-bold mb-1 text-danger">0 LIMIT REACHED</h6>
+                                    <h6 class="fw-bold mb-1 text-danger">LIMIT EXCEEDED</h6>
                                     <p class="small mb-0 text-dark">
-                                        Cannot release funds. This member has reached their maximum allowable 3× borrowing limit.
+                                        Cannot release funds. The member's remaining borrowing power is 
+                                        <strong>KES {{ true_available_power|floatformat:2 }}</strong>, which is 
+                                        less than the requested <strong>KES {{ loan.principal|floatformat:2 }}</strong>.
                                     </p>
                                 </div>
                                 
@@ -630,7 +638,9 @@
                 <div class="bg-light p-3 rounded" style="border: 1px solid #000;">
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted small fw-bold text-uppercase">Recipient</span>
-                        <span class="fw-bold">{{ loan.member.full_name }}</span>
+                        <span class="fw-bold">
+                            {{ borrower_name }}
+                        </span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted small fw-bold text-uppercase">Amount to Release</span>

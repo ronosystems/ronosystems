@@ -1,0 +1,74 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}Customers{% endblock %}
+
+{% block page_title %}Customers{% endblock %}
+{% block page_subtitle %}View all customers registered under {{ current_company.display_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+
+    <!-- Top Bar -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="fw-bold mb-0">
+            <i class="fas fa-users me-2"></i> Customer Directory
+        </h4>
+        <span class="badge bg-dark px-3 py-2 fs-6">
+            Total: {{ customers.count }}
+        </span>
+    </div>
+
+    <!-- Table -->
+    <div class="card" style="border: 2px solid #000; border-radius: 4px;">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead style="background: #000; color: #fff;">
+                    <tr>
+                        <th class="ps-3 py-3">Profile</th>
+                        <th class="py-3">Full Name</th>
+                        <th class="py-3">Phone Number</th>
+                        <th class="py-3">Email</th>
+                        <th class="py-3">Joined On</th>
+                        <th class="text-end pe-3 py-3">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in customers %}
+                    <tr>
+                        <td class="ps-3">
+                            {% if c.profile_photo_url %}
+                                <img src="{{ c.profile_photo_url }}" alt="{{ c.full_name }}" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover; border: 2px solid #000;">
+                            {% else %}
+                                <div class="rounded-circle bg-light d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; border: 2px solid #000;">
+                                    <i class="fas fa-user text-muted"></i>
+                                </div>
+                            {% endif %}
+                        </td>
+                        <td class="fw-bold">{{ c.full_name }}</td>
+                        <td>{{ c.phone_number }}</td>
+                        <td>{{ c.email|default:"—" }}</td>
+                        <td>{{ c.created_at|date:"M d, Y" }}</td>
+                        <td class="text-end pe-3">
+                            {% if c.is_active %}
+                                <span class="badge bg-success" style="border:1px solid #000;">Active</span>
+                            {% else %}
+                                <span class="badge bg-danger" style="border:1px solid #000;">Inactive</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <i class="fas fa-users fa-3x mb-3" style="opacity:0.2;"></i>
+                            <p class="mb-0">No customers have registered under this company yet.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

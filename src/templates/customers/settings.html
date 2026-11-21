@@ -1,0 +1,98 @@
+{% extends "customer_base.html" %}
+{% load static %}
+
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+
+    <div class="row">
+        <!-- LEFT COLUMN: Change PIN & Contact Info -->
+        <div class="col-lg-8">
+            
+            <!-- Card 1: Change PIN -->
+            <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px;">
+                <div class="card-header bg-white border-0 pt-4 pb-0">
+                    <h5 class="fw-bold mb-0"><i class="fas fa-lock text-primary me-2"></i> Change PIN / Password</h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="change_password">
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-muted">Current PIN</label>
+                            <input type="password" name="old_password" class="form-control" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-muted">New PIN</label>
+                            <input type="password" name="new_password1" class="form-control" required minlength="4" maxlength="10">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small text-muted">Confirm New PIN</label>
+                            <input type="password" name="new_password2" class="form-control" required minlength="4" maxlength="10">
+                        </div>
+
+                        <button type="submit" class="btn btn-dark fw-bold px-4" style="border-radius: 6px;">
+                            Update PIN
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Card 2: Contact Info -->
+            <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px;">
+                <div class="card-header bg-white border-0 pt-4 pb-0">
+                    <h5 class="fw-bold mb-0"><i class="fas fa-address-card text-info me-2"></i> Contact Information</h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="update_info">
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-muted">Phone Number</label>
+                            <input type="tel" name="phone_number" class="form-control" value="{{ customer.phone_number }}" required>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small text-muted">Email Address</label>
+                            <input type="email" name="email" class="form-control" value="{{ customer.email|default:'' }}">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary fw-bold px-4" style="border-radius: 6px;">
+                            Save Changes
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN: Danger Zone -->
+        <div class="col-lg-4">
+            <div class="card border-danger shadow-sm" style="border-radius: 12px;">
+                <div class="card-header bg-danger text-white border-0 pt-4 pb-2" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                    <h5 class="fw-bold mb-0"><i class="fas fa-exclamation-triangle me-2"></i> Danger Zone</h5>
+                </div>
+                <div class="card-body p-4">
+                    <p class="text-muted small mb-4">
+                        Once you delete your account, there is no going back. All your data, order history, and contribution records will be permanently removed.
+                    </p>
+                    
+                    <form method="POST" onsubmit="return confirm('Are you absolutely sure you want to delete your account? This action cannot be undone.');">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete_account">
+                        <button type="submit" class="btn btn-outline-danger fw-bold w-100">
+                            <i class="fas fa-trash-alt me-1"></i> Delete My Account
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

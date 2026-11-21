@@ -1,0 +1,520 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}My Account{% endblock %} | {{ current_company.display_name|default:"RonoSystems" }}</title>
+
+    {% if site_favicon_url %}
+        <link rel="icon" type="image/png" href="{{ site_favicon_url }}">
+    {% endif %}
+
+    <link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'vendor/fontawesome/css/all.min.css' %}">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --sidebar-width: 260px;
+            --primary-color: {{ site_primary_color|default:"#2d5f7c" }};
+            --sidebar-bg: {{ site_accent_color|default:"#1e4e6d" }};
+            --text-light: #f8f9fa;
+            --ff-border: #e5e7eb;
+        }
+
+        body {
+            font-family: 'Open Sans', Arial, sans-serif;
+            background-color: #f0f2f5;
+            overflow-x: hidden;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* ============================================
+           SIDEBAR
+        ============================================ */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: var(--sidebar-width);
+            background: var(--sidebar-bg);
+            color: #fff;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1050;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        }
+
+        /* Sidebar Profile Section */
+        .sidebar-profile {
+            padding: 40px 20px 30px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.1);
+        }
+
+        .profile-img-container {
+            position: relative;
+            width: 90px;
+            height: 90px;
+            margin: 0 auto 15px;
+        }
+
+        .profile-img-wrap {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: #fff;
+            border: 3px solid var(--primary-color);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+
+        .profile-img-wrap img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .profile-img-wrap i {
+            font-size: 2.5rem;
+            color: #ccc;
+        }
+
+        /* Camera Upload Button */
+        .camera-btn {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 30px;
+            height: 30px;
+            background: var(--primary-color);
+            border: 2px solid #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            transition: transform 0.2s;
+        }
+
+        .camera-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .camera-btn i {
+            font-size: 0.8rem;
+            color: #fff;
+        }
+
+        .sidebar-profile h5 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin: 0 0 5px 0;
+            color: #fff;
+        }
+
+        .sidebar-profile p {
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.7);
+            margin: 0;
+        }
+
+        /* Sidebar Navigation */
+        .sidebar-nav-wrapper {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px 0;
+        }
+
+        .sidebar-nav {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .sidebar-nav .nav-item {
+            margin-bottom: 2px;
+        }
+
+        .sidebar-nav .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+            gap: 12px;
+        }
+
+        .sidebar-nav .nav-link:hover,
+        .sidebar-nav .nav-link.active {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border-left-color: var(--primary-color);
+        }
+
+        .sidebar-nav .nav-link i {
+            width: 20px;
+            text-align: center;
+            font-size: 1.1rem;
+            color: var(--primary-color);
+        }
+        
+        .sidebar-nav .nav-link:hover i,
+        .sidebar-nav .nav-link.active i {
+            color: #fff;
+        }
+
+        .sidebar-nav .nav-link.text-danger {
+            color: #ff6b6b !important;
+        }
+        .sidebar-nav .nav-link.text-danger i {
+            color: #ff6b6b !important;
+        }
+        .sidebar-nav .nav-link.text-danger:hover {
+            background: rgba(255, 107, 107, 0.1);
+        }
+
+        /* ============================================
+           MAIN CONTENT
+        ============================================ */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            transition: margin-left 0.3s ease;
+        }
+
+        /* ============================================
+           TOP NAVBAR
+        ============================================ */
+        .top-navbar {
+            background: #fff;
+            padding: 12px 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 1040;
+            border-bottom: 2px solid var(--ff-border);
+        }
+
+        .top-navbar .navbar-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .mobile-toggle {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--sidebar-bg);
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        .navbar-left .customer-name {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--sidebar-bg);
+            margin: 0;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .nav-action-btn {
+            background: none;
+            border: none;
+            font-size: 1.3rem;
+            color: #555;
+            cursor: pointer;
+            position: relative;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .nav-action-btn:hover {
+            color: var(--primary-color);
+        }
+
+        /* ============================================
+           CONTENT AREA & FOOTER
+        ============================================ */
+        .content-area {
+            flex: 1;
+            padding: 25px;
+        }
+
+        .footer {
+            background: #fff;
+            padding: 15px 25px;
+            border-top: 1px solid var(--ff-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: nowrap; /* 👈 FORCE 1 ROW */
+            gap: 10px;
+        }
+
+        .footer .copyright,
+        .footer .powered-by {
+            font-size: 0.8rem;
+            color: #6c757d;
+            white-space: nowrap; /* 👈 PREVENT TEXT WRAPPING */
+        }
+
+        .footer .powered-by a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 700;
+        }
+
+        /* ============================================
+           SIDEBAR OVERLAY (Mobile)
+        ============================================ */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1045;
+        }
+
+        .sidebar-overlay.active {
+            display: block;
+        }
+
+        /* ============================================
+           RESPONSIVE DESIGN
+        ============================================ */
+        @media (max-width: 992px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+            .main-content {
+                margin-left: 0;
+            }
+            .mobile-toggle {
+                display: block;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .content-area {
+                padding: 15px;
+            }
+            .navbar-left .customer-name {
+                font-size: 0.95rem;
+            }
+            .footer {
+                padding: 10px 15px;
+            }
+            /* Keep footer text small but on 1 row */
+            .footer .copyright,
+            .footer .powered-by {
+                font-size: 0.7rem;
+            }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+    <!-- Sidebar Overlay for Mobile -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        
+        <!-- Sidebar Profile Photo & Name -->
+        <div class="sidebar-profile">
+            <div class="profile-img-container">
+                <div class="profile-img-wrap">
+                    {% if request.user.customer_profile.profile_photo_url %}
+                        <img src="{{ request.user.customer_profile.profile_photo_url }}" alt="Profile Photo">
+                    {% else %}
+                        <i class="fas fa-user"></i>
+                    {% endif %}
+                </div>
+                <!-- Camera Icon to trigger upload -->
+                <label for="photoUpload" class="camera-btn" title="Update Profile Photo">
+                    <i class="fas fa-camera"></i>
+                </label>
+                <!-- Hidden File Input -->
+                <form id="photoUploadForm" method="POST" enctype="multipart/form-data" style="display: none;">
+                    {% csrf_token %}
+                    <input type="file" name="profile_photo" id="photoUpload" accept="image/*" onchange="this.form.submit();">
+                    <input type="hidden" name="update_photo" value="1">
+                </form>
+            </div>
+            
+            <h5>{{ request.user.customer_profile.full_name|default:request.user.username }}</h5>
+            <p>Customer Account</p>
+        </div>
+
+        <!-- Sidebar Menu -->
+        <div class="sidebar-nav-wrapper">
+            <ul class="sidebar-nav">
+                
+                <li class="nav-item">
+                    <a href="{% url 'customers:dashboard' %}" class="nav-link {% if '/customers/dashboard/' in request.path %}active{% endif %}">
+                        <i class="fas fa-home"></i> <span>Home</span>
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a href="{% url 'customers:profile' %}" class="nav-link {% if '/customers/profile/' in request.path %}active{% endif %}">
+                        <i class="fas fa-home"></i> <span>Profile</span>
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a href="{% url 'customers:settings' %}" class="nav-link {% if '/customers/settings/' in request.path %}active{% endif %}">
+                        <i class="fas fa-cog"></i> <span>Settings</span>
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a href="{% url 'customers:support' %}" class="nav-link {% if '/customers/support/' in request.path %}active{% endif %}">
+                        <i class="fas fa-headset"></i> <span>Get Support</span>
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a href="{% url 'customers:faqs' %}" class="nav-link {% if '/customers/faqs/' in request.path %}active{% endif %}">
+                        <i class="fas fa-question-circle"></i> <span>FAQs</span>
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a href="{% url 'customers:terms' %}" class="nav-link {% if '/customers/terms/' in request.path %}active{% endif %}">
+                        <i class="fas fa-file-contract"></i> <span>Terms & Conditions</span>
+                    </a>
+                </li>
+
+                <li class="nav-item mt-3">
+                    <a href="{% url 'customers:logout' %}" class="nav-link text-danger">
+                        <i class="fas fa-sign-out-alt"></i> <span>Logout</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        
+        <!-- Top Navbar -->
+        <nav class="top-navbar">
+            <div class="navbar-left">
+                <button class="mobile-toggle" id="mobileToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1 class="customer-name">
+                    {{ request.user.customer_profile.full_name|default:request.user.username }}
+                </h1>
+            </div>
+
+            <div class="navbar-right">
+                <a href="#" class="nav-action-btn" title="Notifications">
+                    <i class="far fa-bell"></i>
+                </a>
+            </div>
+        </nav>
+
+        <!-- Content Area -->
+        <main class="content-area">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show shadow-sm" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="copyright">
+                Copyright <i class="fas fa-copyright"></i> {% now "Y" %}. {{ current_company.display_name|default:system_name }}
+            </div>
+            <div class="powered-by">
+                Powered by
+                <a href="{{ system_website_url|default:'/' }}" {% if is_custom_domain %}target="_blank" rel="noopener"{% endif %}>
+                    {{ system_name|default:"RonoSystems" }}
+                </a>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
+    
+    <script>
+        // Mobile Sidebar Toggle
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            const mobileToggle = document.getElementById('mobileToggle');
+
+            if (mobileToggle && sidebar && overlay) {
+                mobileToggle.addEventListener('click', function() {
+                    sidebar.classList.toggle('mobile-open');
+                    overlay.classList.toggle('active');
+                });
+
+                overlay.addEventListener('click', function() {
+                    sidebar.classList.remove('mobile-open');
+                    overlay.classList.remove('active');
+                });
+            }
+
+            // Auto-dismiss alerts after 4 seconds
+            setTimeout(function() {
+                let alerts = document.querySelectorAll('.alert');
+                alerts.forEach(function(alert) {
+                    let bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                });
+            }, 4000);
+        });
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

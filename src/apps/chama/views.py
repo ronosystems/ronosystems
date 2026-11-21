@@ -2093,12 +2093,15 @@ def loan_list(request):
         'needs_committee_review': needs_committee_review,
     })
 
+from decimal import Decimal
+from django.db.models import Sum
+from apps.customers.models import Customer # Ensure this is imported
 
 @login_required
 def loan_detail(request, pk):
     company = _get_company(request)
     loan = get_object_or_404(
-        Loan.objects.select_related('member', 'loan_type'),
+        Loan.objects.select_related('member', 'guest', 'loan_type'),
         pk=pk, company=company
     )
 
@@ -2107,34 +2110,75 @@ def loan_detail(request, pk):
         'chairperson', 'vice_chairperson', 'treasurer', 'loan_officer',
     ]
     
-    # 👇 Get the member profile for the logged-in user
     current_member = _get_current_member(request, company)
     
+    # Permission check
     if not is_officer and (not current_member or loan.member != current_member):
         messages.error(request, 'You do not have permission to view this loan.')
         return redirect('chama:loan_list')
 
     repayments = loan.repayments.order_by('-date', '-created_at')
 
-    # 👇 NEW: Calculate TRUE available power, excluding THIS specific loan
-    true_available_power = 0
+    # Calculate limits based on loan type (Internal vs External)
+    true_available_power = Decimal('0.00')
+    display_limit = Decimal('0.00')
+    display_taken = Decimal('0.00')
+    display_active_debt = Decimal('0.00')
+
     if loan.member:
-        current_limit = loan.member.eligible_loan_limit
+        # --- INTERNAL LOAN LOGIC ---
+        display_limit = loan.member.eligible_loan_limit or Decimal('0.00')
+        display_taken = loan.member.total_principal_taken or Decimal('0.00')
+        display_active_debt = loan.member.active_loans_total or Decimal('0.00')
         
-        # Sum all OTHER active loans (ignore the one we are looking at right now)
-        other_active_loans = loan.member.loans.filter(
+        # Get other active loans for power calc
+        other_active_loans_sum = loan.member.loans.filter(
             status__in=['approved', 'disbursed']
-        ).exclude(pk=loan.pk).aggregate(t=Sum('principal'))['t'] or 0
+        ).exclude(pk=loan.pk).aggregate(t=Sum('principal'))['t'] or Decimal('0.00')
         
-        true_available_power = current_limit - other_active_loans
+        true_available_power = display_limit - other_active_loans_sum
+
+    elif loan.guest:
+        # --- EXTERNAL LOAN LOGIC ---
+        identifier = loan.guest.national_id or loan.guest.phone
+        customer = Customer.objects.filter(
+            company=company,
+            national_id=identifier
+        ).first()
+
+        if customer:
+            display_limit = customer.custom_loan_limit or Decimal('0.00')
+            
+            # Sum all active external loans for this customer (excluding this one)
+            customer_loans = Loan.objects.filter(
+                company=company,
+                loan_category='external',
+                status__in=['approved', 'disbursed'],
+                guest__national_id=identifier
+            )
+            
+            display_taken = customer_loans.aggregate(t=Sum('principal'))['t'] or Decimal('0.00')
+            
+            # Calculate active debt (Principal + Interest)
+            display_active_debt = sum(l.total_repayable for l in customer_loans)
+            
+            # Calculate power
+            other_loans = customer_loans.exclude(pk=loan.pk).aggregate(t=Sum('principal'))['t'] or Decimal('0.00')
+            true_available_power = display_limit - other_loans
 
     return render(request, 'chama/loan_detail.html', {
         'loan': loan,
         'repayments': repayments,
         'is_officer': is_officer,
         'current_member': current_member,
-        'true_available_power': true_available_power,  # 👈 Pass it to the template
+        'true_available_power': true_available_power,
+        # Pass these new variables to the template
+        'display_limit': display_limit,
+        'display_taken': display_taken,
+        'display_active_debt': display_active_debt,
     })
+
+
 
 @login_required
 def loan_create(request):
@@ -2260,7 +2304,7 @@ def loan_approve(request, pk):
 
     company = _get_company(request)
     loan = get_object_or_404(
-        Loan.objects.select_related('member', 'loan_type'),
+        Loan.objects.select_related('member', 'guest', 'loan_type'),
         pk=pk,
         company=company,
     )
@@ -2269,18 +2313,48 @@ def loan_approve(request, pk):
         messages.warning(request, 'Loan is no longer pending.')
         return redirect('chama:loan_list')
 
-    # ── SAFETY CHECK: enforce 3× contributions limit ──
+    # ── SAFETY CHECK: Handle Internal vs External loans ──
     member = loan.member
-    available = member.available_borrowing_power
+    guest = loan.guest
 
-    if loan.principal > available:
-        messages.error(
-            request,
-            f'Cannot approve: {member.full_name} can only borrow up to '
-            f'KES {available:,.2f} '
-            f'(3× contributions of KES {member.total_contributions_paid:,.2f}, '
-            f'minus outstanding loans of KES {member.active_loans_total:,.2f}).'
-        )
+    if member:
+        # 👇 INTERNAL LOAN: Check 3x contributions limit
+        available = member.available_borrowing_power
+        if loan.principal > available:
+            messages.error(
+                request,
+                f'Cannot approve: {member.full_name} can only borrow up to '
+                f'KES {available:,.2f} '
+                f'(3× contributions of KES {member.total_contributions_paid:,.2f}, '
+                f'minus outstanding loans of KES {member.active_loans_total:,.2f}).'
+            )
+            return redirect('chama:loan_list')
+            
+    elif guest:
+        # 👇 EXTERNAL LOAN: Check Customer's custom limit
+        from apps.customers.models import Customer
+        
+        # Find the customer linked to this guest (by phone or national ID)
+        customer = Customer.objects.filter(
+            company=company,
+            phone_number=guest.phone
+        ).first()
+
+        if customer:
+            available = customer.custom_loan_limit
+            if loan.principal > available:
+                messages.error(
+                    request,
+                    f'Cannot approve: {guest.full_name} can only borrow up to '
+                    f'KES {available:,.2f} (their approved external limit).'
+                )
+                return redirect('chama:loan_list')
+        else:
+            # If no customer profile found, you can choose to block or allow
+            messages.warning(request, "Could not find a customer profile to verify limit. Proceeding with approval.")
+    
+    else:
+        messages.error(request, 'This loan has neither a member nor a guest attached to it.')
         return redirect('chama:loan_list')
 
     # ── Also verify against the loan type's max_amount ──
@@ -2296,14 +2370,18 @@ def loan_approve(request, pk):
     loan.status = 'approved'
     loan.approved_on = timezone.localdate()
     loan.approved_by = request.user 
-    loan.save(update_fields=['status', 'approved_on', 'approved_by']) # 👈 Added 'approved_by'
+    loan.save(update_fields=['status', 'approved_on', 'approved_by'])
+
+    # Get name for success message
+    borrower_name = member.full_name if member else guest.full_name
 
     messages.success(
         request,
-        f'✅ Loan #{loan.id} approved for {member.full_name} '
+        f'✅ Loan #{loan.id} approved for {borrower_name} '
         f'(KES {loan.principal:,.2f}).'
     )
     return redirect('chama:loan_list')
+
 
 @login_required
 @_require_officer

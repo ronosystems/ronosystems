@@ -135,6 +135,7 @@ INSTALLED_APPS = [
     'apps.mpesa',  
     'apps.cart_orders', 
     'apps.ai_chatbot',
+    'apps.customers',
 
     # Business Type Apps
     'apps.epa_shop',
