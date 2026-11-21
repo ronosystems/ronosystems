@@ -68,6 +68,11 @@ urlpatterns = [
     path('loan-repayments/', views.loan_repayment_list, name='loan_repayment_list'),
     path('loans/<int:loan_pk>/repay/', views.loan_repayment_create, name='loan_repayment_create'),
 
+    # Internal Loan Limit Management
+    path('internal-loans/limits/', views.internal_loan_limits, name='internal_loan_limits'),
+    path('internal-loans/limits/<int:member_pk>/history/', views.member_loan_history, name='member_loan_history'),
+    path('internal-loans/limits/<int:member_pk>/adjust/', views.member_loan_limit_adjust, name='member_loan_limit_adjust'),
+
     # Transactions
     path('transactions/', views.transaction_list, name='transaction_list'),
     path('transactions/create/', views.transaction_create, name='transaction_create'),

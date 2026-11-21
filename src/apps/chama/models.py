@@ -95,6 +95,7 @@ class MembershipType(TimeStampedModel):
         return self.get_name_display()
 
 
+
 class Member(TimeStampedModel):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -114,6 +115,10 @@ class Member(TimeStampedModel):
     membership_type = models.ForeignKey(
         MembershipType, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='members',
+    )
+    custom_loan_limit = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+        help_text="Override borrowing limit for staff members. Set to 0 to use default (3x contributions)."
     )
     member_number = models.CharField(max_length=50, unique=True)
     full_name = models.CharField(max_length=200)
@@ -160,13 +165,45 @@ class Member(TimeStampedModel):
         return 3
 
     @property
-    def eligible_loan_limit(self):
-        """Maximum borrowing based on 3× paid contributions."""
-        return self.total_contributions_paid * self.max_loan_multiplier
+    def has_good_repayment_history(self):
+        """
+        Returns True if the member has at least one loan that was 
+        disbursed > 1 year ago and fully repaid (closed).
+        """
+        from datetime import timedelta
+        
+        one_year_ago = timezone.localdate() - timedelta(days=365)
+        
+        # Look for a loan that was disbursed before one_year_ago and is now closed
+        good_loan = self.loans.filter(
+            status='closed',
+            disbursed_on__lte=one_year_ago
+        ).exists()
+        
+        return good_loan
 
     @property
-    def active_loans_total(self):
-        """Sum of principal for loans still outstanding (approved or disbursed)."""
+    def eligible_loan_limit(self):
+        """
+        Maximum borrowing based on:
+        1. Custom limit set by committee (if > 0)
+        2. 3x contributions IF they have 1 year of good history
+        3. 0 (meaning they must rely on committee limit)
+        """
+        # 1. If the committee set a custom limit, use that.
+        if self.custom_loan_limit > 0:
+            return self.custom_loan_limit
+            
+        # 2. If they have good history, apply the 3x rule
+        if self.has_good_repayment_history:
+            return self.total_contributions_paid * 3
+            
+        # 3. If they don't meet the qualification, they get 0 (must be set by committee)
+        return 0
+
+    @property
+    def total_principal_taken(self):
+        """Sum of PRINCIPAL for all active loans (approved or disbursed)."""
         agg = self.loans.filter(
             status__in=['approved', 'disbursed']
         ).aggregate(total=models.Sum('principal'))
@@ -174,8 +211,14 @@ class Member(TimeStampedModel):
 
     @property
     def available_borrowing_power(self):
-        """How much the member can still borrow (limit − active loans)."""
-        return max(0, self.eligible_loan_limit - self.active_loans_total)
+        """How much they can still borrow (Limit - Principal Taken)."""
+        return max(0, self.eligible_loan_limit - self.total_principal_taken)
+
+    @property
+    def active_loans_total(self):
+        """Sum of TOTAL REPAYABLE (Principal + Interest) for active loans."""
+        active_loans = self.loans.filter(status__in=['approved', 'disbursed'])
+        return sum(loan.total_repayable for loan in active_loans)
 
     # ============================================================
     # CLOUDINARY URL GETTERS
@@ -199,6 +242,7 @@ class Member(TimeStampedModel):
     @property
     def good_conduct_url(self):
         return _build_cloudinary_url(self.good_conduct, resource_type='raw')
+
 
 
 class Registration(TimeStampedModel):
@@ -549,12 +593,12 @@ class Account(TimeStampedModel):
     ]
 
     PURPOSE_CHOICES = [
-        ('pool', 'General / Pool Account'),   
+        ('pool', 'Main Account'),   
         ('welfare', 'Welfare Fund'),
         ('loans', 'Loan Fund'),
         ('projects', 'Project Fund'),
         ('emergency', 'Emergency Fund'),
-        ('general', 'Other Operational Expense'),
+        ('general', 'Operational Fund'),
     ]
 
     company = models.ForeignKey(
@@ -592,6 +636,9 @@ class Account(TimeStampedModel):
         
         return self.opening_balance + total_in - total_out
 
+
+
+
 # ============================================================
 # PROJECTS (New Feature)
 # ============================================================
@@ -613,9 +660,7 @@ class Project(TimeStampedModel):
     def __str__(self):
         return self.name
 
-# ============================================================
-# TRANSACTIONS (Cashbook)
-# ============================================================
+
 class Transaction(TimeStampedModel):
     TYPE_CHOICES = [
         ('in', 'Money In'),
@@ -634,15 +679,20 @@ class Transaction(TimeStampedModel):
     date = models.DateField(default=timezone.localdate)
     description = models.CharField(max_length=255, blank=True)
     reference = models.CharField(max_length=100, blank=True)
-    
-    # Optional: link to a project
     project = models.ForeignKey(Project, on_delete=models.SET_NULL, null=True, blank=True, related_name='transactions')
+
+    # 👇 NEW: mark rows created automatically by Contribution/Loan/Savings/etc.
+    auto_generated = models.BooleanField(
+        default=False,
+        help_text="True if this row mirrors another record (contribution, loan, etc.).",
+    )
 
     class Meta:
         ordering = ['-date', '-created_at']
 
     def __str__(self):
         return f'{self.get_transaction_type_display()} {self.amount} — {self.account}'
+
 
 # ============================================================
 # EXPENSES

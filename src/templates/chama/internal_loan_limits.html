@@ -1,0 +1,452 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}Internal Loans — Loan Limits{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <h4 class="fw-bold mb-0">
+                <i class="fas fa-shield-halved me-2"></i> Internal Loan Limits
+            </h4>
+            <p class="text-muted small mb-0">
+                Review member contributions and set custom borrowing limits.
+                Current month: <strong>{{ current_month }}</strong>
+            </p>
+        </div>
+        <div class="d-flex gap-3">
+            <div class="text-end">
+                <div class="text-muted small fw-bold text-uppercase">Monthly Expected</div>
+                <div class="fw-bold fs-5">KES {{ total_expected|floatformat:2 }}</div>
+            </div>
+            <div class="text-end">
+                <div class="text-muted small fw-bold text-uppercase">Monthly Collected</div>
+                <div class="fw-bold fs-5 text-success">KES {{ total_collected|floatformat:2 }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="card" style="border: 2px solid #000; border-radius: 4px;">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead style="background: #000; color: #fff;">
+                    <tr>
+                        <th class="ps-3 py-3">Member Full Name</th>
+                        <th class="py-3">Total Contributions (Since Joining)</th>
+                        <th class="py-3">Contribution Status ({{ current_month }})</th>
+                        <th class="py-3">Loan Limit</th>
+                        <th class="text-end pe-3 py-3">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        <!-- Member Full Name -->
+                        <td class="ps-3">
+                            <div class="fw-bold">{{ row.member.full_name }}</div>
+                            <div class="small text-muted">
+                                {{ row.member.member_number }}
+                                {% if row.member.membership_type %}
+                                    · {{ row.member.membership_type.get_name_display }}
+                                {% endif %}
+                            </div>
+                        </td>
+
+                        <!-- Total Contributions -->
+                        <td>
+                            <div class="fw-bold">KES {{ row.total_contributions|floatformat:2 }}</div>
+                            {% if row.has_good_history %}
+                                <span class="badge bg-success" style="border:1px solid #000;">
+                                    <i class="fas fa-check-circle"></i> Good history
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary" style="border:1px solid #000;">
+                                    No 1-yr history
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Contribution Status -->
+                        <td>
+                            {% if row.current_month_paid %}
+                                <span class="badge bg-success" style="border:1px solid #000;">Paid</span>
+                            {% else %}
+                                <span class="badge bg-danger" style="border:1px solid #000;">Unpaid</span>
+                                <div class="small text-muted mt-1">
+                                    Required: KES {{ row.current_month_required|floatformat:2 }}
+                                </div>
+                            {% endif %}
+                        </td>
+
+                        <!-- Loan Limit -->
+                        <td>
+                            {% if row.custom_limit > 0 %}
+                                <div class="fw-bold text-primary">
+                                    KES {{ row.custom_limit|floatformat:2 }}
+                                    <span class="badge bg-primary ms-1" style="border:1px solid #000;">Custom</span>
+                                </div>
+                                <div class="small text-muted">
+                                    Rule-based: KES {{ row.eligible_limit|floatformat:2 }}
+                                </div>
+                            {% else %}
+                                <div class="fw-bold">
+                                    KES {{ row.eligible_limit|floatformat:2 }}
+                                </div>
+                                <div class="small text-muted">
+                                    {% if row.multiplier_eligible %}
+                                        3× contributions
+                                    {% else %}
+                                        No limit set (use Adjust)
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            {% if row.active_loans_total > 0 %}
+                                <div class="small text-danger mt-1">
+                                    Active: KES {{ row.active_loans_total|floatformat:2 }}
+                                </div>
+                            {% endif %}
+                        </td>
+
+                        <!-- Actions -->
+                        <td class="text-end pe-3">
+                            <div class="d-flex justify-content-end gap-2 flex-wrap">
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-dark fw-bold"
+                                        style="border: 2px solid #000;"
+                                        onclick="openHistoryModal({{ row.member.pk }})"
+                                        title="Review contributions & past loans">
+                                    <i class="fas fa-clock-rotate-left"></i> Review History
+                                </button>
+
+                                <button type="button"
+                                        class="btn btn-sm btn-dark fw-bold"
+                                        style="border: 2px solid #000;"
+                                        onclick="openLimitModal({{ row.member.pk }},
+                                            '{{ row.member.full_name|escapejs }}',
+                                            '{{ row.custom_limit }}',
+                                            '{{ row.eligible_limit }}',
+                                            '{{ row.available_borrowing_power }}',
+                                            '{{ row.total_contributions }}')"
+                                        title="Adjust loan limit">
+                                    <i class="fas fa-sliders"></i> Adjust Limit
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-5 text-muted">
+                            <i class="fas fa-users fa-3x mb-3" style="opacity:0.2;"></i>
+                            <p class="mb-0">No active members found.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- MODAL 1: REVIEW HISTORY                                       -->
+<!-- ============================================================ -->
+<div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content" style="border: 2px solid #000; border-radius: 4px;">
+            <div class="modal-header" style="background:#000; color:#fff;">
+                <h5 class="modal-title fw-bold">
+                    <i class="fas fa-clock-rotate-left me-2"></i> Review History —
+                    <span id="historyMemberName"></span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="historyModalBody">
+                <div class="text-center py-5">
+                    <div class="spinner-border" role="status"></div>
+                    <p class="mt-2 text-muted">Loading history…</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-dark fw-bold" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- MODAL 2: ADJUST LOAN LIMIT                                    -->
+<!-- ============================================================ -->
+<div class="modal fade" id="limitModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border: 2px solid #000; border-radius: 4px;">
+            <div class="modal-header" style="background:#000; color:#fff;">
+                <h5 class="modal-title fw-bold">
+                    <i class="fas fa-sliders me-2"></i> Adjust Loan Limit
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="limitForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <p class="mb-1"><strong>Member:</strong> <span id="limitMemberName"></span></p>
+                    <p class="mb-3 text-muted small">
+                        Set a custom limit. Enter <code>0</code> to fall back to the
+                        rule-based 3× contributions (only if the member has a good
+                        1-year repayment history).
+                    </p>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Custom Loan Limit (KES)</label>
+                        <input type="number" step="0.01" min="0"
+                               class="form-control fw-bold"
+                               style="border: 2px solid #000;"
+                               id="customLimitInput" name="custom_limit" required>
+                    </div>
+
+                    <div class="bg-light p-3 rounded" style="border:1px solid #000;">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted small fw-bold text-uppercase">Total Contributions</span>
+                            <span class="fw-bold" id="limitTotalContrib">—</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted small fw-bold text-uppercase">Rule-Based Limit</span>
+                            <span class="fw-bold" id="limitRuleBased">—</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted small fw-bold text-uppercase">Available Borrowing Power</span>
+                            <span class="fw-bold text-success" id="limitAvailable">—</span>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-danger mt-3 d-none" id="limitError"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-dark fw-bold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-dark fw-bold" style="border:2px solid #000;" id="limitSaveBtn">
+                        <i class="fas fa-save"></i> Save Limit
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------
+// REVIEW HISTORY MODAL
+// ---------------------------------------------------------------
+let historyModal = null;
+let currentHistoryMemberId = null;
+
+function openHistoryModal(memberPk) {
+    currentHistoryMemberId = memberPk;
+    const body = document.getElementById('historyModalBody');
+    body.innerHTML = `
+        <div class="text-center py-5">
+            <div class="spinner-border" role="status"></div>
+            <p class="mt-2 text-muted">Loading history…</p>
+        </div>`;
+
+    if (!historyModal) {
+        historyModal = new bootstrap.Modal(document.getElementById('historyModal'));
+    }
+    historyModal.show();
+
+    fetch(`/chama/internal-loans/limits/${memberPk}/history/`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            body.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+            return;
+        }
+        document.getElementById('historyMemberName').textContent = data.member.full_name;
+        body.innerHTML = renderHistory(data);
+    })
+    .catch(err => {
+        body.innerHTML = `<div class="alert alert-danger">Failed to load history: ${err}</div>`;
+    });
+}
+
+function fmt(n) {
+    return 'KES ' + Number(n).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function renderHistory(data) {
+    const m = data.member;
+
+    // Summary cards
+    let html = `
+    <div class="row g-2 mb-3">
+        <div class="col-md-3">
+            <div class="border rounded p-2" style="border-color:#000 !important;">
+                <div class="text-muted small fw-bold text-uppercase">Member #</div>
+                <div class="fw-bold">${m.member_number}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="border rounded p-2" style="border-color:#000 !important;">
+                <div class="text-muted small fw-bold text-uppercase">Type</div>
+                <div class="fw-bold">${m.membership_type}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="border rounded p-2" style="border-color:#000 !important;">
+                <div class="text-muted small fw-bold text-uppercase">Total Contributions</div>
+                <div class="fw-bold">${fmt(m.total_contributions_paid)}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="border rounded p-2" style="border-color:#000 !important;">
+                <div class="text-muted small fw-bold text-uppercase">Good History?</div>
+                <div class="fw-bold">${m.has_good_repayment_history ? 'Yes (3× eligible)' : 'No'}</div>
+            </div>
+        </div>
+    </div>`;
+
+    // Contribution history table
+    html += `<h6 class="fw-bold text-uppercase mt-3 mb-2"><i class="fas fa-hand-holding-usd me-1"></i> Contribution History (last 12)</h6>`;
+    if (data.contributions.length === 0) {
+        html += `<div class="text-muted small mb-3">No contribution records.</div>`;
+    } else {
+        html += `<div class="table-responsive mb-3"><table class="table table-sm table-bordered mb-0">
+            <thead class="table-dark"><tr><th>Period</th><th>Amount</th><th>Paid</th><th>On Time</th><th>Date</th></tr></thead>
+            <tbody>`;
+        data.contributions.forEach(c => {
+            html += `<tr>
+                <td>${c.period}</td>
+                <td>${fmt(c.amount)}</td>
+                <td>${c.paid ? '<span class="badge bg-success">Paid</span>' : '<span class="badge bg-danger">Unpaid</span>'}</td>
+                <td>${c.paid ? (c.paid_on_time ? '<span class="badge bg-success">On time</span>' : '<span class="badge bg-warning text-dark">Late</span>') : '—'}</td>
+                <td>${c.date || '—'}</td>
+            </tr>`;
+        });
+        html += `</tbody></table></div>`;
+    }
+
+    // Loan history table
+    html += `<h6 class="fw-bold text-uppercase mt-3 mb-2"><i class="fas fa-money-bill-wave me-1"></i> Loan History</h6>`;
+    if (data.loans.length === 0) {
+        html += `<div class="text-muted small">No loan records.</div>`;
+    } else {
+        html += `<div class="table-responsive"><table class="table table-sm table-bordered mb-0">
+            <thead class="table-dark"><tr>
+                <th>#</th><th>Type</th><th>Principal</th><th>Status</th>
+                <th>Repaid</th><th>Balance</th><th>Progress</th>
+            </tr></thead>
+            <tbody>`;
+        data.loans.forEach(l => {
+            let badgeClass = 'bg-secondary';
+            if (l.status_code === 'closed') badgeClass = 'bg-success';
+            else if (l.status_code === 'disbursed') badgeClass = 'bg-primary';
+            else if (l.status_code === 'approved') badgeClass = 'bg-info text-dark';
+            else if (l.status_code === 'pending') badgeClass = 'bg-warning text-dark';
+            else if (l.status_code === 'rejected') badgeClass = 'bg-danger';
+
+            html += `<tr>
+                <td>#${l.id}</td>
+                <td>${l.type}</td>
+                <td>${fmt(l.principal)}</td>
+                <td><span class="badge ${badgeClass}">${l.status}</span></td>
+                <td>${fmt(l.total_repaid)}</td>
+                <td>${fmt(l.balance_remaining)}</td>
+                <td>
+                    <div class="progress" style="height:8px;">
+                        <div class="progress-bar bg-success" style="width:${l.progress_pct}%"></div>
+                    </div>
+                    <div class="small text-muted">${l.progress_pct}%</div>
+                </td>
+            </tr>`;
+        });
+        html += `</tbody></table></div>`;
+    }
+
+    return html;
+}
+
+// ---------------------------------------------------------------
+// ADJUST LIMIT MODAL
+// ---------------------------------------------------------------
+let limitModal = null;
+let currentLimitMemberId = null;
+
+function openLimitModal(memberPk, fullName, customLimit, ruleLimit, available, totalContrib) {
+    currentLimitMemberId = memberPk;
+
+    document.getElementById('limitMemberName').textContent = fullName;
+    document.getElementById('customLimitInput').value = customLimit;
+    document.getElementById('limitTotalContrib').textContent = fmt(totalContrib);
+    document.getElementById('limitRuleBased').textContent = fmt(ruleLimit);
+    document.getElementById('limitAvailable').textContent = fmt(available);
+    document.getElementById('limitError').classList.add('d-none');
+
+    if (!limitModal) {
+        limitModal = new bootstrap.Modal(document.getElementById('limitModal'));
+    }
+    limitModal.show();
+}
+
+document.getElementById('limitForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('limitSaveBtn');
+    const errBox = document.getElementById('limitError');
+    const raw = document.getElementById('customLimitInput').value;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving…';
+    errBox.classList.add('d-none');
+
+    fetch(`/chama/internal-loans/limits/${currentLimitMemberId}/adjust/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify({ custom_limit: raw }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            errBox.textContent = data.error;
+            errBox.classList.remove('d-none');
+        } else {
+            limitModal.hide();
+            // Reload page to reflect new limits
+            window.location.reload();
+        }
+    })
+    .catch(err => {
+        errBox.textContent = 'Request failed: ' + err;
+        errBox.classList.remove('d-none');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> Save Limit';
+    });
+});
+
+// ---------------------------------------------------------------
+// CSRF cookie helper (standard Django pattern)
+// ---------------------------------------------------------------
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

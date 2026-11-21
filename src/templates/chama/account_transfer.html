@@ -15,12 +15,13 @@
                 Move money from your <strong>General Pool Account</strong> to specific funds (Welfare, Loans, Projects, etc.).
             </div>
 
-            <form method="post">
+            <!-- Added id="transferForm" to the form -->
+            <form method="post" id="transferForm">
                 {% csrf_token %}
                 
                 <div class="mb-3">
                     <label class="form-label fw-bold">From Account (Source) <span class="text-danger">*</span></label>
-                    <select name="from_account" class="form-control" required>
+                    <select name="from_account" id="source_account" class="form-control" required>
                         <option value="">— Select Source Account —</option>
                         {% for acc in accounts %}
                         <option value="{{ acc.pk }}">
@@ -36,7 +37,7 @@
 
                 <div class="mb-3">
                     <label class="form-label fw-bold">To Account (Destination) <span class="text-danger">*</span></label>
-                    <select name="to_account" class="form-control" required>
+                    <select name="to_account" id="dest_account" class="form-control" required>
                         <option value="">— Select Destination Account —</option>
                         {% for acc in accounts %}
                         <option value="{{ acc.pk }}">
@@ -49,7 +50,7 @@
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <label class="form-label fw-bold">Amount (KES) <span class="text-danger">*</span></label>
-                        <input type="number" step="0.01" name="amount" class="form-control" required placeholder="0.00">
+                        <input type="number" step="0.01" name="amount" id="amount_input" class="form-control" required placeholder="0.00">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fw-bold">Description / Reason</label>
@@ -58,7 +59,8 @@
                 </div>
 
                 <div class="d-flex gap-2 mt-4 pt-3" style="border-top:2px solid #000;">
-                    <button type="submit" class="btn btn-dark fw-bold" style="border:2px solid #000;" onclick="return confirm('Are you sure you want to transfer these funds?');">
+                    <!-- Added type="button" and data-bs-toggle to trigger the modal instead of submitting directly -->
+                    <button type="button" class="btn btn-dark fw-bold" style="border:2px solid #000;" data-bs-toggle="modal" data-bs-target="#confirmTransferModal">
                         <i class="fas fa-paper-plane me-1"></i> Process Transfer
                     </button>
                     <a href="{% url 'chama:account_list' %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;">Cancel</a>
@@ -67,4 +69,81 @@
         </div>
     </div>
 </div>
+
+<!-- ============================================ -->
+<!-- CONFIRMATION MODAL -->
+<!-- ============================================ -->
+<div class="modal fade" id="confirmTransferModal" tabindex="-1" aria-labelledby="confirmTransferModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border: 2px solid #000; border-radius: 4px;">
+            <div class="modal-header bg-light" style="border-bottom: 2px solid #000;">
+                <h5 class="modal-title fw-bold" id="confirmTransferModalLabel">
+                    <i class="fas fa-exclamation-triangle text-warning me-2"></i> Confirm Transfer
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="mb-0 fs-5">Are you sure you want to process this fund transfer?</p>
+                <p class="text-muted small mt-2 mb-0">This action will immediately update the account balances and cannot be undone from this screen.</p>
+            </div>
+            <div class="modal-footer" style="border-top: 2px solid #000;">
+                <button type="button" class="btn btn-outline-dark fw-bold" data-bs-dismiss="modal" style="border:2px solid #000;">Cancel</button>
+                <!-- This button actually submits the form -->
+                <button type="button" class="btn btn-dark fw-bold" id="confirmSubmitBtn" style="border:2px solid #000;">
+                    Yes, Transfer Funds
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // --- 1. Destination Filter Logic ---
+        const sourceSelect = document.getElementById('source_account');
+        const destSelect = document.getElementById('dest_account');
+        const originalOptions = Array.from(destSelect.options);
+
+        function filterDestinations() {
+            const selectedSourceId = sourceSelect.value;
+            const currentDestValue = destSelect.value;
+            
+            destSelect.innerHTML = '';
+
+            originalOptions.forEach(option => {
+                if (option.value !== selectedSourceId || option.value === '') {
+                    destSelect.appendChild(option.cloneNode(true));
+                }
+            });
+
+            if (currentDestValue && currentDestValue !== selectedSourceId) {
+                destSelect.value = currentDestValue;
+            }
+        }
+
+        sourceSelect.addEventListener('change', filterDestinations);
+        filterDestinations();
+
+        // --- 2. Modal Form Submission Logic ---
+        const form = document.getElementById('transferForm');
+        const confirmBtn = document.getElementById('confirmSubmitBtn');
+        
+        // When the user clicks "Yes, Transfer Funds" inside the modal
+        confirmBtn.addEventListener('click', function() {
+            // Optional: You can add validation check here just to be safe
+            if (form.checkValidity()) {
+                form.submit();
+            } else {
+                // If the form is invalid (e.g., empty fields), trigger native validation
+                form.reportValidity();
+                // Hide the modal so they can see the error messages
+                const modalElement = document.getElementById('confirmTransferModal');
+                const modal = bootstrap.Modal.getInstance(modalElement);
+                modal.hide();
+            }
+        });
+    });
+</script>
 {% endblock %}

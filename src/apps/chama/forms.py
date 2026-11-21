@@ -70,7 +70,7 @@ class MemberForm(forms.ModelForm):
             'full_name', 'phone', 'email', 'national_id',
             'membership_type', 'status', 'joined_on',
             'passport_photo', 'id_front', 'id_back',
-            'kra_certificate', 'good_conduct',
+            'kra_certificate', 'good_conduct', 'custom_loan_limit', 
         ]
         widgets = {
             'full_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Full name'}),

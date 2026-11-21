@@ -37,7 +37,7 @@ class User(AbstractUser):
         ('treasurer', 'Treasurer'),
         ('loan_officer', 'Loan Officer'),
         ('coopted_member', 'Co-opted Member'),
-        ('member', 'Regular Member'),
+        ('member', 'Member'),
     )
 
     role = models.CharField(max_length=30, choices=ROLE_CHOICES, default='company_staff')

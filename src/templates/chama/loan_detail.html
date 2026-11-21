@@ -45,7 +45,7 @@
         margin-top: 6px;
         padding-top: 12px;
         font-size: 1.05rem;
-        font-weight: 800;
+        font-weight: 1000;
     }
     .badge-status {
         padding: 6px 14px;
@@ -143,26 +143,53 @@
     <div class="eligibility-box">
         <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap">
             <h6 class="fw-bold mb-0" style="color:#2d5f7c;">
-                <i class="fas fa-calculator me-2"></i> {{ loan.member.full_name }}'s Eligibility
+                <i class="fas fa-calculator me-2"></i> {{ loan.member.full_name }}'s Loan Limits
             </h6>
-            <span class="badge-status badge-{{ loan.status }}">{{ loan.get_status_display }}</span>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge-status badge-{{ loan.status }}">{{ loan.get_status_display }}</span>
+
+                {# Committee notification trigger — only when there's a pending/active state #}
+                {% if loan.status == 'pending' or loan.status == 'approved' or loan.status == 'disbursed' %}
+                <button type="button"
+                        class="btn btn-sm btn-dark fw-bold"
+                        style="border:2px solid #000;"
+                        data-bs-toggle="modal"
+                        data-bs-target="#committeeNoticeModal">
+                    <i class="fas fa-bullhorn me-1"></i>
+                    Committee Notice
+                    {% if loan.status == 'pending' %}
+                        <span class="badge bg-warning text-dark ms-1">Pending aproval</span>
+                    {% elif loan.status == 'approved' %}
+                        <span class="badge bg-info text-dark ms-1">Funds Release</span>
+                    {% endif %}
+                </button>
+                {% endif %}
+            </div>
         </div>
+
         <div class="row">
+            <!-- 1. Total Limit -->
             <div class="col-6 col-md-3 eligibility-col">
-                <div class="eligibility-label">Contributions</div>
-                <div class="eligibility-value">KES {{ loan.member.total_contributions_paid|floatformat:2 }}</div>
+                <div class="eligibility-label">Total Limit</div>
+                <div class="eligibility-value text-primary">KES {{ loan.member.eligible_loan_limit|floatformat:2 }}</div>
             </div>
+            
+            <!-- 2. Total Taken (Principal) -->
             <div class="col-6 col-md-3 eligibility-col">
-                <div class="eligibility-label">3× Limit</div>
-                <div class="eligibility-value">KES {{ loan.member.eligible_loan_limit|floatformat:2 }}</div>
+                <div class="eligibility-label">Total Taken</div>
+                <div class="eligibility-value text-warning">KES {{ loan.member.total_principal_taken|floatformat:2 }}</div>
             </div>
+            
+            <!-- 3. Remaining Limit -->
             <div class="col-6 col-md-3 eligibility-col">
-                <div class="eligibility-label">Active Loans</div>
-                <div class="eligibility-value danger">KES {{ loan.member.active_loans_total|floatformat:2 }}</div>
+                <div class="eligibility-label">Remaining Limit</div>
+                <div class="eligibility-value text-success">KES {{ loan.member.available_borrowing_power|floatformat:2 }}</div>
             </div>
+            
+            <!-- 4. Active Loan (Debt = Principal + Interest) -->
             <div class="col-6 col-md-3 eligibility-col">
-                <div class="eligibility-label">Available</div>
-                <div class="eligibility-value success">KES {{ loan.member.available_borrowing_power|floatformat:2 }}</div>
+                <div class="eligibility-label">Active Loan (Debt)</div>
+                <div class="eligibility-value text-danger">KES {{ loan.member.active_loans_total|floatformat:2 }}</div>
             </div>
         </div>
     </div>
@@ -274,21 +301,6 @@
                 </div>
                 <div class="card-body p-4">
 
-                    <!-- 👇 PENDING DISBURSEMENT NOTICE -->
-                    {% if loan.status == 'approved' %}
-                    <div class="alert alert-info mb-3" style="border:2px solid #000; background:#e8f4fd;">
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-hourglass-half me-2" style="font-size:1.3rem; color:#0d6efd;"></i>
-                            <div>
-                                <strong style="color:#0d6efd;">Pending Disbursement</strong>
-                                <div class="small" style="color:#000;">
-                                    Awaiting release of <strong>KES {{ loan.principal|floatformat:2 }}</strong> from the Chama account.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-
                     <div class="stat-row">
                         <span class="text-muted">Principal</span>
                         <span class="fw-bold">KES {{ loan.principal|floatformat:2 }}</span>
@@ -360,9 +372,12 @@
                                 </button>
                             </form>
                         {% else %}
-                            <div class="alert alert-warning mb-0" style="border:2px solid #000;">
-                                <i class="fas fa-clock me-1"></i> Awaiting officer approval
-                            </div>
+                            <button type="button"
+                                    class="action-btn outline"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#committeeNoticeModal">
+                                <i class="fas fa-clock"></i> Awaiting Officer Approval
+                            </button>
                         {% endif %}
                     {% endif %}
 
@@ -371,19 +386,42 @@
                     <!-- ───────────────────────────────────────────────────────── -->
                     {% if loan.status == 'approved' %}
                         {% if is_officer %}
-                            <form method="post" action="{% url 'chama:loan_disburse' loan.pk %}" style="margin-bottom:8px;">
-                                {% csrf_token %}
-                                <button type="submit" class="action-btn disburse" onclick="return confirm('Release KES {{ loan.principal }} from the Chama account to {{ loan.member.full_name }}?');">
+                            
+                            <!-- 👇 USE true_available_power HERE -->
+                            {% if true_available_power >= loan.principal %}
+                                
+                                <!-- Trigger Modal for Release Funds -->
+                                <button type="button" 
+                                        class="action-btn disburse" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#disburseModal" 
+                                        style="margin-bottom:8px;">
                                     <i class="fas fa-money-bill-wave"></i> Release Funds
                                 </button>
-                            </form>
-                            <div class="small text-muted text-center mb-2" style="font-size:0.7rem;">
-                                <i class="fas fa-info-circle"></i> Releases KES {{ loan.principal|floatformat:2 }} from the Chama account
-                            </div>
+                                <div class="small text-muted text-center mb-2" style="font-size:0.7rem;">
+                                    <i class="fas fa-info-circle"></i> Releases KES {{ loan.principal|floatformat:2 }} from the LOAN ACCOUNT
+                                </div>
+
+                            {% else %}
+                                
+                                <!-- Limit is 0: Hide release button, show strict warning -->
+                                <div class="alert alert-danger mb-2 p-2 text-center" style="border:2px solid #000;">
+                                    <i class="fas fa-ban text-danger mb-1" style="font-size:1.5rem;"></i>
+                                    <h6 class="fw-bold mb-1 text-danger">0 LIMIT REACHED</h6>
+                                    <p class="small mb-0 text-dark">
+                                        Cannot release funds. This member has reached their maximum allowable 3× borrowing limit.
+                                    </p>
+                                </div>
+                                
+                            {% endif %}
+
                         {% else %}
-                            <div class="alert alert-info mb-0" style="border:2px solid #000; background:#e8f4fd;">
-                                <i class="fas fa-hourglass-half me-1"></i> Approved — awaiting disbursement
-                            </div>
+                            <button type="button"
+                                    class="action-btn outline"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#committeeNoticeModal">
+                                <i class="fas fa-hourglass-half"></i> Approved — Awaiting Release
+                            </button>
                         {% endif %}
                     {% endif %}
 
@@ -433,6 +471,195 @@
                 </div>
             </div>
 
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 1. COMMITTEE NOTICE MODAL                                    -->
+<!-- ============================================================ -->
+<div class="modal fade" id="committeeNoticeModal" tabindex="-1" aria-labelledby="committeeNoticeLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border:2px solid #000; border-radius:4px;">
+
+            <div class="modal-header" style="background:#000; color:#fff;">
+                <h5 class="modal-title fw-bold" id="committeeNoticeLabel">
+                    <i class="fas fa-bullhorn me-2"></i> Committee Notice
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body p-4">
+
+                {% if loan.status == 'pending' %}
+                    <div class="text-center mb-3">
+                        <i class="fas fa-hourglass-half" style="font-size:2.5rem; color:#856404;"></i>
+                    </div>
+                    <h6 class="fw-bold text-center mb-2">Loan Application Under Review</h6>
+                    <p class="text-center text-muted mb-3">
+                        Your loan application of
+                        <strong>KES {{ loan.principal|floatformat:2 }}</strong>
+                        ({{ loan.loan_type.name|default:"—" }} · {{ loan.term_months }} months)
+                        is currently with the Chama committee for approval.
+                    </p>
+                    <div class="bg-light p-3 rounded" style="border:1px solid #000;">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted small fw-bold text-uppercase">Requested On</span>
+                            <span class="fw-bold">{{ loan.requested_on|date:"M d, Y" }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted small fw-bold text-uppercase">Expected Monthly Installment</span>
+                            <span class="fw-bold">KES {{ loan.monthly_installment|floatformat:2 }}</span>
+                        </div>
+                    </div>
+                    <p class="small text-muted text-center mt-3 mb-0">
+                        You will be notified once a decision has been made.
+                    </p>
+
+                {% elif loan.status == 'approved' %}
+                    <div class="text-center mb-3">
+                        <i class="fas fa-check-circle" style="font-size:2.5rem; color:#0d6efd;"></i>
+                    </div>
+                    <h6 class="fw-bold text-center mb-2">Approved — Pending Disbursement</h6>
+                    <p class="text-center text-muted mb-3">
+                        The committee has <strong>approved</strong> your loan of
+                        <strong>KES {{ loan.principal|floatformat:2 }}</strong>.
+                        Funds are now awaiting release by the treasurer.
+                    </p>
+                    <div class="bg-light p-3 rounded" style="border:1px solid #000;">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted small fw-bold text-uppercase">Approved On</span>
+                            <span class="fw-bold">{{ loan.approved_on|date:"M d, Y"|default:"—" }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted small fw-bold text-uppercase">Amount to Release</span>
+                            <span class="fw-bold">KES {{ loan.principal|floatformat:2 }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted small fw-bold text-uppercase">Total Repayable</span>
+                            <span class="fw-bold">KES {{ loan.total_repayable|floatformat:2 }}</span>
+                        </div>
+                    </div>
+                    <p class="small text-muted text-center mt-3 mb-0">
+                        Please wait for the disbursement confirmation from the treasurer.
+                    </p>
+
+                {% elif loan.status == 'disbursed' %}
+                    <div class="text-center mb-3">
+                        <i class="fas fa-money-bill-wave" style="font-size:2.5rem; color:#0c5460;"></i>
+                    </div>
+                    <h6 class="fw-bold text-center mb-2">Loan Disbursed</h6>
+                    <p class="text-center text-muted mb-3">
+                        Your loan has been disbursed. Please keep up with the
+                        <strong>KES {{ loan.monthly_installment|floatformat:2 }}</strong>
+                        monthly installment to maintain a good repayment history.
+                    </p>
+                    <div class="bg-light p-3 rounded" style="border:1px solid #000;">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted small fw-bold text-uppercase">Balance Remaining</span>
+                            <span class="fw-bold text-danger">KES {{ loan.balance_remaining|floatformat:2 }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted small fw-bold text-uppercase">Next Installment</span>
+                            <span class="fw-bold">KES {{ loan.monthly_installment|floatformat:2 }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted small fw-bold text-uppercase">Progress</span>
+                            <span class="fw-bold">{{ loan.repayment_progress_pct|floatformat:1 }}%</span>
+                        </div>
+                        <div class="progress-bar-custom mt-2">
+                            <div class="progress-bar-fill" style="width: {{ loan.repayment_progress_pct|floatformat:0 }}%;"></div>
+                        </div>
+                    </div>
+
+                {% else %}
+                    <div class="text-center mb-3">
+                        <i class="fas fa-info-circle" style="font-size:2.5rem; color:#6c757d;"></i>
+                    </div>
+                    <h6 class="fw-bold text-center mb-2">{{ loan.get_status_display }}</h6>
+                    <p class="text-center text-muted mb-0">
+                        No active committee notice for this loan.
+                    </p>
+                {% endif %}
+
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;" data-bs-dismiss="modal">
+                    Close
+                </button>
+                {% if is_officer and loan.status == 'pending' %}
+                    <form method="post" action="{% url 'chama:loan_approve' loan.pk %}" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-dark fw-bold" style="border:2px solid #000;">
+                            <i class="fas fa-check"></i> Review Now
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 2. DISBURSE LOAN MODAL (Replaces the ugly browser popup)     -->
+<!-- ============================================================ -->
+<div class="modal fade" id="disburseModal" tabindex="-1" aria-labelledby="disburseModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border: 2px solid #000; border-radius: 4px;">
+            
+            <div class="modal-header" style="background: #0d6efd; color: #fff;">
+                <h5 class="modal-title fw-bold" id="disburseModalLabel">
+                    <i class="fas fa-money-bill-wave me-2"></i> Confirm Disbursement
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <div class="modal-body p-4">
+                <div class="text-center mb-3">
+                    <i class="fas fa-hand-holding-usd" style="font-size: 3rem; color: #0d6efd;"></i>
+                </div>
+                
+                <p class="text-center mb-4">
+                    You are about to release funds from the Chama account. <br>
+                    <strong>This action cannot be undone.</strong>
+                </p>
+
+                <!-- Details Card -->
+                <div class="bg-light p-3 rounded" style="border: 1px solid #000;">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted small fw-bold text-uppercase">Recipient</span>
+                        <span class="fw-bold">{{ loan.member.full_name }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted small fw-bold text-uppercase">Amount to Release</span>
+                        <span class="fw-bold text-primary fs-6">KES {{ loan.principal|floatformat:2 }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted small fw-bold text-uppercase">Loan Type</span>
+                        <span class="fw-bold">{{ loan.loan_type.name|default:"—" }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between border-top pt-2 mt-2" style="border-color:#ccc !important;">
+                        <span class="text-muted small fw-bold text-uppercase">Total Repayable</span>
+                        <span class="fw-bold text-success">KES {{ loan.total_repayable|floatformat:2 }}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;" data-bs-dismiss="modal">
+                    Cancel
+                </button>
+                <!-- The actual form to POST the data -->
+                <form method="post" action="{% url 'chama:loan_disburse' loan.pk %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary fw-bold" style="border:2px solid #000; background:#0d6efd;">
+                        <i class="fas fa-check-circle"></i> Confirm Release
+                    </button>
+                </form>
+            </div>
+            
         </div>
     </div>
 </div>

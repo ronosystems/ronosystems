@@ -53,11 +53,7 @@
     .badge-disbursed { background:#d1ecf1; color:#0c5460; }
     .badge-closed { background:#d4edda; color:#155724; }
     .badge-rejected { background:#f8d7da; color:#721c24; }
-    .action-icon {
-        color:#000; font-size:1rem; margin:0 4px; text-decoration:none;
-    }
-    .action-icon:hover { color:var(--primary-color); }
-    .action-icon.success:hover { color:#28a745; }
+    
     .actor-cell {
         font-size:0.8rem;
         line-height:1.3;
@@ -69,6 +65,35 @@
 
 {% block content %}
 <div class="container-fluid py-2">
+
+    <!-- ============================================ -->
+    <!-- LOCKED BORROWING BANNER (With Action Button) -->
+    <!-- ============================================ -->
+    {% if needs_committee_review %}
+    <div class="alert alert-warning d-flex flex-column flex-md-row align-items-md-center mb-4" style="border: 2px solid #000; background-color: #fff3cd;">
+        <div class="me-md-3 mb-3 mb-md-0 text-dark">
+            <i class="fas fa-lock fa-3x"></i>
+        </div>
+        <div class="flex-grow-1">
+            <h5 class="alert-heading fw-bold mb-1">Automated Big Loans</h5>
+            <p class="mb-0">
+                Your account does not yet qualify for automatic multiplier limits. 
+                To unlock this feature, you must maintain a clean contribution record and repay assigned loans on time.
+            </p>
+            <hr style="border-color: #000; opacity: 0.2;">
+            <p class="mb-0 small fw-bold">
+                <i class="fas fa-info-circle me-1"></i> 
+                Need funds? You can request a manual limit review from the committee.
+            </p>
+        </div>
+        <div class="ms-md-3 mt-3 mt-md-0 text-center">
+            <!-- Triggers the Modal instead of a mailto link -->
+            <button type="button" class="btn btn-dark fw-bold px-4 py-2" style="border: 2px solid #000;" data-bs-toggle="modal" data-bs-target="#limitReviewModal">
+                <i class="fas fa-paper-plane me-1"></i> Request Limit Review
+            </button>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- 4 STAT CARDS (Funnel) -->
     <div class="row g-3 mb-4">
@@ -98,12 +123,19 @@
         </div>
     </div>
 
-    <!-- ACTION BUTTON -->
+    <!-- ACTION BUTTON (Hidden for members with 0 limit) -->
     <div class="mb-3 text-end">
-        <a href="{% url 'chama:loan_create' %}" class="btn-custom btn-primary-custom">
-            <i class="fas fa-plus"></i>
-            {% if is_officer %}New Loan{% else %}Request Loan{% endif %}
-        </a>
+        {% if is_officer %}
+            <a href="{% url 'chama:loan_create' %}" class="btn-custom btn-primary-custom">
+                <i class="fas fa-plus"></i> New Loan
+            </a>
+        {% else %}
+            {% if current_member.available_borrowing_power > 0 %}
+                <a href="{% url 'chama:loan_create' %}" class="btn-custom btn-primary-custom">
+                    <i class="fas fa-plus"></i> Request Loan
+                </a>
+            {% endif %}
+        {% endif %}
     </div>
 
     <!-- FILTERS (officers only) -->
@@ -168,7 +200,6 @@
                         
                         {% if is_officer %}
                         <td>
-                            <!-- 👇 NEW: Dynamic Borrower Display -->
                             {% if l.loan_category == 'external' %}
                                 <span class="badge bg-warning text-dark mb-1" style="font-size: 0.65rem;">EXTERNAL</span>
                                 <div class="fw-bold">{{ l.guest.full_name }}</div>
@@ -230,17 +261,31 @@
                         {% endif %}
                         
                         <td class="text-end">
-                            <a href="{% url 'chama:loan_detail' l.pk %}" class="action-icon" title="View Details">
-                                <i class="fas fa-eye"></i>
+                            <!-- View Button -->
+                            <a href="{% url 'chama:loan_detail' l.pk %}" 
+                               class="btn btn-sm btn-outline-dark fw-bold" 
+                               style="border: 1px solid #000; border-radius: 4px; padding: 4px 10px; font-size: 0.75rem; margin-right: 4px;"
+                               title="View Details">
+                                <i class="fas fa-eye me-1"></i> VIEW
                             </a>
+                            
+                            <!-- Release Funds Button (Triggers Modal) -->
                             {% if is_officer and l.status == 'approved' %}
-                            <form method="post" action="{% url 'chama:loan_disburse' l.pk %}" style="display:inline;" onsubmit="return confirm('Release KES {{ l.principal }}?');">
-                                {% csrf_token %}
-                                <button type="submit" class="action-icon success" title="Release Funds" style="background:none;border:none;padding:0;">
-                                    <i class="fas fa-money-bill-wave"></i>
-                                </button>
-                            </form>
+                            <button type="button" 
+                                    class="btn btn-sm btn-dark fw-bold" 
+                                    style="border: 1px solid #000; border-radius: 4px; padding: 4px 10px; font-size: 0.75rem;"
+                                    title="Release Funds" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#disburseModal"
+                                    data-loan-id="{{ l.pk }}"
+                                    data-loan-principal="{{ l.principal|floatformat:2 }}"
+                                    data-loan-borrower="{% if l.loan_category == 'external' %}{{ l.guest.full_name }}{% else %}{{ l.member.full_name }}{% endif %}"
+                                    data-loan-type="{{ l.loan_type.name|default:'—' }}"
+                                    data-loan-repayable="{{ l.total_repayable|floatformat:2 }}">
+                                <i class="fas fa-money-bill-wave me-1"></i> RELEASE
+                            </button>
                             {% endif %}
+                            
                         </td>
                     </tr>
                     {% empty %}
@@ -259,4 +304,134 @@
     </div>
 
 </div>
+
+<!-- ============================================ -->
+<!-- LIMIT REVIEW MODAL -->
+<!-- ============================================ -->
+<div class="modal fade" id="limitReviewModal" tabindex="-1" aria-labelledby="limitReviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border: 2px solid #000; border-radius: 4px;">
+            <div class="modal-header bg-light" style="border-bottom: 2px solid #000;">
+                <h5 class="modal-title fw-bold" id="limitReviewModalLabel">
+                    <i class="fas fa-envelope-open-text text-primary me-2"></i> Request Limit Review
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                <h5 class="fw-bold">How to Request a Review</h5>
+                <p class="text-muted mb-4">
+                    To increase your borrowing limit, please reach out to the Loan Committee directly. 
+                    They will review your contribution history and current records.
+                </p>
+                
+                <div class="d-grid gap-2">
+                    <!-- Replace phone numbers with your actual committee contact details -->
+                    <a href="tel:+254712345678" class="btn btn-outline-dark fw-bold py-2" style="border:2px solid #000;">
+                        <i class="fas fa-phone me-1"></i> Call Treasurer
+                    </a>
+                    <a href="https://wa.me/254712345678" target="_blank" class="btn btn-success fw-bold py-2">
+                        <i class="fab fa-whatsapp me-1"></i> Message on WhatsApp
+                    </a>
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 2px solid #000;">
+                <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal" style="border:2px solid #000;">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- NEW: DISBURSE LOAN MODAL (Replaces popup)    -->
+<!-- ============================================ -->
+<div class="modal fade" id="disburseModal" tabindex="-1" aria-labelledby="disburseModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border: 2px solid #000; border-radius: 4px;">
+            
+            <div class="modal-header" style="background: #0d6efd; color: #fff;">
+                <h5 class="modal-title fw-bold" id="disburseModalLabel">
+                    <i class="fas fa-money-bill-wave me-2"></i> Confirm Disbursement
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <div class="modal-body p-4">
+                <div class="text-center mb-3">
+                    <i class="fas fa-hand-holding-usd" style="font-size: 3rem; color: #0d6efd;"></i>
+                </div>
+                
+                <p class="text-center mb-4">
+                    You are about to release funds from the Chama account. <br>
+                    <strong>This action cannot be undone.</strong>
+                </p>
+
+                <!-- Details Card -->
+                <div class="bg-light p-3 rounded" style="border: 1px solid #000;">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted small fw-bold text-uppercase">Recipient</span>
+                        <span class="fw-bold" id="modalBorrower">—</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted small fw-bold text-uppercase">Amount to Release</span>
+                        <span class="fw-bold text-primary fs-6" id="modalPrincipal">—</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted small fw-bold text-uppercase">Loan Type</span>
+                        <span class="fw-bold" id="modalType">—</span>
+                    </div>
+                    <div class="d-flex justify-content-between border-top pt-2 mt-2" style="border-color:#ccc !important;">
+                        <span class="text-muted small fw-bold text-uppercase">Total Repayable</span>
+                        <span class="fw-bold text-success" id="modalRepayable">—</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;" data-bs-dismiss="modal">
+                    Cancel
+                </button>
+                <!-- The form action will be updated dynamically via JS -->
+                <form method="post" id="disburseForm" action="" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary fw-bold" style="border:2px solid #000; background:#0d6efd;">
+                        <i class="fas fa-check-circle"></i> Confirm Release
+                    </button>
+                </form>
+            </div>
+            
+        </div>
+    </div>
+</div>
+
+<!-- JS to populate the Modal -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var disburseModal = document.getElementById('disburseModal');
+        if (disburseModal) {
+            disburseModal.addEventListener('show.bs.modal', function (event) {
+                // Button that triggered the modal
+                var button = event.relatedTarget;
+                
+                // Extract info from data-* attributes
+                var loanId = button.getAttribute('data-loan-id');
+                var borrower = button.getAttribute('data-loan-borrower');
+                var principal = button.getAttribute('data-loan-principal');
+                var type = button.getAttribute('data-loan-type');
+                var repayable = button.getAttribute('data-loan-repayable');
+                
+                // Update the modal's content
+                document.getElementById('modalBorrower').textContent = borrower;
+                document.getElementById('modalPrincipal').textContent = 'KES ' + principal;
+                document.getElementById('modalType').textContent = type;
+                document.getElementById('modalRepayable').textContent = 'KES ' + repayable;
+                
+                // Update the form action URL dynamically
+                var form = document.getElementById('disburseForm');
+                // Ensure you have the correct URL pattern, assuming it is /chama/loans/<id>/disburse/
+                form.action = "/chama/loans/" + loanId + "/disburse/";
+            });
+        }
+    });
+</script>
 {% endblock %}

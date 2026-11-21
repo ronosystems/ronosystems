@@ -4,27 +4,183 @@
 
 {% block content %}
 <div class="container-fluid py-2">
+
+    <!-- ============================================ -->
+    <!-- ACCOUNT FILTER BANNER (NEW) -->
+    <!-- ============================================ -->
+    {% if selected_account %}
+    <div class="alert alert-info d-flex justify-content-between align-items-center" style="border:2px solid #000;">
+        <div>
+            <i class="fas fa-filter me-2"></i> Showing transactions for: 
+            <strong>{{ selected_account.name }}</strong> ({{ selected_account.get_purpose_display }})
+        </div>
+        <a href="{% url 'chama:transaction_list' %}" class="btn btn-sm btn-outline-dark fw-bold" style="border:2px solid #000;">
+            Clear Filter
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- ============================================ -->
+    <!-- SUMMARY CARDS -->
+    <!-- ============================================ -->
     <div class="row g-3 mb-4">
-        <div class="col-md-4"><div class="card p-3 text-center" style="border:2px solid #000;"><h6>Total In</h6><h4 class="text-success">KES {{ total_in|floatformat:2 }}</h4></div></div>
-        <div class="col-md-4"><div class="card p-3 text-center" style="border:2px solid #000;"><h6>Total Out</h6><h4 class="text-danger">KES {{ total_out|floatformat:2 }}</h4></div></div>
-        <div class="col-md-4"><div class="card p-3 text-center" style="border:2px solid #000;"><h6>Net Balance</h6><h4>KES {{ net_balance|floatformat:2 }}</h4></div></div>
+        <div class="col-md-4">
+            <div class="card p-3 text-center" style="border:2px solid #000;">
+                <h6>Total In</h6>
+                <h4 class="text-success">KES {{ total_in|floatformat:2 }}</h4>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card p-3 text-center" style="border:2px solid #000;">
+                <h6>Total Out</h6>
+                <h4 class="text-danger">KES {{ total_out|floatformat:2 }}</h4>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card p-3 text-center" style="border:2px solid #000;">
+                <h6>Net Balance</h6>
+                <h4>KES {{ net_balance|floatformat:2 }}</h4>
+            </div>
+        </div>
     </div>
-    <div class="mb-3 text-end"><a href="{% url 'chama:transaction_create' %}" class="btn btn-dark">+ Add Transaction</a></div>
+
+    <!-- ============================================ -->
+    <!-- PER-SOURCE SUMMARY -->
+    <!-- ============================================ -->
+    {% if source_summary %}
+    <div class="row g-2 mb-4">
+        {% for source, data in source_summary.items %}
+        <div class="col-md-3 col-sm-6">
+            <div class="card p-2" style="border:1px solid #999;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <strong class="text-capitalize">{{ source|cut:"_" }}</strong>
+                    <span class="badge bg-secondary">{{ data.count }}</span>
+                </div>
+                <div class="small">
+                    {% if data.in %}
+                        <span class="text-success">+ KES {{ data.in|floatformat:2 }}</span><br>
+                    {% endif %}
+                    {% if data.out %}
+                        <span class="text-danger">− KES {{ data.out|floatformat:2 }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- ============================================ -->
+    <!-- FILTERS -->
+    <!-- ============================================ -->
+    <form method="get" class="row g-2 mb-3 align-items-end">
+        <!-- 👇 NEW: Preserve the account filter when submitting the form -->
+        {% if selected_account %}
+            <input type="hidden" name="account" value="{{ selected_account.pk }}">
+        {% endif %}
+
+        <div class="col-md-3">
+            <label class="form-label small mb-1">Source</label>
+            <select name="source" class="form-select form-select-sm">
+                <option value="">All Sources</option>
+                <option value="cashbook" {% if source_filter == 'cashbook' %}selected{% endif %}>Cashbook (Manual)</option>
+                <option value="saving" {% if source_filter == 'saving' %}selected{% endif %}>Savings</option>
+                <option value="contribution" {% if source_filter == 'contribution' %}selected{% endif %}>Contributions</option>
+                <option value="fine" {% if source_filter == 'fine' %}selected{% endif %}>Fines</option>
+                <option value="loan" {% if source_filter == 'loan' %}selected{% endif %}>Loan Disbursements</option>
+                <option value="loan_repayment" {% if source_filter == 'loan_repayment' %}selected{% endif %}>Loan Repayments</option>
+                <option value="expense" {% if source_filter == 'expense' %}selected{% endif %}>Expenses</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small mb-1">From</label>
+            <input type="date" name="date_from" value="{{ date_from }}" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small mb-1">To</label>
+            <input type="date" name="date_to" value="{{ date_to }}" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-dark btn-sm w-100">Filter</button>
+            <!-- Keep the reset button smart: reset dates/sources but keep the account filter -->
+            <a href="{% url 'chama:transaction_list' %}{% if selected_account %}?account={{ selected_account.pk }}{% endif %}" class="btn btn-outline-secondary btn-sm w-100">Reset</a>
+        </div>
+    </form>
+
+    <!-- ============================================ -->
+    <!-- ACTIONS -->
+    <!-- ============================================ -->
+    {% if is_officer %}
+    <div class="mb-3 text-end">
+        <a href="{% url 'chama:transaction_create' %}" class="btn btn-dark">+ Add Transaction</a>
+    </div>
+    {% endif %}
+
+    <!-- ============================================ -->
+    <!-- TRANSACTIONS TABLE -->
+    <!-- ============================================ -->
     <div class="card" style="border:2px solid #000;">
-        <table class="table table-hover mb-0">
-            <thead><tr><th>Date</th><th>Description</th><th>Account</th><th>Type</th><th class="text-end">Amount</th></tr></thead>
-            <tbody>
-                {% for t in transactions %}
-                <tr>
-                    <td>{{ t.date|date:"M d" }}</td>
-                    <td>{{ t.description }}</td>
-                    <td>{{ t.account.name }}</td>
-                    <td>{% if t.transaction_type == 'in' %}<span class="badge bg-success">In</span>{% else %}<span class="badge bg-danger">Out</span>{% endif %}</td>
-                    <td class="text-end fw-bold">KES {{ t.amount|floatformat:2 }}</td>
-                </tr>
-                {% empty %}<tr><td colspan="5" class="text-center">No transactions yet.</td></tr>{% endfor %}
-            </tbody>
-        </table>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Source</th>
+                        <th>Description</th>
+                        <th>Account</th>
+                        <th>Reference</th>
+                        <th>Type</th>
+                        <th class="text-end">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in transactions %}
+                    <tr>
+                        <td>{{ t.date|date:"M d, Y" }}</td>
+                        <td>
+                            {% if t.source == 'cashbook' %}
+                                <span class="badge bg-dark">Cashbook</span>
+                            {% elif t.source == 'saving' %}
+                                <span class="badge bg-primary">Saving</span>
+                            {% elif t.source == 'contribution' %}
+                                <span class="badge bg-info text-dark">Contribution</span>
+                            {% elif t.source == 'fine' %}
+                                <span class="badge bg-warning text-dark">Fine</span>
+                            {% elif t.source == 'loan' %}
+                                <span class="badge bg-secondary">Loan Out</span>
+                            {% elif t.source == 'loan_repayment' %}
+                                <span class="badge bg-success">Loan Repay</span>
+                            {% elif t.source == 'expense' %}
+                                <span class="badge bg-danger">Expense</span>
+                            {% else %}
+                                <span class="badge bg-light text-dark">{{ t.source }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ t.description }}</td>
+                        <td>{{ t.account_name }}</td>
+                        <td><small class="text-muted">{{ t.reference }}</small></td>
+                        <td>
+                            {% if t.transaction_type == 'in' %}
+                                <span class="badge bg-success">In</span>
+                            {% else %}
+                                <span class="badge bg-danger">Out</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end fw-bold {% if t.transaction_type == 'in' %}text-success{% else %}text-danger{% endif %}">
+                            {% if t.transaction_type == 'out' %}−{% endif %}KES {{ t.amount|floatformat:2 }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">
+                            No transactions found for the selected filters.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
+
 </div>
 {% endblock %}
