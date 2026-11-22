@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Customer Profile{% endblock %}
+{% block page_title %}Customer Profile{% endblock %}
+{% block page_subtitle %}{{ page_subtitle }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Customer Info Card -->
+    <div class="col-md-4 mb-4">
+        <div class="card" style="border: 2px solid #000;">
+            <div class="card-header" style="background: #87CEEB; border-bottom: 2px solid #000;">
+                <h5 class="mb-0 fw-bold">Profile Details</h5>
+            </div>
+            <div class="card-body">
+                
+                <!-- Customer Avatar / Profile Photo -->
+                <div class="text-center mb-3">
+                    {% if customer.profile_photo_url %}
+                        <img src="{{ customer.profile_photo_url }}" alt="{{ customer.full_name }}" class="rounded-circle img-thumbnail" style="width: 120px; height: 120px; object-fit: cover; border: 3px solid #000;">
+                    {% else %}
+                        <div class="rounded-circle bg-secondary text-white d-inline-flex align-items-center justify-content-center" style="width: 120px; height: 120px; border: 3px solid #000; font-size: 40px;">
+                            {{ customer.full_name|first|upper }}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <h3 class="fw-bold text-center mb-3">{{ customer.full_name }}</h3>
+                
+                <p class="mb-1"><i class="fas fa-phone text-muted"></i> {{ customer.phone_number }}</p>
+                <p class="mb-1"><i class="fas fa-envelope text-muted"></i> {{ customer.email|default:"-" }}</p>
+                <p class="mb-1"><i class="fas fa-map-marker-alt text-muted"></i> {{ customer.location|default:"-" }}</p>
+                <p class="mb-1"><i class="fas fa-id-card text-muted"></i> ID: {{ customer.national_id|default:"-" }}</p>
+                
+                <hr>
+                
+                <p class="mb-1">
+                    <strong>Joined:</strong> {{ customer.created_at|date:"Y-m-d" }}
+                </p>
+
+                <hr>
+
+                <!-- KYC Documents -->
+                <h6 class="fw-bold mb-3">Uploaded Documents</h6>
+                <div class="row g-2">
+                    <!-- ID Front -->
+                    <div class="col-6">
+                        <small class="text-muted d-block mb-1">ID Front</small>
+                        {% if customer.id_front_url %}
+                            <a href="{{ customer.id_front_url }}" target="_blank">
+                                <img src="{{ customer.id_front_url }}" alt="ID Front" class="img-fluid rounded border border-dark" style="height: 80px; width: 100%; object-fit: cover;">
+                            </a>
+                        {% else %}
+                            <div class="border border-dark rounded d-flex align-items-center justify-content-center bg-light" style="height: 80px;">
+                                <small class="text-muted">Not uploaded</small>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- ID Back -->
+                    <div class="col-6">
+                        <small class="text-muted d-block mb-1">ID Back</small>
+                        {% if customer.id_back_url %}
+                            <a href="{{ customer.id_back_url }}" target="_blank">
+                                <img src="{{ customer.id_back_url }}" alt="ID Back" class="img-fluid rounded border border-dark" style="height: 80px; width: 100%; object-fit: cover;">
+                            </a>
+                        {% else %}
+                            <div class="border border-dark rounded d-flex align-items-center justify-content-center bg-light" style="height: 80px;">
+                                <small class="text-muted">Not uploaded</small>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <a href="{% url 'epa_shop:customer-update' customer.pk %}" class="btn btn-primary w-100 mb-2" style="border: 2px solid #000; font-weight: bold;">
+                        <i class="fas fa-edit"></i> Edit / Upload Documents
+                    </a>
+                    <a href="{% url 'epa_shop:customer-list' %}" class="btn btn-secondary w-100" style="border: 2px solid #000; font-weight: bold;">
+                        <i class="fas fa-arrow-left"></i> Back to Directory
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Purchases -->
+    <div class="col-md-8 mb-4">
+        <div class="card" style="border: 2px solid #000;">
+            <div class="card-header" style="background: #e6e6e6; border-bottom: 2px solid #000;">
+                <h5 class="mb-0 fw-bold">Recent Purchases (Last 10)</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-bordered mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Receipt #</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sale in recent_sales %}
+                            <tr>
+                                <td>{{ sale.sale_date|date:"Y-m-d H:i" }}</td>
+                                <td class="fw-bold">{{ sale.company_sale_id }}</td>
+                                <td class="text-success fw-bold">KES {{ sale.net_amount|floatformat:2 }}</td>
+                                <td>
+                                    {% if sale.payment_status == 'paid' %}
+                                        <span class="badge bg-success">Paid</span>
+                                    {% elif sale.payment_status == 'refunded' %}
+                                        <span class="badge bg-danger">Refunded</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">{{ sale.get_payment_status_display }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{% url 'epa_shop:epa-sale-receipt' sale.id %}" class="btn btn-sm btn-dark" style="border: 2px solid #000;" title="View Receipt">
+                                        <i class="fas fa-receipt"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-5">
+                                    <i class="fas fa-shopping-cart fa-2x mb-3"></i><br>
+                                    No purchases found for this customer.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -8,7 +8,6 @@ urlpatterns = [
     path('success/<uuid:public_id>/', views.registration_success, name='registration-success'),
 
     # 👇 New Customer Auth Routes
-    path('login/', views.CustomerLoginView.as_view(), name='login'),
     path('dashboard/', views.customer_dashboard, name='dashboard'),
     path('settings/', views.customer_settings, name='settings'), 
     path('profile/', views.customer_profile, name='profile'),

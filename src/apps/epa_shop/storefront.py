@@ -259,7 +259,7 @@ def epa_storefront(request):
         **homepage_data,
     }
     
-    return render(request, 'epa/storefront.html', context)
+    return render(request, 'epa_shop/storefront.html', context)
 
 
 def public_product_detail(request, product_code):
@@ -403,4 +403,4 @@ def public_product_detail(request, product_code):
         'can_manage_images': can_manage_product_images(request.user),
     }
 
-    return render(request, 'epa/public_product_detail.html', context)
+    return render(request, 'epa_shop/public_product_detail.html', context)

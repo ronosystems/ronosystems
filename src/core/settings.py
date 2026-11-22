@@ -314,6 +314,8 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 AUTHENTICATION_BACKENDS = [
+    'apps.accounts.backends.CustomerDomainBackend',
+    'apps.accounts.backends.TenantAuthBackend',
     'apps.accounts.backends.EmailOrPhoneBackend', 
     'django.contrib.auth.backends.ModelBackend',
     'allauth.account.auth_backends.AuthenticationBackend',
@@ -342,11 +344,12 @@ INACTIVITY_TIMEOUT_SECONDS = 60 * 30      # 30 minutes
 # ============================================
 # DJANGO-ALLAUTH
 # ============================================
-ACCOUNT_LOGIN_METHODS = {'username', 'email', 'phone'}
-ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
+ACCOUNT_LOGIN_METHODS = {'username'}  # We use a custom backend for phone/email anyway
+ACCOUNT_SIGNUP_FIELDS = ['username*', 'email', 'password1*', 'password2*']
 ACCOUNT_USER_MODEL_USERNAME_FIELD = 'username'
-ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
-
+ACCOUNT_EMAIL_VERIFICATION = 'optional'
+LOGIN_REDIRECT_URL = '/dashboard/'
+ACCOUNT_LOGIN_REDIRECT_URL = '/dashboard/'
 ACCOUNT_LOGOUT_ON_GET = True
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 ACCOUNT_SESSION_REMEMBER = True

@@ -13,17 +13,17 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='accessory',
             name='image',
-            field=models.ImageField(blank=True, max_length=500, null=True, upload_to='epa/accessories/%Y/%m/'),
+            field=models.ImageField(blank=True, max_length=500, null=True, upload_to='epa_shop/accessories/%Y/%m/'),
         ),
         migrations.AlterField(
             model_name='electronic',
             name='image',
-            field=models.ImageField(blank=True, max_length=500, null=True, upload_to='epa/electronics/%Y/%m/'),
+            field=models.ImageField(blank=True, max_length=500, null=True, upload_to='epa_shop/electronics/%Y/%m/'),
         ),
         migrations.AlterField(
             model_name='phone',
             name='image',
-            field=models.ImageField(blank=True, max_length=500, null=True, upload_to='epa/phones/%Y/%m/'),
+            field=models.ImageField(blank=True, max_length=500, null=True, upload_to='epa_shop/phones/%Y/%m/'),
         ),
         migrations.AlterField(
             model_name='purchaserecord',

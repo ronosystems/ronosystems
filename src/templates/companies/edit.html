@@ -415,6 +415,7 @@
     </div>
 </div>
 
+
 <script>
 (function () {
     // ---------- Plan preview ----------
@@ -467,6 +468,8 @@
 
     btn.addEventListener('click', function () {
         const url = btn.dataset.url;
+        const domainInput = document.getElementById('customDomainInput');
+        const currentDomain = domainInput ? domainInput.value.trim() : '';
 
         result.className = 'domain-status loading';
         result.textContent = 'Checking DNS...';
@@ -477,6 +480,7 @@
                 'X-CSRFToken': '{{ csrf_token }}',
                 'Content-Type': 'application/json',
             },
+            body: JSON.stringify({ domain: currentDomain }),
         })
         .then(r => r.json())
         .then(data => {
@@ -486,6 +490,8 @@
                 // Reflect the new state in the checkbox
                 const checkbox = document.getElementById('domainVerified');
                 if (checkbox) checkbox.checked = true;
+                // Update the input field to the normalized resolving domain
+                if (data.domain && domainInput) domainInput.value = data.domain;
             } else {
                 result.className = 'domain-status error';
                 result.textContent = data.message || 'Verification failed.';
@@ -500,4 +506,6 @@
     });
 })();
 </script>
+
+
 {% endblock %}

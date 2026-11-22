@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('object_id', models.PositiveIntegerField(db_index=True)),
-                ('image', models.ImageField(help_text='Additional gallery image for this product.', max_length=500, upload_to='epa/products/%Y/%m/')),
+                ('image', models.ImageField(help_text='Additional gallery image for this product.', max_length=500, upload_to='epa_shop/products/%Y/%m/')),
                 ('alt_text', models.CharField(blank=True, max_length=200)),
                 ('display_order', models.PositiveIntegerField(default=0, help_text='Lower numbers show first.')),
                 ('is_primary', models.BooleanField(default=False, help_text='Mark one image as the cover/primary image.')),

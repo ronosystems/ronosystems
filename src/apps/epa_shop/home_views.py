@@ -165,4 +165,4 @@ def manage_homepage(request):
         'banner_items': banner_items,
     }
     
-    return render(request, 'epa/home_set.html', context)
+    return render(request, 'epa_shop/home_set.html', context)

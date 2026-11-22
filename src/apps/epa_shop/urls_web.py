@@ -8,6 +8,10 @@ from . import sale_views
 from . import category_views
 from . import inventory_views
 from . import finance_views
+from . import customer_views
+
+app_name = 'epa_shop'
+
 
 
 urlpatterns = [
@@ -221,4 +225,13 @@ urlpatterns = [
     path('finance/cogs-daily/<str:date_str>/',          finance_views.cogs_daily_detail,    name='finance-cogs-daily-detail'),
     path('finance/cogs-weekly/<int:year>/<int:week>/',  finance_views.cogs_weekly_detail,   name='finance-cogs-weekly-detail'),
     path('finance/cogs-monthly/<int:year>/<int:month>/',finance_views.cogs_monthly_detail,  name='finance-cogs-monthly-detail'),
+
+    # ============================================
+    # EPA SHOP CUSTOMERS MANAGEMENT
+    # ============================================
+    path('customers/', customer_views.customer_list, name='customer-list'),
+    path('customers/create/', customer_views.customer_create, name='customer-create'),
+    path('customers/<int:pk>/edit/', customer_views.customer_update, name='customer-update'),
+    path('customers/<int:pk>/delete/', customer_views.customer_delete, name='customer-delete'),
+    path('customers/<int:pk>/', customer_views.customer_detail, name='customer-detail'),
 ]

@@ -49,7 +49,7 @@ urlpatterns = [
     path('dashboard/', include('apps.company.dashboard_urls')),
     path('company/', include('apps.company.urls_web')),
     path('company/', include('apps.accounts.staff_urls')),
-    path('epa_shop/', include('apps.epa_shop.urls_web')),
+    path('epa_shop/', include('apps.epa_shop.urls_web', namespace='epa_shop')),
     path('cart/', include('apps.cart_orders.urls', namespace='cart-orders')),
     path('customers/', include('apps.customers.urls', namespace='customers')),
     path('kuku_biz/', include('apps.kuku_biz.urls')),
@@ -78,7 +78,7 @@ urlpatterns = [
     # ============================================
     path('api/auth/', include('apps.accounts.urls', namespace='api_accounts')),
     path('api/companies/', include('apps.companies.urls')),
-    path('api/epa/', include('apps.epa_shop.urls')),
+    path('api/epa_shop/', include('apps.epa_shop.urls', namespace='epa_shop_api')),
     path('api/supermarket/', include('apps.supermarket.urls')),
 
     # ============================================

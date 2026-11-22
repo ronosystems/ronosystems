@@ -32,13 +32,16 @@ class Customer(models.Model):
     next_of_kin_phone = models.CharField(max_length=30, blank=True)
 
     # --- Auth Link (Optional) ---
-    user = models.OneToOneField(
+    # 👇 CHANGED FROM OneToOneField TO ForeignKey 👇
+    user = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
         on_delete=models.SET_NULL, 
         null=True, blank=True,
-        related_name='customer_profile'
+        related_name='customer_profiles' 
     )
     
+    pin = models.CharField(max_length=128, blank=True, null=True, help_text="Hashed PIN for this specific tenant")
+
     # --- Profile Photo & KYC Documents (Cloudinary Public IDs) ---
     profile_photo = models.CharField(max_length=255, null=True, blank=True)
     
@@ -55,7 +58,7 @@ class Customer(models.Model):
     )
     
     # --- Reviewer Tracking ---
-    reviewer_comment = models.TextField(blank=True, null=True) # 👈 ADDED THIS MISSING FIELD
+    reviewer_comment = models.TextField(blank=True, null=True)
     reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_customers')
     reviewed_at = models.DateTimeField(null=True, blank=True)
     

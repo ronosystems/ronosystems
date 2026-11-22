@@ -33,7 +33,7 @@ def category_list(request):
         'page_title': 'Categories',
         'page_subtitle': 'Product categories',
     }
-    return render(request, 'epa/categories.html', context)
+    return render(request, 'epa_shop/categories.html', context)
 
 
 @login_required
@@ -53,14 +53,14 @@ def category_create(request):
 
         if not name:
             messages.error(request, 'Category name is required.')
-            return render(request, 'epa/category_form.html', {
+            return render(request, 'epa_shop/category_form.html', {
                 'page_title': 'Add Category',
                 'page_subtitle': 'Create a new category',
             })
 
         if not category_type:
             messages.error(request, 'Category type is required.')
-            return render(request, 'epa/category_form.html', {
+            return render(request, 'epa_shop/category_form.html', {
                 'page_title': 'Add Category',
                 'page_subtitle': 'Create a new category',
             })
@@ -68,7 +68,7 @@ def category_create(request):
         # Check if category already exists
         if Category.objects.filter(company=company, name=name).exists():
             messages.error(request, f'Category "{name}" already exists.')
-            return render(request, 'epa/category_form.html', {
+            return render(request, 'epa_shop/category_form.html', {
                 'page_title': 'Add Category',
                 'page_subtitle': 'Create a new category',
             })
@@ -86,7 +86,7 @@ def category_create(request):
         except Exception as e:
             messages.error(request, f'Error creating category: {str(e)}')
 
-    return render(request, 'epa/category_form.html', {
+    return render(request, 'epa_shop/category_form.html', {
         'page_title': 'Add Category',
         'page_subtitle': 'Create a new category',
     })
@@ -111,7 +111,7 @@ def category_edit(request, pk):
 
         if not name:
             messages.error(request, 'Category name is required.')
-            return render(request, 'epa/category_form.html', {
+            return render(request, 'epa_shop/category_form.html', {
                 'category': category,
                 'page_title': 'Edit Category',
                 'page_subtitle': 'Update category details',
@@ -119,7 +119,7 @@ def category_edit(request, pk):
 
         if not category_type:
             messages.error(request, 'Category type is required.')
-            return render(request, 'epa/category_form.html', {
+            return render(request, 'epa_shop/category_form.html', {
                 'category': category,
                 'page_title': 'Edit Category',
                 'page_subtitle': 'Update category details',
@@ -128,7 +128,7 @@ def category_edit(request, pk):
         # Check if category already exists (excluding current)
         if Category.objects.filter(company=company, name=name).exclude(pk=pk).exists():
             messages.error(request, f'Category "{name}" already exists.')
-            return render(request, 'epa/category_form.html', {
+            return render(request, 'epa_shop/category_form.html', {
                 'category': category,
                 'page_title': 'Edit Category',
                 'page_subtitle': 'Update category details',
@@ -145,7 +145,7 @@ def category_edit(request, pk):
         except Exception as e:
             messages.error(request, f'Error updating category: {str(e)}')
 
-    return render(request, 'epa/category_form.html', {
+    return render(request, 'epa_shop/category_form.html', {
         'category': category,
         'page_title': 'Edit Category',
         'page_subtitle': 'Update category details',
@@ -177,7 +177,7 @@ def category_delete(request, pk):
         'page_title': 'Delete Category',
         'page_subtitle': 'Confirm deletion',
     }
-    return render(request, 'epa/category_delete.html', context)
+    return render(request, 'epa_shop/category_delete.html', context)
 
 
 @login_required
@@ -260,7 +260,7 @@ def category_products(request, pk):
         'page_title': f'Products in {category.name}',
         'page_subtitle': 'Category products',
     }
-    return render(request, 'epa/category_products.html', context)
+    return render(request, 'epa_shop/category_products.html', context)
 
 
 @login_required

@@ -253,7 +253,7 @@ def inventory_list(request):
         'page_title': 'Inventory',
         'page_subtitle': 'Manage your stock',
     }
-    return render(request, 'epa/inventory.html', context)
+    return render(request, 'epa_shop/inventory.html', context)
 
 
 # ============================================
@@ -405,7 +405,7 @@ def low_stock(request):
         # ✅ NEW: full list as JSON string for client-side filtering
         'all_low_stock_json': json.dumps(low_stock_items, default=str),
     }
-    return render(request, 'epa/low_stock.html', context)
+    return render(request, 'epa_shop/low_stock.html', context)
 
 
 
@@ -496,46 +496,7 @@ def stock_movement(request):
         'page_title': 'Stock Movements',
         'page_subtitle': 'Inventory transaction history',
     }
-    return render(request, 'epa/stock_movement.html', context)
-
-
-# ============================================
-# CUSTOMERS
-# ============================================
-@login_required
-def customer_list(request):
-    """List all customers"""
-    company, is_viewing_company = get_active_company(request)
-
-    if not company:
-        if request.user.role == 'super_admin':
-            return redirect('/api/support/select/')
-        messages.warning(request, 'You are not assigned to any company.')
-        return redirect('/dashboard/')
-
-    customers = Customer.objects.filter(company=company).order_by('-created_at')[:50]
-
-    context = {
-        'company': company, 'customers': customers, 'total_count': customers.count(),
-        'is_viewing_company': is_viewing_company,
-        'page_title': 'Customers', 'page_subtitle': 'Customer management',
-    }
-    return render(request, 'epa/customers.html', context)
-
-
-@login_required
-def customer_create(request):
-    """Create a new customer"""
-    company, is_viewing_company = get_active_company(request)
-
-    if not company:
-        if request.user.role == 'super_admin':
-            return redirect('/api/support/select/')
-        messages.warning(request, 'You are not assigned to any company.')
-        return redirect('/dashboard/')
-
-    messages.info(request, 'Customer creation coming soon.')
-    return redirect('/epa/customers/')
+    return render(request, 'epa_shop/stock_movement.html', context)
 
 
 
@@ -626,24 +587,24 @@ def bulk_transfer(request):
                 to_branch = Branch.objects.filter(id=to_branch_id, company=company).first()
                 if not to_branch:
                     messages.error(request, 'Invalid destination branch.')
-                    return redirect('bulk-transfer')
+                    return redirect('epa_shop:bulk-transfer') # FIXED
 
                 if from_mode == 'specific':
                     from_branch = Branch.objects.filter(id=from_branch_id, company=company).first()
                     if not from_branch:
                         messages.error(request, 'Invalid source branch.')
-                        return redirect('bulk-transfer')
+                        return redirect('epa_shop:bulk-transfer') # FIXED
             else:
                 to_user = User.objects.filter(id=to_user_id, company=company).first()
                 if not to_user:
                     messages.error(request, 'Invalid destination user.')
-                    return redirect('bulk-transfer')
+                    return redirect('epa_shop:bulk-transfer') # FIXED
 
                 if from_mode == 'specific':
                     from_user = User.objects.filter(id=from_user_id, company=company).first()
                     if not from_user:
                         messages.error(request, 'Invalid source user.')
-                        return redirect('bulk-transfer')
+                        return redirect('epa_shop:bulk-transfer') # FIXED
 
                 to_owner = get_or_create_owner_from_user(to_user, company=company)
 
@@ -756,7 +717,7 @@ def bulk_transfer(request):
         'page_title': 'Bulk Unit Transfer',
         'page_subtitle': 'Move many IMEI / Serial units at once',
     }
-    return render(request, 'epa/bulk_transfer.html', context)
+    return render(request, 'epa_shop/bulk_transfer.html', context)
 
 
 # ============================================
@@ -868,7 +829,7 @@ def receive_transfer_view(request, transfer_id):
     if not is_super_admin and user_branch:
         if transfer.to_branch != user_branch:
             messages.error(request, "You can only receive transfers destined for your branch.")
-            return redirect('bulk-transfer')
+            return redirect('epa_shop:bulk-transfer') # FIXED
 
     try:
         receive_transfer(transfer, request.user)
@@ -876,7 +837,11 @@ def receive_transfer_view(request, transfer_id):
     except Exception as e:
         messages.error(request, str(e))
 
-    return redirect('bulk-transfer')
+    return redirect('epa_shop:bulk-transfer') # FIXED
+
+
+
+
 
 
 # ============================================
@@ -994,7 +959,7 @@ def discontinued_products_list(request):
         'page_title': 'Discontinued Products',
         'page_subtitle': 'Products no longer stocked',
     }
-    return render(request, 'epa/discontinued_products.html', context)
+    return render(request, 'epa_shop/discontinued_products.html', context)
 
 @login_required
 @require_POST

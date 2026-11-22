@@ -1126,46 +1126,71 @@ def company_edit(request, pk):
 # ============================================
 # VERIFY CUSTOM DOMAIN (DNS CHECK)
 # ============================================
-
 @login_required
 @staff_member_required
 @require_POST
 def company_verify_domain(request, pk):
     """
-    Quick DNS check: does the company's custom_domain resolve to an IP?
-
-    Returns JSON: { success, message, verified, resolved_ip? }
+    Quick DNS check: does the company's custom_domain resolve?
+    Accepts an optional 'domain' POST param to verify the *current*
+    input value (not just the saved one).
     """
     company = get_object_or_404(Company, pk=pk)
 
-    if not company.custom_domain:
+    # Prefer the domain currently typed in the form (normalized), fall back to saved.
+    raw = ''
+    if request.content_type and request.content_type.startswith('application/json'):
+        try:
+            raw = (json.loads(request.body.decode() or '{}').get('domain') or '')
+        except json.JSONDecodeError:
+            raw = ''
+    else:
+        raw = request.POST.get('domain', '')
+
+    domain = _normalize_domain(raw) or company.custom_domain
+
+    if not domain:
         return JsonResponse({
             'success': False,
             'verified': False,
             'message': 'No custom domain set for this company.',
         }, status=400)
 
-    try:
-        resolved_ip = socket.gethostbyname(company.custom_domain)
-    except socket.gaierror:
+    # Try both apex and www. — DNS may only have one configured
+    resolved_ip = None
+    tried = []
+    for candidate in dict.fromkeys([domain, f'www.{domain}']):
+        tried.append(candidate)
+        try:
+            resolved_ip = socket.gethostbyname(candidate)
+            domain = candidate  # remember which one worked
+            break
+        except socket.gaierror:
+            continue
+
+    if not resolved_ip:
         company.domain_verified = False
         company.save(update_fields=['domain_verified'])
         return JsonResponse({
             'success': False,
             'verified': False,
-            'message': f'{company.custom_domain} does not resolve. Check the DNS records.',
+            'message': (
+                f'{" / ".join(tried)} does not resolve. '
+                f'Check the DNS A/AAAA records.'
+            ),
         })
 
+    company.custom_domain = domain
     company.domain_verified = True
-    company.save(update_fields=['domain_verified'])
+    company.save(update_fields=['custom_domain', 'domain_verified'])
 
     return JsonResponse({
         'success': True,
         'verified': True,
         'resolved_ip': resolved_ip,
-        'message': f'{company.custom_domain} resolves to {resolved_ip}. Marked as verified.',
+        'domain': domain,
+        'message': f'{domain} resolves to {resolved_ip}. Marked as verified.',
     })
-
 
 # ============================================
 # COMPANY DELETE

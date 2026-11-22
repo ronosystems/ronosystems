@@ -305,4 +305,4 @@ def epa_dashboard(request):
         'page_subtitle': f'Welcome back, {user.get_full_name() or user.username}!',
     }
 
-    return render(request, 'epa/dashboard.html', context)
+    return render(request, 'epa_shop/dashboard.html', context)

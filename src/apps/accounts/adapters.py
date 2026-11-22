@@ -5,6 +5,11 @@ from django.utils.text import slugify
 from django.contrib.auth import get_user_model
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from allauth.account.adapter import DefaultAccountAdapter
+from django.contrib import messages
+from django.shortcuts import redirect
+from django.urls import reverse
+from django.utils.safestring import mark_safe
+from apps.customers.models import Customer
 
 logger = logging.getLogger(__name__)
 
@@ -120,18 +125,43 @@ class RonoSocialAccountAdapter(DefaultSocialAccountAdapter):
         logger.error('=' * 70)
 
 
+
 class RonoAccountAdapter(DefaultAccountAdapter):
-    """
-    Send users to the correct dashboard based on their role.
-    """
+    
+    def pre_login(self, request, user, **kwargs):
+        response = super().pre_login(request, user, **kwargs)
+        current_company = getattr(request, 'company', None) or getattr(request, 'current_company', None)
+        
+        if current_company:
+            # Check if this user is a Customer for THIS domain
+            is_customer_here = Customer.objects.filter(user=user, company=current_company).exists()
+
+            if not is_customer_here:
+                # 1. Block Staff from entering a different company's domain
+                if user.company and user.company != current_company and not user.is_superuser:
+                    if user.role == 'customer':
+                        register_url = reverse('customers:register') + f"?company_id={current_company.id}"
+                        btn_html = f'<div class="mt-3"><a href="{register_url}" class="btn btn-success" style="border-radius: 50px; padding: 10px 24px; font-weight: 700;"><i class="fas fa-user-plus me-2"></i> Register as Customer</a></div>'
+                    else:
+                        register_url = reverse('web_accounts:join-company') + f"?company_id={current_company.id}"
+                        btn_html = f'<div class="mt-3"><a href="{register_url}" class="btn btn-primary" style="border-radius: 50px; padding: 10px 24px; font-weight: 700;"><i class="fas fa-user-plus me-2"></i> Join {current_company.name}</a></div>'
+
+                    error_msg = mark_safe(f"You do not have an account at {current_company.name}.<br>{btn_html}")
+                    messages.error(request, error_msg, extra_tags='modal-error')
+                    return redirect(reverse('account_login')) 
+                    
+                # 2. Block Customers who don't belong here
+                if user.role == 'customer':
+                    register_url = reverse('customers:register') + f"?company_id={current_company.id}"
+                    btn_html = f'<div class="mt-3"><a href="{register_url}" class="btn btn-success" style="border-radius: 50px; padding: 10px 24px; font-weight: 700;"><i class="fas fa-user-plus me-2"></i> Register as Customer</a></div>'
+                    error_msg = mark_safe(f"You do not have a customer account at {current_company.name}.<br>{btn_html}")
+                    messages.error(request, error_msg, extra_tags='modal-error')
+                    return redirect(reverse('account_login'))
+
+        return response
 
     def get_login_redirect_url(self, request):
-        # 1. Send Customers to the Customer Dashboard
-        if getattr(request.user, 'role', None) == 'customer':
-            return '/customers/dashboard/'  # or use reverse('customers:dashboard')
-
-        # 2. Everyone else (Super Admin, Staff) goes to the router
-        return '/dashboard/'
-
-    def get_signup_redirect_url(self, request):
-        return '/dashboard/'
+        user = request.user
+        if user.is_authenticated and user.role == 'customer':
+            return reverse('customers:dashboard')
+        return super().get_login_redirect_url(request)

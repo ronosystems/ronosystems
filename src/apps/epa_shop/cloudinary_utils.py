@@ -13,7 +13,7 @@ def _cloudinary_configure():
         secure=True,
     )
 
-def _upload_product_image_to_cloudinary(uploaded_file, folder='epa/products'):
+def _upload_product_image_to_cloudinary(uploaded_file, folder='epa_shop/products'):
     """
     Upload to Cloudinary and return the public_id, mirroring the
     accounts.profile_picture_upload pattern. Returns None on failure.

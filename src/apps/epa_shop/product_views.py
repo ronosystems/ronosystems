@@ -50,7 +50,7 @@ def _cloudinary_configure():
     )
 
 
-def _upload_product_image_to_cloudinary(uploaded_file, folder='epa/products'):
+def _upload_product_image_to_cloudinary(uploaded_file, folder='epa_shop/products'):
     """
     Upload to Cloudinary and return the public_id, mirroring the
     accounts.profile_picture_upload pattern. Returns None on failure.
@@ -373,7 +373,7 @@ def all_units_combined(request):
         'page_title': 'All Units',
         'page_subtitle': 'All IMEIs and Serial numbers combined',
     }
-    return render(request, 'epa/all_units.html', context)
+    return render(request, 'epa_shop/all_units.html', context)
 
 # ============================================
 # UNIT EDIT - Inline Edit
@@ -438,7 +438,7 @@ def unit_edit(request, unit_id):
             
             if not identifier:
                 messages.error(request, 'Identifier is required.')
-                return render(request, 'epa/unit_edit.html', {
+                return render(request, 'epa_shop/unit_edit.html', {
                     'unit': unit,
                     'product': product,
                     'product_type': product_type,
@@ -450,7 +450,7 @@ def unit_edit(request, unit_id):
             
             if Unit.objects.filter(identifier=identifier).exclude(id=unit_id).exists():
                 messages.error(request, f'Identifier "{identifier}" already exists.')
-                return render(request, 'epa/unit_edit.html', {
+                return render(request, 'epa_shop/unit_edit.html', {
                     'unit': unit,
                     'product': product,
                     'product_type': product_type,
@@ -506,7 +506,7 @@ def unit_edit(request, unit_id):
         'page_title': 'Edit Unit',
         'page_subtitle': 'Update unit details',
     }
-    return render(request, 'epa/unit_edit.html', context)
+    return render(request, 'epa_shop/unit_edit.html', context)
 
 
 # ============================================
@@ -571,7 +571,7 @@ def unit_transfer(request, unit_id):
             
             if not owner_id:
                 messages.error(request, 'Please select an owner.')
-                return render(request, 'epa/unit_transfer.html', {
+                return render(request, 'epa_shop/unit_transfer.html', {
                     'unit': unit,
                     'product': product,
                     'product_type': product_type,
@@ -586,7 +586,7 @@ def unit_transfer(request, unit_id):
                 owner = get_or_create_owner_from_user(user, company=company)
             except User.DoesNotExist:
                 messages.error(request, 'Selected employee not found.')
-                return render(request, 'epa/unit_transfer.html', {
+                return render(request, 'epa_shop/unit_transfer.html', {
                     'unit': unit,
                     'product': product,
                     'product_type': product_type,
@@ -616,7 +616,7 @@ def unit_transfer(request, unit_id):
         'page_title': 'Transfer Unit',
         'page_subtitle': 'Change ownership',
     }
-    return render(request, 'epa/unit_transfer.html', context)
+    return render(request, 'epa_shop/unit_transfer.html', context)
 
 
 # ============================================
@@ -729,7 +729,7 @@ def unit_reverse_sale(request, sale_id):
         'page_title': 'Reverse Sale',
         'page_subtitle': f'Confirm reversal of sale #{sale.company_sale_id}',
     }
-    return render(request, 'epa/sale_reverse.html', context)
+    return render(request, 'epa_shop/sale_reverse.html', context)
 
 # ============================================
 # SALE RECEIPT
@@ -767,7 +767,7 @@ def sale_receipt(request, sale_id):
         'page_title': f'Receipt #{sale.id}',
         'page_subtitle': 'Sale receipt',
     }
-    return render(request, 'epa/receipt.html', context)
+    return render(request, 'epa_shop/receipt.html', context)
 
 
 # ============================================
@@ -834,7 +834,7 @@ def all_phone_units(request):
         'page_title': 'Phone Units (IMEI)',
         'page_subtitle': 'All IMEI numbers across all phone products',
     }
-    return render(request, 'epa/all_units.html', context)
+    return render(request, 'epa_shop/all_units.html', context)
 
 
 # ============================================
@@ -901,7 +901,7 @@ def all_electronic_units(request):
         'page_title': 'Electronic Units (Serial)',
         'page_subtitle': 'All serial numbers across all electronic products',
     }
-    return render(request, 'epa/all_units.html', context)
+    return render(request, 'epa_shop/all_units.html', context)
 
 
 # ============================================
@@ -979,7 +979,7 @@ def unit_delete(request, product_code, identifier):
         'page_title': 'Delete Unit',
         'page_subtitle': f'Confirm deletion of {identifier}',
     }
-    return render(request, 'epa/unit_delete_confirm.html', context)
+    return render(request, 'epa_shop/unit_delete_confirm.html', context)
 
 
 # ============================================
@@ -1337,7 +1337,7 @@ def product_list(request):
         'page_title':         'Products',
         'page_subtitle':      'Manage your products',
     }
-    return render(request, 'epa/products.html', context)
+    return render(request, 'epa_shop/products.html', context)
 
     
 @login_required
@@ -1557,7 +1557,7 @@ def product_detail(request, product_code):
         'page_title': f'Product: {product.name}',
         'page_subtitle': f'Code: {product.product_code}',
     }
-    return render(request, 'epa/product_detail.html', context)
+    return render(request, 'epa_shop/product_detail.html', context)
 
 
 # ============================================
@@ -1634,13 +1634,13 @@ def product_create(request):
 
             # --- Upload to Cloudinary ---
             if category_type in ('smartphone', 'feature_phone'):
-                _folder_root = 'epa/phones'
+                _folder_root = 'epa_shop/phones'
             elif category_type == 'electronics':
-                _folder_root = 'epa/electronics'
+                _folder_root = 'epa_shop/electronics'
             elif category_type == 'accessory':
-                _folder_root = 'epa/accessories'
+                _folder_root = 'epa_shop/accessories'
             else:
-                _folder_root = 'epa/products'
+                _folder_root = 'epa_shop/products'
 
             image_public_id = _upload_product_image_to_cloudinary(
                 image,
@@ -1649,7 +1649,7 @@ def product_create(request):
 
             if image and not image_public_id:
                 messages.error(request, 'Image upload failed. Please try again or check Cloudinary credentials.')
-                return render(request, 'epa/product_form.html', {
+                return render(request, 'epa_shop/product_form.html', {
                     'branches': branches,
                     'form_data': request.POST,
                     'category_value': request.POST.get('category', ''),
@@ -1685,7 +1685,7 @@ def product_create(request):
             # ------------------------------------------------------------
             if not category_type:
                 messages.error(request, 'Please select a category.')
-                return render(request, 'epa/product_form.html', {
+                return render(request, 'epa_shop/product_form.html', {
                     'branches': branches, 'form_data': request.POST,
                     'category_value': category_type, 'units': units,
                     'units_json': '[]', 'is_edit': False,
@@ -1694,7 +1694,7 @@ def product_create(request):
 
             if not brand:
                 messages.error(request, 'Brand is required.')
-                return render(request, 'epa/product_form.html', {
+                return render(request, 'epa_shop/product_form.html', {
                     'branches': branches, 'form_data': request.POST,
                     'category_value': category_type, 'units': units,
                     'units_json': '[]', 'is_edit': False,
@@ -1703,7 +1703,7 @@ def product_create(request):
 
             if not model:
                 messages.error(request, 'Model is required.')
-                return render(request, 'epa/product_form.html', {
+                return render(request, 'epa_shop/product_form.html', {
                     'branches': branches, 'form_data': request.POST,
                     'category_value': category_type, 'units': units,
                     'units_json': '[]', 'is_edit': False,
@@ -1712,7 +1712,7 @@ def product_create(request):
 
             if not branch_id:
                 messages.error(request, 'Please select a branch in the Stock section to assign this inventory.')
-                return render(request, 'epa/product_form.html', {
+                return render(request, 'epa_shop/product_form.html', {
                     'branches': branches, 'form_data': request.POST,
                     'category_value': category_type, 'units': units,
                     'units_json': '[]', 'is_edit': False,
@@ -1723,7 +1723,7 @@ def product_create(request):
                 branch = Branch.objects.get(id=branch_id, company=company, is_active=True)
             except Branch.DoesNotExist:
                 messages.error(request, 'Selected branch is invalid or inactive.')
-                return render(request, 'epa/product_form.html', {
+                return render(request, 'epa_shop/product_form.html', {
                     'branches': branches, 'form_data': request.POST,
                     'category_value': category_type, 'units': units,
                     'units_json': '[]', 'is_edit': False,
@@ -1732,7 +1732,7 @@ def product_create(request):
 
             if purchase_price <= 0:
                 messages.error(request, 'Buying price must be greater than 0.')
-                return render(request, 'epa/product_form.html', {
+                return render(request, 'epa_shop/product_form.html', {
                     'branches': branches, 'form_data': request.POST,
                     'category_value': category_type, 'units': units,
                     'units_json': '[]', 'is_edit': False,
@@ -1741,7 +1741,7 @@ def product_create(request):
 
             if selling_price <= 0:
                 messages.error(request, 'Selling price must be greater than 0.')
-                return render(request, 'epa/product_form.html', {
+                return render(request, 'epa_shop/product_form.html', {
                     'branches': branches, 'form_data': request.POST,
                     'category_value': category_type, 'units': units,
                     'units_json': '[]', 'is_edit': False,
@@ -1752,29 +1752,29 @@ def product_create(request):
             if category_type == 'smartphone':
                 if not ram:
                     messages.error(request, 'RAM is required for smartphones.')
-                    return render(request, 'epa/product_form.html', {'branches': branches, 'form_data': request.POST, 'category_value': category_type, 'units': units, 'units_json': '[]', 'is_edit': False, 'page_title': 'Add Product', 'page_subtitle': 'Create a new product'})
+                    return render(request, 'epa_shop/product_form.html', {'branches': branches, 'form_data': request.POST, 'category_value': category_type, 'units': units, 'units_json': '[]', 'is_edit': False, 'page_title': 'Add Product', 'page_subtitle': 'Create a new product'})
                 if not rom:
                     messages.error(request, 'Storage (ROM) is required for smartphones.')
-                    return render(request, 'epa/product_form.html', {'branches': branches, 'form_data': request.POST, 'category_value': category_type, 'units': units, 'units_json': '[]', 'is_edit': False, 'page_title': 'Add Product', 'page_subtitle': 'Create a new product'})
+                    return render(request, 'epa_shop/product_form.html', {'branches': branches, 'form_data': request.POST, 'category_value': category_type, 'units': units, 'units_json': '[]', 'is_edit': False, 'page_title': 'Add Product', 'page_subtitle': 'Create a new product'})
 
             elif category_type == 'electronics':
                 if not ram:
                     messages.error(request, 'RAM is required for electronics.')
-                    return render(request, 'epa/product_form.html', {'branches': branches, 'form_data': request.POST, 'category_value': category_type, 'units': units, 'units_json': '[]', 'is_edit': False, 'page_title': 'Add Product', 'page_subtitle': 'Create a new product'})
+                    return render(request, 'epa_shop/product_form.html', {'branches': branches, 'form_data': request.POST, 'category_value': category_type, 'units': units, 'units_json': '[]', 'is_edit': False, 'page_title': 'Add Product', 'page_subtitle': 'Create a new product'})
                 if not storage:
                     messages.error(request, 'Storage is required for electronics.')
-                    return render(request, 'epa/product_form.html', {'branches': branches, 'form_data': request.POST, 'category_value': category_type, 'units': units, 'units_json': '[]', 'is_edit': False, 'page_title': 'Add Product', 'page_subtitle': 'Create a new product'})
+                    return render(request, 'epa_shop/product_form.html', {'branches': branches, 'form_data': request.POST, 'category_value': category_type, 'units': units, 'units_json': '[]', 'is_edit': False, 'page_title': 'Add Product', 'page_subtitle': 'Create a new product'})
                 if not processor:
                     messages.error(request, 'Processor is required for electronics.')
-                    return render(request, 'epa/product_form.html', {'branches': branches, 'form_data': request.POST, 'category_value': category_type, 'units': units, 'units_json': '[]', 'is_edit': False, 'page_title': 'Add Product', 'page_subtitle': 'Create a new product'})
+                    return render(request, 'epa_shop/product_form.html', {'branches': branches, 'form_data': request.POST, 'category_value': category_type, 'units': units, 'units_json': '[]', 'is_edit': False, 'page_title': 'Add Product', 'page_subtitle': 'Create a new product'})
 
             elif category_type == 'accessory':
                 if not accessory_type or accessory_type == '':
                     messages.error(request, 'Accessory type is required.')
-                    return render(request, 'epa/product_form.html', {'branches': branches, 'form_data': request.POST, 'category_value': category_type, 'units': units, 'units_json': '[]', 'is_edit': False, 'page_title': 'Add Product', 'page_subtitle': 'Create a new product'})
+                    return render(request, 'epa_shop/product_form.html', {'branches': branches, 'form_data': request.POST, 'category_value': category_type, 'units': units, 'units_json': '[]', 'is_edit': False, 'page_title': 'Add Product', 'page_subtitle': 'Create a new product'})
                 if quantity <= 0:
                     messages.error(request, 'Quantity must be greater than 0 for accessories.')
-                    return render(request, 'epa/product_form.html', {'branches': branches, 'form_data': request.POST, 'category_value': category_type, 'units': units, 'units_json': '[]', 'is_edit': False, 'page_title': 'Add Product', 'page_subtitle': 'Create a new product'})
+                    return render(request, 'epa_shop/product_form.html', {'branches': branches, 'form_data': request.POST, 'category_value': category_type, 'units': units, 'units_json': '[]', 'is_edit': False, 'page_title': 'Add Product', 'page_subtitle': 'Create a new product'})
 
             units_data = request.POST.get('units', '[]')
             try:
@@ -1979,7 +1979,7 @@ def product_create(request):
 
             else:
                 messages.error(request, f'Unknown category: {category_type}')
-                return render(request, 'epa/product_form.html', {
+                return render(request, 'epa_shop/product_form.html', {
                     'branches': branches, 'form_data': request.POST,
                     'category_value': category_type, 'units': units,
                     'units_json': '[]', 'is_edit': False,
@@ -2000,7 +2000,7 @@ def product_create(request):
                 units = []
             units_json = json.dumps(units)
 
-            return render(request, 'epa/product_form.html', {
+            return render(request, 'epa_shop/product_form.html', {
                 'branches': branches, 'form_data': request.POST,
                 'category_value': request.POST.get('category', ''), 'units': units,
                 'units_json': units_json, 'is_edit': False,
@@ -2017,7 +2017,7 @@ def product_create(request):
         'page_title': 'Add Product',
         'page_subtitle': 'Create a new product',
     }
-    return render(request, 'epa/product_form.html', context)
+    return render(request, 'epa_shop/product_form.html', context)
 
     
 # ============================================
@@ -2313,7 +2313,7 @@ def product_edit(request, product_code):
             'phone_type': getattr(product, 'phone_type', 'smartphone'),
         }
     }
-    return render(request, 'epa/product_form.html', context)
+    return render(request, 'epa_shop/product_form.html', context)
 
     
 # ============================================
@@ -2371,7 +2371,7 @@ def product_delete(request, product_code):
         'page_title': f'Delete {product.name}',
         'page_subtitle': f'Code: {product.product_code}',
     }
-    return render(request, 'epa/product_delete_confirm.html', context)
+    return render(request, 'epa_shop/product_delete_confirm.html', context)
 
 
 # ============================================
@@ -2398,10 +2398,10 @@ def product_image_add(request, product_code):
         return JsonResponse({'success': False, 'error': 'No image file provided.'}, status=400)
 
     folder_root = {
-        'Phone': 'epa/phones',
-        'Electronic': 'epa/electronics',
-        'Accessory': 'epa/accessories',
-    }.get(product_type, 'epa/products')
+        'Phone': 'epa_shop/phones',
+        'Electronic': 'epa_shop/electronics',
+        'Accessory': 'epa_shop/accessories',
+    }.get(product_type, 'epa_shop/products')
 
     public_id = _upload_product_image_to_cloudinary(
         image_file,
@@ -2703,7 +2703,7 @@ def product_transfer(request, product_code):
         'page_title': f'Transfer Stock - {product.name}',
         'page_subtitle': f'Code: {product.product_code}',
     }
-    return render(request, 'epa/product_transfer.html', context)
+    return render(request, 'epa_shop/product_transfer.html', context)
 
     
 # ============================================
@@ -2883,7 +2883,7 @@ def stock_restock_scanner(request):
         'page_title': 'Stock Restock',
         'page_subtitle': 'Scan a barcode or search for a product to restock',
     }
-    return render(request, 'epa/stock_restock_scanner.html', context)
+    return render(request, 'epa_shop/stock_restock_scanner.html', context)
 
 
 # ============================================
@@ -3048,7 +3048,7 @@ def product_restock(request, product_code):
 
                 if not new_units:
                     messages.error(request, 'Please add at least one IMEI/Serial number.')
-                    return render(request, 'epa/product_restock.html', {
+                    return render(request, 'epa_shop/product_restock.html', {
                         'product': product, 'product_type': product_type,
                         'existing_units': existing_units, 'form_units': form_units,
                         'form_units_json': form_units_json,
@@ -3088,7 +3088,7 @@ def product_restock(request, product_code):
                         error_msg += 'All identifiers were invalid.'
 
                     messages.error(request, error_msg)
-                    return render(request, 'epa/product_restock.html', {
+                    return render(request, 'epa_shop/product_restock.html', {
                         'product': product, 'product_type': product_type,
                         'existing_units': existing_units, 'form_units': form_units,
                         'form_units_json': form_units_json,
@@ -3135,7 +3135,7 @@ def product_restock(request, product_code):
 
                 if quantity <= 0:
                     messages.error(request, 'Quantity must be greater than 0.')
-                    return render(request, 'epa/product_restock.html', {
+                    return render(request, 'epa_shop/product_restock.html', {
                         'product': product, 'product_type': product_type,
                         'existing_units': existing_units,
                         'submitted_quantity': submitted_quantity,
@@ -3178,7 +3178,7 @@ def product_restock(request, product_code):
             messages.error(request, f'Error restocking product: {str(e)}')
             import traceback
             traceback.print_exc()
-            return render(request, 'epa/product_restock.html', {
+            return render(request, 'epa_shop/product_restock.html', {
                 'product': product, 'product_type': product_type,
                 'existing_units': existing_units, 'form_units': form_units,
                 'form_units_json': form_units_json,
@@ -3198,7 +3198,7 @@ def product_restock(request, product_code):
         'page_subtitle': f'Code: {product.product_code}',
         'unit_label': 'IMEI' if product_type == 'Phone' else 'Serial',
     }
-    return render(request, 'epa/product_restock.html', context)
+    return render(request, 'epa_shop/product_restock.html', context)
     
 
 
@@ -3318,7 +3318,7 @@ def product_units(request, product_code):
         'page_title': f'Units - {product.name}',
         'page_subtitle': f'Code: {product.product_code}',
     }
-    return render(request, 'epa/product_units.html', context)
+    return render(request, 'epa_shop/product_units.html', context)
 
 # ============================================
 # ACCESSORY LIST
@@ -3382,7 +3382,7 @@ def accessory_list(request):
         'page_title': 'Accessories',
         'page_subtitle': 'Manage your accessories',
     }
-    return render(request, 'epa/accessory_list.html', context)
+    return render(request, 'epa_shop/accessory_list.html', context)
 
 
 
@@ -3729,4 +3729,4 @@ def labels_print_page(request):
         'page_title': 'Print Labels',
         'page_subtitle': 'Select products and print barcode labels',
     }
-    return render(request, 'epa/labels_print.html', context)
+    return render(request, 'epa_shop/labels_print.html', context)

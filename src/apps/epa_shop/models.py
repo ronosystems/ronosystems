@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.conf import settings
 from django.conf import settings as django_settings
 from apps.companies.models import Company
+from apps.customers.models import Customer
 from decimal import Decimal
 
 
@@ -288,7 +289,7 @@ class ProductImage(models.Model):
     product = GenericForeignKey('content_type', 'object_id')
 
     image = models.ImageField(
-        upload_to='epa/products/%Y/%m/',
+        upload_to='epa_shop/products/%Y/%m/',
         max_length=500,
         help_text="Additional gallery image for this product.",
     )
@@ -502,7 +503,7 @@ class Phone(BaseProduct):
 
     total_quantity_in_stock = models.IntegerField(default=0)
 
-    image = models.ImageField(upload_to='epa/phones/%Y/%m/', blank=True, null=True, max_length=500)
+    image = models.ImageField(upload_to='epa_shop/phones/%Y/%m/', blank=True, null=True, max_length=500)
     warranty_period_months = models.IntegerField(default=12)
     warranty_expiry = models.DateField(null=True, blank=True)
     owner = models.ForeignKey(Owner, on_delete=models.SET_NULL, null=True, blank=True, related_name='phones')
@@ -567,7 +568,7 @@ class Electronic(BaseProduct):
 
     total_quantity_in_stock = models.IntegerField(default=0)
 
-    image = models.ImageField(upload_to='epa/electronics/%Y/%m/', blank=True, null=True, max_length=500)
+    image = models.ImageField(upload_to='epa_shop/electronics/%Y/%m/', blank=True, null=True, max_length=500)
     warranty_period_months = models.IntegerField(default=12)
     warranty_expiry = models.DateField(null=True, blank=True)
     owner = models.ForeignKey(Owner, on_delete=models.SET_NULL, null=True, blank=True, related_name='electronics')
@@ -620,7 +621,7 @@ class Accessory(BaseProduct):
 
     total_quantity_in_stock = models.IntegerField(default=0)
 
-    image = models.ImageField(upload_to='epa/accessories/%Y/%m/', blank=True, null=True, max_length=500)
+    image = models.ImageField(upload_to='epa_shop/accessories/%Y/%m/', blank=True, null=True, max_length=500)
     warranty_period_months = models.IntegerField(default=6)
     owner = models.ForeignKey(Owner, on_delete=models.SET_NULL, null=True, blank=True, related_name='accessories')
     is_active = models.BooleanField(default=True)
@@ -815,6 +816,16 @@ class Sale(models.Model):
     company_sale_id = models.CharField(max_length=50, unique=True, blank=True, editable=False)
     barcode_number = models.CharField(max_length=50, unique=True, null=True, blank=True, db_index=True, editable=False)
 
+    customer = models.ForeignKey(
+        Customer, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='epa_sales' # Changed related_name so it doesn't conflict
+    )
+    
+    customer_name = models.CharField(max_length=200)
+    customer_phone = models.CharField(max_length=20)
     customer_name = models.CharField(max_length=200)
     customer_phone = models.CharField(max_length=20)
     customer_email = models.EmailField(blank=True)
@@ -1035,7 +1046,7 @@ class Warranty(models.Model):
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='warranties')
     branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='warranties')
     sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name='warranties', null=True, blank=True)
-    customer = models.ForeignKey('Customer', on_delete=models.CASCADE, related_name='warranties')
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='warranties')
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
@@ -1066,7 +1077,7 @@ class Repair(models.Model):
     STATUS_CHOICES = (('pending', 'Pending'), ('in_progress', 'In Progress'), ('completed', 'Completed'), ('cancelled', 'Cancelled'), ('waiting_parts', 'Waiting for Parts'))
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='repairs')
     branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='repairs')
-    customer = models.ForeignKey('Customer', on_delete=models.CASCADE, related_name='repairs')
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='repairs')
     warranty = models.ForeignKey(Warranty, on_delete=models.SET_NULL, null=True, blank=True, related_name='repairs')
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
@@ -1095,34 +1106,6 @@ class Repair(models.Model):
     class Meta:
         db_table = 'epa_repairs'
         ordering = ['-received_date']
-
-
-# ============================================
-# CUSTOMER
-# ============================================
-
-class Customer(models.Model):
-    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='epa_customers')
-    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='customers', null=True, blank=True)
-    name = models.CharField(max_length=200)
-    phone = models.CharField(max_length=20, db_index=True)
-    alternative_phone = models.CharField(max_length=20, blank=True)
-    city = models.CharField(max_length=100, blank=True)
-    email = models.EmailField(blank=True)
-    address = models.TextField(blank=True)
-    id_number = models.CharField(max_length=50, blank=True, db_index=True)
-    next_of_keen_name = models.CharField(max_length=200, blank=True)
-    next_of_keen_phone = models.CharField(max_length=20, blank=True)
-    total_purchases = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    visit_count = models.IntegerField(default=0)
-    last_visit = models.DateTimeField(null=True, blank=True)
-    loyalty_points = models.IntegerField(default=0)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = 'epa_customers'
 
 
 # ============================================

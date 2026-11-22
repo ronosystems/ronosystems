@@ -80,7 +80,7 @@ def pos_dashboard(request):
         'tax_rate': tax_rate,
         'auto_print': receipt_settings.get('auto_print', False),
     }
-    return render(request, 'epa/pos.html', context)
+    return render(request, 'epa_shop/pos.html', context)
 
 
 @login_required

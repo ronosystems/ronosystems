@@ -2,22 +2,24 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db import transaction
 from django.contrib.auth import logout, get_user_model, update_session_auth_hash
-from django.contrib.auth.views import LoginView
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
-from django.urls import reverse_lazy
+from django.contrib.auth.hashers import make_password
 from django.conf import settings
+from django.db.models import Q
+from django.utils.safestring import mark_safe
 from decimal import Decimal
 from apps.companies.models import Company
 from apps.chama.models import Loan, LoanType, Guest 
 from .models import Customer
+from datetime import date
+
+from django.utils import timezone
 import time
 import cloudinary
 import cloudinary.uploader
 
-# Initialize User model
 User = get_user_model()
-
 
 def _cloudinary_configure():
     cfg = getattr(settings, 'CLOUDINARY_STORAGE', {})
@@ -28,20 +30,21 @@ def _cloudinary_configure():
         secure=True,
     )
 
-
 def coming_soon(request, page_name):
-    """A generic placeholder page for features that are not yet built."""
     title = page_name.replace('_', ' ').title()
     return render(request, 'customers/coming_soon.html', {'page_title': title})
 
 
 def customer_register(request):
-    company_id = request.GET.get('company_id')
-    if not company_id:
-        messages.error(request, "Invalid company registration link.")
-        return redirect('home')
-        
-    company = get_object_or_404(Company, id=company_id, is_active=True)
+    company = getattr(request, 'company', None) or getattr(request, 'current_company', None)
+    
+    if not company:
+        company_id = request.GET.get('company_id')
+        if company_id:
+            company = get_object_or_404(Company, id=company_id, is_active=True)
+        else:
+            messages.error(request, "Invalid registration link. No company identified.")
+            return redirect('home')
 
     referer = request.META.get('HTTP_REFERER', '')
     join_action = "join the Chama" if '/chama/' in referer else "start shopping"
@@ -54,49 +57,59 @@ def customer_register(request):
         confirm_pin = request.POST.get('confirm_pin', '').strip()
 
         if not full_name or not phone_number or not pin:
-            messages.error(request, "Name, Phone Number, and PIN are required.")
+            messages.error(request, "Name, Phone Number, and PIN are required.", extra_tags='modal-error')
         elif len(pin) < 4 or len(pin) > 10:
-            messages.error(request, "PIN must be between 4 and 10 digits.")
+            messages.error(request, "PIN must be between 4 and 10 digits.", extra_tags='modal-error')
         elif pin != confirm_pin:
-            messages.error(request, "PINs do not match.")
+            messages.error(request, "PINs do not match.", extra_tags='modal-error')
         else:
             try:
                 with transaction.atomic():
-                    user, user_created = User.objects.get_or_create(
-                        username=phone_number,
+                    # 1. Check if this Customer already exists FOR THIS SPECIFIC COMPANY
+                    existing_customer = Customer.objects.filter(company=company, phone_number=phone_number).first()
+                    if existing_customer:
+                        messages.warning(request, f"You are already registered with {company.display_name}. Please log in.", extra_tags='modal-error')
+                        return redirect('account_login')
+
+                    # 2. Find or Create the Global User
+                    # Prefix username with company ID to ensure global uniqueness
+                    global_username = f"{company.id}_{phone_number}"
+                    user, created = User.objects.get_or_create(
+                        username=global_username,
                         defaults={
                             'email': email,
                             'first_name': full_name.split()[0] if full_name else '',
                             'role': 'customer',
+                            'phone': phone_number,
+                            'company': company,
+                            'is_active': True,
                         }
                     )
 
-                    if user_created:
-                        user.set_password(pin)
+                    if created:
+                        user.set_password(pin) 
                         user.save()
 
-                    customer, created = Customer.objects.get_or_create(
+                    # 3. Attach Customer Profile to THIS COMPANY (with the Tenant-Specific PIN)
+                    Customer.objects.create(
                         company=company,
                         phone_number=phone_number,
-                        defaults={
-                            'full_name': full_name,
-                            'email': email,
-                            'user': user
-                        }
+                        full_name=full_name,
+                        email=email,
+                        user=user,
+                        pin=make_password(pin) # 👈 Saves the PIN specific to this domain
                     )
                     
-                    if not created:
-                        messages.warning(request, f"You are already registered with {company.display_name}.")
-                    else:
-                        messages.success(
-                            request, 
-                            f"Welcome {full_name}! You can now log in using your Phone Number ({phone_number}) and your PIN."
-                        )
-                    
-                    return redirect('customers:login')
+                    # Success Modal Logic
+                    success_msg = mark_safe(
+                        f"Welcome {full_name}!<br>Your account at <strong>{company.display_name}</strong> is ready.<br>"
+                        f"Please log in using your Phone Number ({phone_number})."
+                    )
+                    messages.success(request, success_msg, extra_tags='modal-success')
+                    return redirect('account_login')
                     
             except Exception as e:
-                messages.error(request, f"Registration failed: {str(e)}")
+                messages.error(request, f"Registration failed: {str(e)}", extra_tags='modal-error')
 
     return render(request, 'customers/customer_register.html', {
         'company': company,
@@ -110,26 +123,19 @@ def registration_success(request, public_id):
     return render(request, 'customers/registration_success.html', {'customer': customer})
 
 
-class CustomerLoginView(LoginView):
-    template_name = 'customers/customer_login.html'
-    redirect_authenticated_user = True
-    
-    def get_success_url(self):
-        return reverse_lazy('customers:dashboard') 
-
-
 def customer_logout(request):
     logout(request)
     messages.success(request, "You have been logged out successfully.")
-    return redirect('customers:login')
+    return redirect('account_login')
 
 
-@login_required(login_url='customers:login')
+@login_required(login_url='account_login')
 def customer_profile(request):
-    try:
-        customer = request.user.customer_profile
-    except AttributeError:
-        messages.error(request, "You do not have a customer profile set up.")
+    current_company = getattr(request, 'company', None) or getattr(request, 'current_company', None)
+    customer = request.user.customer_profiles.filter(company=current_company).first()
+    
+    if not customer:
+        messages.error(request, "You do not have a customer profile set up for this store.")
         return redirect('home')
 
     if request.method == 'POST':
@@ -174,12 +180,13 @@ def customer_profile(request):
     return render(request, 'customers/profile.html', {'customer': customer})
 
 
-@login_required(login_url='customers:login')
+@login_required(login_url='account_login')
 def customer_dashboard(request):
-    try:
-        customer = request.user.customer_profile
-    except AttributeError:
-        messages.error(request, "You do not have a customer profile set up.")
+    current_company = getattr(request, 'company', None) or getattr(request, 'current_company', None)
+    customer = request.user.customer_profiles.filter(company=current_company).first()
+    
+    if not customer:
+        messages.error(request, "You do not have a customer profile set up for this store.")
         return redirect('home')
 
     if request.method == 'POST' and 'update_photo' in request.POST:
@@ -225,13 +232,14 @@ def customer_dashboard(request):
     })
 
 
-@login_required(login_url='customers:login')
+@login_required(login_url='account_login')
 def customer_settings(request):
-    try:
-        customer = request.user.customer_profile
-    except AttributeError:
-        messages.error(request, "You do not have a customer profile set up.")
-        return redirect('customers:login')
+    current_company = getattr(request, 'company', None) or getattr(request, 'current_company', None)
+    customer = request.user.customer_profiles.filter(company=current_company).first()
+    
+    if not customer:
+        messages.error(request, "You do not have a customer profile set up for this store.")
+        return redirect('account_login')
 
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -277,13 +285,15 @@ def customer_settings(request):
         'password_form': password_form,
     })
 
-@login_required(login_url='customers:login')
+
+@login_required(login_url='account_login')
 def customer_loan_create(request):
     """Customer Self-Service Loan Application"""
-    try:
-        customer = request.user.customer_profile
-    except AttributeError:
-        messages.error(request, "You do not have a customer profile set up.")
+    current_company = getattr(request, 'company', None) or getattr(request, 'current_company', None)
+    customer = request.user.customer_profiles.filter(company=current_company).first()
+    
+    if not customer:
+        messages.error(request, "You do not have a customer profile set up for this store.")
         return redirect('home')
 
     if customer.custom_loan_limit <= 0:

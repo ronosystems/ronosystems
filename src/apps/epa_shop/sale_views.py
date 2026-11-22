@@ -476,7 +476,7 @@ def sale_create_single(request):
         'page_title': 'Create Single Sale',
         'page_subtitle': 'Sell an item by scanning IMEI/Serial',
     }
-    return render(request, 'epa/sale_create_single.html', context)
+    return render(request, 'epa_shop/sale_create_single.html', context)
 
 
 # ============================================
@@ -920,7 +920,7 @@ def sale_receipt(request, pk):
         'is_embed': request.GET.get('embed') == '1',
         'is_receipt': True,
     }
-    return render(request, 'epa/sale_receipt.html', context)
+    return render(request, 'epa_shop/sale_receipt.html', context)
 
 
 # ============================================
@@ -966,7 +966,7 @@ def sale_receipt_by_id(request, company_sale_id):
         'is_embed': request.GET.get('embed') == '1',
         'is_receipt': True,
     }
-    return render(request, 'epa/sale_receipt.html', context)
+    return render(request, 'epa_shop/sale_receipt.html', context)
 
 
 # ============================================
@@ -1020,7 +1020,7 @@ def sale_history(request):
         'page_title': 'Sales History',
         'page_subtitle': 'All completed sales',
     }
-    return render(request, 'epa/sale_history.html', context)
+    return render(request, 'epa_shop/sale_history.html', context)
 
 
 # ============================================
@@ -1166,7 +1166,7 @@ def sale_list(request):
         'page_title': 'Sales',
         'page_subtitle': 'Sales history',
     }
-    return render(request, 'epa/sales.html', context)
+    return render(request, 'epa_shop/sales.html', context)
 
 
 @login_required
@@ -1367,7 +1367,7 @@ def sale_detail(request, pk):
         'page_title': f'Sale #{sale.id}',
         'page_subtitle': 'Sale details',
     }
-    return render(request, 'epa/sale_detail.html', context)
+    return render(request, 'epa_shop/sale_detail.html', context)
 
 
 # ============================================
@@ -1573,7 +1573,7 @@ def sale_create(request):
 
             if not branch_id:
                 messages.error(request, 'Please select a branch.')
-                return render(request, 'epa/sale_form.html', {
+                return render(request, 'epa_shop/sale_form.html', {
                     'product': product,
                     'product_type': product_type,
                     'unit': unit,
@@ -1585,7 +1585,7 @@ def sale_create(request):
 
             if selling_price <= 0:
                 messages.error(request, 'Please enter a valid selling price.')
-                return render(request, 'epa/sale_form.html', {
+                return render(request, 'epa_shop/sale_form.html', {
                     'product': product,
                     'product_type': product_type,
                     'unit': unit,
@@ -1603,7 +1603,7 @@ def sale_create(request):
                 unit_to_sell = unit
             else:
                 messages.error(request, 'No unit selected for sale.')
-                return render(request, 'epa/sale_form.html', {
+                return render(request, 'epa_shop/sale_form.html', {
                     'product': product,
                     'product_type': product_type,
                     'unit': unit,
@@ -1709,7 +1709,7 @@ def sale_create(request):
         'page_subtitle': 'Sell a unit',
         'default_price': product.selling_price if product else 0,
     }
-    return render(request, 'epa/sale_form.html', context)
+    return render(request, 'epa_shop/sale_form.html', context)
 
 
 # ============================================
@@ -1761,7 +1761,7 @@ def sale_edit(request, pk):
 
             if not branch_id:
                 messages.error(request, 'Please select a branch.')
-                return render(request, 'epa/sale_form.html', {
+                return render(request, 'epa_shop/sale_form.html', {
                     'sale': sale,
                     'sale_items': sale_items,
                     'branches': branches,
@@ -1773,7 +1773,7 @@ def sale_edit(request, pk):
                 selling_price = float(selling_price)
                 if selling_price <= 0:
                     messages.error(request, 'Please enter a valid selling price.')
-                    return render(request, 'epa/sale_form.html', {
+                    return render(request, 'epa_shop/sale_form.html', {
                         'sale': sale,
                         'sale_items': sale_items,
                         'branches': branches,
@@ -1782,7 +1782,7 @@ def sale_edit(request, pk):
                     })
             except ValueError:
                 messages.error(request, 'Invalid selling price.')
-                return render(request, 'epa/sale_form.html', {
+                return render(request, 'epa_shop/sale_form.html', {
                     'sale': sale,
                     'sale_items': sale_items,
                     'branches': branches,
@@ -1792,7 +1792,7 @@ def sale_edit(request, pk):
 
             if not customer_name:
                 messages.error(request, 'Customer name is required.')
-                return render(request, 'epa/sale_form.html', {
+                return render(request, 'epa_shop/sale_form.html', {
                     'sale': sale,
                     'sale_items': sale_items,
                     'branches': branches,
@@ -1842,7 +1842,7 @@ def sale_edit(request, pk):
         'page_title': f'Edit Sale #{sale.company_sale_id}',
         'page_subtitle': 'Update sale details',
     }
-    return render(request, 'epa/sale_form.html', context)
+    return render(request, 'epa_shop/sale_form.html', context)
 
 
 # ============================================
@@ -1918,7 +1918,7 @@ def sale_complete(request, sale_id=None, company_sale_id=None):
     # Verification page helper
     # --------------------------------------------------
     def verification_page():
-        return render(request, 'epa/sale_verify.html', {
+        return render(request, 'epa_shop/sale_verify.html', {
             'sale': sale,
             'page_title': 'Verify Sale',
             'page_subtitle': f'Verify and complete sale #{sale.company_sale_id}',
@@ -2193,7 +2193,7 @@ def sale_pending_list(request):
         'page_title': 'Pending Sales',
         'page_subtitle': 'Sales awaiting completion verification',
     }
-    return render(request, 'epa/sales_pending.html', context)
+    return render(request, 'epa_shop/sales_pending.html', context)
 
 # ============================================
 # SALE DELETE - Pending Sale (admin only)
@@ -2404,7 +2404,7 @@ def sale_delete(request, pk):
         'page_title': 'Delete Sale',
         'page_subtitle': f'Confirm deletion of sale #{sale.company_sale_id}',
     }
-    return render(request, 'epa/sale_delete_confirm.html', context)
+    return render(request, 'epa_shop/sale_delete_confirm.html', context)
 
 
 @login_required
