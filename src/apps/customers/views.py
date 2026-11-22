@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.urls import reverse_lazy
 from django.conf import settings
-from decimal import Decimal  # 👈 IMPORTED HERE
+from decimal import Decimal
 from apps.companies.models import Company
 from apps.chama.models import Loan, LoanType, Guest 
 from .models import Customer
@@ -290,7 +290,7 @@ def customer_loan_create(request):
         messages.warning(request, "You need an approved loan limit before you can apply for a loan.")
         return redirect('customers:dashboard')
 
-    # ✅ NEW: Block new applications while one is pending
+    # ✅ Block new applications while one is pending
     pending_loan = Loan.objects.filter(
         company=customer.company,
         guest__national_id=customer.national_id or customer.phone_number,
@@ -358,6 +358,12 @@ def customer_loan_create(request):
             messages.error(request, f"An error occurred: {e}")
 
     loan_types = LoanType.objects.filter(company=customer.company, is_active=True)
+    
+    # ✅ FETCH LATEST LOAN FOR THE STATUS BANNER
+    latest_loan = Loan.objects.filter(
+        company=customer.company,
+        guest__national_id=customer.national_id or customer.phone_number,
+    ).order_by('-requested_on', '-created_at').first()
 
     return render(request, 'customers/loan_create.html', {
         'customer': customer,

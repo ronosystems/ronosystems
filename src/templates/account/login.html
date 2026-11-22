@@ -54,24 +54,24 @@
                 <form method="post" action="{% url 'account_login' %}" id="loginForm" novalidate>
                     {% csrf_token %}
 
-                    <!-- Username / Email (allauth uses name="login") -->
+                    <!-- 👇 CHANGED: Now accepts Phone OR Email -->
                     <div class="login-field">
                         <input type="text"
                                name="login"
                                id="id_login"
-                               placeholder="Email"
+                               placeholder="Phone Number or Email"
                                required
                                autofocus
                                autocomplete="username">
                         <i class="fas fa-user field-icon"></i>
                     </div>
 
-                    <!-- Password -->
+                    <!-- Password / PIN -->
                     <div class="login-field">
                         <input type="password"
                                name="password"
                                id="id_password"
-                               placeholder="Password"
+                               placeholder="Password or PIN"
                                required
                                autocomplete="current-password">
                         <button class="password-toggle" type="button" id="togglePassword" tabindex="-1">
@@ -527,21 +527,22 @@
                 return false;
             }
 
-            const emailInput = form.querySelector('input[name="login"]');
+            // 👇 CHANGED: Now checks "login" which can be email OR phone
+            const loginInput = form.querySelector('input[name="login"]');
             const passwordInput = form.querySelector('input[name="password"]');
-            const email = emailInput ? emailInput.value.trim() : '';
+            const loginValue = loginInput ? loginInput.value.trim() : '';
             const password = passwordInput ? passwordInput.value : '';
 
             const oldErr = document.getElementById('login-inline-error');
             if (oldErr) oldErr.remove();
 
-            if (!email || !password) {
+            if (!loginValue || !password) {
                 e.preventDefault();
                 e.stopPropagation();
 
                 const err = document.createElement('div');
                 err.id = 'login-inline-error';
-                err.innerHTML = '<i class="fas fa-exclamation-circle"></i><span>Please fill in your email and password before signing in.</span>';
+                err.innerHTML = '<i class="fas fa-exclamation-circle"></i><span>Please fill in your Phone/Email and Password/PIN before signing in.</span>';
                 form.prepend(err);
 
                 resetButton();

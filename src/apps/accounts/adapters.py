@@ -122,10 +122,15 @@ class RonoSocialAccountAdapter(DefaultSocialAccountAdapter):
 
 class RonoAccountAdapter(DefaultAccountAdapter):
     """
-    Send users to your own dashboard rather than allauth's default.
+    Send users to the correct dashboard based on their role.
     """
 
     def get_login_redirect_url(self, request):
+        # 1. Send Customers to the Customer Dashboard
+        if getattr(request.user, 'role', None) == 'customer':
+            return '/customers/dashboard/'  # or use reverse('customers:dashboard')
+
+        # 2. Everyone else (Super Admin, Staff) goes to the router
         return '/dashboard/'
 
     def get_signup_redirect_url(self, request):

@@ -314,6 +314,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 AUTHENTICATION_BACKENDS = [
+    'apps.accounts.backends.EmailOrPhoneBackend', 
     'django.contrib.auth.backends.ModelBackend',
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
@@ -341,9 +342,9 @@ INACTIVITY_TIMEOUT_SECONDS = 60 * 30      # 30 minutes
 # ============================================
 # DJANGO-ALLAUTH
 # ============================================
-ACCOUNT_LOGIN_METHODS = {'email'}
+ACCOUNT_LOGIN_METHODS = {'username', 'email', 'phone'}
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
-ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+ACCOUNT_USER_MODEL_USERNAME_FIELD = 'username'
 ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
 
 ACCOUNT_LOGOUT_ON_GET = True
@@ -404,6 +405,10 @@ SOCIALACCOUNT_PROVIDERS = {
         },
         'SCOPE': ['name', 'email'],
     },
+}
+
+ACCOUNT_FORMS = {
+    'login': 'apps.accounts.forms.CustomLoginForm',
 }
 
 SOCIALACCOUNT_LOGIN_ON_GET = True
