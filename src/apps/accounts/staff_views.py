@@ -66,6 +66,8 @@ def employee_list(request):
         company=company
     ).exclude(
         role='super_admin'
+    ).exclude(
+        customer_profiles__isnull=False 
     ).order_by('-created_at')
     
     search_query = request.GET.get('search', '')
