@@ -18,6 +18,7 @@ def business_type_list(request):
     }
     return render(request, 'business_types/list.html', context)
 
+
 @login_required
 @staff_member_required
 def business_type_create(request):
@@ -32,14 +33,14 @@ def business_type_create(request):
         if not BusinessTypeEnum.validate_name(name):
             valid_names = ', '.join(BusinessTypeEnum.get_all_names())
             messages.error(request, f'Invalid business type. Must be one of: {valid_names}')
-            return render(request, 'business_types/create.html', {
+            return render(request, 'business_types/form.html', {
                 'available_types': BusinessTypeEnum.get_all_active()
             })
         
         # Check if exists
         if BusinessType.objects.filter(name=name).exists():
             messages.error(request, f'Business type "{name}" already exists.')
-            return render(request, 'business_types/create.html', {
+            return render(request, 'business_types/form.html', {
                 'available_types': BusinessTypeEnum.get_all_active()
             })
         
@@ -61,7 +62,8 @@ def business_type_create(request):
         'page_title': 'Create Business Type',
         'page_subtitle': 'Add a new business type',
     }
-    return render(request, 'business_types/create.html', context)
+    return render(request, 'business_types/form.html', context)
+
 
 @login_required
 @staff_member_required
@@ -80,7 +82,7 @@ def business_type_edit(request, pk):
         if not BusinessTypeEnum.validate_name(name):
             valid_names = ', '.join(BusinessTypeEnum.get_all_names())
             messages.error(request, f'Invalid business type. Must be one of: {valid_names}')
-            return render(request, 'business_types/edit.html', {
+            return render(request, 'business_types/form.html', {
                 'business_type': business_type,
                 'available_types': BusinessTypeEnum.get_all_active()
             })
@@ -104,7 +106,8 @@ def business_type_edit(request, pk):
         'page_title': 'Edit Business Type',
         'page_subtitle': f'Editing {business_type.name}',
     }
-    return render(request, 'business_types/edit.html', context)
+    return render(request, 'business_types/form.html', context)
+
 
 @login_required
 @staff_member_required

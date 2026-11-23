@@ -13,6 +13,7 @@ urlpatterns = [
     path('profile/', views.customer_profile, name='profile'),
     path('logout/', views.customer_logout, name='logout'),
     path('loan/create/', views.customer_loan_create, name='loan_create'),
+    path('orders/<str:order_number>/', views.customer_order_detail, name='order_detail'),
 
     # Coming Soon Placeholder Routes
     path('support/', views.coming_soon, {'page_name': 'support'}, name='support'),

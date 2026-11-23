@@ -9,9 +9,12 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db.models import Q
-
 from apps.companies.models import Company, BusinessType
 from apps.company.models import Branch
+from django.utils import timezone
+
+
+
 
 User = get_user_model()
 
@@ -37,14 +40,9 @@ def get_active_branches():
     return Branch.objects.filter(is_active=True).order_by('name')
 
 
-from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
-from django.contrib.admin.views.decorators import staff_member_required
-from django.db.models import Q
-from django.contrib.auth import get_user_model
-
-User = get_user_model()
-
+# ============================================
+# LIST
+# ============================================
 @login_required
 @staff_member_required
 def employee_list(request):
@@ -65,16 +63,12 @@ def employee_list(request):
     context = {
         'users': users,
         'stats': stats,
-        
-        # Note: We keep these in context so the dropdowns populate correctly, 
-        # and so the template can re-select the option if the URL has a query.
         'search_query': request.GET.get('search', '').strip(),
         'role_filter': request.GET.get('role', '').strip(),
         'company_filter': request.GET.get('company', '').strip(),
         'business_type_filter': request.GET.get('business_type', '').strip(),
         'branch_filter': request.GET.get('branch', '').strip(),
         'status_filter': request.GET.get('status', '').strip(),
-        
         'companies': get_active_companies(),
         'business_types': get_active_business_types(),
         'branches': get_active_branches(),
@@ -82,7 +76,16 @@ def employee_list(request):
         'page_title': 'Employees',
         'page_subtitle': 'Manage all employees across companies',
     }
+
+    # ==========================================
+    # THE FIX: UPDATE SESSION WHEN SUPER ADMIN VIEWS THE PAGE
+    # ==========================================
+    if request.user.role == 'super_admin':
+        request.session['users_last_seen'] = timezone.now().isoformat()
+
     return render(request, 'account/users_list.html', context)
+
+
 
 
 # ============================================

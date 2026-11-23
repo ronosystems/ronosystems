@@ -13,6 +13,7 @@ from apps.companies.models import Company
 from apps.chama.models import Loan, LoanType, Guest 
 from .models import Customer
 from datetime import date
+from apps.cart_orders.models import Order
 
 from django.utils import timezone
 import time
@@ -184,20 +185,21 @@ def customer_profile(request):
 def customer_dashboard(request):
     current_company = getattr(request, 'company', None) or getattr(request, 'current_company', None)
     customer = request.user.customer_profiles.filter(company=current_company).first()
-    
+
     if not customer:
         messages.error(request, "You do not have a customer profile set up for this store.")
         return redirect('home')
 
+    # ---------- PROFILE PHOTO UPLOAD ----------
     if request.method == 'POST' and 'update_photo' in request.POST:
         profile_pic = request.FILES.get('profile_photo')
-        
+
         if profile_pic:
             old_key = ''
             if customer.profile_photo:
                 old_key = getattr(customer.profile_photo, 'name', '') or str(customer.profile_photo)
                 old_key = old_key.strip().lstrip('/')
-            
+
             try:
                 _cloudinary_configure()
                 public_id = f"profiles/customer_{customer.id}_{int(time.time())}"
@@ -227,8 +229,53 @@ def customer_dashboard(request):
         else:
             messages.error(request, "No image selected.")
 
+    # ---------- EPA SHOP: FETCH CUSTOMER ORDERS ----------
+    customer_orders = []
+    order_stats = {'total': 0, 'pending': 0, 'fulfilled': 0, 'cancelled': 0}
+
+    # 👇 FIXED: Added 'epa shop' (with space) and safety check for business_type
+    if current_company and current_company.business_type and 'epa shop' in current_company.business_type.name.lower():
+
+        qs = (
+            Order.objects
+            .filter(company=current_company, customer_phone=customer.phone_number)
+            .prefetch_related('items')
+            .order_by('-created_at')
+        )
+        customer_orders = qs[:20]
+        order_stats = {
+            'total': qs.count(),
+            'pending': qs.filter(status__in=['new', 'picked', 'confirmed']).count(),
+            'fulfilled': qs.filter(status='fulfilled').count(),
+            'cancelled': qs.filter(status='cancelled').count(),
+        }
+
     return render(request, 'customers/dashboard.html', {
         'customer': customer,
+        'customer_orders': customer_orders,
+        'order_stats': order_stats,
+    })
+
+
+@login_required(login_url='account_login')
+def customer_order_detail(request, order_number):
+    current_company = getattr(request, 'company', None) or getattr(request, 'current_company', None)
+    customer = request.user.customer_profiles.filter(company=current_company).first()
+    
+    if not customer:
+        messages.error(request, "No customer profile for this store.")
+        return redirect('home')
+
+    order = get_object_or_404(
+        Order.objects.prefetch_related('items'),
+        company=current_company,
+        order_number=order_number,
+        customer_phone=customer.phone_number,  # security: only their own orders
+    )
+
+    return render(request, 'customers/order_detail.html', {
+        'customer': customer,
+        'order': order,
     })
 
 

@@ -3,165 +3,475 @@
 
 {% block title %}My Dashboard{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* ============================================
+       DASHBOARD PALETTE — matches Super Admin
+    ============================================ */
+    :root {
+        --dash-primary:   #2d5f7c;
+        --dash-primary-2: #1e4e6d;
+        --dash-green:     #7bc043;
+        --dash-green-bd:  #66cc33;
+        --dash-link:      #2a6496;
+        --dash-soft:      #eaf2f8;
+        --dash-soft-2:    #f0f7fa;
+    }
+
+    /* ============================================
+       CARDS (Matching Admin Style)
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+        background: #ffffff;
+        height: 100%;
+    }
+    .card-header {
+        background: var(--dash-primary) !important;
+        border-bottom: 2px solid #000000;
+        padding: 10px 18px;
+        border-radius: 0 !important;
+    }
+    .card-header h5, .card-header h6 {
+        color: #ffffff !important;
+        font-weight: 700;
+        margin: 0;
+        text-transform: uppercase;
+        font-size: 13px;
+        letter-spacing: 0.6px;
+    }
+    .card-header h5 i, .card-header h6 i {
+        margin-right: 6px;
+        color: var(--dash-green);
+    }
+    .card-body { color: #000000; padding: 16px; }
+
+    /* ============================================
+       ALERTS (Matching Admin Style)
+    ============================================ */
+    .alert {
+        border: 2px solid #000;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 13px;
+        box-shadow: none;
+    }
+    .alert-danger {
+        background: #f8d7da;
+        color: #721c24;
+        border-color: #000;
+    }
+
+    /* ============================================
+       KYC CHECKLIST ITEMS
+    ============================================ */
+    .kyc-item {
+        background: #f8f9fa;
+        border: 1px solid #000;
+        border-radius: 4px;
+        padding: 8px 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 100%;
+    }
+    .kyc-item i.fa-check-circle { color: var(--dash-green); }
+    .kyc-item i.fa-times-circle { color: #dc3545; }
+    .kyc-item h6 {
+        font-size: 13px;
+        font-weight: 700;
+        margin: 0;
+        color: #000;
+    }
+    .kyc-item small {
+        font-size: 11px;
+        color: #555;
+    }
+
+    /* ============================================
+       LOAN LIMIT CARD
+    ============================================ */
+    .loan-limit-card {
+        text-decoration: none;
+        color: inherit;
+        transition: transform 0.15s;
+        display: block;
+    }
+    .loan-limit-card:hover {
+        transform: translateY(-2px);
+        color: inherit;
+    }
+    .loan-limit-inner {
+        border: 2px solid #000;
+        border-radius: 4px;
+        background: #ffffff;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 24px;
+        text-align: center;
+    }
+    .loan-limit-inner.approved { background: #f0f7fa; }
+    .loan-limit-inner.pending  { background: #fff3cd; }
+    .loan-icon-wrap {
+        width: 70px;
+        height: 70px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: 2px solid #000;
+        margin-bottom: 15px;
+    }
+    .loan-icon-wrap.approved { background: #d4edda; color: #155724; }
+    .loan-icon-wrap.pending  { background: #fff3cd; color: #856404; }
+
+    .loan-amount {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: #000;
+        line-height: 1;
+        margin-bottom: 8px;
+    }
+
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn {
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 12px;
+        border-width: 2px;
+    }
+    .btn-outline-dark {
+        border-color: #000;
+        color: #000;
+        background: transparent;
+    }
+    .btn-outline-dark:hover {
+        background: var(--dash-primary);
+        border-color: #000;
+        color: #fff;
+    }
+
+    /* ============================================
+       ORDER STATS CARDS
+    ============================================ */
+    .order-stat {
+        border: 2px solid #000;
+        border-radius: 4px;
+        padding: 14px 16px;
+        background: #fff;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        height: 100%;
+    }
+    .order-stat .stat-icon {
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        border: 2px solid #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .order-stat.total     .stat-icon { background: #eaf2f8; color: var(--dash-primary); }
+    .order-stat.pending   .stat-icon { background: #fff3cd; color: #856404; }
+    .order-stat.fulfilled .stat-icon { background: #d4edda; color: #155724; }
+    .order-stat.cancelled .stat-icon { background: #f8d7da; color: #721c24; }
+
+    .order-stat .stat-value {
+        font-size: 1.6rem;
+        font-weight: 800;
+        line-height: 1;
+        color: #000;
+    }
+    .order-stat .stat-label {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #555;
+        margin-top: 4px;
+    }
+
+    /* ============================================
+       ORDERS TABLE
+    ============================================ */
+    .orders-table {
+        font-size: 13px;
+        margin: 0;
+    }
+    .orders-table thead th {
+        background: var(--dash-soft);
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 11px;
+        letter-spacing: 0.5px;
+        color: #000;
+        border-bottom: 2px solid #000;
+        padding: 10px 12px;
+        white-space: nowrap;
+    }
+    .orders-table tbody td {
+        padding: 10px 12px;
+        vertical-align: middle;
+        border-bottom: 1px solid #dee2e6;
+    }
+    .orders-table tbody tr:hover { background: var(--dash-soft-2); }
+    .orders-table .order-number {
+        font-weight: 700;
+        color: var(--dash-link);
+    }
+
+    .status-badge {
+        font-size: 10px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        border: 1px solid #000;
+        display: inline-block;
+        white-space: nowrap;
+    }
+    .status-badge.new       { background: #cfe2ff; color: #084298; }
+    .status-badge.picked    { background: #fff3cd; color: #856404; }
+    .status-badge.confirmed { background: #d1e7dd; color: #0f5132; }
+    .status-badge.fulfilled { background: var(--dash-green); color: #fff; }
+    .status-badge.cancelled { background: #f8d7da; color: #721c24; }
+
+    .empty-orders {
+        text-align: center;
+        padding: 50px 20px;
+    }
+    .empty-orders i {
+        font-size: 3rem;
+        color: var(--dash-primary);
+        opacity: 0.3;
+        margin-bottom: 12px;
+    }
+
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 767.98px) {
+        .orders-table thead { display: none; }
+        .orders-table tbody tr {
+            display: block;
+            border: 1px solid #000;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            padding: 8px;
+        }
+        .orders-table tbody td {
+            display: flex;
+            justify-content: space-between;
+            border: none;
+            padding: 6px 8px;
+        }
+        .orders-table tbody td::before {
+            content: attr(data-label);
+            font-weight: 700;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #555;
+            letter-spacing: 0.4px;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-2">
 
     <!-- 👇 REVIEWER FEEDBACK BANNER -->
     {% if request.user.customer_profile.reviewer_comment %}
-    <div class="alert alert-danger d-flex align-items-center mb-4 shadow-sm" style="border: 2px solid #dc3545; border-radius: 8px;">
+    <div class="alert alert-danger d-flex align-items-center mb-4" role="alert">
         <i class="fas fa-exclamation-circle fa-2x me-3 text-danger"></i>
         <div>
-            <h6 class="fw-bold mb-1 text-danger">Action Required from Committee</h6>
+            <h6 class="fw-bold mb-1 text-danger text-uppercase">Action Required from Committee</h6>
             <p class="mb-0 text-dark">{{ request.user.customer_profile.reviewer_comment }}</p>
         </div>
     </div>
     {% endif %}
 
     <!-- GREETINGS BANNER -->
-    <div class="card border-0 shadow-sm mb-4" style="background: linear-gradient(135deg, var(--sidebar-bg, #1e4e6d) 0%, var(--primary-color, #2d5f7c) 100%); border-radius: 12px; overflow: hidden; position: relative;">
-        
-        <!-- Decorative Background Circles -->
-        <div style="position: absolute; top: -50px; right: -50px; width: 200px; height: 200px; background: rgba(255,255,255,0.05); border-radius: 50%;"></div>
-        <div style="position: absolute; bottom: -30px; left: 20%; width: 100px; height: 100px; background: rgba(255,255,255,0.05); border-radius: 50%;"></div>
-
-        <div class="card-body p-4 p-md-5 position-relative z-1">
+    <div class="card mb-4" style="background: var(--dash-primary); border: 2px solid #000;">
+        <div class="card-body p-4">
             <div class="row align-items-center">
-                <div class="col-lg-8 text-center text-lg-start mb-4 mb-lg-0">
-                    <h2 class="fw-bold text-white mb-3" style="font-size: 2rem;">
+                <div class="col-lg-8 text-center text-lg-start">
+                    <h2 class="fw-bold text-white mb-2" style="font-size: 1.8rem;">
                         Hello, {{ customer.full_name }}! 👋
                     </h2>
-                    <p class="text-white-50 mb-0" style="font-size: 1.05rem; max-width: 600px;">
-                        Welcome back to your portal. We're glad to see you here. 
-                        This is your personal space to manage everything related to <strong>{{ current_company.display_name|default:"our company" }}</strong>.
+                    <p class="text-white-50 mb-0" style="font-size: 1rem; max-width: 600px;">
+                        Welcome back to your portal. This is your personal space to manage everything related to <strong class="text-white">{{ current_company.display_name|default:"our company" }}</strong>.
                     </p>
                 </div>
                 <div class="col-lg-4 text-center d-none d-lg-block">
-                    <i class="fas fa-hand-sparkles" style="font-size: 6rem; color: rgba(255,255,255,0.15);"></i>
+                    <i class="fas fa-hand-sparkles" style="font-size: 5rem; color: rgba(255,255,255,0.15);"></i>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- CHAMA BIZ SECTION -->
+    <!-- ============================================================
+         CHAMA BIZ SECTION
+    ============================================================ -->
     {% if 'chama' in current_company.business_type.name.lower %}
-    
+
     <div class="row g-4 mb-4">
-        
-        <!-- LEFT: Profile Completion Checklist -->
+
+        <!-- Left: Approved Loan Limit Card -->
+        <div class="col-lg-5">
+            <a href="{% url 'customers:loan_create' %}" class="loan-limit-card">
+                {% if request.user.customer_profile.custom_loan_limit > 0 %}
+                    <div class="loan-limit-inner approved">
+                        <div class="loan-icon-wrap approved">
+                            <i class="fas fa-check-circle fa-3x"></i>
+                        </div>
+                        <h6 class="text-muted fw-bold text-uppercase mb-2" style="letter-spacing: 1px;">Approved Loan Limit</h6>
+                        <h2 class="loan-amount">
+                            KES {{ request.user.customer_profile.custom_loan_limit|floatformat:2 }}
+                        </h2>
+                        <p class="text-muted small mb-0 mt-2">
+                            Congratulations! You qualify to borrow up to this amount. <strong>Click here to apply.</strong>
+                        </p>
+                    </div>
+                {% else %}
+                    <div class="loan-limit-inner pending">
+                        <div class="loan-icon-wrap pending">
+                            <i class="fas fa-hourglass-half fa-3x"></i>
+                        </div>
+                        <h6 class="text-muted fw-bold text-uppercase mb-2" style="letter-spacing: 1px;">Loan Limit</h6>
+                        <h2 class="loan-amount" style="color: #6c757d;">KES 0.00</h2>
+                        <p class="text-muted small mb-0 mt-2">
+                            Your limit is currently under review. Please complete all KYC requirements above to unlock your borrowing power.
+                        </p>
+                    </div>
+                {% endif %}
+            </a>
+        </div>
+
+        <!-- Right: Profile Completion Checklist -->
         <div class="col-lg-7">
-            <div class="card border-0 shadow-sm h-100" style="border-radius: 12px;">
-                <div class="card-header bg-white border-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
-                    <h5 class="fw-bold mb-0">
-                        <i class="fas fa-id-card text-primary me-2"></i> Unlock Chama Loan Limits
-                    </h5>
-                    <a href="{% url 'customers:profile' %}" class="btn btn-sm btn-outline-dark fw-bold" style="border-radius: 6px;">
-                        <i class="fas fa-edit me-1"></i> Update Profile
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="fas fa-id-card"></i>{{ current_company.display_name|default:system_name }}</h6>
+                    <a href="{% url 'customers:profile' %}" class="btn btn-sm btn-outline-light" style="border-color: #fff;">
+                        <i class="fas fa-edit me-1"></i> Update
                     </a>
                 </div>
-                <div class="card-body p-4">
+                <div class="card-body">
                     <p class="text-muted mb-3 small">
                         To qualify for loans, please ensure you have uploaded all required KYC documents and filled in your personal details.
                     </p>
 
-                    <div class="row g-2">
+                    <div class="row g-3">
                         <!-- ID Front -->
                         <div class="col-sm-6 col-md-4">
-                            <div class="d-flex align-items-center p-2 rounded" style="background: #f8f9fa; border: 1px solid #e9ecef;">
-                                <div class="me-2">
+                            <div class="kyc-item">
+                                <div>
                                     {% if request.user.customer_profile.id_front_url %}
-                                        <i class="fas fa-check-circle fa-lg text-success"></i>
+                                        <i class="fas fa-check-circle fa-lg"></i>
                                     {% else %}
-                                        <i class="fas fa-times-circle fa-lg text-danger"></i>
+                                        <i class="fas fa-times-circle fa-lg"></i>
                                     {% endif %}
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold" style="font-size: 0.85rem;">ID Front</h6>
-                                    <small class="text-muted" style="font-size: 0.7rem;">{% if request.user.customer_profile.id_front_url %}Uploaded{% else %}Pending{% endif %}</small>
+                                    <h6>ID Front</h6>
+                                    <small>{% if request.user.customer_profile.id_front_url %}Uploaded{% else %}Pending{% endif %}</small>
                                 </div>
                             </div>
                         </div>
 
                         <!-- ID Back -->
                         <div class="col-sm-6 col-md-4">
-                            <div class="d-flex align-items-center p-2 rounded" style="background: #f8f9fa; border: 1px solid #e9ecef;">
-                                <div class="me-2">
+                            <div class="kyc-item">
+                                <div>
                                     {% if request.user.customer_profile.id_back_url %}
-                                        <i class="fas fa-check-circle fa-lg text-success"></i>
+                                        <i class="fas fa-check-circle fa-lg"></i>
                                     {% else %}
-                                        <i class="fas fa-times-circle fa-lg text-danger"></i>
+                                        <i class="fas fa-times-circle fa-lg"></i>
                                     {% endif %}
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold" style="font-size: 0.85rem;">ID Back</h6>
-                                    <small class="text-muted" style="font-size: 0.7rem;">{% if request.user.customer_profile.id_back_url %}Uploaded{% else %}Pending{% endif %}</small>
+                                    <h6>ID Back</h6>
+                                    <small>{% if request.user.customer_profile.id_back_url %}Uploaded{% else %}Pending{% endif %}</small>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Good Conduct -->
                         <div class="col-sm-6 col-md-4">
-                            <div class="d-flex align-items-center p-2 rounded" style="background: #f8f9fa; border: 1px solid #e9ecef;">
-                                <div class="me-2">
+                            <div class="kyc-item">
+                                <div>
                                     {% if request.user.customer_profile.good_conduct_url %}
-                                        <i class="fas fa-check-circle fa-lg text-success"></i>
+                                        <i class="fas fa-check-circle fa-lg"></i>
                                     {% else %}
-                                        <i class="fas fa-times-circle fa-lg text-danger"></i>
+                                        <i class="fas fa-times-circle fa-lg"></i>
                                     {% endif %}
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold" style="font-size: 0.85rem;">Good Conduct</h6>
-                                    <small class="text-muted" style="font-size: 0.7rem;">{% if request.user.customer_profile.good_conduct_url %}Uploaded{% else %}Pending{% endif %}</small>
+                                    <h6>Good Conduct</h6>
+                                    <small>{% if request.user.customer_profile.good_conduct_url %}Uploaded{% else %}Pending{% endif %}</small>
                                 </div>
                             </div>
                         </div>
 
                         <!-- KRA PIN -->
                         <div class="col-sm-6 col-md-4">
-                            <div class="d-flex align-items-center p-2 rounded" style="background: #f8f9fa; border: 1px solid #e9ecef;">
-                                <div class="me-2">
+                            <div class="kyc-item">
+                                <div>
                                     {% if request.user.customer_profile.kra_pin_url %}
-                                        <i class="fas fa-check-circle fa-lg text-success"></i>
+                                        <i class="fas fa-check-circle fa-lg"></i>
                                     {% else %}
-                                        <i class="fas fa-times-circle fa-lg text-danger"></i>
+                                        <i class="fas fa-times-circle fa-lg"></i>
                                     {% endif %}
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold" style="font-size: 0.85rem;">KRA PIN</h6>
-                                    <small class="text-muted" style="font-size: 0.7rem;">{% if request.user.customer_profile.kra_pin_url %}Uploaded{% else %}Pending{% endif %}</small>
+                                    <h6>KRA PIN</h6>
+                                    <small>{% if request.user.customer_profile.kra_pin_url %}Uploaded{% else %}Pending{% endif %}</small>
                                 </div>
                             </div>
                         </div>
 
                         <!-- CV -->
                         <div class="col-sm-6 col-md-4">
-                            <div class="d-flex align-items-center p-2 rounded" style="background: #f8f9fa; border: 1px solid #e9ecef;">
-                                <div class="me-2">
+                            <div class="kyc-item">
+                                <div>
                                     {% if request.user.customer_profile.cv_url %}
-                                        <i class="fas fa-check-circle fa-lg text-success"></i>
+                                        <i class="fas fa-check-circle fa-lg"></i>
                                     {% else %}
-                                        <i class="fas fa-times-circle fa-lg text-danger"></i>
+                                        <i class="fas fa-times-circle fa-lg"></i>
                                     {% endif %}
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold" style="font-size: 0.85rem;">CV</h6>
-                                    <small class="text-muted" style="font-size: 0.7rem;">{% if request.user.customer_profile.cv_url %}Uploaded{% else %}Pending{% endif %}</small>
+                                    <h6>CV</h6>
+                                    <small>{% if request.user.customer_profile.cv_url %}Uploaded{% else %}Pending{% endif %}</small>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Next of Kin -->
                         <div class="col-sm-6 col-md-4">
-                            <div class="d-flex align-items-center p-2 rounded" style="background: #f8f9fa; border: 1px solid #e9ecef;">
-                                <div class="me-2">
+                            <div class="kyc-item">
+                                <div>
                                     {% if request.user.customer_profile.next_of_kin_name %}
-                                        <i class="fas fa-check-circle fa-lg text-success"></i>
+                                        <i class="fas fa-check-circle fa-lg"></i>
                                     {% else %}
-                                        <i class="fas fa-times-circle fa-lg text-danger"></i>
+                                        <i class="fas fa-times-circle fa-lg"></i>
                                     {% endif %}
                                 </div>
                                 <div>
-                                    <h6 class="mb-0 fw-bold" style="font-size: 0.85rem;">Next of Kin</h6>
-                                    <small class="text-muted" style="font-size: 0.7rem;">{% if request.user.customer_profile.next_of_kin_name %}Provided{% else %}Pending{% endif %}</small>
+                                    <h6>Next of Kin</h6>
+                                    <small>{% if request.user.customer_profile.next_of_kin_name %}Provided{% else %}Pending{% endif %}</small>
                                 </div>
                             </div>
                         </div>
@@ -170,65 +480,134 @@
             </div>
         </div>
 
-        <!-- 👇 RIGHT: Approved Loan Limit Card (NOW CLICKABLE) -->
-        <div class="col-lg-5">
-            <!-- Changed to <a> tag to make it clickable -->
-            <a href="{% url 'customers:loan_create' %}" class="card border-0 shadow-sm h-100 text-decoration-none" style="border-radius: 12px; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); transition: transform 0.2s;">
-                <div class="card-body d-flex flex-column justify-content-center text-center p-4">
-                    
-                    {% if request.user.customer_profile.custom_loan_limit > 0 %}
-                        <!-- Approved State -->
-                        <div class="mb-3">
-                            <div class="d-inline-flex align-items-center justify-content-center bg-success bg-opacity-10 rounded-circle mb-2" style="width: 70px; height: 70px;">
-                                <i class="fas fa-check-circle fa-3x text-success"></i>
-                            </div>
-                        </div>
-                        <h6 class="text-muted fw-bold text-uppercase letter-spacing-1">Approved Loan Limit</h6>
-                        <h2 class="fw-bold mb-2" style="color: var(--sidebar-bg); font-size: 2.5rem;">
-                            KES {{ request.user.customer_profile.custom_loan_limit|floatformat:2 }}
-                        </h2>
-                        <p class="text-muted small mb-0">
-                            Congratulations! You qualify to borrow up to this amount. <strong>Click here to apply for a loan.</strong>
-                        </p>
-                    
-                    {% else %}
-                        <!-- Pending State -->
-                        <div class="mb-3">
-                            <div class="d-inline-flex align-items-center justify-content-center bg-warning bg-opacity-10 rounded-circle mb-2" style="width: 70px; height: 70px;">
-                                <i class="fas fa-hourglass-half fa-3x text-warning"></i>
-                            </div>
-                        </div>
-                        <h6 class="text-muted fw-bold text-uppercase letter-spacing-1">Loan Limit</h6>
-                        <h2 class="fw-bold mb-2" style="color: #6c757d; font-size: 2.5rem;">
-                            KES 0.00
-                        </h2>
-                        <p class="text-muted small mb-0">
-                            Your limit is currently under review. Please complete all KYC requirements above to unlock your borrowing power.
-                        </p>
-                    {% endif %}
-
-                </div>
-            </a>
-        </div>
-
     </div>
     {% endif %}
 
-    <!-- ADD YOUR NEW SECTIONS BELOW HERE -->
-    <div class="text-center py-5 text-muted">
-        <i class="fas fa-layer-group fa-3x mb-3" style="opacity: 0.2;"></i>
-        <h5>More sections coming soon...</h5>
-        <p class="small">You can add your orders, chama contributions, or recent activity here.</p>
+
+    
+    <!-- ============================================================
+         EPA SHOP — MY ORDERS SECTION
+    ============================================================ -->
+    {% if current_company.business_type and 'epa shop' in current_company.business_type.name.lower %}
+    <!-- Order Stats Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <div class="order-stat total">
+                <div class="stat-icon"><i class="fas fa-receipt fa-lg"></i></div>
+                <div>
+                    <div class="stat-value">{{ order_stats.total }}</div>
+                    <div class="stat-label">Total Orders</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="order-stat pending">
+                <div class="stat-icon"><i class="fas fa-clock fa-lg"></i></div>
+                <div>
+                    <div class="stat-value">{{ order_stats.pending }}</div>
+                    <div class="stat-label">In Progress</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="order-stat fulfilled">
+                <div class="stat-icon"><i class="fas fa-check fa-lg"></i></div>
+                <div>
+                    <div class="stat-value">{{ order_stats.fulfilled }}</div>
+                    <div class="stat-label">Fulfilled</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="order-stat cancelled">
+                <div class="stat-icon"><i class="fas fa-times fa-lg"></i></div>
+                <div>
+                    <div class="stat-value">{{ order_stats.cancelled }}</div>
+                    <div class="stat-label">Cancelled</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Orders Table Card -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h6 class="mb-0"><i class="fas fa-shopping-bag"></i> My Orders</h6>
+            <a href="{% url 'epa_shop:epa-storefront' %}" class="btn btn-sm btn-outline-light" style="border-color: #fff;">
+                <i class="fas fa-store me-1"></i> Continue Shopping
+            </a>
+        </div>
+        <div class="card-body p-0">
+
+            {% if customer_orders %}
+            <div class="table-responsive">
+                <table class="table orders-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Order #</th>
+                            <th>Date</th>
+                            <th>Items</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in customer_orders %}
+                        <tr>
+                            <td data-label="Order #">
+                                <span class="order-number">{{ order.order_number }}</span>
+                            </td>
+                            <td data-label="Date">{{ order.created_at|date:"d M Y" }}</td>
+                            <td data-label="Items">
+                                {{ order.item_count }} item{{ order.item_count|pluralize }}
+                            </td>
+                            <td data-label="Total" class="fw-bold">
+                                KES {{ order.total_amount|floatformat:2 }}
+                            </td>
+                            <td data-label="Status">
+                                <span class="status-badge {{ order.status }}">
+                                    {{ order.get_status_display }}
+                                </span>
+                            </td>
+                            <td data-label="Action">
+                                <a href="{% url 'customers:order_detail' order.order_number %}"
+                                   class="btn btn-sm btn-outline-dark">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-orders">
+                <i class="fas fa-shopping-basket d-block"></i>
+                <h6 class="fw-bold text-dark mb-1">No orders yet</h6>
+                <p class="small text-muted mb-3">
+                    You haven't placed any orders with {{ current_company.display_name }}.
+                </p>
+                <a href="{% url 'epa_shop:epa-storefront' %}" class="btn btn-outline-dark">
+                    <i class="fas fa-store me-1"></i> Start Shopping
+                </a>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ============================================================
+         PLACEHOLDER FOR FUTURE SECTIONS
+    ============================================================ -->
+    <div class="card mt-4">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-layer-group fa-3x mb-3" style="color: var(--dash-primary); opacity: 0.3;"></i>
+            <h5 class="fw-bold text-dark">More sections coming soon...</h5>
+            <p class="small text-muted mb-0">You can add your orders, chama contributions, or recent activity here.</p>
+        </div>
     </div>
 
 </div>
-
-<style>
-    /* Add hover effect to the clickable card */
-    a.card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
-        cursor: pointer;
-    }
-</style>
 {% endblock %}

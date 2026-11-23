@@ -6,10 +6,12 @@ from django.db.models import Sum
 from django.db import models
 from django.utils import timezone
 from apps.customers.models import Customer
-from apps.chama.models import Loan
 from apps.companies.models import Company
 import json
 from decimal import Decimal, InvalidOperation
+from apps.chama.models import Loan, Guest
+
+
 
 # Define admin roles for this file
 ADMIN_ROLES = [
@@ -17,6 +19,8 @@ ADMIN_ROLES = [
     'chairperson', 'vice_chairperson', 'treasurer', 'secretary',
     'vice_secretary', 'loan_officer',
 ]
+
+
 
 def _get_company(request):
     """Helper to resolve the active company for the current request."""
@@ -34,14 +38,6 @@ def _get_company(request):
 
 
 
-
-from decimal import Decimal
-from django.db.models import Sum
-from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from apps.chama.models import Loan, Guest
-from apps.customers.models import Customer
 
 @login_required
 def external_loan_limits(request):
@@ -113,7 +109,7 @@ def chama_customer_list(request):
 
     customers = Customer.objects.filter(company=company).order_by('-created_at')
 
-    return render(request, 'chama/customer_list.html', {
+    return render(request, 'customers/chama/list.html', {
         'customers': customers,
         'is_officer': is_officer,
     })
@@ -227,6 +223,6 @@ def customer_review_view(request, customer_pk):
             except ValueError:
                 messages.error(request, "Invalid limit amount.")
 
-    return render(request, 'chama/customer_review.html', {
+    return render(request, 'customers/chama/review.html', {
         'customer': customer,
     })

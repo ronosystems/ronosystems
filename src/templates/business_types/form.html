@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Create Business Type{% endblock %}
+{% block title %}{% if business_type %}Edit{% else %}Create{% endif %} Business Type{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -13,9 +13,7 @@
         box-shadow: none;
     }
     
-    .card-body {
-        color: #000000;
-    }
+    .card-body { color: #000000; }
     
     .card-header {
         background-color: #87CEEB !important;
@@ -45,27 +43,19 @@
         border-color: #87CEEB;
         box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
     }
-    
-    .form-label {
-        color: #000000;
-        font-weight: 600;
+
+    /* Readonly styling */
+    .form-control[readonly] {
+        background-color: #e9ecef;
+        opacity: 1;
+        cursor: not-allowed;
     }
     
-    .form-label.required:after {
-        content: " *";
-        color: #dc3545;
-        font-weight: bold;
-    }
+    .form-label { color: #000000; font-weight: 600; }
+    .form-label.required:after { content: " *"; color: #dc3545; font-weight: bold; }
     
-    textarea.form-control {
-        border: 2px solid #000000;
-        border-radius: 4px;
-    }
-    
-    textarea.form-control:focus {
-        border-color: #87CEEB;
-        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
-    }
+    textarea.form-control { border: 2px solid #000000; border-radius: 4px; }
+    textarea.form-control:focus { border-color: #87CEEB; box-shadow: 0 0 0 3px rgba(135,206,235,0.3); }
     
     /* ============================================
        BUTTONS
@@ -77,7 +67,6 @@
         border-radius: 4px;
         font-weight: 600;
     }
-    
     .btn-primary:hover {
         background-color: #7bb8d8;
         border-color: #000000;
@@ -93,15 +82,10 @@
         border-radius: 4px;
         font-weight: 600;
     }
-    
-    .btn-secondary:hover {
-        background-color: #87CEEB;
-        border-color: #000000;
-        color: #000000;
-    }
+    .btn-secondary:hover { background-color: #87CEEB; border-color: #000000; color: #000000; }
     
     /* ============================================
-       AVAILABLE TYPES ITEMS
+       AVAILABLE TYPES ITEMS (Only for Create)
     ============================================ */
     .type-item {
         border: 2px solid #000000;
@@ -116,121 +100,23 @@
         transform: translateY(-2px);
         box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     }
-    .type-item i {
-        color: #000000;
-        margin-right: 6px;
-    }
-    .type-item strong {
-        color: #000000;
-    }
-    .type-item small {
-        color: #000000 !important;
-    }
-    .type-item .text-muted {
-        color: #000000 !important;
-    }
+    .type-item i { color: #000000; margin-right: 6px; }
+    .type-item strong { color: #000000; }
+    .type-item small, .type-item .text-muted { color: #000000 !important; }
     
-    /* ============================================
-       TEXT MUTED OVERRIDE
-    ============================================ */
-    .text-muted {
-        color: #000000 !important;
-    }
-    small.text-muted {
-        color: #000000 !important;
-    }
+    .text-muted { color: #000000 !important; }
+    small.text-muted { color: #000000 !important; }
     
     /* ============================================
        RESPONSIVE
     ============================================ */
     @media (max-width: 768px) {
-        .card-body {
-            padding: 15px;
-        }
-        .form-control, .form-select {
-            font-size: 13px;
-            padding: 6px 10px;
-        }
-        .form-label {
-            font-size: 13px;
-        }
-        .btn {
-            font-size: 12px;
-            padding: 6px 12px;
-        }
-        textarea.form-control {
-            font-size: 13px;
-        }
-        .d-flex.gap-2 {
-            flex-wrap: wrap;
-        }
-        .d-flex.gap-2 .btn {
-            flex: 1;
-            min-width: 100px;
-            text-align: center;
-        }
-        .card-header h6 {
-            font-size: 0.9rem;
-        }
-        .col-md-4 {
-            padding: 0 5px;
-        }
-        .row {
-            margin: 0 -5px;
-        }
-        .type-item {
-            padding: 8px 10px;
-            font-size: 13px;
-        }
-    }
-    
-    @media (max-width: 480px) {
-        .card-body {
-            padding: 12px;
-        }
-        .form-control, .form-select {
-            font-size: 12px;
-            padding: 4px 8px;
-            height: 32px;
-        }
-        .form-label {
-            font-size: 12px;
-        }
-        .btn {
-            font-size: 11px;
-            padding: 4px 10px;
-        }
-        textarea.form-control {
-            font-size: 12px;
-            padding: 4px 8px;
-        }
-        .d-flex.gap-2 .btn {
-            font-size: 11px;
-            padding: 4px 8px;
-            min-width: 60px;
-        }
-        .col-md-4 {
-            padding: 0 3px;
-        }
-        .row {
-            margin: 0 -3px;
-        }
-        .mb-3 {
-            margin-bottom: 8px !important;
-        }
-        .card-header {
-            padding: 8px 12px;
-        }
-        .card-header h6 {
-            font-size: 0.8rem;
-        }
-        .type-item {
-            padding: 6px 8px;
-            font-size: 12px;
-        }
-        .type-item i {
-            font-size: 14px;
-        }
+        .card-body { padding: 15px; }
+        .form-control, .form-select { font-size: 13px; padding: 6px 10px; }
+        .form-label { font-size: 13px; }
+        .btn { font-size: 12px; padding: 6px 12px; }
+        .d-flex.gap-2 { flex-wrap: wrap; }
+        .d-flex.gap-2 .btn { flex: 1; min-width: 100px; text-align: center; }
     }
 </style>
 {% endblock %}
@@ -245,29 +131,39 @@
                     
                     <div class="mb-3">
                         <label class="form-label required">Business Type Name</label>
-                        <select class="form-select" name="name" required>
-                            <option value="">Select a business type...</option>
-                            {% for type in available_types %}
-                            <option value="{{ type.name }}">{{ type.name }} - {{ type.description }}</option>
-                            {% endfor %}
-                        </select>
-                        <small class="text-muted">Select from available business types in the registry</small>
+                        
+                        {% if business_type %}
+                            <!-- EDIT MODE: Read-only -->
+                            <input type="text" class="form-control" value="{{ business_type.name }}" readonly>
+                            <!-- Hidden input to pass the name to the backend so validation doesn't fail -->
+                            <input type="hidden" name="name" value="{{ business_type.name }}">
+                            <small class="text-muted">Business type names are fixed and cannot be changed.</small>
+                        {% else %}
+                            <!-- CREATE MODE: Dropdown -->
+                            <select class="form-select" name="name" required>
+                                <option value="">Select a business type...</option>
+                                {% for type in available_types %}
+                                <option value="{{ type.name }}">{{ type.name }} - {{ type.description }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Select from available business types in the registry</small>
+                        {% endif %}
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Description</label>
-                        <textarea class="form-control" name="description" rows="3" placeholder="Enter description..."></textarea>
+                        <textarea class="form-control" name="description" rows="3" placeholder="Enter description...">{% if business_type %}{{ business_type.description }}{% endif %}</textarea>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Icon Class</label>
-                        <input type="text" class="form-control" name="icon" placeholder="fa-store, fa-heartbeat, etc.">
+                        <input type="text" class="form-control" name="icon" value="{% if business_type %}{{ business_type.icon|default:'' }}{% endif %}" placeholder="fa-store, fa-heartbeat, etc.">
                         <small class="text-muted">Font Awesome icon class (e.g., fa-store)</small>
                     </div>
 
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i> Create Business Type
+                            <i class="fas fa-save"></i> {% if business_type %}Save Changes{% else %}Create Business Type{% endif %}
                         </button>
                         <a href="/business-types/" class="btn btn-secondary">Cancel</a>
                     </div>
@@ -275,6 +171,7 @@
             </div>
         </div>
 
+        <!-- Available types list  -->
         <div class="card mt-4">
             <div class="card-header">
                 <h6 class="mb-0"><i class="fas fa-info-circle"></i> Available Business Types</h6>
@@ -293,6 +190,7 @@
                 </div>
             </div>
         </div>
+        
     </div>
 </div>
 {% endblock %}

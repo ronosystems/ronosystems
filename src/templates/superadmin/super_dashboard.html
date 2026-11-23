@@ -2,80 +2,87 @@
 
 {% block title %} Dashboard {% endblock %}
 
-{% block extra_js %}
-<script>
-    // Example: Add any custom JavaScript for the dashboard here
-</script>
-{% endblock %}
-
 {% block extra_css %}
 <style>
     /* ============================================
        DASHBOARD PALETTE — matches auth pages
     ============================================ */
     :root {
-        --dash-primary:   #2d5f7c;   /* nav-bg-top */
-        --dash-primary-2: #1e4e6d;   /* nav-bg-bottom */
-        --dash-green:     #7bc043;   /* nav-active-bg / accent */
-        --dash-green-bd:  #66cc33;   /* nav-border-green */
-        --dash-link:      #2a6496;   /* ff-link */
-        --dash-soft:      #eaf2f8;   /* light blue tint */
-        --dash-soft-2:    #f0f7fa;   /* hover tint */
+        --dash-primary:   #2d5f7c;
+        --dash-primary-2: #1e4e6d;
+        --dash-green:     #7bc043;
+        --dash-green-bd:  #66cc33;
+        --dash-link:      #2a6496;
+        --dash-soft:      #eaf2f8;
+        --dash-soft-2:    #f0f7fa;
     }
 
     /* ============================================
-       KPI CARDS
+       DONUT CHART CARDS
     ============================================ */
-    .kpi-card {
+    .chart-card {
         border: 2px solid #000000;
         border-radius: 4px;
-        padding: 16px 18px;
-        transition: transform 0.2s, box-shadow 0.2s;
-        position: relative;
-        overflow: hidden;
+        background: #ffffff;
         height: 100%;
+        display: flex;
+        flex-direction: column;
     }
-    .kpi-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-    }
-    .kpi-card .kpi-icon {
-        position: absolute;
-        top: 10px;
-        right: 14px;
-        font-size: 28px;
-        opacity: 0.25;
-    }
-    .kpi-card .kpi-value {
-        font-size: 1.9rem;
-        font-weight: 800;
-        line-height: 1.1;
-        color: #000000;
-        word-break: break-word;
-    }
-    .kpi-card .kpi-label {
+    .chart-card .chart-header {
+        background: var(--dash-primary) !important;
+        border-bottom: 2px solid #000000;
+        padding: 10px 18px;
+        color: #ffffff;
+        font-weight: 700;
         font-size: 12px;
-        font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.6px;
-        color: #000000;
-        opacity: 0.85;
-        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
-    .kpi-card .kpi-meta {
-        font-size: 11px;
-        margin-top: 6px;
-        color: #000000;
-        opacity: 0.75;
+    .chart-card .chart-header i {
+        color: var(--dash-green);
     }
-
-    /* KPI card background variants — recolored to the new palette */
-    .kpi-card.bg-sky    { background: #cfe2ed; }              /* soft blue tint */
-    .kpi-card.bg-green  { background: #d9f0c9; }              /* soft green tint */
-    .kpi-card.bg-yellow { background: #fff3cd; }              /* keep warm yellow */
-    .kpi-card.bg-red    { background: #f8d7da; }              /* keep soft red */
-    .kpi-card.bg-purple { background: #e2d4f0; }              /* keep soft purple */
-    .kpi-card.bg-blue   { background: #cce5ff; }              /* keep soft blue */
+    .chart-card .chart-body {
+        padding: 20px;
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
+    .chart-container {
+        position: relative;
+        width: 100%;
+        max-width: 200px; /* Keeps donuts from getting too huge */
+        margin: 0 auto;
+    }
+    /* Center text inside the donut */
+    .donut-center-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        pointer-events: none;
+    }
+    .donut-center-text .value {
+        font-size: 1.8rem;
+        font-weight: 800;
+        color: #000000;
+        line-height: 1;
+        margin: 0;
+    }
+    .donut-center-text .label {
+        font-size: 10px;
+        font-weight: 600;
+        color: #000000;
+        opacity: 0.7;
+        text-transform: uppercase;
+        margin-top: 4px;
+    }
 
     /* ============================================
        CARDS
@@ -156,7 +163,7 @@
     .badge.bg-primary   { background: var(--dash-primary) !important; color: #ffffff !important; }
 
     /* ============================================
-       BUTTONS — recolored to the new palette
+       BUTTONS
     ============================================ */
     .btn {
         border-radius: 4px;
@@ -169,19 +176,13 @@
         border-color: #000000;
         color: #ffffff;
     }
-    .btn-primary:hover,
-    .btn-primary:focus {
-        background: var(--dash-primary-2);
-        border-color: #000000;
-        color: #ffffff;
-    }
+    .btn-primary:hover { background: var(--dash-primary-2); color: #ffffff; }
     .btn-outline-primary {
         border-color: var(--dash-primary);
         color: var(--dash-primary);
         background: transparent;
     }
-    .btn-outline-primary:hover,
-    .btn-outline-primary:focus {
+    .btn-outline-primary:hover {
         background: var(--dash-primary);
         border-color: var(--dash-primary);
         color: #ffffff;
@@ -189,7 +190,7 @@
     .btn-sm { padding: 4px 10px; font-size: 11px; }
 
     /* ============================================
-       ACTION CENTER
+       ACTION CENTER & QUICK ACTIONS
     ============================================ */
     .action-item {
         display: flex;
@@ -207,56 +208,9 @@
     .action-item:hover { background: #f0f0f0; }
     .action-item.urgent { background: #f8d7da; border-color: #721c24; }
     .action-item.warning { background: #fff3cd; border-color: #856404; }
-    .action-item .action-text {
-        font-size: 12px;
-        font-weight: 600;
-        color: #000000;
-    }
-    .action-item .action-sub {
-        font-size: 10px;
-        color: #000000;
-        opacity: 0.7;
-    }
+    .action-item .action-text { font-size: 12px; font-weight: 600; color: #000000; }
+    .action-item .action-sub { font-size: 10px; color: #000000; opacity: 0.7; }
 
-    /* ============================================
-       PLAN DISTRIBUTION BARS
-    ============================================ */
-    .dist-row {
-        margin-bottom: 12px;
-    }
-    .dist-row .dist-label {
-        display: flex;
-        justify-content: space-between;
-        font-size: 12px;
-        font-weight: 600;
-        margin-bottom: 3px;
-        color: #000000;
-        flex-wrap: wrap;
-        gap: 6px;
-    }
-    .dist-row .dist-label .dist-left {
-        font-weight: 700;
-    }
-    .dist-row .dist-label .dist-right {
-        font-size: 11px;
-        opacity: 0.85;
-    }
-    .dist-bar {
-        height: 14px;
-        background: #e9ecef;
-        border: 1px solid #000000;
-        border-radius: 3px;
-        overflow: hidden;
-    }
-    .dist-bar .dist-fill {
-        height: 100%;
-        background: var(--dash-primary);
-        transition: width 0.4s;
-    }
-
-    /* ============================================
-       QUICK ACTIONS GRID
-    ============================================ */
     .qa-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
@@ -277,20 +231,9 @@
         transition: all 0.15s;
         min-height: 46px;
     }
-    .qa-btn:hover {
-        background: var(--dash-primary);
-        color: #ffffff;
-        transform: translateY(-2px);
-        text-decoration: none;
-    }
+    .qa-btn:hover { background: var(--dash-primary); color: #ffffff; transform: translateY(-2px); text-decoration: none; }
     .qa-btn:hover i { color: var(--dash-green); }
-    .qa-btn i {
-        font-size: 16px;
-        width: 22px;
-        text-align: center;
-        color: var(--dash-primary);
-        transition: color 0.15s;
-    }
+    .qa-btn i { font-size: 16px; width: 22px; text-align: center; color: var(--dash-primary); transition: color 0.15s; }
 
     /* ============================================
        PLATFORM HEALTH STRIP
@@ -303,116 +246,27 @@
         flex-wrap: wrap;
         gap: 12px;
     }
-    .health-strip .health-title {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .health-strip .health-title i {
-        color: var(--dash-green);
-        font-size: 18px;
-    }
-    .health-strip .health-stats {
-        display: flex;
-        gap: 22px;
-        flex-wrap: wrap;
-        font-size: 12px;
+    .health-strip .health-title { display: flex; align-items: center; gap: 8px; }
+    .health-strip .health-title i { color: var(--dash-green); font-size: 18px; }
+    .health-strip .health-stats { display: flex; gap: 22px; flex-wrap: wrap; font-size: 12px; }
+    
+    /* Separator for health stats */
+    .health-strip .health-stats span:not(:last-child)::after {
+        content: "|";
+        margin-left: 22px;
+        color: #ccc;
     }
 
-    /* ============================================
-       TEXT MUTED OVERRIDE
-    ============================================ */
     .text-muted { color: #000000 !important; opacity: 0.75; }
 
-    /* ============================================
-       RESPONSIVE — TABLET
-    ============================================ */
-    @media (max-width: 992px) {
-        .health-strip { padding: 12px 14px; }
-        .health-strip .health-stats { gap: 14px; font-size: 11px; }
-    }
-
-    /* ============================================
-       RESPONSIVE — MOBILE
-    ============================================ */
+    /* Responsive */
     @media (max-width: 768px) {
-        .kpi-card { padding: 14px; }
-        .kpi-card .kpi-value { font-size: 1.5rem; }
-        .kpi-card .kpi-icon  { font-size: 22px; top: 8px; right: 10px; }
-        .kpi-card .kpi-label { font-size: 11px; }
-        .kpi-card .kpi-meta  { font-size: 10px; }
-
-        .card-body { padding: 12px; }
-        .card-header { padding: 8px 14px; }
-        .card-header h6 { font-size: 11px; }
-
-        .table-excel th, .table-excel td {
-            padding: 6px 7px;
-            font-size: 11px;
-        }
-
+        .chart-container { max-width: 150px; }
+        .donut-center-text .value { font-size: 1.4rem; }
         .qa-grid { grid-template-columns: 1fr; }
-        .qa-btn { padding: 10px 12px; font-size: 12px; }
-
-        .health-strip {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 8px;
-        }
-        .health-strip .health-stats {
-            gap: 10px 16px;
-            font-size: 11px;
-            width: 100%;
-        }
-
-        .action-item {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 8px;
-        }
-        .action-item > div:last-child {
-            width: 100%;
-            justify-content: flex-end;
-        }
-
-        .dist-row .dist-label {
-            font-size: 11px;
-        }
-    }
-
-    /* ============================================
-       RESPONSIVE — SMALL MOBILE
-    ============================================ */
-    @media (max-width: 480px) {
-        .kpi-card { padding: 12px; }
-        .kpi-card .kpi-value { font-size: 1.25rem; }
-        .kpi-card .kpi-label { font-size: 10px; letter-spacing: 0.4px; }
-        .kpi-card .kpi-meta  { font-size: 9px; }
-
-        .table-excel th, .table-excel td {
-            padding: 5px;
-            font-size: 10px;
-        }
-
-        .card-body { padding: 10px; }
-
-        .btn-sm { padding: 4px 8px; font-size: 10px; }
-        .badge { padding: 2px 7px; font-size: 9px; }
-
-        .health-strip .health-stats { gap: 8px 12px; font-size: 10px; }
-    }
-
-    /* ============================================
-       TABLE SCROLL WRAPPER (mobile-safe)
-    ============================================ */
-    .table-responsive {
-        -webkit-overflow-scrolling: touch;
-    }
-    .table-responsive::-webkit-scrollbar { height: 6px; }
-    .table-responsive::-webkit-scrollbar-track { background: #f0f0f0; }
-    .table-responsive::-webkit-scrollbar-thumb {
-        background: var(--dash-primary);
-        border-radius: 3px;
+        .health-strip { flex-direction: column; align-items: flex-start; }
+        .health-strip .health-stats span:not(:last-child)::after { content: none; }
+        .health-strip .health-stats { flex-direction: column; gap: 4px; }
     }
 </style>
 {% endblock %}
@@ -420,7 +274,7 @@
 {% block content %}
 
 {# ============================================ #}
-{# HEADER STRIP — Platform Health (YOUR metrics) #}
+{# HEADER STRIP — Platform Health #}
 {# ============================================ #}
 <div class="row mb-3">
     <div class="col-12">
@@ -443,74 +297,60 @@
 </div>
 
 {# ============================================ #}
-{# KPI CARDS — YOUR PLATFORM'S METRICS #}
+{# DONUT CHARTS ROW #}
 {# ============================================ #}
 <div class="row g-3 mb-3">
-    <div class="col-lg-3 col-md-6 col-sm-6">
-        <div class="kpi-card bg-sky">
-            <i class="fas fa-building kpi-icon"></i>
-            <div class="kpi-label">Total Companies</div>
-            <div class="kpi-value">{{ stats.total_companies }}</div>
-            <div class="kpi-meta">{{ stats.active_companies }} active</div>
+    <!-- Users Chart -->
+    <div class="col-lg-4 col-md-12">
+        <div class="chart-card">
+            <div class="chart-header">
+                <i class="fas fa-users"></i> User Overview
+            </div>
+            <div class="chart-body">
+                <div class="chart-container">
+                    <canvas id="usersChart"></canvas>
+                    <div class="donut-center-text">
+                        <p class="value">{{ stats.total_users }}</p>
+                        <p class="label">Total</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
-    <div class="col-lg-3 col-md-6 col-sm-6">
-        <div class="kpi-card bg-green">
-            <i class="fas fa-users kpi-icon"></i>
-            <div class="kpi-label">Total Users</div>
-            <div class="kpi-value">{{ stats.total_users }}</div>
-            <div class="kpi-meta">+{{ stats.new_users_30d }} in 30d</div>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6 col-sm-6">
-        <div class="kpi-card bg-purple">
-            <i class="fas fa-crown kpi-icon"></i>
-            <div class="kpi-label">Active Subs</div>
-            <div class="kpi-value">{{ stats.active_subscriptions }}</div>
-            <div class="kpi-meta">currently billing</div>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6 col-sm-6">
-        <div class="kpi-card bg-yellow">
-            <i class="fas fa-hourglass-half kpi-icon"></i>
-            <div class="kpi-label">Expiring Soon</div>
-            <div class="kpi-value">{{ stats.expiring_soon }}</div>
-            <div class="kpi-meta">within 7 days</div>
-        </div>
-    </div>
-</div>
 
-<div class="row g-3 mb-3">
-    <div class="col-lg-3 col-md-6 col-sm-6">
-        <div class="kpi-card bg-blue">
-            <i class="fas fa-coins kpi-icon"></i>
-            <div class="kpi-label">Monthly Recurring Rev.</div>
-            <div class="kpi-value">KES {{ stats.mrr|floatformat:0 }}</div>
-            <div class="kpi-meta">from active tenants</div>
+    <!-- Companies Chart -->
+    <div class="col-lg-4 col-md-12">
+        <div class="chart-card">
+            <div class="chart-header">
+                <i class="fas fa-building"></i> Company Status
+            </div>
+            <div class="chart-body">
+                <div class="chart-container">
+                    <canvas id="companiesChart"></canvas>
+                    <div class="donut-center-text">
+                        <p class="value">{{ stats.total_companies }}</p>
+                        <p class="label">Total</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
-    <div class="col-lg-3 col-md-6 col-sm-6">
-        <div class="kpi-card bg-green">
-            <i class="fas fa-chart-line kpi-icon"></i>
-            <div class="kpi-label">Yearly Forecast</div>
-            <div class="kpi-value">KES {{ stats.yearly_forecast|floatformat:0 }}</div>
-            <div class="kpi-meta">MRR × 12</div>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6 col-sm-6">
-        <div class="kpi-card bg-sky">
-            <i class="fas fa-user-tag kpi-icon"></i>
-            <div class="kpi-label">Avg. Rev / Company</div>
-            <div class="kpi-value">KES {{ stats.arpc|floatformat:0 }}</div>
-            <div class="kpi-meta">per active tenant</div>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6 col-sm-6">
-        <div class="kpi-card bg-red">
-            <i class="fas fa-exclamation-triangle kpi-icon"></i>
-            <div class="kpi-label">Expired Subs</div>
-            <div class="kpi-value">{{ stats.expired_subscriptions }}</div>
-            <div class="kpi-meta">need renewal</div>
+
+    <!-- Subscriptions Chart -->
+    <div class="col-lg-4 col-md-12">
+        <div class="chart-card">
+            <div class="chart-header">
+                <i class="fas fa-crown"></i> Subscriptions
+            </div>
+            <div class="chart-body">
+                <div class="chart-container">
+                    <canvas id="subsChart"></canvas>
+                    <div class="donut-center-text">
+                        <p class="value">{{ stats.active_subscriptions|add:stats.expiring_soon }}</p>
+                        <p class="label">Active</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -519,8 +359,6 @@
 {# MAIN GRID — Attention + Quick Actions #}
 {# ============================================ #}
 <div class="row g-3 mb-3">
-
-    {# ATTENTION REQUIRED #}
     <div class="col-lg-7 col-md-12">
         <div class="card h-100">
             <div class="card-header">
@@ -560,7 +398,6 @@
         </div>
     </div>
 
-    {# QUICK ACTIONS #}
     <div class="col-lg-5 col-md-12">
         <div class="card h-100">
             <div class="card-header">
@@ -583,22 +420,20 @@
                     <a href="/reports/" class="qa-btn">
                         <i class="fas fa-chart-bar"></i> Reports
                     </a>
-                    <a href="/employees/" class="qa-btn">
+                    <!-- FIXED: Pointing to the correct /users/ list -->
+                    <a href="/users/" class="qa-btn">
                         <i class="fas fa-users"></i> Users
                     </a>
                 </div>
             </div>
         </div>
     </div>
-
 </div>
 
 {# ============================================ #}
 {# PLAN DISTRIBUTION + BUSINESS TYPE #}
 {# ============================================ #}
 <div class="row g-3 mb-3">
-
-    {# PLAN DISTRIBUTION with MRR per plan #}
     <div class="col-lg-6 col-md-12">
         <div class="card h-100">
             <div class="card-header">
@@ -608,17 +443,16 @@
                 {% if plan_distribution %}
                     {% for item in plan_distribution %}
                         {% with total=stats.total_companies %}
-                        <div class="dist-row">
-                            <div class="dist-label">
-                                <span class="dist-left">{{ item.plan.display_name }}</span>
-                                <span class="dist-right">
-                                    {{ item.count }} companies
-                                    · KES {{ item.mrr|floatformat:0 }}/mo
+                        <div class="dist-row mb-3">
+                            <div class="dist-label d-flex justify-content-between">
+                                <span class="dist-left fw-bold">{{ item.plan.display_name }}</span>
+                                <span class="dist-right text-muted">
+                                    {{ item.count }} companies · KES {{ item.mrr|floatformat:0 }}/mo
                                 </span>
                             </div>
-                            <div class="dist-bar">
+                            <div class="dist-bar mt-1" style="height: 14px; background: #e9ecef; border: 1px solid #000; border-radius: 3px; overflow: hidden;">
                                 {% widthratio item.count total 100 as pct %}
-                                <div class="dist-fill" style="width: {{ pct }}%;"></div>
+                                <div class="dist-fill" style="width: {{ pct }}%; height: 100%; background: var(--dash-primary);"></div>
                             </div>
                         </div>
                         {% endwith %}
@@ -630,7 +464,6 @@
         </div>
     </div>
 
-    {# BUSINESS TYPE BREAKDOWN #}
     <div class="col-lg-6 col-md-12">
         <div class="card h-100">
             <div class="card-header">
@@ -664,7 +497,6 @@
             </div>
         </div>
     </div>
-
 </div>
 
 {# ============================================ #}
@@ -675,7 +507,7 @@
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h6 style="margin: 0;"><i class="fas fa-clock"></i> Recently Added Companies</h6>
-                <a href="{% url 'companies:company-list' %}" class="btn btn-sm btn-outline-primary">
+                <a href="{% url 'companies:company-list' %}" class="btn btn-sm btn-outline-primary" style="border-color: #fff; color: #fff;">
                     View All <i class="fas fa-arrow-right"></i>
                 </a>
             </div>
@@ -684,22 +516,20 @@
                     <table class="table-excel mb-0">
                         <thead>
                             <tr>
-                                <th style="width: 22%; min-width: 140px;">Company</th>
-                                <th style="width: 15%; min-width: 110px;">Business Type</th>
-                                <th style="width: 12%; min-width: 90px;">Plan</th>
-                                <th style="width: 15%; min-width: 130px;">Custom Domain</th>
-                                <th style="width: 10%; min-width: 70px;">Users</th>
-                                <th style="width: 10%; min-width: 90px;">Status</th>
-                                <th style="width: 12%; min-width: 100px;">Created</th>
-                                <th style="width: 4%; min-width: 60px; text-align: center;">Actions</th>
+                                <th>Company</th>
+                                <th>Business Type</th>
+                                <th>Plan</th>
+                                <th>Custom Domain</th>
+                                <th>Users</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th style="text-align: center;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for company in recent_companies %}
                             <tr>
-                                <td>
-                                    <strong>{{ company.name }}</strong>
-                                </td>
+                                <td><strong>{{ company.name }}</strong></td>
                                 <td>{{ company.business_type.name|default:"—" }}</td>
                                 <td>
                                     {% if company.plan %}
@@ -710,19 +540,13 @@
                                 </td>
                                 <td>
                                     {% if company.custom_domain %}
-                                        <span style="font-family: monospace; font-size: 11px;">
-                                            {{ company.custom_domain }}
-                                        </span>
-                                        {% if company.domain_verified %}
-                                            <span class="badge bg-success" style="margin-left: 4px;">✓</span>
-                                        {% endif %}
+                                        <span style="font-family: monospace; font-size: 11px;">{{ company.custom_domain }}</span>
+                                        {% if company.domain_verified %}<span class="badge bg-success" style="margin-left: 4px;">✓</span>{% endif %}
                                     {% else %}
                                         <span class="text-muted">—</span>
                                     {% endif %}
                                 </td>
-                                <td>
-                                    <span class="badge bg-secondary">{{ company.users.count }}</span>
-                                </td>
+                                <td><span class="badge bg-secondary">{{ company.users.count }}</span></td>
                                 <td>
                                     {% if company.is_active and company.status == 'active' %}
                                         <span class="badge bg-success">Active</span>
@@ -734,9 +558,7 @@
                                 </td>
                                 <td>{{ company.created_at|date:"Y-m-d" }}</td>
                                 <td style="text-align: center;">
-                                    <a href="{% url 'companies:company-detail' company.id %}"
-                                       class="btn btn-sm btn-outline-primary"
-                                       title="View">
+                                    <a href="{% url 'companies:company-detail' company.id %}" class="btn btn-sm btn-outline-primary" title="View">
                                         <i class="fas fa-eye"></i>
                                     </a>
                                 </td>
@@ -760,4 +582,106 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js is already loaded in base.html, but if not, you need it here -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // --- 1. USERS DONUT CHART ---
+    const usersCtx = document.getElementById('usersChart').getContext('2d');
+    
+    // Get data
+    const activeUsers = {{ stats.active_users|default:0 }};
+    const inactiveUsers = {{ stats.inactive_users|default:0 }};
+    
+    // Fix: If one value is 0, Chart.js won't render the donut.
+    // We inject a tiny value (0.001) to force the ring to draw.
+    const userChartData = [activeUsers, inactiveUsers === 0 ? 0.001 : inactiveUsers];
+
+    new Chart(usersCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Active', 'Inactive'],
+            datasets: [{
+                data: userChartData,
+                backgroundColor: ['#7bc043', '#e9ecef'], // Green, Soft Gray
+                borderWidth: 2,
+                borderColor: '#000000'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            cutout: '75%', // Makes it a donut
+            plugins: {
+                legend: { display: false } // Hide default legend to save space
+            }
+        }
+    });
+
+    // --- 2. COMPANIES DONUT CHART ---
+    const compCtx = document.getElementById('companiesChart').getContext('2d');
+    
+    const activeCompanies = {{ stats.active_companies|default:0 }};
+    const totalCompanies = {{ stats.total_companies|default:0 }};
+    const inactiveCompanies = totalCompanies - activeCompanies;
+
+    const companyChartData = [activeCompanies, inactiveCompanies === 0 ? 0.001 : inactiveCompanies];
+
+    new Chart(compCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Active', 'Suspended/Inactive'],
+            datasets: [{
+                data: companyChartData,
+                backgroundColor: ['#2d5f7c', '#f8d7da'], // Blue, Soft Red
+                borderWidth: 2,
+                borderColor: '#000000'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            cutout: '75%',
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    // --- 3. SUBSCRIPTIONS DONUT CHART ---
+    const subsCtx = document.getElementById('subsChart').getContext('2d');
+    
+    const activeSubs = {{ stats.active_subscriptions|default:0 }};
+    const expiringSubs = {{ stats.expiring_soon|default:0 }};
+    const expiredSubs = {{ stats.expired_subscriptions|default:0 }};
+
+    // Check if all are zero (to prevent empty chart error)
+    const hasSubData = (activeSubs + expiringSubs + expiredSubs) > 0;
+    
+    // If no data, show a single gray ring. Otherwise, use real data.
+    const subChartData = hasSubData ? [activeSubs, expiringSubs, expiredSubs] : [0, 0, 1];
+    const subColors = hasSubData 
+        ? ['#e2d4f0', '#fff3cd', '#f8d7da'] // Purple, Yellow, Red
+        : ['#e9ecef', '#e9ecef', '#e9ecef']; // All Gray
+
+    new Chart(subsCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Active', 'Expiring Soon', 'Expired'],
+            datasets: [{
+                data: subChartData,
+                backgroundColor: subColors,
+                borderWidth: 2,
+                borderColor: '#000000'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            cutout: '75%',
+            plugins: { legend: { display: false } }
+        }
+    });
+});
+</script>
 {% endblock %}

@@ -30,7 +30,7 @@ def can_manage_customers(user):
 # ============================================
 # HELPER: Cloudinary Upload
 # ============================================
-def _upload_customer_file(uploaded_file, folder='epa_shop/customers/kyc'):
+def _upload_customer_file(uploaded_file, folder='customers/epa_shop/kyc'):
     """Uploads a KYC document to Cloudinary and returns the public_id."""
     if not uploaded_file:
         return None
@@ -93,7 +93,7 @@ def customer_list(request):
         'page_title': 'Customers',
         'page_subtitle': f'Manage customers for {company.name}',
     }
-    return render(request, 'epa_shop/customers/list.html', context)
+    return render(request, 'customers/epa_shop/list.html', context)
 
 # ============================================
 # CUSTOMER CREATE
@@ -149,7 +149,7 @@ def customer_create(request):
             messages.success(request, f"Customer '{full_name}' created successfully.")
             return redirect('epa_shop:customer-list')
 
-    return render(request, 'epa_shop/customers/form.html', {
+    return render(request, 'customers/epa_shop/form.html', {
         'company': company,
         'is_edit': False,
         'is_viewing_company': is_viewing_company,
@@ -210,7 +210,7 @@ def customer_update(request, pk):
             messages.success(request, f"Customer '{full_name}' updated successfully.")
             return redirect('epa_shop:customer-list')
 
-    return render(request, 'epa_shop/customers/form.html', {
+    return render(request, 'customers/epa_shop/form.html', {
         'company': company,
         'customer': customer,
         'is_edit': True,
@@ -245,7 +245,7 @@ def customer_delete(request, pk):
         messages.success(request, f"Customer '{name}' has been deleted.")
         return redirect('epa_shop:customer-list')
 
-    return render(request, 'epa_shop/customers/delete.html', {
+    return render(request, 'customers/epa_shop/delete.html', {
         'company': company,
         'customer': customer,
         'is_viewing_company': is_viewing_company,
@@ -276,7 +276,7 @@ def customer_detail(request, pk):
     # Fetch their recent sales from the EPA Shop Sale model
     recent_sales = Sale.objects.filter(customer=customer, company=company).order_by('-sale_date')[:10]
 
-    return render(request, 'epa_shop/customers/detail.html', {
+    return render(request, 'customers/epa_shop/detail.html', {
         'customer': customer,
         'recent_sales': recent_sales,
         'is_viewing_company': is_viewing_company,

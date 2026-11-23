@@ -17,10 +17,17 @@
     <style>
         :root {
             --sidebar-width: 260px;
-            --primary-color: {{ site_primary_color|default:"#2d5f7c" }};
-            --sidebar-bg: {{ site_accent_color|default:"#1e4e6d" }};
-            --text-light: #f8f9fa;
-            --ff-border: #e5e7eb;
+            /* Matched to Super Admin Dashboard Palette */
+            --dash-primary:   #2d5f7c;
+            --dash-primary-2: #1e4e6d;
+            --dash-green:     #7bc043;
+            --sidebar-bg:     #1e4e6d; 
+            --text-light:     #f8f9fa;
+            --ff-border:      #e5e7eb;
+            
+            /* Theme variable override for consistency */
+            --primary-color:  var(--dash-primary);
+            --site-accent:    #1e4e6d;
         }
 
         body {
@@ -72,7 +79,7 @@
             height: 100%;
             border-radius: 50%;
             background: #fff;
-            border: 3px solid var(--primary-color);
+            border: 3px solid var(--dash-green);
             overflow: hidden;
             display: flex;
             align-items: center;
@@ -98,7 +105,7 @@
             right: 0;
             width: 30px;
             height: 30px;
-            background: var(--primary-color);
+            background: var(--dash-green);
             border: 2px solid #fff;
             border-radius: 50%;
             display: flex;
@@ -166,14 +173,15 @@
         .sidebar-nav .nav-link.active {
             background: rgba(255,255,255,0.1);
             color: #fff;
-            border-left-color: var(--primary-color);
+            border-left-color: var(--dash-green);
         }
 
         .sidebar-nav .nav-link i {
             width: 20px;
             text-align: center;
             font-size: 1.1rem;
-            color: var(--primary-color);
+            color: var(--dash-green);
+            transition: color 0.2s;
         }
         
         .sidebar-nav .nav-link:hover i,
@@ -189,6 +197,16 @@
         }
         .sidebar-nav .nav-link.text-danger:hover {
             background: rgba(255, 107, 107, 0.1);
+        }
+
+        /* Section Headers in Sidebar (Optional, for better organization) */
+        .sidebar-nav .nav-header {
+            padding: 15px 20px 5px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 800;
+            color: rgba(255,255,255,0.4);
         }
 
         /* ============================================
@@ -216,7 +234,7 @@
             position: sticky;
             top: 0;
             z-index: 1040;
-            border-bottom: 2px solid var(--ff-border);
+            border-bottom: 2px solid #000;
         }
 
         .top-navbar .navbar-left {
@@ -230,7 +248,7 @@
             background: none;
             border: none;
             font-size: 1.5rem;
-            color: var(--sidebar-bg);
+            color: var(--dash-primary);
             cursor: pointer;
             padding: 5px;
         }
@@ -238,8 +256,10 @@
         .navbar-left .customer-name {
             font-size: 1.1rem;
             font-weight: 800;
-            color: var(--sidebar-bg);
+            color: var(--dash-primary);
             margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .navbar-right {
@@ -260,7 +280,7 @@
         }
 
         .nav-action-btn:hover {
-            color: var(--primary-color);
+            color: var(--dash-green);
         }
 
         /* ============================================
@@ -274,25 +294,27 @@
         .footer {
             background: #fff;
             padding: 15px 25px;
-            border-top: 1px solid var(--ff-border);
+            border-top: 2px solid #000;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-wrap: nowrap; /* 👈 FORCE 1 ROW */
+            flex-wrap: nowrap; 
             gap: 10px;
         }
 
         .footer .copyright,
         .footer .powered-by {
             font-size: 0.8rem;
-            color: #6c757d;
-            white-space: nowrap; /* 👈 PREVENT TEXT WRAPPING */
+            color: #000;
+            opacity: 0.75;
+            white-space: nowrap; 
+            font-weight: 600;
         }
 
         .footer .powered-by a {
-            color: var(--primary-color);
+            color: var(--dash-green);
             text-decoration: none;
-            font-weight: 700;
+            font-weight: 800;
         }
 
         /* ============================================
@@ -312,6 +334,21 @@
         .sidebar-overlay.active {
             display: block;
         }
+
+        /* ============================================
+           ALERTS (Matching Theme)
+        ============================================ */
+        .alert {
+            border: 2px solid #000;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 13px;
+            box-shadow: none;
+        }
+        .alert-success { background: #d4edda; color: #155724; border-color: #000; }
+        .alert-danger  { background: #f8d7da; color: #721c24; border-color: #000; }
+        .alert-warning { background: #fff3cd; color: #856404; border-color: #000; }
+        .alert-info    { background: #cce5ff; color: #004085; border-color: #000; }
 
         /* ============================================
            RESPONSIVE DESIGN
@@ -341,7 +378,6 @@
             .footer {
                 padding: 10px 15px;
             }
-            /* Keep footer text small but on 1 row */
             .footer .copyright,
             .footer .powered-by {
                 font-size: 0.7rem;
@@ -388,15 +424,16 @@
         <div class="sidebar-nav-wrapper">
             <ul class="sidebar-nav">
                 
+                <li class="nav-header">Main</li>
                 <li class="nav-item">
                     <a href="{% url 'customers:dashboard' %}" class="nav-link {% if '/customers/dashboard/' in request.path %}active{% endif %}">
-                        <i class="fas fa-home"></i> <span>Home</span>
+                        <i class="fas fa-home"></i> <span>Dashboard</span>
                     </a>
                 </li>
 
                 <li class="nav-item">
                     <a href="{% url 'customers:profile' %}" class="nav-link {% if '/customers/profile/' in request.path %}active{% endif %}">
-                        <i class="fas fa-home"></i> <span>Profile</span>
+                        <i class="fas fa-user-circle"></i> <span>My Profile</span>
                     </a>
                 </li>
 
@@ -406,6 +443,7 @@
                     </a>
                 </li>
 
+                <li class="nav-header">Support</li>
                 <li class="nav-item">
                     <a href="{% url 'customers:support' %}" class="nav-link {% if '/customers/support/' in request.path %}active{% endif %}">
                         <i class="fas fa-headset"></i> <span>Get Support</span>
@@ -458,7 +496,7 @@
         <main class="content-area">
             {% if messages %}
                 {% for message in messages %}
-                    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show shadow-sm" role="alert">
+                    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
                         {{ message }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>

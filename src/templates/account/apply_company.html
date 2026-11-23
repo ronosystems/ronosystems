@@ -36,8 +36,8 @@
                     {% endif %}
                 </div>
                 <h1 class="welcome-title">Grow With Us</h1>
-                <p class="welcome-sub">Real Time Oparations</p>
-                <a href="#" class="btn-register">{{ system_name|default:"RonoSystems" }}</a>
+                <p class="welcome-sub">Real Time Operations</p>
+                <a href="/" class="btn-register">{{ system_name|default:"RonoSystems" }}</a>
             </div>
 
             <!-- RIGHT PANEL — Wizard Form -->
@@ -50,7 +50,8 @@
                          style="width: 25%; background: linear-gradient(90deg, var(--nav-bg-bottom) 0%, var(--nav-bg-top) 100%); border-radius: 10px;"></div>
                 </div>
 
-                <form method="post" id="wizardForm">
+                <!-- Form -->
+                <form method="post" id="wizardForm" novalidate>
                     {% csrf_token %}
 
                     <!-- STEP 1: Company Info -->
@@ -78,7 +79,7 @@
                         </div>
                         
                         <div class="login-field">
-                            <input type="url" name="company_website" placeholder="Company Website" value="{{ post_data.company_website|default:'' }}">
+                            <input type="url" name="company_website" placeholder="Company Website (optional)" value="{{ post_data.company_website|default:'' }}">
                             <i class="fas fa-globe field-icon"></i>
                         </div>
 
@@ -102,7 +103,7 @@
                         </div>
                         
                         <div class="login-field">
-                            <input type="text" name="state" placeholder="State*" required value="{{ post_data.state|default:'' }}">
+                            <input type="text" name="state" placeholder="State/Province *" required value="{{ post_data.state|default:'' }}">
                             <i class="fas fa-map field-icon"></i>
                         </div>
                         
@@ -112,7 +113,7 @@
                         </div>
                         
                         <div class="login-field">
-                            <input type="text" name="postal_code" placeholder="Postal Code" value="{{ post_data.postal_code|default:'' }}">
+                            <input type="text" name="postal_code" placeholder="Postal Code (optional)" value="{{ post_data.postal_code|default:'' }}">
                             <i class="fas fa-mail-bulk field-icon"></i>
                         </div>
 
@@ -141,17 +142,17 @@
                         </div>
                         
                         <div class="login-field">
-                            <input type="email" name="admin_email" placeholder="Email *" required value="{{ post_data.admin_email|default:'' }}">
+                            <input type="email" name="admin_email" placeholder="Admin Email *" required value="{{ post_data.admin_email|default:'' }}">
                             <i class="fas fa-envelope field-icon"></i>
                         </div>
                         
                         <div class="login-field">
-                            <input type="tel" name="admin_phone" placeholder="Phone *" required value="{{ post_data.admin_phone|default:'' }}">
+                            <input type="tel" name="admin_phone" placeholder="Admin Phone *" required value="{{ post_data.admin_phone|default:'' }}">
                             <i class="fas fa-phone field-icon"></i>
                         </div>
                         
                         <div class="login-field">
-                            <input type="text" name="admin_id_number" placeholder="ID Number" value="{{ post_data.admin_id_number|default:'' }}">
+                            <input type="text" name="admin_id_number" placeholder="ID Number (optional)" value="{{ post_data.admin_id_number|default:'' }}">
                             <i class="fas fa-id-card field-icon"></i>
                         </div>
 
@@ -187,6 +188,8 @@
                             <button type="button" class="btn-secondary-light w-50" onclick="prevStep(3)" style="border-radius: 50px; border: 1px solid #d1d5db; color: #4b5563; padding: 12px;">
                                 <i class="fas fa-arrow-left"></i> Back
                             </button>
+                            
+                            <!-- Submit Button -->
                             <button type="submit" class="btn-login-gradient w-50">
                                 <i class="fas fa-paper-plane"></i> Submit
                             </button>
@@ -521,16 +524,49 @@
 
 {% block extra_js %}
 <script>
+    let currentStep = 1;
+
     function nextStep(step) {
+        if (!validateStep(currentStep)) return;
+
         document.querySelectorAll('.step').forEach(el => el.style.display = 'none');
         document.getElementById('step' + step).style.display = 'block';
         document.getElementById('progressBar').style.width = (step * 25) + '%';
+        currentStep = step;
     }
 
     function prevStep(step) {
         document.querySelectorAll('.step').forEach(el => el.style.display = 'none');
         document.getElementById('step' + step).style.display = 'block';
         document.getElementById('progressBar').style.width = (step * 25) + '%';
+        currentStep = step;
+    }
+
+    function validateStep(stepNumber) {
+        const stepDiv = document.getElementById('step' + stepNumber);
+        const inputs = stepDiv.querySelectorAll('input[required]');
+        let isValid = true;
+
+        inputs.forEach(input => {
+            if (!input.value.trim()) {
+                isValid = false;
+                input.reportValidity();
+            }
+        });
+
+        if (stepNumber === 4) {
+            const pw = document.getElementById('password').value;
+            const pwConfirm = document.getElementById('password_confirm').value;
+            if (pw !== pwConfirm) {
+                isValid = false;
+                document.getElementById('password_confirm').setCustomValidity("Passwords do not match.");
+                document.getElementById('password_confirm').reportValidity();
+            } else {
+                document.getElementById('password_confirm').setCustomValidity("");
+            }
+        }
+
+        return isValid;
     }
 
     function togglePassword(inputId) {
@@ -547,5 +583,12 @@
             icon.classList.add('fa-lock');
         }
     }
+
+    document.getElementById('wizardForm').addEventListener('submit', function(e) {
+        e.preventDefault(); 
+        if (validateStep(4)) {
+            this.submit(); 
+        }
+    });
 </script>
 {% endblock %}

@@ -357,7 +357,8 @@ def apply_company(request):
 
         if errors:
             for e in errors:
-                messages.error(request, e)
+                # Add 'modal-error' so base.html triggers the red popup
+                messages.error(request, e, extra_tags='modal-error')
             return render(request, 'account/apply_company.html', {'post_data': request.POST})
 
         try:
@@ -380,11 +381,19 @@ def apply_company(request):
                 password_hash=make_password(password),
                 status='pending'
             )
-            messages.success(request, "Application submitted successfully! Our team will review it and contact you shortly.")
+            
+            # Add 'modal-success' so base.html triggers the green popup
+            messages.success(
+                request, 
+                "Application submitted successfully! Our team will review it and contact you shortly.", 
+                extra_tags='modal-success'
+            )
             return redirect('/auth/login/')
+            
         except Exception as e:
             logger.exception("Company application failed")
-            messages.error(request, f"An error occurred: {e}")
+            # Add 'modal-error' so base.html triggers the red popup
+            messages.error(request, f"An error occurred: {e}", extra_tags='modal-error')
             return render(request, 'account/apply_company.html', {'post_data': request.POST})
 
     return render(request, 'account/apply_company.html')
