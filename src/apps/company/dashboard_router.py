@@ -2,8 +2,7 @@ from django.shortcuts import redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.urls import reverse
-
-
+from django.http import HttpResponseRedirect
 
 @login_required
 def dashboard_router(request):
@@ -12,6 +11,25 @@ def dashboard_router(request):
 
     # 1. CUSTOMERS (Must be first!)
     if getattr(user, 'role', None) == 'customer':
+        # Check if we are on a company domain or the system domain
+        current_company = getattr(request, 'company', None) or getattr(request, 'current_company', None)
+        
+        if not current_company:
+            # We are on the system domain. Find the customer's company and redirect them there.
+            customer = user.customer_profiles.first()
+            if customer and customer.company:
+                company = customer.company
+                if company.custom_domain:
+                    # Send them to their company's custom domain
+                    return HttpResponseRedirect(f"http://{company.custom_domain}/customers/dashboard/")
+                else:
+                    # Fallback if custom domain isn't set (useful for local testing)
+                    return HttpResponseRedirect(f"/customers/dashboard/?company_id={company.id}")
+            else:
+                messages.error(request, "No customer profile found.")
+                return redirect('/no-access/')
+
+        # If we ARE on the company domain, just go to the dashboard
         return redirect('customers:dashboard')
 
     # 2. SUPER ADMIN
@@ -48,6 +66,5 @@ def dashboard_router(request):
         'No dashboard is configured for your account. Please contact support.'
     )
     return redirect('/no-access/')
-
 
     

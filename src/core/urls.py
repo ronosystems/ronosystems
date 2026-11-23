@@ -9,6 +9,7 @@ from apps.accounts import views_guest
 from core.views import qz_sign, contact, manifest_view, service_worker, asset_links, admin_contact_messages
 from . import views
 
+
 # ============================================
 # ADMIN SITE CUSTOMIZATION
 # ============================================
@@ -39,6 +40,7 @@ urlpatterns = [
     # ============================================
     # WEB AUTH — allauth
     # ============================================
+    path('accounts/', include('allauth.urls')), 
     path('auth/', include('allauth.urls')),
     path('auth/', include('apps.accounts.web_urls', namespace='web_accounts')),
     path('auth/apply-company/', views_guest.apply_company, name='apply_company'),

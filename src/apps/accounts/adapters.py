@@ -163,5 +163,5 @@ class RonoAccountAdapter(DefaultAccountAdapter):
     def get_login_redirect_url(self, request):
         user = request.user
         if user.is_authenticated and user.role == 'customer':
-            return reverse('customers:dashboard')
+            return reverse('dashboard-router') 
         return super().get_login_redirect_url(request)

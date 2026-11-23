@@ -183,12 +183,22 @@ def customer_profile(request):
 
 @login_required(login_url='account_login')
 def customer_dashboard(request):
+    # 1. Try to get the company from middleware (custom domain)
     current_company = getattr(request, 'company', None) or getattr(request, 'current_company', None)
+    
+    # 2. FALLBACK: If on the system domain, get the company from the URL query parameter
+    if not current_company:
+        company_id = request.GET.get('company_id')
+        if company_id:
+            current_company = Company.objects.filter(id=company_id).first()
+
+    # 3. Fetch the customer profile for this specific company
     customer = request.user.customer_profiles.filter(company=current_company).first()
 
     if not customer:
         messages.error(request, "You do not have a customer profile set up for this store.")
         return redirect('home')
+
 
     # ---------- PROFILE PHOTO UPLOAD ----------
     if request.method == 'POST' and 'update_photo' in request.POST:
