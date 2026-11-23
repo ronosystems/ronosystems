@@ -1,15 +1,124 @@
 {% extends "customer_base.html" %}
 {% load static %}
 
-{% block title %}My Profile{% endblock %}
+{% block title %}My Profile & KYC{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       THEME OVERRIDES FOR PROFILE
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+        background: #ffffff;
+        height: 100%;
+    }
+    .card-header {
+        background: var(--dash-primary) !important;
+        border-bottom: 2px solid #000000;
+        padding: 10px 18px;
+        border-radius: 0 !important;
+    }
+    .card-header h5, .card-header h6 {
+        color: #ffffff !important;
+        font-weight: 700;
+        margin: 0;
+        text-transform: uppercase;
+        font-size: 13px;
+        letter-spacing: 0.6px;
+    }
+    .card-header i {
+        margin-right: 6px;
+        color: var(--dash-green) !important;
+    }
+
+    /* Form Inputs */
+    .form-label {
+        text-transform: uppercase;
+        font-size: 11px;
+        letter-spacing: 0.5px;
+        color: #444;
+    }
+    .form-control {
+        border: 2px solid #ced4da;
+        border-radius: 4px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #000;
+    }
+    .form-control:focus {
+        border-color: var(--dash-primary);
+        box-shadow: none;
+    }
+
+    /* KYC Upload Blocks */
+    .kyc-upload-box {
+        background: #f8f9fa;
+        border: 2px solid #000;
+        border-radius: 4px;
+        padding: 15px;
+        height: 100%;
+    }
+    .kyc-upload-box .form-label {
+        font-weight: 800;
+        font-size: 12px;
+    }
+    .kyc-upload-box .badge {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border: 1px solid #000;
+    }
+    
+    /* Buttons */
+    .btn {
+        border-radius: 4px;
+        font-weight: 700;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-width: 2px;
+    }
+    .btn-dark {
+        background: var(--dash-primary);
+        border-color: #000;
+    }
+    .btn-dark:hover {
+        background: var(--dash-primary-2);
+        border-color: #000;
+    }
+    .btn-warning {
+        background: var(--dash-green);
+        color: #000;
+        border-color: #000;
+    }
+    .btn-warning:hover {
+        background: var(--dash-green-bd);
+        color: #000;
+        border-color: #000;
+    }
+    
+    .section-divider {
+        border-top: 2px dashed #ccc;
+        margin: 25px 0 15px 0;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-2">
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <!-- HEADER -->
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
         <div>
-            <h3 class="fw-bold mb-1">My Profile & KYC</h3>
-            <p class="text-muted mb-0">Manage your personal details.</p>
+            <h3 class="fw-bold mb-1" style="color: var(--dash-primary); text-transform: uppercase; letter-spacing: 1px;">
+                My Profile & KYC
+            </h3>
+            <p class="text-muted mb-0 fw-bold" style="font-size: 13px;">
+                Manage your personal details and upload required documentation.
+            </p>
         </div>
     </div>
 
@@ -17,9 +126,9 @@
         
         <!-- LEFT COLUMN: Personal Details & Next of Kin -->
         <div class="col-lg-5">
-            <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px;">
-                <div class="card-header bg-white border-0 pt-4 pb-0">
-                    <h5 class="fw-bold mb-0"><i class="fas fa-user-edit text-primary me-2"></i> Personal Info</h5>
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5><i class="fas fa-user-edit"></i> Personal Info</h5>
                 </div>
                 <div class="card-body p-4">
                     <form method="POST">
@@ -27,44 +136,46 @@
                         <input type="hidden" name="action" value="update_details">
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold small text-muted">Full Name</label>
+                            <label class="form-label fw-bold">Full Name</label>
                             <input type="text" name="full_name" class="form-control" value="{{ customer.full_name }}" required>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold small text-muted">ID Number</label>
+                            <label class="form-label fw-bold">ID Number</label>
                             <input type="text" name="national_id" class="form-control" value="{{ customer.national_id|default:'' }}">
                         </div>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold small text-muted">Phone Number</label>
+                            <label class="form-label fw-bold">Phone Number</label>
                             <input type="tel" name="phone_number" class="form-control" value="{{ customer.phone_number }}" required>
                         </div>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold small text-muted">Email Address</label>
+                            <label class="form-label fw-bold">Email Address</label>
                             <input type="email" name="email" class="form-control" value="{{ customer.email|default:'' }}">
                         </div>
 
                         <div class="mb-4">
-                            <label class="form-label fw-bold small text-muted">Location / Address</label>
+                            <label class="form-label fw-bold">Location / Address</label>
                             <input type="text" name="location" class="form-control" value="{{ customer.location|default:'' }}">
                         </div>
 
-                        <h6 class="fw-bold text-muted mt-4 mb-3 border-top pt-3">Next of Kin</h6>
+                        <div class="section-divider"></div>
+
+                        <h6 class="fw-bold text-dark mb-3 text-uppercase" style="font-size: 12px; letter-spacing: 1px;">Next of Kin</h6>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold small text-muted">Next of Kin Name</label>
+                            <label class="form-label fw-bold">Next of Kin Name</label>
                             <input type="text" name="next_of_kin_name" class="form-control" value="{{ customer.next_of_kin_name|default:'' }}">
                         </div>
 
                         <div class="mb-4">
-                            <label class="form-label fw-bold small text-muted">Next of Kin Phone</label>
+                            <label class="form-label fw-bold">Next of Kin Phone</label>
                             <input type="tel" name="next_of_kin_phone" class="form-control" value="{{ customer.next_of_kin_phone|default:'' }}">
                         </div>
 
-                        <button type="submit" class="btn btn-dark fw-bold w-100" style="border-radius: 6px;">
-                            Save Details
+                        <button type="submit" class="btn btn-dark w-100 py-2">
+                            <i class="fas fa-save me-2"></i> Save Details
                         </button>
                     </form>
                 </div>
@@ -73,12 +184,15 @@
 
         <!-- RIGHT COLUMN: KYC Documents -->
         <div class="col-lg-7">
-            <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px;">
-                <div class="card-header bg-white border-0 pt-4 pb-0">
-                    <h5 class="fw-bold mb-0"><i class="fas fa-id-card text-warning me-2"></i> KYC Documents</h5>
-                    <p class="text-muted small mb-0 mt-1">Upload these documents to qualify for Chama loans.</p>
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5><i class="fas fa-id-card"></i> KYC Documents</h5>
                 </div>
                 <div class="card-body p-4">
+                    <p class="text-muted small fw-bold mb-4 text-uppercase" style="letter-spacing: 0.5px;">
+                        Upload your documents HERE.
+                    </p>
+
                     <form method="POST" enctype="multipart/form-data">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="upload_kyc">
@@ -86,76 +200,102 @@
                         <div class="row g-3">
                             <!-- ID Front -->
                             <div class="col-md-6">
-                                <div class="p-3 bg-light rounded h-100" style="border: 1px solid #ddd;">
+                                <div class="kyc-upload-box">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <label class="form-label fw-bold mb-0">ID Front</label>
-                                        {% if customer.id_front_url %}<span class="badge bg-success">Uploaded</span>{% else %}<span class="badge bg-danger">Missing</span>{% endif %}
+                                        <label class="form-label mb-0">ID Front</label>
+                                        {% if customer.id_front_url %}
+                                            <span class="badge bg-success text-white">Uploaded</span>
+                                        {% else %}
+                                            <span class="badge bg-danger text-white">Missing</span>
+                                        {% endif %}
                                     </div>
                                     {% if customer.id_front_url %}
-                                        <img src="{{ customer.id_front_url }}" class="img-fluid rounded mb-2" style="max-height: 80px;">
+                                        <img src="{{ customer.id_front_url }}" class="img-fluid rounded mb-2 border" style="max-height: 70px; object-fit: contain;">
                                     {% endif %}
-                                    <input type="file" name="id_front" class="form-control form-control-sm" accept="image/*">
+                                    <input type="file" name="id_front" class="form-control form-control-sm mt-2" accept="image/*">
                                 </div>
                             </div>
 
                             <!-- ID Back -->
                             <div class="col-md-6">
-                                <div class="p-3 bg-light rounded h-100" style="border: 1px solid #ddd;">
+                                <div class="kyc-upload-box">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <label class="form-label fw-bold mb-0">ID Back</label>
-                                        {% if customer.id_back_url %}<span class="badge bg-success">Uploaded</span>{% else %}<span class="badge bg-danger">Missing</span>{% endif %}
+                                        <label class="form-label mb-0">ID Back</label>
+                                        {% if customer.id_back_url %}
+                                            <span class="badge bg-success text-white">Uploaded</span>
+                                        {% else %}
+                                            <span class="badge bg-danger text-white">Missing</span>
+                                        {% endif %}
                                     </div>
                                     {% if customer.id_back_url %}
-                                        <img src="{{ customer.id_back_url }}" class="img-fluid rounded mb-2" style="max-height: 80px;">
+                                        <img src="{{ customer.id_back_url }}" class="img-fluid rounded mb-2 border" style="max-height: 70px; object-fit: contain;">
                                     {% endif %}
-                                    <input type="file" name="id_back" class="form-control form-control-sm" accept="image/*">
+                                    <input type="file" name="id_back" class="form-control form-control-sm mt-2" accept="image/*">
                                 </div>
                             </div>
 
                             <!-- Good Conduct -->
                             <div class="col-md-12">
-                                <div class="p-3 bg-light rounded" style="border: 1px solid #ddd;">
+                                <div class="kyc-upload-box">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <label class="form-label fw-bold mb-0">Certificate of Good Conduct</label>
-                                        {% if customer.good_conduct_url %}<span class="badge bg-success">Uploaded</span>{% else %}<span class="badge bg-danger">Missing</span>{% endif %}
+                                        <label class="form-label mb-0">Certificate of Good Conduct</label>
+                                        {% if customer.good_conduct_url %}
+                                            <span class="badge bg-success text-white">Uploaded</span>
+                                        {% else %}
+                                            <span class="badge bg-danger text-white">Missing</span>
+                                        {% endif %}
                                     </div>
                                     {% if customer.good_conduct_url %}
-                                        <a href="{{ customer.good_conduct_url }}" target="_blank" class="btn btn-sm btn-outline-primary mb-2"><i class="fas fa-file-pdf"></i> View File</a>
+                                        <a href="{{ customer.good_conduct_url }}" target="_blank" class="btn btn-sm btn-outline-primary mb-2 fw-bold">
+                                            <i class="fas fa-file-pdf"></i> View File
+                                        </a>
                                     {% endif %}
-                                    <input type="file" name="good_conduct" class="form-control form-control-sm" accept=".pdf, image/*">
+                                    <input type="file" name="good_conduct" class="form-control form-control-sm mt-2" accept=".pdf, image/*">
                                 </div>
                             </div>
 
                             <!-- KRA PIN -->
                             <div class="col-md-6">
-                                <div class="p-3 bg-light rounded h-100" style="border: 1px solid #ddd;">
+                                <div class="kyc-upload-box">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <label class="form-label fw-bold mb-0">KRA PIN Certificate</label>
-                                        {% if customer.kra_pin_url %}<span class="badge bg-success">Uploaded</span>{% else %}<span class="badge bg-danger">Missing</span>{% endif %}
+                                        <label class="form-label mb-0">KRA PIN</label>
+                                        {% if customer.kra_pin_url %}
+                                            <span class="badge bg-success text-white">Uploaded</span>
+                                        {% else %}
+                                            <span class="badge bg-danger text-white">Missing</span>
+                                        {% endif %}
                                     </div>
                                     {% if customer.kra_pin_url %}
-                                        <a href="{{ customer.kra_pin_url }}" target="_blank" class="btn btn-sm btn-outline-primary mb-2"><i class="fas fa-file-pdf"></i> View File</a>
+                                        <a href="{{ customer.kra_pin_url }}" target="_blank" class="btn btn-sm btn-outline-primary mb-2 fw-bold">
+                                            <i class="fas fa-file-pdf"></i> View File
+                                        </a>
                                     {% endif %}
-                                    <input type="file" name="kra_pin" class="form-control form-control-sm" accept=".pdf, image/*">
+                                    <input type="file" name="kra_pin" class="form-control form-control-sm mt-2" accept=".pdf, image/*">
                                 </div>
                             </div>
 
                             <!-- CV -->
                             <div class="col-md-6">
-                                <div class="p-3 bg-light rounded h-100" style="border: 1px solid #ddd;">
+                                <div class="kyc-upload-box">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <label class="form-label fw-bold mb-0">Curriculum Vitae (CV)</label>
-                                        {% if customer.cv_url %}<span class="badge bg-success">Uploaded</span>{% else %}<span class="badge bg-danger">Missing</span>{% endif %}
+                                        <label class="form-label mb-0">CV</label>
+                                        {% if customer.cv_url %}
+                                            <span class="badge bg-success text-white">Uploaded</span>
+                                        {% else %}
+                                            <span class="badge bg-danger text-white">Missing</span>
+                                        {% endif %}
                                     </div>
                                     {% if customer.cv_url %}
-                                        <a href="{{ customer.cv_url }}" target="_blank" class="btn btn-sm btn-outline-primary mb-2"><i class="fas fa-file-pdf"></i> View File</a>
+                                        <a href="{{ customer.cv_url }}" target="_blank" class="btn btn-sm btn-outline-primary mb-2 fw-bold">
+                                            <i class="fas fa-file-pdf"></i> View File
+                                        </a>
                                     {% endif %}
-                                    <input type="file" name="cv" class="form-control form-control-sm" accept=".pdf, .doc, .docx">
+                                    <input type="file" name="cv" class="form-control form-control-sm mt-2" accept=".pdf, .doc, .docx">
                                 </div>
                             </div>
                         </div>
 
-                        <button type="submit" class="btn btn-warning fw-bold w-100 text-dark mt-4" style="border-radius: 6px;">
+                        <button type="submit" class="btn btn-warning w-100 py-2 mt-4">
                             <i class="fas fa-upload me-2"></i> Upload Documents
                         </button>
                     </form>

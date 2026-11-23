@@ -398,11 +398,14 @@
         <div class="sidebar-profile">
             <div class="profile-img-container">
                 <div class="profile-img-wrap">
-                    {% if request.user.customer_profile.profile_photo_url %}
-                        <img src="{{ request.user.customer_profile.profile_photo_url }}" alt="Profile Photo">
-                    {% else %}
-                        <i class="fas fa-user"></i>
-                    {% endif %}
+                    {# 🚨 FIX: Fetch the customer profile correctly using customer_profiles #}
+                    {% with profile=request.user.customer_profiles.first %}
+                        {% if profile and profile.profile_photo_url %}
+                            <img src="{{ profile.profile_photo_url }}" alt="Profile Photo">
+                        {% else %}
+                            <i class="fas fa-user"></i>
+                        {% endif %}
+                    {% endwith %}
                 </div>
                 <!-- Camera Icon to trigger upload -->
                 <label for="photoUpload" class="camera-btn" title="Update Profile Photo">
@@ -416,8 +419,11 @@
                 </form>
             </div>
             
-            <h5>{{ request.user.customer_profile.full_name|default:request.user.username }}</h5>
-            <p>Customer Account</p>
+            {# 🚨 FIX: Use the profile variable for the name #}
+            {% with profile=request.user.customer_profiles.first %}
+                <h5>{{ profile.full_name|default:request.user.username }}</h5>
+            {% endwith %}
+            <p> ({{ request.user.customer_profile.full_name|default:request.user.username }})</p>
         </div>
 
         <!-- Sidebar Menu -->
@@ -480,8 +486,11 @@
                 <button class="mobile-toggle" id="mobileToggle">
                     <i class="fas fa-bars"></i>
                 </button>
+                {# 🚨 FIX: Use the profile variable for the top navbar name #}
                 <h1 class="customer-name">
-                    {{ request.user.customer_profile.full_name|default:request.user.username }}
+                    {% with profile=request.user.customer_profiles.first %}
+                        {{ profile.full_name|default:request.user.username }}
+                    {% endwith %}
                 </h1>
             </div>
 
