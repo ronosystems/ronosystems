@@ -75,12 +75,49 @@
         .sidebar.collapsed { width: var(--sidebar-collapsed); }
 
         /* --- Brand --- */
+
+        /* --- Brand --- */
         .sidebar-brand {
             padding: 20px 20px 15px;
             border-bottom: 3px solid #000000;
             text-align: center;
             flex-shrink: 0;
+            
+            /* 👇 VIDEO BACKGROUND LOGIC */
+            position: relative;
+            overflow: hidden; /* Keeps the video inside the rounded/border area */
+            background-color: #000; /* Fallback background */
         }
+        
+        /* The Video Element */
+        .sidebar-brand .brand-video {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            transform: translate(-50%, -50%);
+            object-fit: cover;
+            z-index: 0; /* Sits behind the overlay */
+        }
+
+        /* Dark overlay to keep text readable over the video */
+        .sidebar-brand::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.6); /* 60% dark overlay */
+            z-index: 1;
+        }
+
+        /* Ensure content sits above the video and overlay */
+        .sidebar-brand > *:not(.brand-video) {
+            position: relative;
+            z-index: 2;
+        }
+
         .sidebar-brand .logo-icon {
             font-size: 2.2rem;
             color: #fff;
@@ -88,7 +125,8 @@
         .sidebar-brand .logo-img {
             max-width: 80px;
             max-height: 80px;
-            border-radius: 4px;
+            border-radius: 50%; /* 👈 Makes it a perfect circle */
+            object-fit: cover;  /* 👈 Prevents the image from stretching */
             margin-bottom: 8px;
             border: 2px solid #000000;
         }
@@ -97,17 +135,21 @@
             margin: 8px 0 0;
             color: #fff;
             letter-spacing: 0.5px;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8); /* Better contrast */
         }
         .sidebar-brand .company-name {
             font-size: 0.7rem;
-            color: rgba(255,255,255,0.8);
+            color: rgba(255,255,255,0.9);
             margin-top: 2px;
             display: block;
         }
+        /* Collapsed state adjustments */
         .sidebar.collapsed .sidebar-brand h5,
         .sidebar.collapsed .sidebar-brand .company-name { display: none; }
-        .sidebar.collapsed .sidebar-brand .logo-img { max-width: 45px; max-height: 45px; }
+        .sidebar.collapsed .sidebar-brand .logo-img { max-width: 45px; max-height: 45px; border-radius: 50%;}
         .sidebar.collapsed .sidebar-brand .logo-icon { font-size: 1.5rem; }
+
+
 
         /* --- Nav wrapper --- */
         .sidebar-nav-wrapper {
@@ -583,6 +625,14 @@
     ============================================ -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-brand">
+            {# 👇 USE THE COMPANY'S HERO VIDEO (Not the site one) #}
+            {% if current_company and current_company.hero_video_url %}
+            <video autoplay loop muted playsinline class="brand-video">
+                <source src="{{ current_company.hero_video_url }}" type="video/mp4">
+            </video>
+            {% endif %}
+
+            {# Logo and Text (unchanged) #}
             {% if current_company %}
                 {% if current_company.logo %}
                     <img src="{{ current_company.logo_url }}" alt="{{ current_company.display_name }}" class="logo-img">
@@ -595,6 +645,7 @@
                     <h5>{{ current_company.display_name }}</h5>
                 </span>
             {% else %}
+                {# System Fallbacks for Super Admin #}
                 {% if site_logo_url %}
                     <img src="{{ site_logo_url }}" alt="{{ system_name }}" class="logo-img">
                 {% else %}
@@ -605,7 +656,7 @@
                 </span>
             {% endif %}
         </div>
-
+        
         <div class="sidebar-nav-wrapper" id="sidebarNavWrapper">
             <nav class="sidebar-nav">
                 <ul class="nav flex-column">
@@ -826,6 +877,8 @@
     </aside>
     {% endif %}
 
+
+    
     <!-- ============================================
          MAIN CONTENT
     ============================================ -->

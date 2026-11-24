@@ -429,14 +429,10 @@ class Company(models.Model):
     # ============================================
     # MEDIA URL HELPERS (Cloudinary / local)
     # ============================================
-
     @staticmethod
-    def _build_media_url(key) -> str | None:
+    def _build_media_url(key, resource_type='image') -> str | None:
         """
         Build a delivery URL for a stored Cloudinary public_id.
-
-        Falls back to the local MEDIA_URL prefix if Cloudinary isn't
-        configured (dev with USE_CLOUDINARY_MEDIA=False).
         """
         if not key:
             return None
@@ -451,14 +447,14 @@ class Company(models.Model):
         cfg = getattr(django_settings, 'CLOUDINARY_STORAGE', {})
         cloud_name = cfg.get('CLOUD_NAME', '')
         if cloud_name:
-            return f"https://res.cloudinary.com/{cloud_name}/image/upload/{key}"
+            # 👇 Use the dynamic resource_type (image or video)
+            return f"https://res.cloudinary.com/{cloud_name}/{resource_type}/upload/{key}"
 
-        # Local filesystem fallback (dev with USE_CLOUDINARY_MEDIA=False)
+        # Local filesystem fallback
         media_url = getattr(django_settings, 'MEDIA_URL', '/media/')
         if not media_url.endswith('/'):
             media_url += '/'
         return f"{media_url}{key}"
-
 
         
     @property
@@ -512,7 +508,8 @@ class Company(models.Model):
 
     @property
     def hero_video_url(self):
-        return self._build_media_url(self.hero_video)
+        # 👇 Force Cloudinary to use the /video/upload/ path
+        return self._build_media_url(self.hero_video, resource_type='video')
 
     @property
     def hero_image_url(self):
