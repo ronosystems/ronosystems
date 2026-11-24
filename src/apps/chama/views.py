@@ -593,10 +593,14 @@ def member_create(request):
             )
             return redirect('chama:member_list')
     else:
+        # 👇 UPDATED: Set default custom loan limit to 0
         form = MemberForm(
             company=company,
-            initial={'joined_on': timezone.localdate()},
-            fallback_password=fallback_password,   # 👈 pass dynamic default
+            initial={
+                'joined_on': timezone.localdate(),
+                'custom_loan_limit': 0, 
+            },
+            fallback_password=fallback_password,
         )
 
     return render(request, 'chama/member_form.html', {
@@ -620,7 +624,7 @@ def member_edit(request, pk):
             request.FILES,
             instance=member,
             company=company,
-            fallback_password=fallback_password,   # 👈 pass (form ignores it when user has usable password)
+            fallback_password=fallback_password,
         )
         if form.is_valid():
             m = form.save(commit=False)
@@ -701,10 +705,11 @@ def member_edit(request, pk):
             messages.success(request, f'✅ Member "{m.full_name}" updated.')
             return redirect('chama:member_list')
     else:
+        # 👇 UPDATED: Passing `instance=member` automatically pre-fills the current custom_loan_limit
         form = MemberForm(
-            instance=member,
+            instance=member, 
             company=company,
-            fallback_password=fallback_password,   # 👈 pass (placeholder logic self-selects on edit)
+            fallback_password=fallback_password,
         )
 
     return render(request, 'chama/member_form.html', {

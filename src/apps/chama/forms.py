@@ -1,6 +1,9 @@
 from django import forms
 from django.contrib.auth import get_user_model
 import datetime
+from django import forms
+from django.utils import timezone
+from .models import Member, MembershipType
 from .models import (
     MembershipType, Member,
     Savings, Contribution, Fine,
@@ -47,70 +50,118 @@ def _get_chama_role_choices():
 # ============================================================
 # MEMBER FORM
 # ============================================================
+
 class MemberForm(forms.ModelForm):
-    role = forms.ChoiceField(
-        choices=[],
-        required=False,
-        widget=forms.Select(attrs={'class': 'form-control'}),
-        help_text="Assigns the Chama role to this member's linked user account.",
+    # Explicitly define the field to override the default required=True
+    custom_loan_limit = forms.DecimalField(
+        required=False, 
+        initial=0,
+        max_digits=12, 
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control', 
+            'step': '0.01',
+            'placeholder': '0.00'
+        }),
+        help_text="Leave as 0 to use the default 3x contribution limit."
     )
 
+    # We also need to handle the password field manually since it's not a direct model field
     default_password = forms.CharField(
         required=False,
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Leave blank to use default password'
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control', 
+            'placeholder': 'Leave blank to use default'
         }),
-        help_text="Sets the password for this member's linked user account.",
+        help_text="Leave blank to use the default company password."
+    )
+
+    # Hidden field to pass the role
+    role = forms.ChoiceField(
+        choices=[
+            ('member', 'Member'),
+            ('chairperson', 'Chairperson'),
+            ('vice_chairperson', 'Vice Chairperson'),
+            ('treasurer', 'Treasurer'),
+            ('secretary', 'Secretary'),
+            ('vice_secretary', 'Vice Secretary'),
+            ('loan_officer', 'Loan Officer'),
+        ],
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'})
     )
 
     class Meta:
         model = Member
         fields = [
-            'full_name', 'phone', 'email', 'national_id',
+            'full_name', 'phone', 'email', 'national_id', 
             'membership_type', 'status', 'joined_on',
-            'passport_photo', 'id_front', 'id_back',
-            'kra_certificate', 'good_conduct', 'custom_loan_limit', 
+            'custom_loan_limit', # Added here
+            'passport_photo', 'id_front', 'id_back', 
+            'kra_certificate', 'good_conduct'
         ]
         widgets = {
-            'full_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Full name'}),
-            'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+254...'}),
-            'email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'national_id': forms.TextInput(attrs={'class': 'form-control'}),
-            'membership_type': forms.Select(attrs={'class': 'form-control'}),
-            'status': forms.Select(attrs={'class': 'form-control'}),
+            'full_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. John Doe'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. 0712345678'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'e.g. john@example.com'}),
+            'national_id': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. 12345678'}),
+            'membership_type': forms.Select(attrs={'class': 'form-select'}),
+            'status': forms.Select(attrs={'class': 'form-select'}),
             'joined_on': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'passport_photo': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
-            'id_front': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
-            'id_back': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
-            'kra_certificate': forms.FileInput(attrs={'class': 'form-control', 'accept': '.pdf,image/*'}),
-            'good_conduct': forms.FileInput(attrs={'class': 'form-control', 'accept': '.pdf,image/*'}),
         }
 
-    def __init__(self, *args, company=None, fallback_password=None, **kwargs):
+    def __init__(self, *args, **kwargs):
+        # Extract custom kwargs passed from the view
+        self.company = kwargs.pop('company', None)
+        fallback_password = kwargs.pop('fallback_password', '')
+        
         super().__init__(*args, **kwargs)
 
-        if company:
-            self.fields['membership_type'].queryset = (
-                self.fields['membership_type'].queryset.filter(company=company, is_active=True)
+        # 1. Filter Membership Types by Company
+        if self.company:
+            self.fields['membership_type'].queryset = MembershipType.objects.filter(
+                company=self.company
             )
-        self.fields['membership_type'].required = False
-        self.fields['role'].choices = [('', '— Select Chama Role —')] + _get_chama_role_choices()
+            
+        # 2. Handle default password placeholder logic
+        if fallback_password:
+            self.fields['default_password'].widget.attrs['placeholder'] = f"Default: {fallback_password}"
 
-        if self.instance and self.instance.pk and self.instance.user:
-            self.fields['role'].initial = self.instance.user.role
-            if self.instance.user.has_usable_password():
-                self.fields['default_password'].widget.attrs['placeholder'] = (
-                    'Leave blank to keep current password'
-                )
-                self.fields['default_password'].help_text = (
-                    'Type a new password to override the current one. Leave blank to keep it.'
-                )
-        else:
-            if fallback_password:
-                self.fields['default_password'].widget.attrs['placeholder'] = (
-                    f'Leave blank to use default ({fallback_password})'
-                )
+        # 3. If EDITING an existing member, update the loan limit label
+        if self.instance and self.instance.pk:
+            self.fields['custom_loan_limit'].help_text = (
+                f"Current limit: KES {self.instance.custom_loan_limit:,.2f}. "
+                "Set to 0 to revert to the 3x contribution limit."
+            )
+            
+        # 4. Ensure required fields match your form layout
+        self.fields['full_name'].required = True
+        self.fields['phone'].required = True
+        
+        # 5. Clean up date input formats
+        self.fields['joined_on'].input_formats = ['%Y-%m-%d']
+
+    def clean_custom_loan_limit(self):
+        """Ensure that if the field is left blank, it saves as 0."""
+        limit = self.cleaned_data.get('custom_loan_limit')
+        if limit is None:
+            return 0
+        return limit
+
+    def clean_phone(self):
+        """Ensure phone number formatting and uniqueness if needed."""
+        phone = self.cleaned_data.get('phone')
+        if phone:
+            # Standardize phone format (optional)
+            phone = phone.strip()
+            
+            # Check for duplicates in the same company (excluding self on edit)
+            qs = Member.objects.filter(company=self.company, phone=phone)
+            if self.instance and self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise forms.ValidationError("A member with this phone number already exists.")
+        return phone
 
 
 # ============================================================
