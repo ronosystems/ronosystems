@@ -417,6 +417,9 @@ def company_application_list(request):
 
     context = {
         'applications': applications,
+        'pending_count': applications.count(),
+        'approved_count': CompanyApplication.objects.filter(status='approved').count(),
+        'rejected_count': CompanyApplication.objects.filter(status='rejected').count(),
         'page_title': 'Company Applications',
         'page_subtitle': 'Pending reviews',
     }

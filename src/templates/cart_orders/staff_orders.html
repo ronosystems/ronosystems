@@ -4,409 +4,799 @@
 {% block title %}Orders — {{ current_company.name }}{% endblock %}
 {% block breadcrumb %}Orders{% endblock %}
 
-{% block content %}
+{% block extra_css %}
 <style>
-    /* Card Styling */
+    /* ============================================
+       EXCEL-LIKE TABLE STYLING
+    ============================================ */
+    .table-excel {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .table-excel th,
+    .table-excel td {
+        border-left: 1px solid #000000 !important;
+        border-right: 1px solid #000000 !important;
+        border-top: 1px solid #000000 !important;
+        border-bottom: 1px solid #000000 !important;
+        padding: 8px 12px;
+        vertical-align: middle;
+    }
+
+    .table-excel thead th {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+        font-weight: 600;
+        border-bottom: 2px solid #000000 !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    .table-excel tbody td {
+        background-color: #ffffff;
+        color: #000000;
+    }
+
+    .table-excel tbody tr:hover td {
+        background-color: #f5f5f5;
+    }
+
+    .table-excel tbody tr:nth-child(even) td {
+        background-color: #f9f9f9;
+    }
+
+    .table-excel tbody tr:nth-child(even):hover td {
+        background-color: #f0f0f0;
+    }
+
+    /* ============================================
+       STAT CARDS
+    ============================================ */
+    .stat-card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        transition: transform 0.2s;
+        cursor: default;
+    }
+    .stat-card:hover { transform: translateY(-5px); }
+    .stat-card.bg-primary { background: #87CEEB !important; color: #000000 !important; }
+    .stat-card.bg-primary h3 { color: #000000 !important; }
+    .stat-card.bg-primary small { color: #000000 !important; }
+    .stat-card.bg-success { background: #d4edda !important; color: #155724 !important; }
+    .stat-card.bg-success h3 { color: #155724 !important; }
+    .stat-card.bg-success small { color: #155724 !important; }
+    .stat-card.bg-warning { background: #fff3cd !important; color: #000000 !important; }
+    .stat-card.bg-warning h3 { color: #856404 !important; }
+    .stat-card.bg-warning small { color: #856404 !important; }
+    .stat-card.bg-danger { background: #f8d7da !important; color: #721c24 !important; }
+    .stat-card.bg-danger h3 { color: #721c24 !important; }
+    .stat-card.bg-danger small { color: #721c24 !important; }
+
+    /* ============================================
+       CARD STYLING
+    ============================================ */
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    .card-body { color: #000000; }
+
+    /* ============================================
+       BUTTONS
+    ============================================ */
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-outline-info {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    .btn-outline-info:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-outline-primary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    .btn-outline-primary:hover {
+        background-color: #87CEEB;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-outline-danger {
+        border: 2px solid #000000;
+        color: #dc3545;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    .btn-outline-danger:hover {
+        background-color: #dc3545;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    .btn-outline-secondary {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    .btn-outline-secondary:hover {
+        background-color: #f8f9fa;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-outline-dark {
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    .btn-outline-dark:hover {
+        background-color: #2d3436;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    .btn-outline-warning {
+        border: 2px solid #000000;
+        color: #856404;
+        border-radius: 4px;
+        font-weight: 600;
+        background: transparent;
+    }
+    .btn-outline-warning:hover {
+        background-color: #fff3cd;
+        border-color: #000000;
+        color: #856404;
+    }
+    .btn-warning {
+        background-color: #fff3cd;
+        border: 2px solid #000000;
+        color: #856404;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-warning:hover {
+        background-color: #ffe8a1;
+        border-color: #000000;
+        color: #856404;
+    }
+    .btn-success {
+        background-color: #d4edda;
+        border: 2px solid #000000;
+        color: #155724;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-success:hover {
+        background-color: #c3e6cb;
+        border-color: #000000;
+        color: #155724;
+    }
+    .btn-danger {
+        background-color: #f8d7da;
+        border: 2px solid #000000;
+        color: #721c24;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-danger:hover {
+        background-color: #f5c6cb;
+        border-color: #000000;
+        color: #721c24;
+    }
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-secondary:hover {
+        background-color: #e2e6ea;
+        border-color: #000000;
+        color: #000000;
+    }
+    .btn-dark {
+        background-color: #2d3436;
+        border: 2px solid #000000;
+        color: #ffffff;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-dark:hover {
+        background-color: #1e2223;
+        border-color: #000000;
+        color: #ffffff;
+    }
+    .btn-sm { padding: 4px 12px; font-size: 12px; }
+
+    /* ============================================
+       BADGES
+    ============================================ */
+    .badge {
+        padding: 4px 10px;
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid #000000;
+        white-space: nowrap;
+    }
+    .badge.bg-info    { background: #cce5ff !important; color: #004085 !important; }
+    .badge.bg-secondary { background: #f8f9fa !important; color: #000000 !important; }
+    .badge.bg-primary { background: #87CEEB !important; color: #000000 !important; }
+    .badge.bg-success { background: #d4edda !important; color: #155724 !important; }
+    .badge.bg-danger  { background: #f8d7da !important; color: #721c24 !important; }
+    .badge.bg-warning { background: #fff3cd !important; color: #856404 !important; }
+    .badge.bg-dark    { background: #2d3436 !important; color: #ffffff !important; }
+    .badge.bg-light   { background: #f8f9fa !important; color: #000000 !important; }
+
+    /* ============================================
+       TEXT MUTED OVERRIDE
+    ============================================ */
+    .text-muted { color: #000000 !important; }
+    small.text-muted { color: #000000 !important; }
+
+    /* ============================================
+       MOBILE ORDER CARDS
+    ============================================ */
     .staff-order-card {
-        border: 2px solid #ffc107; /* Default (Yellow/New) */
-        border-radius: 8px;
+        border: 2px solid #000000;
+        border-radius: 4px;
         background: #fff;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
         overflow: hidden;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        box-shadow: none;
         height: 100%;
     }
 
-    /* Status-specific borders */
-    .staff-order-card.status-picked { border-color: #0dcaf0; }
-    .staff-order-card.status-confirmed { border-color: #0d6efd; }
-    .staff-order-card.status-fulfilled { border-color: #198754; }
-    .staff-order-card.status-cancelled { border-color: #dc3545; }
-    .staff-order-card.status-completed { border-color: #6c757d; }
+    /* Status-specific left accent bar (keeps black border) */
+    .staff-order-card.status-picked    { border-left: 6px solid #0dcaf0 !important; }
+    .staff-order-card.status-confirmed { border-left: 6px solid #0d6efd !important; }
+    .staff-order-card.status-fulfilled { border-left: 6px solid #ffc107 !important; }
+    .staff-order-card.status-cancelled { border-left: 6px solid #dc3545 !important; }
+    .staff-order-card.status-completed { border-left: 6px solid #6c757d !important; }
 
     .card-top-bar {
-        border-bottom: 1px solid #eee;
+        border-bottom: 1px solid #000000;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        background: #f8f9fa;
+        background: #87CEEB;
     }
 
     .info-box {
-        background: #f1f3f5;
+        background: #f9f9f9;
+        border: 1px solid #000000;
         border-radius: 4px;
     }
-    
-    .product-card {
-        transition: transform 0.2s, box-shadow 0.2s;
-        border-radius: 8px;
+
+    /* ============================================
+       MODAL STYLING
+    ============================================ */
+    .modal-content {
+        border: 2px solid #000000 !important;
+        border-radius: 4px !important;
+        box-shadow: none !important;
+    }
+    .modal-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000 !important;
+        color: #000000 !important;
+        border-radius: 0 !important;
+    }
+    .modal-header.bg-primary,
+    .modal-header.bg-danger {
+        background-color: #87CEEB !important;
+        color: #000000 !important;
+    }
+    .modal-header .modal-title {
+        color: #000000 !important;
+        font-weight: 700;
+    }
+    .modal-header .btn-close {
+        filter: none;
+        opacity: 1;
+    }
+    .modal-body {
+        color: #000000 !important;
+        background: #ffffff;
+    }
+    .modal-body .bg-light {
+        background-color: #f9f9f9 !important;
+        border: 1px solid #000000 !important;
+    }
+    .modal-body p { color: #000000 !important; }
+    .modal-body strong { color: #000000 !important; }
+    .modal-body .text-muted { color: #000000 !important; }
+    .modal-body .table-bordered,
+    .modal-body .table-bordered th,
+    .modal-body .table-bordered td {
+        border: 1px solid #000000 !important;
+    }
+    .modal-body .table thead.table-light th {
+        background: #87CEEB !important;
+        color: #000000 !important;
+        border: 1px solid #000000 !important;
+    }
+    .modal-footer {
+        background-color: #f9f9f9 !important;
+        border-top: 2px solid #000000 !important;
+        border-radius: 0 !important;
+    }
+    .modal-body .alert-danger {
+        background-color: #f8d7da !important;
+        border: 1px solid #000000 !important;
+        color: #721c24 !important;
+    }
+
+    /* ============================================
+       RESPONSIVE
+    ============================================ */
+    @media (max-width: 768px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 4px 6px;
+            font-size: 11px;
+        }
+        .table-excel th { font-size: 10px; }
+        .btn-sm { font-size: 9px; padding: 2px 6px; }
+        .badge { font-size: 9px; padding: 2px 6px; }
+        .stat-card h3 { font-size: 1.3rem; }
+        .stat-card small { font-size: 0.75rem; }
+        .card-body { padding: 12px; }
+        .d-flex.justify-content-between {
+            flex-direction: column;
+            gap: 10px;
+            align-items: flex-start;
+        }
+        .d-flex.justify-content-between .btn {
+            width: 100%;
+            text-align: center;
+        }
+        .btn-primary { font-size: 12px; padding: 6px 12px; }
+    }
+
+    @media (max-width: 480px) {
+        .table-excel th,
+        .table-excel td {
+            padding: 3px 4px;
+            font-size: 9px;
+        }
+        .table-excel th { font-size: 8px; }
+        .btn-sm { font-size: 8px; padding: 1px 4px; }
+        .btn-sm i { font-size: 10px; }
+        .badge { font-size: 8px; padding: 1px 4px; }
+        .stat-card h3 { font-size: 1.1rem; }
+        .stat-card small { font-size: 0.65rem; }
+        .card-body { padding: 10px; }
+        .btn-primary { font-size: 11px; padding: 4px 8px; }
+        .d-flex.justify-content-between p { font-size: 11px; margin-bottom: 0; }
     }
 </style>
+{% endblock %}
 
-<div class="container-fluid py-3 py-md-4">
-    
-    <!-- HEADER (Sticky) -->
-    <div class="d-flex flex-row justify-content-between align-items-center mb-3 gap-2 sticky-top bg-light pt-2 pb-2" style="z-index: 1020; top: 0;">
-        <div>
-            <h5 class="mb-0 fw-bold" style="font-size: 1.1rem;">
-                <i class="fas fa-clipboard-list text-primary me-1"></i> Orders
-            </h5>
-        </div>
-        <div class="d-flex gap-2">
-            <span class="badge bg-warning text-dark p-2 shadow-sm" style="font-size: 12px; border: 1px solid rgba(0,0,0,0.1);" title="Open Orders">
-                <i class="fas fa-clock"></i> {{ total_pending }}
-            </span>
-            <span class="badge bg-success p-2 shadow-sm" style="font-size: 12px; border: 1px solid rgba(0,0,0,0.1);" title="Active Revenue">
-                <i class="fas fa-money-bill"></i> {{ total_revenue|floatformat:0 }}
-            </span>
-        </div>
-    </div>
+{% block content %}
+<div class="row">
+    <div class="col-12">
 
-    <!-- ========================================== -->
-    <!-- DESKTOP: Table                             -->
-    <!-- ========================================== -->
-    <div class="card shadow-sm border-0 d-none d-md-block">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0 align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th style="width: 10%;">Order #</th>
-                            <th style="width: 12%;">Customer</th>
-                            <th style="width: 12%;">Date</th>
-                            <th style="width: 10%;">Selected Shop</th> 
-                            <th style="width: 13%;">Delivery Location</th> 
-                            <th style="width: 10%;">Status</th>
-                            <th style="width: 10%;">Picked By</th>
-                            <th class="text-end" style="width: 8%;">Total Vallue</th>
-                            <th class="text-start ps-3" style="width: 25%;">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for order in orders %}
-                        <tr id="order-row-{{ order.id }}" class="{% if order.status == 'fulfilled' or order.status == 'cancelled' %}table-light{% endif %}">
-                            
-                            <td><span class="badge bg-secondary">#{{ order.order_number }}</span></td>
-                            <td><strong>{{ order.customer_name }}</strong></td>
-                            <td>{{ order.created_at|date:"d M Y, H:i" }}</td>
-                            <td>
-                                <div class="small fw-bold text-dark">
-                                    <i class="fas fa-store text-primary me-1"></i> {{ order.branch.name|default:"Main Shop" }}
-                                </div>
-                            </td>
-                            <td>
-                                <div class="small fw-bold text-dark">
-                                    <i class="fas fa-map-marker-alt text-danger me-1"></i> {{ order.customer_city|default:"-" }}
-                                </div>
-                                <div class="small text-muted text-truncate" style="max-width: 150px;" title="{{ order.customer_address }}">
-                                    {{ order.customer_address|default:"No address provided" }}
-                                </div>
-                            </td>
-                            <td>
-                                {% if order.status == 'new' %}
-                                    <span class="badge bg-warning text-dark">New</span>
-                                {% elif order.status == 'picked' %}
-                                    <span class="badge bg-info text-dark">On Process Now</span>
-                                {% elif order.status == 'confirmed' %}
-                                    <span class="badge bg-primary">Confirmed</span>
-                                {% elif order.status == 'fulfilled' %}
-                                    {% if order.sale and order.sale.payment_status == 'pending' %}
-                                        <span class="badge bg-warning text-dark">Pending Order (POD)</span>
-                                    {% else %}
-                                        <span class="badge bg-success">Completed Order</span>
-                                    {% endif %}
-                                {% elif order.status == 'cancelled' %}
-                                    <span class="badge bg-danger">Cancelled</span>
-                                {% else %}
-                                    <span class="badge bg-secondary">{{ order.get_status_display }}</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if order.assigned_to %}
-                                    <span class="badge bg-secondary">
-                                        <i class="fas fa-user-check"></i> {{ order.assigned_to.get_full_name|default:order.assigned_to.username }}
-                                    </span>
-                                {% else %}
-                                    <span class="badge bg-light text-muted border">Unassigned</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-end fw-bold">KSh {{ order.total_amount|floatformat:2 }}</td>
-                            <td class="text-start ps-3">
-                                <div class="d-flex flex-wrap justify-content-start gap-1">
-                                    {% if order.status == 'new' or not order.assigned_to %}
-                                        <button class="btn btn-sm btn-warning fw-bold" onclick="pickOrder({{ order.id }})">
-                                            <i class="fas fa-hand-paper"></i> Pick Order
-                                        </button>
-                                        
-                                        {% if is_admin %}
-                                        <!-- ADMIN DELETE BUTTON -->
-                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteOrder({{ order.id }})">
-                                            <i class="fas fa-trash"></i> Delete
-                                        </button>
-                                        {% endif %}
-
-                                    {% elif order.status == 'cancelled' %}
-                                        {% if is_admin %}
-                                            <button class="btn btn-sm btn-outline-danger" onclick="showCancelledDetails({{ order.id }})">
-                                                <i class="fas fa-exclamation-triangle"></i> Client Check
-                                            </button>
-                                        {% else %}
-                                            <span class="text-muted small fst-italic">Awaiting Admin</span>
-                                        {% endif %}
-
-                                    {% elif order.status == 'picked' or order.status == 'confirmed' %}
-                                        {% if order.assigned_to == request.user or is_admin %}
-                                            
-                                            <button class="btn btn-sm btn-outline-primary" onclick="showOrderDetails({{ order.id }})">
-                                                <i class="fas fa-eye"></i> View
-                                            </button>
-                                            
-                                            {% if is_admin %}
-                                                <button class="btn btn-sm btn-outline-warning text-dark fw-bold" onclick="unpickOrder({{ order.id }})">
-                                                    <i class="fas fa-unlock"></i> Unpick
-                                                </button>
-                                            {% else %}
-                                                <button class="btn btn-sm btn-outline-danger" onclick="cancelOrder({{ order.id }})">
-                                                    <i class="fas fa-times"></i> Cancel
-                                                </button>
-                                            {% endif %}
-
-                                        {% else %}
-                                            <span class="text-muted small fst-italic">
-                                                <i class="fas fa-info-circle"></i> Handled by {{ order.assigned_to.get_full_name|default:order.assigned_to.username }}
-                                            </span>
-                                        {% endif %}
-
-                                    {% elif order.status == 'fulfilled' %}
-                                        
-                                        {% if order.sale and order.sale.payment_status == 'pending' %}
-                                            <button class="btn btn-sm btn-success fw-bold" onclick="payPendingOrder({{ order.id }})">
-                                                <i class="fas fa-money-bill-wave"></i> Pay Order
-                                            </button>
-                                        {% else %}
-                                            {% if is_admin %}
-                                                <a href="{% url 'cart-orders:order-archive-detail' order.id %}" class="btn btn-sm btn-outline-dark">
-                                                    <i class="fas fa-archive"></i> View Archive
-                                                </a>
-                                            {% endif %}
-                                        {% endif %}
-
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="9" class="text-center text-muted py-5">
-                                <i class="fas fa-inbox fa-3x mb-3 text-muted"></i>
-                                <h5>No orders found</h5>
-                                <p>When customers place orders from the website, they will appear here.</p>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        {# ============================================ #}
+        {# HEADER #}
+        {# ============================================ #}
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <p class="text-muted mb-0">
+                Showing {{ orders|length }} order{{ orders|length|pluralize }}
+                {% if total_pending %}· {{ total_pending }} open{% endif %}
+            </p>
+            <div class="d-flex gap-2">
+                <span class="badge bg-warning" title="Open Orders">
+                    <i class="fas fa-clock"></i> {{ total_pending }} Open
+                </span>
+                <span class="badge bg-success" title="Active Revenue">
+                    <i class="fas fa-money-bill"></i> KSh {{ total_revenue|floatformat:0 }}
+                </span>
             </div>
         </div>
-    </div>
 
-    <!-- ========================================== -->
-    <!-- MOBILE: 2-Column Grid Storefront Style     -->
-    <!-- ========================================== -->
-    <div class="d-block d-md-none">
-        <div class="row row-cols-2 g-2 pb-5">
-            {% for order in orders %}
-            
-            <div class="col">
-                <div class="staff-order-card
-                    {% if order.status == 'picked' %}status-picked
-                    {% elif order.status == 'confirmed' %}status-confirmed
-                    {% elif order.status == 'cancelled' %}status-cancelled
-                    {% elif order.status == 'fulfilled' %}
-                        {% if order.sale and order.sale.payment_status == 'pending' %}status-fulfilled
-                        {% else %}status-completed{% endif %}
-                    {% endif %}" 
-                    id="order-card-{{ order.id }}">
-                    
-                    <!-- Top Bar: Order # & Status -->
-                    <div class="card-top-bar px-2 py-1">
-                        <span class="badge bg-dark" style="font-size: 9px; padding: 3px 4px;">#{{ order.order_number|slice:"-4:" }}</span>
-                        <div>
-                            {% if order.status == 'new' %}
-                                <span class="badge bg-warning text-dark" style="font-size: 9px;">New</span>
-                            {% elif order.status == 'picked' %}
-                                <span class="badge bg-info text-dark" style="font-size: 9px;">Process</span>
-                            {% elif order.status == 'confirmed' %}
-                                <span class="badge bg-primary" style="font-size: 9px;">Confirm</span>
-                            {% elif order.status == 'cancelled' %}
-                                <span class="badge bg-danger" style="font-size: 9px;">Cancel</span>
-                            {% elif order.status == 'fulfilled' %}
-                                <span class="badge bg-success" style="font-size: 9px;">Done</span>
-                            {% else %}
-                                <span class="badge bg-success" style="font-size: 9px;">Done</span>
-                            {% endif %}
-                        </div>
-                    </div>
+        {# ============================================ #}
+        {# DESKTOP TABLE #}
+        {# ============================================ #}
+        <div class="card d-none d-md-block">
+            <div class="card-body p-0">
+                <div class="table-responsive" style="border: 2px solid #000000;">
+                    <table class="table-excel table-hover mb-0 align-middle" id="ordersTable">
+                        <thead>
+                            <tr>
+                                <th style="width:8%;">Order #</th>
+                                <th style="width:11%;">Customer</th>
+                                <th style="width:11%;">Date</th>
+                                <th style="width:10%;">Shop</th>
+                                <th style="width:12%;">Delivery</th>
+                                <th style="width:10%;">Status</th>
+                                <th style="width:10%;">Picked By</th>
+                                <th class="text-end" style="width:8%;">Total</th>
+                                <th class="text-center" style="width:20%;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in orders %}
+                            <tr id="order-row-{{ order.id }}">
+                                <td>
+                                    <span class="badge bg-dark">#{{ order.order_number }}</span>
+                                </td>
+                                <td>
+                                    <strong>{{ order.customer_name }}</strong>
+                                </td>
+                                <td>
+                                    <small style="color:#000000;">{{ order.created_at|date:"Y-m-d" }}</small><br>
+                                    <small style="color:#000000;">{{ order.created_at|date:"H:i" }}</small>
+                                </td>
+                                <td>
+                                    <small class="fw-bold">
+                                        <i class="fas fa-store text-primary me-1"></i>
+                                        {{ order.branch.name|default:"Main Shop" }}
+                                    </small>
+                                </td>
+                                <td>
+                                    <small class="fw-bold">
+                                        <i class="fas fa-map-marker-alt text-danger me-1"></i>
+                                        {{ order.customer_city|default:"-" }}
+                                    </small><br>
+                                    <small class="text-muted text-truncate d-inline-block"
+                                           style="max-width: 150px;"
+                                           title="{{ order.customer_address }}">
+                                        {{ order.customer_address|default:"No address provided" }}
+                                    </small>
+                                </td>
+                                <td>
+                                    {% if order.status == 'new' %}
+                                        <span class="badge bg-warning">New</span>
+                                    {% elif order.status == 'picked' %}
+                                        <span class="badge bg-info">On Process</span>
+                                    {% elif order.status == 'confirmed' %}
+                                        <span class="badge bg-primary">Confirmed</span>
+                                    {% elif order.status == 'fulfilled' %}
+                                        {% if order.sale and order.sale.payment_status == 'pending' %}
+                                            <span class="badge bg-warning">Pending (POD)</span>
+                                        {% else %}
+                                            <span class="badge bg-success">Completed</span>
+                                        {% endif %}
+                                    {% elif order.status == 'cancelled' %}
+                                        <span class="badge bg-danger">Cancelled</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ order.get_status_display }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if order.assigned_to %}
+                                        <span class="badge bg-secondary">
+                                            <i class="fas fa-user-check"></i>
+                                            {{ order.assigned_to.get_full_name|default:order.assigned_to.username }}
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-light">Unassigned</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end fw-bold">KSh {{ order.total_amount|floatformat:2 }}</td>
+                                <td class="text-center">
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        {% if order.status == 'new' or not order.assigned_to %}
+                                            <button class="btn btn-warning" onclick="pickOrder({{ order.id }})">
+                                                <i class="fas fa-hand-paper"></i> Pick
+                                            </button>
+                                            {% if is_admin %}
+                                                <button class="btn btn-outline-danger" onclick="deleteOrder({{ order.id }})">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            {% endif %}
 
-                    <!-- Middle: Info -->
-                    <div class="card-body-custom p-2">
-                        <h6 class="mb-1 fw-bold text-dark text-truncate" style="font-size: 12px;">
-                            {% if order.status == 'new' and not is_admin %}
-                                <span class="text-muted fst-italic">Hidden</span>
-                            {% else %}
-                                {{ order.customer_name }}
-                            {% endif %}
-                        </h6>
-                        
-                        <p class="text-muted mb-2" style="font-size: 9px;">
-                            <i class="fas fa-clock"></i> {{ order.created_at|date:"d M, H:i" }}
-                        </p>
+                                        {% elif order.status == 'cancelled' %}
+                                            {% if is_admin %}
+                                                <button class="btn btn-outline-danger" onclick="showCancelledDetails({{ order.id }})">
+                                                    <i class="fas fa-exclamation-triangle"></i> Check
+                                                </button>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Awaiting Admin</span>
+                                            {% endif %}
 
-                        <!-- Shop & Delivery Box -->
-                        <div class="info-box p-1 mb-2">
-                            <div class="mb-1 text-truncate" style="font-size: 10px;">
-                                <i class="fas fa-store text-primary me-1"></i> 
-                                <span class="fw-bold">{{ order.branch.name|default:"Main" }}</span>
-                            </div>
-                            <div class="text-truncate" style="font-size: 10px;">
-                                <i class="fas fa-map-marker-alt text-danger me-1"></i> 
-                                {{ order.customer_city|default:"-" }}
-                            </div>
-                            <div class="text-muted text-truncate" style="font-size: 9px; margin-top: 2px;" title="{{ order.customer_address }}">
-                                {{ order.customer_address }}
-                            </div>
-                        </div>
+                                        {% elif order.status == 'picked' or order.status == 'confirmed' %}
+                                            {% if order.assigned_to == request.user or is_admin %}
+                                                <button class="btn btn-outline-primary" onclick="showOrderDetails({{ order.id }})">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                {% if is_admin %}
+                                                    <button class="btn btn-outline-warning" onclick="unpickOrder({{ order.id }})">
+                                                        <i class="fas fa-unlock"></i>
+                                                    </button>
+                                                {% else %}
+                                                    <button class="btn btn-outline-danger" onclick="cancelOrder({{ order.id }})">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="badge bg-secondary">
+                                                    <i class="fas fa-info-circle"></i>
+                                                    {{ order.assigned_to.get_full_name|default:order.assigned_to.username }}
+                                                </span>
+                                            {% endif %}
 
-                        <!-- Assigned Staff -->
-                        <div class="mb-1 text-truncate" style="font-size: 9px;">
-                            {% if order.assigned_to %}
-                                <i class="fas fa-user-check text-success"></i> {{ order.assigned_to.get_full_name|default:order.assigned_to.username|truncatechars:10 }}
-                            {% else %}
-                                <i class="fas fa-user-circle text-muted"></i> Unassigned
-                            {% endif %}
-                        </div>
-                    </div>
+                                        {% elif order.status == 'fulfilled' %}
+                                            {% if order.sale and order.sale.payment_status == 'pending' %}
+                                                <button class="btn btn-success" onclick="payPendingOrder({{ order.id }})">
+                                                    <i class="fas fa-money-bill-wave"></i> Pay
+                                                </button>
+                                            {% else %}
+                                                {% if is_admin %}
+                                                    <a href="{% url 'cart-orders:order-archive-detail' order.id %}" class="btn btn-outline-dark">
+                                                        <i class="fas fa-archive"></i> Archive
+                                                    </a>
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="9" class="text-center py-4">
+                                    <i class="fas fa-inbox fa-3x d-block mb-3" style="color:#000000;"></i>
+                                    <p style="color:#000000;">No orders found.</p>
+                                    <p style="color:#000000;">When customers place orders from the website, they will appear here.</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
 
-                    <!-- Footer: Total & Actions -->
-                    <div class="card-footer-custom p-2 mt-auto">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="text-muted" style="font-size: 9px;">TOTAL</span>
-                            <span class="fw-bold text-primary" style="font-size: 13px;">KSh {{ order.total_amount|floatformat:0 }}</span>
-                        </div>
+        {# ============================================ #}
+        {# MOBILE: 2-Column Grid                      #}
+        {# ============================================ #}
+        <div class="d-block d-md-none">
+            <div class="row row-cols-2 g-2 pb-5">
+                {% for order in orders %}
+                <div class="col">
+                    <div class="staff-order-card
+                        {% if order.status == 'picked' %}status-picked
+                        {% elif order.status == 'confirmed' %}status-confirmed
+                        {% elif order.status == 'cancelled' %}status-cancelled
+                        {% elif order.status == 'fulfilled' %}
+                            {% if order.sale and order.sale.payment_status == 'pending' %}status-fulfilled
+                            {% else %}status-completed{% endif %}
+                        {% endif %}"
+                        id="order-card-{{ order.id }}">
 
-                        <!-- Action Buttons -->
-                        <div class="d-flex gap-1">
-                            {% if order.status == 'new' or not order.assigned_to %}
-                                <button class="btn btn-sm btn-warning flex-grow-1 fw-bold p-1" style="font-size: 10px;" onclick="pickOrder({{ order.id }})">
-                                    <i class="fas fa-hand-paper"></i> Pick
-                                </button>
-                                
-                                {% if is_admin %}
-                                <!-- ADMIN DELETE BUTTON -->
-                                <button class="btn btn-sm btn-outline-danger flex-grow-1 p-1" style="font-size: 10px;" onclick="deleteOrder({{ order.id }})">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                                {% endif %}
-                            
-                            {% elif order.status == 'cancelled' %}
-                                {% if is_admin %}
-                                    <button class="btn btn-sm btn-outline-danger w-100 p-1" style="font-size: 10px;" onclick="showCancelledDetails({{ order.id }})">
-                                        <i class="fas fa-search"></i> Check
-                                    </button>
+                        {# Top Bar #}
+                        <div class="card-top-bar px-2 py-1">
+                            <span class="badge bg-dark" style="font-size: 9px; padding: 3px 4px;">
+                                #{{ order.order_number|slice:"-4:" }}
+                            </span>
+                            <div>
+                                {% if order.status == 'new' %}
+                                    <span class="badge bg-warning" style="font-size: 9px;">New</span>
+                                {% elif order.status == 'picked' %}
+                                    <span class="badge bg-info" style="font-size: 9px;">Process</span>
+                                {% elif order.status == 'confirmed' %}
+                                    <span class="badge bg-primary" style="font-size: 9px;">Confirm</span>
+                                {% elif order.status == 'cancelled' %}
+                                    <span class="badge bg-danger" style="font-size: 9px;">Cancel</span>
+                                {% elif order.status == 'fulfilled' %}
+                                    <span class="badge bg-success" style="font-size: 9px;">Done</span>
                                 {% else %}
-                                    <div class="w-100 text-center py-1 bg-light text-muted rounded border" style="font-size: 9px;">Awaiting</div>
+                                    <span class="badge bg-success" style="font-size: 9px;">Done</span>
                                 {% endif %}
+                            </div>
+                        </div>
 
-                            {% elif order.status == 'picked' or order.status == 'confirmed' %}
-                                {% if order.assigned_to == request.user or is_admin %}
-                                    <button class="btn btn-sm btn-outline-primary flex-grow-1 p-1" style="font-size: 10px;" onclick="showOrderDetails({{ order.id }})">
-                                        <i class="fas fa-eye"></i>
+                        {# Middle Info #}
+                        <div class="p-2">
+                            <h6 class="mb-1 fw-bold text-dark text-truncate" style="font-size: 12px;">
+                                {% if order.status == 'new' and not is_admin %}
+                                    <span class="text-muted fst-italic">Hidden</span>
+                                {% else %}
+                                    {{ order.customer_name }}
+                                {% endif %}
+                            </h6>
+
+                            <p class="text-muted mb-2" style="font-size: 9px;">
+                                <i class="fas fa-clock"></i> {{ order.created_at|date:"d M, H:i" }}
+                            </p>
+
+                            <div class="info-box p-1 mb-2">
+                                <div class="mb-1 text-truncate" style="font-size: 10px;">
+                                    <i class="fas fa-store text-primary me-1"></i>
+                                    <span class="fw-bold">{{ order.branch.name|default:"Main" }}</span>
+                                </div>
+                                <div class="text-truncate" style="font-size: 10px;">
+                                    <i class="fas fa-map-marker-alt text-danger me-1"></i>
+                                    {{ order.customer_city|default:"-" }}
+                                </div>
+                                <div class="text-muted text-truncate" style="font-size: 9px; margin-top: 2px;"
+                                     title="{{ order.customer_address }}">
+                                    {{ order.customer_address }}
+                                </div>
+                            </div>
+
+                            <div class="mb-1 text-truncate" style="font-size: 9px;">
+                                {% if order.assigned_to %}
+                                    <i class="fas fa-user-check text-success"></i>
+                                    {{ order.assigned_to.get_full_name|default:order.assigned_to.username|truncatechars:10 }}
+                                {% else %}
+                                    <i class="fas fa-user-circle text-muted"></i> Unassigned
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        {# Footer #}
+                        <div class="p-2 mt-auto">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-muted" style="font-size: 9px;">TOTAL</span>
+                                <span class="fw-bold" style="font-size: 13px; color:#000000;">
+                                    KSh {{ order.total_amount|floatformat:0 }}
+                                </span>
+                            </div>
+
+                            <div class="d-flex gap-1">
+                                {% if order.status == 'new' or not order.assigned_to %}
+                                    <button class="btn btn-sm btn-warning flex-grow-1 fw-bold p-1"
+                                            style="font-size: 10px;"
+                                            onclick="pickOrder({{ order.id }})">
+                                        <i class="fas fa-hand-paper"></i> Pick
                                     </button>
                                     {% if is_admin %}
-                                        <button class="btn btn-sm btn-outline-warning text-dark flex-grow-1 p-1" style="font-size: 10px;" onclick="unpickOrder({{ order.id }})">
-                                            <i class="fas fa-unlock"></i>
+                                        <button class="btn btn-sm btn-outline-danger flex-grow-1 p-1"
+                                                style="font-size: 10px;"
+                                                onclick="deleteOrder({{ order.id }})">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    {% endif %}
+
+                                {% elif order.status == 'cancelled' %}
+                                    {% if is_admin %}
+                                        <button class="btn btn-sm btn-outline-danger w-100 p-1"
+                                                style="font-size: 10px;"
+                                                onclick="showCancelledDetails({{ order.id }})">
+                                            <i class="fas fa-search"></i> Check
                                         </button>
                                     {% else %}
-                                        <button class="btn btn-sm btn-outline-danger flex-grow-1 p-1" style="font-size: 10px;" onclick="cancelOrder({{ order.id }})">
-                                            <i class="fas fa-times"></i>
-                                        </button>
+                                        <div class="w-100 text-center py-1 bg-light text-muted rounded border"
+                                             style="font-size: 9px; border-color:#000000 !important;">
+                                            Awaiting
+                                        </div>
                                     {% endif %}
-                                {% else %}
-                                    <div class="w-100 text-center py-1 bg-light text-muted rounded border" style="font-size: 9px;">
-                                        Handled
-                                    </div>
-                                {% endif %}
 
-                            {% elif order.status == 'fulfilled' %}
-                                {% if order.sale and order.sale.payment_status == 'pending' %}
-                                    <button class="btn btn-sm btn-success w-100 fw-bold p-1" style="font-size: 10px;" onclick="payPendingOrder({{ order.id }})">
-                                        <i class="fas fa-money-bill-wave"></i> Pay
-                                    </button>
-                                {% else %}
-                                    {% if is_admin %}
-                                        <a href="{% url 'cart-orders:order-archive-detail' order.id %}" class="btn btn-sm btn-dark w-100 p-1" style="font-size: 10px;">
-                                            <i class="fas fa-archive"></i> Archive
-                                        </a>
+                                {% elif order.status == 'picked' or order.status == 'confirmed' %}
+                                    {% if order.assigned_to == request.user or is_admin %}
+                                        <button class="btn btn-sm btn-outline-primary flex-grow-1 p-1"
+                                                style="font-size: 10px;"
+                                                onclick="showOrderDetails({{ order.id }})">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        {% if is_admin %}
+                                            <button class="btn btn-sm btn-outline-warning flex-grow-1 p-1"
+                                                    style="font-size: 10px;"
+                                                    onclick="unpickOrder({{ order.id }})">
+                                                <i class="fas fa-unlock"></i>
+                                            </button>
+                                        {% else %}
+                                            <button class="btn btn-sm btn-outline-danger flex-grow-1 p-1"
+                                                    style="font-size: 10px;"
+                                                    onclick="cancelOrder({{ order.id }})">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        {% endif %}
+                                    {% else %}
+                                        <div class="w-100 text-center py-1 bg-light text-muted rounded border"
+                                             style="font-size: 9px; border-color:#000000 !important;">
+                                            Handled
+                                        </div>
+                                    {% endif %}
+
+                                {% elif order.status == 'fulfilled' %}
+                                    {% if order.sale and order.sale.payment_status == 'pending' %}
+                                        <button class="btn btn-sm btn-success w-100 fw-bold p-1"
+                                                style="font-size: 10px;"
+                                                onclick="payPendingOrder({{ order.id }})">
+                                            <i class="fas fa-money-bill-wave"></i> Pay
+                                        </button>
+                                    {% else %}
+                                        {% if is_admin %}
+                                            <a href="{% url 'cart-orders:order-archive-detail' order.id %}"
+                                               class="btn btn-sm btn-dark w-100 p-1"
+                                               style="font-size: 10px;">
+                                                <i class="fas fa-archive"></i> Archive
+                                            </a>
+                                        {% endif %}
                                     {% endif %}
                                 {% endif %}
-                            {% endif %}
+                            </div>
                         </div>
                     </div>
                 </div>
+                {% empty %}
+                <div class="col-12 text-center py-4">
+                    <i class="fas fa-inbox fa-3x d-block mb-3" style="color:#000000;"></i>
+                    <p style="color:#000000;">No orders found.</p>
+                </div>
+                {% endfor %}
             </div>
-            {% endfor %}
         </div>
     </div>
 </div>
 
-<!-- ========================================== -->
-<!-- MODALS                                     -->
-<!-- ========================================== -->
+{# ========================================== #}
+{# MODALS                                     #}
+{# ========================================== #}
 
-<!-- MODAL 1: Customer Details -->
+<!-- MODAL 1: Order Details -->
 <div class="modal fade" id="orderDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-primary text-white">
+        <div class="modal-content">
+            <div class="modal-header">
                 <h5 class="modal-title"><i class="fas fa-user-circle me-2"></i> Order Details</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body" id="orderDetailsContent"></div>
-            <div class="modal-footer bg-light">
+            <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- MODAL 2: Cancelled Order Verification (Admin Only) -->
+<!-- MODAL 2: Cancelled Order Verification (Admin) -->
 <div class="modal fade" id="cancelledDetailsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-danger text-white">
+        <div class="modal-content">
+            <div class="modal-header">
                 <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i> Verify Cancellation</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body" id="cancelledDetailsContent"></div>
-            <div class="modal-footer bg-light d-flex justify-content-between">
+            <div class="modal-footer d-flex justify-content-between">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 <button type="button" class="btn btn-danger fw-bold" id="btnApproveCancellation">
-                    <i class="fas fa-check-circle"></i> Approve & Delete Order
+                    <i class="fas fa-check-circle"></i> Approve &amp; Delete
                 </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- MODAL 3: Confirm Delete (Centered) -->
+<!-- MODAL 3: Confirm Delete -->
 <div class="modal fade" id="deleteOrderModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-danger text-white">
+        <div class="modal-content">
+            <div class="modal-header">
                 <h5 class="modal-title"><i class="fas fa-trash-alt me-2"></i> Delete Order</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body text-center py-4">
                 <i class="fas fa-exclamation-triangle text-warning display-4 mb-3"></i>
@@ -416,7 +806,7 @@
                     This action <strong>cannot</strong> be undone.
                 </p>
             </div>
-            <div class="modal-footer bg-light justify-content-center">
+            <div class="modal-footer justify-content-center">
                 <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-danger px-4 fw-bold" id="btnConfirmDelete">
                     <i class="fas fa-trash"></i> Yes, Delete It
@@ -425,10 +815,9 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
-<!-- ========================================== -->
-<!-- JAVASCRIPT                                 -->
-<!-- ========================================== -->
+{% block extra_js %}
 <script>
 // Data ya orders
 const ordersData = {
@@ -480,7 +869,7 @@ function getCookie(name) {
 function pickOrder(orderId) {
     const csrfToken = getCookie('csrftoken');
     if (!csrfToken) { alert('CSRF token not found. Please refresh the page.'); return; }
-    
+
     fetch(`/cart/orders/${orderId}/pick/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }
@@ -498,25 +887,22 @@ let orderToDeleteId = null;
 
 function deleteOrder(orderId) {
     orderToDeleteId = orderId;
-    
-    // Get the order number from the JS object to show in the modal
+
     const order = ordersData[orderId];
     if (order) {
         document.getElementById('deleteOrderNumberDisplay').textContent = '#' + order.order_number;
     }
 
-    // Show the Bootstrap Modal
     new bootstrap.Modal(document.getElementById('deleteOrderModal')).show();
 }
 
-// This runs when the user clicks "Yes, Delete It" inside the modal
+// Confirm Delete
 document.getElementById('btnConfirmDelete').addEventListener('click', function() {
     if (!orderToDeleteId) return;
 
     const btn = this;
     const originalHtml = btn.innerHTML;
-    
-    // Show loading state
+
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
 
@@ -525,9 +911,9 @@ document.getElementById('btnConfirmDelete').addEventListener('click', function()
 
     fetch(`/cart/orders/${orderToDeleteId}/delete/`, {
         method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json', 
-            'X-CSRFToken': csrfToken 
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
         }
     })
     .then(res => res.json())
@@ -549,7 +935,7 @@ document.getElementById('btnConfirmDelete').addEventListener('click', function()
 
 // ADMIN: Unpick Order
 function unpickOrder(orderId) {
-    if (!confirm("Unpick this Order to allow other available staff procceed.")) return;
+    if (!confirm("Unpick this order to allow other available staff to proceed.")) return;
 
     const csrfToken = getCookie('csrftoken');
     if (!csrfToken) { alert('CSRF token not found.'); return; }
@@ -560,19 +946,16 @@ function unpickOrder(orderId) {
     })
     .then(res => res.json())
     .then(data => {
-        if (data.success) {
-            location.reload();
-        } else {
-            alert("Error: " + data.error);
-        }
+        if (data.success) { location.reload(); }
+        else { alert("Error: " + data.error); }
     })
     .catch(err => alert("Network error: " + err.message));
 }
 
-// Cancel Order (Prompts for Reason)
+// Cancel Order
 function cancelOrder(orderId) {
     const reason = prompt("Please enter the reason for cancelling this order:");
-    if (reason === null) return; // User clicked Cancel on the prompt
+    if (reason === null) return;
     if (!reason.trim()) {
         alert("A cancellation reason is required.");
         return;
@@ -580,7 +963,7 @@ function cancelOrder(orderId) {
 
     const csrfToken = getCookie('csrftoken');
     if (!csrfToken) { alert('CSRF token not found.'); return; }
-    
+
     fetch(`/cart/orders/${orderId}/cancel/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
@@ -594,7 +977,7 @@ function cancelOrder(orderId) {
     .catch(err => alert("Network error: " + err.message));
 }
 
-// Show Order Details Modal (For active orders and fulfilled archives)
+// Show Order Details Modal
 function showOrderDetails(orderId) {
     const order = ordersData[orderId];
     if (!order) return;
@@ -617,7 +1000,7 @@ function showOrderDetails(orderId) {
                 <div class="p-3 bg-light rounded h-100">
                     <h6 class="text-uppercase text-muted mb-3" style="font-size: 11px;">Customer Info</h6>
                     <p class="mb-2"><strong>${order.customer_name}</strong></p>
-                    <p class="mb-2"><i class="fas fa-phone text-success me-2"></i> 
+                    <p class="mb-2"><i class="fas fa-phone text-success me-2"></i>
                         <a href="tel:${order.customer_phone}" class="text-decoration-none fw-bold">${order.customer_phone}</a>
                     </p>
                     ${order.alt_phone ? `<p class="mb-2"><i class="fas fa-phone-alt text-muted me-2"></i> ${order.alt_phone}</p>` : ''}
@@ -656,7 +1039,6 @@ function showOrderDetails(orderId) {
             <a href="https://wa.me/${order.customer_phone.replace(/^0/, '254')}" target="_blank" class="btn btn-outline-success flex-fill fw-bold">
                 <i class="fab fa-whatsapp"></i> WhatsApp
             </a>
-            <!-- Link to Link Sale Page -->
             <a href="/cart/orders/${orderId}/link-sale/" class="btn btn-primary flex-fill fw-bold">
                 <i class="fas fa-link"></i> Link Sale
             </a>
@@ -667,13 +1049,13 @@ function showOrderDetails(orderId) {
     new bootstrap.Modal(document.getElementById('orderDetailsModal')).show();
 }
 
-// ADMIN: Show Cancelled Details for Verification
+// ADMIN: Show Cancelled Details
 let currentCancelOrderId = null;
 
 function showCancelledDetails(orderId) {
     const order = ordersData[orderId];
     if (!order) return;
-    
+
     currentCancelOrderId = orderId;
 
     const html = `
@@ -681,7 +1063,7 @@ function showCancelledDetails(orderId) {
             <h6 class="fw-bold mb-1"><i class="fas fa-info-circle"></i> Cancellation Reason</h6>
             <p class="mb-0 fst-italic">"${order.cancel_reason || 'No reason provided.'}"</p>
         </div>
-        
+
         <h6 class="text-uppercase text-muted mb-2" style="font-size: 11px;">Order Details</h6>
         <table class="table table-sm table-bordered">
             <tr><th width="35%">Order #</th><td>${order.order_number}</td></tr>
