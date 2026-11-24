@@ -46,7 +46,7 @@ class User(AbstractUser):
         null=True, blank=True, related_name='users',
     )
     branch = models.ForeignKey(
-        'company.Branch', on_delete=models.SET_NULL,
+        'companies.Branch', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='staff',
     )
     phone = models.CharField(max_length=20, blank=True)
@@ -257,3 +257,50 @@ class User(AbstractUser):
     class Meta:
         db_table = 'rono_users'
         ordering = ['-created_at']
+# ============================================================
+# MEMBERSHIP - User can belong to MULTIPLE companies,
+# with a DIFFERENT role in each company.
+# User.company / User.role remain as PRIMARY company/role
+# for backward compat (supermarket/views.py etc. use them).
+# ============================================================
+class Membership(models.Model):
+    ROLE_CHOICES = User.ROLE_CHOICES
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='memberships',
+    )
+    company = models.ForeignKey(
+        'companies.Company', on_delete=models.CASCADE, related_name='memberships',
+    )
+    branch = models.ForeignKey(
+        'companies.Branch', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='memberships',
+    )
+    role = models.CharField(max_length=30, choices=ROLE_CHOICES, default='company_staff')
+    is_active = models.BooleanField(default=True)
+    is_primary = models.BooleanField(default=False)
+    invited_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='sent_invitations',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'rono_memberships'
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'company'], name='unique_user_company_membership'),
+        ]
+
+    def __str__(self):
+        return f"{self.user.email} @ {self.company} ({self.role})"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Keep User.company/role in sync when this is the primary membership
+        if self.is_primary and self.is_active:
+            User.objects.filter(pk=self.user_id).update(
+                company_id=self.company_id, role=self.role,
+                branch_id=self.branch_id,
+            )

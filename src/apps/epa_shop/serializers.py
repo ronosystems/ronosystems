@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.contenttypes.models import ContentType
-from apps.company.models import Branch
+from apps.companies.models import Branch
 from .models import (
     Category, Electronic, Phone, Accessory,
     Sale, SaleItem, Customer, Supplier,
@@ -60,59 +60,51 @@ class CategorySerializer(serializers.ModelSerializer):
 # ============================================
 
 class ElectronicSerializer(serializers.ModelSerializer):
-    profit_margin = serializers.ReadOnlyField()
-    profit_margin_percentage = serializers.ReadOnlyField()
-    is_in_stock = serializers.ReadOnlyField()
-
     class Meta:
         model = Electronic
         fields = [
-            'id', 'company', 'branch', 'category', 'supplier',
+            'id', 'company', 'category', 'supplier',
             'name', 'brand', 'model_number', 'serial_number',
             'device_type', 'processor', 'ram', 'storage', 'screen_size', 'color',
-            'purchase_price', 'selling_price',
-            'quantity_in_stock', 'minimum_stock_level', 'maximum_stock_level',
+            'purchase_price', 'selling_price', 'best_price',
+            'total_quantity_in_stock',
             'image', 'warranty_period_months', 'warranty_expiry',
+            'owner', 'product_code', 'barcode',
             'is_active', 'created_at', 'updated_at',
-            'is_in_stock', 'profit_margin', 'profit_margin_percentage'
         ]
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at', 'product_code']
 
 
 class PhoneSerializer(serializers.ModelSerializer):
-    is_in_stock = serializers.ReadOnlyField()
-    profit_margin_percentage = serializers.ReadOnlyField()
-
     class Meta:
         model = Phone
         fields = [
-            'id', 'company', 'branch', 'category', 'supplier',
+            'id', 'company', 'category', 'supplier',
             'name', 'brand', 'model', 'imei',
             'color', 'storage_capacity', 'ram', 'screen_size', 'battery_capacity',
-            'condition', 'purchase_price', 'selling_price',
-            'quantity_in_stock', 'minimum_stock_level', 'maximum_stock_level',
+            'condition', 'purchase_price', 'selling_price', 'best_price',
+            'total_quantity_in_stock',
             'image', 'warranty_period_months', 'warranty_expiry',
+            'owner', 'phone_type', 'network_type', 'memory_card', 'features',
+            'product_code', 'barcode',
             'is_active', 'created_at', 'updated_at',
-            'is_in_stock', 'profit_margin_percentage'
         ]
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at', 'product_code']
 
 
 class AccessorySerializer(serializers.ModelSerializer):
-    is_in_stock = serializers.ReadOnlyField()
-
     class Meta:
         model = Accessory
         fields = [
-            'id', 'company', 'branch', 'category', 'supplier',
+            'id', 'company', 'category', 'supplier',
             'name', 'brand', 'accessory_type', 'model', 'compatible_phone_models',
-            'purchase_price', 'selling_price',
-            'quantity_in_stock', 'minimum_stock_level', 'maximum_stock_level',
+            'purchase_price', 'selling_price', 'best_price',
+            'total_quantity_in_stock',
             'image', 'warranty_period_months',
+            'owner', 'product_code', 'barcode',
             'is_active', 'created_at', 'updated_at',
-            'is_in_stock'
         ]
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at', 'product_code']
 
 
 # ============================================
@@ -136,6 +128,7 @@ class SaleItemSerializer(serializers.ModelSerializer):
             'unit_cost', 'cogs_amount',
         ]
         read_only_fields = ['total_price', 'unit_cost', 'cogs_amount']
+        extra_kwargs = {'sale': {'required': False}}
 
 
 class SaleSerializer(serializers.ModelSerializer):
@@ -182,6 +175,10 @@ class SaleCreateSerializer(serializers.ModelSerializer):
         from decimal import Decimal
 
         items_data = validated_data.pop('items')
+        # total_amount is NOT NULL - set placeholder, updated after items are summed
+        validated_data.setdefault('total_amount', Decimal('0.00'))
+        validated_data.setdefault('net_amount', Decimal('0.00'))
+        validated_data.setdefault('cogs_amount', Decimal('0.00'))
         sale = Sale.objects.create(**validated_data)
 
         total_amount = Decimal('0.00')
@@ -220,6 +217,19 @@ class SaleCreateSerializer(serializers.ModelSerializer):
             item_data['unit_cost'] = unit_cost
             item_data['cogs_amount'] = line_cogs
             running_cogs += line_cogs
+
+            # -- Decrement stock, fail if insufficient --
+            if product is not None:
+                from rest_framework.exceptions import ValidationError
+                qty = int(item_data['quantity'])
+                stock = getattr(product, 'total_quantity_in_stock', 0) or 0
+                if stock < qty:
+                    raise ValidationError(
+                        f"Insufficient stock for {getattr(product, 'name', 'product')}: "
+                        f"have {stock}, need {qty}"
+                    )
+                product.total_quantity_in_stock = stock - qty
+                product.save(update_fields=['total_quantity_in_stock'])
 
             SaleItem.objects.create(**item_data)
 
@@ -291,12 +301,12 @@ class StockMovementCreateSerializer(serializers.ModelSerializer):
             # Lock the row so two concurrent calls can't corrupt stock
             product = model_class.objects.select_for_update().get(id=object_id)
 
-            validated_data['previous_quantity'] = product.quantity_in_stock
+            validated_data['previous_quantity'] = product.total_quantity_in_stock
 
-            product.quantity_in_stock += quantity
-            product.save(update_fields=['quantity_in_stock'])
+            product.total_quantity_in_stock += quantity
+            product.save(update_fields=['total_quantity_in_stock'])
 
-            validated_data['new_quantity'] = product.quantity_in_stock
+            validated_data['new_quantity'] = product.total_quantity_in_stock
 
             return super().create(validated_data)
 
