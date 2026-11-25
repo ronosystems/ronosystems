@@ -10,7 +10,7 @@ from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.conf import settings
 from apps.companies.models import Company
-from apps.company.models import Branch
+from apps.companies.models import Branch
 from .serializers import (
     UserSerializer, RegisterSerializer, LoginSerializer,
     UserUpdateSerializer, UserRoleUpdateSerializer,
@@ -38,7 +38,7 @@ class RegisterView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = self.perform_create(serializer)
+        user = serializer.save()  # <-- FIX: save() inarudisha user halisi, sio perform_create()
 
         # Send welcome email
         try:
@@ -56,6 +56,7 @@ class RegisterView(generics.CreateAPIView):
             pass
 
         headers = self.get_success_headers(serializer.data)
+        user.refresh_from_db()
         return Response({
             'success': True,
             'message': 'User registered successfully',

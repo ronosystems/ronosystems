@@ -60,7 +60,7 @@ class LossReturn(models.Model):
         related_name='loss_return_records',
     )
     branch = models.ForeignKey(
-        'company.Branch',
+        'companies.Branch',
         on_delete=models.CASCADE,
         related_name='loss_return_records',
     )

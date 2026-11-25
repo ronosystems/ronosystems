@@ -19,7 +19,7 @@ from decimal import Decimal, InvalidOperation
 from django.views.decorators.http import require_POST
 from datetime import date, timedelta
 from apps.companies.support_utils import get_active_company
-from apps.company.models import Branch
+from apps.companies.models import Branch
 from .models import (
     Flock, EggProduction, Customer, EggSale, EggSaleItem,
     FeedType, FeedRecord, FeedConsumption, HealthRecord, Mortality,

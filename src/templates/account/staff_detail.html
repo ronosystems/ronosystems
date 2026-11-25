@@ -1,0 +1,247 @@
+{% extends 'base.html' %}
+
+{% block title %}Staff Detail - {{ staff_user.get_full_name|default:staff_user.username }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card { border: 2px solid #000000; border-radius: 4px; }
+    .card-header { border-bottom: 2px solid #000000; background: #87CEEB !important; color: #000000 !important; }
+    .form-control { border: 2px solid #000000; border-radius: 4px; color: #000000; }
+    .btn-primary { background: #87CEEB; border: 2px solid #000000; color: #000000; font-weight: 600; border-radius: 4px; }
+    .btn-primary:hover { background: #7bb8d8; border-color: #000000; color: #000000; }
+    .btn-outline-info, .btn-outline-primary, .btn-outline-warning, .btn-outline-danger, .btn-outline-secondary {
+        border: 2px solid #000000; border-radius: 4px; font-weight: 600; background: transparent;
+    }
+    .btn-outline-info { color: #000000; }
+    .btn-outline-info:hover { background: #87CEEB; color: #000000; }
+    .btn-outline-primary { color: #000000; }
+    .btn-outline-primary:hover { background: #87CEEB; color: #000000; }
+    .btn-outline-warning { color: #856404; }
+    .btn-outline-warning:hover { background: #ffc107; color: #000000; }
+    .btn-outline-danger { color: #dc3545; }
+    .btn-outline-danger:hover { background: #dc3545; color: #ffffff; }
+    .btn-outline-secondary { color: #000000; }
+    .btn-outline-secondary:hover { background: #87CEEB; color: #000000; }
+    .avatar-lg { width: 90px; height: 90px; border-radius: 50%; background: linear-gradient(135deg, #87CEEB, #7bb8d8); display: flex; align-items: center; justify-content: center; color: #000000; font-weight: 700; font-size: 36px; border: 2px solid #000000; flex-shrink: 0; }
+    .badge { padding: 4px 10px; border-radius: 50px; font-size: 11px; font-weight: 600; border: 1px solid #000000; }
+    .badge.bg-success { background: #d4edda !important; color: #155724 !important; }
+    .badge.bg-danger { background: #f8d7da !important; color: #721c24 !important; }
+    .badge-role { padding: 5px 12px; border-radius: 50px; font-size: 12px; border: 1px solid #000000; color: white; }
+    .badge-company_admin { background: #2ed573; }
+    .badge-company_manager { background: #1e90ff; }
+    .badge-company_staff { background: #ffa502; }
+    .badge-cashier { background: #eccc68; color: #000000; }
+    .badge-technician { background: #a55eea; }
+    .badge-sales { background: #ff6b81; }
+    .badge-super_admin { background: #ff4757; }
+    .info-row { border-bottom: 1px solid #dee2e6; padding: 10px 0; }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { font-weight: 600; color: #000000; }
+    .info-value { color: #000000; }
+    .modal-content { border: 2px solid #000000; border-radius: 8px; }
+    .modal-header { border-bottom: 2px solid #000000; }
+    .modal-footer { border-top: 2px solid #000000; }
+    .table-excel th, .table-excel td { border: 1px solid #000000 !important; padding: 8px 12px; }
+    .table-excel thead th { background: #87CEEB !important; color: #000000 !important; }
+
+    @media (max-width: 768px) {
+        .avatar-lg { width: 70px; height: 70px; font-size: 28px; }
+        .card-body { padding: 12px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+
+        <!-- MESSAGES -->
+        {% if messages %}
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" style="border: 2px solid #000000; color: #000000;" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- PROFILE CARD -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-user me-2"></i> Staff Profile</h5>
+                <span class="badge bg-success" style="background: #d4edda !important; color: #155724 !important;">{{ company.name }}</span>
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+                    <div class="avatar-lg">
+                        {{ staff_user.first_name|default:staff_user.username|make_list|first|upper }}
+                    </div>
+                    <div>
+                        <h4 class="mb-1 fw-bold">{{ staff_user.get_full_name|default:staff_user.username }}</h4>
+                        <p class="mb-1 text-muted">@{{ staff_user.username }}</p>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <span class="badge-role badge-{{ staff_user.role }}">{{ staff_user.get_role_display|default:staff_user.role|title }}</span>
+                            {% if staff_user.is_active %}
+                            <span class="badge bg-success">Active</span>
+                            {% else %}
+                            <span class="badge bg-danger">Inactive</span>
+                            {% endif %}
+                            {% if staff_user.is_verified %}
+                            <span class="badge" style="background: #cce5ff; color: #004085;">Verified</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="info-row d-flex justify-content-between">
+                            <span class="info-label"><i class="fas fa-user me-2"></i> Username</span>
+                            <span class="info-value">{{ staff_user.username }}</span>
+                        </div>
+                        <div class="info-row d-flex justify-content-between">
+                            <span class="info-label"><i class="fas fa-id-card me-2"></i> Staff ID</span>
+                            <span class="info-value">{{ staff_user.staff_id|default:'—' }}</span>
+                        </div>
+                        <div class="info-row d-flex justify-content-between">
+                            <span class="info-label"><i class="fas fa-envelope me-2"></i> Email</span>
+                            <span class="info-value">{{ staff_user.email }}</span>
+                        </div>
+                        <div class="info-row d-flex justify-content-between">
+                            <span class="info-label"><i class="fas fa-phone me-2"></i> Phone</span>
+                            <span class="info-value">{{ staff_user.phone|default:'—' }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-row d-flex justify-content-between">
+                            <span class="info-label"><i class="fas fa-user-tag me-2"></i> Role</span>
+                            <span class="info-value">{{ staff_user.get_role_display|default:staff_user.role|title }}</span>
+                        </div>
+                        <div class="info-row d-flex justify-content-between">
+                            <span class="info-label"><i class="fas fa-building me-2"></i> Company</span>
+                            <span class="info-value">{{ company.name }}</span>
+                        </div>
+                        <div class="info-row d-flex justify-content-between">
+                            <span class="info-label"><i class="fas fa-calendar-alt me-2"></i> Joined</span>
+                            <span class="info-value">{{ staff_user.date_joined|date:"d M Y, H:i" }}</span>
+                        </div>
+                        <div class="info-row d-flex justify-content-between">
+                            <span class="info-label"><i class="fas fa-clock me-2"></i> Last Login</span>
+                            <span class="info-value">
+                                {% if staff_user.last_login %}{{ staff_user.last_login|date:"d M Y, H:i" }}{% else %}Never logged in{% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ACTIONS -->
+                <div class="d-flex justify-content-between mt-4 flex-wrap gap-2">
+                    <a href="{% url 'accounts:staff-list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i> Back to List
+                    </a>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button type="button" class="btn btn-outline-{% if staff_user.is_active %}warning{% else %}success{% endif %}"
+                                data-bs-toggle="modal" data-bs-target="#toggleModal">
+                            <i class="fas {% if staff_user.is_active %}fa-user-slash{% else %}fa-user-check{% endif %} me-1"></i>
+                            {% if staff_user.is_active %}Deactivate{% else %}Activate{% endif %}
+                        </button>
+                        <a href="{% url 'accounts:staff-edit' staff_user.id %}" class="btn btn-primary">
+                            <i class="fas fa-edit me-1"></i> Edit Staff
+                        </a>
+                        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                            <i class="fas fa-trash me-1"></i> Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MEMBERSHIPS -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-users me-2"></i> Memberships</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-excel mb-0">
+                        <thead>
+                            <tr>
+                                <th>Company</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Primary</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for m in memberships %}
+                            <tr>
+                                <td>{{ m.tenant.name|default:m.company.name|default:'—' }}</td>
+                                <td>{{ m.get_role_display|default:m.role|title }}</td>
+                                <td>
+                                    {% if m.is_active %}<span class="badge bg-success">Active</span>
+                                    {% else %}<span class="badge bg-danger">Inactive</span>{% endif %}
+                                </td>
+                                <td>{% if m.is_primary %}Yes{% else %}No{% endif %}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center py-3">No memberships found.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: TOGGLE -->
+<div class="modal fade" id="toggleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold">{% if staff_user.is_active %}Deactivate{% else %}Activate{% endif %} Staff</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <i class="fas {% if staff_user.is_active %}fa-user-slash text-warning{% else %}fa-user-check text-success{% endif %} mb-3" style="font-size: 3rem;"></i>
+                <p class="mb-0 fs-5">Are you sure you want to <strong>{% if staff_user.is_active %}deactivate{% else %}activate{% endif %}</strong><br><strong>{{ staff_user.get_full_name|default:staff_user.username }}</strong>?</p>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" action="{% url 'accounts:staff-toggle' staff_user.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-{% if staff_user.is_active %}warning{% else %}success{% endif %}">
+                        Yes, {% if staff_user.is_active %}Deactivate{% else %}Activate{% endif %}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: DELETE -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-top: 4px solid #dc3545;">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold text-danger"><i class="fas fa-exclamation-triangle me-2"></i> Delete Staff</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <i class="fas fa-trash-alt text-danger mb-3" style="font-size: 3rem;"></i>
+                <h5>Are you absolutely sure?</h5>
+                <p class="text-muted mb-0">This will permanently delete <strong>{{ staff_user.get_full_name|default:staff_user.username }}</strong>. This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" action="{% url 'accounts:staff-delete' staff_user.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger px-4">Yes, Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

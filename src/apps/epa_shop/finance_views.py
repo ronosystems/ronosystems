@@ -15,14 +15,14 @@ import cloudinary
 import cloudinary.uploader
 
 from apps.companies.models import Company
-from apps.company.models import Expense
+from apps.companies.models import Expense
 from apps.companies.support_utils import (
     get_active_company,
     is_support_mode,
     is_effective_admin,
     get_effective_branch,
 )
-from apps.company.models import Branch
+from apps.companies.models import Branch
 from .models import (
     Sale, SaleItem, PurchaseOrder,
     COGSAccount, COGSTransaction, PurchaseRecord,
@@ -160,7 +160,7 @@ def get_all_transactions(company, branch=None,
     """
     Build a unified list of every financial event.
     """
-    from apps.company.models import Expense
+    from apps.companies.models import Expense
 
     events = []
 
@@ -292,7 +292,7 @@ def get_recent_transactions(company, branch=None, limit=5):
     """
     Return the most recent financial events.
     """
-    from apps.company.models import Expense
+    from apps.companies.models import Expense
 
     events = []
 

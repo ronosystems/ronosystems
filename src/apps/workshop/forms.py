@@ -123,7 +123,7 @@ class WorkshopJobForm(forms.ModelForm):
 
             # Branch pool (guard for app without company FK)
             try:
-                from apps.company.models import Branch
+                from apps.companies.models import Branch
                 self.fields['branch'].queryset = Branch.objects.filter(
                     company=company
                 ).order_by('name')

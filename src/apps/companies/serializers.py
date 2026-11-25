@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import Company, BusinessType
-from apps.business_types.business_type_registry import BusinessTypeEnum
+from apps.companies.business_types import BusinessTypeEnum
 
 class BusinessTypeSerializer(serializers.ModelSerializer):
     integration = serializers.SerializerMethodField()

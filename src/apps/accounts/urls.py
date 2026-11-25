@@ -1,30 +1,24 @@
 # apps/accounts/urls.py
 from django.urls import path
-from . import views
-from . import role_views
+from . import staff_views, users_views
 
-app_name = 'api_accounts'  
+app_name = 'accounts'
 
 urlpatterns = [
-    # AUTHENTICATION
-    path('register/', views.RegisterView.as_view(), name='register'),
-    path('login/', views.LoginView.as_view(), name='login'),
-    path('logout/', views.LogoutView.as_view(), name='logout'),
+    # ===== COMPANY ADMIN - STAFF =====
+    path('staff/', staff_views.staff_list, name='staff-list'),
+    path('staff/create/', staff_views.staff_create, name='staff-create'),
+    path('staff/<int:user_id>/', staff_views.staff_detail, name='staff-detail'),
+    path('staff/<int:user_id>/edit/', staff_views.staff_edit, name='staff-edit'),
+    path('staff/<int:user_id>/toggle/', staff_views.staff_toggle_status, name='staff-toggle'),
+    path('staff/<int:user_id>/delete/', staff_views.staff_delete, name='staff-delete'),
 
-    # USER PROFILE
-    path('profile/', views.UserProfileView.as_view(), name='user-profile'),
-    path('change-password/', views.UserChangePasswordView.as_view(), name='change-password'),
-    path('reset-password/', views.UserPasswordResetView.as_view(), name='reset-password'),
-
-    # USER MANAGEMENT
-    path('users/', views.UserListView.as_view(), name='user-list'),
-    path('users/<int:user_id>/company/', views.UserCompanyUpdateView.as_view(), name='user-company-update'),
-    path('users/<int:user_id>/delete/', views.UserDeleteView.as_view(), name='user-delete'),
-    path('users/<int:user_id>/toggle-status/', views.UserStatusToggleView.as_view(), name='user-toggle-status'),
-    path('users/<int:user_id>/branch/', views.UserBranchUpdateView.as_view(), name='user-branch-update'),
-
-    # ROLE MANAGEMENT
-    path('role-info/', role_views.UserRoleInfoView.as_view(), name='role-info'),
-    path('users/company/', role_views.CompanyUserListView.as_view(), name='company-users'),
-    path('users/<int:user_id>/role/', role_views.UserRoleUpdateView.as_view(), name='user-role-update'),
+    # ===== SUPER ADMIN - GLOBAL USERS =====
+    path('users/', users_views.user_list, name='user-list'),
+    path('users/create/', users_views.user_create, name='user-create'),
+    path('users/<int:user_id>/', users_views.user_detail, name='user-detail'),
+    path('users/<int:user_id>/edit/', users_views.user_edit, name='user-edit'),
+    path('users/<int:user_id>/assign-admin/', users_views.assign_company_admin, name='assign-company-admin'),
+    path('users/<int:user_id>/toggle/', users_views.user_toggle_status, name='user-toggle'),
+    path('users/<int:user_id>/delete/', users_views.user_delete, name='user-delete'),
 ]

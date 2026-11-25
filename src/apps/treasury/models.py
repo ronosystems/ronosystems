@@ -23,7 +23,7 @@ class Treasury(models.Model):
         related_name='treasuries'
     )
     branch = models.OneToOneField(
-        'company.Branch',
+        'companies.Branch',
         on_delete=models.CASCADE,
         related_name='treasury'
     )
@@ -102,7 +102,7 @@ class BankAccount(models.Model):
         related_name='bank_accounts'
     )
     branch = models.ForeignKey(
-        'company.Branch',
+        'companies.Branch',
         on_delete=models.CASCADE,
         related_name='bank_accounts'
     )
@@ -194,7 +194,7 @@ class MpesaAccount(models.Model):
         related_name='mpesa_accounts'
     )
     branch = models.ForeignKey(
-        'company.Branch',
+        'companies.Branch',
         on_delete=models.CASCADE,
         related_name='mpesa_accounts'
     )
@@ -282,7 +282,7 @@ class DailyRecord(models.Model):
         related_name='daily_records'
     )
     branch = models.ForeignKey(
-        'company.Branch',
+        'companies.Branch',
         on_delete=models.CASCADE,
         related_name='daily_records'
     )
@@ -595,7 +595,7 @@ class Movement(models.Model):
         related_name='treasury_movements'
     )
     branch = models.ForeignKey(
-        'company.Branch',
+        'companies.Branch',
         on_delete=models.CASCADE,
         related_name='treasury_movements'
     )
@@ -829,7 +829,7 @@ class MpesaCommission(models.Model):
         related_name='mpesa_commissions'
     )
     branch = models.ForeignKey(
-        'company.Branch',
+        'companies.Branch',
         on_delete=models.CASCADE,
         related_name='mpesa_commissions'
     )

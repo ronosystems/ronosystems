@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.utils import timezone
 from django.http import JsonResponse
 from django.db import transaction
-from apps.company.models import Branch
+from apps.companies.models import Branch
 from .models import Phone, Electronic, Accessory, Category, Unit, Sale, SaleItem, Customer, Owner, ReturnItem
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
@@ -14,7 +14,7 @@ from .utils import record_stock_movement
 from decimal import Decimal
 from decimal import Decimal, ROUND_HALF_UP
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from apps.company.settings_views import get_company_settings
+from apps.companies.views import get_company_settings
 from apps.companies.support_utils import (
     get_active_company,
     is_support_mode,
@@ -61,7 +61,7 @@ def calculate_tax(company, subtotal):
 
     If tax is disabled or rate is 0, returns (Decimal('0'), subtotal).
     """
-    from apps.company.settings_views import get_company_settings
+    from apps.companies.views import get_company_settings
 
     try:
         company_settings = get_company_settings(company)
@@ -905,7 +905,7 @@ def sale_receipt(request, pk):
 
     # Load receipt settings (merged with defaults) so the template
     # can honour every toggle from the Receipt Settings page.
-    from apps.company.settings_views import get_company_settings
+    from apps.companies.views import get_company_settings
     company_settings = get_company_settings(company)
     receipt_settings = company_settings.get('receipt', {})
 
@@ -951,7 +951,7 @@ def sale_receipt_by_id(request, company_sale_id):
     items = sale.items.all()
 
     # Load receipt settings (merged with defaults)
-    from apps.company.settings_views import get_company_settings
+    from apps.companies.views import get_company_settings
     company_settings = get_company_settings(company)
     receipt_settings = company_settings.get('receipt', {})
 
@@ -1871,7 +1871,7 @@ def sale_complete(request, sale_id=None, company_sale_id=None):
             return JsonResponse({'error': 'No company assigned'}, status=400)
 
         messages.error(request, 'No company assigned.')
-        return redirect('epa-dashboard')
+        return redirect('epa_shop:web-dashboard')
 
     # --------------------------------------------------
     # Find sale by database ID or company sale reference

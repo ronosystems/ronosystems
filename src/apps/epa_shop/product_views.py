@@ -9,7 +9,7 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.http import JsonResponse, HttpResponse, Http404
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
-from apps.company.models import Branch
+from apps.companies.models import Branch
 from .models import Electronic, Phone, Accessory, DiscontinuedProduct, Category, Supplier, Unit, Sale, SaleItem, Customer, Owner, ProductImage
 from django.contrib.auth import get_user_model
 from .utils import record_stock_movement

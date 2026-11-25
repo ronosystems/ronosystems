@@ -8,7 +8,7 @@ from django.db import models
 from django.utils import timezone
 
 from apps.companies.models import Company
-from apps.company.models import Branch
+from apps.companies.models import Branch
 
 
 # ================================================================

@@ -1,0 +1,208 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if is_edit %}Edit Staff - {{ staff_user.username }}{% else %}Add Staff - {{ company.name }}{% endif %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card { border: 2px solid #000000; border-radius: 4px; }
+    .card-header { border-bottom: 2px solid #000000; background: #87CEEB !important; color: #000000 !important; }
+    .form-control, .form-select { border: 2px solid #000000; border-radius: 4px; color: #000000; }
+    .form-control:focus, .form-select:focus { border-color: #87CEEB; box-shadow: 0 0 0 3px rgba(135,206,235,0.3); }
+    .form-control:read-only { background: #f8f9fa; }
+    .form-label { font-weight: 600; color: #000000; }
+    .btn-primary { background: #87CEEB; border: 2px solid #000000; color: #000000; font-weight: 600; border-radius: 4px; }
+    .btn-primary:hover { background: #7bb8d8; border-color: #000000; color: #000000; }
+    .btn-secondary { border: 2px solid #000000; border-radius: 4px; font-weight: 600; }
+    .company-badge { background: #d4edda; border: 1px solid #155724; color: #155724; padding: 8px 14px; border-radius: 50px; font-weight: 600; }
+    .input-group-text { border: 2px solid #000000; border-right: none; background: #f8f9fa; color: #000000; }
+    .input-group .form-control { border-left: none; }
+    .avatar-lg { width: 60px; height: 60px; border-radius: 50%; background: #87CEEB; display: flex; align-items: center; justify-content: center; color: #000000; font-weight: 700; font-size: 24px; border: 2px solid #000000; }
+
+    @media (max-width: 768px) {
+        .form-control, .form-select { font-size: 13px; padding: 6px 10px; }
+        .card-body { padding: 12px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="mb-0 fw-bold">
+                    <i class="fas {% if is_edit %}fa-user-edit{% else %}fa-user-plus{% endif %} me-2"></i>
+                    {% if is_edit %}Edit Staff{% else %}Add New Staff{% endif %}
+                </h5>
+                <!-- COMPANY - HAICHAGULIWI, INAONYESHWA TU -->
+                <span class="company-badge">
+                    <i class="fas fa-building me-1"></i> {{ company.name }}
+                </span>
+            </div>
+
+            <div class="card-body">
+
+                <!-- INFO BOX -->
+                {% if is_edit %}
+                <div class="d-flex align-items-center gap-3 mb-3 p-3" style="border: 2px solid #000000; border-radius: 4px; background: #f8f9fa;">
+                    <div class="avatar-lg">
+                        {{ staff_user.first_name|default:staff_user.username|make_list|first|upper }}
+                    </div>
+                    <div>
+                        <strong style="font-size: 18px;">{{ staff_user.get_full_name|default:staff_user.username }}</strong><br>
+                        <small style="color: #000000;">Username: {{ staff_user.username }}</small><br>
+                        <small style="color: #000000;">Joined: {{ staff_user.date_joined|date:"d M Y" }}</small>
+                        {% if staff_user.is_active %}
+                        <span class="badge bg-success" style="border: 1px solid #000000; color: #155724; background: #d4edda !important;">Active</span>
+                        {% else %}
+                        <span class="badge bg-danger" style="border: 1px solid #000000;">Inactive</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="alert alert-info" style="border: 2px solid #000000; color: #000000;">
+                    <i class="fas fa-info-circle me-2"></i>
+                    You are creating staff for <strong>{{ company.name }}</strong> only.
+                    This user will login via <strong>{{ company.subdomain }}.localhost</strong>
+                    {% if company.custom_domain %} or <strong>{{ company.custom_domain }}</strong>{% endif %}
+                </div>
+                {% endif %}
+
+                <!-- MESSAGES -->
+                {% if messages %}
+                    {% for message in messages %}
+                    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" style="border: 2px solid #000000; color: #000000;" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+
+                <form method="post" novalidate>
+                    {% csrf_token %}
+
+                    <!-- USERNAME + STAFF ID -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Username <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-user"></i></span>
+                                <input type="text" name="username" class="form-control"
+                                       value="{% if is_edit %}{{ staff_user.username }}{% else %}{{ preserved.username|default:'' }}{% endif %}"
+                                       placeholder="e.g. maria" required
+                                       {% if is_edit %}readonly{% endif %}>
+                            </div>
+                            {% if is_edit %}<small class="text-muted">Username cannot be changed</small>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Staff ID</label>
+                            <input type="text" name="staff_id" class="form-control"
+                                   value="{% if is_edit %}{{ staff_user.staff_id|default:'' }}{% else %}{{ preserved.staff_id|default:'' }}{% endif %}"
+                                   placeholder="e.g. STF-001">
+                        </div>
+                    </div>
+
+                    <!-- NAMES -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">First Name <span class="text-danger">*</span></label>
+                            <input type="text" name="first_name" class="form-control"
+                                   value="{% if is_edit %}{{ staff_user.first_name }}{% else %}{{ preserved.first_name|default:'' }}{% endif %}"
+                                   placeholder="Maria" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Last Name</label>
+                            <input type="text" name="last_name" class="form-control"
+                                   value="{% if is_edit %}{{ staff_user.last_name }}{% else %}{{ preserved.last_name|default:'' }}{% endif %}"
+                                   placeholder="Wanjiru">
+                        </div>
+                    </div>
+
+                    <!-- EMAIL + PHONE -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Email <span class="text-danger">*</span></label>
+                            <input type="email" name="email" class="form-control"
+                                   value="{% if is_edit %}{{ staff_user.email }}{% else %}{{ preserved.email|default:'' }}{% endif %}"
+                                   placeholder="maria@example.com" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Phone</label>
+                            <input type="text" name="phone" class="form-control"
+                                   value="{% if is_edit %}{{ staff_user.phone|default:'' }}{% else %}{{ preserved.phone|default:'' }}{% endif %}"
+                                   placeholder="0712345678">
+                        </div>
+                    </div>
+
+                    <!-- ROLE -->
+                    <div class="mb-3">
+                        <label class="form-label">Role <span class="text-danger">*</span></label>
+                        <select name="role" class="form-select" required>
+                            <option value="">-- Select Role --</option>
+                            {% for value, label in roles %}
+                            <option value="{{ value }}"
+                                {% if is_edit and staff_user.role == value %}selected{% elif not is_edit and preserved.role == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted d-block mt-1">
+                            Company Admin = can manage staff &nbsp;|&nbsp;
+                            Manager = can manage sales &nbsp;|&nbsp;
+                            Staff / Cashier / Technician = day-to-day work
+                        </small>
+                    </div>
+
+                    <!-- PASSWORD -->
+                    {% if not is_edit %}
+                    <!-- CREATE: Password lazima -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Password <span class="text-danger">*</span></label>
+                            <input type="password" name="password" class="form-control" placeholder="Min 8 characters" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Confirm Password <span class="text-danger">*</span></label>
+                            <input type="password" name="password2" class="form-control" placeholder="Repeat password" required>
+                        </div>
+                    </div>
+                    {% else %}
+                    <!-- EDIT: Password hiari -->
+                    <div class="mb-3">
+                        <label class="form-label">New Password <small class="text-muted">(leave blank to keep old password)</small></label>
+                        <input type="password" name="password" class="form-control" placeholder="Leave blank if not changing">
+                        <small class="text-muted">Kama hutaki kubadilisha password, acha tupu.</small>
+                    </div>
+                    {% endif %}
+
+                    <!-- COMPANY HIDDEN INFO - HAICHAGULIWI -->
+                    <!-- Company inatoka kwenye request.tenant, sio kwenye form -->
+                    <input type="hidden" name="company" value="{{ company.id }}">
+
+                    <div class="d-flex justify-content-between mt-4 flex-wrap gap-2">
+                        <a href="{% url 'accounts:staff-list' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-1"></i> Back to Staff List
+                        </a>
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="fas {% if is_edit %}fa-save{% else %}fa-user-plus{% endif %} me-1"></i>
+                            {% if is_edit %}Update Staff{% else %}Create Staff{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            {% if is_edit %}
+            <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2" style="border-top: 2px solid #000000; background: #f8f9fa;">
+                <small style="color: #000000;">
+                    <i class="fas fa-shield-alt me-1"></i>
+                    Staff of {{ company.name }} - Role: {{ staff_user.get_role_display|default:staff_user.role }}
+                </small>
+                <a href="{% url 'accounts:staff-detail' staff_user.id %}" class="btn btn-outline-info btn-sm" style="border: 2px solid #000000;">
+                    <i class="fas fa-eye me-1"></i> View Details
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

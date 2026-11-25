@@ -1,3 +1,4 @@
+# core/settings.py
 import os
 import glob
 import shutil
@@ -9,26 +10,16 @@ from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
 
-# ============================================
-# BASE DIR & ENV LOADING
-# ============================================
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Explicitly load .env from BASE_DIR → /home/rs/ronosystems/src/.env
 load_dotenv(BASE_DIR / '.env')
 
-# ============================================
-# ENVIRONMENT FLAGS
-# ============================================
 ON_RENDER = 'RENDER' in os.environ
 
 def env_bool(key: str, default: bool = False) -> bool:
-    """Parse a boolean env var case-insensitively."""
     val = os.getenv(key)
     if val is None:
         return default
     return val.strip().lower() in ('1', 'true', 'yes', 'on')
-
 
 # ============================================
 # SECURITY
@@ -36,17 +27,16 @@ def env_bool(key: str, default: bool = False) -> bool:
 SECRET_KEY = os.getenv('SECRET_KEY')
 if not SECRET_KEY:
     if ON_RENDER:
-        raise RuntimeError(
-            "SECRET_KEY environment variable must be set in production."
-        )
+        raise RuntimeError("SECRET_KEY environment variable must be set in production.")
     SECRET_KEY = 'django-insecure-ronosystems-dev-only-key'
 
 DEBUG = env_bool('DEBUG', default=False)
 
-
 # ============================================
 # ALLOWED HOSTS
 # ============================================
+# FIXED: Usitumia '*' pekee. Weka platform + wildcard ya subdomain.
+# Custom domains zinachekiwa na CustomDomainMiddleware (DB lookup).
 ALLOWED_HOSTS = []
 
 _allowed = os.getenv('ALLOWED_HOSTS', '')
@@ -55,21 +45,29 @@ if _allowed:
 else:
     ALLOWED_HOSTS.extend(['localhost', '127.0.0.1'])
 
+ALLOWED_HOSTS.extend([
+    'ronosystems.com',
+    '.ronosystems.com',  # kalyet.ronosystems.com, umoja.ronosystems.com
+    'ronosystems.onrender.com',
+    '.ronosystems.onrender.com',  # kalyet.ronosystems.onrender.com (staging)
+    'ronosystems.co.ke',
+    '.ronosystems.co.ke',
+    '.localhost',  # kalyet.localhost kwa local testing
+])
+
 if ON_RENDER:
     ALLOWED_HOSTS.append('ronosystems.onrender.com')
-    ALLOWED_HOSTS.append('.onrender.com')
 
-# Dynamic custom domains are validated by CustomDomainMiddleware (DB lookup)
-# and Cloudflare in front. Django's own host check is opened up to '*'.
-# If you later remove the middleware, replace this with a real whitelist.
-ALLOWED_HOSTS.append('*')
-
+# Custom domains za wateja (kalyet.co.ke) - lazima ziruhusiwe.
+# Middleware itazikataa kama hazipo kwenye DB.
+# Hii '*' inaruhusiwa kwa sababu CustomDomainMiddleware ndio gatekeeper.
+if '*' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('*')
 
 # ============================================
 # CSRF TRUSTED ORIGINS
 # ============================================
 CSRF_TRUSTED_ORIGINS = []
-
 _csrf = os.getenv('CSRF_TRUSTED_ORIGINS', '')
 if _csrf:
     CSRF_TRUSTED_ORIGINS.extend(o.strip() for o in _csrf.split(',') if o.strip())
@@ -77,16 +75,18 @@ else:
     CSRF_TRUSTED_ORIGINS.extend([
         'http://localhost:8000',
         'http://127.0.0.1:8000',
+        'http://*.localhost:8000',
     ])
 
 if ON_RENDER:
-    CSRF_TRUSTED_ORIGINS.append('https://ronosystems.onrender.com')
+    CSRF_TRUSTED_ORIGINS.extend([
+        'https://ronosystems.onrender.com',
+        'https://*.ronosystems.onrender.com',
+        'https://ronosystems.com',
+        'https://*.ronosystems.com',
+    ])
 
-# Only keep entries that look like real origins
-CSRF_TRUSTED_ORIGINS = [
-    o for o in CSRF_TRUSTED_ORIGINS if o.startswith(('http://', 'https://'))
-]
-
+CSRF_TRUSTED_ORIGINS = [o for o in CSRF_TRUSTED_ORIGINS if o.startswith(('http://', 'https://'))]
 
 # ============================================
 # INSTALLED APPS
@@ -98,8 +98,6 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
-    # Sites framework (required by django-allauth)
     'django.contrib.sites',
 
     'rest_framework',
@@ -109,7 +107,6 @@ INSTALLED_APPS = [
     'cloudinary_storage',
     'cloudinary',
 
-    # ===== django-allauth =====
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
@@ -117,39 +114,36 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.apple',
     'allauth.socialaccount.providers.facebook',
 
-    # Main app
-    'core', 
+    'core',
 
-    # Custom Apps
-    'apps.accounts',
-    'apps.business_types',
-    'apps.companies',
-    'apps.company',
+    # ===== GLOBAL / TENANT CORE - HII NDIO INAANZA KWANZA =====
+    'apps.accounts',       # User + Membership + Role
+    'apps.companies',      # Company / Tenant + Domain + Branch + Expense
+    'apps.plans',          # Plan + Subscription
+
+    # ===== SHARED FEATURES =====
     'apps.treasury',
-    'apps.plans',
     'apps.reports',
     'apps.settings',
     'apps.losses',
     'apps.analytics',
-    'apps.workshop', 
-    'apps.mpesa',  
-    'apps.cart_orders', 
+    'apps.workshop',
+    'apps.mpesa',
+    'apps.cart_orders',
     'apps.ai_chatbot',
     'apps.customers',
 
-    # Business Type Apps
+    # ===== BUSINESS TYPE APPS =====
     'apps.epa_shop',
     'apps.supermarket',
     'apps.kuku_biz',
-    'apps.chama', 
+    'apps.chama',
 ]
 
-# Required by django.contrib.sites / allauth
 SITE_ID = 1
 
-
 # ============================================
-# MIDDLEWARE
+# MIDDLEWARE - ORDER NI MUHIMU SANA
 # ============================================
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -158,21 +152,28 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+
+    # 1. Tenant kwanza - inaweka request.tenant kutoka kwa domain
+    'apps.companies.middleware.CustomDomainMiddleware',
+
+    # 2. Auth baada ya tenant - ili backend iweze ku-check tenant
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
-    'apps.accounts.middleware.InactivityLogoutMiddleware',
-    'apps.companies.middleware.CustomDomainMiddleware',
+
+    # 3. Subscription - inatumia request.tenant
     'apps.companies.middleware.SubscriptionExpiryMiddleware',
-    'apps.analytics.middleware.VisitTrackingMiddleware', 
+
+    # 4. Zingine
+    'apps.accounts.middleware.InactivityLogoutMiddleware',
+    'apps.analytics.middleware.VisitTrackingMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
 
-
 # ============================================
-# TEMPLATES
+# TEMPLATES - CONTEXT PROCESSORS ZILIZOFIXWA
 # ============================================
 TEMPLATES = [
     {
@@ -186,33 +187,36 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
 
+                # Settings / AI / Cart
                 'apps.settings.context_processors.pending_payments_count',
                 'apps.settings.context_processors.pending_ai_chats_count',
                 'apps.settings.context_processors.system_settings',
-                
-                'apps.ai_chatbot.context_processors.chatbot_available',               
+                'apps.ai_chatbot.context_processors.chatbot_available',
                 'apps.cart_orders.context_processors.cart_count',
 
-                'apps.epa_shop.context_processors.user_context', 
+                # EPA Shop
+                'apps.epa_shop.context_processors.user_context',
                 'apps.epa_shop.context_processors.pending_orders_count',
                 'apps.epa_shop.context_processors.sidebar_low_stock_count',
 
-                'apps.companies.context_processors.system_website_url', 
-                'apps.company.context_processors.company_context',
+                # ===== COMPANIES - SOURCE OF TRUTH KWA TENANT =====
+                # DELETED: 'apps.companies.context_processors.company_context' - duplicate
+                'apps.companies.context_processors.system_website_url',
                 'apps.companies.context_processors.active_base_template',
                 'apps.companies.context_processors.support_mode_context',
                 'apps.companies.context_processors.pending_join_requests',
                 'apps.companies.context_processors.company_branding_context',
-                'apps.companies.context_processors.unread_messages_count', 
-                'apps.companies.context_processors.receipt_settings_context', 
+                'apps.companies.context_processors.unread_messages_count',
+                'apps.companies.context_processors.receipt_settings_context',
                 'apps.companies.context_processors.pending_feedback_count',
                 'apps.companies.context_processors.total_notifications_count',
-                'apps.companies.context_processors.pending_applications_count', 
+                'apps.companies.context_processors.pending_applications_count',
+                'apps.companies.context_processors.company_features_context',  # ADDED - ilikuwa inakosekana
 
-                'apps.plans.context_processors.plan_features',   
+                'apps.plans.context_processors.plan_features',
                 'apps.losses.context_processors.pending_losses_count',
-                'apps.treasury.context_processors.company_context',
-                'apps.analytics.context_processors.visit_count_today', 
+                # DELETED: 'apps.treasury.context_processors.company_context' - duplicate ya branding
+                'apps.analytics.context_processors.visit_count_today',
             ],
         },
     },
@@ -220,28 +224,19 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
-
 # ============================================
 # VISIT TRACKING
 # ============================================
 VISIT_TRACKING_ENABLED = env_bool('VISIT_TRACKING_ENABLED', default=True)
 VISIT_TRACKING_HASH_IP = env_bool('VISIT_TRACKING_HASH_IP', default=False)
-VISIT_TRACKING_IP_SALT = os.getenv(
-    'VISIT_TRACKING_IP_SALT',
-    'change-me-in-prod'
-)
+VISIT_TRACKING_IP_SALT = os.getenv('VISIT_TRACKING_IP_SALT', 'change-me-in-prod')
 
-# GeoLite2 database location.
-# - Local dev:      BASE_DIR / 'geoip'
-# - Render (prod):  /opt/render/project/geoip  (Render Disk — mounted persistently)
-# - Fallback:       /tmp/geoip (ephemeral, only if disk isn't mounted)
 if ON_RENDER:
     GEOIP_PATH = Path('/opt/render/project/geoip')
     if not GEOIP_PATH.exists():
         GEOIP_PATH = Path('/tmp/geoip')
 else:
     GEOIP_PATH = BASE_DIR / 'geoip'
-
 
 # ============================================
 # DATABASE
@@ -251,57 +246,18 @@ USE_SQLITE = env_bool('USE_SQLITE', default=False)
 if ON_RENDER:
     DATABASE_URL = os.getenv('DATABASE_URL')
     if DATABASE_URL:
-        DATABASES = {
-            'default': dj_database_url.config(
-                default=DATABASE_URL,
-                conn_max_age=600,
-                conn_health_checks=True,
-                ssl_require=True,
-            )
-        }
+        DATABASES = {'default': dj_database_url.config(default=DATABASE_URL, conn_max_age=600, conn_health_checks=True, ssl_require=True)}
     else:
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.postgresql',
-                'NAME': os.getenv('DATABASE_NAME', 'rono_db'),
-                'USER': os.getenv('DATABASE_USER', 'rono_user'),
-                'PASSWORD': os.getenv('DATABASE_PASSWORD', 'rono_secure_password'),
-                'HOST': os.getenv('DATABASE_HOST', 'localhost'),
-                'PORT': os.getenv('DATABASE_PORT', '5432'),
-            }
-        }
-
+        DATABASES = {'default': {'ENGINE': 'django.db.backends.postgresql', 'NAME': os.getenv('DATABASE_NAME', 'rono_db'), 'USER': os.getenv('DATABASE_USER', 'rono_user'), 'PASSWORD': os.getenv('DATABASE_PASSWORD', 'rono_secure_password'), 'HOST': os.getenv('DATABASE_HOST', 'localhost'), 'PORT': os.getenv('DATABASE_PORT', '5432')}}
 elif USE_SQLITE:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+    DATABASES = {'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': BASE_DIR / 'db.sqlite3'}}
     print("✅ Using SQLite database for local development")
-
 else:
     DATABASE_URL = os.getenv('DATABASE_URL')
     if DATABASE_URL:
-        DATABASES = {
-            'default': dj_database_url.config(
-                default=DATABASE_URL,
-                conn_max_age=600,
-                conn_health_checks=True,
-            )
-        }
+        DATABASES = {'default': dj_database_url.config(default=DATABASE_URL, conn_max_age=600, conn_health_checks=True)}
     else:
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.postgresql',
-                'NAME': os.getenv('DATABASE_NAME', 'rono_db'),
-                'USER': os.getenv('DATABASE_USER', 'rono_user'),
-                'PASSWORD': os.getenv('DATABASE_PASSWORD', 'rono_secure_password'),
-                'HOST': os.getenv('DATABASE_HOST', 'localhost'),
-                'PORT': os.getenv('DATABASE_PORT', '5432'),
-            }
-        }
-
+        DATABASES = {'default': {'ENGINE': 'django.db.backends.postgresql', 'NAME': os.getenv('DATABASE_NAME', 'rono_db'), 'USER': os.getenv('DATABASE_USER', 'rono_user'), 'PASSWORD': os.getenv('DATABASE_PASSWORD', 'rono_secure_password'), 'HOST': os.getenv('DATABASE_HOST', 'localhost'), 'PORT': os.getenv('DATABASE_PORT', '5432')}}
 
 # ============================================
 # AUTHENTICATION
@@ -316,35 +272,23 @@ AUTH_PASSWORD_VALIDATORS = [
 AUTHENTICATION_BACKENDS = [
     'apps.accounts.backends.CustomerDomainBackend',
     'apps.accounts.backends.TenantAuthBackend',
-    'apps.accounts.backends.EmailOrPhoneBackend', 
+    'apps.accounts.backends.EmailOrPhoneBackend',
     'django.contrib.auth.backends.ModelBackend',
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
-
 # ============================================
-# SESSION / AUTO-LOGOUT ON INACTIVITY (30 MIN)
+# SESSION / AUTO-LOGOUT (30 MIN)
 # ============================================
-# The session cookie expires after 30 minutes of inactivity.
-# SESSION_SAVE_EVERY_REQUEST=True makes the expiry inactivity-based:
-# every request pushes the expiry forward, so an idle user is logged out
-# after 30 minutes, but an active user stays logged in indefinitely.
-#
-# InactivityLogoutMiddleware is a server-side backup that enforces the
-# same 30-minute rule by tracking _last_activity in the session and
-# flushing the session if it's exceeded.
-SESSION_COOKIE_AGE = 60 * 30             # 30 minutes
-SESSION_SAVE_EVERY_REQUEST = True         # refresh expiry on every request
+SESSION_COOKIE_AGE = 60 * 30
+SESSION_SAVE_EVERY_REQUEST = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
-
-# Enforced by InactivityLogoutMiddleware (belt-and-suspenders)
-INACTIVITY_TIMEOUT_SECONDS = 60 * 30      # 30 minutes
-
+INACTIVITY_TIMEOUT_SECONDS = 60 * 30
 
 # ============================================
 # DJANGO-ALLAUTH
 # ============================================
-ACCOUNT_LOGIN_METHODS = {'username'}  # We use a custom backend for phone/email anyway
+ACCOUNT_LOGIN_METHODS = {'username'}
 ACCOUNT_SIGNUP_FIELDS = ['username*', 'email', 'password1*', 'password2*']
 ACCOUNT_USER_MODEL_USERNAME_FIELD = 'username'
 ACCOUNT_EMAIL_VERIFICATION = 'optional'
@@ -353,13 +297,11 @@ ACCOUNT_LOGIN_REDIRECT_URL = '/dashboard/'
 ACCOUNT_LOGOUT_ON_GET = True
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 ACCOUNT_SESSION_REMEMBER = True
-
 ACCOUNT_SIGNUP_REDIRECT_URL = '/dashboard/'
 ACCOUNT_LOGOUT_REDIRECT_URL = '/auth/login/'
 
 SOCIALACCOUNT_ADAPTER = 'apps.accounts.adapters.RonoSocialAccountAdapter'
 ACCOUNT_ADAPTER = 'apps.accounts.adapters.RonoAccountAdapter'
-
 SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
 SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
 SOCIALACCOUNT_AUTO_SIGNUP = True
@@ -370,11 +312,7 @@ SOCIALACCOUNT_PROVIDERS = {
         'SCOPE': ['profile', 'email'],
         'AUTH_PARAMS': {'access_type': 'online'},
         'VERIFIED_EMAIL': True,
-        'APP': {
-            'client_id': os.getenv('GOOGLE_CLIENT_ID', ''),
-            'secret': os.getenv('GOOGLE_CLIENT_SECRET', ''),
-            'key': '',
-        },
+        'APP': {'client_id': os.getenv('GOOGLE_CLIENT_ID', ''), 'secret': os.getenv('GOOGLE_CLIENT_SECRET', ''), 'key': ''},
     },
     'facebook': {
         'METHOD': 'oauth2',
@@ -382,48 +320,27 @@ SOCIALACCOUNT_PROVIDERS = {
         'SCOPE': ['email', 'public_profile'],
         'AUTH_PARAMS': {'auth_type': 'reauthenticate'},
         'INIT_PARAMS': {'cookie': True},
-        'FIELDS': [
-            'id', 'first_name', 'last_name', 'middle_name',
-            'name', 'name_format', 'picture', 'short_name', 'email',
-        ],
+        'FIELDS': ['id', 'first_name', 'last_name', 'middle_name', 'name', 'name_format', 'picture', 'short_name', 'email'],
         'EXCHANGE_TOKEN': True,
         'VERIFIED_EMAIL': False,
         'VERSION': 'v18.0',
-        'APP': {
-            'client_id': os.getenv('FACEBOOK_CLIENT_ID', ''),
-            'secret': os.getenv('FACEBOOK_CLIENT_SECRET', ''),
-            'key': '',
-        },
+        'APP': {'client_id': os.getenv('FACEBOOK_CLIENT_ID', ''), 'secret': os.getenv('FACEBOOK_CLIENT_SECRET', ''), 'key': ''},
     },
     'apple': {
-        'APP': {
-            'client_id': os.getenv('APPLE_CLIENT_ID', ''),
-            'secret': os.getenv('APPLE_CLIENT_SECRET', ''),
-            'key': os.getenv('APPLE_KEY_ID', ''),
-            # certificate_key must live inside APP.settings for
-            # recent django-allauth versions (silences the UserWarning).
-            'settings': {
-                'certificate_key': os.getenv('APPLE_PRIVATE_KEY', ''),
-            },
-        },
+        'APP': {'client_id': os.getenv('APPLE_CLIENT_ID', ''), 'secret': os.getenv('APPLE_CLIENT_SECRET', ''), 'key': os.getenv('APPLE_KEY_ID', ''), 'settings': {'certificate_key': os.getenv('APPLE_PRIVATE_KEY', '')}},
         'SCOPE': ['name', 'email'],
     },
 }
 
-ACCOUNT_FORMS = {
-    'login': 'apps.accounts.forms.CustomLoginForm',
-}
-
+ACCOUNT_FORMS = {'login': 'apps.accounts.forms.CustomLoginForm'}
 SOCIALACCOUNT_LOGIN_ON_GET = True
 SOCIALACCOUNT_STORE_TOKENS = False
-
 
 # ============================================
 # WHATSAPP TWILIO
 # ===========================================
 TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID', '')
 TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN', '')
-
 
 # ============================================
 # INTERNATIONALIZATION
@@ -432,7 +349,6 @@ LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Africa/Nairobi'
 USE_I18N = True
 USE_TZ = True
-
 
 # ============================================
 # CLOUDINARY
@@ -443,7 +359,6 @@ CLOUDINARY_STORAGE = {
     'API_SECRET': os.getenv('CLOUDINARY_API_SECRET', ''),
 }
 
-
 # ============================================
 # STATIC & MEDIA
 # ============================================
@@ -451,43 +366,19 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Store media on Cloudinary by default in production; opt-in for dev via env.
-USE_CLOUDINARY_MEDIA = env_bool(
-    'USE_CLOUDINARY_MEDIA',
-    default=ON_RENDER,
-)
+USE_CLOUDINARY_MEDIA = env_bool('USE_CLOUDINARY_MEDIA', default=ON_RENDER)
 
 if USE_CLOUDINARY_MEDIA:
-    # Media is uploaded to Cloudinary manually via cloudinary.uploader.upload().
-    # We deliberately keep the default Django storage on FileSystemStorage so
-    # django-cloudinary-storage does not rewrite public_ids / URLs.
     STORAGES = {
-        "default": {
-            "BACKEND": "django.core.files.storage.FileSystemStorage",
-        },
-        "staticfiles": {
-            "BACKEND": (
-                "whitenoise.storage.CompressedManifestStaticFilesStorage"
-                if ON_RENDER
-                else "django.contrib.staticfiles.storage.StaticFilesStorage"
-            ),
-        },
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": ("whitenoise.storage.CompressedManifestStaticFilesStorage" if ON_RENDER else "django.contrib.staticfiles.storage.StaticFilesStorage")},
     }
-    # The /image/upload/ segment is REQUIRED for Cloudinary URLs to resolve.
-    MEDIA_URL = (
-        f"https://res.cloudinary.com/"
-        f"{CLOUDINARY_STORAGE['CLOUD_NAME']}/image/upload/"
-    )
+    MEDIA_URL = f"https://res.cloudinary.com/{CLOUDINARY_STORAGE['CLOUD_NAME']}/image/upload/"
     print("✅ Using Cloudinary for media files (direct SDK uploads)")
-
 else:
     STORAGES = {
-        "default": {
-            "BACKEND": "django.core.files.storage.FileSystemStorage",
-        },
-        "staticfiles": {
-            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-        },
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
     }
     MEDIA_ROOT = BASE_DIR / 'media'
     MEDIA_URL = '/media/'
@@ -495,44 +386,28 @@ else:
 
 os.makedirs(STATIC_ROOT, exist_ok=True)
 
+DATA_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024
 
-# ============================================
-# UPLOAD LIMITS
-# ============================================
-DATA_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024   # 100 MB
-FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024   # 100 MB
-
-
-# ============================================
-# DEFAULTS
-# ============================================
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'accounts.User'
-
 
 # ============================================
 # CORS
 # ============================================
 CORS_ALLOW_ALL_ORIGINS = DEBUG
-
 if not DEBUG:
     _cors = os.getenv('CORS_ALLOWED_ORIGINS', '')
     CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors.split(',') if o.strip()]
     CORS_ALLOW_CREDENTIALS = True
 
-
 # ============================================
 # JWT
 # ============================================
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ),
-    'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
-    ),
+    'DEFAULT_AUTHENTICATION_CLASSES': ('rest_framework_simplejwt.authentication.JWTAuthentication',),
+    'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAuthenticated',),
 }
-
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
@@ -541,14 +416,12 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-
 # ============================================
-# LOGIN / LOGOUT URLs (Django auth, not allauth)
+# LOGIN / LOGOUT URLs
 # ============================================
 LOGIN_URL = '/auth/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/auth/login/'
-
 
 # ============================================
 # SECURITY (Production)
@@ -562,35 +435,23 @@ if not DEBUG and ON_RENDER:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
-
 # ============================================
 # EMAIL
 # ============================================
-# Force SMTP even in dev (for testing real email delivery).
-# Set USE_REAL_EMAIL=True in .env to activate.
 USE_REAL_EMAIL = env_bool('USE_REAL_EMAIL', default=False)
-
 if ON_RENDER or USE_REAL_EMAIL:
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
     EMAIL_PORT = int(os.getenv('EMAIL_PORT', 465))
-
-    # Auto-select TLS vs SSL based on port.
-    # Port 465 → implicit SSL.   Port 587 → STARTTLS.
-    # Django forbids both being True at once.
     if EMAIL_PORT == 465:
         EMAIL_USE_SSL = True
         EMAIL_USE_TLS = False
     else:
         EMAIL_USE_SSL = False
         EMAIL_USE_TLS = True
-
     EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
     EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-    DEFAULT_FROM_EMAIL = os.getenv(
-        'DEFAULT_FROM_EMAIL',
-        EMAIL_HOST_USER or 'support.ronosystems@gmail.com'
-    )
+    DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'support.ronosystems@gmail.com')
     SERVER_EMAIL = os.getenv('SERVER_EMAIL', DEFAULT_FROM_EMAIL)
     SUPPORT_EMAIL = os.getenv('SUPPORT_EMAIL', DEFAULT_FROM_EMAIL)
 else:
@@ -599,89 +460,48 @@ else:
     SERVER_EMAIL = DEFAULT_FROM_EMAIL
     SUPPORT_EMAIL = os.getenv('SUPPORT_EMAIL', DEFAULT_FROM_EMAIL)
 
-
-
 # ============================================
-# SYSTEM ENGINES 
+# SYSTEM ENGINES
 # ============================================
 SYSTEM_NAME = os.getenv('SYSTEM_NAME', 'RonoSystems')
 SYSTEM_WEBSITE_URL = os.getenv('SYSTEM_WEBSITE_URL', '')
-SYSTEM_DOMAIN = os.getenv('SYSTEM_DOMAIN', '')
-
+# FIXED: Lazima iwe na default, sio '' - context processor inategemea hii
+SYSTEM_DOMAIN = os.getenv('SYSTEM_DOMAIN', 'ronosystems.onrender.com' if ON_RENDER else 'localhost')
 
 # ============================================
 # AI ASSISTANT
 # ============================================
-# Primary provider
-AI_PROVIDER = os.getenv('AI_PROVIDER', 'groq')     # 'groq' | 'openai' | 'gemini'
-
-# Groq
+AI_PROVIDER = os.getenv('AI_PROVIDER', 'groq')
 GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
 GROQ_MODEL = os.getenv('GROQ_MODEL', 'llama-3.3-70b-versatile')
-
-# OpenAI (kept as fallback)
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
-
-# Gemini (optional)
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
-
-# Enable if ANY provider has a key
 AI_ASSISTANT_ENABLED = bool(GROQ_API_KEY or OPENAI_API_KEY or GEMINI_API_KEY)
-
 
 # ============================================
 # CONTACT FORM
 # ============================================
 CONTACT_EMAIL = os.getenv('CONTACT_EMAIL', 'support.ronosystems@gmail.com')
 
-
 # ============================================
-# KOPOKOPO PAYMENT GATEWAY
+# KOPOKOPO / KCB
 # ============================================
 KOPOKOPO_CLIENT_ID = os.getenv('KOPOKOPO_CLIENT_ID', '')
 KOPOKOPO_CLIENT_SECRET = os.getenv('KOPOKOPO_CLIENT_SECRET', '')
 KOPOKOPO_API_KEY = os.getenv('KOPOKOPO_API_KEY', '')
-
 KOPOKOPO_ENVIRONMENT = os.getenv('KOPOKOPO_ENVIRONMENT', 'sandbox')
+KOPOKOPO_BASE_URL = 'https://api.kopokopo.com' if KOPOKOPO_ENVIRONMENT == 'production' else 'https://sandbox.kopokopo.com'
+KOPOKOPO_CALLBACK_URL = os.getenv('KOPOKOPO_CALLBACK_URL', 'https://ronosystems.onrender.com/payments/kopokopo/callback/')
+KOPOKOPO_REDIRECT_URL = os.getenv('KOPOKOPO_REDIRECT_URL', 'https://ronosystems.onrender.com/')
 
-if KOPOKOPO_ENVIRONMENT == 'production':
-    KOPOKOPO_BASE_URL = 'https://api.kopokopo.com'
-else:
-    KOPOKOPO_BASE_URL = 'https://sandbox.kopokopo.com'
-
-KOPOKOPO_CALLBACK_URL = os.getenv(
-    'KOPOKOPO_CALLBACK_URL',
-    'https://ronosystems.onrender.com/payments/kopokopo/callback/'
-)
-
-KOPOKOPO_REDIRECT_URL = os.getenv(
-    'KOPOKOPO_REDIRECT_URL',
-    'https://ronosystems.onrender.com/'
-)
-
-
-# ============================================
-# KCB BUNI PAYMENT GATEWAY
-# ============================================
 KCB_CONSUMER_KEY = os.getenv('KCB_CONSUMER_KEY', '')
 KCB_CONSUMER_SECRET = os.getenv('KCB_CONSUMER_SECRET', '')
 KCB_ENVIRONMENT = os.getenv('KCB_ENVIRONMENT', 'sandbox')
-
-if KCB_ENVIRONMENT == 'production':
-    KCB_BASE_URL = 'https://api.buni.kcbgroup.com'
-else:
-    KCB_BASE_URL = 'https://uat.buni.kcbgroup.com'
-
+KCB_BASE_URL = 'https://api.buni.kcbgroup.com' if KCB_ENVIRONMENT == 'production' else 'https://uat.buni.kcbgroup.com'
 KCB_TOKEN_URL = f'{KCB_BASE_URL}/token?grant_type=client_credentials'
 KCB_STK_ENDPOINT = '/mm/api/request/1.0.0/stkpush'
-KCB_CALLBACK_URL = os.getenv(
-    'KCB_CALLBACK_URL',
-    'https://ronosystems.onrender.com/payments/kcb/callback/'
-)
-
-
-
+KCB_CALLBACK_URL = os.getenv('KCB_CALLBACK_URL', 'https://ronosystems.onrender.com/payments/kcb/callback/')
 
 # ============================================
 # LOGGING
@@ -689,57 +509,29 @@ KCB_CALLBACK_URL = os.getenv(
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-        },
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': 'INFO',
-    },
-    'loggers': {
-        'django': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-    },
+    'handlers': {'console': {'class': 'logging.StreamHandler'}},
+    'root': {'handlers': ['console'], 'level': 'INFO'},
+    'loggers': {'django': {'handlers': ['console'], 'level': 'INFO', 'propagate': False}},
 }
 
-
-
 # ============================================
-# GEOIP AUTO-DOWNLOAD (survives ephemeral containers)
+# GEOIP AUTO-DOWNLOAD
 # ============================================
 if ON_RENDER:
-
     _log = logging.getLogger(__name__)
     _mmdb = GEOIP_PATH / 'GeoLite2-City.mmdb'
-
     if not _mmdb.exists():
         _log.warning('GeoLite2-City.mmdb missing — attempting download…')
         try:
             GEOIP_PATH.mkdir(parents=True, exist_ok=True)
             _account = os.getenv('MAXMIND_ACCOUNT_ID', '')
-            _key     = os.getenv('MAXMIND_LICENSE_KEY', '')
-
+            _key = os.getenv('MAXMIND_LICENSE_KEY', '')
             if _account and _key:
-                subprocess.run([
-                    'curl', '-fL', '-u', f'{_account}:{_key}',
-                    'https://download.maxmind.com/geoip/databases/GeoLite2-City/download?suffix=tar.gz',
-                    '-o', '/tmp/geolite2-city.tar.gz',
-                ], check=True, timeout=120)
-
-                subprocess.run(
-                    ['tar', '-xzf', '/tmp/geolite2-city.tar.gz', '-C', '/tmp'],
-                    check=True, timeout=60,
-                )
-
+                subprocess.run(['curl', '-fL', '-u', f'{_account}:{_key}', 'https://download.maxmind.com/geoip/databases/GeoLite2-City/download?suffix=tar.gz', '-o', '/tmp/geolite2-city.tar.gz'], check=True, timeout=120)
+                subprocess.run(['tar', '-xzf', '/tmp/geolite2-city.tar.gz', '-C', '/tmp'], check=True, timeout=60)
                 _extracted = glob.glob('/tmp/GeoLite2-City_*/GeoLite2-City.mmdb')
                 if _extracted:
                     shutil.move(_extracted[0], str(_mmdb))
                     _log.info('GeoLite2-City.mmdb installed at %s', _mmdb)
         except Exception as _e:
             _log.warning('GeoIP auto-download failed: %s', _e)
-

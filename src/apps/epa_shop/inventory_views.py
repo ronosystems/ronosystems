@@ -14,7 +14,7 @@ from apps.companies.support_utils import (
     is_effective_admin,
     get_effective_branch,
 )
-from apps.company.models import Branch
+from apps.companies.models import Branch
 from django.contrib.auth import get_user_model
 from .product_views import get_or_create_owner_from_user
 from django.db import transaction

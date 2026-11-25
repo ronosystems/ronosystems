@@ -10,7 +10,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from django.views.decorators.cache import never_cache
 from apps.epa_shop.storefront import get_epa_products
-from apps.business_types.business_type_registry import BusinessTypeEnum
+from apps.companies.business_types import BusinessTypeEnum
 from django.contrib.auth.decorators import login_required
 from apps.companies.models import ContactMessage, Gallery
 from django.shortcuts import render
@@ -166,7 +166,7 @@ def home(request):
     if company:
         bt_slug = ""
         if company.business_type:
-            from apps.business_types.business_type_registry import BusinessTypeEnum
+            from apps.companies.business_types import BusinessTypeEnum
             bt_enum = BusinessTypeEnum.get_by_name(company.business_type.name)
             if bt_enum:
                 bt_slug = bt_enum.value['slug']
@@ -822,3 +822,259 @@ def asset_links(request):
             return HttpResponse(f.read(), content_type='application/json')
     except FileNotFoundError:
         return HttpResponse('Not found', status=404)
+
+
+
+
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+
+@login_required
+def super_admin_dashboard(request):
+    if getattr(request.user, 'role', None) != 'super_admin':
+        return redirect('dashboard-router')
+
+    from django.utils import timezone
+    from django.db.models import Count, Sum, Q
+    from datetime import timedelta
+
+    now = timezone.now()
+    today = now.date()
+    soon = now + timedelta(days=14)
+    thirty_ago = now - timedelta(days=30)
+    sixty_ago = now - timedelta(days=60)
+
+    stats = {
+        'total_companies': 0, 'active_companies': 0,
+        'total_users': 0, 'active_users': 0, 'inactive_users': 0,
+        'active_subscriptions': 0, 'expiring_soon': 0,
+        'expired_subscriptions': 0,
+        'mrr': 0, 'arpc': 0,
+    }
+    business_type_breakdown = []
+    recent_companies = []
+    attention_companies = []
+    plan_distribution = []
+    health = {'active_rate': 0, 'growth_rate_30d': 0, 'suspended_rate': 0}
+
+    try:
+        from apps.companies.models import Company
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
+        # --- Stats: Companies ---
+        total = Company.objects.count()
+        stats['total_companies'] = total
+        try:
+            stats['active_companies'] = Company.objects.filter(status='active').count()
+            suspended = Company.objects.filter(status='suspended').count()
+        except Exception:
+            stats['active_companies'] = Company.objects.filter(is_active=True).count()
+            suspended = 0
+
+        # --- Stats: Users ---
+        stats['total_users'] = User.objects.count()
+        try:
+            stats['active_users'] = User.objects.filter(is_active=True).count()
+        except Exception:
+            stats['active_users'] = stats['total_users']
+        stats['inactive_users'] = stats['total_users'] - stats['active_users']
+
+        # --- Health ---
+        if total > 0:
+            health['active_rate'] = round(stats['active_companies'] / total * 100, 1)
+            health['suspended_rate'] = round(suspended / total * 100, 1)
+        last_30 = Company.objects.filter(created_at__gte=thirty_ago).count()
+        prev_30 = Company.objects.filter(created_at__gte=sixty_ago, created_at__lt=thirty_ago).count()
+        if prev_30 > 0:
+            health['growth_rate_30d'] = round((last_30 - prev_30) / prev_30 * 100, 1)
+        elif last_30 > 0:
+            health['growth_rate_30d'] = 100.0
+
+        # --- Business Type Breakdown ---
+        # Inahitaji: bt.business_type__name, bt.count
+        try:
+            business_type_breakdown = list(
+                Company.objects.values('business_type__name')
+                .annotate(count=Count('id'))
+                .order_by('-count')
+            )
+        except Exception:
+            business_type_breakdown = []
+
+        # --- Recent Companies ---
+        # Inahitaji: company.name, .business_type.name, .created_at,
+        # .custom_domain, .domain_verified, .plan.display_name, .users.count, .is_active, .status
+        try:
+            recent_companies = list(
+                Company.objects.select_related('business_type', 'plan')
+                .prefetch_related('users')
+                .order_by('-created_at')[:8]
+            )
+        except Exception:
+            recent_companies = list(Company.objects.order_by('-created_at')[:8])
+
+        # --- Subscriptions / MRR / Plan Distribution ---
+        # Jaribu kupata Subscription model
+        SubModel = None
+        for path in [
+            'apps.companies.models.CompanySubscription',
+            'apps.plans.models.Subscription',
+            'apps.companies.models.Subscription',
+        ]:
+            try:
+                mod_path, cls_name = path.rsplit('.', 1)
+                import importlib
+                mod = importlib.import_module(mod_path)
+                SubModel = getattr(mod, cls_name)
+                break
+            except Exception:
+                continue
+
+        if SubModel:
+            subs = SubModel.objects.select_related('company', 'plan').all()
+            # Active = end_date bado haijaisha + is_active kama ipo
+            try:
+                active_subs = subs.filter(end_date__gte=today)
+                stats['active_subscriptions'] = active_subs.count()
+            except Exception:
+                try:
+                    active_subs = subs.filter(is_active_subscription=True)
+                    stats['active_subscriptions'] = active_subs.count()
+                except Exception:
+                    active_subs = subs
+                    stats['active_subscriptions'] = subs.count()
+
+            try:
+                stats['expiring_soon'] = active_subs.filter(end_date__lte=soon.date()).count()
+            except Exception:
+                stats['expiring_soon'] = 0
+            try:
+                stats['expired_subscriptions'] = subs.filter(end_date__lt=today).count()
+            except Exception:
+                stats['expired_subscriptions'] = 0
+
+            # MRR = jumla ya bei za plan za active subs
+            try:
+                mrr = 0
+                for s in active_subs:
+                    price = getattr(getattr(s, 'plan', None), 'price', 0) or 0
+                    # Kama plan ina monthly_price, tumia hiyo
+                    if hasattr(getattr(s, 'plan', None), 'monthly_price'):
+                        price = getattr(s.plan, 'monthly_price') or price
+                    mrr += float(price)
+                stats['mrr'] = int(mrr)
+            except Exception:
+                stats['mrr'] = 0
+
+            if stats['active_subscriptions'] > 0:
+                stats['arpc'] = int(stats['mrr'] / stats['active_subscriptions'])
+
+            # Plan Distribution: item.count, item.plan, item.mrr, item.renewal_amount
+            try:
+                grouped = subs.values('plan').annotate(count=Count('id'))
+                for g in grouped:
+                    plan_obj = None
+                    try:
+                        from apps.plans.models import Plan
+                        plan_obj = Plan.objects.filter(id=g['plan']).first()
+                    except Exception:
+                        pass
+                    price = float(getattr(plan_obj, 'price', 0) or 0) if plan_obj else 0
+                    plan_distribution.append({
+                        'plan': plan_obj,
+                        'count': g['count'],
+                        'mrr': int(price * g['count']),
+                        'renewal_amount': int(price * g['count']),
+                    })
+            except Exception:
+                plan_distribution = []
+
+            # Attention Companies: zinazoisha hivi karibuni / expired
+            # item.company, item.days_left, item.end_date, item.plan
+            try:
+                for s in active_subs.filter(end_date__lte=soon.date()).order_by('end_date')[:10]:
+                    end = getattr(s, 'end_date', None)
+                    days_left = (end - today).days if end else None
+                    attention_companies.append({
+                        'company': getattr(s, 'company', None),
+                        'plan': getattr(s, 'plan', None),
+                        'end_date': end,
+                        'days_left': days_left,
+                        'count': 1,
+                    })
+            except Exception:
+                attention_companies = []
+
+    except Exception as e:
+        # Usi-crash dashboard - log error lakini onyesha zeros
+        import logging
+        logging.getLogger(__name__).exception(f"super_admin_dashboard error: {e}")
+
+    context = {
+        'stats': stats,
+        'business_type_breakdown': business_type_breakdown,
+        'recent_companies': recent_companies,
+        'attention_companies': attention_companies,
+        'plan_distribution': plan_distribution,
+        'health': health,
+        # Aliases kwa ajili ya base.html / sidebar
+        'total': stats['total_companies'],
+        'current_company': None,
+        'is_embed': False,
+    }
+    return render(request, 'superadmin/super_dashboard.html', context)
+
+
+
+from django.contrib.auth.decorators import login_required
+from apps.companies.business_types import BusinessTypeEnum
+
+@login_required
+def dashboard_router(request):
+    user = request.user
+
+    # 0. SUPER ADMIN -> dashboard yake mwenyewe
+    if getattr(user, 'role', None) == 'super_admin':
+        # Kama yuko kwenye Support Mode, mpeleke kwenye dashboard ya hiyo company
+        support_id = request.session.get('support_company_id')
+        if support_id:
+            from apps.companies.models import Company
+            company = Company.objects.filter(id=support_id).first()
+            if company:
+                slug = getattr(company, 'business_type_slug', None)
+                bt = BusinessTypeEnum.get_by_slug(slug) if slug else None
+                url_name = (bt.value.get('integration') or {}).get('web_dashboard_url_name') if bt else None
+                if url_name:
+                    return redirect(url_name)
+        # Sio support mode -> super admin dashboard
+        return redirect('super-admin-dashboard')
+
+    # 1. Customer...
+    if getattr(user, 'role', None) == 'customer':
+        return redirect('customers:dashboard')
+
+    # 2. Pata company
+    company = getattr(user, 'company', None)
+    if not company:
+        company_id = request.session.get('current_company_id') or request.session.get('company_id')
+        if company_id:
+            from apps.companies.models import Company
+            company = Company.objects.filter(id=company_id).first()
+
+    if not company:
+        return redirect('companies:company-list')
+
+    # 3. business_type ni FK -> tumia slug
+    #    company.business_type_slug inarudi 'epa-shop', 'supermarket', 'kuku-biz', 'chama'
+    #    (kutoka models.py:464-465)
+    slug = getattr(company, 'business_type_slug', None)
+    bt = BusinessTypeEnum.get_by_slug(slug) if slug else None
+    integration = bt.value.get('integration') if bt else None
+    url_name = (integration or {}).get('web_dashboard_url_name')
+
+    if url_name:
+        return redirect(url_name)
+
+    # 4. Fallback: hakuna business_type / inactive
+    return redirect('epa_shop:web-dashboard')

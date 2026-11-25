@@ -7,7 +7,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django.contrib.contenttypes.models import ContentType
 
-from apps.company.models import Branch
+from apps.companies.models import Branch
 from .models import (
     Category, Electronic, Phone, Accessory, 
     Sale, SaleItem, Customer, Supplier,
@@ -635,15 +635,15 @@ class EPADashboardView(CompanyScopedMixin, APIView):
 
         # Total stock value
         electronic_value = Electronic.objects.filter(company=company).aggregate(
-            total=Sum(F('quantity_in_stock') * F('purchase_price'))
+            total=Sum(F('total_quantity_in_stock') * F('purchase_price'))
         )['total'] or 0
 
         phones_value = Phone.objects.filter(company=company).aggregate(
-            total=Sum(F('quantity_in_stock') * F('purchase_price'))
+            total=Sum(F('total_quantity_in_stock') * F('purchase_price'))
         )['total'] or 0
 
         accessories_value = Accessory.objects.filter(company=company).aggregate(
-            total=Sum(F('quantity_in_stock') * F('purchase_price'))
+            total=Sum(F('total_quantity_in_stock') * F('purchase_price'))
         )['total'] or 0
 
         total_stock_value = electronic_value + phones_value + accessories_value
@@ -651,17 +651,17 @@ class EPADashboardView(CompanyScopedMixin, APIView):
         # Low stock items
         low_stock_electronics = Electronic.objects.filter(
             company=company,
-            quantity_in_stock__lte=F('minimum_stock_level')
+            total_quantity_in_stock__lte=5
         ).count()
 
         low_stock_phones = Phone.objects.filter(
             company=company,
-            quantity_in_stock__lte=F('minimum_stock_level')
+            total_quantity_in_stock__lte=5
         ).count()
 
         low_stock_accessories = Accessory.objects.filter(
             company=company,
-            quantity_in_stock__lte=F('minimum_stock_level')
+            total_quantity_in_stock__lte=5
         ).count()
 
         # Recent sales

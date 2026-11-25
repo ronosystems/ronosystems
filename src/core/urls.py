@@ -6,9 +6,8 @@ from django.views.generic import TemplateView
 from apps.companies import web_views as company_views
 from apps.accounts.admin_site import restricted_admin_site
 from apps.accounts import views_guest
-from core.views import qz_sign, contact, manifest_view, service_worker, asset_links, admin_contact_messages
+from core.views import contact, manifest_view, service_worker, asset_links, admin_contact_messages
 from . import views
-
 
 # ============================================
 # ADMIN SITE CUSTOMIZATION
@@ -34,33 +33,38 @@ urlpatterns = [
     # Restricted admin
     path('admin/', restricted_admin_site.urls),
 
-    # No-access
-    path('no-access/', views_guest.no_access, name='no-access'),
+    # DASHBOARD
+    path('dashboard/', views.dashboard_router, name='dashboard-router'),
+    path('superadmin/dashboard/', views.super_admin_dashboard, name='super-admin-dashboard'),
 
     # ============================================
-    # WEB AUTH — allauth
+    # WEB AUTH — allauth (MARA MOJA TU)
     # ============================================
-    path('accounts/', include('allauth.urls')), 
-    path('auth/', include('allauth.urls')),
+    path('accounts/', include('allauth.urls')),
     path('auth/', include('apps.accounts.web_urls', namespace='web_accounts')),
     path('auth/apply-company/', views_guest.apply_company, name='apply_company'),
 
     # ============================================
+    # STAFF + USERS CRUD - MARA MOJA TU, KATIKA ROOT
+    # Hii inatoa:
+    #   /staff/  -> Company Admin Staff CRUD (staff_views.py)
+    #   /users/  -> Super Admin Users CRUD (users_views.py)
+    # Usii-include tena chini ya company/ au users/ au api/auth/
+    # ============================================
+    path('', include('apps.accounts.urls')),
+
+    # ============================================
     # WEB INTERFACE
     # ============================================
-    path('dashboard/', include('apps.company.dashboard_urls')),
-    path('company/', include('apps.company.urls_web')),
-    path('company/', include('apps.accounts.staff_urls')),
     path('epa_shop/', include('apps.epa_shop.urls_web', namespace='epa_shop')),
     path('cart/', include('apps.cart_orders.urls', namespace='cart-orders')),
     path('customers/', include('apps.customers.urls', namespace='customers')),
     path('kuku_biz/', include('apps.kuku_biz.urls')),
     path('chama/', include('apps.chama.urls')),
-    path('business-types/', include('apps.business_types.urls')),
+    path('business-types/', include('apps.companies.business_types_urls')),
     path('subscription-expired/', company_views.subscription_expired, name='subscription-expired'),
     path('payments/kcb/callback/', company_views.company_payments_callback, name='kcb-callback'),
     path('companies/', include('apps.companies.web_urls')),
-    path('users/', include('apps.accounts.user_urls')),
     path('losses/', include('apps.losses.urls', namespace='losses')),
     path('treasury/', include('apps.treasury.urls')),
     path('plans/', include('apps.plans.urls')),
@@ -78,7 +82,9 @@ urlpatterns = [
     # ============================================
     # API ENDPOINTS
     # ============================================
-    path('api/auth/', include('apps.accounts.urls', namespace='api_accounts')),
+    # IMEONDOLEWA: path('api/auth/', include('apps.accounts.urls', namespace='api_accounts'))
+    # Sababu: apps.accounts.urls ni WEB views (render HTML), sio API.
+    # Ukiihitaji API ya auth, tengeneza apps/accounts/api_urls.py tofauti.
     path('api/companies/', include('apps.companies.urls')),
     path('api/epa_shop/', include('apps.epa_shop.urls', namespace='epa_shop_api')),
     path('api/supermarket/', include('apps.supermarket.urls')),
@@ -107,7 +113,6 @@ urlpatterns = [
     path('terms/', get_template('website/terms.html', 'website/company_terms.html'), name='terms'),
     path('privacy/', get_template('website/privacy.html', 'website/company_privacy.html'), name='privacy'),
 ]
-
 
 # ============================================
 # STATIC & MEDIA (DEBUG ONLY)

@@ -13,7 +13,7 @@ from decimal import Decimal
 import json
 
 from .models import Order, OrderItem
-from apps.company.models import Branch
+from apps.companies.models import Branch
 
 
 CART_SESSION_KEY = 'cart_orders_cart'

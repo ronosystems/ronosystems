@@ -7,7 +7,7 @@ from apps.epa_shop.models import Phone, Electronic, Accessory, BranchStock, Prod
 from apps.supermarket.models import Product as SMProduct
 from apps.kuku_biz.models import Flock, EggProduction
 from apps.chama.models import Savings, Loan
-from apps.company.models import Branch
+from apps.companies.models import Branch
 
 logger = logging.getLogger(__name__)
 

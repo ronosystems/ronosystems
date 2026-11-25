@@ -22,7 +22,7 @@ from django.utils.dateparse import parse_datetime
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from apps.settings.models import SystemSetting
-from apps.company.models import Branch
+from apps.companies.models import Branch
 from apps.plans.models import Plan, Subscription
 
 from .models import (
@@ -886,64 +886,190 @@ def company_list(request):
 
 
 # ============================================
-# COMPANY CREATE
+# COMPANY CREATE / EDIT - SHARED FORM
 # ============================================
+# Template moja: companies/form.html
+# Create: company=None, form_data={}
+# Edit:   company=instance, form_data=company fields
 
 @login_required
 @staff_member_required
 def company_create(request):
     """Create a new company + initial subscription."""
+    return _company_form(request, company=None)
+
+@login_required
+@staff_member_required
+def company_edit(request, pk):
+    """Edit a company + its subscription."""
+    company = get_object_or_404(Company, pk=pk)
+    return _company_form(request, company=company)
+
+def _company_form(request, company=None):
+    """Shared create/edit logic. One template: companies/form.html"""
+    is_edit = company is not None
     business_types = BusinessType.objects.filter(is_active=True).order_by('name')
     plans = Plan.objects.filter(is_active=True).order_by('order', 'price')
 
     if request.method == 'POST':
-        name = request.POST.get('name')
-        business_type_id = request.POST.get('business_type')
-        plan_id = request.POST.get('plan')
+        return _company_form_save(request, company, business_types, plans)
 
-        start_raw = request.POST.get('subscription_start')
-        end_raw = request.POST.get('subscription_end')
-        sub_status = request.POST.get('subscription_status', 'active')
+    # GET: jaza form_data kutoka kwenye company (edit) au tupu (create)
+    form_data = {}
+    if is_edit:
+        latest = company.latest_subscription
+        form_data = {
+            'name': company.name,
+            'display_name': company.display_name or '',
+            'subdomain': company.subdomain or '',
+            'business_type': str(company.business_type_id or ''),
+            'registration_number': company.registration_number or '',
+            'email': company.email or '',
+            'phone': company.phone or '',
+            'website': company.website or '',
+            'address': company.address or '',
+            'city': company.city or '',
+            'state': company.state or '',
+            'country': company.country or '',
+            'postal_code': company.postal_code or '',
+            'custom_domain': company.custom_domain or '',
+            'domain_verified': company.domain_verified,
+            'plan': str(company.plan_id or latest.plan_id if latest else ''),
+            'subscription_start': _dt_to_input(company.subscription_start),
+            'subscription_end': _dt_to_input(company.subscription_end),
+            'subscription_status': latest.status if latest else 'active',
+            'is_active': company.is_active,
+        }
 
-        raw_domain = request.POST.get('custom_domain', '')
-        custom_domain = _normalize_domain(raw_domain)
-        domain_verified = request.POST.get('domain_verified') == 'on'
+    return render(request, 'companies/form.html', {
+        'company': company,
+        'is_edit': is_edit,
+        'business_types': business_types,
+        'plans': plans,
+        'form_data': form_data,
+        'page_title': f'Edit Company - {company.name}' if is_edit else 'Create Company',
+        'page_subtitle': f'Editing {company.name}' if is_edit else 'Add a new company',
+    })
 
-        # ---------- Validation ----------
-        if not name:
-            messages.error(request, 'Company name is required.')
-            return render(request, 'companies/create.html', {
-                'business_types': business_types,
-                'plans': plans,
-                'form_data': request.POST,
-            })
+def _company_form_save(request, company, business_types, plans):
+    """POST handler kwa create + edit."""
+    is_edit = company is not None
+    post = request.POST
 
-        domain_ok, domain_err = _validate_domain(custom_domain)
-        if not domain_ok:
-            messages.error(request, domain_err)
-            return render(request, 'companies/create.html', {
-                'business_types': business_types,
-                'plans': plans,
-                'form_data': request.POST,
-            })
+    name = (post.get('name') or '').strip()
+    subdomain_raw = (post.get('subdomain') or '').strip().lower()
+    business_type_id = post.get('business_type') or None
+    plan_id = post.get('plan')
+    is_active = post.get('is_active') == 'on' if is_edit else True
 
-        try:
-            plan = _resolve_plan(plan_id)
-            start_dt = _parse_dt(start_raw) or timezone.now()
-            end_dt = _parse_dt(end_raw)
+    start_raw = post.get('subscription_start')
+    end_raw = post.get('subscription_end')
+    sub_status = post.get('subscription_status', 'active')
 
+    custom_domain = _normalize_domain(post.get('custom_domain', ''))
+    domain_verified = post.get('domain_verified') == 'on'
+
+    def _fail(msg):
+        messages.error(request, msg)
+        return render(request, 'companies/form.html', {
+            'company': company,
+            'is_edit': is_edit,
+            'business_types': business_types,
+            'plans': plans,
+            'form_data': post,  # rudisha kile user aliandika, kisipotee
+            'page_title': 'Edit Company' if is_edit else 'Create Company',
+        })
+
+    # ---------- Validation ----------
+    if not name:
+        return _fail('Company name is required.')
+
+    # Subdomain: kama tupu, tengeneza kutoka kwenye name. Kama ipo, slugify + hakikisha unique
+    from django.utils.text import slugify
+    subdomain = slugify(subdomain_raw) if subdomain_raw else None
+    if subdomain:
+        qs = Company.objects.filter(subdomain__iexact=subdomain)
+        if is_edit:
+            qs = qs.exclude(pk=company.pk)
+        if qs.exists():
+            return _fail(f"Subdomain '{subdomain}' tayari inatumika. Chagua nyingine.")
+
+    domain_ok, domain_err = _validate_domain(
+        custom_domain,
+        exclude_company_id=company.pk if is_edit else None,
+    )
+    if not domain_ok:
+        return _fail(domain_err)
+
+    try:
+        plan = _resolve_plan(plan_id)
+        start_dt = _parse_dt(start_raw) or (timezone.now() if not is_edit else None)
+        end_dt = _parse_dt(end_raw)
+
+        # ---------- Common fields ----------
+        fields = {
+            'name': name,
+            'business_type_id': business_type_id,
+            'registration_number': post.get('registration_number', ''),
+            'address': post.get('address', ''),
+            'city': post.get('city', ''),
+            'state': post.get('state', ''),
+            'country': post.get('country', ''),
+            'postal_code': post.get('postal_code', ''),
+            'email': post.get('email', ''),
+            'phone': post.get('phone', ''),
+            'website': post.get('website', ''),
+        }
+
+        if is_edit:
+            # ---- EDIT ----
+            for k, v in fields.items():
+                setattr(company, k, v)
+
+            # Subdomain: badilisha tu kama user ameandika mpya
+            if subdomain:
+                company.subdomain = subdomain
+            # Kama subdomain ni tupu na company haina subdomain, tengeneza kutoka kwenye name
+            if not company.subdomain:
+                company.subdomain = generate_unique_subdomain(name, exclude_pk=company.pk)
+
+            # Custom domain: kama imebadilika, lazima i-verify upya
+            if custom_domain != (company.custom_domain or ''):
+                company.custom_domain = custom_domain or None
+                company.domain_verified = False
+            else:
+                company.domain_verified = domain_verified
+
+            # Sync is_active <-> status
+            if is_active:
+                if company.status in ('inactive', ''):
+                    company.status = 'active'
+                company.is_active = True
+            else:
+                company.status = 'inactive'
+                company.is_active = False
+
+            _sync_company_from_subscription(
+                company=company, plan=plan,
+                start_dt=start_dt, end_dt=end_dt, status=sub_status,
+            )
+
+            latest = company.latest_subscription
+            if is_active and not _subscription_is_valid(latest):
+                messages.warning(
+                    request,
+                    'Company set to Active, but the subscription is not currently '
+                    'valid. Adjust the subscription dates or status to fully restore access.'
+                )
+
+            company.save()
+            messages.success(request, f'Company "{name}" updated successfully!')
+
+        else:
+            # ---- CREATE ----
             company = Company.objects.create(
-                name=name,
-                business_type_id=business_type_id or None,
-                registration_number=request.POST.get('registration_number', ''),
-                address=request.POST.get('address', ''),
-                city=request.POST.get('city', ''),
-                state=request.POST.get('state', ''),
-                country=request.POST.get('country', ''),
-                postal_code=request.POST.get('postal_code', ''),
-                email=request.POST.get('email', ''),
-                phone=request.POST.get('phone', ''),
-                website=request.POST.get('website', ''),
+                **fields,
+                subdomain=subdomain,  # None -> model ita-auto-generate kutoka kwenye name
                 custom_domain=custom_domain or None,
                 domain_verified=domain_verified,
                 plan=plan,
@@ -953,29 +1079,25 @@ def company_create(request):
                 is_active=True,
                 status='active',
             )
-
             if plan:
                 Subscription.objects.create(
-                    company=company,
-                    plan=plan,
-                    start_date=start_dt,
-                    end_date=end_dt,
-                    status=sub_status,
+                    company=company, plan=plan,
+                    start_date=start_dt, end_date=end_dt, status=sub_status,
                 )
-
             messages.success(request, f'Company "{name}" created successfully!')
-            return redirect('companies:company-detail', pk=company.pk)
 
-        except Exception as e:
-            messages.error(request, f'Error creating company: {e}')
+        return redirect('companies:company-detail', pk=company.pk)
 
-    context = {
-        'business_types': business_types,
-        'plans': plans,
-        'page_title': 'Create Company',
-        'page_subtitle': 'Add a new company',
-    }
-    return render(request, 'companies/create.html', context)
+    except Exception as e:
+        return _fail(f'Error {"updating" if is_edit else "creating"} company: {e}')
+
+def _dt_to_input(dt):
+    """datetime -> 'YYYY-MM-DDTHH:MM' kwa <input type=datetime-local>"""
+    if not dt:
+        return ''
+    if timezone.is_aware(dt):
+        dt = timezone.localtime(dt)
+    return dt.strftime('%Y-%m-%dT%H:%M')
 
 
 # ============================================
@@ -1017,122 +1139,7 @@ def company_detail(request, pk):
     return render(request, 'companies/detail.html', context)
 
 
-# ============================================
-# COMPANY EDIT
-# ============================================
 
-@login_required
-@staff_member_required
-def company_edit(request, pk):
-    """Edit a company + its subscription."""
-    company = get_object_or_404(Company, pk=pk)
-    business_types = BusinessType.objects.filter(is_active=True).order_by('name')
-    plans = Plan.objects.filter(is_active=True).order_by('order', 'price')
-
-    if request.method == 'POST':
-        name = request.POST.get('name')
-        business_type_id = request.POST.get('business_type')
-        plan_id = request.POST.get('plan')
-        is_active = request.POST.get('is_active') == 'on'
-
-        start_raw = request.POST.get('subscription_start')
-        end_raw = request.POST.get('subscription_end')
-        sub_status = request.POST.get('subscription_status', 'active')
-
-        raw_domain = request.POST.get('custom_domain', '')
-        custom_domain = _normalize_domain(raw_domain)
-        domain_verified = request.POST.get('domain_verified') == 'on'
-
-        # ---------- Validation ----------
-        if not name:
-            messages.error(request, 'Company name is required.')
-            return render(request, 'companies/edit.html', {
-                'company': company,
-                'business_types': business_types,
-                'plans': plans,
-                'form_data': request.POST,
-            })
-
-        domain_ok, domain_err = _validate_domain(custom_domain, exclude_company_id=company.pk)
-        if not domain_ok:
-            messages.error(request, domain_err)
-            return render(request, 'companies/edit.html', {
-                'company': company,
-                'business_types': business_types,
-                'plans': plans,
-                'form_data': request.POST,
-            })
-
-        try:
-            # ---------- Scalar fields ----------
-            company.name = name
-            company.business_type_id = business_type_id or None
-            company.registration_number = request.POST.get('registration_number', '')
-            company.address = request.POST.get('address', '')
-            company.city = request.POST.get('city', '')
-            company.state = request.POST.get('state', '')
-            company.country = request.POST.get('country', '')
-            company.postal_code = request.POST.get('postal_code', '')
-            company.email = request.POST.get('email', '')
-            company.phone = request.POST.get('phone', '')
-            company.website = request.POST.get('website', '')
-
-            # ---------- Custom domain ----------
-            if custom_domain != (company.custom_domain or ''):
-                company.custom_domain = custom_domain or None
-                company.domain_verified = False   # require re-verify
-            else:
-                company.domain_verified = domain_verified
-
-            # ---------- Sync is_active ↔ status ----------
-            if is_active:
-                if company.status in ('inactive', ''):
-                    company.status = 'active'
-                company.is_active = True
-            else:
-                company.status = 'inactive'
-                company.is_active = False
-
-            # ---------- Plan + subscription ----------
-            new_plan = _resolve_plan(plan_id)
-            start_dt = _parse_dt(start_raw)
-            end_dt = _parse_dt(end_raw)
-
-            _sync_company_from_subscription(
-                company=company,
-                plan=new_plan,
-                start_dt=start_dt,
-                end_dt=end_dt,
-                status=sub_status,
-            )
-
-            # ---------- Consistency warning ----------
-            latest = company.latest_subscription
-            sub_valid = _subscription_is_valid(latest)
-
-            if is_active and not sub_valid:
-                messages.warning(
-                    request,
-                    'Company set to Active, but the subscription is not currently '
-                    'valid. Adjust the subscription dates or status to fully '
-                    'restore access.'
-                )
-
-            company.save()
-            messages.success(request, f'Company "{name}" updated successfully!')
-            return redirect('companies:company-detail', pk=company.pk)
-
-        except Exception as e:
-            messages.error(request, f'Error updating company: {e}')
-
-    context = {
-        'company': company,
-        'business_types': business_types,
-        'plans': plans,
-        'page_title': 'Edit Company',
-        'page_subtitle': f'Editing {company.name}',
-    }
-    return render(request, 'companies/edit.html', context)
 
 
 # ============================================
@@ -1988,53 +1995,6 @@ def company_payments_dev_confirm(request, pk):
     ])
 
     return JsonResponse({'success': True, 'message': 'Marked as paid.'})
-
-
-# ============================================
-# COMPANY EMPLOYEES (Super Admin list)
-# ============================================
-
-@login_required
-@staff_member_required
-def company_employee_list(request, company_id):
-    """Super admin view: list employees for a specific company."""
-    company = get_object_or_404(
-        Company.objects.select_related('business_type', 'plan'),
-        pk=company_id,
-    )
-
-    employees = (
-        User.objects
-        .filter(company=company)
-        .exclude(role='super_admin')
-        .select_related('branch')
-        .order_by('-created_at')
-    )
-
-    search_query = request.GET.get('search', '').strip()
-    if search_query:
-        employees = employees.filter(
-            Q(first_name__icontains=search_query) |
-            Q(last_name__icontains=search_query) |
-            Q(email__icontains=search_query) |
-            Q(username__icontains=search_query) |
-            Q(phone__icontains=search_query) |
-            Q(staff_id__icontains=search_query)
-        )
-
-    role_filter = request.GET.get('role', '').strip()
-    if role_filter:
-        employees = employees.filter(role=role_filter)
-
-    context = {
-        'company': company,
-        'employees': employees,
-        'search_query': search_query,
-        'role_filter': role_filter,
-        'page_title': f'{company.name} · Employees',
-        'page_subtitle': 'Company employees',
-    }
-    return render(request, 'companies/employees.html', context)
 
 
 # ============================================

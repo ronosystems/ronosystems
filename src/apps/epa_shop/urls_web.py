@@ -27,7 +27,7 @@ urlpatterns = [
     # ============================================
     # DASHBOARD
     # ============================================
-    path('dashboard/', dashboard_views.epa_dashboard, name='epa-dashboard'),
+    path('dashboard/', dashboard_views.epa_dashboard, name='web-dashboard'),
 
     # ============================================
     # INVENTORY

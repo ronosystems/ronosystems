@@ -1,5 +1,5 @@
 # apps/users/serializers.py
-
+import uuid
 from rest_framework import serializers
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.password_validation import validate_password
@@ -103,57 +103,98 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 # ============================================================
 # REGISTRATION
 # ============================================================
+
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
     confirm_password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
+    company_name = serializers.CharField(write_only=True, required=True, max_length=200)
+    business_type = serializers.CharField(write_only=True, required=True, max_length=100)
 
     class Meta:
         model = User
         fields = [
             'username', 'email', 'password', 'confirm_password',
             'first_name', 'last_name', 'role', 'phone',
+            'company_name', 'business_type',
         ]
 
     def validate(self, attrs):
-        # Password match
         if attrs['password'] != attrs['confirm_password']:
             raise serializers.ValidationError({"confirm_password": "Passwords don't match"})
-
-        # Password strength
         try:
             validate_password(attrs['password'])
         except ValidationError as e:
             raise serializers.ValidationError({"password": list(e.messages)})
 
-        # ─────────────────────────────────────────
-        # ROLE WHITELIST — WHERE TO RESTRICT
-        # ─────────────────────────────────────────
-        allowed_roles = [
-            # Platform staff
-            'company_admin',
-            'company_manager',
-            'company_cashier',
-            'company_agent',
-            'company_technician',
-            'customer_care',
-            'company_staff',
-            'stock_controller',
-            'mpesa_agent',
-
-            # Chama — only allow 'member' self-registration.
-            # Chairperson, Treasurer, etc. should be assigned by an admin.
-            'member',
-        ]
-        if attrs.get('role') and attrs['role'] not in allowed_roles:
-            raise serializers.ValidationError({"role": "Invalid role selected"})
-
+        # --- Validate business_type: kubali slug ("epa-shop") au jina ("EPA Shop") ---
+        from apps.companies.business_types import (
+            BusinessTypeEnum, BUSINESS_TYPE_SLUGS,
+        )
+        raw = (attrs.get('business_type') or '').strip()
+        # BUSINESS_TYPE_SLUGS = {"EPA Shop": "epa-shop", ...} -> reverse it
+        slug_to_name = {v: k for k, v in BUSINESS_TYPE_SLUGS.items()}
+        # Jaribu kama ni slug kwanza, kisha kama ni jina
+        resolved_name = slug_to_name.get(raw.lower()) or slug_to_name.get(raw)
+        if not resolved_name:
+            # Labda user alituma jina lenyewe
+            for name in BusinessTypeEnum.get_all_names():
+                if name.lower() == raw.lower():
+                    resolved_name = name
+                    break
+        if not resolved_name or not BusinessTypeEnum.validate_name(resolved_name):
+            raise serializers.ValidationError({
+                "business_type": f"Invalid business type. Choose one of: {', '.join(BusinessTypeEnum.get_all_names())}"
+            })
+        attrs['_business_type_name'] = resolved_name
+        attrs['role'] = 'company_admin'
         return attrs
 
     def create(self, validated_data):
-        validated_data.pop('confirm_password')
-        user = User.objects.create_user(**validated_data)
-        return user
+        from django.db import transaction
+        from apps.companies.models import Company, BusinessType
 
+        company_name = validated_data.pop('company_name')
+        validated_data.pop('business_type')
+        business_name = validated_data.pop('_business_type_name')
+        validated_data.pop('confirm_password')
+
+        with transaction.atomic():
+            # 1. User - ACTIVE mara moja
+            validated_data['is_active'] = True
+            validated_data['role'] = 'company_admin'
+            user = User.objects.create_user(**validated_data)
+
+            # 2. BusinessType - lazima iwe kwenye choices, usi-create ya ovyo
+            try:
+                business_type_obj = BusinessType.objects.get(name=business_name)
+            except BusinessType.DoesNotExist:
+                business_type_obj = BusinessType(name=business_name, is_active=True)
+                business_type_obj.save()  # clean() ita-validate kupitia Enum
+
+            # 3. Company - jaza fields zote required
+            company = Company.objects.create(
+                name=company_name,
+                business_type=business_type_obj,
+                registration_number=f"REG-{uuid.uuid4().hex[:8].upper()}",
+                address='Not provided',
+                city='Eldoret',
+                state='Uasin Gishu',
+                country='Kenya',
+                postal_code='30100',
+                email=user.email,
+                phone=getattr(user, 'phone', '') or '',
+                status='active',
+                is_active=True,
+                created_by=user,
+            )
+
+            # 4. Unganisha user -> company
+            user.company = company
+            user.role = 'company_admin'
+            user.is_active = True
+            user.save()
+
+        return user
 
         
 # ============================================================

@@ -20,7 +20,7 @@ class Order(models.Model):
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='cart_orders')
     branch = models.ForeignKey(
-        'company.Branch', on_delete=models.CASCADE, related_name='cart_orders'
+        'companies.Branch', on_delete=models.CASCADE, related_name='cart_orders'
     )
 
     order_number = models.CharField(max_length=50, unique=True, blank=True, editable=False)

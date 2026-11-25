@@ -1,0 +1,255 @@
+{% extends 'base.html' %}
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card { border: 2px solid #000000; border-radius: 4px; box-shadow: none; }
+    .card-body { color: #000000; }
+    .form-control, .form-select { border: 2px solid #000000; border-radius: 4px; background: white; color: #000000; }
+    .form-control:focus, .form-select:focus { border-color: #87CEEB; box-shadow: 0 0 0 3px rgba(135,206,235,0.3); }
+    .form-label { color: #000000; font-weight: 600; }
+    .form-label.required:after { content: " *"; color: #dc3545; font-weight: bold; }
+    .btn-primary { background-color: #87CEEB; border: 2px solid #000000; color: #000000; border-radius: 4px; font-weight: 600; }
+    .btn-primary:hover { background-color: #7bb8d8; border-color: #000000; color: #000000; transform: translateY(-2px); box-shadow: 0 4px 15px rgba(135,206,235,0.3); }
+    .btn-secondary { background-color: #f8f9fa; border: 2px solid #000000; color: #000000; border-radius: 4px; font-weight: 600; }
+    .btn-secondary:hover { background-color: #87CEEB; border-color: #000000; color: #000000; }
+    .form-section-title { background: #87CEEB; border: 2px solid #000000; border-radius: 4px; padding: 6px 12px; margin: 18px 0 12px 0; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .plan-preview { border: 2px dashed #000000; border-radius: 4px; padding: 10px 14px; background: #f8f9fa; font-size: 13px; margin-top: 6px; }
+    .plan-preview .price { font-weight: 700; font-size: 15px; }
+    .plan-preview .feat-list { list-style: none; padding-left: 0; margin: 6px 0 0 0; }
+    .plan-preview .feat-list li { padding: 1px 0; }
+    .plan-preview .feat-list li i { color: #28a745; margin-right: 6px; }
+    .domain-hint { font-size: 12px; color: #555; margin-top: 4px; }
+    .domain-hint code { background: #f0f0f0; padding: 1px 4px; border-radius: 3px; color: #000; }
+    @media (max-width: 768px) {
+        .card-body { padding: 15px; }
+        .form-control, .form-select { font-size: 13px; padding: 6px 10px; }
+        .form-label { font-size: 13px; }
+        .btn { font-size: 12px; padding: 6px 12px; }
+        .d-flex.gap-2 { flex-wrap: wrap; }
+        .d-flex.gap-2 .btn { flex: 1; min-width: 100px; text-align: center; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-10 mx-auto">
+        <div class="card">
+            <div class="card-body p-4">
+                <h5 class="mb-1">{{ page_title }}</h5>
+                <p class="text-muted mb-3">{{ page_subtitle }}</p>
+
+                <form method="post" id="companyForm">
+                    {% csrf_token %}
+
+                    {# ---------- COMPANY ---------- #}
+                    <div class="form-section-title"><i class="fas fa-building"></i> Company Details</div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">Company Name</label>
+                            <input type="text" class="form-control" name="name" id="nameInput"
+                                   value="{{ form_data.name|default:'' }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Business Type</label>
+                            <select class="form-select" name="business_type">
+                                <option value="">Select Business Type...</option>
+                                {% for bt in business_types %}
+                                <option value="{{ bt.id }}" {% if form_data.business_type == bt.id|stringformat:"s" %}selected{% endif %}>{{ bt.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    {# ---------- SUBDOMAIN (5) + CUSTOM DOMAIN (4) + DNS (3) - ALL IN 1 ROW ---------- #}
+                    <div class="row align-items-start">
+                        <div class="col-md-5 mb-3">
+                            <label class="form-label required">Subdomain</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" name="subdomain" id="subdomainInput"
+                                       value="{{ form_data.subdomain|default:'' }}"
+                                       placeholder="e.g. kalwal" pattern="[a-z0-9-]+" {% if not is_edit %}required{% endif %}>
+                                <span class="input-group-text">.ronosystems.com</span>
+                            </div>
+                            <div class="domain-hint">
+                                URL: <code id="subdomainPreview">your-company.ronosystems.com</code><br>
+                                Local: <code id="subdomainLocalPreview">your-company.localhost:8000</code>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Custom Domain</label>
+                            <input type="text" class="form-control" name="custom_domain"
+                                   value="{{ form_data.custom_domain|default:'' }}" placeholder="e.g., clientcompany.co.ke">
+                            <div class="domain-hint">Without <code>https://</code> or <code>www.</code></div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label d-block">DNS</label>
+                            <div class="form-check form-switch" style="padding-top:6px;">
+                                <input class="form-check-input" type="checkbox" name="domain_verified" id="domainVerified"
+                                       {% if form_data.domain_verified %}checked{% endif %}>
+                                <label class="form-check-label" for="domainVerified">Verified</label>
+                            </div>
+                            <div class="domain-hint">Check once DNS points here.</div>
+                        </div>
+                    </div>
+
+                    
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Registration Number</label>
+                            <input type="text" class="form-control" name="registration_number" value="{{ form_data.registration_number|default:'' }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="email" value="{{ form_data.email|default:'' }}">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Phone</label>
+                            <input type="text" class="form-control" name="phone" value="{{ form_data.phone|default:'' }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Website</label>
+                            <input type="url" class="form-control" name="website" value="{{ form_data.website|default:'' }}" placeholder="https://example.com">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Address</label>
+                        <textarea class="form-control" name="address" rows="2">{{ form_data.address|default:'' }}</textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">City</label>
+                            <input type="text" class="form-control" name="city" value="{{ form_data.city|default:'' }}">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">State/Province</label>
+                            <input type="text" class="form-control" name="state" value="{{ form_data.state|default:'' }}">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Country</label>
+                            <input type="text" class="form-control" name="country" value="{{ form_data.country|default:'' }}">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Postal Code</label>
+                            <input type="text" class="form-control" name="postal_code" value="{{ form_data.postal_code|default:'' }}">
+                        </div>
+                    </div>
+
+                    {# ---------- SUBSCRIPTION ---------- #}
+                    <div class="form-section-title"><i class="fas fa-crown"></i> Subscription &amp; Plan</div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">Plan</label>
+                            <select class="form-select" name="plan" id="planSelect" required>
+                                {% for plan in plans %}
+                                <option value="{{ plan.id }}"
+                                        data-price="{{ plan.price }}" data-currency="{{ plan.currency }}"
+                                        data-cycle="{{ plan.get_billing_cycle_display }}" data-desc="{{ plan.description }}"
+                                        data-max-emp="{{ plan.max_employees }}" data-max-branch="{{ plan.max_branches }}"
+                                        data-storage="{{ plan.max_storage }}"
+                                        data-api="{{ plan.has_api_access|yesno:'1,0' }}" data-reports="{{ plan.has_advanced_reports|yesno:'1,0' }}"
+                                        data-branding="{{ plan.has_custom_branding|yesno:'1,0' }}" data-support="{{ plan.has_priority_support|yesno:'1,0' }}"
+                                        data-bulk="{{ plan.has_bulk_import|yesno:'1,0' }}" data-domain="{{ plan.has_custom_domain|yesno:'1,0' }}"
+                                        data-mpesa="{{ plan.has_mpesa_integration|yesno:'1,0' }}"
+                                        {% if form_data.plan == plan.id|stringformat:"s" %}selected{% elif not is_edit and plan.name == 'free' %}selected{% endif %}>
+                                    {{ plan.display_name }} — {{ plan.currency }} {{ plan.price }}/{{ plan.get_billing_cycle_display }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="plan-preview" id="planPreview"></div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">Subscription Start</label>
+                            <input type="datetime-local" class="form-control" name="subscription_start" id="subStart" value="{{ form_data.subscription_start|default:'' }}">
+                            <label class="form-label mt-3">Subscription End</label>
+                            <input type="datetime-local" class="form-control" name="subscription_end" id="subEnd" value="{{ form_data.subscription_end|default:'' }}">
+                            <small class="text-muted">Leave blank for lifetime / no expiry.</small>
+                            <label class="form-label mt-3">Status</label>
+                            <select class="form-select" name="subscription_status">
+                                <option value="active" {% if form_data.subscription_status == 'active' or not is_edit %}selected{% endif %}>Active</option>
+                                <option value="pending" {% if form_data.subscription_status == 'pending' %}selected{% endif %}>Pending</option>
+                                <option value="inactive" {% if form_data.subscription_status == 'inactive' %}selected{% endif %}>Inactive</option>
+                                <option value="cancelled" {% if form_data.subscription_status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                                <option value="expired" {% if form_data.subscription_status == 'expired' %}selected{% endif %}>Expired</option>
+                            </select>
+                            {% if is_edit %}
+                            <div class="form-check form-switch mt-3">
+                                <input class="form-check-input" type="checkbox" name="is_active" id="isActive"
+                                       {% if form_data.is_active %}checked{% endif %}>
+                                <label class="form-check-label" for="isActive">Company Active</label>
+                            </div>
+                            <small class="text-muted">Ukizima hii, company inakuwa inactive na status inabadilika.</small>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> {% if is_edit %}Update Company{% else %}Create Company{% endif %}
+                        </button>
+                        <a href="{% if is_edit %}{% url 'companies:company-detail' pk=company.pk %}{% else %}{% url 'companies:company-list' %}{% endif %}" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const planSelect = document.getElementById('planSelect');
+    const preview = document.getElementById('planPreview');
+    const subStart = document.getElementById('subStart');
+    const nameInput = document.getElementById('nameInput');
+    const subInput = document.getElementById('subdomainInput');
+    const previewEl = document.getElementById('subdomainPreview');
+    const localPreviewEl = document.getElementById('subdomainLocalPreview');
+    let subTouched = !!subInput.value;
+
+    function slugify(s){ return s.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
+    function updateSubPreview(){
+        const v = slugify(subInput.value || '');
+        if (previewEl) previewEl.textContent = (v || 'your-company') + '.ronosystems.com';
+        if (localPreviewEl) localPreviewEl.textContent = (v || 'your-company') + '.localhost:8000';
+    }
+    if (subInput) subInput.addEventListener('input', () => { subTouched = true; updateSubPreview(); });
+    if (nameInput && subInput) nameInput.addEventListener('input', () => {
+        if (!subTouched) { subInput.value = slugify(nameInput.value); updateSubPreview(); }
+    });
+
+    if (subStart && !subStart.value) {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        subStart.value = now.toISOString().slice(0, 16);
+    }
+    function renderPreview() {
+        const opt = planSelect.options[planSelect.selectedIndex];
+        if (!opt) { preview.innerHTML = ''; return; }
+        const feats = [];
+        if (opt.dataset.api === '1') feats.push('API Access');
+        if (opt.dataset.reports === '1') feats.push('Advanced Reports');
+        if (opt.dataset.branding === '1') feats.push('Custom Branding');
+        if (opt.dataset.support === '1') feats.push('Priority Support');
+        if (opt.dataset.bulk === '1') feats.push('Bulk Import');
+        if (opt.dataset.domain === '1') feats.push('Custom Domain');
+        if (opt.dataset.mpesa === '1') feats.push('M-Pesa Integration');
+        let html = `<div class="price">${opt.dataset.currency || ''} ${opt.dataset.price || '0'} <span style="font-weight:400;">/ ${opt.dataset.cycle || ''}</span></div>`;
+        if (opt.dataset.desc) html += `<div style="margin-top:4px;">${opt.dataset.desc}</div>`;
+        html += `<div style="margin-top:6px;"><strong>Limits:</strong> ${opt.dataset.maxEmp || '-'} employees · ${opt.dataset.maxBranch || '-'} branches · ${opt.dataset.storage || '-'} MB storage</div>`;
+        if (feats.length) html += `<ul class="feat-list">${feats.map(f => `<li><i class="fas fa-check"></i>${f}</li>`).join('')}</ul>`;
+        preview.innerHTML = html;
+    }
+    planSelect.addEventListener('change', renderPreview);
+    renderPreview();
+    updateSubPreview();
+})();
+</script>
+{% endblock %}

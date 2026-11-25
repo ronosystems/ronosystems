@@ -1,446 +1,396 @@
 # apps/accounts/staff_views.py
+"""
+COMPANY ADMIN - STAFF CRUD
+Anafanya kazi ndani ya company yake TU.
+HACHAGUI company - company inatoka kwenye request.tenant (middleware).
 
-from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
+Membership model REAL fields:
+  branch, company, created_at, id, invited_by, is_active,
+  is_primary, role, updated_at, user
+HAKUNA tenant, HAKUNA status - usitumie hizo!
+
+URL base: /staff/
+Domain: fieldmax.localhost/staff/ -> staff wa FIELDMAX tu
+
+Templates:
+  List   -> account/staff_list.html
+  Form   -> account/staff_form.html  (Create + Edit - TEMPLATE MOJA)
+  Detail -> account/staff_detail.html
+  Delete -> account/staff_delete_confirm.html
+"""
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
 from django.db.models import Q
-from django.contrib.auth.password_validation import validate_password
-from django.core.exceptions import ValidationError
-from apps.company.models import Branch
-from apps.companies.support_utils import (
-    get_active_company,
-    is_support_mode,
-    is_effective_admin,
-    get_effective_branch,
-)
 
 User = get_user_model()
 
 # ============================================
-# HELPER FUNCTIONS
+# HELPER - Pata company ya admin aliyelogin
 # ============================================
+def _get_company(request):
+    return getattr(request, 'tenant', None) or getattr(request, 'company', None)
 
-def get_roles():
-    """Get role choices for dropdown"""
-    return [
-        ('company_admin', 'Company Admin'),
-        ('company_manager', 'Company Manager'),
-        ('company_cashier', 'Company Cashier'),
-        ('company_agent', 'Company Agent'),
-        ('company_staff', 'Company Staff'),
-        ('stock_controller', 'Stock Controller'),
-        ('mpesa_agent', 'M-Pesa Agent'),
+def _check_company_admin(request):
+    """Hakikisha ni company admin au superuser"""
+    if request.user.is_superuser:
+        return True
+    company = _get_company(request)
+    if not company:
+        return False
+    try:
+        # FIX: company=, is_active= - sio tenant=, status=
+        membership = request.user.memberships.filter(
+            company=company, is_active=True
+        ).first()
+        if membership and membership.role in ['company_admin', 'company_manager', 'admin', 'manager']:
+            return True
+        # Fallback kwa user.role ya zamani
+        if getattr(request.user, 'role', '') in ['company_admin', 'company_manager', 'admin', 'manager']:
+            return True
+    except Exception:
+        pass
+    return False
+
+# Roles Company Admin anaweza kumpa staff wake
+# HAWEZI kumpa super_admin
+# ROLES ZINABADILIKA KWA BUSINESS TYPE - sio static
+BASE_ROLES = [
+    ('company_admin', 'Company Admin'),
+    ('company_manager', 'Company Manager'),
+    ('company_staff', 'Company Staff'),
+]
+
+ROLES_BY_BUSINESS_TYPE = {
+    'epa-shop': [('cashier', 'Cashier'), ('sales', 'Sales'), ('mpesa_agent', 'Mpesa Agent')],
+    'supermarket': [('cashier', 'Cashier'), ('sales', 'Sales'), ('mpesa_agent', 'Mpesa Agent')],
+    'retail': [('cashier', 'Cashier'), ('sales', 'Sales'), ('mpesa_agent', 'Mpesa Agent')],
+    'kuku-biz': [('sales', 'Sales'), ('cashier', 'Cashier')],
+    'chama': [('cashier', 'Cashier')],
+    'healthcare': [('cashier', 'Cashier')],
+    'education': [('cashier', 'Cashier')],
+    'restaurant': [('cashier', 'Cashier'), ('sales', 'Sales')],
+    'mpesa': [('mpesa_agent', 'Mpesa Agent'), ('cashier', 'Cashier')],
+    'mpesa-agent': [('mpesa_agent', 'Mpesa Agent'), ('cashier', 'Cashier')],
+    'mobile-money': [('mpesa_agent', 'Mpesa Agent'), ('cashier', 'Cashier')],
+    'workshop': [('technician', 'Technician'), ('cashier', 'Cashier')],
+    'garage': [('technician', 'Technician'), ('cashier', 'Cashier')],
+}
+
+def get_roles_for_company(company):
+    if not company:
+        return BASE_ROLES
+    bt = getattr(company, 'business_type', None)
+    slug = ''
+    if bt:
+        slug = (getattr(bt, 'slug', '') or getattr(bt, 'name', '') or str(bt)).lower()
+    for key, extra in ROLES_BY_BUSINESS_TYPE.items():
+        if key in slug:
+            return BASE_ROLES + extra
+    return BASE_ROLES + [
+        ('cashier', 'Cashier'),
+        ('technician', 'Technician'),
+        ('sales', 'Sales'),
+        ('mpesa_agent', 'Mpesa Agent'),
     ]
 
-def get_branches(company):
-    """Get branches for the company"""
-    return Branch.objects.filter(company=company, is_active=True)
+# Backward compat
+COMPANY_STAFF_ROLES = BASE_ROLES + [
+    ('cashier', 'Cashier'),
+    ('technician', 'Technician'),
+    ('sales', 'Sales'),
+    ('mpesa_agent', 'Mpesa Agent'),
+]
 
-
+# ============================================
+# LIST - Orodha ya staff wa company hii
+# ============================================
 @login_required
-def employee_list(request):
-    """List employees for the logged-in user's company"""
-    company, is_viewing_company = get_active_company(request)
-    
+def staff_list(request):
+    company = _get_company(request)
     if not company:
-        if request.user.role == 'super_admin':
-            return redirect('/api/support/select/')
-        messages.warning(request, 'You are not assigned to any company.')
-        return redirect('/dashboard/')
-    
-    is_authorized = (
-        is_viewing_company or
-        request.user.is_company_admin or 
-        request.user.is_company_manager or 
-        request.user.is_super_admin or
-        request.user.is_superuser or
-        request.user.is_staff
-    )
-    
-    if not is_authorized:
-        messages.error(request, 'You do not have permission to view employees.')
-        return redirect('/dashboard/')
-    
-    employees = User.objects.filter(
-        company=company
-    ).exclude(
-        role='super_admin'
-    ).exclude(
-        customer_profiles__isnull=False 
-    ).order_by('-created_at')
-    
-    search_query = request.GET.get('search', '')
-    if search_query:
-        employees = employees.filter(
-            Q(first_name__icontains=search_query) |
-            Q(last_name__icontains=search_query) |
-            Q(email__icontains=search_query) |
-            Q(phone__icontains=search_query) |
-            Q(staff_id__icontains=search_query)
-        )
-    
+        messages.error(request, "No company found for this domain.")
+        return redirect('/auth/login/')
+
+    if not _check_company_admin(request):
+        messages.error(request, "You don't have permission to manage staff.")
+        return redirect('/')
+
+    search = request.GET.get('search', '')
     role_filter = request.GET.get('role', '')
+    status_filter = request.GET.get('status', '')
+
+    # FIX: memberships__company - sio memberships__tenant
+    users = User.objects.filter(
+        Q(company=company) | Q(memberships__company=company)
+    ).distinct().order_by('-date_joined')
+
+    if search:
+        users = users.filter(
+            Q(username__icontains=search) |
+            Q(first_name__icontains=search) |
+            Q(last_name__icontains=search) |
+            Q(email__icontains=search) |
+            Q(phone__icontains=search)
+        )
     if role_filter:
-        employees = employees.filter(role=role_filter)
-    
-    branch_filter = request.GET.get('branch', '')
-    if branch_filter:
-        employees = employees.filter(branch_id=branch_filter)
-    
-    stats = {
-        'total_employees': User.objects.filter(company=company).count(),
-        'managers': User.objects.filter(company=company, role='company_manager').count(),
-        'staff': User.objects.filter(company=company, role='company_staff').count(),
-        'cashiers': User.objects.filter(company=company, role='company_cashier').count(),
-        'agents': User.objects.filter(company=company, role='company_agent').count(),
-        'stock_controllers': User.objects.filter(company=company, role='stock_controller').count(),
-        'mpesa_agents': User.objects.filter(company=company, role='mpesa_agent').count(),
-    }
-    
-    branches = Branch.objects.filter(company=company, is_active=True)
-    
+        users = users.filter(role=role_filter)
+    if status_filter == 'active':
+        users = users.filter(is_active=True)
+    elif status_filter == 'inactive':
+        users = users.filter(is_active=False)
+
     context = {
         'company': company,
-        'employees': employees,
-        'stats': stats,
-        'branches': branches,
-        'roles': get_roles(),
-        'search_query': search_query,
+        'users': users,
+        'roles': get_roles_for_company(company),
+        'search': search,
         'role_filter': role_filter,
-        'branch_filter': branch_filter,
-        'is_viewing_company': is_viewing_company,
-        'page_title': 'Employees',
-        'page_subtitle': 'Manage your company employees',
+        'status_filter': status_filter,
+        'stats': {
+            'total': users.count(),
+            'active': users.filter(is_active=True).count(),
+            'inactive': users.filter(is_active=False).count(),
+        }
     }
-    return render(request, 'company/employees/list.html', context)
+    return render(request, 'account/staff_list.html', context)
 
-
+# ============================================
+# CREATE - Company Admin anatengeneza staff wake
+# Render: account/staff_form.html
+# ============================================
 @login_required
-def employee_detail(request, pk):
-    """View employee details for the active company."""
-    company, is_viewing_company = get_active_company(request)
-
+def staff_create(request):
+    company = _get_company(request)
     if not company:
-        if request.user.role == 'super_admin':
-            return redirect('/api/support/select/')
-        messages.warning(request, 'You are not assigned to any company.')
-        return redirect('/dashboard/')
+        messages.error(request, "No company found for this domain.")
+        return redirect('/auth/login/')
 
-    is_authorized = (
-        is_viewing_company or
-        request.user.is_company_admin or
-        request.user.is_company_manager or
-        request.user.is_super_admin or
-        request.user.is_superuser or
-        request.user.is_staff
-    )
+    if not _check_company_admin(request):
+        messages.error(request, "You don't have permission to create staff.")
+        return redirect('accounts:staff-list')
 
-    if not is_authorized:
-        messages.error(request, 'You do not have permission to view employee details.')
-        return redirect('staff:employee-list')
+    def form_context(extra=None):
+        ctx = {
+            'company': company,
+            'roles': get_roles_for_company(company),
+            'staff_user': None,
+            'is_edit': False,
+            'form_mode': 'create',
+        }
+        if extra:
+            ctx.update(extra)
+        return ctx
 
-    employee = get_object_or_404(
-        User.objects.select_related('company', 'branch'),
-        pk=pk,
-        company=company,
-    )
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        email = request.POST.get('email', '').strip()
+        password = request.POST.get('password', '')
+        password2 = request.POST.get('password2', '')
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        phone = request.POST.get('phone', '').strip()
+        role = request.POST.get('role', 'company_staff')
+        staff_id = request.POST.get('staff_id', '').strip()
+
+        preserved = {
+            'username': username,
+            'email': email,
+            'first_name': first_name,
+            'last_name': last_name,
+            'phone': phone,
+            'role': role,
+            'staff_id': staff_id,
+        }
+
+        if not username or not email or not password:
+            messages.error(request, "Username, Email and Password are required.")
+            return render(request, 'account/staff_form.html', form_context({'preserved': preserved}))
+
+        if password != password2:
+            messages.error(request, "Passwords do not match.")
+            return render(request, 'account/staff_form.html', form_context({'preserved': preserved}))
+
+        if User.objects.filter(username=username).exists():
+            messages.error(request, f"Username '{username}' already exists.")
+            return render(request, 'account/staff_form.html', form_context({'preserved': preserved}))
+
+        if User.objects.filter(email=email).exists():
+            messages.error(request, f"Email '{email}' already exists.")
+            return render(request, 'account/staff_form.html', form_context({'preserved': preserved}))
+
+        if role == 'super_admin':
+            messages.error(request, "You cannot create a Super Admin.")
+            return render(request, 'account/staff_form.html', form_context({'preserved': preserved}))
+
+        # Create user - company ni hii ya admin mwenyewe, HACHAGUI
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            first_name=first_name,
+            last_name=last_name,
+            phone=phone,
+            role=role,
+            company=company,
+        )
+        if hasattr(user, 'staff_id'):
+            user.staff_id = staff_id
+            user.save()
+
+        # FIX: Membership kwa company=, sio tenant=
+        # FIX: defaults HAINA status, ina is_active tu
+        from apps.accounts.models import Membership
+        Membership.objects.get_or_create(
+            user=user,
+            company=company,
+            defaults={
+                'role': role,
+                'is_primary': True,
+                'is_active': True,
+            }
+        )
+
+        messages.success(request, f"Staff '{username}' created for {company.name} as {role}.")
+        return redirect('accounts:staff-list')
+
+    return render(request, 'account/staff_form.html', form_context())
+
+# ============================================
+# DETAIL - Angalia staff mmoja
+# ============================================
+@login_required
+def staff_detail(request, user_id):
+    company = _get_company(request)
+    if not _check_company_admin(request):
+        messages.error(request, "No permission.")
+        return redirect('accounts:staff-list')
+
+    user = get_object_or_404(User, id=user_id, company=company)
 
     context = {
         'company': company,
-        'employee': employee,
-        'is_viewing_company': is_viewing_company,
-        'page_title': employee.get_full_name() or employee.username,
-        'page_subtitle': 'Employee details',
+        'staff_user': user,
+        # FIX: company=, sio tenant=
+        'memberships': user.memberships.filter(company=company),
     }
-    return render(request, 'company/employees/detail.html', context)
+    return render(request, 'account/staff_detail.html', context)
 
-
+# ============================================
+# EDIT - Badilisha staff + role
+# Render: account/staff_form.html - TEMPLATE MOJA NA CREATE
+# ============================================
 @login_required
-def employee_create(request):
-    """Add a new employee to the company"""
-    company, is_viewing_company = get_active_company(request)
-    
-    if not company:
-        if request.user.role == 'super_admin':
-            return redirect('/api/support/select/')
-        messages.warning(request, 'You are not assigned to any company.')
-        return redirect('/dashboard/')
-    
-    is_authorized = (
-        is_viewing_company or
-        request.user.is_company_admin or 
-        request.user.is_company_manager or 
-        request.user.is_super_admin or
-        request.user.is_superuser or
-        request.user.is_staff
-    )
-    
-    if not is_authorized:
-        messages.error(request, 'You do not have permission to add employees.')
-        return redirect('staff:employee-list')
-    
+def staff_edit(request, user_id):
+    company = _get_company(request)
+    if not _check_company_admin(request):
+        messages.error(request, "No permission.")
+        return redirect('accounts:staff-list')
+
+    user = get_object_or_404(User, id=user_id, company=company)
+
     if request.method == 'POST':
-        try:
-            first_name = request.POST.get('first_name', '').strip()
-            last_name = request.POST.get('last_name', '').strip()
-            email = request.POST.get('email', '').strip()
-            username = request.POST.get('username', '').strip()
-            phone = request.POST.get('phone', '').strip()
-            role = request.POST.get('role', 'company_staff')
-            department = request.POST.get('department', '').strip()
-            position = request.POST.get('position', '').strip()
-            staff_id = request.POST.get('staff_id', '').strip()
-            branch_id = request.POST.get('branch_id', '')
-            hire_date = request.POST.get('hire_date', '').strip()
-            password = request.POST.get('password', '')
-            confirm_password = request.POST.get('confirm_password', '')
-            
-            if not all([first_name, last_name, email, username, password, confirm_password]):
-                messages.error(request, 'Please fill in all required fields.')
-                return render(request, 'company/employees/form.html', {
-                    'company': company,
-                    'roles': get_roles(),
-                    'branches': get_branches(company),
-                    'is_viewing_company': is_viewing_company,
-                    'page_title': 'Add Employee',
-                    'page_subtitle': 'Add a new employee to your company',
-                })
-            
-            if password != confirm_password:
-                messages.error(request, 'Passwords do not match.')
-                return render(request, 'company/employees/form.html', {
-                    'company': company,
-                    'roles': get_roles(),
-                    'branches': get_branches(company),
-                    'is_viewing_company': is_viewing_company,
-                    'page_title': 'Add Employee',
-                    'page_subtitle': 'Add a new employee to your company',
-                })
-            
-            if User.objects.filter(email=email).exists():
-                messages.error(request, 'Email already exists.')
-                return render(request, 'company/employees/form.html', {
-                    'company': company,
-                    'roles': get_roles(),
-                    'branches': get_branches(company),
-                    'is_viewing_company': is_viewing_company,
-                    'page_title': 'Add Employee',
-                    'page_subtitle': 'Add a new employee to your company',
-                })
-            
-            if User.objects.filter(username=username).exists():
-                messages.error(request, 'Username already exists.')
-                return render(request, 'company/employees/form.html', {
-                    'company': company,
-                    'roles': get_roles(),
-                    'branches': get_branches(company),
-                    'is_viewing_company': is_viewing_company,
-                    'page_title': 'Add Employee',
-                    'page_subtitle': 'Add a new employee to your company',
-                })
-            
-            try:
-                validate_password(password)
-            except ValidationError as e:
-                messages.error(request, f'Password error: {", ".join(e.messages)}')
-                return render(request, 'company/employees/form.html', {
-                    'company': company,
-                    'roles': get_roles(),
-                    'branches': get_branches(company),
-                    'is_viewing_company': is_viewing_company,
-                    'page_title': 'Add Employee',
-                    'page_subtitle': 'Add a new employee to your company',
-                })
-            
-            user = User.objects.create_user(
-                username=username,
-                email=email,
-                password=password,
-                first_name=first_name,
-                last_name=last_name,
-                phone=phone,
-                role=role,
-                company=company,
-                department=department,
-                position=position,
-                staff_id=staff_id,
-                branch_id=branch_id if branch_id else None,
-                hire_date=hire_date if hire_date else None,
-                is_active=True,
-                is_verified=True,
-            )
-            
-            messages.success(request, f'Employee {user.get_full_name()} created successfully!')
-            return redirect('staff:employee-list')
-            
-        except Exception as e:
-            messages.error(request, f'Error creating employee: {str(e)}')
-            return render(request, 'company/employees/form.html', {
+        user.first_name = request.POST.get('first_name', user.first_name).strip()
+        user.last_name = request.POST.get('last_name', user.last_name).strip()
+        user.email = request.POST.get('email', user.email).strip()
+        user.phone = request.POST.get('phone', user.phone).strip()
+        new_role = request.POST.get('role', user.role)
+        if hasattr(user, 'staff_id'):
+            user.staff_id = request.POST.get('staff_id', getattr(user, 'staff_id', '')).strip()
+
+        # Badilisha role - lakini sio super_admin
+        if new_role != 'super_admin':
+            user.role = new_role
+        else:
+            messages.error(request, "You cannot assign Super Admin role.")
+            return render(request, 'account/staff_form.html', {
                 'company': company,
-                'roles': get_roles(),
-                'branches': get_branches(company),
-                'is_viewing_company': is_viewing_company,
-                'page_title': 'Add Employee',
-                'page_subtitle': 'Add a new employee to your company',
+                'roles': get_roles_for_company(company),
+                'staff_user': user,
+                'is_edit': True,
+                'form_mode': 'edit',
             })
-    
-    context = {
-        'company': company,
-        'roles': get_roles(),
-        'branches': get_branches(company),
-        'is_viewing_company': is_viewing_company,
-        'page_title': 'Add Employee',
-        'page_subtitle': 'Add a new employee to your company',
-    }
-    return render(request, 'company/employees/form.html', context)
+        user.save()
 
-
-@login_required
-def employee_edit(request, pk):
-    """Edit employee details"""
-    company, is_viewing_company = get_active_company(request)
-    
-    if not company:
-        if request.user.role == 'super_admin':
-            return redirect('/api/support/select/')
-        messages.warning(request, 'You are not assigned to any company.')
-        return redirect('/dashboard/')
-    
-    is_authorized = (
-        is_viewing_company or
-        request.user.is_company_admin or 
-        request.user.is_company_manager or 
-        request.user.is_super_admin or
-        request.user.is_superuser or
-        request.user.is_staff
-    )
-    
-    if not is_authorized:
-        messages.error(request, 'You do not have permission to edit employees.')
-        return redirect('staff:employee-list')
-    
-    employee = get_object_or_404(User, pk=pk, company=company)
-    
-    if request.method == 'POST':
+        # FIX: Membership filter kwa company=
         try:
-            employee.first_name = request.POST.get('first_name', '').strip()
-            employee.last_name = request.POST.get('last_name', '').strip()
-            employee.phone = request.POST.get('phone', '').strip()
-            employee.role = request.POST.get('role', 'company_staff')
-            employee.department = request.POST.get('department', '').strip()
-            employee.position = request.POST.get('position', '').strip()
-            employee.staff_id = request.POST.get('staff_id', '').strip()
-            employee.branch_id = request.POST.get('branch_id', None) or None
-            employee.is_active = request.POST.get('is_active') == 'on'
-            
-            hire_date = request.POST.get('hire_date', '').strip()
-            employee.hire_date = hire_date if hire_date else None
-            
-            employee.save()
-            
-            messages.success(request, f'Employee {employee.get_full_name()} updated successfully!')
-            return redirect('staff:employee-list')
-            
-        except Exception as e:
-            messages.error(request, f'Error updating employee: {str(e)}')
-    
+            from apps.accounts.models import Membership
+            Membership.objects.filter(user=user, company=company).update(role=new_role)
+        except Exception:
+            pass
+
+        # Badilisha password kama ameweka mpya
+        new_password = request.POST.get('password', '')
+        if new_password:
+            user.set_password(new_password)
+            user.save()
+
+        messages.success(request, f"Staff '{user.username}' updated.")
+        return redirect('accounts:staff-list')
+
+    # GET - Fungua form ikiwa na data ya staff huyu
     context = {
-        'employee': employee,
         'company': company,
-        'roles': get_roles(),
-        'branches': get_branches(company),
-        'is_viewing_company': is_viewing_company,
-        'page_title': f'Edit {employee.get_full_name()}',
-        'page_subtitle': 'Edit employee details',
+        'roles': get_roles_for_company(company),
+        'staff_user': user,
+        'is_edit': True,
+        'form_mode': 'edit',
     }
-    return render(request, 'company/employees/form.html', context)
+    return render(request, 'account/staff_form.html', context)
 
-
+# ============================================
+# TOGGLE - Activate / Deactivate
+# ============================================
 @login_required
-def employee_delete(request, pk):
-    """Delete employee"""
-    company, is_viewing_company = get_active_company(request)
-    
-    if not company:
-        if request.user.role == 'super_admin':
-            return redirect('/api/support/select/')
-        messages.warning(request, 'You are not assigned to any company.')
-        return redirect('/dashboard/')
-    
-    is_authorized = (
-        is_viewing_company or
-        request.user.is_company_admin or 
-        request.user.is_company_manager or 
-        request.user.is_super_admin or
-        request.user.is_superuser or
-        request.user.is_staff
-    )
-    
-    if not is_authorized:
-        messages.error(request, 'You do not have permission to delete employees.')
-        return redirect('staff:employee-list')
-    
-    employee = get_object_or_404(User, pk=pk, company=company)
-    
-    if employee.id == request.user.id and not is_viewing_company:
-        messages.error(request, 'You cannot delete your own account.')
-        return redirect('staff:employee-list')
-    
+def staff_toggle_status(request, user_id):
+    company = _get_company(request)
+    if not _check_company_admin(request):
+        messages.error(request, "No permission.")
+        return redirect('accounts:staff-list')
+
+    user = get_object_or_404(User, id=user_id, company=company)
+
+    if user.id == request.user.id:
+        messages.error(request, "You cannot deactivate yourself.")
+        return redirect('accounts:staff-list')
+
     if request.method == 'POST':
+        user.is_active = not user.is_active
+        user.save()
         try:
-            name = employee.get_full_name()
-            employee.delete()
-            messages.success(request, f'Employee {name} deleted successfully!')
-            return redirect('staff:employee-list')
-        except Exception as e:
-            messages.error(request, f'Error deleting employee: {str(e)}')
-    
-    context = {
-        'company': company,
-        'employee': employee,
-        'is_viewing_company': is_viewing_company,
-        'page_title': 'Delete Employee',
-        'page_subtitle': f'Confirm deletion of {employee.get_full_name()}',
-    }
-    return render(request, 'company/employees/confirm_delete.html', context)
+            from apps.accounts.models import Membership
+            # FIX: company=, is_active= - HAKUNA status
+            Membership.objects.filter(user=user, company=company).update(
+                is_active=user.is_active,
+            )
+        except Exception:
+            pass
+        status = "activated" if user.is_active else "deactivated"
+        messages.success(request, f"Staff '{user.username}' {status}.")
+    return redirect('accounts:staff-list')
 
-
+# ============================================
+# DELETE - Futa staff
+# ============================================
 @login_required
-def employee_toggle_status(request, pk):
-    """Toggle employee active status"""
-    company, is_viewing_company = get_active_company(request)
-    
-    if not company:
-        if request.user.role == 'super_admin':
-            return redirect('/api/support/select/')
-        messages.warning(request, 'You are not assigned to any company.')
-        return redirect('/dashboard/')
-    
-    is_authorized = (
-        is_viewing_company or
-        request.user.is_company_admin or 
-        request.user.is_company_manager or 
-        request.user.is_super_admin or
-        request.user.is_superuser or
-        request.user.is_staff
-    )
-    
-    if not is_authorized:
-        messages.error(request, 'You do not have permission to change employee status.')
-        return redirect('staff:employee-list')
-    
-    employee = get_object_or_404(User, pk=pk, company=company)
-    
-    if employee.id == request.user.id and not is_viewing_company:
-        messages.error(request, 'You cannot change your own status.')
-        return redirect('staff:employee-list')
-    
+def staff_delete(request, user_id):
+    company = _get_company(request)
+    if not _check_company_admin(request):
+        messages.error(request, "No permission.")
+        return redirect('accounts:staff-list')
+
+    user = get_object_or_404(User, id=user_id, company=company)
+
+    if user.id == request.user.id:
+        messages.error(request, "You cannot delete yourself.")
+        return redirect('accounts:staff-list')
+
     if request.method == 'POST':
-        employee.is_active = not employee.is_active
-        employee.save()
-        status = 'activated' if employee.is_active else 'deactivated'
-        messages.success(request, f'Employee {employee.get_full_name()} has been {status}.')
-        return redirect('staff:employee-list')
-    
-    return redirect('staff:employee-list')
+        username = user.username
+        user.delete()
+        messages.success(request, f"Staff '{username}' deleted.")
+        return redirect('accounts:staff-list')
+
+    context = {'company': company, 'staff_user': user}
+    return render(request, 'account/staff_delete_confirm.html', context)

@@ -40,14 +40,6 @@ urlpatterns = [
     path('<int:pk>/edit/',   web_views.company_edit,   name='company-edit'),
     path('<int:pk>/delete/', web_views.company_delete, name='company-delete'),
 
-    # ============================================
-    # EMPLOYEES
-    # ============================================
-    path(
-        '<int:company_id>/employees/',
-        web_views.company_employee_list,
-        name='company-employees',
-    ),
 
     # ============================================
     # JOIN REQUESTS

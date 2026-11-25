@@ -4,7 +4,6 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.conf import settings as django_settings
 
-
 class User(AbstractUser):
     ROLE_CHOICES = (
         # ─────────────────────────────────────────
@@ -40,6 +39,13 @@ class User(AbstractUser):
         ('member', 'Member'),
     )
 
+    # Email ni unique - mtu mmoja = email moja = akaunti moja
+    # Huyu mtu huyu anaweza kuwa na Memberships nyingi (Kalyet + Chama)
+    # kwa kutumia email hii hii moja. Hahitaji email mpya.
+    email = models.EmailField(unique=True, blank=True)
+
+    # PRIMARY company / role - kwa backward compat
+    # Company halisi anayotoka inatoka kwenye Membership
     role = models.CharField(max_length=30, choices=ROLE_CHOICES, default='company_staff')
     company = models.ForeignKey(
         'companies.Company', on_delete=models.SET_NULL,
@@ -49,6 +55,8 @@ class User(AbstractUser):
         'companies.Branch', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='staff',
     )
+
+    # Contact
     phone = models.CharField(max_length=20, blank=True)
     is_verified = models.BooleanField(default=False)
     two_factor_enabled = models.BooleanField(default=False)
@@ -77,7 +85,33 @@ class User(AbstractUser):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.email} ({self.role})"
+        return f"{self.username or self.email} ({self.role})"
+
+    # ============================================================
+    # MEMBERSHIP HELPERS
+    # ============================================================
+    def get_companies(self):
+        """Companies zote ambazo user ni member (active)."""
+        return [
+            m.company
+            for m in self.memberships.select_related('company').filter(is_active=True)
+        ]
+
+    def get_primary_membership(self):
+        """Membership ambayo ni primary."""
+        return self.memberships.filter(
+            is_primary=True, is_active=True
+        ).select_related('company', 'branch').first()
+
+    def get_membership_for_company(self, company):
+        """Membership ya user kwenye company fulani."""
+        return self.memberships.filter(
+            company=company, is_active=True
+        ).select_related('company', 'branch').first()
+
+    def has_membership_in(self, company):
+        """Ana ruhusa kwenye hii company?"""
+        return self.memberships.filter(company=company, is_active=True).exists()
 
     # ============================================================
     # ROLE HELPERS (Platform)
@@ -257,11 +291,17 @@ class User(AbstractUser):
     class Meta:
         db_table = 'rono_users'
         ordering = ['-created_at']
+
 # ============================================================
 # MEMBERSHIP - User can belong to MULTIPLE companies,
 # with a DIFFERENT role in each company.
 # User.company / User.role remain as PRIMARY company/role
 # for backward compat (supermarket/views.py etc. use them).
+#
+# Domain logic:
+# kalyet.ronosystems.com -> tenant = Kalyet
+# ronosystems.com (mama) -> tenant = None, user anachagua company
+# Membership ndiyo inaamua kama user anaruhusiwa kuingia kwenye tenant
 # ============================================================
 class Membership(models.Model):
     ROLE_CHOICES = User.ROLE_CHOICES
@@ -294,9 +334,14 @@ class Membership(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.user.email} @ {self.company} ({self.role})"
+        return f"{self.user.username} @ {self.company} ({self.role})"
 
     def save(self, *args, **kwargs):
+        # Kama hii ni primary, zima primary nyingine zote za huyu user
+        if self.is_primary and self.is_active:
+            Membership.objects.filter(
+                user=self.user, is_primary=True
+            ).exclude(pk=self.pk).update(is_primary=False)
         super().save(*args, **kwargs)
         # Keep User.company/role in sync when this is the primary membership
         if self.is_primary and self.is_active:

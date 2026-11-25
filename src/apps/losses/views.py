@@ -9,7 +9,7 @@ from decimal import Decimal
 
 from apps.companies.models import Company
 from apps.companies.support_utils import get_active_company
-from apps.company.models import Branch
+from apps.companies.models import Branch
 from .models import LossReturn
 from .forms import LossReturnForm
 

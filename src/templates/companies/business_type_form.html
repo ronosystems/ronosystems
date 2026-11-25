@@ -1,0 +1,200 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+    .card-body { color: #000000; }
+    .card-header {
+        background-color: #87CEEB !important;
+        border-bottom: 2px solid #000000;
+        padding: 12px 20px;
+        color: #000000 !important;
+        border-radius: 0 !important;
+    }
+    .card-header h6 {
+        color: #000000 !important;
+        font-weight: 700;
+        margin: 0;
+    }
+    .form-control, .form-select {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        background: white;
+        color: #000000;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #87CEEB;
+        box-shadow: 0 0 0 3px rgba(135,206,235,0.3);
+    }
+    .form-control[readonly] {
+        background-color: #e9ecef;
+        opacity: 1;
+        cursor: not-allowed;
+    }
+    .form-label { color: #000000; font-weight: 600; }
+    .form-label.required:after { content: " *"; color: #dc3545; font-weight: bold; }
+    textarea.form-control { border: 2px solid #000000; border-radius: 4px; }
+    textarea.form-control:focus { border-color: #87CEEB; box-shadow: 0 0 0 3px rgba(135,206,235,0.3); }
+    .btn-primary {
+        background-color: #87CEEB;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-primary:hover {
+        background-color: #7bb8d8;
+        border-color: #000000;
+        color: #000000;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(135,206,235,0.3);
+    }
+    .btn-secondary {
+        background-color: #f8f9fa;
+        border: 2px solid #000000;
+        color: #000000;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .btn-secondary:hover { background-color: #87CEEB; border-color: #000000; color: #000000; }
+    .type-item {
+        border: 2px solid #000000;
+        border-radius: 4px;
+        padding: 10px 12px;
+        background: white;
+        transition: all 0.3s;
+        cursor: pointer;
+    }
+    .type-item:hover {
+        border-color: #87CEEB;
+        background: #f8f9fa;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .type-item i { color: #000000; margin-right: 6px; }
+    .type-item strong { color: #000000; }
+    .type-item small, .type-item .text-muted { color: #000000 !important; }
+    .text-muted { color: #000000 !important; }
+    small.text-muted { color: #000000 !important; }
+    @media (max-width: 768px) {
+        .card-body { padding: 15px; }
+        .form-control, .form-select { font-size: 13px; padding: 6px 10px; }
+        .form-label { font-size: 13px; }
+        .btn { font-size: 12px; padding: 6px 12px; }
+        .d-flex.gap-2 { flex-wrap: wrap; }
+        .d-flex.gap-2 .btn { flex: 1; min-width: 100px; text-align: center; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card">
+            <div class="card-body p-4">
+                <form method="post" id="btForm">
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label class="form-label required">Business Type Name</label>
+                        {% if object %}
+                            <!-- EDIT MODE: Read-only, lakini bado tunatuma name -->
+                            <input type="text" class="form-control" value="{{ object.name }}" readonly>
+                            <input type="hidden" name="name" value="{{ object.name }}">
+                            <small class="text-muted">Business type names are fixed and cannot be changed.</small>
+                        {% else %}
+                            <!-- CREATE MODE: Dropdown kutoka Enum -->
+                            <select class="form-select" name="name" id="id_name" required>
+                                <option value="">Select a business type...</option>
+                                {% for t in available_types %}
+                                <option value="{{ t.name }}" data-description="{{ t.description|default:'' }}" data-icon="{{ t.icon|default:'fa-tag' }}" {% if form.name.value == t.name %}selected{% endif %}>{{ t.name }} - {{ t.description }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Select from available business types in the registry</small>
+                            {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors }}</div>{% endif %}
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="id_description">Description</label>
+                        <textarea class="form-control" name="description" id="id_description" rows="3" placeholder="Enter description...">{{ form.description.value|default_if_none:"" }}</textarea>
+                        {% if form.description.errors %}<div class="text-danger small">{{ form.description.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="id_icon">Icon Class</label>
+                        <input type="text" class="form-control" name="icon" id="id_icon" value="{{ form.icon.value|default_if_none:'' }}" placeholder="fa-store, fa-heartbeat, etc.">
+                        <small class="text-muted">Font Awesome icon class (e.g., fa-store)</small>
+                        {% if form.icon.errors %}<div class="text-danger small">{{ form.icon.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" name="is_active" id="id_is_active" {% if form.is_active.value %}checked{% endif %}>
+                        <label class="form-check-label" for="id_is_active">Is Active</label>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> {{ button_text|default:"Save" }}
+                        </button>
+                        <a href="{% url 'business-type-list' %}" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Available types list - clickable ku-jaza form -->
+        {% if available_types and not object %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-info-circle"></i> Available Business Types - Click to Select</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for t in available_types %}
+                    <div class="col-md-4 mb-2">
+                        <div class="type-item" onclick="selectType('{{ t.name }}', '{{ t.description|default:''|escapejs }}', '{{ t.icon|default:'fa-tag' }}')">
+                            <i class="fas {{ t.icon|default:'fa-tag' }}"></i>
+                            <strong>{{ t.name }}</strong>
+                            <br><small class="text-muted">{{ t.description|truncatechars:30 }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function selectType(name, description, icon) {
+    const nameSelect = document.getElementById('id_name');
+    const descField = document.getElementById('id_description');
+    const iconField = document.getElementById('id_icon');
+    if (nameSelect) nameSelect.value = name;
+    if (descField && !descField.value) descField.value = description;
+    if (iconField && !iconField.value) iconField.value = icon;
+    if (nameSelect) nameSelect.scrollIntoView({behavior: 'smooth', block: 'center'});
+}
+// Auto-fill description/icon ukichagua kutoka dropdown
+document.getElementById('id_name')?.addEventListener('change', function() {
+    const opt = this.options[this.selectedIndex];
+    if (!opt) return;
+    const descField = document.getElementById('id_description');
+    const iconField = document.getElementById('id_icon');
+    if (descField) descField.value = opt.dataset.description || '';
+    if (iconField) iconField.value = opt.dataset.icon || '';
+});
+</script>
+{% endblock %}

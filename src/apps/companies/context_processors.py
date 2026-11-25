@@ -1,158 +1,151 @@
+# apps/companies/context_processors.py
 """
-Context processors.
-
-These run on every request and inject tenant-aware variables into every
-template's context. All of them are defensive: if a company isn't set,
-is anonymous, or a field is empty, they return safe defaults instead of
-raising — templates should never crash because of a missing tenant.
+Context processors - Tenant-aware.
+All defensive: if no tenant, return safe defaults.
+Source of truth: request.tenant (set by TenantMiddleware from domain)
+NOT user.company, NOT user.role
 """
 
 import os
 from django.conf import settings
-from django.db.models import F
 from apps.companies.models import Company, CompanyJoinRequest, TenantFeedback
-from apps.business_types.business_type_registry import BusinessTypeEnum
+from apps.companies.business_types import BusinessTypeEnum
 
-# ============================================
-# ACTIVE BASE TEMPLATE (Dynamic)
-# ============================================
-def active_base_template(request):
-    """
-    Automatically selects the correct base template based on the company's business type.
-    Falls back to 'base.html' if no match is found.
-    """
-    # Use _get_effective_company to support Super Admin support mode!
-    company = _get_effective_company(request)
-    
-    if not company or not getattr(company, 'business_type', None):
-        return {'base_template': 'base.html'}
-
-    # Get the business name from the database (e.g., "Chama", "Kuku Biz")
-    business_name = company.business_type.name
-    
-    # Look it up in the registry
-    registry_entry = BusinessTypeEnum.get_by_name(business_name)
-    
-    if registry_entry:
-        module = registry_entry.value['integration']['module']
-        # Map the module to the base template file
-        if module == 'chama':
-            return {'base_template': 'chama_base.html'}
-        elif module == 'kuku_biz':
-            return {'base_template': 'kuku_base.html'}
-        elif module == 'epa_shop':
-            return {'base_template': 'base.html'}
-        # Add other modules here if you have specific bases for them
-
-    # Default fallback
-    return {'base_template': 'base.html'}
-
-# ============================================
-# PLATFORM DEFAULTS
-# ============================================
 DEFAULT_SYSTEM_NAME = 'RonoSystems'
 DEFAULT_PRIMARY_COLOR = '#87CEEB'
 DEFAULT_ACCENT_COLOR = '#036a77'
 
-
 # ============================================
-# HELPERS
+# HELPERS - HII NDIO MOYO
 # ============================================
 def _get_effective_company(request):
     """
-    Return the Company that should be "active" for this request.
-    (Kept exactly as you had it - it's perfect)
+    1. Support mode (Super Admin anaangalia company nyingine)
+    2. request.tenant (kutoka kwa domain - kalyet.ronosystems.com)
+    3. Hakuna tena user.company - imefutwa
     """
     cached = getattr(request, '_effective_company', False)
     if cached is not False:
         return cached
 
     company = None
-    user = request.user
+    user = getattr(request, 'user', None)
 
-    # ── 1. Support mode ──
-    if user.is_authenticated:
+    # 1. Support mode
+    if user and user.is_authenticated:
         support_mode = request.session.get('support_mode', False)
         viewing_company_id = request.session.get('viewing_company_id')
         if support_mode and viewing_company_id:
             company = Company.objects.filter(id=viewing_company_id).first()
 
-    # ── 2. Custom domain ──
+    # 2. Tenant kutoka kwa Middleware (DOMAIN)
+    if company is None:
+        company = getattr(request, 'tenant', None)
+
+    # 3. Fallback kwa backwards compat - kama middleware haijaweka tenant
+    # lakini request.company ipo (code ya zamani)
     if company is None:
         company = getattr(request, 'company', None)
-
-    # ── 3. User's own company — skip for super_admins on the mother site ──
-    if company is None and user.is_authenticated:
-        is_super = (
-            user.is_superuser
-            or getattr(user, 'role', None) == 'super_admin'
-        )
-        if not is_super:
-            company = getattr(user, 'company', None)
 
     request._effective_company = company
     return company
 
+def _get_user_role_in_company(user, company):
+    """
+    Badala ya user.role, tunatafuta role yake KWENYE HIYO COMPANY.
+    Mtu anaweza kuwa Manager hapa, Chairperson kwingine.
+    Returns: 'manager', 'chairperson', 'company_admin', etc au None
+    """
+    if not user or not user.is_authenticated or not company:
+        return None
+    try:
+        membership = user.memberships.filter(tenant=company, status='active').select_related('role').first()
+        if membership and membership.role:
+            return membership.role.slug  # manager, chairperson, treasurer
+        # Fallback kwa code ya zamani kama bado una User.role
+        return getattr(user, 'role', None)
+    except Exception:
+        return getattr(user, 'role', None)
+
+def _is_super_admin(user):
+    if not user or not user.is_authenticated:
+        return False
+    return user.is_superuser or getattr(user, 'role', '') == 'super_admin'
+
+# ============================================
+# ACTIVE BASE TEMPLATE
+# ============================================
+def active_base_template(request):
+    company = _get_effective_company(request)
+    if not company or not getattr(company, 'business_type', None):
+        return {'base_template': 'base.html'}
+
+    business_name = company.business_type.name
+    registry_entry = BusinessTypeEnum.get_by_name(business_name)
+    if registry_entry:
+        module = registry_entry.value['integration']['module']
+        if module == 'chama':
+            return {'base_template': 'chama_base.html'}
+        elif module == 'kuku_biz':
+            return {'base_template': 'kuku_base.html'}
+        elif module == 'epa_shop':
+            return {'base_template': 'base.html'}
+    return {'base_template': 'base.html'}
 
 # ============================================
 # PENDING JOIN REQUESTS
 # ============================================
 def pending_join_requests(request):
-    """Inject pending_join_requests_count into every template context."""
     count = 0
     try:
         user = request.user
-        if user.is_authenticated and getattr(user, 'role', None) in (
-            'company_admin', 'super_admin'
-        ):
-            company = getattr(user, 'company', None)
-            if company:
-                count = CompanyJoinRequest.objects.filter(
-                    company=company, status='pending'
-                ).count()
+        company = _get_effective_company(request)
+        if user.is_authenticated and company:
+            role = _get_user_role_in_company(user, company)
+            if role in ('company_admin', 'admin', 'manager') or _is_super_admin(user):
+                count = CompanyJoinRequest.objects.filter(company=company, status='pending').count()
     except Exception:
         count = 0
     return {'pending_join_requests_count': count}
-
 
 # ============================================
 # SUPPORT MODE
 # ============================================
 def support_mode_context(request):
-    """
-    Adds `support_company` to the context when in support mode.
-    """
     support_company = None
-
     if request.user.is_authenticated:
         viewing_company_id = request.session.get('viewing_company_id')
         support_mode = request.session.get('support_mode', False)
-
         if support_mode and viewing_company_id:
             try:
                 support_company = Company.objects.get(id=viewing_company_id)
             except Company.DoesNotExist:
                 pass
-
     return {
         'support_company': support_company,
         'is_support_mode': support_company is not None,
     }
 
-
 # ============================================
-# COMPANY BRANDING (favicon, logo, colors, name)
+# COMPANY BRANDING
 # ============================================
 def company_branding_context(request):
-    """
-    Inject tenant-specific branding into every template.
-    """
     company = _get_effective_company(request)
-    is_custom_domain = getattr(request, 'company', None) is not None
+    # is_custom_domain = True kama user yuko kwenye kalyet.co.ke
+    is_custom_domain = False
+    if company:
+        host = request.get_host().split(':')[0].lower()
+        if company.custom_domain and host == company.custom_domain.lower():
+            is_custom_domain = True
 
     ctx = {
+        'company': company,  # <- FIX: base.html inatumia company.id
         'current_company': company,
+        'current_tenant': company,  # alias kwa template mpya
         'is_custom_domain': is_custom_domain,
+        'system_name': DEFAULT_SYSTEM_NAME,
+        'site_primary_color': DEFAULT_PRIMARY_COLOR,
+        'site_accent_color': DEFAULT_ACCENT_COLOR,
     }
 
     if company is None:
@@ -160,37 +153,31 @@ def company_branding_context(request):
 
     if company.logo_url:
         ctx['site_logo_url'] = company.logo_url
-
     if company.favicon_url:
         ctx['site_favicon_url'] = company.favicon_url
-
-    if company.login_background_url:                              
+    if company.login_background_url:
         ctx['login_background_url'] = company.login_background_url
-
     if company.primary_color:
         ctx['site_primary_color'] = company.primary_color
-
     if company.accent_color:
         ctx['site_accent_color'] = company.accent_color
-
     if company.system_name:
         ctx['system_name'] = company.system_name
 
-    return ctx
+    # Role ya user kwenye hii company - kwa ajili ya template kuonyesha menu
+    if request.user.is_authenticated:
+        ctx['current_user_role'] = _get_user_role_in_company(request.user, company)
 
+    return ctx
 
 # ============================================
 # RECEIPT SETTINGS
 # ============================================
 def receipt_settings_context(request):
-    """
-    Inject `receipt_settings` (dict) into every template context.
-    """
     if hasattr(request, '_receipt_settings'):
         return {'receipt_settings': request._receipt_settings}
 
     company = _get_effective_company(request)
-
     settings_dict = None
     if company is not None:
         try:
@@ -201,315 +188,201 @@ def receipt_settings_context(request):
 
     if not settings_dict:
         settings_dict = {
-            'receipt_header': '',
-            'receipt_footer': '',
-            'receipt_format': 'standard',
-            'show_logo': True,
-            'show_company_details': True,
-            'show_customer_details': True,
-            'show_items': True,
-            'show_totals': True,
-            'show_payment': True,
-            'show_signature': True,
-            'receipt_title': 'RECEIPT',
-            'thank_you_message': 'Thank you for your business!',
-            'include_barcode': False,
-            'print_copies': 1,
-            'auto_print': False,
-            'receipt_font_size': '14',
-            'receipt_width': '80',
-            'custom_css': '',
+            'receipt_header': '', 'receipt_footer': '', 'receipt_format': 'standard',
+            'show_logo': True, 'show_company_details': True, 'show_customer_details': True,
+            'show_items': True, 'show_totals': True, 'show_payment': True, 'show_signature': True,
+            'receipt_title': 'RECEIPT', 'thank_you_message': 'Thank you for your business!',
+            'include_barcode': False, 'print_copies': 1, 'auto_print': False,
+            'receipt_font_size': '14', 'receipt_width': '80', 'custom_css': '',
         }
 
     request._receipt_settings = settings_dict
     return {'receipt_settings': settings_dict}
 
-
 # ============================================
-# PENDING FEEDBACK COUNT (for super-admins only)
+# PENDING FEEDBACK COUNT
 # ============================================
 def pending_feedback_count(request):
-    """
-    Inject the number of *new* feedback items into every template context
-    for super-admins only.
-    """
     user = getattr(request, 'user', None)
     if not user or not user.is_authenticated:
         return {'pending_feedback_count': 0}
-
-    is_hub_owner = user.is_superuser or getattr(user, 'role', '') == 'super_admin'
-    if not is_hub_owner:
+    if not _is_super_admin(user):
         return {'pending_feedback_count': 0}
-
     from apps.companies.support_utils import is_support_mode
     if is_support_mode(request):
         return {'pending_feedback_count': 0}
-
-    count = TenantFeedback.objects.filter(
-        status=TenantFeedback.STATUS_NEW,
-    ).count()
-
+    count = TenantFeedback.objects.filter(status=TenantFeedback.STATUS_NEW).count()
     return {'pending_feedback_count': count}
 
-
 # ============================================
-# COMPANY FEATURE FLAGS (Treasury, Workshop, etc.)
+# COMPANY FEATURE FLAGS
 # ============================================
 def company_features_context(request):
-    """
-    Strictly evaluates feature flags based on the company's ACTIVE subscription.
-    """
     company = _get_effective_company(request)
-    
     has_treasury = False
     has_workshop = False
 
     if company:
-        active_sub = (
-            company.subscriptions
-            .filter(status='active')
-            .order_by('-created_at')
-            .first()
-        )
-        
-        # FIXED: Check if it's a property or method
+        active_sub = company.subscriptions.filter(status='active').order_by('-created_at').first()
         if active_sub:
             is_active = active_sub.is_active_subscription
             if callable(is_active):
                 is_active = is_active()
-                
             if is_active:
-                has_treasury = bool(active_sub.plan.has_treasury)
-                has_workshop = bool(active_sub.plan.has_workshop)
-        
+                has_treasury = bool(getattr(active_sub.plan, 'has_treasury', False))
+                has_workshop = bool(getattr(active_sub.plan, 'has_workshop', False))
         if not has_treasury and not has_workshop and company.plan:
-            # Fallback to the cached plan (only if there is no active sub row at all)
-            has_treasury = bool(company.plan.has_treasury)
-            has_workshop = bool(company.plan.has_workshop)
+            has_treasury = bool(getattr(company.plan, 'has_treasury', False))
+            has_workshop = bool(getattr(company.plan, 'has_workshop', False))
 
     return {
         'company_has_treasury': has_treasury,
         'company_has_workshop': has_workshop,
     }
 
-
-
-
 # ============================================
-# SYSTEM WEBSITE URL (for "Powered by" footer link)
+# SYSTEM WEBSITE URL
 # ============================================
 def system_website_url(request):
-    """
-    URL of the system's own website homepage — never the tenant site.
-
-    Resolution order:
-      1. settings.SYSTEM_WEBSITE_URL  (explicit override, e.g. env var)
-      2. settings.SYSTEM_DOMAIN       (e.g. "ronosystems.onrender.com")
-      3. Strip a known tenant subdomain from the request host
-         (e.g. fieldmax.localhost -> localhost,
-               fieldmax.ronosystems.onrender.com -> ronosystems.onrender.com)
-      4. Fall back to the request host as-is
-    """
-    explicit = (
-        getattr(settings, 'SYSTEM_WEBSITE_URL', None)
-        or os.getenv('SYSTEM_WEBSITE_URL', '')
-    )
+    explicit = getattr(settings, 'SYSTEM_WEBSITE_URL', None) or os.getenv('SYSTEM_WEBSITE_URL', '')
     if explicit:
         return {'system_website_url': explicit.rstrip('/') + '/'}
 
-    full_host = request.get_host()             # includes port
+    full_host = request.get_host()
     host, _, port = full_host.partition(':')
     host = host.lower()
 
-    # --- 2. Explicit system domain ---
-    system_domain = (
-        getattr(settings, 'SYSTEM_DOMAIN', None)
-        or os.getenv('SYSTEM_DOMAIN', '')
-    )
+    system_domain = getattr(settings, 'SYSTEM_DOMAIN', None) or os.getenv('SYSTEM_DOMAIN', '')
     if system_domain:
         host = system_domain
     else:
-        # --- 3. Strip tenant subdomain ---
-        # Base domains we know are system roots — never strip below these
-        SYSTEM_ROOTS = (
-            'localhost',
-            'ronosystems.onrender.com',
-            'ronosystems.co.ke',
-        )
+        SYSTEM_ROOTS = ('localhost', 'ronosystems.onrender.com', 'ronosystems.co.ke')
         for root in SYSTEM_ROOTS:
             if host == root or host.endswith('.' + root):
                 host = root
                 break
         else:
-            # Custom company domain (e.g. fieldmax.co.ke) → fall back to
-            # the canonical system domain if configured, else leave as-is
             if settings.DEBUG:
                 host = 'localhost'
-            # In production, without SYSTEM_DOMAIN or SYSTEM_WEBSITE_URL set,
-            # we can't know the system domain → leave the host unchanged.
-            # Set SYSTEM_DOMAIN in prod to guarantee correct behaviour.
 
     scheme = 'https' if request.is_secure() else 'http'
     port_part = f':{port}' if port else ''
     return {'system_website_url': f'{scheme}://{host}{port_part}/'}
 
-
 # ============================================
-# UNREAD CONTACT MESSAGES (for navbar bell & notification center)
+# UNREAD CONTACT MESSAGES
 # ============================================
 def unread_messages_count(request):
-    """
-    Inject the number of unread contact messages into every template context.
-    Only runs for authenticated admins/managers.
-    """
     user = getattr(request, 'user', None)
     if not user or not user.is_authenticated:
-        return {'unread_messages_count': 0}
-
-    # Check if the user has permission to see messages
-    is_admin = user.is_superuser or getattr(user, 'role', '') in ('super_admin', 'company_admin', 'company_manager')
-    if not is_admin:
         return {'unread_messages_count': 0}
 
     company = _get_effective_company(request)
-    
+    role = _get_user_role_in_company(user, company) if company else getattr(user, 'role', '')
+    is_admin = _is_super_admin(user) or role in ('super_admin', 'company_admin', 'admin', 'manager')
+
+    if not is_admin:
+        return {'unread_messages_count': 0}
+
     try:
         from apps.companies.models import ContactMessage
-        
         if company:
-            # Company domain: only their messages
             count = ContactMessage.objects.filter(company=company, is_read=False).count()
         else:
-            # Super admin on the main site: ONLY system messages (company is NULL)
             count = ContactMessage.objects.filter(company__isnull=True, is_read=False).count()
-            
     except Exception:
         count = 0
-
     return {'unread_messages_count': count}
-    
-    
 
 def pending_applications_count(request):
-    """
-    Injects the count of pending company applications into every template context.
-    Only visible to super admins.
-    """
     user = getattr(request, 'user', None)
     if not user or not user.is_authenticated:
         return {'pending_applications_count': 0}
-
-    role = getattr(user, 'role', '')
-    if role != 'super_admin' and not user.is_staff:
+    if not _is_super_admin(user) and not user.is_staff:
         return {'pending_applications_count': 0}
-
     try:
         from apps.companies.models import CompanyApplication
         count = CompanyApplication.objects.filter(status='pending').count()
     except Exception:
         count = 0
-
     return {'pending_applications_count': count}
 
-
-
 def total_notifications_count(request):
-    """
-    Combines all relevant notification counts into a single integer
-    to display on the navbar bell.
-    """
     user = getattr(request, 'user', None)
     if not user or not user.is_authenticated:
         return {'total_notifications_count': 0}
 
     total = 0
     company = _get_effective_company(request)
-    role = getattr(user, 'role', '')
+    role = _get_user_role_in_company(user, company) if company else getattr(user, 'role', '')
 
-    # 1. Unread Messages (Fixed Isolation)
-    if role in ('company_admin', 'company_manager', 'super_admin'):
+    # 1. Unread Messages
+    if role in ('company_admin', 'admin', 'manager', 'super_admin') or _is_super_admin(user):
         try:
             from apps.companies.models import ContactMessage
             if company:
-                # Company domain: only their messages
                 total += ContactMessage.objects.filter(company=company, is_read=False).count()
             else:
-                # System domain: ONLY system messages (company is NULL)
                 total += ContactMessage.objects.filter(company__isnull=True, is_read=False).count()
         except Exception:
             pass
 
     # 2. Pending Orders
-    if company and role in ('company_admin', 'company_manager', 'super_admin'):
+    if company and role in ('company_admin', 'admin', 'manager', 'super_admin'):
         try:
             from apps.cart_orders.models import Order
             total += Order.objects.filter(company=company, status='new').count()
-        except ImportError:
+        except Exception:
             pass
 
-    # 3. Low Stock (Bulletproof Context Processor)
-    if company and role in ('company_admin', 'stock_controller', 'super_admin'):
+    # 3. Low Stock - OPTIMIZED: usifanye loop kwa kila product
+    if company and role in ('company_admin', 'admin', 'stock_controller', 'super_admin'):
         try:
             from apps.epa_shop.models import Phone, Electronic, Accessory, Unit
-            
-            count = 0
-            
-            # Check Live Units for Phones
-            for item in Phone.objects.filter(company=company, is_active=True):
-                if Unit.objects.filter(phone=item, status='available').count() <= 5:
-                    count += 1
-                    
-            # Check Live Units for Electronics
-            for item in Electronic.objects.filter(company=company, is_active=True):
-                if Unit.objects.filter(electronic=item, status='available').count() <= 5:
-                    count += 1
-                    
-            # Check Accessories
-            for item in Accessory.objects.filter(company=company, is_active=True):
-                if item.total_quantity_in_stock <= 5:
-                    count += 1
-                    
-            total += count
+            from django.db.models import Count, Q
+            # Count phones with <=5 available units using annotate - 1 query badala ya N queries
+            low_phones = Phone.objects.filter(company=company, is_active=True).annotate(
+                avail=Count('units', filter=Q(units__status='available'))
+            ).filter(avail__lte=5).count()
+            low_electronics = Electronic.objects.filter(company=company, is_active=True).annotate(
+                avail=Count('units', filter=Q(units__status='available'))
+            ).filter(avail__lte=5).count()
+            low_accessories = Accessory.objects.filter(company=company, is_active=True, total_quantity_in_stock__lte=5).count()
+            total += low_phones + low_electronics + low_accessories
         except Exception as e:
-            print(f"Sidebar Low stock error: {e}")
+            print(f"Low stock error: {e}")
 
     # 4. Pending Join Requests
-    if company and role in ('company_admin', 'super_admin'):
+    if company and role in ('company_admin', 'admin', 'super_admin'):
         try:
-            from apps.companies.models import CompanyJoinRequest
             total += CompanyJoinRequest.objects.filter(company=company, status='pending').count()
-        except ImportError:
+        except Exception:
             pass
 
     # 5. Unverified Daily Records
-    if company and role in ('company_admin', 'super_admin'):
+    if company and role in ('company_admin', 'admin', 'super_admin'):
         try:
             from apps.treasury.models import DailyRecord
             total += DailyRecord.objects.filter(company=company, is_approved=False).count()
-        except ImportError:
+        except Exception:
             pass
 
-    # 6. Pending Losses / Returns
-    if company and role in ('company_admin', 'super_admin'):
+    # 6. Pending Losses
+    if company and role in ('company_admin', 'admin', 'super_admin'):
         try:
             from apps.losses.models import LossReturn
             total += LossReturn.objects.filter(company=company, is_verified=False).count()
-        except ImportError:
+        except Exception:
             pass
 
-    # ==========================================
-    # SYSTEM-LEVEL COUNTS (SUPER ADMIN ONLY)
-    # ==========================================
-    if role == 'super_admin' and not company:
-        # 7. New Users
+    # 7. System-level (Super Admin on main domain)
+    if _is_super_admin(user) and not company:
         try:
             from apps.accounts.models import User
-            from datetime import datetime
             from django.utils import timezone
-            
+            from datetime import datetime
             today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
             last_seen_iso = request.session.get('users_last_seen')
-
             if last_seen_iso:
                 try:
                     last_seen = datetime.fromisoformat(last_seen_iso)
@@ -520,12 +393,9 @@ def total_notifications_count(request):
                     cutoff = today_start
             else:
                 cutoff = today_start
-
             total += User.objects.filter(created_at__gte=cutoff).count()
-        except Exception as e:
-            print(f"Users count error: {e}")
-
-        # 8. Pending Company Applications
+        except Exception:
+            pass
         try:
             from apps.companies.models import CompanyApplication
             total += CompanyApplication.objects.filter(status='pending').count()

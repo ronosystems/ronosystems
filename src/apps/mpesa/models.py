@@ -62,7 +62,7 @@ class MpesaConfig(models.Model):
         Company, on_delete=models.CASCADE, related_name='mpesa_configs'
     )
     branch = models.ForeignKey(
-        'company.Branch', on_delete=models.CASCADE,
+        'companies.Branch', on_delete=models.CASCADE,
         related_name='mpesa_configs', null=True, blank=True,
         help_text="Leave empty for a company-wide config; set for a branch-specific Till."
     )
@@ -231,7 +231,7 @@ class MpesaTransaction(models.Model):
         Company, on_delete=models.CASCADE, related_name='mpesa_transactions'
     )
     branch = models.ForeignKey(
-        'company.Branch', on_delete=models.SET_NULL,
+        'companies.Branch', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='mpesa_transactions'
     )
     mpesa_config = models.ForeignKey(

@@ -1,74 +1,45 @@
 {% extends 'base.html' %}
 
-{% block title %}Delete {{ employee.get_full_name|default:employee.username }}{% endblock %}
+{% block title %}Delete User - {{ detail_user.username }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card { border: 2px solid #000000; border-radius: 4px; }
+    .card-header { border-bottom: 2px solid #000000; background: #f8d7da !important; color: #721c24 !important; }
+    .btn-danger { border: 2px solid #000000; border-radius: 4px; font-weight: 600; }
+    .btn-secondary { border: 2px solid #000000; border-radius: 4px; font-weight: 600; }
+    .avatar-lg { width: 70px; height: 70px; border-radius: 50%; background: #f8d7da; display: flex; align-items: center; justify-content: center; color: #721c24; font-weight: 700; font-size: 28px; border: 2px solid #000000; }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <div class="row">
-        <div class="col-lg-6 mx-auto">
-            <div class="card shadow-sm border-0" style="border-top: 4px solid #dc3545;">
-                <div class="card-header bg-white pb-0 pt-4 border-0">
-                    <h4 class="mb-0 text-danger fw-bold text-center">
-                        <i class="fas fa-exclamation-triangle me-2"></i> Confirm Deletion
-                    </h4>
-                    <p class="text-center text-muted mt-2">This action cannot be undone. All data for this user will be permanently removed.</p>
-                </div>
-                <div class="card-body p-4">
-                    
-                    <div class="alert alert-warning border-warning" style="background-color: #fffbeb;">
-                        <div class="row g-3">
-                            <div class="col-6">
-                                <small class="text-muted d-block">Full Name</small>
-                                <strong class="text-dark">{{ employee.get_full_name|default:employee.username }}</strong>
-                            </div>
-                            <div class="col-6">
-                                <small class="text-muted d-block">Email Address</small>
-                                <strong class="text-dark">{{ employee.email }}</strong>
-                            </div>
-                            
-                            <div class="col-6">
-                                <small class="text-muted d-block">Role</small>
-                                <span class="badge bg-secondary">{{ employee.get_role_display }}</span>
-                            </div>
-                            <div class="col-6">
-                                <small class="text-muted d-block">Company</small>
-                                <strong class="text-dark">
-                                    {% if employee.company %}
-                                        {{ employee.company.name }}
-                                    {% else %}
-                                        <span class="text-muted fst-italic">System User</span>
-                                    {% endif %}
-                                </strong>
-                            </div>
-                            
-                            <div class="col-6">
-                                <small class="text-muted d-block">Account Status</small>
-                                {% if employee.is_active %}
-                                    <span class="badge bg-success">Active</span>
-                                {% else %}
-                                    <span class="badge bg-danger">Inactive</span>
-                                {% endif %}
-                            </div>
-                            <div class="col-6">
-                                <small class="text-muted d-block">Date Joined</small>
-                                <strong class="text-dark">{{ employee.date_joined|date:"M d, Y" }}</strong>
-                            </div>
-                        </div>
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card" style="border-top: 4px solid #dc3545;">
+            <div class="card-header"><h5 class="mb-0 fw-bold"><i class="fas fa-exclamation-triangle me-2"></i> Delete User</h5></div>
+            <div class="card-body text-center py-4">
+                <i class="fas fa-trash-alt text-danger mb-3" style="font-size: 3rem;"></i>
+                <h5>Are you absolutely sure?</h5>
+                <p class="text-muted">This will permanently delete this user and all associated data. This action cannot be undone.</p>
+
+                <div class="d-flex align-items-center gap-3 p-3 mt-3 text-start" style="border: 2px solid #000000; border-radius: 4px; background: #f8f9fa;">
+                    <div class="avatar-lg">{{ detail_user.first_name|default:detail_user.username|make_list|first|upper }}</div>
+                    <div>
+                        <strong style="font-size: 18px;">{{ detail_user.get_full_name|default:detail_user.username }}</strong><br>
+                        <small>@{{ detail_user.username }} - {{ detail_user.email }}</small><br>
+                        <small>Role: {{ detail_user.get_role_display|default:detail_user.role|title }} - {{ detail_user.company.name|default:'Platform' }}</small><br>
+                        <small>Joined: {{ detail_user.date_joined|date:"d M Y" }}</small>
                     </div>
-                    
-                    <form method="post">
-                        {% csrf_token %}
-                        <div class="d-flex gap-2 justify-content-center mt-4">
-                            <a href="{% url 'users:superadmin-employee-list' %}" class="btn btn-light border px-4">
-                                <i class="fas fa-times"></i> Cancel
-                            </a>
-                            <button type="submit" class="btn btn-danger px-4 fw-bold">
-                                <i class="fas fa-trash"></i> Yes, Delete User
-                            </button>
-                        </div>
-                    </form>
-                    
                 </div>
+
+                <form method="post" class="mt-4">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-center gap-2 flex-wrap">
+                        <a href="{% url 'accounts:user-list' %}" class="btn btn-secondary px-4"><i class="fas fa-times me-1"></i> Cancel</a>
+                        <a href="{% url 'accounts:user-detail' detail_user.id %}" class="btn btn-secondary px-4"><i class="fas fa-eye me-1"></i> View Instead</a>
+                        <button type="submit" class="btn btn-danger px-4"><i class="fas fa-trash me-1"></i> Yes, Delete</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

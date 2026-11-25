@@ -578,12 +578,39 @@ def member_create(request):
 
             member.save()
 
-            # 3. Save the role to the User
-            role = form.cleaned_data.get('role')
-            if role and member.user:
-                member.user.role = role
-                member.user.company = company
-                member.user.save(update_fields=['role', 'company'])
+            # 3. Save/Sync to the User account
+            if member.user:
+                update_fields = []
+                role = form.cleaned_data.get('role')
+                
+                # 👇 NEW: Sync Name, Email, and Phone from Member to User
+                names = member.full_name.split(' ', 1)
+                first_name = names[0]
+                last_name = names[1] if len(names) > 1 else ''
+                
+                if member.user.first_name != first_name:
+                    member.user.first_name = first_name
+                    update_fields.append('first_name')
+                if member.user.last_name != last_name:
+                    member.user.last_name = last_name
+                    update_fields.append('last_name')
+                if member.user.email != member.email:
+                    member.user.email = member.email
+                    update_fields.append('email')
+                if member.user.phone != member.phone:
+                    member.user.phone = member.phone
+                    update_fields.append('phone')
+
+                # Sync role and company
+                if role and member.user.role != role:
+                    member.user.role = role
+                    update_fields.append('role')
+                if member.user.company != company:
+                    member.user.company = company
+                    update_fields.append('company')
+
+                if update_fields:
+                    member.user.save(update_fields=update_fields)
 
             messages.success(
                 request,
@@ -681,11 +708,30 @@ def member_edit(request, pk):
 
             m.save()
 
-            # 3. Update User Role & Password (if provided)
+            # 3. Update User Role, Details & Password
             if m.user:
                 update_fields = []
                 role = form.cleaned_data.get('role')
 
+                # 👇 NEW: Sync Name, Email, and Phone from Member to User
+                names = m.full_name.split(' ', 1)
+                first_name = names[0]
+                last_name = names[1] if len(names) > 1 else ''
+
+                if m.user.first_name != first_name:
+                    m.user.first_name = first_name
+                    update_fields.append('first_name')
+                if m.user.last_name != last_name:
+                    m.user.last_name = last_name
+                    update_fields.append('last_name')
+                if m.user.email != m.email:
+                    m.user.email = m.email
+                    update_fields.append('email')
+                if m.user.phone != m.phone:
+                    m.user.phone = m.phone
+                    update_fields.append('phone')
+
+                # Role & Company
                 if role and m.user.role != role:
                     m.user.role = role
                     update_fields.append('role')

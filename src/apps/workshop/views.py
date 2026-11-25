@@ -19,7 +19,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from apps.accounts.models import User
-from apps.company.models import Branch
+from apps.companies.models import Branch
 
 from .forms import (
     JobMaterialForm,

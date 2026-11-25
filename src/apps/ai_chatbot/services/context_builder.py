@@ -43,7 +43,7 @@ def build_context(request):
     branches_info = ""
     if company:
         try:
-            from apps.company.models import Branch
+            from apps.companies.models import Branch
             branches = Branch.objects.filter(company=company, is_active=True)
             if branches.exists():
                 branches_info = "\nBRANCHES (live from database — use this, do not guess):\n"

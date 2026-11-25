@@ -61,7 +61,7 @@ def send_message(request):
     # fetch the DB right now and inject it as a system fact.
     branch_keywords = ['branch', 'branches', 'location', 'locations', 'nairobi', 'eldoret', 'store', 'shop']
     if any(kw in user_text.lower() for kw in branch_keywords) and company:
-        from apps.company.models import Branch
+        from apps.companies.models import Branch
         branches = Branch.objects.filter(company=company, is_active=True)
         
         if branches.exists():

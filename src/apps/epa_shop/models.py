@@ -109,7 +109,7 @@ class Category(models.Model):
         ('parts', 'Parts & Components'),
     )
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='epa_categories')
-    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='categories', null=True, blank=True)
+    branch = models.ForeignKey('companies.Branch', on_delete=models.CASCADE, related_name='categories', null=True, blank=True)
     name = models.CharField(max_length=100)
     category_type = models.CharField(max_length=20, choices=CATEGORY_TYPES)
     description = models.TextField(blank=True)
@@ -157,7 +157,7 @@ class Supplier(models.Model):
 
 class Owner(models.Model):
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='epa_owners')
-    branch = models.ForeignKey('company.Branch', on_delete=models.SET_NULL, null=True, blank=True, related_name='owners')
+    branch = models.ForeignKey('companies.Branch', on_delete=models.SET_NULL, null=True, blank=True, related_name='owners')
     name = models.CharField(max_length=200)
     phone = models.CharField(max_length=20, db_index=True)
     email = models.EmailField(blank=True)
@@ -343,7 +343,7 @@ class ProductImage(models.Model):
 
 class BranchStock(models.Model):
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='branch_stocks')
-    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='branch_stocks')
+    branch = models.ForeignKey('companies.Branch', on_delete=models.CASCADE, related_name='branch_stocks')
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField(db_index=True)
     product = GenericForeignKey('content_type', 'object_id')
@@ -375,11 +375,11 @@ class StockTransfer(models.Model):
         Company, on_delete=models.CASCADE, related_name='stock_transfers'
     )
     from_branch = models.ForeignKey(
-        'company.Branch', on_delete=models.CASCADE,
+        'companies.Branch', on_delete=models.CASCADE,
         related_name='stock_transfers_from'
     )
     to_branch = models.ForeignKey(
-        'company.Branch', on_delete=models.CASCADE,
+        'companies.Branch', on_delete=models.CASCADE,
         related_name='stock_transfers_to'
     )
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
@@ -677,7 +677,7 @@ class DiscontinuedProduct(models.Model):
         Company, on_delete=models.CASCADE, related_name='discontinued_products'
     )
     branch = models.ForeignKey(
-        'company.Branch', on_delete=models.SET_NULL, null=True, blank=True,
+        'companies.Branch', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='discontinued_products',
         help_text="Optional: only discontinue for this branch.",
     )
@@ -773,7 +773,7 @@ class Unit(models.Model):
 
     phone = models.ForeignKey(Phone, on_delete=models.CASCADE, null=True, blank=True, related_name='units')
     electronic = models.ForeignKey(Electronic, on_delete=models.CASCADE, null=True, blank=True, related_name='units')
-    branch = models.ForeignKey('company.Branch', on_delete=models.SET_NULL, null=True, blank=True, related_name='units')
+    branch = models.ForeignKey('companies.Branch', on_delete=models.SET_NULL, null=True, blank=True, related_name='units')
 
     identifier = models.CharField(max_length=100, unique=True, db_index=True)
     unit_type = models.CharField(max_length=20, choices=UNIT_TYPES, default='imei')
@@ -809,7 +809,7 @@ class Sale(models.Model):
     PAYMENT_METHOD = (('cash', 'Cash'), ('m-pesa', 'M-Pesa'), ('bank_transfer', 'Bank Transfer'), ('card', 'Card'), ('credit', 'Credit'))
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='epa_sales')
-    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='sales')
+    branch = models.ForeignKey('companies.Branch', on_delete=models.CASCADE, related_name='sales')
     customer = models.ForeignKey('Customer', on_delete=models.SET_NULL, null=True, blank=True, related_name='sales')
 
     sale_number = models.PositiveIntegerField(default=1, editable=False)
@@ -950,7 +950,7 @@ class ReturnItem(models.Model):
 class StockMovement(models.Model):
     MOVEMENT_TYPES = (('purchase', 'Purchase Order'), ('sale', 'Sale'), ('return', 'Return'), ('adjustment', 'Adjustment'), ('transfer', 'Branch Transfer'), ('damage', 'Damaged/Write-off'))
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='stock_movements')
-    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='stock_movements', null=True, blank=True)
+    branch = models.ForeignKey('companies.Branch', on_delete=models.CASCADE, related_name='stock_movements', null=True, blank=True)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField(db_index=True)
     product = GenericForeignKey('content_type', 'object_id')
@@ -1000,7 +1000,7 @@ class StockMovement(models.Model):
 class PurchaseOrder(models.Model):
     STATUS_CHOICES = (('draft', 'Draft'), ('ordered', 'Ordered'), ('received', 'Received'), ('partially_received', 'Partially Received'), ('cancelled', 'Cancelled'))
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='purchase_orders')
-    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='purchase_orders')
+    branch = models.ForeignKey('companies.Branch', on_delete=models.CASCADE, related_name='purchase_orders')
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, related_name='purchase_orders')
     order_number = models.CharField(max_length=50, unique=True)
     order_date = models.DateField(default=timezone.now)
@@ -1044,7 +1044,7 @@ class PurchaseOrderItem(models.Model):
 class Warranty(models.Model):
     STATUS_CHOICES = (('active', 'Active'), ('expired', 'Expired'), ('claimed', 'Claimed'), ('void', 'Void'))
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='warranties')
-    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='warranties')
+    branch = models.ForeignKey('companies.Branch', on_delete=models.CASCADE, related_name='warranties')
     sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name='warranties', null=True, blank=True)
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='warranties')
 
@@ -1076,7 +1076,7 @@ class Warranty(models.Model):
 class Repair(models.Model):
     STATUS_CHOICES = (('pending', 'Pending'), ('in_progress', 'In Progress'), ('completed', 'Completed'), ('cancelled', 'Cancelled'), ('waiting_parts', 'Waiting for Parts'))
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='repairs')
-    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='repairs')
+    branch = models.ForeignKey('companies.Branch', on_delete=models.CASCADE, related_name='repairs')
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='repairs')
     warranty = models.ForeignKey(Warranty, on_delete=models.SET_NULL, null=True, blank=True, related_name='repairs')
 
@@ -1119,7 +1119,7 @@ class COGSAccount(models.Model):
         ('product', 'Product Category Account'),
     )
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='cogs_accounts')
-    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='cogs_accounts', null=True, blank=True)
+    branch = models.ForeignKey('companies.Branch', on_delete=models.CASCADE, related_name='cogs_accounts', null=True, blank=True)
     account_name = models.CharField(max_length=200)
     account_code = models.CharField(max_length=50, unique=True)
     account_type = models.CharField(max_length=20, choices=ACCOUNT_TYPES, default='main')
@@ -1172,7 +1172,7 @@ class COGSAccount(models.Model):
 class COGSTransaction(models.Model):
     TRANSACTION_TYPES = (('credit', 'Credit (From Sales)'), ('debit', 'Debit (Used for Purchases)'), ('adjustment', 'Adjustment'), ('transfer', 'Transfer'))
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='cogs_transactions')
-    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='cogs_transactions', null=True, blank=True)
+    branch = models.ForeignKey('companies.Branch', on_delete=models.CASCADE, related_name='cogs_transactions', null=True, blank=True)
     cogs_account = models.ForeignKey(COGSAccount, on_delete=models.CASCADE, related_name='transactions')
     transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES)
     amount = models.DecimalField(max_digits=15, decimal_places=2)
@@ -1194,7 +1194,7 @@ class PurchaseRecord(models.Model):
     PURCHASE_TYPES = (('inventory', 'Inventory Purchase'), ('supplies', 'Supplies'), ('equipment', 'Equipment'), ('maintenance', 'Maintenance'), ('other', 'Other'))
     PAYMENT_METHODS = (('cash', 'Cash'), ('bank_transfer', 'Bank Transfer'), ('m-pesa', 'M-Pesa'), ('cheque', 'Cheque'), ('credit', 'Credit'))
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='purchase_records')
-    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='purchase_records')
+    branch = models.ForeignKey('companies.Branch', on_delete=models.CASCADE, related_name='purchase_records')
     cogs_account = models.ForeignKey(COGSAccount, on_delete=models.SET_NULL, null=True, blank=True, related_name='purchases')
     cogs_transaction = models.ForeignKey(COGSTransaction, on_delete=models.SET_NULL, null=True, blank=True, related_name='purchase_record')
     purchase_number = models.CharField(max_length=50, unique=True)
@@ -1253,7 +1253,7 @@ class PurchaseRecord(models.Model):
 
 class COGSAllocationRule(models.Model):
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='cogs_rules')
-    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='cogs_rules', null=True, blank=True)
+    branch = models.ForeignKey('companies.Branch', on_delete=models.CASCADE, related_name='cogs_rules', null=True, blank=True)
     rule_name = models.CharField(max_length=200)
     is_active = models.BooleanField(default=True)
     electronics_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=100)
@@ -1276,7 +1276,7 @@ class COGSAllocationRule(models.Model):
 class COGSSummary(models.Model):
     PERIOD_TYPES = (('daily', 'Daily'), ('weekly', 'Weekly'), ('monthly', 'Monthly'), ('quarterly', 'Quarterly'), ('yearly', 'Yearly'))
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='cogs_summaries')
-    branch = models.ForeignKey('company.Branch', on_delete=models.CASCADE, related_name='cogs_summaries', null=True, blank=True)
+    branch = models.ForeignKey('companies.Branch', on_delete=models.CASCADE, related_name='cogs_summaries', null=True, blank=True)
     cogs_account = models.ForeignKey(COGSAccount, on_delete=models.CASCADE, related_name='summaries')
     period_type = models.CharField(max_length=20, choices=PERIOD_TYPES)
     period_start = models.DateField()

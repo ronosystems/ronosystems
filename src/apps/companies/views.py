@@ -162,3 +162,63 @@ class BusinessTypeDetailView(APIView):
             return Response({'error': 'Business type not found'}, status=status.HTTP_404_NOT_FOUND)
         business_type.delete()
         return Response({'message': 'Business type deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+
+# ============================================
+# COMPANY SETTINGS - Recreated after deleting apps/company/settings_views.py
+# ============================================
+def get_company_settings(company):
+    """
+    Returns dict ya settings za company.
+    Inajaribu kusoma kutoka kwa:
+    1. CompanySettings model kama ipo
+    2. Fields zilizopo kwenye Company model yenyewe
+    3. Defaults kama hakuna chochote
+    """
+    defaults = {
+        'receipt': {
+            'receipt_header': '',
+            'receipt_footer': '',
+            'receipt_format': 'standard',
+            'show_logo': True,
+            'show_company_details': True,
+            'show_customer_details': True,
+            'show_items': True,
+            'show_totals': True,
+            'show_payment': True,
+            'show_signature': True,
+            'receipt_title': 'RECEIPT',
+            'thank_you_message': 'Thank you for your business!',
+            'include_barcode': False,
+            'print_copies': 1,
+            'auto_print': False,
+            'receipt_font_size': '14',
+            'receipt_width': '80',
+            'custom_css': '',
+        },
+        'general': {},
+        'notifications': {},
+    }
+    if not company:
+        return defaults
+
+    # 1. Jaribu CompanySettings model kama ipo kwenye models.py
+    try:
+        from apps.companies.models import CompanySettings
+        obj = CompanySettings.objects.filter(company=company).first()
+        if obj:
+            for key in defaults['receipt']:
+                if hasattr(obj, key):
+                    defaults['receipt'][key] = getattr(obj, key)
+            return defaults
+    except Exception:
+        pass
+
+    # 2. Jaribu fields kwenye Company model yenyewe
+    try:
+        for key in list(defaults['receipt'].keys()):
+            if hasattr(company, key):
+                defaults['receipt'][key] = getattr(company, key)
+    except Exception:
+        pass
+
+    return defaults

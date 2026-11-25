@@ -245,7 +245,7 @@ class Flock(models.Model):
         related_name='kuku_flocks',
     )
     branch = models.ForeignKey(
-        'company.Branch',
+        'companies.Branch',
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_flocks',
@@ -403,7 +403,7 @@ class BirdSale(models.Model):
         related_name='kuku_bird_sales',
     )
     branch = models.ForeignKey(
-        'company.Branch',
+        'companies.Branch',
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_bird_sales',
@@ -528,7 +528,7 @@ class EggProduction(models.Model):
         related_name='kuku_egg_production',
     )
     branch = models.ForeignKey(
-        'company.Branch',
+        'companies.Branch',
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_egg_production',
@@ -599,7 +599,7 @@ class Customer(models.Model):
     )
     # ── NEW: which branch this customer belongs to ──
     branch = models.ForeignKey(
-        'company.Branch',
+        'companies.Branch',
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_customers',
@@ -656,7 +656,7 @@ class EggSale(models.Model):
         related_name='kuku_egg_sales',
     )
     branch = models.ForeignKey(
-        'company.Branch',
+        'companies.Branch',
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_egg_sales',
@@ -987,7 +987,7 @@ class FeedRecord(models.Model):
         related_name='kuku_feed_records',
     )
     branch = models.ForeignKey(
-        'company.Branch',
+        'companies.Branch',
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_feed_records',
@@ -1238,7 +1238,7 @@ class FeedConsumption(models.Model):
         related_name='kuku_feed_consumption',
     )
     branch = models.ForeignKey(
-        'company.Branch',
+        'companies.Branch',
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_feed_consumption',
@@ -1462,7 +1462,7 @@ class HealthRecord(models.Model):
         related_name='kuku_health_records',
     )
     branch = models.ForeignKey(
-        'company.Branch',
+        'companies.Branch',
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_health_records',
@@ -1738,7 +1738,7 @@ class Mortality(models.Model):
         related_name='kuku_mortality',
     )
     branch = models.ForeignKey(
-        'company.Branch',
+        'companies.Branch',
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_mortality',
@@ -1879,7 +1879,7 @@ class Expense(models.Model):
         related_name='kuku_expenses',
     )
     branch = models.ForeignKey(
-        'company.Branch',
+        'companies.Branch',
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_expenses',
@@ -2000,7 +2000,7 @@ class InventoryItem(models.Model):
         related_name='kuku_inventory',
     )
     branch = models.ForeignKey(
-        'company.Branch',
+        'companies.Branch',
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='kuku_inventory',

@@ -1,30 +1,22 @@
-# apps/companies/middleware.py
-
 from django.conf import settings
 from django.shortcuts import redirect
 from django.urls import reverse, NoReverseMatch
 from django.contrib import messages
-from django.http import Http404
-
+from django.http import Http404, HttpResponseForbidden
 
 # ============================================
-# PATHS THAT BYPASS CUSTOM-DOMAIN RESOLUTION
+# PATHS THAT BYPASS TENANT RESOLUTION
 # ============================================
 BYPASS_DOMAIN_PREFIXES = (
-    '/payments/',        # KCB / M-Pesa callbacks + payment UI
-    '/mpesa/',           # 👈 NEW — M-Pesa STK push / status / confirm / callback
-    '/admin/',           # Django admin
-    '/static/',          # static assets
-    '/media/',           # user-uploaded media
-    # NOTE: '/auth/' is intentionally NOT bypassed so that login / register /
-    # password-reset pages on a custom domain render that tenant's branding
-    # (favicon, logo, colours). Platform hosts still bypass earlier, so
-    # /auth/ on ronosystems.onrender.com keeps showing platform branding.
-    '/api/support/',     # support-mode API
+    '/payments/',
+    '/mpesa/',
+    '/admin/',
+    '/static/',
+    '/media/',
+    '/api/support/',
     '/subscription-expired/',
-    '/plans/',           # plans list (super admin)
+    '/plans/',
 )
-
 
 # ============================================
 # PLATFORM HOSTS (never treated as tenant domains)
@@ -33,138 +25,192 @@ PLATFORM_HOSTS = frozenset({
     'ronosystems.com',
     'www.ronosystems.com',
     'ronosystems.onrender.com',
+    'www.ronosystems.onrender.com',
     'localhost',
     '127.0.0.1',
 })
 
-PLATFORM_HOST_SUFFIXES = (
-    '.onrender.com',
+# Hizi TU ndio platform roots. Subdomain ya hizi ndio tenant.
+# 'kalyet.ronosystems.com' -> tenant
+# 'ronosystems.onrender.com' -> platform (iko kwenye PLATFORM_HOSTS)
+PLATFORM_ROOTS = (
+    'ronosystems.com',
+    'ronosystems.onrender.com',
+    'localhost',
 )
-
 
 # ============================================
 # CSRF TRUSTED ORIGINS — runtime cache
 # ============================================
-# Custom domains arrive at runtime and can't be pre-listed in settings.
-# We append them to CSRF_TRUSTED_ORIGINS lazily. This set avoids re-scanning
-# the full list on every request (which is what `if origin not in list` does).
 _RUNTIME_TRUSTED_ORIGINS = set()
 
-
 def _trust_csrf_origin(origin: str) -> None:
-    """Register `origin` as a trusted CSRF origin (idempotent, cached)."""
     if origin in _RUNTIME_TRUSTED_ORIGINS:
         return
     if origin not in settings.CSRF_TRUSTED_ORIGINS:
         settings.CSRF_TRUSTED_ORIGINS.append(origin)
     _RUNTIME_TRUSTED_ORIGINS.add(origin)
 
-
 class CustomDomainMiddleware:
+    """
+    THE tenant resolver. Runs first.
+    Reads Host -> finds Company via Company.find_by_domain()
+    Sets: request.tenant, request.company (alias), request.tenant_company (alias)
+    """
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
         host = request.get_host().split(':')[0].lower()
 
+        # Default: no tenant
+        request.tenant = None
+        request.company = None
+        request.tenant_company = None
+        request.current_company = None
+
         # ------------------------------------------------------------
-        # BYPASS 1: Paths that never resolve a tenant company
+        # BYPASS 1: Paths that never resolve a tenant
         # ------------------------------------------------------------
         if any(request.path_info.startswith(p) for p in BYPASS_DOMAIN_PREFIXES):
-            request.company = None
-            request.tenant_company = None
-            request.current_company = None
             return self.get_response(request)
 
         # ------------------------------------------------------------
-        # BYPASS 2: Platform's own hosts
+        # BYPASS 2: Platform's own hosts - ronosystems.com, localhost
         # ------------------------------------------------------------
-        if host in PLATFORM_HOSTS or host.endswith(PLATFORM_HOST_SUFFIXES):
-            request.company = None
-            request.tenant_company = None
-            request.current_company = None
+        if host in PLATFORM_HOSTS:
             return self.get_response(request)
 
         # ------------------------------------------------------------
-        # Resolve company by custom domain
+        # Resolve company by domain / subdomain
         # ------------------------------------------------------------
         from apps.companies.models import Company
 
-        # 1. Strip '.localhost' for local testing (e.g., fieldmax.localhost -> fieldmax)
+        # Local testing: kalyet.localhost -> kalyet
         is_local_test = host.endswith('.localhost')
         lookup_host = host.replace('.localhost', '') if is_local_test else host
 
-        # 2. Try exact match on custom_domain field
+        # Hii ndio inashughulikia zote:
+        # 1. kalyet.co.ke (custom_domain)
+        # 2. kalyet.ronosystems.com (subdomain)
+        # 3. kalyet.ronosystems.onrender.com (staging subdomain)
         company = Company.find_by_domain(lookup_host, require_verified=not is_local_test)
 
-        # 3. If no domain match, dynamically search by company name (substring match)
-        if not company:
-            # 'fieldmax' will match 'FIELDMAX SHOP'
-            company = Company.objects.filter(name__icontains=lookup_host).first()
+        # ===== FIX: FALLBACK KWA SUBDOMAIN (LOCAL TESTING) =====
+        # Company haina field 'slug', ina 'subdomain'
+        # fieldmax.localhost -> lookup_host = 'fieldmax'
+        # find_by_domain('fieldmax') -> None (kwa sababu custom_domain ni fieldmax.shop)
+        # Kwa hiyo jaribu subdomain moja kwa moja
+        if company is None and is_local_test:
+            company = Company.objects.filter(subdomain=lookup_host).first()
+            if company is None:
+                company = Company.objects.filter(name__iexact=lookup_host).first()
+        # ===== MWISHO WA FIX =====
 
+        # ===== FIX 2: FALLBACK KWA PLATFORM SUBDOMAIN =====
+        # kalyet.ronosystems.com -> lookup_host = kalyet.ronosystems.com
+        # Kama find_by_domain imeshindwa, jaribu kuchukua subdomain
+        # kabla ya '.' ya kwanza na kutafuta kwa subdomain
+        if company is None and not is_local_test:
+            # Kama ni subdomain ya platform root
+            for root in PLATFORM_ROOTS:
+                if root == 'localhost':
+                    continue
+                suffix = '.' + root
+                if lookup_host.endswith(suffix):
+                    sub = lookup_host[:-len(suffix)]  # kalyet
+                    # Kama bado kuna dot, ni subdomain ya subdomain - chukua ya kwanza
+                    sub = sub.split('.')[0]
+                    company = Company.objects.filter(subdomain=sub).first()
+                    if company:
+                        break
+        # ===== MWISHO WA FIX 2 =====
+
+        # KAMA HAKUNA COMPANY - USI-FALLBACK KWA name__icontains (ni security hole)
+        # Kama host ni subdomain ya platform lakini company haipo -> 404
+        # Kama host ni custom domain isiyojulikana -> 404
         if company is None:
+            # Kama ni subdomain ya platform lakini haipo, onyesha 404 safi
+            is_platform_subdomain = any(
+                lookup_host.endswith('.' + root) for root in PLATFORM_ROOTS
+            )
+            # Kwa local test, fieldmax.localhost pia ni platform subdomain
+            if is_local_test:
+                is_platform_subdomain = True
+            if is_platform_subdomain:
+                raise Http404(f"No company registered for this domain: {host}")
+            # Custom domain isiyojulikana - pia 404, usimpeleke kwa company nyingine
+            # Ila kwa paths kama /auth/ kwenye domain isiyojulikana, turuhusu
+            # login page ya platform ionekane badala ya kuvunja
+            if request.path_info.startswith('/auth/'):
+                return self.get_response(request)
             raise Http404(f"No company registered for this domain: {host}")
 
-        request.current_company = company
+        # Tenant amepatikana
+        request.tenant = company
         request.company = company
         request.tenant_company = company
+        request.current_company = company
+        # Session kwa ajili ya code ya zamani inayosoma session
+        request.session['current_tenant_id'] = company.id
 
         # Trust CSRF
         _trust_csrf_origin(f"https://{host}")
         _trust_csrf_origin(f"http://{host}")
 
+        # ------------------------------------------------------------
+        # SECURITY: Kama user amelogin, ana Membership kwenye hii tenant?
+        # ------------------------------------------------------------
+        user = getattr(request, 'user', None)
+        if user and user.is_authenticated and not user.is_superuser:
+            # Support mode - super admin anaangalia company
+            if request.session.get('support_mode'):
+                return self.get_response(request)
+            # Check membership
+            try:
+                has_access = user.memberships.filter(tenant=company, status='active').exists()
+                # Fallback kwa code ya zamani: kama user bado ana user.company
+                if not has_access:
+                    legacy_company = getattr(user, 'company', None)
+                    if legacy_company and legacy_company.id == company.id:
+                        has_access = True
+                if not has_access:
+                    # Ana-try kuingia kwenye biashara si yake
+                    return HttpResponseForbidden(
+                        "You don't belong to this business. "
+                        f"Go to your own domain. You are trying to access {company.name}."
+                    )
+            except Exception:
+                # Kama membership table bado haija-migrate, usivunje request
+                pass
+
         return self.get_response(request)
 
-        
+# Alias - ili settings zako za zamani zenye 'TenantMiddleware' zifanye kazi
+TenantMiddleware = CustomDomainMiddleware
 
 # ============================================
 # URL names that remain accessible when subscription is expired
 # ============================================
 EXEMPT_URL_NAMES = {
-    'login',
-    'logout',
-    'register',
-    'forgot-password',
-    'reset-password',
+    'login', 'logout', 'register', 'forgot-password', 'reset-password',
     'subscription-expired',
-    'company-payments',
-    'company-payments-initiate',
-    'company-payments-status',
-    'company-payments-callback',
-    'company-payments-dev-confirm',
-    'kcb-callback',
-    'mpesa-callback',
+    'company-payments', 'company-payments-initiate', 'company-payments-status',
+    'company-payments-callback', 'company-payments-dev-confirm',
+    'kcb-callback', 'mpesa-callback',
 }
 
-
-# ============================================
-# Path prefixes that bypass subscription-expiry check
-# ============================================
 EXEMPT_URL_PREFIXES = (
-    '/admin/',
-    '/static/',
-    '/media/',
-    '/auth/',
-    '/api/support/',
-    '/subscription-expired/',
-    '/payments/',        # covers /payments/kcb/callback/
-    '/plans/',
+    '/admin/', '/static/', '/media/', '/auth/',
+    '/api/support/', '/subscription-expired/',
+    '/payments/', '/plans/',
 )
-
 
 class SubscriptionExpiryMiddleware:
     """
     Blocks requests from users whose company subscription has expired.
-
-    Exemptions:
-      - Anonymous users
-      - Superusers
-      - Support-mode sessions (super admin impersonating a company)
-      - Users with no company attached
-      - Exempt URL prefixes (admin, static, media, auth, support API, payments)
-      - Exempt URL names (login, logout, expired page, payment endpoints, callbacks)
+    Uses request.tenant (from CustomDomainMiddleware) - NOT user.company
     """
-
     def __init__(self, get_response):
         self.get_response = get_response
 
@@ -191,35 +237,28 @@ class SubscriptionExpiryMiddleware:
         except Exception:
             pass
 
-        # Resolve current company.
-        # Prefer custom-domain-resolved company, then support-mode company,
-        # then the user's own company.
+        # Resolve company: PREFER request.tenant from CustomDomainMiddleware
         company = (
-            getattr(request, 'company', None)
+            getattr(request, 'tenant', None)
+            or getattr(request, 'company', None)
             or getattr(request, 'tenant_company', None)
-            or getattr(request.user, 'company', None)
         )
         if company is None:
+            # Kwenye main domain (ronosystems.com) hakuna tenant - ruhusu
+            # User ataona list ya biashara zake
             return self.get_response(request)
 
-        allowed, reason = company.can_access_system()
-
-        # 7. Check if the company is allowed to access the system
+        # FIXED: ulikuwa unaita can_access_system() mara 2
         allowed, reason = company.can_access_system()
 
         if not allowed:
-            # Lazy auto-expire: flip status once, so admin list shows reality
             try:
                 company.mark_subscription_expired()
             except Exception:
                 pass
 
-            # Show a safe, user-friendly message (do NOT leak `reason`)
-            messages.error(
-                request,
-                "Your subscription has expired. Please renew to regain access."
-            )
-            
+            messages.error(request, "Your subscription has expired. Please renew to regain access.")
+
             try:
                 return redirect('subscription-expired')
             except NoReverseMatch:

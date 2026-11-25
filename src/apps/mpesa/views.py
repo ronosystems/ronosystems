@@ -26,7 +26,7 @@ def _company_for_request(request):
 def _branch_for_request(request, branch_id):
     if not branch_id:
         return None
-    from apps.company.models import Branch
+    from apps.companies.models import Branch
     company = _company_for_request(request)
     if not company:
         return None
