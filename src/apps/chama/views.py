@@ -12,20 +12,18 @@ import cloudinary
 import cloudinary.uploader
 from apps.companies.models import Company
 from functools import wraps
-from django.http import HttpResponseForbidden
 from django.utils import timezone
 from datetime import datetime
-import json
 from decimal import Decimal, InvalidOperation
 from django.http import JsonResponse
 from .forms import (
     MemberForm, MembershipTypeForm,
     SavingsForm, ContributionForm, FineForm,
-    SelfServiceContributionForm, 
-    LoanTypeForm, LoanForm, SelfServiceLoanForm, LoanRepaymentForm,
-    MeetingForm, AttendanceForm, AnnouncementForm,
-    AccountForm, TransactionForm, ExpenseForm, ProjectForm,
-    CommitteeForm, CommitteeMemberForm, GuestForm,
+    LoanTypeForm, 
+    LoanForm, SelfServiceLoanForm, LoanRepaymentForm, MeetingForm,
+    AttendanceForm, AnnouncementForm, AccountForm,
+    TransactionForm, ExpenseForm, ProjectForm, CommitteeForm,
+    CommitteeMemberForm, GuestForm,
 )
 
 from .models import (
@@ -934,7 +932,7 @@ def registration_reject(request, pk):
 
 @login_required
 def committee_list(request):
-    company = _get_company(request)
+    _get_company(request)
     qs = _company_queryset(request, Committee).order_by('name')
     
     is_officer = request.user.role in [
@@ -1016,7 +1014,7 @@ def committee_member_remove(request, pk, member_pk):
 # ============================================================
 @login_required
 def project_list(request):
-    company = _get_company(request)
+    _get_company(request)
     qs = _company_queryset(request, Project).order_by('-start_date')
     return render(request, 'chama/project_list.html', {
         'projects': qs,
@@ -1040,7 +1038,7 @@ def project_create(request):
 
 @login_required
 def meeting_list(request):
-    company = _get_company(request)
+    _get_company(request)
     qs = _company_queryset(request, Meeting).order_by('-scheduled_for')
     
     is_officer = request.user.role in [
@@ -1151,7 +1149,7 @@ def attendance_create(request, meeting_pk):
 
 @login_required
 def announcement_list(request):
-    company = _get_company(request)
+    _get_company(request)
     qs = _company_queryset(request, Announcement).order_by('-created_at')
     
     is_officer = request.user.role in [
@@ -1957,7 +1955,7 @@ def check_internal_loan_eligibility(member):
 
 @login_required
 def loan_type_list(request):
-    company = _get_company(request)
+    _get_company(request)
     qs = _company_queryset(request, LoanType).order_by('name')
     return render(request, 'chama/loan_type_list.html', {
         'loan_types': qs,
@@ -2927,7 +2925,7 @@ def member_loan_limit_adjust(request, member_pk):
 # ============================================================
 @login_required
 def account_list(request):
-    company = _get_company(request)
+    _get_company(request)
     qs = _company_queryset(request, Account).order_by('name')
     
     # Calculate totals for the summary cards
@@ -3306,7 +3304,7 @@ def transaction_create(request):
 
 @login_required
 def expense_list(request):
-    company = _get_company(request)
+    _get_company(request)
     qs = _company_queryset(request, Expense).select_related('account').order_by('-date')
     total_expenses = qs.aggregate(t=Sum('amount'))['t'] or 0
     

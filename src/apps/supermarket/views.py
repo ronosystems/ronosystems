@@ -1,21 +1,19 @@
-from rest_framework import generics, status
+from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from django.db.models import Sum, Count, F, Q
+from django.db.models import Sum, F
 from django.utils import timezone
 from datetime import timedelta
 
 from .models import (
-    Category, Supplier, Product, PriceHistory, Inventory,
-    PurchaseOrder, PurchaseOrderItem, Sale, SaleItem,
-    Customer, Discount, ShelfLocation
+    Category, Supplier, Product, Inventory, PurchaseOrder,
+    Sale, Customer, Discount
 )
 from .serializers import (
     CategorySerializer, SupplierSerializer, ProductSerializer,
-    InventorySerializer, PurchaseOrderSerializer, PurchaseOrderItemSerializer,
-    SaleSerializer, SaleItemSerializer, CustomerSerializer,
-    DiscountSerializer, ShelfLocationSerializer
+    InventorySerializer, PurchaseOrderSerializer, SaleSerializer,
+    CustomerSerializer, DiscountSerializer
 )
 from apps.accounts.permissions import IsCompanyAdmin
 

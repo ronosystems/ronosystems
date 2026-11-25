@@ -2,7 +2,6 @@ from django import forms
 from django.contrib.auth import get_user_model
 import datetime
 from django import forms
-from django.utils import timezone
 from .models import Member, MembershipType
 from .models import (
     MembershipType, Member,

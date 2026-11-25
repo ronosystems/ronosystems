@@ -7,7 +7,6 @@ from django.utils import timezone
 from django.http import JsonResponse
 from decimal import Decimal
 
-from apps.companies.models import Company
 from apps.companies.support_utils import get_active_company
 from apps.companies.models import Branch
 from .models import LossReturn

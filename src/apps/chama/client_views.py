@@ -3,13 +3,12 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.db.models import Sum
-from django.db import models
 from django.utils import timezone
 from apps.customers.models import Customer
 from apps.companies.models import Company
 import json
 from decimal import Decimal, InvalidOperation
-from apps.chama.models import Loan, Guest
+from apps.chama.models import Loan
 
 
 

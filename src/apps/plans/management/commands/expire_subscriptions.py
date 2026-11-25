@@ -6,7 +6,6 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from apps.plans.models import Subscription
-from apps.companies.models import Company
 
 
 class Command(BaseCommand):

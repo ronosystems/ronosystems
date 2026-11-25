@@ -10,8 +10,6 @@ from django.utils.text import slugify
 from apps.companies.business_types import (
     BusinessTypeEnum,
     BUSINESS_TYPE_CHOICES,
-    BUSINESS_TYPE_SLUGS,
-    BUSINESS_TYPE_APPS,
 )
 
 # ============================================

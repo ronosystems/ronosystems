@@ -6,16 +6,13 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.hashers import make_password
 from django.conf import settings
-from django.db.models import Q
 from django.utils.safestring import mark_safe
 from decimal import Decimal
 from apps.companies.models import Company
 from apps.chama.models import Loan, LoanType, Guest 
 from .models import Customer
-from datetime import date
 from apps.cart_orders.models import Order
 
-from django.utils import timezone
 import time
 import cloudinary
 import cloudinary.uploader

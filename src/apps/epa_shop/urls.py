@@ -1,6 +1,5 @@
 from django.urls import path
 from . import views
-from . import product_views
 
 app_name = 'epa_shop_api'
 

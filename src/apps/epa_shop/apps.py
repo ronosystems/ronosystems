@@ -6,4 +6,4 @@ class EpaShopConfig(AppConfig):
     verbose_name = 'EPA Shop'
 
     def ready(self):
-        import apps.epa_shop.signals
+        pass

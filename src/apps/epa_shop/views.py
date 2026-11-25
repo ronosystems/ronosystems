@@ -2,25 +2,23 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from django.db.models import Sum, Count, F, Q
+from django.db.models import Sum, F, Q
 from django.utils import timezone
 from datetime import timedelta
-from django.contrib.contenttypes.models import ContentType
 
 from apps.companies.models import Branch
 from .models import (
     Category, Electronic, Phone, Accessory, 
-    Sale, SaleItem, Customer, Supplier,
-    StockMovement, PurchaseOrder, PurchaseOrderItem,
-    Warranty, Repair
+    Sale, Customer, Supplier, StockMovement,
+    PurchaseOrder, Warranty, Repair
 )
 from .serializers import (
     CategorySerializer, ElectronicSerializer, PhoneSerializer,
     AccessorySerializer, SaleSerializer, SaleCreateSerializer,
-    SaleItemSerializer, CustomerSerializer, BranchSerializer,
-    BranchDetailSerializer, SupplierSerializer, StockMovementSerializer,
-    StockMovementCreateSerializer, PurchaseOrderSerializer,
-    PurchaseOrderItemSerializer, WarrantySerializer, RepairSerializer
+    CustomerSerializer, BranchSerializer, BranchDetailSerializer,
+    SupplierSerializer, StockMovementSerializer, StockMovementCreateSerializer,
+    PurchaseOrderSerializer, WarrantySerializer,
+    RepairSerializer
 )
 from apps.accounts.permissions import IsCompanyAdmin
 

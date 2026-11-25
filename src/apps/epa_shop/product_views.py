@@ -1,16 +1,13 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.core.files.storage import default_storage
-from django.core.files.base import ContentFile
-from django.db.models import Q, Count, Sum, F
+from django.db.models import Q, F
 from decimal import Decimal
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.http import JsonResponse, HttpResponse, Http404
-from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
 from apps.companies.models import Branch
-from .models import Electronic, Phone, Accessory, DiscontinuedProduct, Category, Supplier, Unit, Sale, SaleItem, Customer, Owner, ProductImage
+from .models import Electronic, Phone, Accessory, DiscontinuedProduct, Category, Unit, Sale, SaleItem, Owner, ProductImage
 from django.contrib.auth import get_user_model
 from .utils import record_stock_movement
 from django.db import transaction
@@ -18,17 +15,12 @@ from django.views.decorators.http import require_POST
 from django.contrib.contenttypes.models import ContentType
 from apps.companies.support_utils import (
     get_active_company,
-    is_support_mode,
-    is_effective_admin,
-    get_effective_branch,
 )
 import json
-import os
 import time
 import cloudinary
 import cloudinary.uploader
 from django.conf import settings
-import csv
 import openpyxl
 from openpyxl.styles import Font, PatternFill
 
@@ -1587,8 +1579,6 @@ def product_create(request):
         if user_branch:
             branches = branches.filter(id=user_branch.id)
 
-    form_data = {}
-    category_value = ''
     units_json = '[]'
     units = []
 

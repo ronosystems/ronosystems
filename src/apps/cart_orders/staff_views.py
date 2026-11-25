@@ -174,7 +174,6 @@ def mark_order_followed_up(request, order_id):
 def confirm_order(request, order_id):
     from apps.epa_shop.models import Sale, SaleItem, Customer, BranchStock, Unit
     from apps.epa_shop.sale_views import _snapshot_cogs
-    from apps.epa_shop.utils import record_stock_movement
 
     company = _get_company(request)
     order = Order.objects.filter(id=order_id, company=company).first()

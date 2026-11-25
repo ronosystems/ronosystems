@@ -1,4 +1,3 @@
-from decimal import Decimal
 from django.utils import timezone
 from django.db import transaction
 from apps.companies.models import Branch
@@ -398,7 +397,7 @@ def generate_company_treasury_report(company, start_date=None, end_date=None):
     """
     Generate a treasury report for a company
     """
-    from django.db.models import Sum, Avg, Count, Q
+    from django.db.models import Sum, Avg
     
     if not start_date:
         start_date = timezone.now().date().replace(day=1)

@@ -10,7 +10,7 @@ from functools import wraps
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Sum, Count, Q, F
+from django.db.models import Sum, Count, F
 from django.utils import timezone
 from datetime import timedelta
 from django.http import JsonResponse
@@ -29,14 +29,9 @@ from .models import (
     INVENTORY_ITEM_TYPE_CHOICES,
     EGG_UNIT_CHOICES,
     TRAY_SIZE_CHOICES,
-    FEED_RECORD_TYPE_CHOICES,
-    FEED_PAYMENT_STATUS_CHOICES,
-    HEALTH_RECORD_TYPE_CHOICES,         
-    HEALTH_ITEM_KIND_CHOICES,               
-    HEALTH_ADMIN_METHOD_CHOICES,            
-    HEALTH_PAYMENT_STATUS_CHOICES, 
-    MORTALITY_CAUSE_CHOICES,   
-    EXPENSE_CATEGORY_CHOICES,  
+    HEALTH_ITEM_KIND_CHOICES,
+    MORTALITY_CAUSE_CHOICES,
+    EXPENSE_CATEGORY_CHOICES,         
     EXPENSE_PAYMENT_METHOD_CHOICES,      
 )
 import time
@@ -497,7 +492,6 @@ def dashboard(request):
     # HQ: sees all branches, can filter via ?branch=X
     # Mother branch user: sees mother + children
     # Shop user: sees only their own branch
-    from apps.companies.support_utils import get_active_company
 
     if is_hq:
         branches = Branch.objects.filter(
@@ -934,7 +928,7 @@ def reports(request):
         paid=Sum('amount_paid'),
     )
     other_cost = expense_agg['total'] or 0
-    other_cost_paid = expense_agg['paid'] or 0
+    expense_agg['paid'] or 0
 
     # Per-category breakdown (bills, salaries/labour, maintenance, etc.)
     expense_by_category = []
@@ -3107,7 +3101,7 @@ def feed_list(request):
 
     user_branch = _user_branch(request)
     is_hq = _is_hq_user(request, is_viewing_company)
-    is_shop = _is_shop_user(request)
+    _is_shop_user(request)
 
     if is_hq:
         branches = Branch.objects.filter(company=company, is_active=True).order_by('name')

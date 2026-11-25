@@ -1,11 +1,11 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
-from django.db.models import Sum, Count, Q
+from django.db.models import Sum, Count
 from django.utils import timezone
 from datetime import datetime, timedelta
 from apps.companies.models import Company
-from apps.plans.models import Plan, Subscription
+from apps.plans.models import Subscription
 from django.contrib.auth import get_user_model
 
 User = get_user_model()

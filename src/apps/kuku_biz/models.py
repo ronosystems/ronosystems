@@ -1812,7 +1812,7 @@ class Mortality(models.Model):
     # Save / delete — keep flock count in sync
     # ------------------------------------------------------------
     def save(self, *args, **kwargs):
-        is_new = self.pk is None
+        self.pk is None
 
         # Auto-fill branch from flock
         if not self.branch_id and self.flock_id:

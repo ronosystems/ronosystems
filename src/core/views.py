@@ -5,21 +5,15 @@ from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.core.mail import send_mail
-from django.templatetags.static import static
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
-from django.views.decorators.cache import never_cache
-from apps.epa_shop.storefront import get_epa_products
 from apps.companies.business_types import BusinessTypeEnum
 from django.contrib.auth.decorators import login_required
-from apps.companies.models import ContactMessage, Gallery
+from apps.companies.models import ContactMessage
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
-from apps.epa_shop.models import BranchStock
-from apps.treasury.models import DailyRecord
-from django.db.models import F
 from apps.settings.models import SystemSetting
 from datetime import datetime
 
@@ -585,7 +579,6 @@ def manifest_view(request):
     from apps.companies.models import Company
     from django.templatetags.static import static
     from django.http import JsonResponse
-    from django.conf import settings
     
     try:
         from apps.settings.models import SystemSetting
@@ -835,7 +828,7 @@ def super_admin_dashboard(request):
         return redirect('dashboard-router')
 
     from django.utils import timezone
-    from django.db.models import Count, Sum, Q
+    from django.db.models import Count
     from datetime import timedelta
 
     now = timezone.now()

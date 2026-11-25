@@ -1,6 +1,5 @@
 # apps/company/context_processors.py
 
-from django.utils import timezone
 
 
 def company_context(request):

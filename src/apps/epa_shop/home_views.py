@@ -2,10 +2,8 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.contenttypes.models import ContentType
-from django.utils import timezone
 from django.http import JsonResponse
 from django.db.models import Q
-import json
 
 # ✅ CRITICAL: Import all models needed
 from apps.epa_shop.models import (
@@ -16,7 +14,6 @@ from apps.epa_shop.models import (
     ProductImage
 )
 
-from apps.epa_shop.cloudinary_utils import _upload_product_image_to_cloudinary
 
 
 @login_required

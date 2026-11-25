@@ -4,7 +4,6 @@ import uuid
 from django.db import models
 from django.conf import settings
 from django.core.validators import RegexValidator
-from django.utils import timezone
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 

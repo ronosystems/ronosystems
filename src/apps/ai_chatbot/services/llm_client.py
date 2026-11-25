@@ -1,5 +1,3 @@
-import os
-import json
 import logging
 from django.conf import settings
 
@@ -37,7 +35,7 @@ class LLMClient:
 
         try:
             resp = self.client.chat.completions.create(**kwargs)
-        except Exception as e:
+        except Exception:
             logger.exception("LLM call failed")
             return {'content': "Sorry, I hit a snag. Please try again.",
                     'tool_calls': [], 'tokens': 0}

@@ -152,7 +152,7 @@ class KopokopoProvider(BaseProvider):
         overall_status = (attributes.get('status') or '').lower()
         
         event = attributes.get('event', {})
-        event_type = event.get('type', '')
+        event.get('type', '')
         
         # 👈 The resource holds all the payment details
         resource = event.get('resource') or {}

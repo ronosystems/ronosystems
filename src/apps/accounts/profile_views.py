@@ -1,8 +1,7 @@
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
-from django.contrib.auth.forms import PasswordChangeForm
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth import logout
@@ -64,7 +63,7 @@ def profile_view(request):
             if updated:
                 user.save()
                 
-    except Exception as e:
+    except Exception:
         pass
 
     context = {

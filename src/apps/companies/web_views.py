@@ -543,7 +543,7 @@ def reject_company_application(request, app_id):
     application = get_object_or_404(CompanyApplication, id=app_id)
 
     if request.method == 'POST':
-        reason = (request.POST.get('reason') or '').strip()
+        (request.POST.get('reason') or '').strip()
         application.status = 'rejected'
         application.save(update_fields=['status'])
         messages.success(request, f"Application from '{application.company_name}' rejected.")
@@ -1580,8 +1580,8 @@ def company_payments_initiate(request, pk):
 
         plan_id = payload.get('plan_id')
         phone = (payload.get('phone') or '').strip()
-        first_name = (payload.get('first_name') or request.user.first_name or 'Customer').strip()
-        last_name = (payload.get('last_name') or request.user.last_name or '').strip()
+        (payload.get('first_name') or request.user.first_name or 'Customer').strip()
+        (payload.get('last_name') or request.user.last_name or '').strip()
 
         if not plan_id or not phone:
             return JsonResponse(

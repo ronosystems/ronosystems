@@ -1,9 +1,9 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Sum, Count, Q
+from django.db.models import Sum, Q
 from django.utils import timezone
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse
 from django.conf import settings as django_settings
 from datetime import datetime, timedelta, date
 from decimal import Decimal, InvalidOperation
@@ -14,19 +14,14 @@ import time
 import cloudinary
 import cloudinary.uploader
 
-from apps.companies.models import Company
 from apps.companies.models import Expense
 from apps.companies.support_utils import (
     get_active_company,
-    is_support_mode,
-    is_effective_admin,
-    get_effective_branch,
 )
 from apps.companies.models import Branch
 from .models import (
-    Sale, SaleItem, PurchaseOrder,
-    COGSAccount, COGSTransaction, PurchaseRecord,
-    COGSAllocationRule, COGSSummary
+    Sale, COGSAccount, COGSTransaction,
+    PurchaseRecord
 )
 from apps.treasury.models import MpesaCommission
 

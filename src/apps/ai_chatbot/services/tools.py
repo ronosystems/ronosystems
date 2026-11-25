@@ -3,9 +3,8 @@ import inspect
 from django.db.models import Q, Sum
 from django.urls import reverse
 
-from apps.epa_shop.models import Phone, Electronic, Accessory, BranchStock, ProductImage
-from apps.supermarket.models import Product as SMProduct
-from apps.kuku_biz.models import Flock, EggProduction
+from apps.epa_shop.models import Phone, Electronic, Accessory, ProductImage
+from apps.kuku_biz.models import Flock
 from apps.chama.models import Savings, Loan
 from apps.companies.models import Branch
 

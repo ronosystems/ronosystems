@@ -7,19 +7,15 @@ from django.utils import timezone
 from django.http import JsonResponse
 from django.db import transaction
 from apps.companies.models import Branch
-from .models import Phone, Electronic, Accessory, Category, Unit, Sale, SaleItem, Customer, Owner, ReturnItem
+from .models import Phone, Electronic, Accessory, Unit, Sale, SaleItem, Customer, Owner, ReturnItem
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from .utils import record_stock_movement
 from decimal import Decimal
 from decimal import Decimal, ROUND_HALF_UP
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from apps.companies.views import get_company_settings
 from apps.companies.support_utils import (
     get_active_company,
-    is_support_mode,
-    is_effective_admin,
-    get_effective_branch,
 )
 import json
 from datetime import timedelta

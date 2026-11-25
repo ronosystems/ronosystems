@@ -2,7 +2,6 @@ from django.conf import settings
 from django.conf import settings as django_settings
 from django.db import models
 from django.utils import timezone
-from django.urls import reverse
 
 
 # ============================================================

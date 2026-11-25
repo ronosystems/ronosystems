@@ -1,13 +1,12 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Sum, Avg, Q
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.db.models import Sum
+from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.utils import timezone
 from django.db import transaction
 from decimal import Decimal
-import json
 import csv
 from django.http import HttpResponse
 
@@ -16,9 +15,8 @@ from apps.companies.models import Branch
 from .models import (
     Treasury, BankAccount, MpesaAccount, DailyRecord, 
     DailyBankBalance, DailyMpesaBalance, Movement, 
-    TreasurySummary, TreasuryTransactionLog, MpesaCommission
+    TreasuryTransactionLog, MpesaCommission
 )
-from .utils import create_boost_movement, create_transfer_movement, create_daily_record, update_daily_balances
 
 # ============================================
 # HELPER FUNCTIONS - User Role Checks

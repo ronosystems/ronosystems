@@ -1,22 +1,17 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Sum, Count, Q
-from django.utils import timezone
+from django.db.models import Q
 from .models import (
-    Electronic, Phone, Accessory, Category,
-    Sale, SaleItem, Customer, StockMovement, Supplier,
+    Electronic, Phone, Accessory, StockMovement,
     Unit, StockTransfer,
 )
 from apps.companies.support_utils import (
     get_active_company,
-    is_support_mode,
-    is_effective_admin,
     get_effective_branch,
 )
 from apps.companies.models import Branch
 from django.contrib.auth import get_user_model
-from .product_views import get_or_create_owner_from_user
 from django.db import transaction
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST

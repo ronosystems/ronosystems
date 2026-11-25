@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Sum, Count, F, Q
+from django.db.models import Sum, Q
 from django.utils import timezone
 from datetime import timedelta, date
 from .models import Electronic, Phone, Accessory, Sale, Unit, SaleItem, Owner

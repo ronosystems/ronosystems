@@ -1,8 +1,8 @@
 from rest_framework import serializers
 from .models import (
-    Category, Supplier, Product, PriceHistory, Inventory,
-    PurchaseOrder, PurchaseOrderItem, Sale, SaleItem,
-    Customer, Discount, ShelfLocation
+    Category, Supplier, Product, Inventory, PurchaseOrder,
+    PurchaseOrderItem, Sale, SaleItem, Customer,
+    Discount, ShelfLocation
 )
 
 class CategorySerializer(serializers.ModelSerializer):

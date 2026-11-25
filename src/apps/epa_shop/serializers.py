@@ -1,5 +1,4 @@
 from rest_framework import serializers
-from django.contrib.contenttypes.models import ContentType
 from apps.companies.models import Branch
 from .models import (
     Category, Electronic, Phone, Accessory,

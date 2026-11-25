@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.shortcuts import redirect
-from django.urls import reverse, NoReverseMatch
+from django.urls import NoReverseMatch
 from django.contrib import messages
 from django.http import Http404, HttpResponseForbidden
 

@@ -1,4 +1,3 @@
-from apps.companies.business_types import BusinessTypeEnum
 from . import epa_shop, supermarket, kuku_biz, chama
 
 _PROMPTS = {

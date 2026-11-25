@@ -35,16 +35,12 @@ from .forms import (
 from .models import (
     JobMaterial,
     JobPayment,
-    JobNote,
-    RepairCategory,
     TechnicianPayout,
     TechnicianRate,
     WorkshopCustomer,
     WorkshopJob,
 )
 from .permissions import (
-    WORKSHOP_ROLES,
-    user_has_workshop_access,
     workshop_required,
 )
 

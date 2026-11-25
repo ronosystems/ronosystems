@@ -338,7 +338,7 @@ def total_notifications_count(request):
     # 3. Low Stock - OPTIMIZED: usifanye loop kwa kila product
     if company and role in ('company_admin', 'admin', 'stock_controller', 'super_admin'):
         try:
-            from apps.epa_shop.models import Phone, Electronic, Accessory, Unit
+            from apps.epa_shop.models import Phone, Electronic, Accessory
             from django.db.models import Count, Q
             # Count phones with <=5 available units using annotate - 1 query badala ya N queries
             low_phones = Phone.objects.filter(company=company, is_active=True).annotate(

@@ -2,17 +2,13 @@ from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from apps.companies.models import Branch
-from .models import Phone, Electronic, Accessory, Unit, BranchStock
+from .models import Phone, Electronic, Accessory, Unit
 from django.db.models import Q
 from django.http import JsonResponse
 from apps.companies.views import get_company_settings
 from apps.companies.support_utils import (
     get_active_company,
-    is_support_mode,
-    is_effective_admin,
-    get_effective_branch,
 )
-import json
 
 
 # ============================================

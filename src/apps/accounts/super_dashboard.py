@@ -5,7 +5,7 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.utils import timezone
 from datetime import timedelta
-from django.db.models import Count, Sum, Q
+from django.db.models import Count, Q
 
 from apps.companies.models import Company
 from apps.plans.models import Plan, Subscription

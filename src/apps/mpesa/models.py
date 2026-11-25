@@ -3,7 +3,6 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.utils import timezone
 
 from apps.companies.models import Company
 

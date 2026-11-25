@@ -1,6 +1,5 @@
 from django.contrib.admin import AdminSite
 from django.shortcuts import redirect
-from django.contrib import messages
 
 
 class RestrictedAdminSite(AdminSite):

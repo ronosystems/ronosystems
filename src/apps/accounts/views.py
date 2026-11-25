@@ -18,9 +18,8 @@ from .serializers import (
     UserPasswordResetSerializer
 )
 from .permissions import (
-    IsSuperAdmin, IsCompanyAdmin, IsAdminOrManager,
-    IsSuperAdminOrCompanyAdmin, HasCompanyAccess,
-    IsSameCompany, IsSameBranch, CanManageUsers
+    IsSuperAdmin, IsAdminOrManager, IsSuperAdminOrCompanyAdmin,
+    HasCompanyAccess, IsSameCompany
 )
 
 User = get_user_model()

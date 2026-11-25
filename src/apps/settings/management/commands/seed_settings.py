@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from apps.settings.views import _ensure_schema_rows, SETTINGS_SCHEMA
+from apps.settings.views import _ensure_schema_rows
 from apps.settings.models import SystemSetting
 
 
