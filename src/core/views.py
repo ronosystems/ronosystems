@@ -1,12 +1,9 @@
 import os
-import base64
 from django.conf import settings
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.core.mail import send_mail
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding
 from apps.companies.business_types import BusinessTypeEnum
 from django.contrib.auth.decorators import login_required
 from apps.companies.models import ContactMessage
@@ -117,36 +114,6 @@ def no_session(view_func):
         response = view_func(request, *args, **kwargs)
         return response
     return wrapper
-
-# ============================================
-# QZ TRAY SIGNING
-# ============================================
-
-def qz_sign(request):
-    """
-    Sign QZ Tray print requests so the browser doesn't get the
-    'Untrusted website' prompt.
-    """
-    if request.method != 'POST':
-        return JsonResponse({'error': 'POST required'}, status=405)
-
-    message = request.body.decode('utf-8')
-    key_path = os.path.join(settings.BASE_DIR, 'qz_keys', 'private.key')
-    
-    try:
-        with open(key_path, 'rb') as f:
-            private_key = serialization.load_pem_private_key(f.read(), password=None)
-
-        signature = private_key.sign(
-            message.encode('utf-8'),
-            padding.PKCS1v15(),
-            hashes.SHA512(),
-        )
-        return JsonResponse({
-            'signature': base64.b64encode(signature).decode('ascii')
-        })
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
 
 # ============================================
 # PUBLIC PAGES
