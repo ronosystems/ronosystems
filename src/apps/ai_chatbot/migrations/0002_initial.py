@@ -4,7 +4,6 @@ import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
 
-
 class Migration(migrations.Migration):
 
     initial = True
@@ -16,27 +15,33 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='chatsession',
-            name='company',
-            field=models.ForeignKey(blank=True, help_text='Null = system-level chat (public site).', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='ai_chat_sessions', to='companies.company'),
-        ),
-        migrations.AddField(
-            model_name='chatsession',
-            name='user',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='ai_chat_sessions', to=settings.AUTH_USER_MODEL),
-        ),
-        migrations.AddField(
-            model_name='chatmessage',
-            name='session',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='messages', to='ai_chatbot.chatsession'),
-        ),
-        migrations.AddIndex(
-            model_name='chatsession',
-            index=models.Index(fields=['company', 'user'], name='ai_chatbot__company_45eede_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='chatsession',
-            index=models.Index(fields=['session_key'], name='ai_chatbot__session_22574c_idx'),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AddField(
+                    model_name='chatsession',
+                    name='company',
+                    field=models.ForeignKey(blank=True, help_text='Null = system-level chat (public site).', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='ai_chat_sessions', to='companies.company'),
+                ),
+                migrations.AddField(
+                    model_name='chatsession',
+                    name='user',
+                    field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='ai_chat_sessions', to=settings.AUTH_USER_MODEL),
+                ),
+                migrations.AddField(
+                    model_name='chatmessage',
+                    name='session',
+                    field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='messages', to='ai_chatbot.chatsession'),
+                ),
+                migrations.AddIndex(
+                    model_name='chatsession',
+                    index=models.Index(fields=['company', 'user'], name='ai_chatbot__company_45eede_idx'),
+                ),
+                migrations.AddIndex(
+                    model_name='chatsession',
+                    index=models.Index(fields=['session_key'], name='ai_chatbot__session_22574c_idx'),
+                ),
+            ],
+            # Columns already exist in production DB (created manually)
+            database_operations=[],
         ),
     ]
