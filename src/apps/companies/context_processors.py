@@ -22,7 +22,7 @@ def _get_effective_company(request):
     """
     1. Support mode (Super Admin anaangalia company nyingine)
     2. request.tenant (kutoka kwa domain - kalyet.ronosystems.com)
-    3. Hakuna tena user.company - imefutwa
+    3. NEW: Membership ya user aliye-login (kwa main domain kama ronosystems.onrender.com)
     """
     cached = getattr(request, '_effective_company', False)
     if cached is not False:
@@ -42,13 +42,38 @@ def _get_effective_company(request):
     if company is None:
         company = getattr(request, 'tenant', None)
 
-    # 3. Fallback kwa backwards compat - kama middleware haijaweka tenant
-    # lakini request.company ipo (code ya zamani)
+    # 3. Fallback kwa backwards compat
     if company is None:
         company = getattr(request, 'company', None)
 
+    # 4. NEW: Kama bado hakuna company, tumia Membership ya user
+    # Hii ndio inafanya logo ya Chan ionekane kwenye ronosystems.onrender.com
+    # Super Admin HARUHUSIWI hapa - yeye anaona branding ya System
+    if company is None and user and user.is_authenticated:
+        if not _is_super_admin(user):
+            try:
+                # Kama session ina tenant ya zamani na user ni member wake, itumie
+                last_tenant_id = request.session.get('current_tenant_id')
+                if last_tenant_id:
+                    m = user.memberships.filter(
+                        tenant_id=last_tenant_id, status='active'
+                    ).select_related('tenant').first()
+                    if m and m.tenant:
+                        company = m.tenant
+
+                # Kama hakuna, chukua membership ya kwanza active
+                if company is None:
+                    m = user.memberships.filter(
+                        status='active'
+                    ).select_related('tenant').first()
+                    if m and m.tenant:
+                        company = m.tenant
+            except Exception:
+                pass
+
     request._effective_company = company
     return company
+
 
 def _get_user_role_in_company(user, company):
     """
@@ -66,6 +91,7 @@ def _get_user_role_in_company(user, company):
         return getattr(user, 'role', None)
     except Exception:
         return getattr(user, 'role', None)
+
 
 def _is_super_admin(user):
     if not user or not user.is_authenticated:
