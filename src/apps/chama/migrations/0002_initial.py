@@ -16,6 +16,8 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
         migrations.AddField(
             model_name='account',
             name='company',
@@ -244,5 +246,9 @@ class Migration(migrations.Migration):
         migrations.AlterUniqueTogether(
             name='membershiptype',
             unique_together={('company', 'name')},
+        ),
+            ],
+            # Columns already exist in production DB (created manually)
+            database_operations=[],
         ),
     ]

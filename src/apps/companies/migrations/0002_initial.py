@@ -16,6 +16,8 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
         migrations.AddField(
             model_name='company',
             name='plan',
@@ -175,5 +177,9 @@ class Migration(migrations.Migration):
         migrations.AddIndex(
             model_name='tenantfeedback',
             index=models.Index(fields=['feedback_type', 'status'], name='rono_tenant_feedbac_b1d07c_idx'),
+        ),
+            ],
+            # Columns already exist in production DB (created manually)
+            database_operations=[],
         ),
     ]

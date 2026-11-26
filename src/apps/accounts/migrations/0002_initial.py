@@ -16,6 +16,8 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
         migrations.AddField(
             model_name='user',
             name='branch',
@@ -59,5 +61,9 @@ class Migration(migrations.Migration):
         migrations.AddConstraint(
             model_name='membership',
             constraint=models.UniqueConstraint(fields=('user', 'company'), name='unique_user_company_membership'),
+        ),
+            ],
+            # Columns already exist in production DB (created manually)
+            database_operations=[],
         ),
     ]
