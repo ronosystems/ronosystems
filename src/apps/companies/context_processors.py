@@ -204,7 +204,7 @@ def receipt_settings_context(request):
     settings_dict = None
     if company is not None:
         try:
-            from apps.companies.views import get_company_settings
+            from apps.companies.settings_views import get_company_settings
             settings_dict = get_company_settings(company).get('receipt', {})
         except Exception:
             settings_dict = None
