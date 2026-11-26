@@ -2,7 +2,6 @@
 
 from django.db import migrations, models
 
-
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -10,10 +9,17 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='membership',
-            name='company_username',
-            field=models.CharField(blank=True, help_text='Auto-generated unique username for this specific company.', max_length=50, null=True, unique=True),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AddField(
+                    model_name='membership',
+                    name='company_username',
+                    field=models.CharField(blank=True, help_text='Auto-generated unique username for this specific company.', max_length=50, null=True, unique=True),
+                ),
+            ],
+            # Column already exists in production DB (created manually)
+            # so don't try to ADD COLUMN again
+            database_operations=[],
         ),
         migrations.AlterField(
             model_name='user',
