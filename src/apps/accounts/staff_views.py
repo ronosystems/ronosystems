@@ -19,19 +19,34 @@ from apps.companies.models import Branch
 from .models import User, Membership
 
 
+
 @login_required
 def staff_list(request):
     """
     READ: List all staff members for the active company.
+
+    Customer sio staff - ana page yake ya Customers.
+    Kwa hiyo Customer / Guest / Super Admin hawaonekani hapa,
+    hata kama wana Membership kwenye hii company.
     """
     company, is_viewing_company = get_active_company(request)
     if not company:
         messages.error(request, "No active company selected.")
         return redirect('/dashboard/')
 
+    # Roles ambazo sio staff - ziko na page zao wenyewe
+    NON_STAFF_ROLES = ['customer', 'guest', 'super_admin']
+
     # Get all active memberships for this company
+    # 1. Ondoa Membership zenye role ya customer/guest
+    # 2. Ondoa pia kama User mwenyewe ni customer (kwa usalama, kama
+    #    Membership role ilikuwa company_staff lakini User.role ni customer)
     memberships = Membership.objects.filter(
         company=company, is_active=True
+    ).exclude(
+        role__in=NON_STAFF_ROLES
+    ).exclude(
+        user__role__in=NON_STAFF_ROLES
     ).select_related('user', 'branch').order_by('-created_at')
 
     # Search functionality
