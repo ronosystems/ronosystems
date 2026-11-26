@@ -162,8 +162,8 @@ def company_branding_context(request):
         'system_name': DEFAULT_SYSTEM_NAME,
         'site_primary_color': DEFAULT_PRIMARY_COLOR,
         'site_accent_color': DEFAULT_ACCENT_COLOR,
-        'CLOUDINARY_CLOUD_NAME': getattr(django_settings, 'CLOUDINARY_STORAGE', {}).get('CLOUD_NAME', ''),
-        'CLOUDINARY_UNSIGNED_PRESET': getattr(django_settings, 'CLOUDINARY_STORAGE', {}).get('UNSIGNED_PRESET', ''),
+        'CLOUDINARY_CLOUD_NAME': getattr(settings, 'CLOUDINARY_STORAGE', {}).get('CLOUD_NAME', ''),
+        'CLOUDINARY_UNSIGNED_PRESET': getattr(settings, 'CLOUDINARY_STORAGE', {}).get('UNSIGNED_PRESET', ''),
     }
 
     if company is None:
