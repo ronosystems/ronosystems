@@ -3,7 +3,6 @@
 import django.db.models.deletion
 from django.db import migrations, models
 
-
 class Migration(migrations.Migration):
 
     initial = True
@@ -14,14 +13,19 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='order',
-            name='branch',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='cart_orders', to='companies.branch'),
-        ),
-        migrations.AddField(
-            model_name='order',
-            name='company',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='cart_orders', to='companies.company'),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AddField(
+                    model_name='order',
+                    name='branch',
+                    field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='cart_orders', to='companies.branch'),
+                ),
+                migrations.AddField(
+                    model_name='order',
+                    name='company',
+                    field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='cart_orders', to='companies.company'),
+                ),
+            ],
+            database_operations=[],
         ),
     ]

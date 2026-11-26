@@ -3,7 +3,6 @@
 import django.db.models.deletion
 from django.db import migrations, models
 
-
 class Migration(migrations.Migration):
 
     initial = True
@@ -15,35 +14,40 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='order',
-            name='sale',
-            field=models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='source_order', to='epa_shop.sale'),
-        ),
-        migrations.AddField(
-            model_name='orderitem',
-            name='content_type',
-            field=models.ForeignKey(limit_choices_to={'app_label': 'epa_shop', 'model__in': ['phone', 'electronic', 'accessory']}, on_delete=django.db.models.deletion.CASCADE, to='contenttypes.contenttype'),
-        ),
-        migrations.AddField(
-            model_name='orderitem',
-            name='order',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='items', to='cart_orders.order'),
-        ),
-        migrations.AddIndex(
-            model_name='order',
-            index=models.Index(fields=['company', 'status'], name='cart_orders_company_67ad76_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='order',
-            index=models.Index(fields=['company', 'customer_phone'], name='cart_orders_company_232228_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='order',
-            index=models.Index(fields=['order_number'], name='cart_orders_order_n_5042d1_idx'),
-        ),
-        migrations.AddIndex(
-            model_name='orderitem',
-            index=models.Index(fields=['content_type', 'object_id'], name='cart_order__content_c457f9_idx'),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AddField(
+                    model_name='order',
+                    name='sale',
+                    field=models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='source_order', to='epa_shop.sale'),
+                ),
+                migrations.AddField(
+                    model_name='orderitem',
+                    name='content_type',
+                    field=models.ForeignKey(limit_choices_to={'app_label': 'epa_shop', 'model__in': ['phone', 'electronic', 'accessory']}, on_delete=django.db.models.deletion.CASCADE, to='contenttypes.contenttype'),
+                ),
+                migrations.AddField(
+                    model_name='orderitem',
+                    name='order',
+                    field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='items', to='cart_orders.order'),
+                ),
+                migrations.AddIndex(
+                    model_name='order',
+                    index=models.Index(fields=['company', 'status'], name='cart_orders_company_67ad76_idx'),
+                ),
+                migrations.AddIndex(
+                    model_name='order',
+                    index=models.Index(fields=['company', 'customer_phone'], name='cart_orders_company_232228_idx'),
+                ),
+                migrations.AddIndex(
+                    model_name='order',
+                    index=models.Index(fields=['order_number'], name='cart_orders_order_n_5042d1_idx'),
+                ),
+                migrations.AddIndex(
+                    model_name='orderitem',
+                    index=models.Index(fields=['content_type', 'object_id'], name='cart_order__content_c457f9_idx'),
+                ),
+            ],
+            database_operations=[],
         ),
     ]
