@@ -1,4 +1,3 @@
-# apps/companies/context_processors.py
 """
 Context processors - Tenant-aware.
 All defensive: if no tenant, return safe defaults.
@@ -52,46 +51,46 @@ def _get_effective_company(request):
     if company is None and user and user.is_authenticated:
         if not _is_super_admin(user):
             try:
-                # Kama session ina tenant ya zamani na user ni member wake, itumie
+                # FIXED: Membership haina tenant/status - ina company/is_active
                 last_tenant_id = request.session.get('current_tenant_id')
                 if last_tenant_id:
                     m = user.memberships.filter(
-                        tenant_id=last_tenant_id, status='active'
-                    ).select_related('tenant').first()
-                    if m and m.tenant:
-                        company = m.tenant
+                        company_id=last_tenant_id, is_active=True
+                    ).select_related('company').first()
+                    if m and m.company:
+                        company = m.company
 
                 # Kama hakuna, chukua membership ya kwanza active
+                # Kipaumbele: is_primary kwanza, ndipo ya zamani zaidi
                 if company is None:
                     m = user.memberships.filter(
-                        status='active'
-                    ).select_related('tenant').first()
-                    if m and m.tenant:
-                        company = m.tenant
+                        is_active=True
+                    ).select_related('company').order_by('-is_primary', 'created_at').first()
+                    if m and m.company:
+                        company = m.company
             except Exception:
                 pass
 
     request._effective_company = company
     return company
 
-
 def _get_user_role_in_company(user, company):
     """
     Badala ya user.role, tunatafuta role yake KWENYE HIYO COMPANY.
     Mtu anaweza kuwa Manager hapa, Chairperson kwingine.
-    Returns: 'manager', 'chairperson', 'company_admin', etc au None
+    Returns: 'company_manager', 'chairperson', 'company_admin', etc au None
     """
     if not user or not user.is_authenticated or not company:
         return None
     try:
-        membership = user.memberships.filter(tenant=company, status='active').select_related('role').first()
+        # FIXED: company=, is_active=, role ni CharField (haina .slug, haina select_related)
+        membership = user.memberships.filter(company=company, is_active=True).first()
         if membership and membership.role:
-            return membership.role.slug  # manager, chairperson, treasurer
+            return membership.role
         # Fallback kwa code ya zamani kama bado una User.role
         return getattr(user, 'role', None)
     except Exception:
         return getattr(user, 'role', None)
-
 
 def _is_super_admin(user):
     if not user or not user.is_authenticated:
@@ -128,7 +127,7 @@ def pending_join_requests(request):
         company = _get_effective_company(request)
         if user.is_authenticated and company:
             role = _get_user_role_in_company(user, company)
-            if role in ('company_admin', 'admin', 'manager') or _is_super_admin(user):
+            if role in ('company_admin', 'admin', 'manager', 'company_manager') or _is_super_admin(user):
                 count = CompanyJoinRequest.objects.filter(company=company, status='pending').count()
     except Exception:
         count = 0
@@ -157,7 +156,6 @@ def support_mode_context(request):
 # ============================================
 def company_branding_context(request):
     company = _get_effective_company(request)
-    # is_custom_domain = True kama user yuko kwenye kalyet.co.ke
     is_custom_domain = False
     if company:
         host = request.get_host().split(':')[0].lower()
@@ -165,9 +163,9 @@ def company_branding_context(request):
             is_custom_domain = True
 
     ctx = {
-        'company': company,  # <- FIX: base.html inatumia company.id
+        'company': company,
         'current_company': company,
-        'current_tenant': company,  # alias kwa template mpya
+        'current_tenant': company,
         'is_custom_domain': is_custom_domain,
         'system_name': DEFAULT_SYSTEM_NAME,
         'site_primary_color': DEFAULT_PRIMARY_COLOR,
@@ -190,7 +188,6 @@ def company_branding_context(request):
     if company.system_name:
         ctx['system_name'] = company.system_name
 
-    # Role ya user kwenye hii company - kwa ajili ya template kuonyesha menu
     if request.user.is_authenticated:
         ctx['current_user_role'] = _get_user_role_in_company(request.user, company)
 
@@ -305,7 +302,7 @@ def unread_messages_count(request):
 
     company = _get_effective_company(request)
     role = _get_user_role_in_company(user, company) if company else getattr(user, 'role', '')
-    is_admin = _is_super_admin(user) or role in ('super_admin', 'company_admin', 'admin', 'manager')
+    is_admin = _is_super_admin(user) or role in ('super_admin', 'company_admin', 'admin', 'manager', 'company_manager')
 
     if not is_admin:
         return {'unread_messages_count': 0}
@@ -343,7 +340,7 @@ def total_notifications_count(request):
     role = _get_user_role_in_company(user, company) if company else getattr(user, 'role', '')
 
     # 1. Unread Messages
-    if role in ('company_admin', 'admin', 'manager', 'super_admin') or _is_super_admin(user):
+    if role in ('company_admin', 'admin', 'manager', 'company_manager', 'super_admin') or _is_super_admin(user):
         try:
             from apps.companies.models import ContactMessage
             if company:
@@ -354,19 +351,18 @@ def total_notifications_count(request):
             pass
 
     # 2. Pending Orders
-    if company and role in ('company_admin', 'admin', 'manager', 'super_admin'):
+    if company and role in ('company_admin', 'admin', 'manager', 'company_manager', 'super_admin'):
         try:
             from apps.cart_orders.models import Order
             total += Order.objects.filter(company=company, status='new').count()
         except Exception:
             pass
 
-    # 3. Low Stock - OPTIMIZED: usifanye loop kwa kila product
+    # 3. Low Stock
     if company and role in ('company_admin', 'admin', 'stock_controller', 'super_admin'):
         try:
             from apps.epa_shop.models import Phone, Electronic, Accessory
             from django.db.models import Count, Q
-            # Count phones with <=5 available units using annotate - 1 query badala ya N queries
             low_phones = Phone.objects.filter(company=company, is_active=True).annotate(
                 avail=Count('units', filter=Q(units__status='available'))
             ).filter(avail__lte=5).count()
