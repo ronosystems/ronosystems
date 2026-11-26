@@ -57,7 +57,7 @@ def calculate_tax(company, subtotal):
 
     If tax is disabled or rate is 0, returns (Decimal('0'), subtotal).
     """
-    from apps.companies.views import get_company_settings
+    from apps.companies.settings_views import get_company_settings
 
     try:
         company_settings = get_company_settings(company)
@@ -867,6 +867,12 @@ def sale_process_single(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+
+
+
+
+
+
 # ============================================
 # SALE RECEIPT
 # ============================================
@@ -901,7 +907,7 @@ def sale_receipt(request, pk):
 
     # Load receipt settings (merged with defaults) so the template
     # can honour every toggle from the Receipt Settings page.
-    from apps.companies.views import get_company_settings
+    from apps.companies.settings_views import get_company_settings
     company_settings = get_company_settings(company)
     receipt_settings = company_settings.get('receipt', {})
 
@@ -947,7 +953,7 @@ def sale_receipt_by_id(request, company_sale_id):
     items = sale.items.all()
 
     # Load receipt settings (merged with defaults)
-    from apps.companies.views import get_company_settings
+    from apps.companies.settings_views import get_company_settings
     company_settings = get_company_settings(company)
     receipt_settings = company_settings.get('receipt', {})
 
@@ -963,6 +969,13 @@ def sale_receipt_by_id(request, company_sale_id):
         'is_receipt': True,
     }
     return render(request, 'epa_shop/sale_receipt.html', context)
+
+
+
+
+
+
+
 
 
 # ============================================

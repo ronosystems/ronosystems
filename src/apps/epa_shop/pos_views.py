@@ -5,7 +5,7 @@ from apps.companies.models import Branch
 from .models import Phone, Electronic, Accessory, Unit
 from django.db.models import Q
 from django.http import JsonResponse
-from apps.companies.views import get_company_settings
+from apps.companies.settings_views import get_company_settings
 from apps.companies.support_utils import (
     get_active_company,
 )

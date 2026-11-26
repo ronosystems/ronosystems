@@ -1,330 +1,127 @@
-{% extends 'base.html' %}
-
-{% block title %}All Users - Super Admin{% endblock %}
-
-{% block extra_css %}
-<style>
-    /* ... KEEP ALL YOUR EXISTING CSS EXACTLY AS IS ... */
-    .table-excel { border-collapse: collapse; width: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    .table-excel th, .table-excel td { border: 1px solid #000000 !important; padding: 8px 12px; vertical-align: middle; }
-    .table-excel thead th { background-color: #ff4757 !important; color: #ffffff !important; font-weight: 600; border-bottom: 2px solid #000000 !important; position: sticky; top: 0; z-index: 10; }
-    .table-excel tbody td { background-color: #ffffff; color: #000000; }
-    .table-excel tbody tr:hover td { background-color: #f5f5f5; }
-    .table-excel tbody tr:nth-child(even) td { background-color: #f9f9f9; }
-    .stat-card { border: 2px solid #000000; border-radius: 4px; transition: transform 0.2s; }
-    .stat-card:hover { transform: translateY(-5px); }
-    .stat-card.bg-danger { background: #ff4757 !important; color: #ffffff !important; }
-    .stat-card.bg-success { background: #d4edda !important; color: #155724 !important; }
-    .stat-card.bg-primary { background: #87CEEB !important; color: #000000 !important; }
-    .stat-card.bg-info { background: #cce5ff !important; color: #004085 !important; }
-    .stat-card.bg-warning { background: #fff3cd !important; color: #856404 !important; }
-    .card { border: 2px solid #000000; border-radius: 4px; box-shadow: none; }
-    .card-footer { border-top: 2px solid #000000; background-color: #f8f9fa; }
-    .form-control, .form-select { border: 2px solid #000000; border-radius: 4px; color: #000000; }
-    .form-control:focus, .form-select:focus { border-color: #ff4757; box-shadow: 0 0 0 3px rgba(255,71,87,0.2); }
-    .input-group-text { border: 2px solid #000000; border-right: none; background: #f8f9fa; color: #000000; }
-    .input-group .form-control { border-left: none; }
-    .btn-danger { background-color: #ff4757; border: 2px solid #000000; color: #ffffff; border-radius: 4px; font-weight: 600; }
-    .btn-danger:hover { background-color: #e8414f; border-color: #000000; color: #ffffff; }
-    .btn-outline-info, .btn-outline-primary, .btn-outline-warning, .btn-outline-success, .btn-outline-danger, .btn-outline-secondary {
-        border: 2px solid #000000; border-radius: 4px; font-weight: 600; background: transparent;
-    }
-    .btn-outline-info { color: #000000; }
-    .btn-outline-info:hover { background: #87CEEB; color: #000000; }
-    .btn-outline-primary { color: #000000; }
-    .btn-outline-primary:hover { background: #87CEEB; color: #000000; }
-    .btn-outline-warning { color: #856404; }
-    .btn-outline-warning:hover { background: #ffc107; color: #000000; }
-    .btn-outline-success { color: #155724; }
-    .btn-outline-success:hover { background: #28a745; color: #ffffff; }
-    .btn-outline-danger { color: #dc3545; }
-    .btn-outline-danger:hover { background: #dc3545; color: #ffffff; }
-    .btn-outline-secondary { color: #000000; }
-    .btn-outline-secondary:hover { background: #87CEEB; color: #000000; }
-    .btn-sm { padding: 4px 12px; font-size: 12px; }
-    .avatar-sm { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #ff4757, #e8414f); display: flex; align-items: center; justify-content: center; color: #ffffff; font-weight: 700; flex-shrink: 0; border: 2px solid #000000; }
-    .badge { padding: 4px 10px; border-radius: 50px; font-size: 11px; font-weight: 600; border: 1px solid #000000; }
-    .badge.bg-success { background: #d4edda !important; color: #155724 !important; }
-    .badge.bg-danger { background: #f8d7da !important; color: #721c24 !important; }
-    .badge-role { padding: 5px 12px; border-radius: 50px; font-size: 12px; border: 1px solid #000000; color: white; display: inline-block; }
-    .badge-super_admin { background: #ff4757; }
-    .badge-company_admin { background: #2ed573; }
-    .badge-company_manager { background: #1e90ff; }
-    .badge-company_staff { background: #ffa502; }
-    .badge-cashier { background: #eccc68; color: #000000; }
-    .badge-technician { background: #a55eea; }
-    .badge-sales { background: #ff6b81; }
-    .badge-mpesa_agent { background: #00A651; }
-    .badge-customer { background: #57606f; }
-    .modal-content { border: 2px solid #000000; border-radius: 8px; }
-    .modal-header { border-bottom: 2px solid #000000; }
-    .modal-footer { border-top: 2px solid #000000; }
-
-    /* Popover Customization */
-    .company-popover { max-width: 300px; border: 2px solid #000 !important; border-radius: 6px; }
-    .company-popover .popover-header { background-color: #ff4757; color: #fff; font-weight: bold; border-bottom: 2px solid #000; }
-    .company-popover .popover-body { padding: 10px; }
-    .company-popover .company-list { list-style: none; padding: 0; margin: 0; }
-    .company-popover .company-list li { padding: 6px 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-    .company-popover .company-list li:last-child { border-bottom: none; }
-
-    @media (max-width: 768px) {
-        .table-excel th, .table-excel td { padding: 4px 6px; font-size: 11px; }
-        .btn-sm { font-size: 9px; padding: 2px 6px; }
-        .badge { font-size: 9px; padding: 2px 6px; }
-        .badge-role { font-size: 9px; padding: 3px 8px; }
-        .avatar-sm { width: 30px; height: 30px; font-size: 12px; }
-    }
-</style>
-{% endblock %}
+{% extends base_template %}
+{% load static %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
-        <!-- HEADER & STATS (Keep exactly as before) -->
-        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-            <div>
-                <h4 class="mb-0 fw-bold"><i class="fas fa-crown me-2" style="color: #ff4757;"></i> All Users - Super Admin</h4>
-                <small class="text-muted">Manage every user across all companies</small>
-            </div>
-            <a href="{% url 'accounts:user-create' %}" class="btn btn-danger">
-                <i class="fas fa-user-plus me-2"></i> Add User
-            </a>
+    <!-- HEADER - kama Customer page -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Staff</h1>
+            <p class="text-sm text-gray-500 mt-1">{{ memberships|length }} staff member{{ memberships|length|pluralize }} in {{ company.name }}</p>
         </div>
+        <a href="{% url 'accounts:staff_create' %}"
+           class="inline-flex items-center justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-sm transition">
+            <span class="mr-2">+</span> Add Staff
+        </a>
+    </div>
 
-        <div class="row mb-4 g-3">
-            <div class="col-md-3">
-                <div class="card stat-card bg-primary"><div class="card-body"><h3>{{ stats.total }}</h3><small>Total Users</small></div></div>
-            </div>
-            <div class="col-md-3">
-                <div class="card stat-card bg-danger"><div class="card-body"><h3>{{ stats.super_admins|default:0 }}</h3><small>Super Admins</small></div></div>
-            </div>
-            <div class="col-md-3">
-                <div class="card stat-card bg-info"><div class="card-body"><h3>{{ stats.company_admins|default:0 }}</h3><small>Company Admins</small></div></div>
-            </div>
-            <div class="col-md-3">
-                <div class="card stat-card bg-success"><div class="card-body"><h3>{{ stats.active|default:0 }}</h3><small>Active Users</small></div></div>
-            </div>
-        </div>
+    <!-- SEARCH + TABLE CARD - kama Customer page -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
 
-        <!-- FILTERS (Keep exactly as before) -->
-        <div class="card mb-4">
-            <div class="card-body">
-                <form method="get" class="row g-3">
-                    <div class="col-md-3">
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="fas fa-search"></i></span>
-                            <input type="text" class="form-control" name="search" value="{{ search }}" placeholder="Search name, email, phone...">
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <select class="form-select" name="company">
-                            <option value="">All Companies</option>
-                            {% for c in companies %}
-                            <option value="{{ c.id }}" {% if company_filter == c.id|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <select class="form-select" name="role">
-                            <option value="">All Roles</option>
-                            {% for value, label in roles %}
-                            <option value="{{ value }}" {% if role_filter == value %}selected{% endif %}>{{ label }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <select class="form-select" name="status">
-                            <option value="">All Status</option>
-                            <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
-                            <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 d-flex gap-2">
-                        <button type="submit" class="btn btn-danger flex-fill"><i class="fas fa-search me-1"></i> Filter</button>
-                        <a href="{% url 'accounts:user-list' %}" class="btn btn-outline-secondary" title="Clear"><i class="fas fa-times"></i></a>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- TABLE -->
-        <div class="card">
-            <div class="card-body p-0">
-                <div class="table-responsive" style="border: 2px solid #000000;">
-                    <table class="table-excel table-hover mb-0">
-                        <thead>
-                            <tr>
-                                <th style="width:4%;">#</th>
-                                <th style="width:20%;">User Profile</th>
-                                <th style="width:18%;">Email</th>
-                                <th style="width:18%;">Companies</th>
-                                <th style="width:14%;">Role</th>
-                                <th style="width:10%;">Status</th>
-                                <th style="width:18%;" class="text-center">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for u in users %}
-                            <tr>
-                                <td>{{ forloop.counter }}</td>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <div class="avatar-sm me-2">{{ u.first_name|default:u.username|make_list|first|upper }}</div>
-                                        <div>
-                                            <strong>{{ u.get_full_name|default:u.username }}</strong>
-                                            {% if u.staff_id %}<br><small style="color: #000000;">Staff ID: {{ u.staff_id }}</small>{% endif %}
-                                            <br><small class="text-muted">@{{ u.username }}</small>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td><i class="fas fa-envelope me-1"></i> {{ u.email }}</td>
-                                
-                                <!-- INTERACTIVE COMPANIES COLUMN -->
-                                <td>
-                                    {% with memberships=u.memberships.all %}
-                                        {% if memberships %}
-                                            {% if memberships|length == 1 %}
-                                                <!-- Only 1 company: just show the badge -->
-                                                <span class="badge" style="background:#cce5ff;color:#004085;">{{ memberships.0.company.name }}</span>
-                                            {% else %}
-                                                <!-- Multiple companies: Make it a clickable Popover -->
-                                                <button type="button" class="badge border-0" 
-                                                        style="background:#cce5ff;color:#004085;cursor:pointer; font-size:12px;"
-                                                        data-bs-toggle="popover" 
-                                                        data-bs-trigger="focus"
-                                                        data-bs-html="true"
-                                                        data-bs-title="Companies for {{ u.first_name }}"
-                                                        data-bs-content='<ul class="company-list">{% for m in memberships %}<li><span>{{ m.company.name }}</span> <span class="badge bg-dark" style="font-size:9px;">{{ m.get_role_display }}</span></li>{% endfor %}</ul>'>
-                                                    {{ memberships|length }} Companies <i class="fas fa-caret-down ms-1"></i>
-                                                </button>
-                                            {% endif %}
-                                        {% elif u.company %}
-                                            <span class="badge" style="background:#cce5ff;color:#004085;">{{ u.company.name }}</span>
-                                        {% else %}
-                                            <span class="badge" style="background:#f8d7da;color:#721c24;">No membership</span>
-                                        {% endif %}
-                                    {% endwith %}
-                                </td>
-
-                                <td>
-                                    {% if u.role %}
-                                        <span class="badge-role badge-{{ u.role }}">
-                                            {{ u.get_role_display|default:u.role|title }}
-                                        </span>
-                                    {% else %}
-                                        <!-- Fallback if user has no global role but has a membership role -->
-                                        {% with m=u.memberships.first %}
-                                            {% if m %}
-                                                <span class="badge-role badge-{{ m.role }}">
-                                                    {{ m.get_role_display|default:m.role|title }}
-                                                </span>
-                                            {% else %}
-                                                <span class="badge bg-secondary text-dark border-dark">No Role</span>
-                                            {% endif %}
-                                        {% endwith %}
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if u.is_active %}<span class="badge bg-success">Active</span>
-                                    {% else %}<span class="badge bg-danger">Inactive</span>{% endif %}
-                                </td>
-                                <td class="text-center">
-                                    <div class="btn-group btn-group-sm">
-                                        <a href="{% url 'accounts:user-detail' u.id %}" class="btn btn-outline-info" title="View"><i class="fas fa-eye"></i></a>
-                                        <a href="{% url 'accounts:user-edit' u.id %}" class="btn btn-outline-primary" title="Edit"><i class="fas fa-edit"></i></a>
-                                        <a href="{% url 'accounts:assign-company-admin' u.id %}" class="btn btn-outline-warning" title="Make Company Admin"><i class="fas fa-crown"></i></a>
-                                        <button type="button" class="btn btn-outline-{% if u.is_active %}warning{% else %}success{% endif %}"
-                                                data-bs-toggle="modal" data-bs-target="#toggleModal{{ u.id }}">
-                                            <i class="fas {% if u.is_active %}fa-user-slash{% else %}fa-user-check{% endif %}"></i>
-                                        </button>
-                                        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ u.id }}">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-
-                            <!-- MODAL TOGGLE -->
-                            <div class="modal fade" id="toggleModal{{ u.id }}" tabindex="-1" aria-hidden="true">
-                                <!-- Keep exactly as before -->
-                                <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
-                                    <div class="modal-header bg-light">
-                                        <h5 class="modal-title fw-bold">{% if u.is_active %}Deactivate{% else %}Activate{% endif %} User</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                    </div>
-                                    <div class="modal-body text-center py-4">
-                                        <i class="fas {% if u.is_active %}fa-user-slash text-warning{% else %}fa-user-check text-success{% endif %} mb-3" style="font-size: 3rem;"></i>
-                                        <p class="mb-0 fs-5">Are you sure you want to <strong>{% if u.is_active %}deactivate{% else %}activate{% endif %}</strong><br><strong>{{ u.get_full_name|default:u.username }}</strong>?</p>
-                                    </div>
-                                    <div class="modal-footer justify-content-center">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                        <form method="post" action="{% url 'accounts:user-toggle' u.id %}">
-                                            {% csrf_token %}
-                                            <button type="submit" class="btn btn-{% if u.is_active %}warning{% else %}success{% endif %}">Yes, {% if u.is_active %}Deactivate{% else %}Activate{% endif %}</button>
-                                        </form>
-                                    </div>
-                                </div></div>
-                            </div>
-
-                            <!-- MODAL DELETE (soft) -->
-                            <div class="modal fade" id="deleteModal{{ u.id }}" tabindex="-1" aria-hidden="true">
-                                <!-- Keep exactly as before -->
-                                <div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="border-top: 4px solid #dc3545;">
-                                    <div class="modal-header bg-light">
-                                        <h5 class="modal-title fw-bold text-danger"><i class="fas fa-exclamation-triangle me-2"></i> Deactivate User</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                    </div>
-                                    <div class="modal-body text-center py-4">
-                                        <i class="fas fa-user-slash text-danger mb-3" style="font-size: 3rem;"></i>
-                                        <h5>Deactivate this user?</h5>
-                                        <p class="text-muted mb-0">
-                                            <strong>{{ u.get_full_name|default:u.username }}</strong> will be
-                                            blocked from logging in. Their data and history remain intact.
-                                        </p>
-                                    </div>
-                                    <div class="modal-footer justify-content-center">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                        <form method="post" action="{% url 'accounts:user-delete' u.id %}">
-                                            {% csrf_token %}
-                                            <button type="submit" class="btn btn-danger px-4">Yes, Deactivate</button>
-                                        </form>
-                                    </div>
-                                </div></div>
-                            </div>
-                            {% empty %}
-                            <tr>
-                                <td colspan="7" class="text-center py-5">
-                                    <i class="fas fa-users fa-3x d-block mb-3"></i>
-                                    <p>No users found.</p>
-                                    <a href="{% url 'accounts:user-create' %}" class="btn btn-danger btn-sm mt-2"><i class="fas fa-user-plus me-1"></i> Add First User</a>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+        <!-- Search bar -->
+        <div class="p-4 border-b border-gray-200">
+            <form method="get" class="flex gap-2">
+                <div class="relative flex-1">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+                    <input type="text" name="q" value="{{ query }}"
+                           placeholder="Search staff by name, email or username..."
+                           class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
                 </div>
-            </div>
-            <div class="card-footer text-muted d-flex justify-content-between" style="color: #000000 !important;">
-                <span>Showing {{ users|length }} users</span>
-                <span><i class="fas fa-crown me-1"></i> Super Admin View</span>
-            </div>
+                <button type="submit" class="px-4 py-2.5 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium rounded-lg">
+                    Search
+                </button>
+                {% if query %}
+                <a href="{% url 'accounts:staff_list' %}" class="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg">
+                    Clear
+                </a>
+                {% endif %}
+            </form>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Staff</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for m in memberships %}
+                    <tr class="hover:bg-gray-50">
+                        <!-- Staff - avatar + name + email, kama Customer page -->
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 h-10 w-10">
+                                    <div class="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm">
+                                        {{ m.user.first_name|first|upper }}{{ m.user.last_name|first|upper }}
+                                    </div>
+                                </div>
+                                <div class="ml-4">
+                                    <div class="text-sm font-medium text-gray-900">
+                                        {{ m.user.first_name }} {{ m.user.last_name }}
+                                    </div>
+                                    <div class="text-sm text-gray-500">{{ m.user.email }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <!-- Username -->
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ m.company_username|default:"—" }}
+                        </td>
+                        <!-- Role - badge kama Customer page -->
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {{ m.role|title }}
+                            </span>
+                        </td>
+                        <!-- Branch -->
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ m.branch.name|default:"—" }}
+                        </td>
+                        <!-- Phone -->
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ m.user.phone|default:"—" }}
+                        </td>
+                        <!-- Status -->
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if m.is_active %}
+                            <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
+                            {% else %}
+                            <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <!-- Actions -->
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <a href="{% url 'accounts:staff_detail' m.id %}" class="text-blue-600 hover:text-blue-900 mr-3">View</a>
+                            <a href="{% url 'accounts:staff_edit' m.id %}" class="text-gray-600 hover:text-gray-900 mr-3">Edit</a>
+                            <a href="{% url 'accounts:staff_deactivate' m.id %}" class="text-red-600 hover:text-red-900">Deactivate</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="px-6 py-12 text-center">
+                            <div class="text-gray-400 text-4xl mb-3">👥</div>
+                            <p class="text-sm font-medium text-gray-900">No staff found</p>
+                            <p class="text-sm text-gray-500 mt-1">
+                                {% if query %}No staff matches "{{ query }}".{% else %}Add your first staff member to get started.{% endif %}
+                            </p>
+                            {% if not query %}
+                            <a href="{% url 'accounts:staff_create' %}" class="mt-4 inline-flex px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg">Add Staff</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<!-- Initialize Popovers -->
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'))
-        var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
-            return new bootstrap.Popover(popoverTriggerEl, {
-                template: '<div class="popover company-popover" role="tooltip"><div class="popover-arrow"></div><h3 class="popover-header"></h3><div class="popover-body"></div></div>'
-            })
-        });
-    });
-</script>
 {% endblock %}
