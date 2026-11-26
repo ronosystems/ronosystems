@@ -300,7 +300,16 @@ class Company(models.Model):
 
     @property
     def hero_video_url(self):
-        return self._build_media_url(self.hero_video, resource_type='video')
+        if not self.hero_video:
+            return None
+            
+        url = self._build_media_url(self.hero_video, resource_type='video')
+        
+        # Cloudinary video URLs need an extension for HTML5 browsers to play them
+        if url and not url.split('?')[0].endswith(('.mp4', '.webm', '.ogg')):
+            return f"{url}.mp4"
+            
+        return url
 
     @property
     def hero_image_url(self):

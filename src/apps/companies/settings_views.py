@@ -452,10 +452,10 @@ def settings_company(request):
         'active_tab': 'company',
         'is_viewing_company': is_viewing_company,
         'gallery_images': gallery_images,
+        'CLOUDINARY_CLOUD_NAME': getattr(django_settings, 'CLOUDINARY_STORAGE', {}).get('CLOUD_NAME', ''),
+        'CLOUDINARY_UNSIGNED_PRESET': getattr(django_settings, 'CLOUDINARY_STORAGE', {}).get('UNSIGNED_PRESET', ''),
     }
     return render(request, 'companies/settings/dashboard.html', context)
-
-
 
 
 
@@ -463,7 +463,13 @@ def settings_company(request):
 @login_required
 @require_POST
 def company_gallery_upload(request):
-    company = request.user.company  # adjust to your model
+    # Use your safe get_active_company method to prevent super admins from breaking it
+    company, _ = get_active_company(request) 
+    
+    if not company:
+        messages.error(request, "No active company found.")
+        return redirect(request.META.get("HTTP_REFERER", "company-settings-company"))
+
     title = request.POST.get("gallery_title", "").strip()
     description = request.POST.get("gallery_description", "").strip()
     photo = request.FILES.get("gallery_photo")
@@ -472,13 +478,26 @@ def company_gallery_upload(request):
         messages.error(request, "Title and photo are required.")
         return redirect(request.META.get("HTTP_REFERER", "company-settings-company"))
 
-    Gallery.objects.create(
-        company=company,
-        title=title,
-        description=description,
-        image=photo,
-    )
-    messages.success(request, "Photo uploaded to gallery.")
+    try:
+        # 1. Upload the photo to Cloudinary FIRST
+        public_id = _upload_company_media(
+            photo,
+            company.id,
+            'gallery',
+            resource_type='image'
+        )
+        
+        # 2. Save the Cloudinary ID to the database
+        Gallery.objects.create(
+            company=company,
+            title=title,
+            description=description,
+            image=public_id,
+        )
+        messages.success(request, "Photo uploaded to gallery.")
+    except Exception as e:
+        messages.error(request, f"Gallery upload failed: {str(e)}")
+
     return redirect(request.META.get("HTTP_REFERER", "company-settings-company"))
 
 
