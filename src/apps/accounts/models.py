@@ -1,8 +1,11 @@
 # apps/accounts/models.py
 
+import random
+import string
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.conf import settings as django_settings
+
 
 class User(AbstractUser):
     ROLE_CHOICES = (
@@ -39,13 +42,14 @@ class User(AbstractUser):
         ('member', 'Member'),
     )
 
-    # Email ni unique - mtu mmoja = email moja = akaunti moja
-    # Huyu mtu huyu anaweza kuwa na Memberships nyingi (Kalyet + Chama)
-    # kwa kutumia email hii hii moja. Hahitaji email mpya.
-    email = models.EmailField(unique=True, blank=True)
+    # EMAIL IS THE TRUE IDENTIFIER FOR THE MILLIONS OF USERS
+    email = models.EmailField(unique=True, blank=False)
+    
+    # Username is still required by Django, but we use it as a global unique ID
+    # We do not use this for logging in. We use email.
+    username = models.CharField(max_length=150, unique=True, blank=True)
 
-    # PRIMARY company / role - kwa backward compat
-    # Company halisi anayotoka inatoka kwenye Membership
+    # PRIMARY company / role - for backward compatibility
     role = models.CharField(max_length=30, choices=ROLE_CHOICES, default='company_staff')
     company = models.ForeignKey(
         'companies.Company', on_delete=models.SET_NULL,
@@ -78,14 +82,22 @@ class User(AbstractUser):
     # SAVE OVERRIDE
     # ============================================================
     def save(self, *args, **kwargs):
+        # If no username is provided, use the email prefix or a random string
+        if not self.username:
+            self.username = self.email.split('@')[0]
+            # Ensure uniqueness
+            while User.objects.filter(username=self.username).exclude(pk=self.pk).exists():
+                self.username += str(random.randint(1, 9999))
+
         if self.is_superuser and self.role != 'super_admin':
             self.role = 'super_admin'
         if self.company_id and self.role == 'guest':
             self.role = 'company_staff'
+            
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.username or self.email} ({self.role})"
+        return f"{self.email} ({self.role})"
 
     # ============================================================
     # MEMBERSHIP HELPERS
@@ -292,16 +304,11 @@ class User(AbstractUser):
         db_table = 'rono_users'
         ordering = ['-created_at']
 
+
 # ============================================================
-# MEMBERSHIP - User can belong to MULTIPLE companies,
-# with a DIFFERENT role in each company.
-# User.company / User.role remain as PRIMARY company/role
-# for backward compat (supermarket/views.py etc. use them).
-#
-# Domain logic:
-# kalyet.ronosystems.com -> tenant = Kalyet
-# ronosystems.com (mama) -> tenant = None, user anachagua company
-# Membership ndiyo inaamua kama user anaruhusiwa kuingia kwenye tenant
+# MEMBERSHIP - The Bridge
+# Jane can belong to MULTIPLE companies, with a DIFFERENT 
+# role and UNIQUE username in each company.
 # ============================================================
 class Membership(models.Model):
     ROLE_CHOICES = User.ROLE_CHOICES
@@ -316,9 +323,17 @@ class Membership(models.Model):
         'companies.Branch', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='memberships',
     )
+    
+    # This is the specific username for this company profile (e.g., FJ443355)
+    company_username = models.CharField(
+        max_length=50, unique=True, null=True, blank=True,
+        help_text="Auto-generated unique username for this specific company."
+    )
+    
     role = models.CharField(max_length=30, choices=ROLE_CHOICES, default='company_staff')
     is_active = models.BooleanField(default=True)
     is_primary = models.BooleanField(default=False)
+    
     invited_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='sent_invitations',
@@ -334,18 +349,51 @@ class Membership(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.user.username} @ {self.company} ({self.role})"
+        return f"{self.company_username} @ {self.company} ({self.role})"
+
+    def generate_company_username(self):
+        """
+        Generates a username like FJ443355.
+        Company Prefix (F) + First Initial (J) + Last Initial (S) + 6 random digits.
+        """
+        first_name = self.user.first_name or 'X'
+        last_name = self.user.last_name or 'X'
+        
+        f_initial = first_name[0].upper()
+        l_initial = last_name[0].upper()
+        
+        # Get Company Prefix (First letter of company name)
+        c_prefix = self.company.name[0].upper() if self.company.name else 'C'
+        
+        while True:
+            # Generate 6 random digits
+            digits = ''.join(random.choices(string.digits, k=6))
+            username = f"{c_prefix}{f_initial}{l_initial}{digits}"
+            
+            # Ensure it doesn't exist globally in User model OR Membership model
+            if not User.objects.filter(username=username).exists() and \
+               not Membership.objects.filter(company_username=username).exists():
+                return username
 
     def save(self, *args, **kwargs):
-        # Kama hii ni primary, zima primary nyingine zote za huyu user
+        # 1. Auto-generate the unique username if it doesn't exist yet
+        if not self.company_username:
+            self.company_username = self.generate_company_username()
+
+        # 2. If this is set as primary, unset all other primary memberships
         if self.is_primary and self.is_active:
             Membership.objects.filter(
                 user=self.user, is_primary=True
             ).exclude(pk=self.pk).update(is_primary=False)
+            
         super().save(*args, **kwargs)
-        # Keep User.company/role in sync when this is the primary membership
+
+        # 3. Keep User model in sync when this is the primary membership
         if self.is_primary and self.is_active:
             User.objects.filter(pk=self.user_id).update(
-                company_id=self.company_id, role=self.role,
+                company_id=self.company_id, 
+                role=self.role,
                 branch_id=self.branch_id,
+                # Do NOT update the global User.username here. 
+                # Let the Membership hold the company-specific username.
             )

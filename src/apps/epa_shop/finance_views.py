@@ -658,7 +658,7 @@ def finance_dashboard(request):
         'is_finance': True,
         'is_viewing_company': is_viewing_company,
     }
-    return render(request, 'company/finance/dashboard.html', context)
+    return render(request, 'companies/finance/dashboard.html', context)
 
 
 @login_required
@@ -745,7 +745,7 @@ def all_transactions(request):
         'is_finance': True,
         'is_viewing_company': is_viewing_company,
     }
-    return render(request, 'company/finance/all_transactions.html', context)
+    return render(request, 'companies/finance/all_transactions.html', context)
 
 
 # ============================================
@@ -1000,7 +1000,7 @@ def cogs_report(request):
         'is_finance': True,
         'is_viewing_company': is_viewing_company,
     }
-    return render(request, 'company/finance/cogs_report.html', context)
+    return render(request, 'companies/finance/cogs_report.html', context)
 
 
 # ============================================
@@ -1046,7 +1046,7 @@ def cogs_daily_detail(request, date_str):
         'is_finance': True,
         'is_viewing_company': is_viewing_company,
     }
-    return render(request, 'company/finance/cogs_daily_detail.html', context)
+    return render(request, 'companies/finance/cogs_daily_detail.html', context)
 
 
 # ============================================
@@ -1102,7 +1102,7 @@ def cogs_weekly_detail(request, year, week):
         'is_finance': True,
         'is_viewing_company': is_viewing_company,
     }
-    return render(request, 'company/finance/cogs_weekly_detail.html', context)
+    return render(request, 'companies/finance/cogs_weekly_detail.html', context)
 
 
 # ============================================
@@ -1158,7 +1158,7 @@ def cogs_monthly_detail(request, year, month):
         'is_finance': True,
         'is_viewing_company': is_viewing_company,
     }
-    return render(request, 'company/finance/cogs_monthly_detail.html', context)
+    return render(request, 'companies/finance/cogs_monthly_detail.html', context)
 
 
 # ============================================
@@ -1226,7 +1226,7 @@ def cogs_transactions(request):
         'is_finance': True,
         'is_viewing_company': is_viewing_company,
     }
-    return render(request, 'company/finance/cogs_transactions.html', context)
+    return render(request, 'companies/finance/cogs_transactions.html', context)
 
 
 # ============================================
@@ -1297,7 +1297,7 @@ def purchase_records(request):
         'is_finance': True,
         'is_viewing_company': is_viewing_company,
     }
-    return render(request, 'company/finance/purchase_records.html', context)
+    return render(request, 'companies/finance/purchase_records.html', context)
 
 
 # ============================================
@@ -1354,7 +1354,7 @@ def purchase_create(request):
 
         if errors:
             messages.error(request, "\n".join(errors))
-            return render(request, 'company/finance/purchase_form.html', _form_context())
+            return render(request, 'companies/finance/purchase_form.html', _form_context())
 
         try:
             amount = Decimal(amount)
@@ -1379,10 +1379,10 @@ def purchase_create(request):
                     )
                 except ValueError as e:
                     messages.error(request, str(e))
-                    return render(request, 'company/finance/purchase_form.html', _form_context())
+                    return render(request, 'companies/finance/purchase_form.html', _form_context())
                 except Exception as e:
                     messages.error(request, f"Receipt upload failed: {e}")
-                    return render(request, 'company/finance/purchase_form.html', _form_context())
+                    return render(request, 'companies/finance/purchase_form.html', _form_context())
 
             with transaction.atomic():
                 purchase = PurchaseRecord.objects.create(
@@ -1413,7 +1413,7 @@ def purchase_create(request):
         except Exception as e:
             messages.error(request, f"Error creating purchase: {str(e)}")
 
-    return render(request, 'company/finance/purchase_form.html', _form_context())
+    return render(request, 'companies/finance/purchase_form.html', _form_context())
 
 
 # ============================================
@@ -1478,7 +1478,7 @@ def purchase_edit(request, pk):
         if errors:
             for err in errors:
                 messages.error(request, err)
-            return render(request, 'company/finance/purchase_form.html', _form_context())
+            return render(request, 'companies/finance/purchase_form.html', _form_context())
 
         try:
             amount = Decimal(amount_raw)
@@ -1486,7 +1486,7 @@ def purchase_edit(request, pk):
                 raise ValueError("Amount must be greater than zero.")
         except (InvalidOperation, ValueError, TypeError):
             messages.error(request, "Invalid amount. Please enter a positive number.")
-            return render(request, 'company/finance/purchase_form.html', _form_context())
+            return render(request, 'companies/finance/purchase_form.html', _form_context())
 
         if amount > current_balance:
             projected_balance = current_balance - amount
@@ -1503,7 +1503,7 @@ def purchase_edit(request, pk):
             branch_obj = Branch.objects.get(id=branch_id, company=company)
         except Branch.DoesNotExist:
             messages.error(request, "Selected branch does not exist.")
-            return render(request, 'company/finance/purchase_form.html', _form_context())
+            return render(request, 'companies/finance/purchase_form.html', _form_context())
 
         new_public_id = old_public_id
 
@@ -1515,10 +1515,10 @@ def purchase_edit(request, pk):
                 )
             except ValueError as e:
                 messages.error(request, str(e))
-                return render(request, 'company/finance/purchase_form.html', _form_context())
+                return render(request, 'companies/finance/purchase_form.html', _form_context())
             except Exception as e:
                 messages.error(request, f"Receipt upload failed: {e}")
-                return render(request, 'company/finance/purchase_form.html', _form_context())
+                return render(request, 'companies/finance/purchase_form.html', _form_context())
 
             if old_public_id and old_public_id != new_public_id:
                 _delete_cloudinary_asset(old_public_id)
@@ -1551,9 +1551,9 @@ def purchase_edit(request, pk):
             if receipt_image_file and new_public_id and new_public_id != old_public_id:
                 _delete_cloudinary_asset(new_public_id)
             messages.error(request, f"❌ Error updating purchase: {str(e)}")
-            return render(request, 'company/finance/purchase_form.html', _form_context())
+            return render(request, 'companies/finance/purchase_form.html', _form_context())
 
-    return render(request, 'company/finance/purchase_form.html', _form_context())
+    return render(request, 'companies/finance/purchase_form.html', _form_context())
 
 
 @login_required
@@ -1571,7 +1571,7 @@ def purchase_delete(request, pk):
         messages.success(request, f"Purchase #{purchase.purchase_number} deleted.")
         return redirect('finance-purchase-records')
 
-    return render(request, 'company/finance/purchase_confirm_delete.html', {
+    return render(request, 'companies/finance/purchase_confirm_delete.html', {
         'company': company,
         'purchase': purchase,
         'is_finance': True,
@@ -1601,7 +1601,7 @@ def purchase_detail(request, pk):
         'is_finance': True,
         'is_viewing_company': is_viewing_company,
     }
-    return render(request, 'company/finance/purchase_detail.html', context)
+    return render(request, 'companies/finance/purchase_detail.html', context)
 
 
 # ============================================
@@ -1627,7 +1627,7 @@ def cogs_accounts(request):
         'is_finance': True,
         'is_viewing_company': is_viewing_company,
     }
-    return render(request, 'company/finance/cogs_accounts.html', context)
+    return render(request, 'companies/finance/cogs_accounts.html', context)
 
 
 @login_required
@@ -1656,7 +1656,7 @@ def cogs_account_create(request):
 
         if errors:
             messages.error(request, "\n".join(errors))
-            return render(request, 'company/finance/cogs_account_create.html', {
+            return render(request, 'companies/finance/cogs_account_create.html', {
                 'company': company,
                 'branches': Branch.objects.filter(company=company, is_active=True),
                 'is_finance': True,
@@ -1685,7 +1685,7 @@ def cogs_account_create(request):
         'account_types': COGSAccount.ACCOUNT_TYPES,
         'is_viewing_company': is_viewing_company,
     }
-    return render(request, 'company/finance/cogs_account_create.html', context)
+    return render(request, 'companies/finance/cogs_account_create.html', context)
 
 
 # ============================================

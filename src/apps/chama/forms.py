@@ -1,7 +1,6 @@
 from django import forms
 from django.contrib.auth import get_user_model
 import datetime
-from django import forms
 from .models import Member, MembershipType
 from .models import (
     MembershipType, Member,
@@ -11,39 +10,23 @@ from .models import (
     Account, Transaction, Expense, Project,
     Committee, CommitteeMember, Guest,
 )
+from apps.companies.business_types import BusinessTypeEnum
 
 User = get_user_model()
 
 
 # ============================================================
-# HELPER: Get Chama roles only (exclude platform roles)
+# HELPER: Get Chama roles dynamically from BusinessTypes
 # ============================================================
 def _get_chama_role_choices():
-    chama_role_keys = {
-        'chairperson', 'vice_chairperson', 'secretary', 'vice_secretary',
-        'treasurer', 'loan_officer', 'coopted_member', 'member',
-    }
-
-    all_choices = getattr(User, 'ROLE_CHOICES', [])
-
-    filtered = [
-        (key, label) for key, label in all_choices
-        if key in chama_role_keys
-    ]
-
-    if not filtered:
-        filtered = [
-            ('chairperson', 'Chairperson'),
-            ('vice_chairperson', 'Vice Chairperson'),
-            ('secretary', 'Secretary'),
-            ('vice_secretary', 'Vice Secretary'),
-            ('treasurer', 'Treasurer'),
-            ('loan_officer', 'Loan Officer'),
-            ('coopted_member', 'Co-opted Member'),
-            ('member', 'Regular Member'),
-        ]
-
-    return filtered
+    """
+    Pulls the exact Chama roles defined in business_types.py
+    instead of hardcoding them. This ensures the dropdown
+    always matches the rest of the system.
+    """
+    roles = BusinessTypeEnum.get_allowed_roles('Chama')
+    # Return as a list of tuples: (key, label)
+    return roles
 
 
 # ============================================================
@@ -75,17 +58,9 @@ class MemberForm(forms.ModelForm):
         help_text="Leave blank to use the default company password."
     )
 
-    # Hidden field to pass the role
+    # The Chama Role - Now dynamically loaded in __init__
     role = forms.ChoiceField(
-        choices=[
-            ('member', 'Member'),
-            ('chairperson', 'Chairperson'),
-            ('vice_chairperson', 'Vice Chairperson'),
-            ('treasurer', 'Treasurer'),
-            ('secretary', 'Secretary'),
-            ('vice_secretary', 'Vice Secretary'),
-            ('loan_officer', 'Loan Officer'),
-        ],
+        choices=[], # Empty here, populated in __init__
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'})
     )
@@ -95,7 +70,7 @@ class MemberForm(forms.ModelForm):
         fields = [
             'full_name', 'phone', 'email', 'national_id', 
             'membership_type', 'status', 'joined_on',
-            'custom_loan_limit', # Added here
+            'custom_loan_limit', 
             'passport_photo', 'id_front', 'id_back', 
             'kra_certificate', 'good_conduct'
         ]
@@ -116,28 +91,38 @@ class MemberForm(forms.ModelForm):
         
         super().__init__(*args, **kwargs)
 
-        # 1. Filter Membership Types by Company
+        # 1. Populate the Chama Role dropdown from business_types.py
+        self.fields['role'].choices = [('', '---------')] + _get_chama_role_choices()
+
+        # 2. Pre-select the current role if editing
+        if self.instance and self.instance.pk and self.instance.user:
+            # Find their membership for this specific company
+            current_membership = self.instance.user.memberships.filter(company=self.instance.company).first()
+            if current_membership:
+                self.initial['role'] = current_membership.role
+
+        # 3. Filter Membership Types by Company
         if self.company:
             self.fields['membership_type'].queryset = MembershipType.objects.filter(
                 company=self.company
             )
             
-        # 2. Handle default password placeholder logic
+        # 4. Handle default password placeholder logic
         if fallback_password:
             self.fields['default_password'].widget.attrs['placeholder'] = f"Default: {fallback_password}"
 
-        # 3. If EDITING an existing member, update the loan limit label
+        # 5. If EDITING an existing member, update the loan limit label
         if self.instance and self.instance.pk:
             self.fields['custom_loan_limit'].help_text = (
                 f"Current limit: KES {self.instance.custom_loan_limit:,.2f}. "
                 "Set to 0 to revert to the 3x contribution limit."
             )
             
-        # 4. Ensure required fields match your form layout
+        # 6. Ensure required fields match your form layout
         self.fields['full_name'].required = True
         self.fields['phone'].required = True
         
-        # 5. Clean up date input formats
+        # 7. Clean up date input formats
         self.fields['joined_on'].input_formats = ['%Y-%m-%d']
 
     def clean_custom_loan_limit(self):

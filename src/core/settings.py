@@ -158,6 +158,7 @@ MIDDLEWARE = [
 
     # 2. Auth baada ya tenant - ili backend iweze ku-check tenant
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'apps.accounts.middleware.LoginRequiredMiddleware', 
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
@@ -355,8 +356,9 @@ USE_TZ = True
 # ============================================
 CLOUDINARY_STORAGE = {
     'CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME', 'dg9it0ut8'),
-    'API_KEY': os.getenv('CLOUDINARY_API_KEY', ''),
+    'API_KEY':    os.getenv('CLOUDINARY_API_KEY', ''),
     'API_SECRET': os.getenv('CLOUDINARY_API_SECRET', ''),
+    'UNSIGNED_PRESET': os.getenv('CLOUDINARY_UNSIGNED_PRESET', 'epa_unsigned'),   # 👈 ADD THIS
 }
 
 # ============================================
@@ -419,9 +421,10 @@ SIMPLE_JWT = {
 # ============================================
 # LOGIN / LOGOUT URLs
 # ============================================
-LOGIN_URL = '/auth/login/'
+LOGIN_URL = 'account_login'
 LOGIN_REDIRECT_URL = '/dashboard/'
-LOGOUT_REDIRECT_URL = '/auth/login/'
+ACCOUNT_LOGOUT_REDIRECT_URL = 'account_login'
+LOGOUT_REDIRECT_URL = 'account_login'
 
 # ============================================
 # SECURITY (Production)
@@ -465,8 +468,7 @@ else:
 # ============================================
 SYSTEM_NAME = os.getenv('SYSTEM_NAME', 'RonoSystems')
 SYSTEM_WEBSITE_URL = os.getenv('SYSTEM_WEBSITE_URL', '')
-# FIXED: Lazima iwe na default, sio '' - context processor inategemea hii
-SYSTEM_DOMAIN = os.getenv('SYSTEM_DOMAIN', 'ronosystems.onrender.com' if ON_RENDER else 'localhost')
+SYSTEM_DOMAIN = os.getenv('SYSTEM_DOMAIN', 'ronosystems.onrender.com' if ON_RENDER else 'localhost:8000')
 
 # ============================================
 # AI ASSISTANT

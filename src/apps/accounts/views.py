@@ -1,5 +1,10 @@
-# apps/users/views.py
 
+
+# apps/accounts/views.py
+
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.urls import reverse
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -23,6 +28,73 @@ from .permissions import (
 )
 
 User = get_user_model()
+
+
+
+@login_required
+def post_login_redirect(request):
+    """
+    Determines where to send the user after they log in based on the domain.
+    """
+    user = request.user
+    current_company = getattr(request, 'company', None) or getattr(request, 'current_company', None)
+
+    # 1. Super Admins always go to the master dashboard
+    if user.is_superuser or user.role == 'super_admin':
+        return redirect('/superadmin/dashboard/')
+
+    # 2. If they are logging in from a specific company domain (e.g., kalwal.localhost)
+    if current_company:
+        # Since the backend already verified they have a membership,
+        # we just send them to the dashboard for this company.
+        return redirect('/dashboard/')
+
+    # 3. If they are on the Mother Domain (localhost:8000)
+    # We show them the company selector.
+    return redirect('/select-company/')
+
+
+@login_required
+def select_company(request):
+    """
+    Displays a list of companies the user belongs to.
+    """
+    user = request.user
+
+    # Fetch all active memberships for this user
+    memberships = user.memberships.filter(is_active=True).select_related('company', 'branch')
+
+    # If they only belong to ONE company, auto-redirect them there
+    if memberships.count() == 1:
+        company = memberships.first().company
+        return redirect_to_company_dashboard(company, request)
+
+    # If they have MULTIPLE companies, show the selector screen
+    return render(request, 'accounts/select_company.html', {
+        'memberships': memberships
+    })
+
+
+def redirect_to_company_dashboard(company, request):
+    """
+    Helper to build the absolute URL for a specific company subdomain.
+    Handles both localhost (development) and production domains.
+    """
+    host = request.get_host()
+    
+    # Development: localhost:8000 -> kalwal.localhost:8000
+    if 'localhost' in host:
+        base_domain = 'localhost:8000'
+        return redirect(f"http://{company.subdomain}.{base_domain}/dashboard/")
+    
+    # Production: ronosystems.com -> kalwal.ronosystems.com
+    base_domain = 'ronosystems.com'
+    if 'onrender.com' in host:
+        base_domain = 'ronosystems.onrender.com'
+        
+    return redirect(f"https://{company.subdomain}.{base_domain}/dashboard/")
+
+
 
 
 # ============================================================

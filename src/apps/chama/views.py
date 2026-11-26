@@ -420,9 +420,11 @@ def dashboard(request):
 
 
 
+
 # ============================================================
 # MEMBERS MEMBERSHIP TYPES, REGISTRATION, & COMMITTEES
 # ============================================================
+
 @login_required
 def member_list(request):
     qs = _company_queryset(request, Member).select_related('membership_type', 'user')
@@ -501,6 +503,7 @@ def member_detail(request, pk):
         'recent_loans': recent_loans,
     })
 
+
 @login_required
 @transaction.atomic
 def member_create(request):
@@ -509,25 +512,18 @@ def member_create(request):
         messages.error(request, 'No company assigned.')
         return redirect('chama:member_list')
 
-    # Fallback password if left blank
     fallback_password = _generate_default_password(company)
 
     if request.method == 'POST':
-        form = MemberForm(
-            request.POST,
-            request.FILES,
-            company=company,
-            fallback_password=fallback_password,   # 👈 pass dynamic default
-        )
+        form = MemberForm(request.POST, request.FILES, company=company, fallback_password=fallback_password)
+        
         if form.is_valid():
             member = form.save(commit=False)
             member.company = company
 
-            # 1. Get the custom password (or fall back)
             custom_password = form.cleaned_data.get('default_password', '').strip()
             final_password = custom_password if custom_password else fallback_password
 
-            # Auto-generate member number
             if not getattr(member, 'member_number', None):
                 member.member_number = _next_member_number(company)
 
@@ -543,14 +539,20 @@ def member_create(request):
             if request.FILES.get('good_conduct'):
                 member.good_conduct = _upload_to_cloudinary(request.FILES.get('good_conduct'))
 
-            # 2. Link or create a User account
+            # =========================================================
+            # UNIFIED ACCOUNT & MEMBERSHIP LOGIC
+            # =========================================================
             if not member.user:
                 existing_user = None
+                is_new_user = False
+                
+                # 1. Try to find them by Email or Phone
                 if member.email:
                     existing_user = User.objects.filter(email__iexact=member.email).first()
                 elif member.phone:
                     existing_user = User.objects.filter(username=member.phone).first()
 
+                # 2. If they DON'T exist, create them
                 if not existing_user:
                     username_base = member.phone or member.email or f"member_{member.member_number.lower()}"
                     username = username_base
@@ -559,29 +561,42 @@ def member_create(request):
                         username = f"{username_base}_{counter}"
                         counter += 1
 
-                    existing_user = User.objects.create(
+                    existing_user = User.objects.create_user(
                         username=username,
                         email=member.email or '',
+                        password=get_random_string(32), # Unusable until they reset
                         first_name=(member.full_name.split()[0] if member.full_name else ''),
                         last_name=(' '.join(member.full_name.split()[1:]) if member.full_name else ''),
                         company=company,
-                        role='member',
                         is_active=True,
                     )
-                    # ✅ SET THE FINAL PASSWORD
-                    existing_user.set_password(final_password)
-                    existing_user.save()
+                    is_new_user = True
 
                 member.user = existing_user
-
+            
             member.save()
 
-            # 3. Save/Sync to the User account
             if member.user:
-                update_fields = []
-                role = form.cleaned_data.get('role')
+                from apps.accounts.models import Membership
                 
-                # 👇 NEW: Sync Name, Email, and Phone from Member to User
+                # Ensure the user has a Membership to this company
+                membership, created = Membership.objects.get_or_create(
+                    user=member.user,
+                    company=company,
+                    defaults={
+                        'role': form.cleaned_data.get('role') or 'member',
+                        'is_active': True,
+                        'is_primary': not member.user.memberships.exists(), # Make primary if it's their first
+                    }
+                )
+
+                # If membership already existed but was inactive, reactivate it
+                if not created and not membership.is_active:
+                    membership.is_active = True
+                    membership.save()
+
+                # Sync their base details to the global User account
+                update_fields = []
                 names = member.full_name.split(' ', 1)
                 first_name = names[0]
                 last_name = names[1] if len(names) > 1 else ''
@@ -599,32 +614,82 @@ def member_create(request):
                     member.user.phone = member.phone
                     update_fields.append('phone')
 
-                # Sync role and company
-                if role and member.user.role != role:
-                    member.user.role = role
-                    update_fields.append('role')
-                if member.user.company != company:
-                    member.user.company = company
-                    update_fields.append('company')
-
                 if update_fields:
                     member.user.save(update_fields=update_fields)
 
-            messages.success(
-                request,
-                f'✅ Member "{member.full_name}" created (No. {member.member_number}). '
-                f'Login Email: {member.user.email or member.user.username} | '
-                f'Password: {final_password}'
-            )
+                # =========================================================
+                # SEND EMAIL INVITE (ONLY if this is a brand new user)
+                # =========================================================
+                if is_new_user and member.user.email:
+                    try:
+                        from django.urls import reverse
+                        from django.utils.http import urlsafe_base64_encode
+                        from django.utils.encoding import force_bytes
+                        from django.contrib.auth.tokens import default_token_generator
+                        from django.core.mail import send_mail
+                        from django.template.loader import render_to_string
+                        from django.utils.html import strip_tags
+                        from django.conf import settings
+
+                        uid = urlsafe_base64_encode(force_bytes(member.user.pk))
+                        token = default_token_generator.make_token(member.user)
+
+                        protocol = 'https' if request.is_secure() else 'http'
+                        system_domain = getattr(settings, 'SYSTEM_DOMAIN', 'localhost:8000')
+
+                        if company.custom_domain and company.domain_verified and not settings.DEBUG:
+                            mother_host = company.custom_domain
+                        elif company.subdomain:
+                            mother_host = f"{company.subdomain}.{system_domain}"
+                        else:
+                            mother_host = system_domain
+
+                        reset_path = reverse(
+                            'accounts:password_reset_confirm',
+                            kwargs={'uidb64': uid, 'token': token},
+                        )
+                        reset_link = f"{protocol}://{mother_host}{reset_path}"
+
+                        context = {
+                            'first_name': member.full_name.split()[0],
+                            'company_name': company.name,
+                            'role': membership.get_role_display(),
+                            'username': membership.company_username,
+                            'email': member.user.email,
+                            'reset_link': reset_link,
+                            'is_new_user': True,
+                        }
+                        
+                        html_message = render_to_string('emails/staff_invite.html', context)
+                        plain_message = strip_tags(html_message)
+
+                        send_mail(
+                            f"You have been added to {company.name}",
+                            plain_message,
+                            settings.DEFAULT_FROM_EMAIL,
+                            [member.user.email],
+                            html_message=html_message,
+                            fail_silently=False,
+                        )
+                        messages.success(request, f"✅ Member added and invitation email sent to {member.user.email}.")
+                    except Exception as e:
+                        messages.warning(
+                            request, 
+                            f"✅ Member added, but email failed to send ({str(e)}). "
+                            f"Username: {membership.company_username}"
+                        )
+                else:
+                    messages.success(
+                        request,
+                        f'✅ Member "{member.full_name}" added to Chama (No. {member.member_number}). '
+                        f'They can log in using their existing account.'
+                    )
+
             return redirect('chama:member_list')
     else:
-        # 👇 UPDATED: Set default custom loan limit to 0
         form = MemberForm(
             company=company,
-            initial={
-                'joined_on': timezone.localdate(),
-                'custom_loan_limit': 0, 
-            },
+            initial={'joined_on': timezone.localdate(), 'custom_loan_limit': 0},
             fallback_password=fallback_password,
         )
 
@@ -634,13 +699,13 @@ def member_create(request):
         'default_password': fallback_password,
     })
 
+
 @login_required
 @transaction.atomic
 def member_edit(request, pk):
     company = _get_company(request)
     member = get_object_or_404(Member.objects.select_related('user'), pk=pk, company=company)
 
-    # Fallback password (used only when creating a new linked user with no typed password)
     fallback_password = _generate_default_password(company)
 
     if request.method == 'POST':
@@ -654,7 +719,6 @@ def member_edit(request, pk):
         if form.is_valid():
             m = form.save(commit=False)
 
-            # 1. Get the custom password (if provided)
             custom_password = form.cleaned_data.get('default_password', '').strip()
 
             # ── Cloudinary uploads ──
@@ -691,7 +755,6 @@ def member_edit(request, pk):
                         first_name=(m.full_name.split()[0] if m.full_name else ''),
                         last_name=(' '.join(m.full_name.split()[1:]) if m.full_name else ''),
                         company=company,
-                        role='member',
                         is_active=True,
                     )
 
@@ -708,10 +771,22 @@ def member_edit(request, pk):
 
             # 3. Update User Role, Details & Password
             if m.user:
+                from apps.accounts.models import Membership
+                
+                # Ensure membership exists
+                membership, created = Membership.objects.get_or_create(
+                    user=m.user,
+                    company=company,
+                    defaults={
+                        'role': form.cleaned_data.get('role') or 'member',
+                        'is_active': True,
+                    }
+                )
+
                 update_fields = []
                 role = form.cleaned_data.get('role')
 
-                # 👇 NEW: Sync Name, Email, and Phone from Member to User
+                # 👇 Sync Name, Email, and Phone from Member to User
                 names = m.full_name.split(' ', 1)
                 first_name = names[0]
                 last_name = names[1] if len(names) > 1 else ''
@@ -738,7 +813,6 @@ def member_edit(request, pk):
                     m.user.company = company
                     update_fields.append('company')
 
-                # ✅ Override password if a new one was typed
                 if custom_password:
                     m.user.set_password(custom_password)
                     update_fields.append('password')
@@ -749,7 +823,6 @@ def member_edit(request, pk):
             messages.success(request, f'✅ Member "{m.full_name}" updated.')
             return redirect('chama:member_list')
     else:
-        # 👇 UPDATED: Passing `instance=member` automatically pre-fills the current custom_loan_limit
         form = MemberForm(
             instance=member, 
             company=company,
@@ -761,6 +834,7 @@ def member_edit(request, pk):
         'mode': 'edit',
         'member': member,
     })
+
 
 @login_required
 def role_list(request):
@@ -864,15 +938,16 @@ def registration_approve(request, pk):
     reg.status = 'approved'
     reg.save(update_fields=['status'])
 
-    # Generate default password
     default_password = _generate_default_password(company)
 
-    # Link or create a User
+    # Unified Account Logic
     user = None
+    is_new_user = False
     if reg.email:
         user = User.objects.filter(email__iexact=reg.email).first()
     if not user and reg.phone:
         user = User.objects.filter(username=reg.phone).first()
+        
     if not user:
         username_base = reg.phone or reg.email or f"member_{reg.id}"
         username = username_base
@@ -880,18 +955,16 @@ def registration_approve(request, pk):
         while User.objects.filter(username=username).exists():
             username = f"{username_base}_{counter}"
             counter += 1
-        user = User.objects.create(
+        user = User.objects.create_user(
             username=username,
             email=reg.email or '',
+            password=default_password,
             first_name=(reg.full_name.split()[0] if reg.full_name else ''),
             last_name=(' '.join(reg.full_name.split()[1:]) if reg.full_name else ''),
             company=company,
-            role='member',
             is_active=True,
         )
-        # ✅ SET COMPANY-BASED DEFAULT PASSWORD
-        user.set_password(default_password)
-        user.save()
+        is_new_user = True
 
     Member.objects.create(
         company=company,
@@ -905,12 +978,72 @@ def registration_approve(request, pk):
         user=user,
     )
 
-    messages.success(
-        request,
-        f'✅ {reg.full_name} approved. '
-        f'Login Email: {user.email or user.username} | '
-        f'Password: {default_password}'
+    from apps.accounts.models import Membership
+    membership, created = Membership.objects.get_or_create(
+        user=user,
+        company=company,
+        defaults={
+            'role': 'member',
+            'is_active': True,
+            'is_primary': not user.memberships.exists()
+        }
     )
+
+    # Send Invite Email if new
+    if is_new_user and user.email:
+        try:
+            from django.urls import reverse
+            from django.utils.http import urlsafe_base64_encode
+            from django.utils.encoding import force_bytes
+            from django.contrib.auth.tokens import default_token_generator
+            from django.core.mail import send_mail
+            from django.template.loader import render_to_string
+            from django.utils.html import strip_tags
+            from django.conf import settings
+
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+
+            protocol = 'https' if request.is_secure() else 'http'
+            system_domain = getattr(settings, 'SYSTEM_DOMAIN', 'localhost:8000')
+
+            if company.custom_domain and company.domain_verified and not settings.DEBUG:
+                mother_host = company.custom_domain
+            elif company.subdomain:
+                mother_host = f"{company.subdomain}.{system_domain}"
+            else:
+                mother_host = system_domain
+
+            reset_path = reverse('accounts:password_reset_confirm', kwargs={'uidb64': uid, 'token': token})
+            reset_link = f"{protocol}://{mother_host}{reset_path}"
+
+            context = {
+                'first_name': reg.full_name.split()[0],
+                'company_name': company.name,
+                'role': membership.get_role_display(),
+                'username': membership.company_username,
+                'email': user.email,
+                'reset_link': reset_link,
+                'is_new_user': True,
+            }
+            
+            html_message = render_to_string('emails/staff_invite.html', context)
+            plain_message = strip_tags(html_message)
+
+            send_mail(
+                f"You have been added to {company.name}",
+                plain_message,
+                settings.DEFAULT_FROM_EMAIL,
+                [user.email],
+                html_message=html_message,
+                fail_silently=False,
+            )
+            messages.success(request, f'✅ {reg.full_name} approved and invite email sent.')
+        except Exception as e:
+            messages.warning(request, f'✅ {reg.full_name} approved, but email failed. Username: {membership.company_username}')
+    else:
+        messages.success(request, f'✅ {reg.full_name} approved. Linked to existing user account.')
+
     return redirect('chama:registration_list')
 
 @login_required
@@ -995,7 +1128,7 @@ def committee_member_add(request, pk):
     else:
         form = CommitteeMemberForm(company=company)
 
-    return render(request, 'chama/committee_member_form.html', {'form': form, 'committee': committee})
+    return render(request, 'chama/committee_form.html', {'form': form, 'committee': committee})
 
 @login_required
 def committee_member_remove(request, pk, member_pk):
@@ -1006,7 +1139,9 @@ def committee_member_remove(request, pk, member_pk):
     messages.info(request, f'🗑️ {name} removed from {committee.name}.')
     return redirect('chama:committee_detail', pk=committee.pk)
 
-    
+
+
+
 
 
 # ============================================================

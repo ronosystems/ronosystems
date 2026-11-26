@@ -144,6 +144,24 @@
         margin-bottom: 15px;
     }
     .btn-back:hover { color: var(--primary-color); }
+    
+    /* Chama Role Badges */
+    .role-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-weight: 700;
+        font-size: 0.75rem;
+        border: 1px solid #000;
+        text-transform: capitalize;
+    }
+    .role-chairperson { background: #fff3cd; color: #856404; }
+    .role-vice_chairperson { background: #d4edda; color: #155724; }
+    .role-secretary { background: #cce5ff; color: #004085; }
+    .role-vice_secretary { background: #e2e3e5; color: #383d41; }
+    .role-treasurer { background: #d1ecf1; color: #0c5460; }
+    .role-loan_officer { background: #f8d7da; color: #721c24; }
+    .role-member { background: #f8f9fa; color: #000; }
 </style>
 {% endblock %}
 
@@ -195,6 +213,29 @@
                                 {% endif %}
                             </div>
                         </div>
+                        
+                        <!-- NEW: Login Username & Chama Role -->
+                        {% if member.user %}
+                        <div class="col-md-6">
+                            <div class="info-label">System Username</div>
+                            <div class="info-value" style="font-family: monospace; background: #f8f9fa; padding: 2px 8px; border-radius: 4px; display: inline-block; border: 1px solid #ddd;">
+                                {{ member.user.memberships.first.company_username|default:"Not set" }}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-label">Chama Role</div>
+                            <div class="info-value">
+                                {% if member.user.memberships.first %}
+                                    <span class="role-badge role-{{ member.user.memberships.first.role }}">
+                                        {{ member.user.memberships.first.get_role_display }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">No role assigned</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
                         <div class="col-md-6">
                             <div class="info-label">Status</div>
                             <div class="info-value">
@@ -306,10 +347,18 @@
                     <i class="fas fa-chart-pie me-1"></i> Financial Summary
                 </h6>
 
+                <!-- Contributions -->
+                <div class="stat-box" style="background: #d4edda; border-color: #155724;">
+                    <div class="stat-label">Total Contributions</div>
+                    <div class="stat-value">KES {{ total_contributions|floatformat:2 }}</div>
+                    <small class="text-muted">Total contributions since join</small>
+                </div>
+
                 <!-- Total Savings -->
                 <div class="stat-box" style="background: #eaf2f8; border-color: #2d5f7c;">
                     <div class="stat-label">Total Savings</div>
                     <div class="stat-value">KES {{ total_savings|floatformat:2 }}</div>
+                    <small class="text-muted">Total current savings balance</small>
                 </div>
 
                 <!-- Active Loans -->
@@ -317,12 +366,6 @@
                     <div class="stat-label">Active Loans</div>
                     <div class="stat-value">{{ active_loans_count }}</div>
                     <small class="text-muted">Outstanding: KES {{ active_loans_outstanding|floatformat:2 }}</small>
-                </div>
-
-                <!-- Contributions -->
-                <div class="stat-box" style="background: #d4edda; border-color: #155724;">
-                    <div class="stat-label">Total Contributions</div>
-                    <div class="stat-value">KES {{ total_contributions|floatformat:2 }}</div>
                 </div>
 
                 <hr style="border-top: 2px dashed #ccc;">

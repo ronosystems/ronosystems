@@ -1,3 +1,5 @@
+# apps/companies/business_types.py
+
 """
 Business Type Registry - Centralized definition of all business types
 This ensures consistent naming and proper integration mapping.
@@ -8,6 +10,50 @@ Rule:
 """
 
 from enum import Enum
+
+
+# ============================================
+# BUSINESS TYPE ROLES (Defined first)
+# ============================================
+
+BUSINESS_TYPE_ROLES = {
+    'EPA Shop': [
+        ('company_admin', 'Company Admin'),
+        ('company_manager', 'Company Manager'),
+        ('company_cashier', 'Company Cashier'),
+        ('stock_controller', 'Stock Controller'),
+        ('company_agent', 'Company Agent'),
+        ('mpesa_agent', 'Mpesa Agent'),
+        ('company_technician', 'Company Technician'),
+        ('customer_care', 'Customer Care'),
+        ('company_staff', 'Company Staff'),
+    ],
+    'Chama': [
+        ('chairperson', 'Chairperson'),
+        ('vice_chairperson', 'Vice Chairperson'),
+        ('secretary', 'Secretary'),
+        ('vice_secretary', 'Vice Secretary'),
+        ('treasurer', 'Treasurer'),
+        ('loan_officer', 'Loan Officer'),
+        ('coopted_member', 'Co-opted Member'),
+        ('member', 'Member'),
+    ],
+    'Kuku Biz': [
+        ('company_admin', 'Company Admin'),
+        ('company_manager', 'Company Manager'),
+        ('company_staff', 'Company Staff'),
+        ('customer_care', 'Customer Care'),
+    ],
+    'Supermarket': [
+        ('company_admin', 'Company Admin'),
+        ('company_manager', 'Company Manager'),
+        ('company_cashier', 'Company Cashier'),
+        ('stock_controller', 'Stock Controller'),
+        ('company_staff', 'Company Staff'),
+    ],
+    # Add Muggies Hotel, etc. here later
+}
+
 
 class BusinessTypeEnum(Enum):
     """Official Business Types with their exact spelling and integrations"""
@@ -87,8 +133,6 @@ class BusinessTypeEnum(Enum):
                 'PriceHistory',
                 'BirdSale',
                 'VaccineType',
-                # NOTE: No 'Hen' model yet - Flock is the batch model.
-                # Add 'Hen' here only after you create apps/kuku_biz/models.py -> Hen
             ],
             'dashboard': 'KukuBizDashboardView',
             'dashboard_url_name': 'kuku_biz:dashboard',
@@ -265,6 +309,15 @@ class BusinessTypeEnum(Enum):
     def get_active_slugs(cls):
         """Get slugs of active types only"""
         return [m.value['slug'] for m in cls if m.value['is_active']]
+
+    @classmethod
+    def get_allowed_roles(cls, business_type_name):
+        """Returns a list of allowed roles for a specific business type."""
+        return BUSINESS_TYPE_ROLES.get(
+            business_type_name, 
+            BUSINESS_TYPE_ROLES['EPA Shop']
+        )
+
 
 # ============================================
 # Business Type Constants (For use in models)

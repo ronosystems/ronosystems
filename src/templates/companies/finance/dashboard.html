@@ -1,0 +1,880 @@
+{% extends base_template|default:"base.html" %}
+
+{% block title %}Finance Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       FINANCE DASHBOARD STYLES
+    ============================================ */
+
+    .finance-dashboard {
+        padding: 10px 0;
+    }
+
+    /* ============================================
+       BALANCE CARDS — 2 IN ONE ROW
+    ============================================ */
+    .balance-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+
+    .balance-card {
+        background: white;
+        border-radius: 8px;
+        padding: 20px 18px;
+        border: 2px solid #000000;
+        height: 100%;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+        text-decoration: none;
+        display: block;
+        color: inherit;
+    }
+
+    .balance-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .balance-card .card-icon {
+        font-size: 2rem;
+        opacity: 0.15;
+        color: #000000;
+        position: absolute;
+        right: 16px;
+        bottom: 16px;
+        transition: all 0.3s ease;
+    }
+
+    .balance-card:hover .card-icon {
+        opacity: 0.3;
+        transform: scale(1.1);
+    }
+
+    .balance-card .card-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #6c757d;
+        margin-bottom: 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .balance-card .card-value {
+        font-size: 1.6rem;
+        font-weight: 800;
+        color: #000000;
+        line-height: 1.15;
+        word-break: break-word;
+    }
+
+    .balance-card .card-sub {
+        font-size: 0.7rem;
+        color: #6c757d;
+        margin-top: 6px;
+        line-height: 1.3;
+    }
+
+    .balance-card.cogs-balance {
+        border-left: 6px solid #007bff;
+        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    }
+    .balance-card.cogs-balance .card-value { color: #007bff; }
+
+    .balance-card.profit-balance {
+        border-left: 6px solid #28a745;
+        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    }
+    .balance-card.profit-balance .card-value { color: #28a745; }
+
+    /* ============================================
+       NAV ACTION CARDS — 5 IN ONE ROW (desktop)
+    ============================================ */
+    .nav-actions-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .nav-action-card {
+        background: white;
+        border-radius: 8px;
+        padding: 12px 14px;
+        border: 2px solid #000000;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        color: inherit;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 100%;
+        position: relative;
+        overflow: hidden;
+        width: 100%;
+        cursor: pointer;
+        text-align: left;
+    }
+
+    .nav-action-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .nav-action-card .action-icon {
+        font-size: 1.3rem;
+        width: 38px;
+        height: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        flex-shrink: 0;
+        transition: all 0.3s ease;
+    }
+
+    .nav-action-card:hover .action-icon {
+        transform: scale(1.1) rotate(-5deg);
+    }
+
+    .nav-action-card .action-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .nav-action-card .action-title {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #000000;
+        margin-bottom: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .nav-action-card .action-desc {
+        font-size: 0.65rem;
+        color: #6c757d;
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .nav-action-card .action-arrow {
+        font-size: 1rem;
+        color: #6c757d;
+        opacity: 0.5;
+        transition: all 0.3s ease;
+        flex-shrink: 0;
+    }
+
+    .nav-action-card:hover .action-arrow {
+        opacity: 1;
+        transform: translateX(5px);
+        color: #000000;
+    }
+
+    .nav-action-card.purchase-action { border-left: 4px solid #28a745; }
+    .nav-action-card.purchase-action .action-icon {
+        background: #d4edda;
+        color: #28a745;
+    }
+
+    .nav-action-card.cogs-action { border-left: 4px solid #007bff; }
+    .nav-action-card.cogs-action .action-icon {
+        background: #cce5ff;
+        color: #007bff;
+    }
+
+    .nav-action-card.sales-action { border-left: 4px solid #fd7e14; }
+    .nav-action-card.sales-action .action-icon {
+        background: #ffe5d0;
+        color: #fd7e14;
+    }
+
+    .nav-action-card.reports-action { border-left: 4px solid #6f42c1; }
+    .nav-action-card.reports-action .action-icon {
+        background: #e2d9f3;
+        color: #6f42c1;
+    }
+
+    .nav-action-card.expense-action { border-left: 4px solid #09fc01; }
+    .nav-action-card.expense-action .action-icon {
+        background: #e9ecef;
+        color: #6c757d;
+    }
+
+    /* ============================================
+       EXPENSE DROPDOWN
+    ============================================ */
+    .expense-dropdown-wrap {
+        position: relative;
+        height: 100%;
+    }
+
+    .expense-dropdown-wrap .dropdown-toggle::after {
+        display: none;
+    }
+
+    .expense-dropdown-menu {
+        width: 100%;
+        border: 2px solid #000000;
+        border-radius: 8px;
+        padding: 6px;
+        margin-top: 4px;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    }
+
+    .expense-dropdown-menu .dropdown-item {
+        border-radius: 6px;
+        padding: 10px 12px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: #000000;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .expense-dropdown-menu .dropdown-item:hover {
+        background-color: #f1f5f9;
+        color: #000000;
+    }
+
+    .expense-dropdown-menu .dropdown-item i {
+        width: 18px;
+        text-align: center;
+    }
+
+    /* ============================================
+       RECENT TRANSACTIONS
+    ============================================ */
+    .recent-tx-card {
+        background: #ffffff;
+        border: 2px solid #000000;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .recent-tx-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        background-color: #87CEEB;
+        border-bottom: 2px solid #000000;
+        gap: 10px;
+    }
+
+    .recent-tx-header h5 {
+        margin: 0;
+        font-weight: 700;
+        color: #000000;
+        font-size: 0.95rem;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .recent-tx-header h5 i { margin-right: 6px; }
+
+    .recent-tx-link {
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #000000;
+        text-decoration: none;
+        padding: 4px 10px;
+        border: 1px solid #000000;
+        border-radius: 4px;
+        background: #ffffff;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .recent-tx-link:hover {
+        background: #000000;
+        color: #ffffff;
+        text-decoration: none;
+    }
+
+    .recent-tx-link i {
+        margin-left: 4px;
+        font-size: 0.7rem;
+    }
+
+    .recent-tx-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        table-layout: auto;
+    }
+
+    .recent-tx-table thead th {
+        background: #f1f5f9;
+        color: #000000;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 10px 14px;
+        border-bottom: 2px solid #000000;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .recent-tx-table tbody td {
+        padding: 12px 14px;
+        border-bottom: 1px solid #e9ecef;
+        font-size: 0.85rem;
+        color: #000000;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .recent-tx-table tbody tr:last-child td { border-bottom: none; }
+    .recent-tx-table tbody tr:hover td { background-color: #f9fafb; }
+
+    .tx-date {
+        font-weight: 700;
+        color: #000000;
+        font-size: 0.82rem;
+    }
+    .tx-time {
+        font-size: 0.7rem;
+        color: #6c757d;
+        margin-top: 2px;
+    }
+
+    .tx-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 50px;
+        border: 1px solid #000000;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+    }
+
+    .tx-badge-success { background: #d4edda; color: #155724; }
+    .tx-badge-danger  { background: #f8d7da; color: #721c24; }
+    .tx-badge-warning { background: #fff3cd; color: #856404; }
+    .tx-badge-info    { background: #cce5ff; color: #004085; }
+
+    .tx-ref {
+        font-family: 'Courier New', monospace;
+        font-size: 0.78rem;
+        background: #f1f5f9;
+        padding: 3px 8px;
+        border-radius: 4px;
+        color: #000000;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .tx-desc { color: #333; font-size: 0.82rem; }
+    .tx-user { font-size: 0.8rem; color: #333; font-weight: 500; }
+    .tx-muted { color: #adb5bd; }
+
+    .tx-amount {
+        font-weight: 700;
+        font-size: 0.88rem;
+        white-space: nowrap;
+    }
+
+    .tx-amount-success { color: #155724; }
+    .tx-amount-danger  { color: #721c24; }
+    .tx-amount-warning { color: #856404; }
+    .tx-amount-info    { color: #004085; }
+
+    .tx-empty {
+        text-align: center;
+        padding: 30px 14px !important;
+        color: #6c757d;
+        font-size: 0.85rem;
+    }
+
+    .tx-empty i { margin-right: 6px; }
+
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .table-responsive::-webkit-scrollbar { height: 8px; }
+    .table-responsive::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
+    .table-responsive::-webkit-scrollbar-thumb {
+        background: #87CEEB;
+        border-radius: 3px;
+        border: 1px solid #000000;
+    }
+
+    /* ============================================
+       BOTTOM QUICK LINKS
+    ============================================ */
+    .bottom-quick-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 20px;
+        margin-bottom: 10px;
+    }
+
+    /* ============================================
+       RESPONSIVE — TABLET (≤992px)
+    ============================================ */
+    @media (max-width: 992px) {
+        .balance-grid { gap: 10px; }
+        .balance-card { padding: 16px 14px; }
+        .balance-card .card-value { font-size: 1.4rem; }
+
+        .nav-actions-grid {
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .nav-action-card { padding: 10px 12px; }
+        .nav-action-card .action-icon {
+            font-size: 1.15rem;
+            width: 34px;
+            height: 34px;
+        }
+        .nav-action-card .action-title { font-size: 0.72rem; }
+        .nav-action-card .action-desc { font-size: 0.6rem; }
+    }
+
+    /* ============================================
+       RESPONSIVE — MOBILE (≤768px)
+    ============================================ */
+    @media (max-width: 768px) {
+        /* Balance cards — 2 in one row */
+        .balance-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+            margin-bottom: 14px;
+        }
+        .balance-card {
+            padding: 12px 10px;
+            border-radius: 6px;
+        }
+        .balance-card .card-icon {
+            font-size: 1.4rem;
+            right: 10px;
+            bottom: 10px;
+        }
+        .balance-card .card-label {
+            font-size: 0.6rem;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        .balance-card .card-value {
+            font-size: 1.05rem;
+        }
+        .balance-card .card-sub {
+            font-size: 0.58rem;
+            line-height: 1.2;
+        }
+
+        /* Nav actions — 6-col grid: 3 in row 1, 2 in row 2 (50/50) */
+        .nav-actions-grid {
+            grid-template-columns: repeat(6, 1fr);
+            gap: 5px;
+            margin-bottom: 14px;
+        }
+        .nav-actions-grid > *:nth-child(1),
+        .nav-actions-grid > *:nth-child(2),
+        .nav-actions-grid > *:nth-child(3) {
+            grid-column: span 2;   /* 3 cards, each 1/3 width */
+        }
+        .nav-actions-grid > *:nth-child(4),
+        .nav-actions-grid > *:nth-child(5) {
+            grid-column: span 3;   /* 2 cards, each 1/2 width */
+        }
+
+        .nav-action-card {
+            padding: 8px 8px;
+            border-radius: 6px;
+            flex-direction: column;
+            gap: 4px;
+            text-align: center;
+            border-width: 1.5px;
+        }
+        .nav-action-card .action-icon {
+            font-size: 1.1rem;
+            width: 32px;
+            height: 32px;
+            margin: 0 auto;
+        }
+        .nav-action-card .action-content {
+            width: 100%;
+        }
+        .nav-action-card .action-title {
+            font-size: 0.62rem;
+            letter-spacing: 0.1px;
+            margin-bottom: 1px;
+        }
+        .nav-action-card .action-desc {
+            font-size: 0.5rem;
+            line-height: 1.1;
+            white-space: normal;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+        .nav-action-card .action-arrow { display: none; }
+
+        /* Recent tx header */
+        .recent-tx-header { padding: 10px 12px; }
+        .recent-tx-header h5 { font-size: 0.82rem; }
+        .recent-tx-link { font-size: 0.65rem; padding: 3px 8px; }
+
+        /* Table scroll */
+        .recent-tx-table { min-width: 720px; }
+        .recent-tx-table thead th,
+        .recent-tx-table tbody td {
+            padding: 8px 10px;
+            font-size: 0.75rem;
+        }
+        .tx-ref { font-size: 0.7rem; padding: 2px 6px; }
+        .tx-badge { font-size: 0.62rem; padding: 3px 8px; }
+        .tx-desc { font-size: 0.72rem; }
+        .tx-user { font-size: 0.7rem; }
+        .tx-amount { font-size: 0.78rem; }
+
+        /* Bottom quick links */
+        .bottom-quick-links {
+            gap: 8px;
+            margin-top: 14px;
+        }
+        .bottom-quick-links .btn {
+            font-size: 0.75rem;
+            padding: 6px 10px;
+            flex: 1 1 calc(50% - 8px);
+            text-align: center;
+        }
+    }
+
+    /* ============================================
+       RESPONSIVE — SMALL MOBILE (≤480px)
+    ============================================ */
+    @media (max-width: 480px) {
+        /* Balance cards — still 2 in one row, tighter */
+        .balance-grid { gap: 4px; }
+        .balance-card {
+            padding: 10px 8px;
+            border-width: 1.5px;
+            border-left-width: 4px;
+        }
+        .balance-card .card-icon {
+            font-size: 1.1rem;
+            right: 8px;
+            bottom: 8px;
+        }
+        .balance-card .card-label {
+            font-size: 0.52rem;
+            letter-spacing: 0.2px;
+        }
+        .balance-card .card-value { font-size: 0.85rem; }
+        .balance-card .card-sub { font-size: 0.5rem; }
+
+        /* Nav actions — still 3 in row 1, 2 in row 2 (50/50) */
+        .nav-actions-grid {
+            grid-template-columns: repeat(6, 1fr);
+            gap: 4px;
+        }
+        .nav-actions-grid > *:nth-child(1),
+        .nav-actions-grid > *:nth-child(2),
+        .nav-actions-grid > *:nth-child(3) {
+            grid-column: span 2;
+        }
+        .nav-actions-grid > *:nth-child(4),
+        .nav-actions-grid > *:nth-child(5) {
+            grid-column: span 3;
+        }
+
+        .nav-action-card {
+            padding: 6px 4px;
+            border-width: 1px;
+            border-left-width: 3px;
+        }
+        .nav-action-card .action-icon {
+            font-size: 0.95rem;
+            width: 26px;
+            height: 26px;
+        }
+        .nav-action-card .action-title { font-size: 0.55rem; }
+        .nav-action-card .action-desc { font-size: 0.44rem; }
+
+        /* Table */
+        .recent-tx-table { min-width: 680px; }
+        .recent-tx-table thead th,
+        .recent-tx-table tbody td {
+            padding: 6px 8px;
+            font-size: 0.68rem;
+        }
+        .tx-date { font-size: 0.65rem; }
+        .tx-time { font-size: 0.58rem; }
+        .tx-ref { font-size: 0.6rem; padding: 1px 5px; }
+        .tx-badge { font-size: 0.55rem; padding: 2px 6px; gap: 3px; }
+        .tx-badge i { display: none; }
+        .tx-desc { font-size: 0.65rem; }
+        .tx-user { font-size: 0.62rem; }
+        .tx-amount { font-size: 0.68rem; }
+
+        .recent-tx-header { padding: 8px 10px; }
+        .recent-tx-header h5 { font-size: 0.72rem; }
+        .recent-tx-link { font-size: 0.6rem; padding: 2px 6px; }
+
+        /* Bottom quick links */
+        .bottom-quick-links .btn {
+            flex: 1 1 100%;
+            font-size: 0.72rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid finance-dashboard">
+
+    <!-- ============================================
+         BALANCE CARDS — 2 IN ONE ROW
+    ============================================ -->
+    <div class="balance-grid">
+        <!-- COGS Balance Card -->
+        <a href="{% url 'epa_shop:finance-cogs-report' %}" class="balance-card cogs-balance">
+            <div class="card-icon"><i class="fas fa-coins"></i></div>
+            <div class="card-label">
+                <i class="fas fa-tag"></i> Cost Of Goods Sold
+            </div>
+            <div class="card-value">KSh {{ current_balance|floatformat:2|default:"0.00" }}</div>
+            <div class="card-sub">Available for inventory & stock purchases</div>
+        </a>
+
+        <!-- Profit Balance Card -->
+        <a href="/companies/reports/" class="balance-card profit-balance">
+            <div class="card-icon"><i class="fas fa-chart-line"></i></div>
+            <div class="card-label">
+                <i class="fas fa-hand-holding-usd"></i> Profit + Commissions
+            </div>
+            <div class="card-value">KSh {{ current_profit_balance|floatformat:2|default:"0.00" }}</div>
+            <div class="card-sub">
+                Revenue + Commissions − COGS − Expenses
+            </div>
+        </a>
+    </div>
+
+    <!-- ============================================
+         NAV ACTION CARDS
+         Desktop: 5 in one row
+         Mobile:  3 in row 1 · 2 in row 2 (50/50)
+    ============================================ -->
+    <div class="nav-actions-grid">
+
+        <!-- 1. Purchase Report -->
+        <a href="{% url 'epa_shop:finance-cogs-report' %}" class="nav-action-card cogs-action">
+            <div class="action-icon"><i class="fas fa-file-alt"></i></div>
+            <div class="action-content">
+                <div class="action-title">Purchases</div>
+                <p class="action-desc">Purchase report</p>
+            </div>
+            <div class="action-arrow"><i class="fas fa-chevron-right"></i></div>
+        </a>
+
+        <!-- 2. Expense Report -->
+        <a href="{% url 'companies:company-expenses-dashboard' %}" class="nav-action-card sales-action">
+            <div class="action-icon"><i class="fas fa-chart-bar"></i></div>
+            <div class="action-content">
+                <div class="action-title">Expenses</div>
+                <p class="action-desc">Expense report</p>
+            </div>
+            <div class="action-arrow"><i class="fas fa-chevron-right"></i></div>
+        </a>
+
+        <!-- 3. Revenue Report -->
+        <a href="{% url 'companies:company-reports-dashboard' %}" class="nav-action-card sales-action">
+            <div class="action-icon"><i class="fas fa-chart-bar"></i></div>
+            <div class="action-content">
+                <div class="action-title">Revenue</div>
+                <p class="action-desc">Revenue report</p>
+            </div>
+            <div class="action-arrow"><i class="fas fa-chevron-right"></i></div>
+        </a>
+
+        <!-- 4. Purchase (50% on mobile row 2) -->
+        <a href="{% url 'epa_shop:finance-purchase-create' %}" class="nav-action-card purchase-action">
+            <div class="action-icon"><i class="fas fa-plus"></i></div>
+            <div class="action-content">
+                <div class="action-title">Purchase</div>
+                <p class="action-desc">Add stock</p>
+            </div>
+            <div class="action-arrow"><i class="fas fa-chevron-right"></i></div>
+        </a>
+
+        <!-- 5. Payments (50% on mobile row 2) -->
+        <div class="dropdown expense-dropdown-wrap">
+            <button type="button"
+                    class="nav-action-card expense-action dropdown-toggle"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false">
+                <div class="action-icon"><i class="fas fa-plus"></i></div>
+                <div class="action-content">
+                    <div class="action-title">Payments</div>
+                    <p class="action-desc">Choose category</p>
+                </div>
+                <div class="action-arrow"><i class="fas fa-chevron-down"></i></div>
+            </button>
+            <ul class="dropdown-menu expense-dropdown-menu">
+                <li>
+                    <a class="dropdown-item" href="{% url 'companies:company-salaries-create' %}">
+                        <i class="fas fa-users text-success"></i>
+                        <span>Pay Salary</span>
+                    </a>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <a class="dropdown-item" href="{% url 'companies:company-rents-create' %}">
+                        <i class="fas fa-building text-primary"></i>
+                        <span>Pay Rent</span>
+                    </a>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <a class="dropdown-item" href="{% url 'companies:company-bills-create' %}">
+                        <i class="fas fa-file-invoice text-danger"></i>
+                        <span>Pay Bills</span>
+                    </a>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <a class="dropdown-item" href="{% url 'companies:company-general-create' %}">
+                        <i class="fas fa-shopping-cart text-info"></i>
+                        <span>General Expense</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ============================================
+         RECENT TRANSACTIONS TABLE
+    ============================================ -->
+    <div class="recent-tx-card">
+        <div class="recent-tx-header">
+            <h5>
+                <i class="fas fa-history"></i> Recent Transactions
+            </h5>
+            <a href="{% url 'epa_shop:all-transactions-records' %}" class="recent-tx-link">
+                View all <i class="fas fa-arrow-right"></i>
+            </a>
+        </div>
+
+        <div class="table-responsive">
+            <table class="recent-tx-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Reference</th>
+                        <th>Description</th>
+                        <th>Recorded By</th>
+                        <th class="text-end">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tx in recent_transactions %}
+                    <tr>
+                        <td>
+                            <div class="tx-date">{{ tx.date|date:"M d, Y" }}</div>
+                            <div class="tx-time">{{ tx.date|date:"H:i" }}</div>
+                        </td>
+                        <td>
+                            <span class="tx-badge tx-badge-{{ tx.type_class }}">
+                                <i class="fas {{ tx.icon }}"></i>
+                                {{ tx.type_label }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="tx-ref">{{ tx.reference }}</span>
+                        </td>
+                        <td>
+                            <div class="tx-desc">{{ tx.description }}</div>
+                        </td>
+                        <td>
+                            {% if tx.user %}
+                                <div class="tx-user">
+                                    {{ tx.user.get_full_name|default:tx.user.username }}
+                                </div>
+                            {% else %}
+                                <span class="tx-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <span class="tx-amount tx-amount-{{ tx.type_class }}">
+                                {{ tx.sign }} KSh {{ tx.amount|floatformat:2 }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="tx-empty">
+                            <i class="fas fa-info-circle"></i>
+                            No transactions recorded yet.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ============================================
+         BOTTOM QUICK LINKS
+    ============================================ -->
+    <div class="bottom-quick-links">
+        <a href="{% url 'companies:company-expenses-all' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-list"></i> All Expenses History
+        </a>
+
+        <a href="{% url 'epa_shop:finance-purchase-records' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-list"></i> All Purchases History
+        </a>
+        
+        {# Commissions — admins go company-wide, others go branch-scoped #}
+        {% if request.user.role == 'super_admin' or request.user.role == 'company_admin' %}
+        <a href="{% url 'treasury:company_commissions_list' company.id %}"
+        class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-list"></i> All Commissions History
+        </a>
+        {% elif treasury_branch %}
+        <a href="{% url 'treasury:commissions_list' company.id treasury_branch.id %}"
+        class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-list"></i> Branch Commissions History
+        </a>
+        {% else %}
+        <button class="btn btn-outline-secondary btn-sm" disabled
+                title="No branch available">
+            <i class="fas fa-list"></i> Commissions History
+        </button>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

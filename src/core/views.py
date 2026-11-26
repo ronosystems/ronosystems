@@ -13,6 +13,11 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from apps.settings.models import SystemSetting
 from datetime import datetime
+from apps.companies.business_types import BusinessTypeEnum
+from django.shortcuts import render
+
+
+
 
 @login_required
 def notification_center(request):
@@ -87,18 +92,21 @@ def notification_center(request):
             
             if last_seen_iso:
                 try:
-                    last_seen = datetime.fromisoformat(last_seen_iso)
-                    if timezone.is_naive(last_seen):
-                        last_seen = timezone.make_aware(last_seen)
-                    cutoff = max(last_seen, today_start)
+                    # Use Django's parse_datetime for safe timezone handling
+                    from django.utils.dateparse import parse_datetime
+                    last_seen = parse_datetime(last_seen_iso)
+                    if not last_seen:
+                        last_seen = today_start
                 except (ValueError, TypeError):
-                    cutoff = today_start
+                    last_seen = today_start
             else:
-                cutoff = today_start
+                last_seen = today_start
 
-            context['new_users_count'] = User.objects.filter(created_at__gte=cutoff).count()
+            context['new_users_count'] = User.objects.filter(created_at__gte=last_seen).count()
         except Exception:
             context['new_users_count'] = 0
+
+
 
     return render(request, 'companies/notification_center.html', context)
 
@@ -786,8 +794,6 @@ def asset_links(request):
 
 
 
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
 
 @login_required
 def super_admin_dashboard(request):
@@ -985,10 +991,6 @@ def super_admin_dashboard(request):
     }
     return render(request, 'superadmin/super_dashboard.html', context)
 
-
-
-from django.contrib.auth.decorators import login_required
-from apps.companies.business_types import BusinessTypeEnum
 
 @login_required
 def dashboard_router(request):

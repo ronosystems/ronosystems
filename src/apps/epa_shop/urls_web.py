@@ -9,226 +9,135 @@ from . import category_views
 from . import inventory_views
 from . import finance_views
 from . import customer_views
-
 app_name = 'epa_shop'
-
-
-
 urlpatterns = [
-    # ============================================
-    # EPA SHOP FRONTEND (PUBLIC)
-    # ============================================
     path('', storefront.epa_storefront, name='epa-storefront'),
     path('shop/product/<str:product_code>/', storefront.public_product_detail, name='public-product-detail'),
     path('manage-home/', home_views.manage_homepage, name='manage-homepage'),
     path('api/search-products/', home_views.search_products_api, name='search-products-api'),
-
-
-    # ============================================
-    # DASHBOARD
-    # ============================================
     path('dashboard/', dashboard_views.epa_dashboard, name='web-dashboard'),
 
-    # ============================================
-    # INVENTORY
-    # ============================================
-    path('inventory/',                       inventory_views.inventory_list,      name='epa-inventory'),
-    path('inventory/low-stock/',             inventory_views.low_stock,           name='epa-low-stock'),
-    path('inventory/movement/',              inventory_views.stock_movement,      name='epa-stock-movement'),
-    path('inventory/bulk-transfer/',         inventory_views.bulk_transfer,       name='bulk-transfer'),
-    path('inventory/bulk-transfer/check/',   inventory_views.bulk_transfer_check, name='bulk-transfer-check'),
-    path('inventory/stock-restock/',         product_views.stock_restock_scanner, name='epa-stock-restock-scanner'),
+
+
+    path('inventory/', inventory_views.inventory_list, name='epa-inventory'),
+    path('inventory/low-stock/', inventory_views.low_stock, name='epa-low-stock'),
+    path('inventory/movement/', inventory_views.stock_movement, name='epa-stock-movement'),
+    path('inventory/bulk-transfer/', inventory_views.bulk_transfer, name='bulk-transfer'),
+    path('inventory/bulk-transfer/check/', inventory_views.bulk_transfer_check, name='bulk-transfer-check'),
+    path('inventory/stock-restock/', product_views.stock_restock_scanner, name='epa-stock-restock-scanner'),
     path('inventory/stock-restock/suggest/', product_views.stock_restock_suggestions, name='epa-stock-restock-suggest'),
     path('inventory/transfer/<int:transfer_id>/receive/', inventory_views.receive_transfer_view, name='receive-transfer'),
-
-    # ============================================
-    # DISCONTINUED PRODUCTS
-    # ============================================
-    path('inventory/discontinued/',
-         inventory_views.discontinued_products_list,
-         name='discontinued-products'),
-    path('inventory/discontinued/<str:product_code>/reactivate/',
-         inventory_views.reactivate_product_view,
-         name='reactivate-product'),
-    path('products/<str:product_code>/discontinue/',
-         inventory_views.discontinue_product_view,
-         name='discontinue-product'),
-     path('discontinued/<int:record_id>/set-replacement/',
-         inventory_views.set_replacement_view,
-         name='set-replacement'),
- 
-    # ============================================
-    # PRODUCTS — Full CRUD (Using Product Code)
-    # ============================================
-    path('scanner-lookup/',                        product_views.scanner_lookup,      name='scanner_lookup'),
-    path('barcode/<str:kind>/<int:pk>.png',        product_views.barcode_png,         name='barcode_png'),
-    path('label/<str:kind>/<int:pk>.pdf',          product_views.label_single_pdf,    name='label_single_pdf'),
-    path('labels-mixed.pdf',                       product_views.labels_mixed_pdf,    name='labels_mixed_pdf'),
-    path('labels/<str:kind>.pdf',                  product_views.labels_bulk_pdf,     name='labels_bulk_pdf'),
-    path('labels/print/',                          product_views.labels_print_page,   name='labels-print'),
-    path('products/export-excel/',                 product_views.product_export_excel,   name='epa-product-export'),
-    path('products/',                                     product_views.product_list,    name='epa-products'),
-    path('products/add/',                                 product_views.product_create,  name='epa-product-create'),
-    path('products/search-units/',                        product_views.product_search_units, name='product-search-units'),
-    path('products/<str:product_code>/',                  product_views.product_detail,  name='epa-product-detail'),
-    path('products/<str:product_code>/edit/',             product_views.product_edit,    name='epa-product-edit'),
-    path('products/<str:product_code>/delete/',           product_views.product_delete,  name='epa-product-delete'),
-    path('products/<str:product_code>/restock/',          product_views.product_restock, name='epa-product-restock'),
-    path('products/<str:product_code>/units/',            product_views.product_units,   name='epa-product-units'),
-    path('products/<str:product_code>/update-prices/',    product_views.update_product_prices, name='epa-product-update-prices'),
-    path('products/<str:product_code>/transfer/',         product_views.product_transfer,      name='epa-product-transfer'),
-    path('products/<str:product_code>/images/add/',       product_views.product_image_add,     name='product_image_add'),
-    path('products/<str:product_code>/images/<int:image_id>/delete/',    product_views.product_image_delete,   name='product_image_delete'),
-    path('products/<str:product_code>/unit/<str:identifier>/delete/',    product_views.unit_delete,            name='epa-unit-delete'),
-    path('products/<str:product_code>/images/cover/delete/',             product_views.product_image_cover_delete, name='product_image_cover_delete'),
+    path('inventory/discontinued/', inventory_views.discontinued_products_list, name='discontinued-products'),
+    path('inventory/discontinued/<str:product_code>/reactivate/', inventory_views.reactivate_product_view, name='reactivate-product'),
 
 
-    # ============================================
-    # UNIT MANAGEMENT
-    # ============================================
-    path('units/',             product_views.all_units_combined,    name='epa-all-units'),
-    path('unit/<int:unit_id>/edit/',      product_views.unit_edit,     name='epa-unit-edit'),
-    path('unit/<int:unit_id>/transfer/',  product_views.unit_transfer, name='epa-unit-transfer'),
-    
 
-    # ============================================
-    # ALL UNITS PAGES
-    # ============================================
-    path('units/phones/',      product_views.all_phone_units,       name='epa-all-phone-units'),
-    path('units/electronics/', product_views.all_electronic_units,  name='epa-all-electronic-units'),
-    path('accessories/',       product_views.accessory_list,        name='epa-accessories'),
+    path('products/<str:product_code>/discontinue/', inventory_views.discontinue_product_view, name='discontinue-product'),
+    path('discontinued/<int:record_id>/set-replacement/', inventory_views.set_replacement_view, name='set-replacement'),
+    path('scanner-lookup/', product_views.scanner_lookup, name='scanner_lookup'),
+    path('barcode/<str:kind>/<int:pk>.png', product_views.barcode_png, name='barcode_png'),
 
-    # ============================================
-    # POINT OF SALE (POS)
-    # ============================================
-    path('pos/',                       pos_views.pos_dashboard,          name='epa-pos'),
-    path('pos/search/',                pos_views.pos_search_products,    name='epa-pos-search'),
-    path('pos/search-imei/',           pos_views.pos_search_imei,        name='epa-pos-search-imei'),
-    path('pos/search/barcode/',        pos_views.pos_search_barcode,     name='epa-pos-search-barcode'),
-    path('pos/branches/',              sale_views.get_branches,          name='epa-pos-branches'),
-    path('pos/pending/',               sale_views.pos_pending_payments,  name='pos-pending-payments'),
 
-    # ============================================
-    # SALE MANAGEMENT (list, detail, edit, delete)
-    # ============================================
-    path('sales/',                     sale_views.sale_list,     name='epa-sales'),
-    path('sales/add/',                 sale_views.sale_create,   name='epa-sale-create'),
-    path('sales/<int:pk>/',            sale_views.sale_detail,   name='epa-sale-detail'),
-    path('sales/<int:pk>/edit/',       sale_views.sale_edit,     name='epa-sale-edit'),
-    path('sale/process/',              sale_views.process_sale,  name='epa-sale-process'),
-    path('sale/history/',              sale_views.sale_history,  name='epa-sale-history'),
-    path('sale/<int:pk>/delete/',      sale_views.sale_delete,   name='epa-sale-delete'),
 
-    # ============================================
-    # SINGLE ITEM SALE
-    # ============================================
-    path('sales/single/',              sale_views.sale_create_single,           name='epa-sale-create-single'),
-    path('sale/search-units/',         sale_views.sale_search_units,            name='epa-sale-search-units'),
-    path('sale/get-unit/',             sale_views.sale_get_unit_by_identifier,  name='epa-sale-get-unit'),
-    path('sale/process-single/',       sale_views.sale_process_single,          name='epa-sale-process-single'),
-    path('sales/pending/',             sale_views.sale_pending_list,            name='epa-sales-pending'),
+    path('label/<str:kind>/<int:pk>.pdf', product_views.label_single_pdf, name='label_single_pdf'),
+    path('labels-mixed.pdf', product_views.labels_mixed_pdf, name='labels_mixed_pdf'),
+    path('labels/<str:kind>.pdf', product_views.labels_bulk_pdf, name='labels_bulk_pdf'),
+    path('labels/print/', product_views.labels_print_page, name='labels-print'),
 
-    # ============================================
-    # SALE LOOKUP (used by POS Return + Pending modals)
-    # ============================================
-    path('sale/lookup/',               sale_views.sale_lookup_by_barcode,  name='epa-sale-lookup'),
 
-    # ============================================
-    # SALE RETURNS (used by POS Return modal)
-    # ============================================
-    path('sale/<int:sale_id>/return-data/',  sale_views.sale_return_data,     name='sale-return-data'),
-    path('sale/process-return/',             sale_views.sale_process_return,  name='sale-process-return'),
-    path('sales/export-excel/',              sale_views.sale_export_excel,    name='epa-sales-export'),
 
-    # ============================================
-    # COMPLETE SALE — TWO DISTINCT PATHS
-    #   /complete-json/  → JSON API for POS pending modal
-    #   /complete/       → form-based flow for admin verify page
-    # ============================================
-    path('sale/<int:sale_id>/complete-json/',
-         sale_views.sale_complete_json,
-         name='sale-complete-json'),
+    path('products/export-excel/', product_views.product_export_excel, name='epa-product-export'),
+    path('products/', product_views.product_list, name='epa-products'),
+    path('products/add/', product_views.product_create, name='epa-product-create'),
+    path('products/search-units/', product_views.product_search_units, name='product-search-units'),
+    path('products/<str:product_code>/', product_views.product_detail, name='epa-product-detail'),
+    path('products/<str:product_code>/edit/', product_views.product_edit, name='epa-product-edit'),
+    path('products/<str:product_code>/delete/', product_views.product_delete, name='epa-product-delete'),
+    path('products/<str:product_code>/restock/', product_views.product_restock, name='epa-product-restock'),
+    path('products/<str:product_code>/units/', product_views.product_units, name='epa-product-units'),
+    path('products/<str:product_code>/update-prices/', product_views.update_product_prices, name='epa-product-update-prices'),
+    path('products/<str:product_code>/transfer/', product_views.product_transfer, name='epa-product-transfer'),
+    path('products/<str:product_code>/images/add/', product_views.product_image_add, name='product_image_add'),
+    path('products/<str:product_code>/images/<int:image_id>/delete/', product_views.product_image_delete, name='product_image_delete'),
+    path('products/<str:product_code>/unit/<str:identifier>/delete/', product_views.unit_delete, name='epa-unit-delete'),
+    path('products/<str:product_code>/images/cover/delete/', product_views.product_image_cover_delete, name='product_image_cover_delete'),
 
-    path('sale/<int:sale_id>/complete/',
-         sale_views.sale_complete,
-         name='epa-sale-complete'),
 
-    path('sale/<str:company_sale_id>/complete/',
-         sale_views.sale_complete,
-         name='epa-sale-complete-by-id'),
 
-    # ============================================
-    # SALE RECEIPTS
-    # Order matters — Django matches top-to-bottom.
-    # <int:pk> must come before <str:company_sale_id>
-    # so numeric IDs are not swallowed by the string pattern.
-    # ============================================
-    path('sale/receipt/<int:pk>/',
-         sale_views.sale_receipt,
-         name='epa-sale-receipt'),
+    path('units/', product_views.all_units_combined, name='epa-all-units'),
+    path('unit/<int:unit_id>/edit/', product_views.unit_edit, name='epa-unit-edit'),
+    path('unit/<int:unit_id>/transfer/', product_views.unit_transfer, name='epa-unit-transfer'),
+    path('units/phones/', product_views.all_phone_units, name='epa-all-phone-units'),
+    path('units/electronics/', product_views.all_electronic_units, name='epa-all-electronic-units'),
 
-    path('sale/receipt/<str:company_sale_id>/',
-         sale_views.sale_receipt_by_id,
-         name='epa-sale-receipt-by-id'),
 
-    # ============================================
-    # REVERSE SALE — int first, then str
-    # ============================================
-    path('sale/<int:sale_id>/reverse/',
-         product_views.unit_reverse_sale,
-         name='epa-sale-reverse'),
 
-    path('sale/<str:company_sale_id>/reverse/',
-         product_views.unit_reverse_sale,
-         name='epa-sale-reverse-by-id'),
+    path('accessories/', product_views.accessory_list, name='epa-accessories'),
 
-     path('sale/<int:pk>/delete-pending/',
-          sale_views.sale_delete_pending,
-          name='epa-sale-delete-pending'),
+    path('pos/', pos_views.pos_dashboard, name='epa-pos'),
+    path('pos/search/', pos_views.pos_search_products, name='epa-pos-search'),
+    path('pos/search-imei/', pos_views.pos_search_imei, name='epa-pos-search-imei'),
+    path('pos/search/barcode/', pos_views.pos_search_barcode, name='epa-pos-search-barcode'),
+    path('pos/branches/', sale_views.get_branches, name='epa-pos-branches'),
+    path('pos/pending/', sale_views.pos_pending_payments, name='pos-pending-payments'),
 
-    # ============================================
-    # CATEGORIES — Full CRUD
-    # ============================================
-    path('categories/',                            category_views.category_list,           name='epa-categories'),
-    path('categories/add/',                        category_views.category_create,         name='epa-category-create'),
-    path('categories/<int:pk>/edit/',              category_views.category_edit,           name='epa-category-edit'),
-    path('categories/<int:pk>/delete/',            category_views.category_delete,         name='epa-category-delete'),
-    path('categories/<int:pk>/products/',          category_views.category_products,       name='epa-category-products'),
-    path('categories/<int:pk>/toggle-status/',     category_views.category_toggle_status,  name='epa-category-toggle-status'),
 
-    # ============================================
-    # FINANCE — Full CRUD (EPA Shop Finance)
-    # ============================================
-    path('finance/',                                       finance_views.finance_dashboard,      name='finance-dashboard'),
-    path('finance/cogs-transactions/',                     finance_views.cogs_transactions,      name='finance-cogs-transactions'),
-    path('finance/cogs-accounts/',                         finance_views.cogs_accounts,          name='finance-cogs-accounts'),
-    path('finance/cogs-accounts/create/',                  finance_views.cogs_account_create,    name='finance-cogs-account-create'),
-    path('finance/purchases/',                             finance_views.purchase_records,       name='finance-purchase-records'),
-    path('finance/purchases/create/',                      finance_views.purchase_create,        name='finance-purchase-create'),
-    path('finance/purchases/<int:pk>/edit/',               finance_views.purchase_edit,          name='finance-purchase-edit'),
-    path('finance/purchases/<int:pk>/delete/',             finance_views.purchase_delete,        name='finance-purchase-delete'),
-    path('finance/purchases/<int:pk>/',                    finance_views.purchase_detail,        name='finance-purchase-detail'),
-    path('finance/cogs-report/',                           finance_views.cogs_report,            name='finance-cogs-report'),
-    path('finance/api/data/',                              finance_views.finance_api_data,       name='finance-api-data'),
-    path('finance/api/balance/',                           finance_views.api_cogs_balance,       name='finance-api-balance'),
-    path('finance/export/',                                finance_views.export_cogs_report,     name='finance-export-cogs'),
-    path('finance/debug/',                                 finance_views.debug_cogs_balance,     name='finance-debug'),
 
-    # ============================================
-    # FINANCE — ALL TRANSACTIONS
-    # ============================================
+    path('sales/', sale_views.sale_list, name='epa-sales'),
+    path('sales/add/', sale_views.sale_create, name='epa-sale-create'),
+    path('sales/<int:pk>/', sale_views.sale_detail, name='epa-sale-detail'),
+    path('sales/<int:pk>/edit/', sale_views.sale_edit, name='epa-sale-edit'),
+    path('sale/process/', sale_views.process_sale, name='epa-sale-process'),
+    path('sale/history/', sale_views.sale_history, name='epa-sale-history'),
+    path('sale/<int:pk>/delete/', sale_views.sale_delete, name='epa-sale-delete'),
+    path('sales/single/', sale_views.sale_create_single, name='epa-sale-create-single'),
+    path('sale/search-units/', sale_views.sale_search_units, name='epa-sale-search-units'),
+    path('sale/get-unit/', sale_views.sale_get_unit_by_identifier, name='epa-sale-get-unit'),
+    path('sale/process-single/', sale_views.sale_process_single, name='epa-sale-process-single'),
+    path('sales/pending/', sale_views.sale_pending_list, name='epa-sales-pending'),
+    path('sale/lookup/', sale_views.sale_lookup_by_barcode, name='epa-sale-lookup'),
+    path('sale/<int:sale_id>/return-data/', sale_views.sale_return_data, name='sale-return-data'),
+    path('sale/process-return/', sale_views.sale_process_return, name='sale-process-return'),
+    path('sales/export-excel/', sale_views.sale_export_excel, name='epa-sales-export'),
+    path('sale/<int:sale_id>/complete-json/', sale_views.sale_complete_json, name='sale-complete-json'),
+    path('sale/<int:sale_id>/complete/', sale_views.sale_complete, name='epa-sale-complete'),
+    path('sale/<str:company_sale_id>/complete/', sale_views.sale_complete, name='epa-sale-complete-by-id'),
+    path('sale/receipt/<int:pk>/', sale_views.sale_receipt, name='epa-sale-receipt'),
+    path('sale/receipt/<str:company_sale_id>/', sale_views.sale_receipt_by_id, name='epa-sale-receipt-by-id'),
+    path('sale/<int:sale_id>/reverse/', product_views.unit_reverse_sale, name='epa-sale-reverse'),
+    path('sale/<str:company_sale_id>/reverse/', product_views.unit_reverse_sale, name='epa-sale-reverse-by-id'),
+    path('sale/<int:pk>/delete-pending/', sale_views.sale_delete_pending, name='epa-sale-delete-pending'),
+
+
+
+    path('categories/', category_views.category_list, name='epa-categories'),
+    path('categories/add/', category_views.category_create, name='epa-category-create'),
+    path('categories/<int:pk>/edit/', category_views.category_edit, name='epa-category-edit'),
+    path('categories/<int:pk>/delete/', category_views.category_delete, name='epa-category-delete'),
+    path('categories/<int:pk>/products/', category_views.category_products, name='epa-category-products'),
+    path('categories/<int:pk>/toggle-status/', category_views.category_toggle_status, name='epa-category-toggle-status'),
+
+
+    path('finance/', finance_views.finance_dashboard, name='finance-dashboard'),
+    path('finance/cogs-transactions/', finance_views.cogs_transactions, name='finance-cogs-transactions'),
+    path('finance/cogs-accounts/', finance_views.cogs_accounts, name='finance-cogs-accounts'),
+    path('finance/cogs-accounts/create/', finance_views.cogs_account_create, name='finance-cogs-account-create'),
+    path('finance/purchases/', finance_views.purchase_records, name='finance-purchase-records'),
+    path('finance/purchases/create/', finance_views.purchase_create, name='finance-purchase-create'),
+    path('finance/purchases/<int:pk>/edit/', finance_views.purchase_edit, name='finance-purchase-edit'),
+    path('finance/purchases/<int:pk>/delete/', finance_views.purchase_delete, name='finance-purchase-delete'),
+    path('finance/purchases/<int:pk>/', finance_views.purchase_detail, name='finance-purchase-detail'),
+    path('finance/cogs-report/', finance_views.cogs_report, name='finance-cogs-report'),
+    path('finance/api/data/', finance_views.finance_api_data, name='finance-api-data'),
+    path('finance/api/balance/', finance_views.api_cogs_balance, name='finance-api-balance'),
+    path('finance/export/', finance_views.export_cogs_report, name='finance-export-cogs'),
+    path('finance/debug/', finance_views.debug_cogs_balance, name='finance-debug'),
     path('finance/transactions/', finance_views.all_transactions, name='all-transactions-records'),
+    path('finance/cogs-daily/<str:date_str>/', finance_views.cogs_daily_detail, name='finance-cogs-daily-detail'),
+    path('finance/cogs-weekly/<int:year>/<int:week>/', finance_views.cogs_weekly_detail, name='finance-cogs-weekly-detail'),
+    path('finance/cogs-monthly/<int:year>/<int:month>/', finance_views.cogs_monthly_detail, name='finance-cogs-monthly-detail'),
 
-    # ============================================
-    # FINANCE — COGS Detail Views
-    # ============================================
-    path('finance/cogs-daily/<str:date_str>/',          finance_views.cogs_daily_detail,    name='finance-cogs-daily-detail'),
-    path('finance/cogs-weekly/<int:year>/<int:week>/',  finance_views.cogs_weekly_detail,   name='finance-cogs-weekly-detail'),
-    path('finance/cogs-monthly/<int:year>/<int:month>/',finance_views.cogs_monthly_detail,  name='finance-cogs-monthly-detail'),
-
-    # ============================================
-    # EPA SHOP CUSTOMERS MANAGEMENT
-    # ============================================
+    
     path('customers/', customer_views.customer_list, name='customer-list'),
     path('customers/create/', customer_views.customer_create, name='customer-create'),
     path('customers/<int:pk>/edit/', customer_views.customer_update, name='customer-update'),

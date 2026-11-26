@@ -153,6 +153,7 @@ class Company(models.Model):
         max_length=20, unique=True, db_index=True, editable=False, blank=True,
         help_text="Auto-generated unique company ID (e.g. F@RS001). Employees use this to register.",
     )
+
     name = models.CharField(max_length=200)
     business_type = models.ForeignKey(BusinessType, on_delete=models.SET_NULL, null=True, related_name='companies')
     registration_number = models.CharField(max_length=100, unique=True, blank=True)
@@ -500,6 +501,17 @@ class Company(models.Model):
         if self.subdomain:
             return f"https://{self.subdomain}.ronosystems.com"
         return "https://ronosystems.onrender.com"
+
+        
+    @property
+    def allowed_roles(self):
+        """Returns the list of roles allowed for this company's business type."""
+        from apps.companies.business_types import BusinessTypeEnum
+        if self.business_type:
+            return BusinessTypeEnum.get_allowed_roles(self.business_type.name)
+        return BusinessTypeEnum.get_allowed_roles('EPA Shop') # Fallback
+
+
 
     @classmethod
     def find_by_domain(cls, host, require_verified: bool = True):
@@ -913,6 +925,7 @@ class Branch(models.Model):
     def __str__(self):
         return f"{self.name} ({self.code})"
 
+
 # ============================================
 # COMPANY EXPENSES
 # ============================================
@@ -959,11 +972,17 @@ class Expense(models.Model):
         ('other', 'Other'),
     )
 
+    # ── Status constants (required by expenses_views.py) ──
+    STATUS_PENDING  = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_REJECTED = 'rejected'
+    STATUS_PAID     = 'paid'
+
     EXPENSE_STATUS = (
-        ('pending', 'Pending'),
-        ('approved', 'Approved'),
-        ('rejected', 'Rejected'),
-        ('paid', 'Paid'),
+        (STATUS_PENDING,  'Pending'),
+        (STATUS_APPROVED, 'Approved'),
+        (STATUS_REJECTED, 'Rejected'),
+        (STATUS_PAID,     'Paid'),
     )
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='expenses')
@@ -994,7 +1013,7 @@ class Expense(models.Model):
     attachment = models.FileField(upload_to='expense_attachments/%Y/%m/', blank=True, null=True, max_length=500)
     attachment_format = models.CharField(max_length=10, blank=True, default='')
     notes = models.TextField(blank=True)
-    status = models.CharField(max_length=20, choices=EXPENSE_STATUS, default='pending')
+    status = models.CharField(max_length=20, choices=EXPENSE_STATUS, default=STATUS_PENDING)
     paid_at = models.DateTimeField(null=True, blank=True)
 
     created_by = models.ForeignKey(django_settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='expenses_created')
@@ -1051,17 +1070,17 @@ class Expense(models.Model):
         return f"{media_url}{key}"
 
     def approve(self, user):
-        self.status = 'approved'
+        self.status = self.STATUS_APPROVED
         self.approved_by = user
         self.approved_at = timezone.now()
         self.save()
 
     def reject(self):
-        self.status = 'rejected'
+        self.status = self.STATUS_REJECTED
         self.save()
 
     def mark_paid(self, user=None):
-        self.status = 'paid'
+        self.status = self.STATUS_PAID
         self.paid_at = timezone.now()
         if user:
             self.paid_by = user

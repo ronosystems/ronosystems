@@ -156,6 +156,30 @@
         transition: color 0.15s;
     }
     .action-icon:hover { color: var(--primary-color); }
+    
+    .sys-username {
+        font-family: monospace;
+        background: #e9ecef;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        color: #495057;
+        border: 1px solid #ced4da;
+    }
+    
+    /* Avatar Column Layout */
+    .member-col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+    }
+    .member-num {
+        font-size: 0.7rem;
+        font-weight: bold;
+        color: #666;
+    }
 </style>
 {% endblock %}
 
@@ -165,7 +189,7 @@
     <!-- Header Actions -->
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <div>
-            <h5 class="fw-bold mb-0"><i class="fas fa-users text-primary"></i> Members Directory</h5>
+            <h5 class="fw-bold mb-0"><i class="fas fa-users text-primary"></i>  {{ company.name }} STAFF MEMBERS </h5>
             <small class="text-muted">{{ members|length }} total member{{ members|length|pluralize }} registered</small>
         </div>
         {% if user.role == 'super_admin' or user.role == 'company_admin' or user.role == 'chairperson' or user.role == 'secretary' %}
@@ -212,8 +236,9 @@
             <table class="table table-hover table-custom">
                 <thead>
                     <tr>
-                        <th style="width: 60px;">Member</th>
-                        <th>Name / ID</th>
+                        <!-- MOVED MEMBER ID HERE -->
+                        <th style="width: 80px;" class="text-center">Member ID</th>
+                        <th>Name / Username</th>
                         <th>Contact</th>
                         <th>Membership Type</th>
                         <th>Chama Role</th>
@@ -225,14 +250,20 @@
                 <tbody>
                     {% for m in members %}
                     <tr>
-                        <td>
-                            <div class="avatar-circle">
-                                {{ m.full_name|default:m.member_number|make_list|first|upper }}
+                        <!-- MOVED MEMBER ID HERE -->
+                        <td class="text-center">
+                            <div class="member-col">
+                                <div class="avatar-circle">
+                                    {{ m.full_name|default:m.member_number|make_list|first|upper }}
+                                </div>
+                                <span class="member-num">{{ m.member_number }}</span>
                             </div>
                         </td>
                         <td>
                             <div class="fw-bold text-dark">{{ m.full_name }}</div>
-                            <small class="text-muted">{{ m.member_number }}</small>
+                            {% if m.user %}
+                                <br><span class="sys-username" title="Login Username">{{ m.user.memberships.first.company_username }}</span>
+                            {% endif %}
                         </td>
                         <td>
                             <div>{{ m.phone|default:"—" }}</div>
@@ -241,16 +272,17 @@
                         <td>
                             {% if m.membership_type %}
                                 <span class="badge-status" style="background:#eaf2f8; color:#2d5f7c; border-color:#2d5f7c; text-transform:none;">
-                                    {{ m.membership_type.name }}
+                                    {{ m.membership_type.get_name_display }}
                                 </span>
                             {% else %}
                                 <span class="text-muted small">—</span>
                             {% endif %}
                         </td>
                         <td>
-                            {% if m.user and m.user.role %}
-                                <span class="role-badge role-{{ m.user.role }}">
-                                    {{ m.user.get_role_display }}
+                            <!-- Pull role from Membership instead of User -->
+                            {% if m.user and m.user.memberships.first %}
+                                <span class="role-badge role-{{ m.user.memberships.first.role }}">
+                                    {{ m.user.memberships.first.get_role_display }}
                                 </span>
                             {% else %}
                                 <span class="role-badge role-none">No role assigned</span>

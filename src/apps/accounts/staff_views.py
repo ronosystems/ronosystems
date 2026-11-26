@@ -1,396 +1,398 @@
 # apps/accounts/staff_views.py
-"""
-COMPANY ADMIN - STAFF CRUD
-Anafanya kazi ndani ya company yake TU.
-HACHAGUI company - company inatoka kwenye request.tenant (middleware).
 
-Membership model REAL fields:
-  branch, company, created_at, id, invited_by, is_active,
-  is_primary, role, updated_at, user
-HAKUNA tenant, HAKUNA status - usitumie hizo!
-
-URL base: /staff/
-Domain: fieldmax.localhost/staff/ -> staff wa FIELDMAX tu
-
-Templates:
-  List   -> account/staff_list.html
-  Form   -> account/staff_form.html  (Create + Edit - TEMPLATE MOJA)
-  Detail -> account/staff_detail.html
-  Delete -> account/staff_delete_confirm.html
-"""
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.db.models import Q
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+from django.conf import settings
+from django.utils.crypto import get_random_string
+from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import force_bytes
+from django.contrib.auth.tokens import default_token_generator
+from django.urls import reverse 
+from apps.companies.support_utils import get_active_company
+from apps.companies.models import Branch
+from .models import User, Membership
 
-User = get_user_model()
 
-# ============================================
-# HELPER - Pata company ya admin aliyelogin
-# ============================================
-def _get_company(request):
-    return getattr(request, 'tenant', None) or getattr(request, 'company', None)
-
-def _check_company_admin(request):
-    """Hakikisha ni company admin au superuser"""
-    if request.user.is_superuser:
-        return True
-    company = _get_company(request)
-    if not company:
-        return False
-    try:
-        # FIX: company=, is_active= - sio tenant=, status=
-        membership = request.user.memberships.filter(
-            company=company, is_active=True
-        ).first()
-        if membership and membership.role in ['company_admin', 'company_manager', 'admin', 'manager']:
-            return True
-        # Fallback kwa user.role ya zamani
-        if getattr(request.user, 'role', '') in ['company_admin', 'company_manager', 'admin', 'manager']:
-            return True
-    except Exception:
-        pass
-    return False
-
-# Roles Company Admin anaweza kumpa staff wake
-# HAWEZI kumpa super_admin
-# ROLES ZINABADILIKA KWA BUSINESS TYPE - sio static
-BASE_ROLES = [
-    ('company_admin', 'Company Admin'),
-    ('company_manager', 'Company Manager'),
-    ('company_staff', 'Company Staff'),
-]
-
-ROLES_BY_BUSINESS_TYPE = {
-    'epa-shop': [('cashier', 'Cashier'), ('sales', 'Sales'), ('mpesa_agent', 'Mpesa Agent')],
-    'supermarket': [('cashier', 'Cashier'), ('sales', 'Sales'), ('mpesa_agent', 'Mpesa Agent')],
-    'retail': [('cashier', 'Cashier'), ('sales', 'Sales'), ('mpesa_agent', 'Mpesa Agent')],
-    'kuku-biz': [('sales', 'Sales'), ('cashier', 'Cashier')],
-    'chama': [('cashier', 'Cashier')],
-    'healthcare': [('cashier', 'Cashier')],
-    'education': [('cashier', 'Cashier')],
-    'restaurant': [('cashier', 'Cashier'), ('sales', 'Sales')],
-    'mpesa': [('mpesa_agent', 'Mpesa Agent'), ('cashier', 'Cashier')],
-    'mpesa-agent': [('mpesa_agent', 'Mpesa Agent'), ('cashier', 'Cashier')],
-    'mobile-money': [('mpesa_agent', 'Mpesa Agent'), ('cashier', 'Cashier')],
-    'workshop': [('technician', 'Technician'), ('cashier', 'Cashier')],
-    'garage': [('technician', 'Technician'), ('cashier', 'Cashier')],
-}
-
-def get_roles_for_company(company):
-    if not company:
-        return BASE_ROLES
-    bt = getattr(company, 'business_type', None)
-    slug = ''
-    if bt:
-        slug = (getattr(bt, 'slug', '') or getattr(bt, 'name', '') or str(bt)).lower()
-    for key, extra in ROLES_BY_BUSINESS_TYPE.items():
-        if key in slug:
-            return BASE_ROLES + extra
-    return BASE_ROLES + [
-        ('cashier', 'Cashier'),
-        ('technician', 'Technician'),
-        ('sales', 'Sales'),
-        ('mpesa_agent', 'Mpesa Agent'),
-    ]
-
-# Backward compat
-COMPANY_STAFF_ROLES = BASE_ROLES + [
-    ('cashier', 'Cashier'),
-    ('technician', 'Technician'),
-    ('sales', 'Sales'),
-    ('mpesa_agent', 'Mpesa Agent'),
-]
-
-# ============================================
-# LIST - Orodha ya staff wa company hii
-# ============================================
 @login_required
 def staff_list(request):
-    company = _get_company(request)
+    """
+    READ: List all staff members for the active company.
+    """
+    company, is_viewing_company = get_active_company(request)
     if not company:
-        messages.error(request, "No company found for this domain.")
-        return redirect('/auth/login/')
+        messages.error(request, "No active company selected.")
+        return redirect('/dashboard/')
 
-    if not _check_company_admin(request):
-        messages.error(request, "You don't have permission to manage staff.")
-        return redirect('/')
+    # Get all active memberships for this company
+    memberships = Membership.objects.filter(
+        company=company, is_active=True
+    ).select_related('user', 'branch').order_by('-created_at')
 
-    search = request.GET.get('search', '')
-    role_filter = request.GET.get('role', '')
-    status_filter = request.GET.get('status', '')
-
-    # FIX: memberships__company - sio memberships__tenant
-    users = User.objects.filter(
-        Q(company=company) | Q(memberships__company=company)
-    ).distinct().order_by('-date_joined')
-
-    if search:
-        users = users.filter(
-            Q(username__icontains=search) |
-            Q(first_name__icontains=search) |
-            Q(last_name__icontains=search) |
-            Q(email__icontains=search) |
-            Q(phone__icontains=search)
+    # Search functionality
+    query = request.GET.get('q', '').strip()
+    if query:
+        memberships = memberships.filter(
+            Q(user__first_name__icontains=query) |
+            Q(user__last_name__icontains=query) |
+            Q(user__email__icontains=query) |
+            Q(company_username__icontains=query)
         )
-    if role_filter:
-        users = users.filter(role=role_filter)
-    if status_filter == 'active':
-        users = users.filter(is_active=True)
-    elif status_filter == 'inactive':
-        users = users.filter(is_active=False)
 
     context = {
         'company': company,
-        'users': users,
-        'roles': get_roles_for_company(company),
-        'search': search,
-        'role_filter': role_filter,
-        'status_filter': status_filter,
-        'stats': {
-            'total': users.count(),
-            'active': users.filter(is_active=True).count(),
-            'inactive': users.filter(is_active=False).count(),
-        }
+        'memberships': memberships,
+        'query': query,
+        'page_title': f'Staff - {company.name}',
     }
-    return render(request, 'account/staff_list.html', context)
+    return render(request, 'accounts/staff_list.html', context)
 
-# ============================================
-# CREATE - Company Admin anatengeneza staff wake
-# Render: account/staff_form.html
-# ============================================
+
 @login_required
 def staff_create(request):
-    company = _get_company(request)
+    """
+    CREATE: Add a new member to the company.
+    Sends an email invite with the generated username.
+    """
+    company, _ = get_active_company(request)
     if not company:
-        messages.error(request, "No company found for this domain.")
-        return redirect('/auth/login/')
+        messages.error(request, "No active company selected.")
+        return redirect('/dashboard/')
 
-    if not _check_company_admin(request):
-        messages.error(request, "You don't have permission to create staff.")
-        return redirect('accounts:staff-list')
+    allowed_roles = company.allowed_roles
+    allowed_role_keys = [r[0] for r in allowed_roles]
+    branches = Branch.objects.filter(company=company, is_active=True)
 
-    def form_context(extra=None):
-        ctx = {
+    def _render_form(form_data=None):
+        return render(request, 'accounts/staff_form.html', {
             'company': company,
-            'roles': get_roles_for_company(company),
-            'staff_user': None,
+            'branches': branches,
+            'role_choices': allowed_roles,
             'is_edit': False,
-            'form_mode': 'create',
-        }
-        if extra:
-            ctx.update(extra)
-        return ctx
+            'form_data': form_data,
+        })
 
     if request.method == 'POST':
-        username = request.POST.get('username', '').strip()
-        email = request.POST.get('email', '').strip()
-        password = request.POST.get('password', '')
-        password2 = request.POST.get('password2', '')
+        email = request.POST.get('email', '').strip().lower()
         first_name = request.POST.get('first_name', '').strip()
         last_name = request.POST.get('last_name', '').strip()
         phone = request.POST.get('phone', '').strip()
         role = request.POST.get('role', 'company_staff')
-        staff_id = request.POST.get('staff_id', '').strip()
+        branch_id = request.POST.get('branch')
 
-        preserved = {
-            'username': username,
-            'email': email,
-            'first_name': first_name,
-            'last_name': last_name,
-            'phone': phone,
-            'role': role,
-            'staff_id': staff_id,
-        }
+        # --- Validation ---
+        if role not in allowed_role_keys:
+            messages.error(request, f"The role '{role}' is not valid for {company.business_type.name}.")
+            return _render_form(request.POST)
 
-        if not username or not email or not password:
-            messages.error(request, "Username, Email and Password are required.")
-            return render(request, 'account/staff_form.html', form_context({'preserved': preserved}))
+        if not email or not first_name or not last_name:
+            messages.error(request, "First Name, Last Name, and Email are required.")
+            return _render_form(request.POST)
 
-        if password != password2:
-            messages.error(request, "Passwords do not match.")
-            return render(request, 'account/staff_form.html', form_context({'preserved': preserved}))
+        branch = None
+        if branch_id:
+            branch = Branch.objects.filter(id=branch_id, company=company).first()
 
-        if User.objects.filter(username=username).exists():
-            messages.error(request, f"Username '{username}' already exists.")
-            return render(request, 'account/staff_form.html', form_context({'preserved': preserved}))
+        try:
+            with transaction.atomic():
+                # 1. Resolve the User (create if new)
+                user = User.objects.filter(email=email).first()
+                is_new_user = False
 
-        if User.objects.filter(email=email).exists():
-            messages.error(request, f"Email '{email}' already exists.")
-            return render(request, 'account/staff_form.html', form_context({'preserved': preserved}))
+                if not user:
+                    user = User.objects.create_user(
+                        email=email,
+                        username=email,
+                        password=get_random_string(32),   # unusable; they must reset
+                        first_name=first_name,
+                        last_name=last_name,
+                        phone=phone,
+                        is_active=True,
+                    )
+                    is_new_user = True
+                elif Membership.objects.filter(user=user, company=company).exists():
+                    messages.warning(request, f"{first_name} is already a member of {company.name}.")
+                    return redirect('accounts:staff-list')
 
-        if role == 'super_admin':
-            messages.error(request, "You cannot create a Super Admin.")
-            return render(request, 'account/staff_form.html', form_context({'preserved': preserved}))
+                # 2. Create the Membership (auto-generates company_username)
+                membership = Membership.objects.create(
+                    user=user,
+                    company=company,
+                    branch=branch,
+                    role=role,
+                    is_active=True,
+                )
+                if not user.memberships.exclude(pk=membership.pk).exists():
+                    membership.is_primary = True
+                    membership.save(update_fields=['is_primary'])
 
-        # Create user - company ni hii ya admin mwenyewe, HACHAGUI
-        user = User.objects.create_user(
-            username=username,
-            email=email,
-            password=password,
-            first_name=first_name,
-            last_name=last_name,
-            phone=phone,
-            role=role,
-            company=company,
-        )
-        if hasattr(user, 'staff_id'):
-            user.staff_id = staff_id
-            user.save()
+            # 3. Send the Invite Email (outside the DB transaction so a slow
+            #    SMTP call doesn't hold locks / delay rollback on failure)
+            try:
+                uid = urlsafe_base64_encode(force_bytes(user.pk))
+                token = default_token_generator.make_token(user)
 
-        # FIX: Membership kwa company=, sio tenant=
-        # FIX: defaults HAINA status, ina is_active tu
-        from apps.accounts.models import Membership
-        Membership.objects.get_or_create(
-            user=user,
-            company=company,
-            defaults={
-                'role': role,
-                'is_primary': True,
-                'is_active': True,
-            }
-        )
+                protocol = 'https' if request.is_secure() else 'http'
+                system_domain = getattr(settings, 'SYSTEM_DOMAIN', 'localhost:8000')
 
-        messages.success(request, f"Staff '{username}' created for {company.name} as {role}.")
-        return redirect('accounts:staff-list')
+                if company.custom_domain and company.domain_verified and not settings.DEBUG:
+                    # Production: company has a verified custom domain (e.g. fieldmax.shop)
+                    mother_host = company.custom_domain
+                elif company.subdomain:
+                    # Tenant subdomain: fieldmax.localhost:8000 or fieldmax.ronosystems.com
+                    mother_host = f"{company.subdomain}.{system_domain}"
+                else:
+                    # Fallback: mother domain only (shouldn't happen for a real company)
+                    mother_host = system_domain
 
-    return render(request, 'account/staff_form.html', form_context())
+                reset_path = reverse(
+                    'accounts:password_reset_confirm',
+                    kwargs={'uidb64': uid, 'token': token},
+                )
+                reset_link = f"{protocol}://{mother_host}{reset_path}"
 
-# ============================================
-# DETAIL - Angalia staff mmoja
-# ============================================
+                context = {
+                    'first_name': first_name,
+                    'company_name': company.name,
+                    'role': membership.get_role_display(),
+                    'username': membership.company_username,
+                    'email': email,
+                    'reset_link': reset_link,
+                    'is_new_user': is_new_user,
+                }
+                html_message = render_to_string('emails/staff_invite.html', context)
+                plain_message = strip_tags(html_message)
+
+                send_mail(
+                    f"You have been added to {company.name}",
+                    plain_message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [email],
+                    html_message=html_message,
+                    fail_silently=False,
+                )
+                messages.success(
+                    request,
+                    f"✅ {first_name} added to {company.name}. "
+                    f"An invitation email has been sent to {email}."
+                )
+            except Exception as e:
+                messages.warning(
+                    request,
+                    f"✅ {first_name} added to {company.name}. "
+                    f"However, the email failed to send ({str(e)}). "
+                    f"Please give them their username: {membership.company_username}"
+                )
+
+            return redirect('accounts:staff-list')
+
+        except Exception as e:
+            messages.error(request, f"Error adding staff: {str(e)}")
+            return _render_form(request.POST)
+
+    return _render_form()
+
 @login_required
-def staff_detail(request, user_id):
-    company = _get_company(request)
-    if not _check_company_admin(request):
-        messages.error(request, "No permission.")
+def staff_resend_invite(request, membership_id):
+    """
+    Resend the invitation / password-reset email for an existing membership.
+    Generates a fresh token so the recipient can set a new password.
+    """
+    company, _ = get_active_company(request)
+    if not company:
+        messages.error(request, "No active company selected.")
+        return redirect('/dashboard/')
+
+    membership = get_object_or_404(
+        Membership, id=membership_id, company=company, is_active=True
+    )
+    user = membership.user
+
+    # POST-only for safety, even though it's idempotent
+    if request.method != 'POST':
         return redirect('accounts:staff-list')
 
-    user = get_object_or_404(User, id=user_id, company=company)
+    try:
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
 
-    context = {
-        'company': company,
-        'staff_user': user,
-        # FIX: company=, sio tenant=
-        'memberships': user.memberships.filter(company=company),
-    }
-    return render(request, 'account/staff_detail.html', context)
+        protocol = 'https' if request.is_secure() else 'http'
+        system_domain = getattr(settings, 'SYSTEM_DOMAIN', 'localhost:8000')
 
-# ============================================
-# EDIT - Badilisha staff + role
-# Render: account/staff_form.html - TEMPLATE MOJA NA CREATE
-# ============================================
-@login_required
-def staff_edit(request, user_id):
-    company = _get_company(request)
-    if not _check_company_admin(request):
-        messages.error(request, "No permission.")
-        return redirect('accounts:staff-list')
-
-    user = get_object_or_404(User, id=user_id, company=company)
-
-    if request.method == 'POST':
-        user.first_name = request.POST.get('first_name', user.first_name).strip()
-        user.last_name = request.POST.get('last_name', user.last_name).strip()
-        user.email = request.POST.get('email', user.email).strip()
-        user.phone = request.POST.get('phone', user.phone).strip()
-        new_role = request.POST.get('role', user.role)
-        if hasattr(user, 'staff_id'):
-            user.staff_id = request.POST.get('staff_id', getattr(user, 'staff_id', '')).strip()
-
-        # Badilisha role - lakini sio super_admin
-        if new_role != 'super_admin':
-            user.role = new_role
+        if company.custom_domain and company.domain_verified and not settings.DEBUG:
+            mother_host = company.custom_domain
+        elif company.subdomain:
+            mother_host = f"{company.subdomain}.{system_domain}"
         else:
-            messages.error(request, "You cannot assign Super Admin role.")
-            return render(request, 'account/staff_form.html', {
-                'company': company,
-                'roles': get_roles_for_company(company),
-                'staff_user': user,
-                'is_edit': True,
-                'form_mode': 'edit',
-            })
-        user.save()
+            mother_host = system_domain
 
-        # FIX: Membership filter kwa company=
-        try:
-            from apps.accounts.models import Membership
-            Membership.objects.filter(user=user, company=company).update(role=new_role)
-        except Exception:
-            pass
+        reset_path = reverse(
+            'accounts:password_reset_confirm',
+            kwargs={'uidb64': uid, 'token': token},
+        )
+        reset_link = f"{protocol}://{mother_host}{reset_path}"
 
-        # Badilisha password kama ameweka mpya
-        new_password = request.POST.get('password', '')
-        if new_password:
-            user.set_password(new_password)
-            user.save()
+        context = {
+            'first_name': user.first_name or user.username,
+            'company_name': company.name,
+            'role': membership.get_role_display(),
+            'username': membership.company_username,
+            'email': user.email,
+            'reset_link': reset_link,
+            'is_new_user': False,   # existing user, "reset optional" wording
+        }
+        html_message = render_to_string('emails/staff_invite.html', context)
+        plain_message = strip_tags(html_message)
 
-        messages.success(request, f"Staff '{user.username}' updated.")
-        return redirect('accounts:staff-list')
+        send_mail(
+            f"You have been added to {company.name}",
+            plain_message,
+            settings.DEFAULT_FROM_EMAIL,
+            [user.email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+        messages.success(
+            request,
+            f"✅ Invitation re-sent to {user.email}. "
+            f"A fresh reset link has been emailed."
+        )
+    except Exception as e:
+        messages.error(
+            request,
+            f"Failed to resend invite to {user.email}: {e}"
+        )
 
-    # GET - Fungua form ikiwa na data ya staff huyu
-    context = {
-        'company': company,
-        'roles': get_roles_for_company(company),
-        'staff_user': user,
-        'is_edit': True,
-        'form_mode': 'edit',
-    }
-    return render(request, 'account/staff_form.html', context)
-
-# ============================================
-# TOGGLE - Activate / Deactivate
-# ============================================
-@login_required
-def staff_toggle_status(request, user_id):
-    company = _get_company(request)
-    if not _check_company_admin(request):
-        messages.error(request, "No permission.")
-        return redirect('accounts:staff-list')
-
-    user = get_object_or_404(User, id=user_id, company=company)
-
-    if user.id == request.user.id:
-        messages.error(request, "You cannot deactivate yourself.")
-        return redirect('accounts:staff-list')
-
-    if request.method == 'POST':
-        user.is_active = not user.is_active
-        user.save()
-        try:
-            from apps.accounts.models import Membership
-            # FIX: company=, is_active= - HAKUNA status
-            Membership.objects.filter(user=user, company=company).update(
-                is_active=user.is_active,
-            )
-        except Exception:
-            pass
-        status = "activated" if user.is_active else "deactivated"
-        messages.success(request, f"Staff '{user.username}' {status}.")
     return redirect('accounts:staff-list')
 
-# ============================================
-# DELETE - Futa staff
-# ============================================
+
+
 @login_required
-def staff_delete(request, user_id):
-    company = _get_company(request)
-    if not _check_company_admin(request):
-        messages.error(request, "No permission.")
-        return redirect('accounts:staff-list')
+def staff_edit(request, membership_id):
+    """
+    UPDATE: Edit an existing staff member's details.
+    """
+    company, _ = get_active_company(request)
+    membership = get_object_or_404(Membership, id=membership_id, company=company)
+    user = membership.user
+    
+    allowed_roles = company.allowed_roles 
+    allowed_role_keys = [r[0] for r in allowed_roles]
 
-    user = get_object_or_404(User, id=user_id, company=company)
+    if request.method == 'POST':
+        role = request.POST.get('role', membership.role)
+        
+        if role not in allowed_role_keys:
+            messages.error(request, f"The role '{role}' is not valid for {company.business_type.name}.")
+            return render(request, 'accounts/staff_form.html', {
+                'company': company,
+                'membership': membership,
+                'staff_user': user,
+                'branches': Branch.objects.filter(company=company, is_active=True),
+                'role_choices': allowed_roles,
+                'is_edit': True
+            })
 
-    if user.id == request.user.id:
-        messages.error(request, "You cannot delete yourself.")
+        try:
+            with transaction.atomic():
+                # Update User details
+                user.first_name = request.POST.get('first_name', user.first_name).strip()
+                user.last_name = request.POST.get('last_name', user.last_name).strip()
+                user.phone = request.POST.get('phone', user.phone).strip()
+                user.save()
+
+                # Update Membership details
+                membership.role = role
+                branch_id = request.POST.get('branch')
+                if branch_id:
+                    membership.branch = Branch.objects.filter(id=branch_id, company=company).first()
+                else:
+                    membership.branch = None
+                
+                membership.save()
+
+                messages.success(request, f"Successfully updated {user.full_name}.")
+                return redirect('accounts:staff-list')
+        except Exception as e:
+            messages.error(request, f"Error updating staff: {str(e)}")
+
+    branches = Branch.objects.filter(company=company, is_active=True)
+    return render(request, 'accounts/staff_form.html', {
+        'company': company,
+        'membership': membership,
+        'staff_user': user,
+        'branches': branches,
+        'role_choices': allowed_roles,
+        'is_edit': True
+    })
+
+
+@login_required
+def staff_detail(request, membership_id):
+    """
+    READ: View details of a single staff member.
+    """
+    company, _ = get_active_company(request)
+    membership = get_object_or_404(Membership, id=membership_id, company=company)
+    
+    return render(request, 'accounts/staff_detail.html', {
+        'company': company,
+        'membership': membership,
+        'staff_user': membership.user,
+    })
+
+
+@login_required
+def staff_delete(request, membership_id):
+    """
+    DELETE: Remove a staff member from THIS company.
+    Does not delete the global User account (so they can still log into other companies).
+    """
+    company, _ = get_active_company(request)
+    membership = get_object_or_404(Membership, id=membership_id, company=company)
+    
+    # Prevent the company admin from deleting themselves
+    if membership.user == request.user:
+        messages.error(request, "You cannot remove yourself from the company.")
         return redirect('accounts:staff-list')
 
     if request.method == 'POST':
-        username = user.username
-        user.delete()
-        messages.success(request, f"Staff '{username}' deleted.")
+        user_name = membership.user.full_name
+        # Deactivate membership instead of hard deleting (preserves transaction history)
+        membership.is_active = False
+        membership.save()
+
+        messages.success(request, f"{user_name} has been removed from {company.name}.")
         return redirect('accounts:staff-list')
 
-    context = {'company': company, 'staff_user': user}
-    return render(request, 'account/staff_delete_confirm.html', context)
+    return render(request, 'accounts/staff_confirm_delete.html', {
+        'company': company,
+        'membership': membership,
+    })
+
+
+@login_required
+def staff_toggle_status(request, membership_id):
+    """
+    UPDATE: Toggle staff active/inactive status (Soft ban).
+    """
+    company, _ = get_active_company(request)
+    membership = get_object_or_404(Membership, id=membership_id, company=company)
+    
+    if membership.user == request.user:
+        messages.error(request, "You cannot deactivate your own account.")
+        return redirect('accounts:staff-list')
+
+    if request.method == 'POST':
+        membership.is_active = not membership.is_active
+        membership.save()
+        
+        status_text = "activated" if membership.is_active else "deactivated"
+        messages.success(request, f"{membership.user.full_name} has been {status_text}.")
+        
+    return redirect('accounts:staff-list')
