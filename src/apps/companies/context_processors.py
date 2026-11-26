@@ -18,11 +18,6 @@ DEFAULT_ACCENT_COLOR = '#036a77'
 # HELPERS - HII NDIO MOYO
 # ============================================
 def _get_effective_company(request):
-    """
-    1. Support mode (Super Admin anaangalia company nyingine)
-    2. request.tenant (kutoka kwa domain - kalyet.ronosystems.com)
-    3. NEW: Membership ya user aliye-login (kwa main domain kama ronosystems.onrender.com)
-    """
     cached = getattr(request, '_effective_company', False)
     if cached is not False:
         return cached
@@ -37,7 +32,7 @@ def _get_effective_company(request):
         if support_mode and viewing_company_id:
             company = Company.objects.filter(id=viewing_company_id).first()
 
-    # 2. Tenant kutoka kwa Middleware (DOMAIN)
+    # 2. Tenant kutoka kwa Middleware (DOMAIN) - THIS IS THE MOST RELIABLE
     if company is None:
         company = getattr(request, 'tenant', None)
 
@@ -45,13 +40,11 @@ def _get_effective_company(request):
     if company is None:
         company = getattr(request, 'company', None)
 
-    # 4. NEW: Kama bado hakuna company, tumia Membership ya user
-    # Hii ndio inafanya logo ya Chan ionekane kwenye ronosystems.onrender.com
-    # Super Admin HARUHUSIWI hapa - yeye anaona branding ya System
+    # 4. Kama bado hakuna company, tumia Membership ya user
     if company is None and user and user.is_authenticated:
         if not _is_super_admin(user):
             try:
-                # FIXED: Membership haina tenant/status - ina company/is_active
+                # Try to find the last tenant they visited
                 last_tenant_id = request.session.get('current_tenant_id')
                 if last_tenant_id:
                     m = user.memberships.filter(
@@ -60,8 +53,7 @@ def _get_effective_company(request):
                     if m and m.company:
                         company = m.company
 
-                # Kama hakuna, chukua membership ya kwanza active
-                # Kipaumbele: is_primary kwanza, ndipo ya zamani zaidi
+                # If still no company, fall back to their primary membership
                 if company is None:
                     m = user.memberships.filter(
                         is_active=True
