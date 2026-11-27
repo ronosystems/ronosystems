@@ -13,12 +13,96 @@ from django.utils.crypto import get_random_string
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.contrib.auth.tokens import default_token_generator
-from django.urls import reverse 
+from django.urls import reverse
 from apps.companies.support_utils import get_active_company
 from apps.companies.models import Branch
 from .models import User, Membership
 
+# ============================================
+# DOMAIN / RESET LINK HELPERS
+# ============================================
+# Mother domain: ronosystems.onrender.com (system)
+# Tenant domain: fieldmax.shop (custom domain, kama verified)
+# MUHIMU: Usiwahi tengeneza {subdomain}.ronosystems.onrender.com
+# Kwa sababu certificate ya *.onrender.com haifuniki nested subdomain
+# na browser italeta ERR_SSL_VERSION_OR_CIPHER_MISMATCH
 
+def _get_company_host(company):
+    """
+    Rudisha host sahihi ya kutuma kwenye email.
+    - Custom domain verified (fieldmax.shop) -> tumia hiyo
+    - Render (.onrender.com) -> tumia mother domain tu, USITENGENEZE subdomain
+    - Localhost -> tumia subdomain.localhost (fieldmax.localhost:8000) - hii inafanya kazi
+    """
+    system_domain = getattr(settings, 'SYSTEM_DOMAIN', 'localhost:8000').strip()
+    system_domain = system_domain.replace('http://', '').replace('https://', '').strip('/')
+
+    # 1. Custom domain - bora zaidi
+    custom = getattr(company, 'custom_domain', None)
+    verified = getattr(company, 'domain_verified', False)
+    if custom and verified and not settings.DEBUG:
+        return custom.strip().replace('http://', '').replace('https://', '').strip('/')
+
+    # 2. Render - nested subdomain inavunja SSL, tumia mother domain
+    if system_domain.endswith('.onrender.com'):
+        return system_domain
+
+    # 3. Localhost tu ndiyo subdomain inafanya kazi
+    subdomain = getattr(company, 'subdomain', None)
+    if subdomain and ('localhost' in system_domain or '127.0.0.1' in system_domain):
+        return f"{subdomain}.{system_domain}"
+
+    # 4. Fallback - mother domain
+    return system_domain
+
+def _get_reset_link(company, uid, token):
+    """Tengeneza reset link sahihi - https kwenye prod, http kwenye localhost."""
+    # Production lazima iwe https. request.is_secure() inadanganya nyuma ya Render proxy.
+    protocol = 'https' if not settings.DEBUG else 'http'
+    host = _get_company_host(company)
+    reset_path = reverse(
+        'accounts:password_reset_confirm',
+        kwargs={'uidb64': uid, 'token': token},
+    )
+    return f"{protocol}://{host}{reset_path}"
+
+def _send_invite_email(company, membership, user, first_name, email, is_new_user):
+    """
+    Tuma invite email. Inarudisha (success, error_message).
+    Helper moja inayotumika na staff_create na staff_resend_invite.
+    """
+    try:
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        reset_link = _get_reset_link(company, uid, token)
+
+        context = {
+            'first_name': first_name,
+            'company_name': company.name,
+            'role': membership.get_role_display(),
+            'username': membership.company_username,
+            'email': email,
+            'reset_link': reset_link,
+            'is_new_user': is_new_user,
+        }
+        html_message = render_to_string('emails/staff_invite.html', context)
+        plain_message = strip_tags(html_message)
+
+        send_mail(
+            f"You have been added to {company.name}",
+            plain_message,
+            settings.DEFAULT_FROM_EMAIL,
+            [email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+        return True, None
+    except Exception as e:
+        return False, str(e)
+
+# ============================================
+# STAFF LIST
+# ============================================
 
 @login_required
 def staff_list(request):
@@ -67,6 +151,9 @@ def staff_list(request):
     }
     return render(request, 'accounts/staff_list.html', context)
 
+# ============================================
+# STAFF CREATE
+# ============================================
 
 @login_required
 def staff_create(request):
@@ -148,59 +235,20 @@ def staff_create(request):
 
             # 3. Send the Invite Email (outside the DB transaction so a slow
             #    SMTP call doesn't hold locks / delay rollback on failure)
-            try:
-                uid = urlsafe_base64_encode(force_bytes(user.pk))
-                token = default_token_generator.make_token(user)
-
-                protocol = 'https' if request.is_secure() else 'http'
-                system_domain = getattr(settings, 'SYSTEM_DOMAIN', 'localhost:8000')
-
-                if company.custom_domain and company.domain_verified and not settings.DEBUG:
-                    # Production: company has a verified custom domain (e.g. fieldmax.shop)
-                    mother_host = company.custom_domain
-                elif company.subdomain:
-                    # Tenant subdomain: fieldmax.localhost:8000 or fieldmax.ronosystems.com
-                    mother_host = f"{company.subdomain}.{system_domain}"
-                else:
-                    # Fallback: mother domain only (shouldn't happen for a real company)
-                    mother_host = system_domain
-
-                reset_path = reverse(
-                    'accounts:password_reset_confirm',
-                    kwargs={'uidb64': uid, 'token': token},
-                )
-                reset_link = f"{protocol}://{mother_host}{reset_path}"
-
-                context = {
-                    'first_name': first_name,
-                    'company_name': company.name,
-                    'role': membership.get_role_display(),
-                    'username': membership.company_username,
-                    'email': email,
-                    'reset_link': reset_link,
-                    'is_new_user': is_new_user,
-                }
-                html_message = render_to_string('emails/staff_invite.html', context)
-                plain_message = strip_tags(html_message)
-
-                send_mail(
-                    f"You have been added to {company.name}",
-                    plain_message,
-                    settings.DEFAULT_FROM_EMAIL,
-                    [email],
-                    html_message=html_message,
-                    fail_silently=False,
-                )
+            success, err = _send_invite_email(
+                company, membership, user, first_name, email, is_new_user
+            )
+            if success:
                 messages.success(
                     request,
                     f"✅ {first_name} added to {company.name}. "
                     f"An invitation email has been sent to {email}."
                 )
-            except Exception as e:
+            else:
                 messages.warning(
                     request,
                     f"✅ {first_name} added to {company.name}. "
-                    f"However, the email failed to send ({str(e)}). "
+                    f"However, the email failed to send ({err}). "
                     f"Please give them their username: {membership.company_username}"
                 )
 
@@ -211,6 +259,10 @@ def staff_create(request):
             return _render_form(request.POST)
 
     return _render_form()
+
+# ============================================
+# STAFF RESEND INVITE
+# ============================================
 
 @login_required
 def staff_resend_invite(request, membership_id):
@@ -232,60 +284,26 @@ def staff_resend_invite(request, membership_id):
     if request.method != 'POST':
         return redirect('accounts:staff-list')
 
-    try:
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
-        token = default_token_generator.make_token(user)
-
-        protocol = 'https' if request.is_secure() else 'http'
-        system_domain = getattr(settings, 'SYSTEM_DOMAIN', 'localhost:8000')
-
-        if company.custom_domain and company.domain_verified and not settings.DEBUG:
-            mother_host = company.custom_domain
-        elif company.subdomain:
-            mother_host = f"{company.subdomain}.{system_domain}"
-        else:
-            mother_host = system_domain
-
-        reset_path = reverse(
-            'accounts:password_reset_confirm',
-            kwargs={'uidb64': uid, 'token': token},
-        )
-        reset_link = f"{protocol}://{mother_host}{reset_path}"
-
-        context = {
-            'first_name': user.first_name or user.username,
-            'company_name': company.name,
-            'role': membership.get_role_display(),
-            'username': membership.company_username,
-            'email': user.email,
-            'reset_link': reset_link,
-            'is_new_user': False,   # existing user, "reset optional" wording
-        }
-        html_message = render_to_string('emails/staff_invite.html', context)
-        plain_message = strip_tags(html_message)
-
-        send_mail(
-            f"You have been added to {company.name}",
-            plain_message,
-            settings.DEFAULT_FROM_EMAIL,
-            [user.email],
-            html_message=html_message,
-            fail_silently=False,
-        )
+    success, err = _send_invite_email(
+        company, membership, user,
+        user.first_name or user.username,
+        user.email,
+        is_new_user=False,
+    )
+    if success:
         messages.success(
             request,
             f"✅ Invitation re-sent to {user.email}. "
             f"A fresh reset link has been emailed."
         )
-    except Exception as e:
-        messages.error(
-            request,
-            f"Failed to resend invite to {user.email}: {e}"
-        )
+    else:
+        messages.error(request, f"Failed to resend invite to {user.email}: {err}")
 
     return redirect('accounts:staff-list')
 
-
+# ============================================
+# STAFF EDIT
+# ============================================
 
 @login_required
 def staff_edit(request, membership_id):
@@ -295,13 +313,13 @@ def staff_edit(request, membership_id):
     company, _ = get_active_company(request)
     membership = get_object_or_404(Membership, id=membership_id, company=company)
     user = membership.user
-    
-    allowed_roles = company.allowed_roles 
+
+    allowed_roles = company.allowed_roles
     allowed_role_keys = [r[0] for r in allowed_roles]
 
     if request.method == 'POST':
         role = request.POST.get('role', membership.role)
-        
+
         if role not in allowed_role_keys:
             messages.error(request, f"The role '{role}' is not valid for {company.business_type.name}.")
             return render(request, 'accounts/staff_form.html', {
@@ -328,7 +346,7 @@ def staff_edit(request, membership_id):
                     membership.branch = Branch.objects.filter(id=branch_id, company=company).first()
                 else:
                     membership.branch = None
-                
+
                 membership.save()
 
                 messages.success(request, f"Successfully updated {user.full_name}.")
@@ -346,6 +364,9 @@ def staff_edit(request, membership_id):
         'is_edit': True
     })
 
+# ============================================
+# STAFF DETAIL
+# ============================================
 
 @login_required
 def staff_detail(request, membership_id):
@@ -354,13 +375,16 @@ def staff_detail(request, membership_id):
     """
     company, _ = get_active_company(request)
     membership = get_object_or_404(Membership, id=membership_id, company=company)
-    
+
     return render(request, 'accounts/staff_detail.html', {
         'company': company,
         'membership': membership,
         'staff_user': membership.user,
     })
 
+# ============================================
+# STAFF DELETE
+# ============================================
 
 @login_required
 def staff_delete(request, membership_id):
@@ -370,7 +394,7 @@ def staff_delete(request, membership_id):
     """
     company, _ = get_active_company(request)
     membership = get_object_or_404(Membership, id=membership_id, company=company)
-    
+
     # Prevent the company admin from deleting themselves
     if membership.user == request.user:
         messages.error(request, "You cannot remove yourself from the company.")
@@ -383,6 +407,7 @@ def staff_delete(request, membership_id):
         membership.save()
 
         messages.success(request, f"{user_name} has been removed from {company.name}.")
+
         return redirect('accounts:staff-list')
 
     return render(request, 'accounts/staff_confirm_delete.html', {
@@ -390,6 +415,9 @@ def staff_delete(request, membership_id):
         'membership': membership,
     })
 
+# ============================================
+# STAFF TOGGLE STATUS
+# ============================================
 
 @login_required
 def staff_toggle_status(request, membership_id):
@@ -398,7 +426,7 @@ def staff_toggle_status(request, membership_id):
     """
     company, _ = get_active_company(request)
     membership = get_object_or_404(Membership, id=membership_id, company=company)
-    
+
     if membership.user == request.user:
         messages.error(request, "You cannot deactivate your own account.")
         return redirect('accounts:staff-list')
@@ -406,8 +434,8 @@ def staff_toggle_status(request, membership_id):
     if request.method == 'POST':
         membership.is_active = not membership.is_active
         membership.save()
-        
+
         status_text = "activated" if membership.is_active else "deactivated"
         messages.success(request, f"{membership.user.full_name} has been {status_text}.")
-        
+
     return redirect('accounts:staff-list')

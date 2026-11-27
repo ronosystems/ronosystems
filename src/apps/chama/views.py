@@ -1,3 +1,7 @@
+import time
+import cloudinary
+import cloudinary.uploader
+
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
@@ -6,16 +10,18 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.utils import timezone
 from django.conf import settings
-from decimal import Decimal
-import time
-import cloudinary
-import cloudinary.uploader
 from apps.companies.models import Company
 from functools import wraps
-from django.utils import timezone
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from django.http import JsonResponse
+from django.urls import reverse
+from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import force_bytes
+from django.contrib.auth.tokens import default_token_generator
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
 from .forms import (
     MemberForm, MembershipTypeForm,
     SavingsForm, ContributionForm, FineForm,
@@ -419,10 +425,76 @@ def dashboard(request):
     return render(request, 'chama/dashboard.html', ctx)
 
 
-
-
 # ============================================================
 # MEMBERS MEMBERSHIP TYPES, REGISTRATION, & COMMITTEES
+# ============================================================
+# DOMAIN HELPERS - sawa na staff_views.py
+# Mother: ronosystems.onrender.com
+# Tenant: fieldmax.shop (kama custom_domain verified)
+# USITENGENEZE {subdomain}.ronosystems.onrender.com - inavunja SSL (ERR_SSL_VERSION_OR_CIPHER_MISMATCH)
+
+def _get_company_host(company):
+    system_domain = getattr(settings, 'SYSTEM_DOMAIN', 'localhost:8000').strip()
+    system_domain = system_domain.replace('http://', '').replace('https://', '').strip('/')
+
+    custom = getattr(company, 'custom_domain', None)
+    verified = getattr(company, 'domain_verified', False)
+    if custom and verified and not settings.DEBUG:
+        return custom.strip().replace('http://', '').replace('https://', '').strip('/')
+
+    # Render - nested subdomain inavunja SSL, tumia mother domain
+    if system_domain.endswith('.onrender.com'):
+        return system_domain
+
+    # Localhost tu ndiyo subdomain inafanya kazi
+    subdomain = getattr(company, 'subdomain', None)
+    if subdomain and ('localhost' in system_domain or '127.0.0.1' in system_domain):
+        return f"{subdomain}.{system_domain}"
+
+    return system_domain
+
+def _get_reset_link(company, uid, token):
+    protocol = 'https' if not settings.DEBUG else 'http'
+    host = _get_company_host(company)
+    reset_path = reverse(
+        'accounts:password_reset_confirm',
+        kwargs={'uidb64': uid, 'token': token},
+    )
+    return f"{protocol}://{host}{reset_path}"
+
+def _send_invite_email(company, membership, user, first_name, email, is_new_user=True):
+    """Tuma invite email. Inarudisha (success, error)."""
+    try:
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        reset_link = _get_reset_link(company, uid, token)
+
+        context = {
+            'first_name': first_name,
+            'company_name': company.name,
+            'role': membership.get_role_display(),
+            'username': membership.company_username,
+            'email': email,
+            'reset_link': reset_link,
+            'is_new_user': is_new_user,
+        }
+        html_message = render_to_string('emails/staff_invite.html', context)
+        plain_message = strip_tags(html_message)
+
+        send_mail(
+            f"You have been added to {company.name}",
+            plain_message,
+            settings.DEFAULT_FROM_EMAIL,
+            [email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+        return True, None
+    except Exception as e:
+        return False, str(e)
+
+# ============================================================
+# MEMBER LIST / DETAIL
 # ============================================================
 
 @login_required
@@ -503,6 +575,9 @@ def member_detail(request, pk):
         'recent_loans': recent_loans,
     })
 
+# ============================================================
+# MEMBER CREATE
+# ============================================================
 
 @login_required
 @transaction.atomic
@@ -516,7 +591,7 @@ def member_create(request):
 
     if request.method == 'POST':
         form = MemberForm(request.POST, request.FILES, company=company, fallback_password=fallback_password)
-        
+
         if form.is_valid():
             member = form.save(commit=False)
             member.company = company
@@ -542,10 +617,10 @@ def member_create(request):
             # =========================================================
             # UNIFIED ACCOUNT & MEMBERSHIP LOGIC
             # =========================================================
+            is_new_user = False
             if not member.user:
                 existing_user = None
-                is_new_user = False
-                
+
                 # 1. Try to find them by Email or Phone
                 if member.email:
                     existing_user = User.objects.filter(email__iexact=member.email).first()
@@ -564,7 +639,7 @@ def member_create(request):
                     existing_user = User.objects.create_user(
                         username=username,
                         email=member.email or '',
-                        password=get_random_string(32), # Unusable until they reset
+                        password=get_random_string(32),  # Unusable until they reset
                         first_name=(member.full_name.split()[0] if member.full_name else ''),
                         last_name=(' '.join(member.full_name.split()[1:]) if member.full_name else ''),
                         company=company,
@@ -573,12 +648,12 @@ def member_create(request):
                     is_new_user = True
 
                 member.user = existing_user
-            
+
             member.save()
 
             if member.user:
                 from apps.accounts.models import Membership
-                
+
                 # Ensure the user has a Membership to this company
                 membership, created = Membership.objects.get_or_create(
                     user=member.user,
@@ -586,7 +661,7 @@ def member_create(request):
                     defaults={
                         'role': form.cleaned_data.get('role') or 'member',
                         'is_active': True,
-                        'is_primary': not member.user.memberships.exists(), # Make primary if it's their first
+                        'is_primary': not member.user.memberships.exists(),
                     }
                 )
 
@@ -600,7 +675,7 @@ def member_create(request):
                 names = member.full_name.split(' ', 1)
                 first_name = names[0]
                 last_name = names[1] if len(names) > 1 else ''
-                
+
                 if member.user.first_name != first_name:
                     member.user.first_name = first_name
                     update_fields.append('first_name')
@@ -621,61 +696,18 @@ def member_create(request):
                 # SEND EMAIL INVITE (ONLY if this is a brand new user)
                 # =========================================================
                 if is_new_user and member.user.email:
-                    try:
-                        from django.urls import reverse
-                        from django.utils.http import urlsafe_base64_encode
-                        from django.utils.encoding import force_bytes
-                        from django.contrib.auth.tokens import default_token_generator
-                        from django.core.mail import send_mail
-                        from django.template.loader import render_to_string
-                        from django.utils.html import strip_tags
-                        from django.conf import settings
-
-                        uid = urlsafe_base64_encode(force_bytes(member.user.pk))
-                        token = default_token_generator.make_token(member.user)
-
-                        protocol = 'https' if request.is_secure() else 'http'
-                        system_domain = getattr(settings, 'SYSTEM_DOMAIN', 'localhost:8000')
-
-                        if company.custom_domain and company.domain_verified and not settings.DEBUG:
-                            mother_host = company.custom_domain
-                        elif company.subdomain:
-                            mother_host = f"{company.subdomain}.{system_domain}"
-                        else:
-                            mother_host = system_domain
-
-                        reset_path = reverse(
-                            'accounts:password_reset_confirm',
-                            kwargs={'uidb64': uid, 'token': token},
-                        )
-                        reset_link = f"{protocol}://{mother_host}{reset_path}"
-
-                        context = {
-                            'first_name': member.full_name.split()[0],
-                            'company_name': company.name,
-                            'role': membership.get_role_display(),
-                            'username': membership.company_username,
-                            'email': member.user.email,
-                            'reset_link': reset_link,
-                            'is_new_user': True,
-                        }
-                        
-                        html_message = render_to_string('emails/staff_invite.html', context)
-                        plain_message = strip_tags(html_message)
-
-                        send_mail(
-                            f"You have been added to {company.name}",
-                            plain_message,
-                            settings.DEFAULT_FROM_EMAIL,
-                            [member.user.email],
-                            html_message=html_message,
-                            fail_silently=False,
-                        )
+                    success, err = _send_invite_email(
+                        company, membership, member.user,
+                        member.full_name.split()[0],
+                        member.user.email,
+                        is_new_user=True,
+                    )
+                    if success:
                         messages.success(request, f"✅ Member added and invitation email sent to {member.user.email}.")
-                    except Exception as e:
+                    else:
                         messages.warning(
-                            request, 
-                            f"✅ Member added, but email failed to send ({str(e)}). "
+                            request,
+                            f"✅ Member added, but email failed to send ({err}). "
                             f"Username: {membership.company_username}"
                         )
                 else:
@@ -699,6 +731,9 @@ def member_create(request):
         'default_password': fallback_password,
     })
 
+# ============================================================
+# MEMBER EDIT
+# ============================================================
 
 @login_required
 @transaction.atomic
@@ -830,12 +865,6 @@ def member_edit(request, pk):
                 if update_fields:
                     m.user.save(update_fields=update_fields)
 
-                # 3. Sanity: log so you can confirm in dev
-                print(
-                    f"✅ Member '{m.full_name}' saved — "
-                    f"User.role={m.user.role}, Membership.role={membership.role}"
-                )
-
             messages.success(request, f'✅ Member "{m.full_name}" updated.')
             return redirect('chama:member_list')
     else:
@@ -863,7 +892,6 @@ def member_edit(request, pk):
         'mode': 'edit',
         'member': member,
     })
-
 
 @login_required
 def role_list(request):
@@ -926,6 +954,10 @@ def membership_type_delete(request, pk):
     messages.info(request, f'🗑️ "{name}" deleted.')
     return redirect('chama:membership_type_list')
 
+# ============================================================
+# REGISTRATION
+# ============================================================
+
 @login_required
 def registration_list(request):
     qs = _company_queryset(request, Registration).select_related('membership_type')
@@ -976,7 +1008,7 @@ def registration_approve(request, pk):
         user = User.objects.filter(email__iexact=reg.email).first()
     if not user and reg.phone:
         user = User.objects.filter(username=reg.phone).first()
-        
+
     if not user:
         username_base = reg.phone or reg.email or f"member_{reg.id}"
         username = username_base
@@ -1018,58 +1050,18 @@ def registration_approve(request, pk):
         }
     )
 
-    # Send Invite Email if new
+    # Send Invite Email if new - sasa inatumia helper, sio protocol/mother_host tena
     if is_new_user and user.email:
-        try:
-            from django.urls import reverse
-            from django.utils.http import urlsafe_base64_encode
-            from django.utils.encoding import force_bytes
-            from django.contrib.auth.tokens import default_token_generator
-            from django.core.mail import send_mail
-            from django.template.loader import render_to_string
-            from django.utils.html import strip_tags
-            from django.conf import settings
-
-            uid = urlsafe_base64_encode(force_bytes(user.pk))
-            token = default_token_generator.make_token(user)
-
-            protocol = 'https' if request.is_secure() else 'http'
-            system_domain = getattr(settings, 'SYSTEM_DOMAIN', 'localhost:8000')
-
-            if company.custom_domain and company.domain_verified and not settings.DEBUG:
-                mother_host = company.custom_domain
-            elif company.subdomain:
-                mother_host = f"{company.subdomain}.{system_domain}"
-            else:
-                mother_host = system_domain
-
-            reset_path = reverse('accounts:password_reset_confirm', kwargs={'uidb64': uid, 'token': token})
-            reset_link = f"{protocol}://{mother_host}{reset_path}"
-
-            context = {
-                'first_name': reg.full_name.split()[0],
-                'company_name': company.name,
-                'role': membership.get_role_display(),
-                'username': membership.company_username,
-                'email': user.email,
-                'reset_link': reset_link,
-                'is_new_user': True,
-            }
-            
-            html_message = render_to_string('emails/staff_invite.html', context)
-            plain_message = strip_tags(html_message)
-
-            send_mail(
-                f"You have been added to {company.name}",
-                plain_message,
-                settings.DEFAULT_FROM_EMAIL,
-                [user.email],
-                html_message=html_message,
-                fail_silently=False,
-            )
+        success, err = _send_invite_email(
+            company, membership, user,
+            reg.full_name.split()[0],
+            user.email,
+            is_new_user=True,
+        )
+        if success:
             messages.success(request, f'✅ {reg.full_name} approved and invite email sent.')
-        except Exception as e:
-            messages.warning(request, f'✅ {reg.full_name} approved, but email failed. Username: {membership.company_username}')
+        else:
+            messages.warning(request, f'✅ {reg.full_name} approved, but email failed ({err}). Username: {membership.company_username}')
     else:
         messages.success(request, f'✅ {reg.full_name} approved. Linked to existing user account.')
 
@@ -1092,15 +1084,19 @@ def registration_reject(request, pk):
     messages.info(request, f'{reg.full_name}\'s application was rejected.')
     return redirect('chama:registration_list')
 
+# ============================================================
+# COMMITTEES
+# ============================================================
+
 @login_required
 def committee_list(request):
     _get_company(request)
     qs = _company_queryset(request, Committee).order_by('name')
-    
+
     is_officer = request.user.role in [
         'super_admin', 'company_admin', 'chairperson', 'vice_chairperson', 'secretary', 'treasurer'
     ]
-    
+
     return render(request, 'chama/committee_list.html', {
         'committees': qs,
         'is_officer': is_officer,
@@ -1130,11 +1126,11 @@ def committee_detail(request, pk):
     company = _get_company(request)
     committee = get_object_or_404(Committee, pk=pk, company=company)
     members = committee.members.select_related('member').order_by('role_in_committee', 'member__full_name')
-    
+
     is_officer = request.user.role in [
         'super_admin', 'company_admin', 'chairperson', 'vice_chairperson', 'secretary'
     ]
-    
+
     return render(request, 'chama/committee_detail.html', {
         'committee': committee,
         'members': members,
@@ -1167,6 +1163,7 @@ def committee_member_remove(request, pk, member_pk):
     member.delete()
     messages.info(request, f'🗑️ {name} removed from {committee.name}.')
     return redirect('chama:committee_detail', pk=committee.pk)
+
 
 
 

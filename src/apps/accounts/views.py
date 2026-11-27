@@ -1,18 +1,22 @@
 # apps/accounts/views.py
 
 from django.shortcuts import render, redirect
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model, logout, login as django_login
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.conf import settings
+from django.urls import reverse
+from django.utils.http import urlsafe_base64_encode, url_has_allowed_host_and_scheme
+from django.utils.encoding import force_bytes
+from django.contrib.auth.tokens import default_token_generator
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.utils.http import url_has_allowed_host_and_scheme
 from apps.companies.models import Company, Branch
 from apps.accounts.models import Membership
 from .serializers import (
@@ -26,14 +30,56 @@ from .permissions import (
     HasCompanyAccess, IsSameCompany,
 )
 
-
-
-
 User = get_user_model()
 
+# ============================================================
+# DOMAIN / RESET LINK HELPERS
+# ============================================================
+# Mother: ronosystems.onrender.com
+# Tenant: fieldmax.shop (custom domain, kama verified)
+# USITENGENEZE {subdomain}.ronosystems.onrender.com - inavunja SSL
 
+def _get_company_host(company=None):
+    system_domain = getattr(settings, 'SYSTEM_DOMAIN', 'localhost:8000').strip()
+    system_domain = system_domain.replace('http://', '').replace('https://', '').strip('/')
 
+    # 1. Custom domain - bora zaidi
+    if company:
+        custom = getattr(company, 'custom_domain', None)
+        verified = getattr(company, 'domain_verified', False)
+        if custom and verified and not settings.DEBUG:
+            return custom.strip().replace('http://', '').replace('https://', '').strip('/')
 
+    # 2. Render - nested subdomain inavunja SSL, tumia mother domain
+    if system_domain.endswith('.onrender.com'):
+        return system_domain
+
+    # 3. Localhost tu ndiyo subdomain inafanya kazi
+    if company and getattr(company, 'subdomain', None) and ('localhost' in system_domain or '127.0.0.1' in system_domain):
+        return f"{company.subdomain}.{system_domain}"
+
+    return system_domain
+
+def _get_reset_link(company, uid, token):
+    protocol = 'https' if not settings.DEBUG else 'http'
+    host = _get_company_host(company)
+    reset_path = reverse(
+        'accounts:password_reset_confirm',
+        kwargs={'uidb64': uid, 'token': token},
+    )
+    return f"{protocol}://{host}{reset_path}"
+
+def _get_company_dashboard_url(company, request=None):
+    """
+    URL ya dashboard ya company.
+    - Localhost: http://fieldmax.localhost:8000/dashboard/
+    - Render bila custom domain: https://ronosystems.onrender.com/dashboard/
+      (tenant atachaguliwa kwa membership, sio subdomain)
+    - Render na custom domain: https://fieldmax.shop/dashboard/
+    """
+    protocol = 'https' if not settings.DEBUG else 'http'
+    host = _get_company_host(company)
+    return f"{protocol}://{host}/dashboard/"
 
 # ============================================================
 # HELPERS
@@ -50,32 +96,27 @@ def _active_company(request):
         or getattr(request.user, 'company', None)
     )
 
-
 def _issue_tokens_for(user, membership=None):
     """Build a JWT whose claims describe the active membership."""
     refresh = RefreshToken.for_user(user)
     if membership:
         refresh['membership_id'] = membership.id
-        refresh['company_id']    = membership.company_id
-        refresh['role']          = membership.role
+        refresh['company_id'] = membership.company_id
+        refresh['role'] = membership.role
     else:
-        refresh['company_id']    = user.company_id
-        refresh['role']          = user.role
+        refresh['company_id'] = user.company_id
+        refresh['role'] = user.role
     return refresh
-
 
 def _bind_session(request, user, membership):
     """Keep Django session in sync (so template pages also work)."""
     django_login(request, user)
     if membership:
         request.session['active_membership_id'] = membership.id
-        request.session['active_company_id']    = membership.company_id
+        request.session['active_company_id'] = membership.company_id
     else:
         request.session.pop('active_membership_id', None)
         request.session.pop('active_company_id', None)
-
-
-
 
 # ============================================================
 # WEB LOGIN (HTML) - kwa session expired / browser
@@ -132,14 +173,6 @@ def web_login(request):
         'next': request.GET.get('next', ''),
     })
 
-
-
-
-
-
-
-
-
 # ============================================================
 # SESSION / TEMPLATE VIEWS  (unchanged behaviour, safer lookups)
 # ============================================================
@@ -158,7 +191,6 @@ def post_login_redirect(request):
 
     return redirect('/select-company/')
 
-
 @login_required
 def select_company(request):
     """List of companies the user belongs to (template flow)."""
@@ -176,21 +208,13 @@ def select_company(request):
         'memberships': memberships,
     })
 
-
 def redirect_to_company_dashboard(company, request):
-    """Build the absolute URL for a company subdomain."""
-    host = request.get_host()
-
-    if 'localhost' in host:
-        base_domain = 'localhost:8000'
-        return redirect(f"http://{company.subdomain}.{base_domain}/dashboard/")
-
-    base_domain = 'ronosystems.com'
-    if 'onrender.com' in host:
-        base_domain = 'ronosystems.onrender.com'
-
-    return redirect(f"https://{company.subdomain}.{base_domain}/dashboard/")
-
+    """
+    Build the absolute URL for a company dashboard.
+    FIX: Usitengeneze {subdomain}.ronosystems.onrender.com - inavunja SSL.
+    Kwenye Render tumia mother domain, tenant atapatikana kupitia session/membership.
+    """
+    return redirect(_get_company_dashboard_url(company, request))
 
 # ============================================================
 # AUTH
@@ -231,7 +255,6 @@ class RegisterView(generics.CreateAPIView):
             'user': UserSerializer(user).data,
         }, status=status.HTTP_201_CREATED, headers=headers)
 
-
 class LoginView(APIView):
     """
     Multi-tenant login.
@@ -260,11 +283,10 @@ class LoginView(APIView):
             'access': str(refresh.access_token),
             'refresh': str(refresh),
             'membership_id': membership.id if membership else None,
-            'company_id':    membership.company_id if membership else user.company_id,
-            'role':          membership.role if membership else user.role,
+            'company_id': membership.company_id if membership else user.company_id,
+            'role': membership.role if membership else user.role,
             'user': UserSerializer(user).data,
         })
-
 
 class LogoutView(APIView):
     """Blacklist refresh token + clear Django session."""
@@ -284,7 +306,6 @@ class LogoutView(APIView):
 
         return Response({'success': True, 'message': 'Logout successful'})
 
-
 # ============================================================
 # MEMBERSHIPS  (multi-company profiles)
 # ============================================================
@@ -300,7 +321,6 @@ class MyMembershipsView(APIView):
             .select_related('company', 'branch')
         )
         return Response(MembershipSerializer(qs, many=True).data)
-
 
 class SwitchCompanyView(APIView):
     """
@@ -325,22 +345,21 @@ class SwitchCompanyView(APIView):
 
         refresh = _issue_tokens_for(request.user, membership)
         request.session['active_membership_id'] = membership.id
-        request.session['active_company_id']    = membership.company_id
+        request.session['active_company_id'] = membership.company_id
 
         # Expose membership on the user for the response serializer
         request.user.active_membership = membership
 
         return Response({
             'success': True,
-            'access':  str(refresh.access_token),
+            'access': str(refresh.access_token),
             'refresh': str(refresh),
-            'membership_id':     membership.id,
-            'company_id':        membership.company_id,
+            'membership_id': membership.id,
+            'company_id': membership.company_id,
             'company_subdomain': membership.company.subdomain,
-            'role':              membership.role,
-            'user':              UserSerializer(request.user).data,
+            'role': membership.role,
+            'user': UserSerializer(request.user).data,
         })
-
 
 # ============================================================
 # PROFILE
@@ -365,7 +384,6 @@ class UserProfileView(APIView):
             })
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 # ============================================================
 # USER LISTING
 # ============================================================
@@ -377,7 +395,6 @@ class UserListView(APIView):
     def get(self, request):
         users = User.objects.all().order_by('-created_at')
         return Response(UserSerializer(users, many=True).data)
-
 
 class CompanyUserListView(APIView):
     """
@@ -408,7 +425,6 @@ class CompanyUserListView(APIView):
         users = [m.user for m in memberships]
 
         return Response(UserSerializer(users, many=True).data)
-
 
 # ============================================================
 # USER ROLE / COMPANY / BRANCH MANAGEMENT
@@ -443,7 +459,6 @@ class UserRoleUpdateView(APIView):
             'message': f"Role updated to {user.role}",
             'user': UserSerializer(user).data,
         })
-
 
 class UserCompanyUpdateView(APIView):
     """
@@ -490,7 +505,6 @@ class UserCompanyUpdateView(APIView):
             'message': f"User assigned to {company.name}",
             'user': UserSerializer(user).data,
         })
-
 
 class UserBranchUpdateView(APIView):
     """Update user branch within the active company."""
@@ -541,7 +555,6 @@ class UserBranchUpdateView(APIView):
             'user': UserSerializer(user).data,
         })
 
-
 # ============================================================
 # PASSWORD
 # ============================================================
@@ -578,7 +591,6 @@ class UserChangePasswordView(APIView):
             'message': 'Password changed successfully',
         })
 
-
 class UserPasswordResetView(APIView):
     """Request password reset."""
     permission_classes = []
@@ -596,13 +608,14 @@ class UserPasswordResetView(APIView):
                 'message': 'User with this email does not exist',
             }, status=status.HTTP_404_NOT_FOUND)
 
-        from django.utils.http import urlsafe_base64_encode
-        from django.utils.encoding import force_bytes
-        from django.contrib.auth.tokens import default_token_generator
-
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
-        reset_link = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}"
+
+        # FIX: Usitumie FRONTEND_URL (mara nyingi ni localhost / frontend tofauti)
+        # Tumia company ya user kama ana primary membership, vinginevyo mother domain
+        membership = user.get_primary_membership()
+        company = membership.company if membership else None
+        reset_link = _get_reset_link(company, uid, token)
 
         try:
             html_message = render_to_string('emails/password_reset.html', {
@@ -622,7 +635,6 @@ class UserPasswordResetView(APIView):
             'success': True,
             'message': 'Password reset link sent to your email',
         })
-
 
 # ============================================================
 # ROLE INFO
@@ -665,22 +677,22 @@ class UserRoleInfoView(APIView):
         }
 
         capability_flags = {
-            'can_manage_users':   effective_role in ['super_admin', 'company_admin'],
-            'can_manage_sales':   effective_role in ['super_admin', 'company_admin', 'company_manager', 'company_cashier'],
-            'can_view_reports':   effective_role in ['super_admin', 'company_admin', 'company_manager'],
-            'can_approve_sales':  effective_role in ['super_admin', 'company_admin', 'company_manager'],
-            'can_process_sales':  effective_role in ['super_admin', 'company_admin', 'company_manager', 'company_cashier', 'company_agent'],
+            'can_manage_users': effective_role in ['super_admin', 'company_admin'],
+            'can_manage_sales': effective_role in ['super_admin', 'company_admin', 'company_manager', 'company_cashier'],
+            'can_view_reports': effective_role in ['super_admin', 'company_admin', 'company_manager'],
+            'can_approve_sales': effective_role in ['super_admin', 'company_admin', 'company_manager'],
+            'can_process_sales': effective_role in ['super_admin', 'company_admin', 'company_manager', 'company_cashier', 'company_agent'],
             'can_handle_tickets': effective_role in ['super_admin', 'company_admin', 'company_manager', 'customer_care'],
-            'can_perform_jobs':   effective_role in ['super_admin', 'company_admin', 'company_manager', 'company_technician'],
+            'can_perform_jobs': effective_role in ['super_admin', 'company_admin', 'company_manager', 'company_technician'],
 
-            'can_manage_members':     effective_role in ['super_admin', 'company_admin', 'company_manager', 'chairperson', 'vice_chairperson', 'secretary', 'vice_secretary'],
-            'can_manage_savings':     effective_role in ['super_admin', 'company_admin', 'company_manager', 'chairperson', 'vice_chairperson', 'treasurer'],
-            'can_manage_loans':       effective_role in ['super_admin', 'company_admin', 'company_manager', 'chairperson', 'vice_chairperson', 'treasurer', 'loan_officer'],
-            'can_manage_cashbook':    effective_role in ['super_admin', 'company_admin', 'company_manager', 'chairperson', 'treasurer'],
-            'can_manage_meetings':    effective_role in ['super_admin', 'company_admin', 'company_manager', 'chairperson', 'vice_chairperson', 'secretary', 'vice_secretary', 'treasurer', 'loan_officer', 'coopted_member', 'member'],
-            'can_manage_committees':  effective_role in ['super_admin', 'company_admin', 'chairperson', 'secretary'],
+            'can_manage_members': effective_role in ['super_admin', 'company_admin', 'company_manager', 'chairperson', 'vice_chairperson', 'secretary', 'vice_secretary'],
+            'can_manage_savings': effective_role in ['super_admin', 'company_admin', 'company_manager', 'chairperson', 'vice_chairperson', 'treasurer'],
+            'can_manage_loans': effective_role in ['super_admin', 'company_admin', 'company_manager', 'chairperson', 'vice_chairperson', 'treasurer', 'loan_officer'],
+            'can_manage_cashbook': effective_role in ['super_admin', 'company_admin', 'company_manager', 'chairperson', 'treasurer'],
+            'can_manage_meetings': effective_role in ['super_admin', 'company_admin', 'company_manager', 'chairperson', 'vice_chairperson', 'secretary', 'vice_secretary', 'treasurer', 'loan_officer', 'coopted_member', 'member'],
+            'can_manage_committees': effective_role in ['super_admin', 'company_admin', 'chairperson', 'secretary'],
             'can_view_chama_reports': effective_role in ['super_admin', 'company_admin', 'company_manager', 'chairperson', 'treasurer', 'loan_officer'],
-            'can_view_own_savings':   effective_role in ['chairperson', 'vice_chairperson', 'secretary', 'vice_secretary', 'treasurer', 'loan_officer', 'coopted_member', 'member'],
+            'can_view_own_savings': effective_role in ['chairperson', 'vice_chairperson', 'secretary', 'vice_secretary', 'treasurer', 'loan_officer', 'coopted_member', 'member'],
         }
 
         return Response({
@@ -700,7 +712,6 @@ class UserRoleInfoView(APIView):
             'company_username': membership.company_username if membership else None,
             'permissions': {**role_flags, **capability_flags},
         })
-
 
 # ============================================================
 # USER DELETE / STATUS
@@ -722,7 +733,6 @@ class UserDeleteView(APIView):
 
         user.delete()
         return Response({'success': True, 'message': 'User deleted successfully'})
-
 
 class UserStatusToggleView(APIView):
     permission_classes = [IsSuperAdmin]
