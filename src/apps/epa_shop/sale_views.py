@@ -446,6 +446,104 @@ def process_sale(request):
 
 
 
+
+# ============================================
+# FIELD-MAPPING HELPERS - FIX YA FieldError
+# Customer / Owner zinaweza kuwa na majina tofauti ya field
+# (full_name vs name, phone_number vs phone, national_id vs id_number)
+# Hii helper inaangalia model yenyewe na inachagua field iliyopo
+# ============================================
+
+def _model_fields(model):
+    return {f.name for f in model._meta.get_fields()}
+
+def _pick_field(model, candidates):
+    """Rudisha jina la field la kwanza lililopo kwenye model."""
+    fields = _model_fields(model)
+    for c in candidates:
+        if c in fields:
+            return c
+    return None
+
+def _customer_kwargs(customer_name, customer_phone, customer_email, customer_id_number, next_of_keen_name, next_of_keen_phone):
+    """Tengeneza kwargs za Customer.create() zinazofanya kazi na model halisi."""
+    kwargs = {}
+    # name
+    f = _pick_field(Customer, ['full_name', 'name'])
+    if f: kwargs[f] = customer_name
+    # phone
+    f = _pick_field(Customer, ['phone_number', 'phone'])
+    if f: kwargs[f] = customer_phone
+    # email
+    if 'email' in _model_fields(Customer):
+        kwargs['email'] = customer_email
+    # id
+    f = _pick_field(Customer, ['national_id', 'id_number'])
+    if f: kwargs[f] = customer_id_number
+    # next of kin
+    f = _pick_field(Customer, ['next_of_kin_name', 'next_of_keen_name'])
+    if f: kwargs[f] = next_of_keen_name
+    f = _pick_field(Customer, ['next_of_kin_phone', 'next_of_keen_phone'])
+    if f: kwargs[f] = next_of_keen_phone
+    # address / location / notes
+    f = _pick_field(Customer, ['address', 'location', 'notes'])
+    if f:
+        kwargs[f] = f"ID: {customer_id_number} | Next of Keen: {next_of_keen_name} | NOK Phone: {next_of_keen_phone}"
+    if 'is_active' in _model_fields(Customer):
+        kwargs['is_active'] = True
+    return kwargs
+
+def _owner_kwargs(customer_name, customer_phone, customer_email, customer_id_number, next_of_keen_name, next_of_keen_phone):
+    """Tengeneza kwargs za Owner.create() - Owner hana 'name'/'phone'/'id_number'/'address'."""
+    kwargs = {}
+    f = _pick_field(Owner, ['full_name', 'name'])
+    if f: kwargs[f] = customer_name
+    f = _pick_field(Owner, ['phone_number', 'phone'])
+    if f: kwargs[f] = customer_phone
+    if 'email' in _model_fields(Owner):
+        kwargs['email'] = customer_email
+    f = _pick_field(Owner, ['national_id', 'id_number'])
+    if f: kwargs[f] = customer_id_number
+    f = _pick_field(Owner, ['next_of_kin_name', 'next_of_keen_name'])
+    if f: kwargs[f] = next_of_keen_name
+    f = _pick_field(Owner, ['next_of_kin_phone', 'next_of_keen_phone'])
+    if f: kwargs[f] = next_of_keen_phone
+    f = _pick_field(Owner, ['location', 'address', 'notes'])
+    if f:
+        kwargs[f] = f"ID: {customer_id_number} | Next of Keen: {next_of_keen_name}"
+    if 'is_active' in _model_fields(Owner):
+        kwargs['is_active'] = True
+    return kwargs
+
+def _lookup_customer(company, phone):
+    """Tafuta Customer kwa phone - jaribu phone_number kwanza, halafu phone."""
+    fields = _model_fields(Customer)
+    if 'phone_number' in fields:
+        obj = Customer.objects.filter(company=company, phone_number=phone).first()
+        if obj: return obj
+    if 'phone' in fields:
+        return Customer.objects.filter(company=company, phone=phone).first()
+    return None
+
+def _lookup_owner(company, phone):
+    """Tafuta Owner kwa phone_number (Owner hana 'phone')."""
+    fields = _model_fields(Owner)
+    if 'phone_number' in fields:
+        obj = Owner.objects.filter(company=company, phone_number=phone).first()
+        if obj: return obj
+    if 'phone' in fields:
+        return Owner.objects.filter(company=company, phone=phone).first()
+    return None
+
+def _safe_order_customers(qs):
+    """Order customers bila kuvunja - tumia full_name kama ipo, vinginevyo -created_at."""
+    fields = _model_fields(Customer)
+    if 'full_name' in fields:
+        return qs.order_by('full_name')
+    if 'name' in fields:
+        return qs.order_by('name')
+    return qs.order_by('-created_at')
+
 # ============================================
 # SINGLE ITEM SALE - Create Page
 # ============================================
@@ -462,7 +560,10 @@ def sale_create_single(request):
         return redirect('/dashboard/')
 
     branches = Branch.objects.filter(company=company, is_active=True)
-    customers = Customer.objects.filter(company=company, is_active=True).order_by('name')[:50]
+    # FIX: usi-order na 'name' moja kwa moja - tumia helper inayochagua field iliyopo
+    customers = _safe_order_customers(
+        Customer.objects.filter(company=company, is_active=True)
+    )[:50]
 
     context = {
         'company': company,
@@ -473,7 +574,6 @@ def sale_create_single(request):
         'page_subtitle': 'Sell an item by scanning IMEI/Serial',
     }
     return render(request, 'epa_shop/sale_create_single.html', context)
-
 
 # ============================================
 # PRODUCT SEARCH - Autocomplete (Filtered by Company & Branch)
@@ -492,7 +592,6 @@ def sale_search_units(request):
     if len(query) < 2:
         return JsonResponse({'results': []})
 
-    # In support mode, super admin sees all branches
     is_admin = (
         is_viewing_company or
         request.user.is_company_admin or
@@ -503,48 +602,25 @@ def sale_search_units(request):
     )
 
     results = []
+    base_filter = {'identifier__icontains': query, 'status': 'available'}
 
-    base_filter = {
-        'identifier__icontains': query,
-        'status': 'available'
-    }
-
-    # Filter by branch only if not admin AND not in support mode
     if not is_admin and request.user.branch:
-        units = Unit.objects.filter(
-            **base_filter
-        ).filter(
+        units = Unit.objects.filter(**base_filter).filter(
             models.Q(phone__branch=request.user.branch) |
             models.Q(electronic__branch=request.user.branch)
-        ).select_related(
-            'phone', 'phone__branch',
-            'electronic', 'electronic__branch'
-        )[:20]
+        ).select_related('phone', 'phone__branch', 'electronic', 'electronic__branch')[:20]
     else:
-        units = Unit.objects.filter(
-            **base_filter,
-            phone__company=company
-        ).select_related(
-            'phone', 'phone__branch',
+        units = Unit.objects.filter(**base_filter, phone__company=company).select_related(
+            'phone', 'phone__branch', 'electronic', 'electronic__branch'
+        )[:20]
+        electronic_units = Unit.objects.filter(**base_filter, electronic__company=company).select_related(
             'electronic', 'electronic__branch'
         )[:20]
-
-        electronic_units = Unit.objects.filter(
-            **base_filter,
-            electronic__company=company
-        ).select_related(
-            'electronic', 'electronic__branch'
-        )[:20]
-
         units = list(units) + list(electronic_units)
         seen = set()
         units = [u for u in units if u.id not in seen and not seen.add(u.id)]
 
     for unit in units:
-        product = None
-        product_type = None
-        product_info = {}
-
         if unit.phone:
             product = unit.phone
             product_type = 'Phone'
@@ -584,7 +660,6 @@ def sale_search_units(request):
 
     return JsonResponse({'results': results})
 
-
 # ============================================
 # SINGLE ITEM SALE - Process
 # ============================================
@@ -600,33 +675,26 @@ def sale_process_single(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-    # ============================================================
-    # PHASE 0 — READ + VALIDATE FORM INPUT (no DB writes)
-    # ============================================================
-    unit_id              = (request.POST.get('unit_id') or '').strip()
-    customer_name        = (request.POST.get('customer_name') or '').strip()
-    customer_phone       = (request.POST.get('customer_phone') or '').strip()
-    customer_id_number   = (request.POST.get('customer_id_number') or '').strip()
-    customer_email       = (request.POST.get('customer_email') or '').strip()
-    next_of_keen_name    = (request.POST.get('next_of_keen_name') or '').strip()
-    next_of_keen_phone   = (request.POST.get('next_of_keen_phone') or '').strip()
-    sale_price_raw       = request.POST.get('sale_price', '0')
-    sale_type            = (request.POST.get('sale_type') or 'cash').strip()
-    branch_id            = (request.POST.get('branch_id') or '').strip()
-    payment_reference    = (request.POST.get('payment_reference') or '').strip() or None
+    unit_id = (request.POST.get('unit_id') or '').strip()
+    customer_name = (request.POST.get('customer_name') or '').strip()
+    customer_phone = (request.POST.get('customer_phone') or '').strip()
+    customer_id_number = (request.POST.get('customer_id_number') or '').strip()
+    customer_email = (request.POST.get('customer_email') or '').strip()
+    next_of_keen_name = (request.POST.get('next_of_keen_name') or '').strip()
+    next_of_keen_phone = (request.POST.get('next_of_keen_phone') or '').strip()
+    sale_price_raw = request.POST.get('sale_price', '0')
+    sale_type = (request.POST.get('sale_type') or 'cash').strip()
+    branch_id = (request.POST.get('branch_id') or '').strip()
+    payment_reference = (request.POST.get('payment_reference') or '').strip() or None
 
     if not unit_id:
         return JsonResponse({'error': 'Please scan or enter a unit identifier'}, status=400)
-
     if not customer_name:
         return JsonResponse({'error': 'Customer name is required'}, status=400)
-
     if not customer_phone:
         return JsonResponse({'error': 'Customer phone number is required'}, status=400)
-
     if not customer_id_number:
         return JsonResponse({'error': 'Customer ID number is required'}, status=400)
-
     if not sale_type:
         return JsonResponse({'error': 'Please select a sale type'}, status=400)
 
@@ -637,25 +705,16 @@ def sale_process_single(request):
     except (ValueError, TypeError, ArithmeticError):
         return JsonResponse({'error': 'Invalid sale price'}, status=400)
 
-    # ============================================================
-    # PHASE 1 — VALIDATE EVERYTHING AGAINST THE DB (no writes)
-    # ============================================================
     try:
         with transaction.atomic():
-
-            # --- Resolve + validate unit ---
             unit = Unit.objects.filter(id=unit_id).select_related(
-                'phone', 'phone__branch',
-                'electronic', 'electronic__branch',
+                'phone', 'phone__branch', 'electronic', 'electronic__branch',
             ).first()
-
             if not unit:
                 raise SaleError(f'Unit "{unit_id}" not found.', status=404)
-
             if unit.status != 'available':
                 raise SaleError(f'Unit "{unit.identifier}" is not available.')
 
-            # --- Resolve product ---
             if unit.phone:
                 product = unit.phone
             elif unit.electronic:
@@ -663,11 +722,9 @@ def sale_process_single(request):
             else:
                 raise SaleError('Invalid product attached to this unit.')
 
-            # --- Verify product belongs to the active company ---
             if product.company_id != company.id:
                 raise SaleError('Product does not belong to this company.', status=403)
 
-            # --- Resolve branch ---
             branch = None
             if branch_id:
                 branch = Branch.objects.filter(id=branch_id, company=company).first()
@@ -678,80 +735,65 @@ def sale_process_single(request):
             if not branch:
                 raise SaleError('No branch assigned to this product.')
 
-            # --- Tax ---
             tax_amount, net_amount = calculate_tax(company, sale_price)
 
-            # ============================================================
-            # PHASE 2 — WRITE EVERYTHING (all validation passed)
-            # ============================================================
-
-            # --- Create or reuse customer ---
-            customer = Customer.objects.filter(
-                phone=customer_phone, company=company
-            ).first()
-
+            # --- Create or reuse customer (field-safe) ---
+            customer = _lookup_customer(company, customer_phone)
             if not customer:
-                customer = Customer.objects.create(
-                    company=company,
-                    branch=branch,
-                    name=customer_name,
-                    phone=customer_phone,
-                    email=customer_email,
-                    id_number=customer_id_number,
-                    next_of_keen_name=next_of_keen_name,
-                    next_of_keen_phone=next_of_keen_phone,
-                    address=(
-                        f"ID: {customer_id_number} | "
-                        f"Next of Keen: {next_of_keen_name} | "
-                        f"NOK Phone: {next_of_keen_phone}"
-                    ),
-                    is_active=True,
+                c_kwargs = _customer_kwargs(
+                    customer_name, customer_phone, customer_email,
+                    customer_id_number, next_of_keen_name, next_of_keen_phone,
                 )
+                c_kwargs['company'] = company
+                if 'branch' in _model_fields(Customer):
+                    c_kwargs['branch'] = branch
+                customer = Customer.objects.create(**c_kwargs)
             else:
-                # Merge any newly-provided fields
-                if customer_name and customer.name != customer_name:
-                    customer.name = customer_name
-                if customer_email and not customer.email:
+                # Merge - tumia field iliyopo tu
+                c_fields = _model_fields(Customer)
+                name_f = _pick_field(Customer, ['full_name', 'name'])
+                if name_f and customer_name and getattr(customer, name_f) != customer_name:
+                    setattr(customer, name_f, customer_name)
+                if 'email' in c_fields and customer_email and not customer.email:
                     customer.email = customer_email
-                if customer_id_number and customer.id_number != customer_id_number:
-                    customer.id_number = customer_id_number
-                if next_of_keen_name and customer.next_of_keen_name != next_of_keen_name:
-                    customer.next_of_keen_name = next_of_keen_name
-                if next_of_keen_phone and customer.next_of_keen_phone != next_of_keen_phone:
-                    customer.next_of_keen_phone = next_of_keen_phone
-                customer.address = (
-                    f"ID: {customer_id_number} | "
-                    f"Next of Keen: {next_of_keen_name} | "
-                    f"NOK Phone: {next_of_keen_phone}"
-                )
+                id_f = _pick_field(Customer, ['national_id', 'id_number'])
+                if id_f and customer_id_number and getattr(customer, id_f) != customer_id_number:
+                    setattr(customer, id_f, customer_id_number)
+                nok_n = _pick_field(Customer, ['next_of_kin_name', 'next_of_keen_name'])
+                if nok_n and next_of_keen_name and getattr(customer, nok_n) != next_of_keen_name:
+                    setattr(customer, nok_n, next_of_keen_name)
+                nok_p = _pick_field(Customer, ['next_of_kin_phone', 'next_of_keen_phone'])
+                if nok_p and next_of_keen_phone and getattr(customer, nok_p) != next_of_keen_phone:
+                    setattr(customer, nok_p, next_of_keen_phone)
                 customer.save()
 
-            # --- Create or reuse owner ---
-            owner = Owner.objects.filter(
-                phone=customer_phone, company=company
-            ).first()
-
+            # --- Create or reuse owner (field-safe - Owner hana 'name'/'phone') ---
+            owner = _lookup_owner(company, customer_phone)
             if not owner:
-                owner = Owner.objects.create(
-                    company=company,
-                    branch=branch,
-                    name=customer_name,
-                    phone=customer_phone,
-                    email=customer_email,
-                    id_number=customer_id_number,
-                    address=(
-                        f"ID: {customer_id_number} | "
-                        f"Next of Keen: {next_of_keen_name} | "
-                        f"NOK Phone: {next_of_keen_phone}"
-                    ),
-                    is_active=True,
+                o_kwargs = _owner_kwargs(
+                    customer_name, customer_phone, customer_email,
+                    customer_id_number, next_of_keen_name, next_of_keen_phone,
                 )
+                o_kwargs['company'] = company
+                if 'branch' in _model_fields(Owner):
+                    o_kwargs['branch'] = branch
+                # Owner anaweza kuhitaji 'user' - kama ni required, usiweke (itakuwa null)
+                owner = Owner.objects.create(**o_kwargs)
+            else:
+                o_fields = _model_fields(Owner)
+                name_f = _pick_field(Owner, ['full_name', 'name'])
+                if name_f and customer_name and getattr(owner, name_f) != customer_name:
+                    setattr(owner, name_f, customer_name)
+                if 'email' in o_fields and customer_email and not owner.email:
+                    owner.email = customer_email
+                id_f = _pick_field(Owner, ['national_id', 'id_number'])
+                if id_f and customer_id_number and not getattr(owner, id_f):
+                    setattr(owner, id_f, customer_id_number)
+                owner.save()
 
-            # --- Determine payment status ---
             paid_methods = {'cash', 'm-pesa', 'mpesa', 'bank_transfer', 'card'}
             payment_status = 'paid' if sale_type in paid_methods else 'pending'
 
-            # --- Create Sale ---
             sale = Sale.objects.create(
                 company=company,
                 branch=branch,
@@ -759,27 +801,23 @@ def sale_process_single(request):
                 customer_name=customer_name,
                 customer_phone=customer_phone,
                 customer_email=customer_email,
-                total_amount=sale_price,       # pre-tax subtotal
+                total_amount=sale_price,
                 discount=Decimal('0'),
                 tax=tax_amount,
-                net_amount=net_amount,         # what customer pays
+                net_amount=net_amount,
                 payment_status=payment_status,
                 payment_method=sale_type,
                 sold_by=request.user,
                 sale_date=timezone.now(),
             )
 
-            # Link the M-Pesa transaction to this sale
             if sale_type in ('m-pesa', 'mpesa') and payment_reference:
                 MpesaTransaction.objects.filter(
-                    company=company,
-                    mpesa_code__iexact=payment_reference,
+                    company=company, mpesa_code__iexact=payment_reference,
                 ).update(sale=sale)
 
-            # --- Snapshot historical COGS for this line ---
             unit_cost, line_cogs = _snapshot_cogs(product, sale_price, 1)
 
-            # --- Create SaleItem ---
             content_type = ContentType.objects.get_for_model(product)
             SaleItem.objects.create(
                 sale=sale,
@@ -792,15 +830,13 @@ def sale_process_single(request):
                 unit_price=sale_price,
                 total_price=sale_price,
                 unit=unit,
-                unit_cost=unit_cost,        # ← NEW
-                cogs_amount=line_cogs,      # ← NEW
+                unit_cost=unit_cost,
+                cogs_amount=line_cogs,
             )
 
-            # ── Freeze the sale's COGS total ──
             sale.cogs_amount = line_cogs
             sale.save(update_fields=['cogs_amount'])
 
-            # --- Mark unit as sold ---
             unit.status = 'sold'
             unit.owner = owner
             unit.owner_name = customer_name
@@ -808,31 +844,36 @@ def sale_process_single(request):
             unit.sold_date = timezone.now()
             unit.save()
 
-            # --- Decrement product stock ---
-            previous_quantity = product.quantity_in_stock
-            if product.quantity_in_stock > 0:
-                product.quantity_in_stock -= 1
+            # Stock - tumia field iliyopo (quantity_in_stock vs total_quantity_in_stock)
+            stock_field = 'quantity_in_stock' if 'quantity_in_stock' in _model_fields(product.__class__) else 'total_quantity_in_stock'
+            previous_quantity = getattr(product, stock_field, 0) or 0
+            if previous_quantity > 0:
+                setattr(product, stock_field, previous_quantity - 1)
                 product.save()
 
-            # --- Customer stats (only for PAID) ---
+            # Customer stats - tu kama fields zipo
             if payment_status == 'paid':
-                customer.total_purchases += net_amount
-                customer.visit_count += 1
-                customer.last_visit = timezone.now()
-                customer.save()
+                c_fields = _model_fields(Customer)
+                updated = []
+                if 'total_purchases' in c_fields:
+                    customer.total_purchases = (customer.total_purchases or 0) + net_amount
+                    updated.append('total_purchases')
+                if 'visit_count' in c_fields:
+                    customer.visit_count = (customer.visit_count or 0) + 1
+                    updated.append('visit_count')
+                if 'last_visit' in c_fields:
+                    customer.last_visit = timezone.now()
+                    updated.append('last_visit')
+                if updated:
+                    customer.save(update_fields=updated)
+                # Owner hana hizo stats - usijaribu ku-update
 
-                owner.total_purchases += net_amount
-                owner.purchase_count += 1
-                owner.last_purchase_date = timezone.now()
-                owner.save()
-
-            # --- Stock movement ---
             record_stock_movement(
                 product=product,
                 movement_type='sale',
                 quantity=-1,
                 previous_quantity=previous_quantity,
-                new_quantity=product.quantity_in_stock,
+                new_quantity=getattr(product, stock_field, 0) or 0,
                 branch=branch,
                 unit=unit,
                 reference_id=f"SALE-{sale.id}",
@@ -841,9 +882,6 @@ def sale_process_single(request):
                 performed_by=request.user,
             )
 
-            # ============================================================
-            # SUCCESS
-            # ============================================================
             return JsonResponse({
                 'success': True,
                 'sale_id': sale.id,
@@ -857,15 +895,11 @@ def sale_process_single(request):
             })
 
     except SaleError as e:
-        # Expected validation failure — atomic block already rolled back
         return JsonResponse({'error': e.message}, status=e.status)
-
     except Exception as e:
-        # Unexpected — print traceback and return 500
         import traceback
         traceback.print_exc()
         return JsonResponse({'error': str(e)}, status=500)
-
 
 
 

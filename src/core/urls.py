@@ -5,6 +5,7 @@ from django.views.generic import TemplateView
 from apps.companies import web_views as company_views
 from apps.accounts.admin_site import restricted_admin_site
 from apps.accounts import views_guest
+from apps.accounts.views import web_login 
 from core.views import contact, manifest_view, service_worker, asset_links, admin_contact_messages
 from . import views
 
@@ -39,6 +40,7 @@ urlpatterns = [
     # ============================================
     # WEB AUTH — allauth (MARA MOJA TU)
     # ============================================
+    path('accounts/login/', web_login, name='account_login'),
     path('accounts/', include('allauth.urls')),
     path('auth/', include('apps.accounts.web_urls', namespace='web_accounts')),
     path('auth/apply-company/', views_guest.apply_company, name='apply_company'),
@@ -50,7 +52,7 @@ urlpatterns = [
     #   /users/  -> Super Admin Users CRUD (users_views.py)
     # Usii-include tena chini ya company/ au users/ au api/auth/
     # ============================================
-    path('', include('apps.accounts.urls')),
+    path('accounts/', include('apps.accounts.urls')),
 
     # ============================================
     # WEB INTERFACE

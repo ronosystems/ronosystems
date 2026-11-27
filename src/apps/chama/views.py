@@ -720,6 +720,7 @@ def member_edit(request, pk):
             m = form.save(commit=False)
 
             custom_password = form.cleaned_data.get('default_password', '').strip()
+            role = (form.cleaned_data.get('role') or '').strip() or None
 
             # ── Cloudinary uploads ──
             if request.FILES.get('passport_photo'):
@@ -733,7 +734,7 @@ def member_edit(request, pk):
             if request.FILES.get('good_conduct'):
                 m.good_conduct = _upload_to_cloudinary(request.FILES.get('good_conduct'))
 
-            # 2. Ensure the member has a linked User account
+            # ── Ensure the member has a linked User account ──
             if not m.user:
                 existing_user = None
                 if m.email:
@@ -758,7 +759,6 @@ def member_edit(request, pk):
                         is_active=True,
                     )
 
-                    # ✅ If a custom password was provided, use it. Otherwise, unusable.
                     if custom_password:
                         existing_user.set_password(custom_password)
                     else:
@@ -769,24 +769,38 @@ def member_edit(request, pk):
 
             m.save()
 
-            # 3. Update User Role, Details & Password
+            # =========================================================
+            # SYNC USER + MEMBERSHIP (NAME, EMAIL, PHONE, ROLE, PASSWORD)
+            # =========================================================
             if m.user:
                 from apps.accounts.models import Membership
-                
-                # Ensure membership exists
+
+                # Determine the final role — form value wins, else existing, else 'member'
+                final_role = role or m.user.role or 'member'
+
+                # 1. Ensure Membership row exists AND force-update its role
                 membership, created = Membership.objects.get_or_create(
                     user=m.user,
                     company=company,
                     defaults={
-                        'role': form.cleaned_data.get('role') or 'member',
+                        'role': final_role,
                         'is_active': True,
+                        'is_primary': not m.user.memberships.exists(),
                     }
                 )
 
-                update_fields = []
-                role = form.cleaned_data.get('role')
+                membership_updates = []
+                if membership.role != final_role:
+                    membership.role = final_role
+                    membership_updates.append('role')
+                if not membership.is_active:
+                    membership.is_active = True
+                    membership_updates.append('is_active')
+                if membership_updates:
+                    membership.save(update_fields=membership_updates)
 
-                # 👇 Sync Name, Email, and Phone from Member to User
+                # 2. Sync User base fields + role
+                update_fields = []
                 names = m.full_name.split(' ', 1)
                 first_name = names[0]
                 last_name = names[1] if len(names) > 1 else ''
@@ -803,16 +817,12 @@ def member_edit(request, pk):
                 if m.user.phone != m.phone:
                     m.user.phone = m.phone
                     update_fields.append('phone')
-
-                # Role & Company
-                if role and m.user.role != role:
-                    m.user.role = role
+                if m.user.role != final_role:
+                    m.user.role = final_role
                     update_fields.append('role')
-
                 if m.user.company != company:
                     m.user.company = company
                     update_fields.append('company')
-
                 if custom_password:
                     m.user.set_password(custom_password)
                     update_fields.append('password')
@@ -820,13 +830,32 @@ def member_edit(request, pk):
                 if update_fields:
                     m.user.save(update_fields=update_fields)
 
+                # 3. Sanity: log so you can confirm in dev
+                print(
+                    f"✅ Member '{m.full_name}' saved — "
+                    f"User.role={m.user.role}, Membership.role={membership.role}"
+                )
+
             messages.success(request, f'✅ Member "{m.full_name}" updated.')
             return redirect('chama:member_list')
     else:
+        # Pre-populate the role field from the membership (not just User.role)
+        initial = {}
+        if member.user:
+            from apps.accounts.models import Membership
+            existing_membership = Membership.objects.filter(
+                user=member.user, company=company
+            ).first()
+            initial['role'] = (
+                existing_membership.role if existing_membership
+                else member.user.role
+            )
+
         form = MemberForm(
-            instance=member, 
+            instance=member,
             company=company,
             fallback_password=fallback_password,
+            initial=initial,
         )
 
     return render(request, 'chama/member_form.html', {
