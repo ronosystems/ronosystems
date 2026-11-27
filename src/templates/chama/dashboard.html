@@ -40,6 +40,12 @@
 
     .chart-container {
         position: relative;
+        height: 220px;
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    .bar-chart-container {
+        position: relative;
         height: 300px;
         width: 100%;
     }
@@ -66,6 +72,66 @@
         padding: 10px 12px;
         font-size: 0.8rem;
         flex-grow: 1;
+    }
+
+    /* Percentage Overlay on Doughnut Charts */
+    .chart-percentage-overlay {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        pointer-events: none;
+        z-index: 10;
+    }
+    .chart-percentage-overlay .percentage-value {
+        font-size: 1.8rem;
+        font-weight: 800;
+        color: #000;
+        line-height: 1.2;
+    }
+    .chart-percentage-overlay .percentage-label {
+        font-size: 0.65rem;
+        font-weight: 600;
+        color: #555;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    /* Legend with values */
+    .chart-legend {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 0 10px;
+    }
+    .chart-legend-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #333;
+        border-bottom: 1px dashed #ddd;
+        padding-bottom: 4px;
+    }
+    .chart-legend-item:last-child {
+        border-bottom: none;
+    }
+    .chart-legend-label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .chart-legend-color {
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        border: 1px solid #000;
+        flex-shrink: 0;
+    }
+    .chart-legend-value {
+        font-weight: 800;
     }
 </style>
 {% endblock %}
@@ -148,87 +214,43 @@
         </div>
     </div>
 
-    <!-- SINGLE ROW WITH TWO COLUMNS -->
+    <!-- ROW 2: TWO COLUMNS AS DOUGHNUT CHARTS -->
     <div class="row g-4 mb-4 mt-1">
         
-        <!-- ========================================== -->
-        <!-- LEFT COLUMN: Funds Allocation (Row 2)      -->
-        <!-- ========================================== -->
+        <!-- LEFT COLUMN: Funds Allocation Chart -->
         <div class="col-lg-6">
-            <h6 class="text-muted fw-bold mb-2 text-uppercase" style="font-size: 0.75rem; letter-spacing: 1px;">Funds Allocation</h6>
-            <div class="row g-3">
-                <div class="col-sm-6">
-                    <div class="stat-card" style="border-color: #ffc107; height: 100%;">
-                        <i class="fas fa-layer-group stat-icon text-warning"></i>
-                        <div class="stat-title text-warning">Unallocated Pool</div>
-                        <div class="stat-value">KES {{ pool_balance|floatformat:2 }}</div>
-                        <div class="stat-sub">Waiting to be allocated</div>
-                    </div>
+            <div class="dash-panel" style="border-color: #000;">
+                <div class="dash-panel-header">
+                    <span><i class="fas fa-layer-group me-2"></i> Funds Allocation</span>
                 </div>
-                <div class="col-sm-6">
-                    <div class="stat-card" style="border-color: #28a745; height: 100%;">
-                        <i class="fas fa-heartbeat stat-icon text-success"></i>
-                        <div class="stat-title text-success">Welfare Fund</div>
-                        <div class="stat-value">KES {{ welfare_funds|floatformat:2 }}</div>
-                        <div class="stat-sub">Member welfare</div>
+                <div class="dash-panel-body p-3">
+                    <div class="chart-container" style="position: relative;">
+                        <canvas id="fundsChart"></canvas>
+                        <div class="chart-percentage-overlay">
+                            <div class="percentage-value" id="fundsChartPercent">0%</div>
+                            <div class="percentage-label">Total Funds</div>
+                        </div>
                     </div>
-                </div>
-                <div class="col-sm-6">
-                    <div class="stat-card" style="border-color: #17a2b8; height: 100%;">
-                        <i class="fas fa-building stat-icon text-info"></i>
-                        <div class="stat-title text-info">Project Fund</div>
-                        <div class="stat-value">KES {{ project_funds|floatformat:2 }}</div>
-                        <div class="stat-sub">Allocated for investments</div>
-                    </div>
-                </div>
-                <div class="col-sm-6">
-                    <div class="stat-card" style="border-color: #007bff; height: 100%;">
-                        <i class="fas fa-hand-holding-usd stat-icon text-primary"></i>
-                        <div class="stat-title text-primary">Loan Fund</div>
-                        <div class="stat-value">KES {{ loan_funds|floatformat:2 }}</div>
-                        <div class="stat-sub">Available for lending</div>
-                    </div>
+                    <div class="chart-legend" id="fundsChartLegend"></div>
                 </div>
             </div>
         </div>
 
-        <!-- ========================================== -->
-        <!-- RIGHT COLUMN: Loan Performance (Row 3)     -->
-        <!-- ========================================== -->
+        <!-- RIGHT COLUMN: Contributions & Loan Performance Chart -->
         <div class="col-lg-6">
-            <h6 class="text-muted fw-bold mb-2 text-uppercase" style="font-size: 0.75rem; letter-spacing: 1px;">Contributions & Loan Performance</h6>
-            <div class="row g-3">
-                <div class="col-sm-6">
-                    <div class="stat-card" style="height: 100%;">
-                        <i class="fas fa-hand-holding-usd stat-icon"></i>
-                        <div class="stat-title">Contributions This Year</div>
-                        <div class="stat-value">KES {{ contributions_this_year|floatformat:2 }}</div>
-                        <div class="stat-sub">Total collected in {{ current_year }}</div>
-                    </div>
+            <div class="dash-panel" style="border-color: #000;">
+                <div class="dash-panel-header">
+                    <span><i class="fas fa-chart-line me-2"></i> Contributions & Loan Performance</span>
                 </div>
-                <div class="col-sm-6">
-                    <div class="stat-card" style="height: 100%;">
-                        <i class="fas fa-money-check-alt stat-icon"></i>
-                        <div class="stat-title">Total Loan Disbursed</div>
-                        <div class="stat-value">KES {{ loans_disbursed|floatformat:2 }}</div>
-                        <div class="stat-sub">Lifetime total</div>
+                <div class="dash-panel-body p-3">
+                    <div class="chart-container" style="position: relative;">
+                        <canvas id="performanceChart"></canvas>
+                        <div class="chart-percentage-overlay">
+                            <div class="percentage-value" id="performanceChartPercent">0%</div>
+                            <div class="percentage-label">Total Value</div>
+                        </div>
                     </div>
-                </div>
-                <div class="col-sm-6">
-                    <div class="stat-card" style="height: 100%;">
-                        <i class="fas fa-hand-holding-usd stat-icon"></i>
-                        <div class="stat-title">Total Outstanding</div>
-                        <div class="stat-value">KES {{ loans_outstanding|floatformat:2 }}</div>
-                        <div class="stat-sub text-danger fw-bold">Remaining balance</div>
-                    </div>
-                </div>
-                <div class="col-sm-6">
-                    <div class="stat-card" style="height: 100%;">
-                        <i class="fas fa-check-circle stat-icon text-success"></i>
-                        <div class="stat-title">Total Repaid</div>
-                        <div class="stat-value text-success">KES {{ loans_repaid|floatformat:2 }}</div>
-                        <div class="stat-sub">Lifetime repayments</div>
-                    </div>
+                    <div class="chart-legend" id="performanceChartLegend"></div>
                 </div>
             </div>
         </div>
@@ -236,7 +258,7 @@
     </div>
 
 
-    <!-- ROW 4: Financial Overview Chart -->
+    <!-- ROW 3: Financial Overview (RESTORED TO BAR CHART) -->
     <div class="row g-3 mb-3">
         <div class="col-12">
             <div class="dash-panel">
@@ -244,7 +266,7 @@
                     <span><i class="fas fa-chart-pie me-2"></i> Financial Overview</span>
                 </div>
                 <div class="dash-panel-body p-3">
-                    <div class="chart-container">
+                    <div class="bar-chart-container">
                         <canvas id="adminChart"></canvas>
                     </div>
                 </div>
@@ -254,6 +276,116 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {
+            
+            // --- 1. Funds Allocation Doughnut Chart ---
+            const fundsData = {
+                labels: ['Unallocated Pool', 'Welfare Fund', 'Project Fund', 'Loan Fund'],
+                values: [
+                    {{ pool_balance|default:0 }}, 
+                    {{ welfare_funds|default:0 }}, 
+                    {{ project_funds|default:0 }}, 
+                    {{ loan_funds|default:0 }}
+                ],
+                colors: ['rgba(255, 206, 86, 0.8)', 'rgba(40, 167, 69, 0.8)', 'rgba(23, 162, 184, 0.8)', 'rgba(0, 123, 255, 0.8)'],
+                borderColors: ['#ffc107', '#28a745', '#17a2b8', '#007bff']
+            };
+            const totalFunds = fundsData.values.reduce((a, b) => a + b, 0);
+            
+            if (totalFunds > 0) {
+                const maxPercent = ((Math.max(...fundsData.values) / totalFunds) * 100).toFixed(1);
+                document.getElementById('fundsChartPercent').textContent = maxPercent + '%';
+            } else {
+                document.getElementById('fundsChartPercent').textContent = '0%';
+            }
+
+            new Chart(document.getElementById('fundsChart').getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: fundsData.labels,
+                    datasets: [{
+                        data: fundsData.values,
+                        backgroundColor: fundsData.colors,
+                        borderColor: '#000',
+                        borderWidth: 2,
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, cutout: '65%',
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            const fundsLegend = document.getElementById('fundsChartLegend');
+            fundsData.labels.forEach((label, i) => {
+                const pct = totalFunds > 0 ? ((fundsData.values[i] / totalFunds) * 100).toFixed(1) : 0;
+                fundsLegend.innerHTML += `
+                    <div class="chart-legend-item">
+                        <div class="chart-legend-label">
+                            <span class="chart-legend-color" style="background: ${fundsData.colors[i]}; border-color: ${fundsData.borderColors[i]};"></span>
+                            <span>${label}</span>
+                        </div>
+                        <div class="chart-legend-value">KES ${fundsData.values[i].toLocaleString()} (${pct}%)</div>
+                    </div>
+                `;
+            });
+
+
+            // --- 2. Contributions & Loan Performance Doughnut Chart ---
+            const performanceData = {
+                labels: ['Contributions This Year', 'Total Loan Disbursed', 'Total Outstanding', 'Total Repaid'],
+                values: [
+                    {{ contributions_this_year|default:0 }}, 
+                    {{ loans_disbursed|default:0 }}, 
+                    {{ loans_outstanding|default:0 }}, 
+                    {{ loans_repaid|default:0 }}
+                ],
+                colors: ['rgba(54, 162, 235, 0.8)', 'rgba(153, 102, 255, 0.8)', 'rgba(255, 99, 132, 0.8)', 'rgba(75, 192, 192, 0.8)'],
+                borderColors: ['#36a2eb', '#9966ff', '#ff6384', '#4bc0c0']
+            };
+            const totalPerformance = performanceData.values.reduce((a, b) => a + b, 0);
+            
+            if (totalPerformance > 0) {
+                const maxPercent = ((Math.max(...performanceData.values) / totalPerformance) * 100).toFixed(1);
+                document.getElementById('performanceChartPercent').textContent = maxPercent + '%';
+            } else {
+                document.getElementById('performanceChartPercent').textContent = '0%';
+            }
+
+            new Chart(document.getElementById('performanceChart').getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: performanceData.labels,
+                    datasets: [{
+                        data: performanceData.values,
+                        backgroundColor: performanceData.colors,
+                        borderColor: '#000',
+                        borderWidth: 2,
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, cutout: '65%',
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            const performanceLegend = document.getElementById('performanceChartLegend');
+            performanceData.labels.forEach((label, i) => {
+                const pct = totalPerformance > 0 ? ((performanceData.values[i] / totalPerformance) * 100).toFixed(1) : 0;
+                performanceLegend.innerHTML += `
+                    <div class="chart-legend-item">
+                        <div class="chart-legend-label">
+                            <span class="chart-legend-color" style="background: ${performanceData.colors[i]}; border-color: ${performanceData.borderColors[i]};"></span>
+                            <span>${label}</span>
+                        </div>
+                        <div class="chart-legend-value">KES ${performanceData.values[i].toLocaleString()} (${pct}%)</div>
+                    </div>
+                `;
+            });
+
+
+            // --- 3. Overall Financial Overview (RESTORED BAR CHART) ---
             const ctx = document.getElementById('adminChart').getContext('2d');
             new Chart(ctx, {
                 type: 'bar',
@@ -286,6 +418,7 @@
                     scales: { y: { beginAtZero: true } }
                 }
             });
+
         });
     </script>
 
@@ -343,16 +476,23 @@
     </div>
 
     <div class="row g-3 mb-3">
-        <!-- PERSONAL CHART -->
+        <!-- PERSONAL CHART (Doughnut with Percentage) -->
         <div class="col-lg-7">
             <div class="dash-panel">
                 <div class="dash-panel-header">
                     <span><i class="fas fa-chart-pie me-2"></i> My Financial Portfolio</span>
                 </div>
                 <div class="dash-panel-body p-3">
-                    <div class="chart-container">
+                    <div class="chart-container" style="position: relative;">
                         <canvas id="memberChart"></canvas>
+                        <!-- Percentage Overlay -->
+                        <div class="chart-percentage-overlay" id="memberChartOverlay">
+                            <div class="percentage-value" id="memberChartPercent">0%</div>
+                            <div class="percentage-label">Total Portfolio</div>
+                        </div>
                     </div>
+                    <!-- Legend with Values -->
+                    <div class="chart-legend" id="memberChartLegend"></div>
                 </div>
             </div>
         </div>
@@ -393,31 +533,85 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {
+            // Data for member chart
+            const memberData = {
+                labels: ['Savings', 'Contributions', 'Loan Balance'],
+                values: [
+                    {{ member_profile.savings_balance|default:0 }}, 
+                    {{ my_contributions|default:0 }}, 
+                    {{ my_loan_balance|default:0 }}
+                ],
+                colors: [
+                    'rgba(75, 192, 192, 0.8)',
+                    'rgba(54, 162, 235, 0.8)',
+                    'rgba(255, 99, 132, 0.8)'
+                ],
+                borderColors: [
+                    '#4bc0c0',
+                    '#36a2eb',
+                    '#ff6384'
+                ]
+            };
+
+            const totalMember = memberData.values.reduce((a, b) => a + b, 0);
+            
+            // Update percentage overlay
+            const percentEl = document.getElementById('memberChartPercent');
+            if (totalMember > 0) {
+                const maxVal = Math.max(...memberData.values);
+                const maxPercent = ((maxVal / totalMember) * 100).toFixed(1);
+                percentEl.textContent = maxPercent + '%';
+            } else {
+                percentEl.textContent = '0%';
+            }
+
             const ctx = document.getElementById('memberChart').getContext('2d');
             new Chart(ctx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Savings', 'Contributions', 'Loan Balance'],
+                    labels: memberData.labels,
                     datasets: [{
-                        data: [
-                            {{ member_profile.savings_balance|default:0 }}, 
-                            {{ my_contributions|default:0 }}, 
-                            {{ my_loan_balance|default:0 }}
-                        ],
-                        backgroundColor: [
-                            'rgba(75, 192, 192, 0.8)',
-                            'rgba(54, 162, 235, 0.8)',
-                            'rgba(255, 99, 132, 0.8)'
-                        ],
+                        data: memberData.values,
+                        backgroundColor: memberData.colors,
                         borderColor: '#000',
-                        borderWidth: 2
+                        borderWidth: 2,
+                        hoverOffset: 6
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { position: 'right' } }
+                    cutout: '60%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.parsed;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                    return ` ${context.label}: KES ${value.toLocaleString()} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
                 }
+            });
+
+            // Build custom legend with values
+            const legendContainer = document.getElementById('memberChartLegend');
+            memberData.labels.forEach((label, i) => {
+                const item = document.createElement('div');
+                item.className = 'chart-legend-item';
+                const pct = totalMember > 0 ? ((memberData.values[i] / totalMember) * 100).toFixed(1) : 0;
+                item.innerHTML = `
+                    <div class="chart-legend-label">
+                        <span class="chart-legend-color" style="background: ${memberData.colors[i]}; border-color: ${memberData.borderColors[i]};"></span>
+                        <span>${label}</span>
+                    </div>
+                    <div class="chart-legend-value">KES ${memberData.values[i].toLocaleString()} (${pct}%)</div>
+                `;
+                legendContainer.appendChild(item);
             });
         });
     </script>

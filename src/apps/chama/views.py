@@ -265,6 +265,10 @@ def dashboard(request):
     return render(request, 'chama/dashboard.html', ctx)
 
 
+
+
+
+
 # ============================================================
 # COMMITTEES
 # ============================================================
