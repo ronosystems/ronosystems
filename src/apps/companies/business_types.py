@@ -346,3 +346,14 @@ BUSINESS_TYPE_INTEGRATIONS = {
     for m in BusinessTypeEnum
     if m.value['is_active']
 }
+
+# ============================================
+# Convenience helper for Chama roles
+# ============================================
+
+def _get_chama_role_choices():
+    """
+    Return the list of Chama roles as (value, label) tuples.
+    Used by MemberForm to populate the 'role' dropdown.
+    """
+    return BUSINESS_TYPE_ROLES.get('Chama', [])

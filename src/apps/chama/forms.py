@@ -11,6 +11,7 @@ from .models import (
     Committee, CommitteeMember, Guest,
 )
 from apps.companies.business_types import BusinessTypeEnum
+from apps.companies.business_types import _get_chama_role_choices
 
 User = get_user_model()
 
@@ -29,38 +30,37 @@ def _get_chama_role_choices():
     return roles
 
 
+
+
 # ============================================================
 # MEMBER FORM
 # ============================================================
 
 class MemberForm(forms.ModelForm):
-    # Explicitly define the field to override the default required=True
     custom_loan_limit = forms.DecimalField(
-        required=False, 
+        required=False,
         initial=0,
-        max_digits=12, 
+        max_digits=12,
         decimal_places=2,
         widget=forms.NumberInput(attrs={
-            'class': 'form-control', 
+            'class': 'form-control',
             'step': '0.01',
             'placeholder': '0.00'
         }),
         help_text="Leave as 0 to use the default 3x contribution limit."
     )
 
-    # We also need to handle the password field manually since it's not a direct model field
     default_password = forms.CharField(
         required=False,
         widget=forms.PasswordInput(attrs={
-            'class': 'form-control', 
+            'class': 'form-control',
             'placeholder': 'Leave blank to use default'
         }),
         help_text="Leave blank to use the default company password."
     )
 
-    # The Chama Role - Now dynamically loaded in __init__
     role = forms.ChoiceField(
-        choices=[], # Empty here, populated in __init__
+        choices=[],
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'})
     )
@@ -68,10 +68,10 @@ class MemberForm(forms.ModelForm):
     class Meta:
         model = Member
         fields = [
-            'full_name', 'phone', 'email', 'national_id', 
+            'full_name', 'phone', 'email', 'national_id',
             'membership_type', 'status', 'joined_on',
-            'custom_loan_limit', 
-            'passport_photo', 'id_front', 'id_back', 
+            'custom_loan_limit',
+            'passport_photo', 'id_front', 'id_back',
             'kra_certificate', 'good_conduct'
         ]
         widgets = {
@@ -82,22 +82,27 @@ class MemberForm(forms.ModelForm):
             'membership_type': forms.Select(attrs={'class': 'form-select'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
             'joined_on': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'passport_photo': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+            'id_front': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+            'id_back': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+            'kra_certificate': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+            'good_conduct': forms.ClearableFileInput(attrs={'class': 'form-control'}),
         }
 
     def __init__(self, *args, **kwargs):
-        # Extract custom kwargs passed from the view
         self.company = kwargs.pop('company', None)
         fallback_password = kwargs.pop('fallback_password', '')
-        
+
         super().__init__(*args, **kwargs)
 
-        # 1. Populate the Chama Role dropdown from business_types.py
+        # 1. Populate Chama Role dropdown
         self.fields['role'].choices = [('', '---------')] + _get_chama_role_choices()
 
-        # 2. Pre-select the current role if editing
+        # 2. Pre-select current role if editing
         if self.instance and self.instance.pk and self.instance.user:
-            # Find their membership for this specific company
-            current_membership = self.instance.user.memberships.filter(company=self.instance.company).first()
+            current_membership = self.instance.user.memberships.filter(
+                company=self.instance.company
+            ).first()
             if current_membership:
                 self.initial['role'] = current_membership.role
 
@@ -106,46 +111,43 @@ class MemberForm(forms.ModelForm):
             self.fields['membership_type'].queryset = MembershipType.objects.filter(
                 company=self.company
             )
-            
-        # 4. Handle default password placeholder logic
+
+        # 4. Default password placeholder
         if fallback_password:
             self.fields['default_password'].widget.attrs['placeholder'] = f"Default: {fallback_password}"
 
-        # 5. If EDITING an existing member, update the loan limit label
+        # 5. Edit-mode loan limit help text
         if self.instance and self.instance.pk:
             self.fields['custom_loan_limit'].help_text = (
                 f"Current limit: KES {self.instance.custom_loan_limit:,.2f}. "
                 "Set to 0 to revert to the 3x contribution limit."
             )
-            
-        # 6. Ensure required fields match your form layout
+
+        # 6. Required fields
         self.fields['full_name'].required = True
         self.fields['phone'].required = True
-        
-        # 7. Clean up date input formats
+
+        # 7. Date format
         self.fields['joined_on'].input_formats = ['%Y-%m-%d']
 
     def clean_custom_loan_limit(self):
-        """Ensure that if the field is left blank, it saves as 0."""
         limit = self.cleaned_data.get('custom_loan_limit')
         if limit is None:
             return 0
         return limit
 
     def clean_phone(self):
-        """Ensure phone number formatting and uniqueness if needed."""
         phone = self.cleaned_data.get('phone')
         if phone:
-            # Standardize phone format (optional)
             phone = phone.strip()
-            
-            # Check for duplicates in the same company (excluding self on edit)
             qs = Member.objects.filter(company=self.company, phone=phone)
             if self.instance and self.instance.pk:
                 qs = qs.exclude(pk=self.instance.pk)
             if qs.exists():
                 raise forms.ValidationError("A member with this phone number already exists.")
         return phone
+
+
 
 
 # ============================================================
@@ -280,21 +282,27 @@ class TransactionForm(forms.ModelForm):
 class ExpenseForm(forms.ModelForm):
     class Meta:
         model = Expense
-        fields = ['account', 'title', 'amount', 'date', 'category', 'notes']
+        fields = [
+            'title', 'category', 'amount', 'date',
+            'account', 'reference', 'description', 'receipt',
+        ]
         widgets = {
-            'account': forms.Select(attrs={'class': 'form-control'}),
             'title': forms.TextInput(attrs={'class': 'form-control'}),
-            'amount': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'category': forms.Select(attrs={'class': 'form-select'}),
+            'amount': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
             'date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'category': forms.TextInput(attrs={'class': 'form-control'}),
-            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'account': forms.Select(attrs={'class': 'form-select'}),
+            'reference': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'receipt': forms.ClearableFileInput(attrs={'class': 'form-control'}),
         }
 
     def __init__(self, *args, company=None, **kwargs):
         super().__init__(*args, **kwargs)
         if company:
-            self.fields['account'].queryset = Account.objects.filter(company=company, is_active=True)
-        self.fields['account'].required = False
+            self.fields['account'].queryset = Account.objects.filter(
+                company=company, is_active=True
+            )
 
 
 class SavingsForm(forms.ModelForm):
@@ -317,9 +325,12 @@ class SavingsForm(forms.ModelForm):
             ).order_by('full_name')
 
 
+
+
 # ============================================================
 # LOAN TYPE FORM
 # ============================================================
+
 class LoanTypeForm(forms.ModelForm):
     class Meta:
         model = LoanType
@@ -339,6 +350,7 @@ class LoanTypeForm(forms.ModelForm):
 # ============================================================
 # LOAN FORM (Officer Manual Entry)
 # ============================================================
+
 class LoanForm(forms.ModelForm):
     class Meta:
         model = Loan

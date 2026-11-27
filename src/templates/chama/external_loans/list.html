@@ -1,0 +1,190 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}External Loans{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dash-panel { background:#fff; border:2px solid #000; border-radius:4px; }
+    .table-custom th { border-bottom:2px solid #000 !important; background:#f8f9fa; font-weight:700; font-size:0.75rem; text-transform:uppercase; padding:12px 16px; }
+    .table-custom td { padding:12px 16px; font-size:0.85rem; border-bottom:1px solid #dee2e6; vertical-align:middle; }
+    .table-custom tbody tr:hover { background:#f8f9fa; }
+    .filter-bar { background:#fff; border:2px solid #000; border-radius:4px; padding:10px 15px; margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .filter-bar input, .filter-bar select { border:2px solid #ccc; border-radius:4px; padding:6px 10px; font-size:0.85rem; }
+    .btn-custom { border:2px solid #000; border-radius:4px; font-weight:700; font-size:0.85rem; padding:6px 15px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+    .btn-primary-custom { background:var(--primary-color); color:#fff; }
+    .btn-primary-custom:hover { background:color-mix(in srgb, var(--primary-color) 85%, #000); color:#fff; }
+    .btn-outline-custom { background:#fff; color:#000; }
+    .stat-box { background:#fff; border:2px solid #000; border-radius:4px; padding:15px; text-align:center; height:100%; }
+    .stat-box .stat-value { font-size:1.4rem; font-weight:800; color:#000; line-height:1.2; }
+    .stat-box .stat-label { font-size:0.7rem; text-transform:uppercase; color:#666; font-weight:700; margin-bottom:6px; }
+    .badge-status { padding:4px 10px; border-radius:50px; font-weight:700; font-size:0.7rem; border:1px solid #000; text-transform:uppercase; display:inline-block; }
+    .badge-pending { background:#fff3cd; color:#856404; }
+    .badge-approved { background:#cce5ff; color:#004085; }
+    .badge-disbursed { background:#d1ecf1; color:#0c5460; }
+    .badge-closed { background:#d4edda; color:#155724; }
+    .badge-rejected { background:#f8d7da; color:#721c24; }
+    .actor-cell { font-size:0.8rem; line-height:1.3; }
+    .actor-cell strong { color:#000; }
+    .actor-cell small { color:#666; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold mb-1"><i class="fas fa-file-invoice-dollar me-2"></i> External Loans</h4>
+            <p class="text-muted small mb-0">Loans issued to external borrowers (guests).</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'chama:guest_list' %}" class="btn-custom btn-outline-custom"><i class="fas fa-users"></i> Guests</a>
+            <a href="{% url 'chama:external_loan_limits' %}" class="btn-custom btn-outline-custom"><i class="fas fa-sliders"></i> Limits</a>
+            <a href="{% url 'chama:guest_create' %}" class="btn-custom btn-primary-custom"><i class="fas fa-user-plus"></i> New Guest</a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3"><div class="stat-box" style="background:#eaf2f8;"><div class="stat-label">Pending</div><div class="stat-value">KES {{ total_pending|floatformat:2 }}</div></div></div>
+        <div class="col-md-3"><div class="stat-box" style="background:#cce5ff;"><div class="stat-label">Approved</div><div class="stat-value">KES {{ total_approved|floatformat:2 }}</div></div></div>
+        <div class="col-md-3"><div class="stat-box" style="background:#d1ecf1;"><div class="stat-label">Disbursed</div><div class="stat-value">KES {{ total_disbursed|floatformat:2 }}</div></div></div>
+        <div class="col-md-3"><div class="stat-box" style="background:#d4edda;"><div class="stat-label">Repaid</div><div class="stat-value text-success">KES {{ total_repaid|floatformat:2 }}</div></div></div>
+    </div>
+
+    <form method="get" class="filter-bar">
+        <div class="flex-grow-1" style="min-width:200px;">
+            <input type="text" name="q" class="w-100" placeholder="Search by guest name, phone, or ID..." value="{{ request.GET.q|default:'' }}">
+        </div>
+        <div>
+            <select name="status">
+                <option value="">All Statuses</option>
+                <option value="pending" {% if request.GET.status == 'pending' %}selected{% endif %}>Pending</option>
+                <option value="approved" {% if request.GET.status == 'approved' %}selected{% endif %}>Approved</option>
+                <option value="disbursed" {% if request.GET.status == 'disbursed' %}selected{% endif %}>Disbursed</option>
+                <option value="closed" {% if request.GET.status == 'closed' %}selected{% endif %}>Closed</option>
+                <option value="rejected" {% if request.GET.status == 'rejected' %}selected{% endif %}>Rejected</option>
+            </select>
+        </div>
+        <button type="submit" class="btn-custom btn-primary-custom"><i class="fas fa-search"></i> Filter</button>
+        {% if request.GET.q or request.GET.status %}
+        <a href="{% url 'chama:external_loan_list' %}" class="btn-custom btn-outline-custom"><i class="fas fa-times"></i> Clear</a>
+        {% endif %}
+    </form>
+
+    <div class="dash-panel">
+        <div class="table-responsive">
+            <table class="table table-hover table-custom mb-0">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Borrower</th>
+                        <th>Type</th>
+                        <th class="text-end">Principal</th>
+                        <th class="text-end">Total</th>
+                        <th>Status</th>
+                        <th>Approved / Rejected By</th>
+                        <th>Disbursed By</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for l in loans %}
+                    <tr>
+                        <td><strong>#{{ l.id }}</strong></td>
+                        <td>
+                            <span class="badge bg-warning text-dark mb-1" style="font-size:0.65rem;">EXTERNAL</span>
+                            <div class="fw-bold">{{ l.guest.full_name }}</div>
+                            <small class="text-muted">{{ l.guest.phone }}</small>
+                        </td>
+                        <td>{{ l.loan_type.name|default:"—" }}</td>
+                        <td class="text-end fw-bold">KES {{ l.principal|floatformat:2 }}</td>
+                        <td class="text-end">KES {{ l.total_repayable|floatformat:2 }}<div class="small text-muted">{{ l.interest_rate }}%</div></td>
+                        <td><span class="badge-status badge-{{ l.status }}">{{ l.get_status_display }}</span></td>
+                        <td>
+                            <div class="actor-cell">
+                                {% if l.status == 'approved' or l.status == 'disbursed' or l.status == 'closed' %}
+                                    {% if l.approved_by %}<strong>{{ l.approved_by.get_full_name|default:l.approved_by.username }}</strong><br><small>Approved {{ l.approved_on|date:"M d, Y" }}</small>
+                                    {% else %}<em class="text-muted">Approved (no record)</em>{% endif %}
+                                {% elif l.status == 'rejected' %}
+                                    {% if l.rejected_by %}<strong class="text-danger">{{ l.rejected_by.get_full_name|default:l.rejected_by.username }}</strong><br><small>Rejected</small>
+                                    {% else %}<em class="text-muted">Rejected (no record)</em>{% endif %}
+                                {% elif l.status == 'pending' %}<em class="text-muted">Awaiting approval</em>{% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="actor-cell">
+                                {% if l.status == 'disbursed' or l.status == 'closed' %}
+                                    {% if l.disbursed_by %}<strong>{{ l.disbursed_by.get_full_name|default:l.disbursed_by.username }}</strong><br><small>{{ l.disbursed_on|date:"M d, Y" }}</small>
+                                    {% else %}<em class="text-muted">Disbursed (no record)</em>{% endif %}
+                                {% else %}<em class="text-muted">Not disbursed</em>{% endif %}
+                            </div>
+                        </td>
+                        <td class="text-end">
+                            <a href="{% url 'chama:external_loan_detail' l.pk %}" class="btn btn-sm btn-outline-dark fw-bold" style="border:1px solid #000; border-radius:4px; padding:4px 10px; font-size:0.75rem; margin-right:4px;"><i class="fas fa-eye me-1"></i> VIEW</a>
+                            {% if l.status == 'pending' %}
+                            <form method="post" action="{% url 'chama:loan_approve_external' l.pk %}" class="d-inline">{% csrf_token %}<button type="submit" class="btn btn-sm btn-success fw-bold" style="border:1px solid #000; border-radius:4px; padding:4px 10px; font-size:0.75rem;" onclick="return confirm('Approve this external loan?');"><i class="fas fa-check-circle me-1"></i> APPROVE</button></form>
+                            <form method="post" action="{% url 'chama:loan_reject_external' l.pk %}" class="d-inline">{% csrf_token %}<button type="submit" class="btn btn-sm btn-outline-danger fw-bold" style="border:1px solid #000; border-radius:4px; padding:4px 10px; font-size:0.75rem;" onclick="return confirm('Reject this external loan?');"><i class="fas fa-times-circle me-1"></i> REJECT</button></form>
+                            {% endif %}
+                            {% if l.status == 'approved' %}
+                            <button type="button" class="btn btn-sm btn-dark fw-bold" style="border:1px solid #000; border-radius:4px; padding:4px 10px; font-size:0.75rem;" data-bs-toggle="modal" data-bs-target="#disburseModal" data-loan-id="{{ l.pk }}" data-loan-principal="{{ l.principal|floatformat:2 }}" data-loan-borrower="{{ l.guest.full_name }}" data-loan-type="{{ l.loan_type.name|default:'—' }}" data-loan-repayable="{{ l.total_repayable|floatformat:2 }}"><i class="fas fa-money-bill-wave me-1"></i> RELEASE</button>
+                            {% endif %}
+                            {% if l.status == 'pending' or l.status == 'approved' %}
+                            <a href="{% url 'chama:loan_edit_external' l.pk %}" class="btn btn-sm btn-outline-dark fw-bold" style="border:1px solid #000; border-radius:4px; padding:4px 10px; font-size:0.75rem; margin-left:4px;"><i class="fas fa-pen me-1"></i> EDIT</a>
+                            {% endif %}
+                            {% if l.status == 'pending' or l.status == 'rejected' %}
+                            <a href="{% url 'chama:loan_delete_external' l.pk %}" class="btn btn-sm btn-outline-danger fw-bold" style="border:1px solid #000; border-radius:4px; padding:4px 10px; font-size:0.75rem; margin-left:4px;"><i class="fas fa-trash me-1"></i> DELETE</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="9" class="text-center py-5"><i class="fas fa-file-invoice-dollar fa-3x text-muted mb-3" style="opacity:0.3;"></i><h6 class="fw-bold text-muted">No external loans yet</h6><p class="text-muted small mb-3">Register a guest and create their first loan to get started.</p><a href="{% url 'chama:guest_create' %}" class="btn-custom btn-primary-custom"><i class="fas fa-user-plus"></i> Register Guest</a></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<div class="modal fade" id="disburseModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border:2px solid #000; border-radius:4px;">
+            <div class="modal-header" style="background:#0d6efd; color:#fff;"><h5 class="modal-title fw-bold"><i class="fas fa-money-bill-wave me-2"></i> Confirm Disbursement</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body p-4">
+                <div class="text-center mb-3"><i class="fas fa-hand-holding-usd" style="font-size:3rem; color:#0d6efd;"></i></div>
+                <p class="text-center mb-4">You are about to release funds from the Chama account.<br><strong>This action cannot be undone.</strong></p>
+                <div class="bg-light p-3 rounded" style="border:1px solid #000;">
+                    <div class="d-flex justify-content-between mb-2"><span class="text-muted small fw-bold text-uppercase">Recipient</span><span class="fw-bold" id="modalBorrower">—</span></div>
+                    <div class="d-flex justify-content-between mb-2"><span class="text-muted small fw-bold text-uppercase">Amount to Release</span><span class="fw-bold text-primary fs-6" id="modalPrincipal">—</span></div>
+                    <div class="d-flex justify-content-between mb-2"><span class="text-muted small fw-bold text-uppercase">Loan Type</span><span class="fw-bold" id="modalType">—</span></div>
+                    <div class="d-flex justify-content-between border-top pt-2 mt-2"><span class="text-muted small fw-bold text-uppercase">Total Repayable</span><span class="fw-bold text-success" id="modalRepayable">—</span></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" id="disburseForm" action="" class="d-inline">{% csrf_token %}<button type="submit" class="btn btn-primary fw-bold" style="border:2px solid #000; background:#0d6efd;"><i class="fas fa-check-circle"></i> Confirm Release</button></form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var disburseModal = document.getElementById('disburseModal');
+    if (disburseModal) {
+        disburseModal.addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            var loanId = button.getAttribute('data-loan-id');
+            document.getElementById('modalBorrower').textContent = button.getAttribute('data-loan-borrower');
+            document.getElementById('modalPrincipal').textContent = 'KES ' + button.getAttribute('data-loan-principal');
+            document.getElementById('modalType').textContent = button.getAttribute('data-loan-type');
+            document.getElementById('modalRepayable').textContent = 'KES ' + button.getAttribute('data-loan-repayable');
+            document.getElementById('disburseForm').action = "{% url 'chama:loan_disburse_external' 0 %}".replace('/0/', '/' + loanId + '/');
+        });
+    }
+});
+</script>
+{% endblock %}

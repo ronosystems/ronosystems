@@ -1,0 +1,73 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}External Loan #{{ loan.pk }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold mb-1"><i class="fas fa-file-invoice-dollar me-2"></i> External Loan #{{ loan.pk }}</h4>
+            <p class="text-muted small mb-0">{{ loan.guest.full_name }} · {{ loan.guest.phone }}</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'chama:external_loan_list' %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;"><i class="fas fa-arrow-left me-1"></i> Back</a>
+            {% if loan.status == 'pending' or loan.status == 'approved' %}
+            <a href="{% url 'chama:loan_edit_external' loan.pk %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;"><i class="fas fa-pen me-1"></i> Edit</a>
+            {% endif %}
+            {% if loan.status == 'approved' %}
+            <form method="post" action="{% url 'chama:loan_disburse_external' loan.pk %}" class="d-inline">{% csrf_token %}<button type="submit" class="btn btn-primary fw-bold" style="border:2px solid #000;" onclick="return confirm('Release funds for this loan?');"><i class="fas fa-money-bill-wave me-1"></i> Release Funds</button></form>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3"><div class="card" style="border:2px solid #000;"><div class="card-body text-center"><div class="small text-muted text-uppercase fw-bold">Principal</div><div class="h5 fw-bold mb-0">KES {{ loan.principal|floatformat:2 }}</div></div></div></div>
+        <div class="col-md-3"><div class="card" style="border:2px solid #000;"><div class="card-body text-center"><div class="small text-muted text-uppercase fw-bold">Interest</div><div class="h5 fw-bold mb-0">{{ loan.interest_rate }}%</div></div></div></div>
+        <div class="col-md-3"><div class="card" style="border:2px solid #000;"><div class="card-body text-center"><div class="small text-muted text-uppercase fw-bold">Total Repayable</div><div class="h5 fw-bold mb-0">KES {{ loan.total_repayable|floatformat:2 }}</div></div></div></div>
+        <div class="col-md-3"><div class="card" style="border:2px solid #000;"><div class="card-body text-center"><div class="small text-muted text-uppercase fw-bold">Balance</div><div class="h5 fw-bold text-danger mb-0">KES {{ loan.balance_remaining|floatformat:2 }}</div></div></div></div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-4">
+            <div class="card" style="border:2px solid #000;">
+                <div class="card-header bg-dark text-white fw-bold">Loan Details</div>
+                <div class="card-body small">
+                    <p class="mb-2"><strong>Status:</strong> {{ loan.get_status_display }}</p>
+                    <p class="mb-2"><strong>Loan Type:</strong> {{ loan.loan_type.name|default:"—" }}</p>
+                    <p class="mb-2"><strong>Term:</strong> {{ loan.term_months }} months</p>
+                    <p class="mb-2"><strong>Requested:</strong> {{ loan.requested_on|date:"M d, Y" }}</p>
+                    <p class="mb-2"><strong>Approved:</strong> {{ loan.approved_on|date:"M d, Y"|default:"—" }}</p>
+                    <p class="mb-2"><strong>Disbursed:</strong> {{ loan.disbursed_on|date:"M d, Y"|default:"—" }}</p>
+                    <p class="mb-0"><strong>Purpose:</strong> {{ loan.purpose|default:"—" }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card" style="border:2px solid #000;">
+                <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between align-items-center">
+                    <span>Repayments</span>
+                    {% if loan.status == 'disbursed' or loan.status == 'approved' %}
+                    <a href="{% url 'chama:external_loan_repayment_create' loan.pk %}" class="btn btn-sm btn-light fw-bold"><i class="fas fa-plus me-1"></i> Record</a>
+                    {% endif %}
+                </div>
+                <div class="table-responsive">
+                    <table class="table mb-0" style="font-size:0.85rem;">
+                        <thead><tr><th>Date</th><th>Reference</th><th class="text-end">Amount</th><th>Notes</th></tr></thead>
+                        <tbody>
+                            {% for r in repayments %}
+                            <tr><td>{{ r.date|date:"M d, Y" }}</td><td><code>{{ r.reference|default:"—" }}</code></td><td class="text-end fw-bold text-success">KES {{ r.amount|floatformat:2 }}</td><td>{{ r.notes|default:"—" }}</td></tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="text-center text-muted py-4">No repayments yet.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

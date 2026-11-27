@@ -1,0 +1,45 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}{% if mode == 'edit' %}Edit External Loan{% else %}New External Loan{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:720px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold mb-1"><i class="fas fa-file-invoice-dollar me-2"></i> {% if mode == 'edit' %}Edit{% else %}New{% endif %} External Loan</h4>
+            <p class="text-muted small mb-0">{{ guest.full_name }} · {{ guest.phone }}</p>
+        </div>
+        <a href="{% url 'chama:guest_detail' guest.pk %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;"><i class="fas fa-arrow-left me-1"></i> Back</a>
+    </div>
+
+    {% if limit %}
+    <div class="alert alert-info mb-3" style="border:2px solid #000;">
+        <div class="d-flex justify-content-between">
+            <span><strong>Limit:</strong> KES {{ limit|floatformat:2 }}</span>
+            <span><strong>Active:</strong> KES {{ active_loans|floatformat:2 }}</span>
+            <span class="text-success"><strong>Available:</strong> KES {{ available|floatformat:2 }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card" style="border:2px solid #000;">
+        <div class="card-body p-4">
+            {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+            <form method="post" novalidate>
+                {% csrf_token %}
+                <div class="row g-3">
+                    <div class="col-md-6"><label class="form-label fw-bold">Loan Type *</label>{{ form.loan_type }}{% for e in form.loan_type.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+                    <div class="col-md-6"><label class="form-label fw-bold">Principal (KES) *</label>{{ form.principal }}{% for e in form.principal.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+                    <div class="col-md-6"><label class="form-label fw-bold">Term (months) *</label>{{ form.term_months }}{% for e in form.term_months.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+                    <div class="col-12"><label class="form-label fw-bold">Purpose</label>{{ form.purpose }}{% for e in form.purpose.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+                </div>
+                <div class="d-flex gap-2 justify-content-end mt-4">
+                    <a href="{% url 'chama:guest_detail' guest.pk %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;">Cancel</a>
+                    <button type="submit" class="btn btn-primary fw-bold" style="border:2px solid #000;"><i class="fas fa-save me-1"></i> {% if mode == 'edit' %}Save Changes{% else %}Create Loan{% endif %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

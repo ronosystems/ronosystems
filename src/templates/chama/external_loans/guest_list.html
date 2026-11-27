@@ -1,0 +1,72 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}External Borrowers{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dash-panel { background:#fff; border:2px solid #000; border-radius:4px; }
+    .table-custom th { border-bottom:2px solid #000 !important; background:#f8f9fa; font-weight:700; font-size:0.75rem; text-transform:uppercase; padding:12px 16px; }
+    .table-custom td { padding:12px 16px; font-size:0.85rem; border-bottom:1px solid #dee2e6; vertical-align:middle; }
+    .table-custom tbody tr:hover { background:#f8f9fa; }
+    .filter-bar { background:#fff; border:2px solid #000; border-radius:4px; padding:10px 15px; margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .filter-bar input, .filter-bar select { border:2px solid #ccc; border-radius:4px; padding:6px 10px; font-size:0.85rem; }
+    .btn-custom { border:2px solid #000; border-radius:4px; font-weight:700; font-size:0.85rem; padding:6px 15px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+    .btn-primary-custom { background:var(--primary-color); color:#fff; }
+    .btn-primary-custom:hover { background:color-mix(in srgb, var(--primary-color) 85%, #000); color:#fff; }
+    .btn-outline-custom { background:#fff; color:#000; }
+    @media (max-width:767.98px){.table-responsive{overflow-x:hidden;}.mobile-card-table thead{display:none;}.mobile-card-table tbody tr{display:block;border:2px solid #000;border-radius:6px;margin-bottom:15px;padding:10px;background:#fff;}.mobile-card-table tbody td{display:block;text-align:right;padding:8px 0;border-bottom:1px dashed #eee;}.mobile-card-table tbody td:last-child{border-bottom:none;padding-top:15px;}.mobile-card-table tbody td::before{content:attr(data-label);float:left;font-weight:700;text-transform:uppercase;font-size:0.75rem;color:#666;margin-top:2px;}.mobile-card-table .d-flex.gap-2{flex-direction:column;}.mobile-card-table .btn{width:100%;justify-content:center;}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold mb-1"><i class="fas fa-users me-2"></i> External Borrowers</h4>
+            <p class="text-muted small mb-0">{{ total_count }} registered guest{{ total_count|pluralize }} — external loan beneficiaries.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'chama:external_loan_limits' %}" class="btn-custom btn-outline-custom"><i class="fas fa-sliders"></i> Loan Limits</a>
+            <a href="{% url 'chama:guest_create' %}" class="btn-custom btn-primary-custom"><i class="fas fa-user-plus"></i> New Guest</a>
+        </div>
+    </div>
+
+    <form method="get" class="filter-bar">
+        <div class="flex-grow-1" style="min-width:200px;">
+            <input type="text" name="q" class="w-100" placeholder="Search by name, phone, or national ID..." value="{{ request.GET.q|default:'' }}">
+        </div>
+        <button type="submit" class="btn-custom btn-primary-custom"><i class="fas fa-search"></i> Search</button>
+        {% if request.GET.q %}<a href="{% url 'chama:guest_list' %}" class="btn-custom btn-outline-custom"><i class="fas fa-times"></i> Clear</a>{% endif %}
+    </form>
+
+    <div class="dash-panel">
+        <div class="table-responsive">
+            <table class="table table-hover table-custom mb-0 mobile-card-table">
+                <thead><tr><th>#</th><th>Full Name</th><th>Phone</th><th>National ID</th><th>Registered</th><th class="text-end">Actions</th></tr></thead>
+                <tbody>
+                    {% for g in guests %}
+                    <tr>
+                        <td data-label="#"><strong>{{ forloop.counter }}</strong></td>
+                        <td data-label="Name"><div class="fw-bold">{{ g.full_name }}</div>{% if g.email %}<small class="text-muted">{{ g.email }}</small>{% endif %}</td>
+                        <td data-label="Phone">{{ g.phone|default:"—" }}</td>
+                        <td data-label="National ID">{{ g.national_id|default:"—" }}</td>
+                        <td data-label="Registered"><small class="text-muted">{{ g.created_at|date:"M d, Y" }}</small></td>
+                        <td class="text-end" data-label="Actions">
+                            <div class="d-flex justify-content-end gap-2 flex-wrap">
+                                <a href="{% url 'chama:guest_detail' g.pk %}" class="btn btn-sm btn-outline-dark fw-bold" style="border:1px solid #000; border-radius:4px; padding:4px 10px; font-size:0.75rem;"><i class="fas fa-eye me-1"></i> VIEW</a>
+                                <a href="{% url 'chama:loan_create_external' g.pk %}" class="btn btn-sm btn-primary fw-bold" style="border:1px solid #000; border-radius:4px; padding:4px 10px; font-size:0.75rem;"><i class="fas fa-file-invoice-dollar me-1"></i> LOAN</a>
+                                <a href="{% url 'chama:guest_edit' g.pk %}" class="btn btn-sm btn-outline-dark fw-bold" style="border:1px solid #000; border-radius:4px; padding:4px 10px; font-size:0.75rem;"><i class="fas fa-pen me-1"></i> EDIT</a>
+                                <a href="{% url 'chama:guest_delete' g.pk %}" class="btn btn-sm btn-outline-danger fw-bold" style="border:1px solid #000; border-radius:4px; padding:4px 10px; font-size:0.75rem;"><i class="fas fa-trash me-1"></i> DELETE</a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" class="text-center py-5"><i class="fas fa-users fa-3x text-muted mb-3" style="opacity:0.3;"></i><h6 class="fw-bold text-muted">No external borrowers yet</h6><p class="text-muted small mb-3">Register a guest to create their first external loan.</p><a href="{% url 'chama:guest_create' %}" class="btn-custom btn-primary-custom"><i class="fas fa-user-plus"></i> Register Guest</a></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

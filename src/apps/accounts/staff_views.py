@@ -21,52 +21,37 @@ from .models import User, Membership
 # ============================================
 # DOMAIN / RESET LINK HELPERS
 # ============================================
-# Mother domain: ronosystems.onrender.com (system)
-# Tenant domain: fieldmax.shop (custom domain, kama verified)
-# MUHIMU: Usiwahi tengeneza {subdomain}.ronosystems.onrender.com
-# Kwa sababu certificate ya *.onrender.com haifuniki nested subdomain
-# na browser italeta ERR_SSL_VERSION_OR_CIPHER_MISMATCH
+# PRIORITY:
+# 1. Company custom domain verified -> fieldmax.shop (inashinda kila kitu)
+# 2. Current request domain -> kama uko fieldmax.shop, tumia fieldmax.shop
+#    kama uko ronosystems.onrender.com, tumia ronosystems.onrender.com
+# 3. MUHIMU: Usiwahi tengeneza {subdomain}.ronosystems.onrender.com
+#    Certificate ya *.onrender.com haifuniki nested subdomain -> ERR_SSL_VERSION_OR_CIPHER_MISMATCH
 
-def _get_company_host(company):
-    """
-    Rudisha host sahihi ya kutuma kwenye email.
-    - Custom domain verified (fieldmax.shop) -> tumia hiyo
-    - Render (.onrender.com) -> tumia mother domain tu, USITENGENEZE subdomain
-    - Localhost -> tumia subdomain.localhost (fieldmax.localhost:8000) - hii inafanya kazi
-    """
-    system_domain = getattr(settings, 'SYSTEM_DOMAIN', 'localhost:8000').strip()
-    system_domain = system_domain.replace('http://', '').replace('https://', '').strip('/')
-
-    # 1. Custom domain - bora zaidi
+def _get_reset_link(request, company, uid, token):
+    # 1. PRIORITY: Custom domain ya company
     custom = getattr(company, 'custom_domain', None)
     verified = getattr(company, 'domain_verified', False)
-    if custom and verified and not settings.DEBUG:
-        return custom.strip().replace('http://', '').replace('https://', '').strip('/')
+    if custom and verified:
+        host = custom.strip().replace('http://', '').replace('https://', '').strip('/')
+    else:
+        # 2. FALLBACK: Current request domain
+        host = request.get_host()
+        # Safety: nested onrender subdomain inavunja SSL
+        # fieldmax.ronosystems.onrender.com -> tumia ronosystems.onrender.com
+        if host.endswith('.onrender.com') and host.count('.') > 2:
+            host = getattr(settings, 'SYSTEM_DOMAIN', 'ronosystems.onrender.com')
+            host = host.replace('http://', '').replace('https://', '').strip('/')
 
-    # 2. Render - nested subdomain inavunja SSL, tumia mother domain
-    if system_domain.endswith('.onrender.com'):
-        return system_domain
+    protocol = 'http' if ('localhost' in host or '127.0.0.1' in host) else 'https'
 
-    # 3. Localhost tu ndiyo subdomain inafanya kazi
-    subdomain = getattr(company, 'subdomain', None)
-    if subdomain and ('localhost' in system_domain or '127.0.0.1' in system_domain):
-        return f"{subdomain}.{system_domain}"
-
-    # 4. Fallback - mother domain
-    return system_domain
-
-def _get_reset_link(company, uid, token):
-    """Tengeneza reset link sahihi - https kwenye prod, http kwenye localhost."""
-    # Production lazima iwe https. request.is_secure() inadanganya nyuma ya Render proxy.
-    protocol = 'https' if not settings.DEBUG else 'http'
-    host = _get_company_host(company)
     reset_path = reverse(
         'accounts:password_reset_confirm',
         kwargs={'uidb64': uid, 'token': token},
     )
     return f"{protocol}://{host}{reset_path}"
 
-def _send_invite_email(company, membership, user, first_name, email, is_new_user):
+def _send_invite_email(request, company, membership, user, first_name, email, is_new_user):
     """
     Tuma invite email. Inarudisha (success, error_message).
     Helper moja inayotumika na staff_create na staff_resend_invite.
@@ -74,7 +59,7 @@ def _send_invite_email(company, membership, user, first_name, email, is_new_user
     try:
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
-        reset_link = _get_reset_link(company, uid, token)
+        reset_link = _get_reset_link(request, company, uid, token)
 
         context = {
             'first_name': first_name,
@@ -236,7 +221,7 @@ def staff_create(request):
             # 3. Send the Invite Email (outside the DB transaction so a slow
             #    SMTP call doesn't hold locks / delay rollback on failure)
             success, err = _send_invite_email(
-                company, membership, user, first_name, email, is_new_user
+                request, company, membership, user, first_name, email, is_new_user
             )
             if success:
                 messages.success(
@@ -285,7 +270,7 @@ def staff_resend_invite(request, membership_id):
         return redirect('accounts:staff-list')
 
     success, err = _send_invite_email(
-        company, membership, user,
+        request, company, membership, user,
         user.first_name or user.username,
         user.email,
         is_new_user=False,

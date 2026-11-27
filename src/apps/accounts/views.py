@@ -60,14 +60,35 @@ def _get_company_host(company=None):
 
     return system_domain
 
-def _get_reset_link(company, uid, token):
+
+def _get_reset_link(request, company, uid, token):
+    """
+    STRICTLY use current request domain.
+    - Uko fieldmax.shop -> link ni fieldmax.shop
+    - Uko ronosystems.onrender.com -> link ni ronosystems.onrender.com
+    - Uko localhost:8000 -> link ni localhost:8000
+    - Uko fieldmax.ronosystems.onrender.com (nested, SSL inavunja) -> fallback mother domain
+    """
+    host = request.get_host()  # <-- HII ndiyo fix
+
+    # Safety: kama host ni nested onrender subdomain, inavunja SSL
+    # fieldmax.ronosystems.onrender.com -> tumia ronosystems.onrender.com
+    if host.endswith('.onrender.com') and host.count('.') > 2:
+        # mfano: fieldmax.ronosystems.onrender.com ina dots 3
+        system_domain = getattr(settings, 'SYSTEM_DOMAIN', 'ronosystems.onrender.com')
+        host = system_domain.replace('http://', '').replace('https://', '').strip('/')
+
     protocol = 'https' if not settings.DEBUG else 'http'
-    host = _get_company_host(company)
+    # Kwenye localhost lazima iwe http
+    if 'localhost' in host or '127.0.0.1' in host:
+        protocol = 'http'
+
     reset_path = reverse(
         'accounts:password_reset_confirm',
         kwargs={'uidb64': uid, 'token': token},
     )
     return f"{protocol}://{host}{reset_path}"
+
 
 def _get_company_dashboard_url(company, request=None):
     """

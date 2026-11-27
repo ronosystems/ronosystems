@@ -1,0 +1,78 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}External Loan Repayments{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dash-panel { background:#fff; border:2px solid #000; border-radius:4px; }
+    .table-custom th { border-bottom:2px solid #000 !important; background:#f8f9fa; font-weight:700; font-size:0.75rem; text-transform:uppercase; padding:12px 16px; }
+    .table-custom td { padding:12px 16px; font-size:0.85rem; border-bottom:1px solid #dee2e6; vertical-align:middle; }
+    .table-custom tbody tr:hover { background:#f8f9fa; }
+    .filter-bar { background:#fff; border:2px solid #000; border-radius:4px; padding:10px 15px; margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .filter-bar input { border:2px solid #ccc; border-radius:4px; padding:6px 10px; font-size:0.85rem; }
+    .btn-custom { border:2px solid #000; border-radius:4px; font-weight:700; font-size:0.85rem; padding:6px 15px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+    .btn-primary-custom { background:var(--primary-color); color:#fff; }
+    .btn-primary-custom:hover { background:color-mix(in srgb, var(--primary-color) 85%, #000); color:#fff; }
+    .btn-outline-custom { background:#fff; color:#000; }
+    .stat-box { background:#fff; border:2px solid #000; border-radius:4px; padding:15px; text-align:center; height:100%; }
+    .stat-box .stat-value { font-size:1.4rem; font-weight:800; color:#000; line-height:1.2; }
+    .stat-box .stat-label { font-size:0.7rem; text-transform:uppercase; color:#666; font-weight:700; margin-bottom:6px; }
+    @media (max-width:767.98px){.table-responsive{overflow-x:hidden;}.mobile-card-table thead{display:none;}.mobile-card-table tbody tr{display:block;border:2px solid #000;border-radius:6px;margin-bottom:15px;padding:10px;background:#fff;}.mobile-card-table tbody td{display:block;text-align:right;padding:8px 0;border-bottom:1px dashed #eee;}.mobile-card-table tbody td:last-child{border-bottom:none;padding-top:15px;}.mobile-card-table tbody td::before{content:attr(data-label);float:left;font-weight:700;text-transform:uppercase;font-size:0.75rem;color:#666;margin-top:2px;}.mobile-card-table .d-flex.gap-2{flex-direction:column;}.mobile-card-table .btn{width:100%;justify-content:center;}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold mb-1"><i class="fas fa-receipt me-2"></i> External Loan Repayments</h4>
+            <p class="text-muted small mb-0">{{ total_count }} repayment{{ total_count|pluralize }} recorded for external borrowers.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'chama:external_loan_list' %}" class="btn-custom btn-outline-custom"><i class="fas fa-file-invoice-dollar"></i> Loans</a>
+            <a href="{% url 'chama:guest_list' %}" class="btn-custom btn-outline-custom"><i class="fas fa-users"></i> Guests</a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4"><div class="stat-box" style="background:#d4edda;"><div class="stat-label">Total Repaid</div><div class="stat-value text-success">KES {{ total_repaid|floatformat:2 }}</div></div></div>
+        <div class="col-md-4"><div class="stat-box" style="background:#eaf2f8;"><div class="stat-label">Repayment Entries</div><div class="stat-value">{{ total_count }}</div></div></div>
+        <div class="col-md-4"><div class="stat-box" style="background:#fff3cd;"><div class="stat-label">Filtered View</div><div class="stat-value">{% if request.GET.q %}Active{% else %}All{% endif %}</div></div></div>
+    </div>
+
+    <form method="get" class="filter-bar">
+        <div class="flex-grow-1" style="min-width:200px;"><input type="text" name="q" class="w-100" placeholder="Search by guest name or reference..." value="{{ request.GET.q|default:'' }}"></div>
+        <button type="submit" class="btn-custom btn-primary-custom"><i class="fas fa-search"></i> Search</button>
+        {% if request.GET.q %}<a href="{% url 'chama:external_loan_repayment_list' %}" class="btn-custom btn-outline-custom"><i class="fas fa-times"></i> Clear</a>{% endif %}
+    </form>
+
+    <div class="dash-panel">
+        <div class="table-responsive">
+            <table class="table table-hover table-custom mb-0 mobile-card-table">
+                <thead><tr><th>#</th><th>Date</th><th>Borrower</th><th>Loan Ref</th><th>Reference</th><th class="text-end">Amount</th><th class="text-end">Actions</th></tr></thead>
+                <tbody>
+                    {% for r in repayments %}
+                    <tr>
+                        <td data-label="#"><strong>{{ forloop.counter }}</strong></td>
+                        <td data-label="Date"><div>{{ r.date|date:"M d, Y" }}</div><small class="text-muted">{{ r.created_at|date:"H:i" }}</small></td>
+                        <td data-label="Borrower"><div class="fw-bold">{{ r.loan.guest.full_name|default:"—" }}</div>{% if r.loan.guest.phone %}<small class="text-muted">{{ r.loan.guest.phone }}</small>{% endif %}</td>
+                        <td data-label="Loan"><a href="{% url 'chama:external_loan_detail' r.loan.pk %}" class="fw-bold text-decoration-none">#{{ r.loan.pk }}</a><div><small class="text-muted">{{ r.loan.loan_type.name|default:"Loan" }}</small></div></td>
+                        <td data-label="Reference">{% if r.reference %}<code class="small">{{ r.reference }}</code>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                        <td class="text-end" data-label="Amount"><span class="fw-bold text-success">KES {{ r.amount|floatformat:2 }}</span></td>
+                        <td class="text-end" data-label="Actions">
+                            <div class="d-flex justify-content-end gap-2 flex-wrap">
+                                <a href="{% url 'chama:external_loan_detail' r.loan.pk %}" class="btn btn-sm btn-outline-dark fw-bold" style="border:1px solid #000; border-radius:4px; padding:4px 10px; font-size:0.75rem;"><i class="fas fa-eye me-1"></i> VIEW LOAN</a>
+                                <a href="{% url 'chama:guest_detail' r.loan.guest.pk %}" class="btn btn-sm btn-outline-dark fw-bold" style="border:1px solid #000; border-radius:4px; padding:4px 10px; font-size:0.75rem;"><i class="fas fa-user me-1"></i> GUEST</a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="7" class="text-center py-5"><i class="fas fa-receipt fa-3x text-muted mb-3" style="opacity:0.3;"></i><h6 class="fw-bold text-muted">No external repayments recorded</h6><p class="text-muted small mb-3">Repayments appear here once recorded against an external loan.</p><a href="{% url 'chama:external_loan_list' %}" class="btn-custom btn-primary-custom"><i class="fas fa-file-invoice-dollar"></i> View External Loans</a></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

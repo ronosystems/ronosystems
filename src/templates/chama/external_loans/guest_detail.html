@@ -1,0 +1,88 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}Guest — {{ guest.full_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold mb-1"><i class="fas fa-user me-2"></i> {{ guest.full_name }}</h4>
+            <p class="text-muted small mb-0">National ID: {{ guest.national_id }} · Phone: {{ guest.phone }}</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'chama:guest_list' %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;"><i class="fas fa-arrow-left me-1"></i> Back</a>
+            <a href="{% url 'chama:guest_edit' guest.pk %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;"><i class="fas fa-pen me-1"></i> Edit</a>
+            <a href="{% url 'chama:loan_create_external' guest.pk %}" class="btn btn-primary fw-bold" style="border:2px solid #000;"><i class="fas fa-plus me-1"></i> New Loan</a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card" style="border:2px solid #000;"><div class="card-body text-center">
+                <div class="small text-muted text-uppercase fw-bold">Loan Limit</div>
+                <div class="h5 fw-bold mb-0">KES {{ limit|floatformat:2 }}</div>
+            </div></div>
+        </div>
+        <div class="col-md-3">
+            <div class="card" style="border:2px solid #000;"><div class="card-body text-center">
+                <div class="small text-muted text-uppercase fw-bold">Active Loans</div>
+                <div class="h5 fw-bold text-danger mb-0">KES {{ active_loans|floatformat:2 }}</div>
+            </div></div>
+        </div>
+        <div class="col-md-3">
+            <div class="card" style="border:2px solid #000;"><div class="card-body text-center">
+                <div class="small text-muted text-uppercase fw-bold">Available</div>
+                <div class="h5 fw-bold text-success mb-0">KES {{ available|floatformat:2 }}</div>
+            </div></div>
+        </div>
+        <div class="col-md-3">
+            <div class="card" style="border:2px solid #000;"><div class="card-body text-center">
+                <div class="small text-muted text-uppercase fw-bold">Status</div>
+                <div class="h5 fw-bold mb-0">{{ guest.get_status_display }}</div>
+            </div></div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-4">
+            <div class="card" style="border:2px solid #000;">
+                <div class="card-header bg-dark text-white fw-bold">Contact</div>
+                <div class="card-body small">
+                    <p class="mb-2"><strong>Phone:</strong> {{ guest.phone }}</p>
+                    <p class="mb-2"><strong>Email:</strong> {{ guest.email|default:"—" }}</p>
+                    <p class="mb-2"><strong>Address:</strong> {{ guest.address|default:"—" }}</p>
+                    <p class="mb-0"><strong>Registered:</strong> {{ guest.created_at|date:"M d, Y" }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card" style="border:2px solid #000;">
+                <div class="card-header bg-dark text-white fw-bold">External Loans</div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0" style="font-size:0.85rem;">
+                        <thead><tr><th>#</th><th>Type</th><th class="text-end">Principal</th><th>Status</th><th class="text-end">Balance</th><th></th></tr></thead>
+                        <tbody>
+                            {% for loan in external_loans %}
+                            <tr>
+                                <td>#{{ loan.pk }}</td>
+                                <td>{{ loan.loan_type.name|default:"—" }}</td>
+                                <td class="text-end">KES {{ loan.principal|floatformat:2 }}</td>
+                                <td>{{ loan.get_status_display }}</td>
+                                <td class="text-end">KES {{ loan.balance_remaining|floatformat:2 }}</td>
+                                <td class="text-end"><a href="{% url 'chama:external_loan_detail' loan.pk %}" class="btn btn-sm btn-outline-dark" style="border:1px solid #000;"><i class="fas fa-eye"></i></a></td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="6" class="text-center text-muted py-4">No loans yet.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

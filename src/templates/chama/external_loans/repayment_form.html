@@ -1,0 +1,40 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}Record Repayment — Loan #{{ loan.pk }}{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:600px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold mb-1"><i class="fas fa-receipt me-2"></i> Record Repayment</h4>
+            <p class="text-muted small mb-0">Loan #{{ loan.pk }} — {{ loan.guest.full_name }}</p>
+        </div>
+        <a href="{% url 'chama:external_loan_detail' loan.pk %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;"><i class="fas fa-arrow-left me-1"></i> Back</a>
+    </div>
+
+    <div class="card mb-3" style="border:2px solid #000;">
+        <div class="card-body">
+            <div class="d-flex justify-content-between mb-2"><span class="text-muted">Total Repayable</span><strong>KES {{ loan.total_repayable|floatformat:2 }}</strong></div>
+            <div class="d-flex justify-content-between mb-2"><span class="text-muted">Already Repaid</span><strong class="text-success">KES {{ loan.total_repaid|floatformat:2 }}</strong></div>
+            <div class="d-flex justify-content-between"><span class="text-muted">Balance</span><strong class="text-danger">KES {{ loan.balance_remaining|floatformat:2 }}</strong></div>
+        </div>
+    </div>
+
+    <div class="card" style="border:2px solid #000;">
+        <div class="card-body p-4">
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3"><label class="form-label fw-bold">Amount (KES) *</label><input type="number" step="0.01" min="0.01" name="amount" class="form-control" value="{{ suggested_amount }}" required style="border:2px solid #000;"></div>
+                <div class="mb-3"><label class="form-label fw-bold">Date *</label><input type="date" name="date" class="form-control" value="{% now 'Y-m-d' %}" required style="border:2px solid #000;"></div>
+                <div class="mb-3"><label class="form-label fw-bold">Reference</label><input type="text" name="reference" class="form-control" placeholder="M-Pesa code, receipt #, etc." style="border:2px solid #000;"></div>
+                <div class="mb-3"><label class="form-label fw-bold">Notes</label><textarea name="notes" rows="2" class="form-control" style="border:2px solid #000;"></textarea></div>
+                <div class="d-flex gap-2 justify-content-end">
+                    <a href="{% url 'chama:external_loan_detail' loan.pk %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;">Cancel</a>
+                    <button type="submit" class="btn btn-primary fw-bold" style="border:2px solid #000;"><i class="fas fa-save me-1"></i> Record Repayment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

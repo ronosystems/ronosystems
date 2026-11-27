@@ -24,10 +24,8 @@ def _build_cloudinary_url(field_value, resource_type='image'):
     cloud_name = cfg.get('CLOUD_NAME', '')
 
     if cloud_name:
-        # Add fl_attachment for raw files (PDFs) to bypass 401 errors
         if resource_type == 'raw':
             return f"https://res.cloudinary.com/{cloud_name}/{resource_type}/upload/fl_attachment/{key}"
-        
         return f"https://res.cloudinary.com/{cloud_name}/{resource_type}/upload/{key}"
 
     media_url = getattr(django_settings, 'MEDIA_URL', '/media/')
@@ -52,8 +50,6 @@ class TimeStampedModel(models.Model):
 # ============================================================
 
 class MembershipType(TimeStampedModel):
-    
-    # Define the exact choices allowed for Chama membership
     TYPE_CHOICES = [
         ('regular', 'Regular Member'),
         ('executive', 'Executive Member'),
@@ -68,14 +64,11 @@ class MembershipType(TimeStampedModel):
         'companies.Company', on_delete=models.CASCADE,
         related_name='chama_membership_types',
     )
-    
-    # Changed from CharField to use choices
     name = models.CharField(
         max_length=100,
         choices=TYPE_CHOICES,
         help_text="Select the category for this membership tier."
     )
-    
     description = models.TextField(blank=True)
     monthly_contribution = models.DecimalField(
         max_digits=12, decimal_places=2, default=0,
@@ -87,12 +80,10 @@ class MembershipType(TimeStampedModel):
 
     class Meta:
         ordering = ['name']
-        # Ensures a company doesn't create the same type twice
         unique_together = [('company', 'name')]
 
     def __str__(self):
         return self.get_name_display()
-
 
 
 class Member(TimeStampedModel):
@@ -117,7 +108,7 @@ class Member(TimeStampedModel):
     )
     custom_loan_limit = models.DecimalField(
         max_digits=12, decimal_places=2, default=0,
-        help_text="Override borrowing limit for staff members. Set to 0 to use default (3x contributions)."
+        help_text="Override borrowing limit. Set to 0 to use default (3x contributions)."
     )
     member_number = models.CharField(max_length=50, unique=True)
     full_name = models.CharField(max_length=200)
@@ -142,17 +133,23 @@ class Member(TimeStampedModel):
         return f'{self.member_number} — {self.full_name}'
 
     # ============================================================
+    # ALIASES
+    # ============================================================
+    @property
+    def phone_number(self):
+        """Alias for compatibility with templates that expect phone_number."""
+        return self.phone
+
+    # ============================================================
     # BALANCE / ELIGIBILITY PROPERTIES
     # ============================================================
     @property
     def savings_balance(self):
-        """Sum of all savings deposits for this member."""
         agg = self.savings.aggregate(total=models.Sum('amount'))
         return agg['total'] or 0
 
     @property
     def total_contributions_paid(self):
-        """Sum of all PAID contributions for this member."""
         agg = self.contributions.filter(paid=True).aggregate(
             total=models.Sum('amount')
         )
@@ -160,49 +157,27 @@ class Member(TimeStampedModel):
 
     @property
     def max_loan_multiplier(self):
-        """The multiplier applied to contributions to determine max loan (3×)."""
         return 3
 
     @property
     def has_good_repayment_history(self):
-        """
-        Returns True if the member has at least one loan that was 
-        disbursed > 1 year ago and fully repaid (closed).
-        """
         from datetime import timedelta
-        
         one_year_ago = timezone.localdate() - timedelta(days=365)
-        
-        # Look for a loan that was disbursed before one_year_ago and is now closed
-        good_loan = self.loans.filter(
+        return self.loans.filter(
             status='closed',
-            disbursed_on__lte=one_year_ago
+            disbursed_on__lte=one_year_ago,
         ).exists()
-        
-        return good_loan
 
     @property
     def eligible_loan_limit(self):
-        """
-        Maximum borrowing based on:
-        1. Custom limit set by committee (if > 0)
-        2. 3x contributions IF they have 1 year of good history
-        3. 0 (meaning they must rely on committee limit)
-        """
-        # 1. If the committee set a custom limit, use that.
         if self.custom_loan_limit > 0:
             return self.custom_loan_limit
-            
-        # 2. If they have good history, apply the 3x rule
         if self.has_good_repayment_history:
             return self.total_contributions_paid * 3
-            
-        # 3. If they don't meet the qualification, they get 0 (must be set by committee)
         return 0
 
     @property
     def total_principal_taken(self):
-        """Sum of PRINCIPAL for all active loans (approved or disbursed)."""
         agg = self.loans.filter(
             status__in=['approved', 'disbursed']
         ).aggregate(total=models.Sum('principal'))
@@ -210,12 +185,10 @@ class Member(TimeStampedModel):
 
     @property
     def available_borrowing_power(self):
-        """How much they can still borrow (Limit - Principal Taken)."""
         return max(0, self.eligible_loan_limit - self.total_principal_taken)
 
     @property
     def active_loans_total(self):
-        """Sum of TOTAL REPAYABLE (Principal + Interest) for active loans."""
         active_loans = self.loans.filter(status__in=['approved', 'disbursed'])
         return sum(loan.total_repayable for loan in active_loans)
 
@@ -241,7 +214,6 @@ class Member(TimeStampedModel):
     @property
     def good_conduct_url(self):
         return _build_cloudinary_url(self.good_conduct, resource_type='raw')
-
 
 
 class Registration(TimeStampedModel):
@@ -335,13 +307,13 @@ class Fine(TimeStampedModel):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     date = models.DateField(default=timezone.localdate)
     is_paid = models.BooleanField(default=False)
+    paid_on = models.DateField(null=True, blank=True)   # 👈 ADDED
 
     class Meta:
         ordering = ['-date', '-created_at']
 
     def __str__(self):
         return f'{self.member} — {self.reason} ({self.amount})'
-
 
 
 # ============================================================
@@ -357,14 +329,14 @@ class LoanType(TimeStampedModel):
     ]
 
     company = models.ForeignKey(
-        'companies.Company', 
+        'companies.Company',
         on_delete=models.CASCADE,
         related_name='chama_loan_types',
     )
     name = models.CharField(
         max_length=100,
         choices=LOAN_NAME_CHOICES,
-        help_text="Select the type of loan (e.g., Emergency, Development).",
+        help_text="Select the type of loan.",
     )
     interest_rate = models.DecimalField(
         max_digits=5, decimal_places=2, default=10,
@@ -393,7 +365,6 @@ class LoanType(TimeStampedModel):
         return self.get_name_display()
 
 
-
 # ============================================================
 # GUEST MODEL (For External Loans)
 # ============================================================
@@ -402,6 +373,12 @@ class Guest(TimeStampedModel):
     External borrowers who are not Chama members.
     They must provide full KYC and a valid M-Pesa statement.
     """
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('blacklisted', 'Blacklisted'),
+    ]
+
     company = models.ForeignKey(
         'companies.Company', on_delete=models.CASCADE,
         related_name='chama_guests',
@@ -420,7 +397,7 @@ class Guest(TimeStampedModel):
 
     status = models.CharField(
         max_length=20,
-        choices=[('pending', 'Pending'), ('approved', 'Approved'), ('blacklisted', 'Blacklisted')],
+        choices=STATUS_CHOICES,
         default='pending',
     )
     created_by = models.ForeignKey(
@@ -432,6 +409,33 @@ class Guest(TimeStampedModel):
 
     def __str__(self):
         return f'{self.full_name} ({self.national_id})'
+
+    # ============================================================
+    # ALIASES
+    # ============================================================
+    @property
+    def phone_number(self):
+        """Alias used by external loan templates/views."""
+        return self.phone
+
+    # ============================================================
+    # CLOUDINARY URL GETTERS
+    # ============================================================
+    @property
+    def passport_photo_url(self):
+        return _build_cloudinary_url(self.passport_photo)
+
+    @property
+    def id_front_url(self):
+        return _build_cloudinary_url(self.id_front)
+
+    @property
+    def id_back_url(self):
+        return _build_cloudinary_url(self.id_back)
+
+    @property
+    def mpesa_statement_url(self):
+        return _build_cloudinary_url(self.mpesa_statement, resource_type='raw')
 
 
 # ============================================================
@@ -455,25 +459,22 @@ class Loan(TimeStampedModel):
         'companies.Company', on_delete=models.CASCADE,
         related_name='chama_loans',
     )
-    
-    # 👇 NEW: Category field
+
     loan_category = models.CharField(
         max_length=20, choices=LOAN_CATEGORY_CHOICES, default='internal',
         help_text="Internal = for Chama members. External = for guests.",
     )
-    
-    # Member (for Internal Loans)
+
     member = models.ForeignKey(
         Member, on_delete=models.CASCADE, related_name='loans',
         null=True, blank=True,
     )
-    
-    # Guest (for External Loans)
+
     guest = models.ForeignKey(
         Guest, on_delete=models.CASCADE, related_name='loans',
         null=True, blank=True,
     )
-    
+
     loan_type = models.ForeignKey(
         LoanType, on_delete=models.SET_NULL, null=True, blank=True,
     )
@@ -503,7 +504,10 @@ class Loan(TimeStampedModel):
         ordering = ['-requested_on', '-created_at']
 
     def __str__(self):
-        borrower = self.member.full_name if self.member else (self.guest.full_name if self.guest else 'Unknown')
+        borrower = (
+            self.member.full_name if self.member
+            else (self.guest.full_name if self.guest else 'Unknown')
+        )
         return f'Loan #{self.pk} — {borrower} ({self.get_status_display()})'
 
     # ============================================================
@@ -511,55 +515,58 @@ class Loan(TimeStampedModel):
     # ============================================================
     @property
     def total_repaid(self):
-        """Sum of all repayments made against this loan."""
         agg = self.repayments.aggregate(total=models.Sum('amount'))
         return agg['total'] or 0
 
-    # ============================================================
-    # INTEREST CALCULATIONS (flat rate — standard for Chamas)
-    # ============================================================
     @property
     def total_interest(self):
-        """
-        Total interest owed on this loan (flat rate).
-        Formula: Principal × (Interest Rate / 100)
-        """
         from decimal import Decimal
         return self.principal * (self.interest_rate / Decimal('100'))
 
     @property
     def total_repayable(self):
-        """Total amount the member must pay back (principal + interest)."""
         return self.principal + self.total_interest
 
     @property
     def monthly_installment(self):
-        """
-        Fixed monthly repayment amount.
-        Formula: Total Repayable / Term in Months
-        """
         if not self.term_months or self.term_months <= 0:
             return self.total_repayable
         return self.total_repayable / self.term_months
 
     @property
     def balance_remaining(self):
-        """Outstanding balance after subtracting what's been repaid."""
         repaid = self.total_repaid
         return max(0, self.total_repayable - repaid)
 
     @property
     def is_fully_repaid(self):
-        """True once repayments meet or exceed the total repayable amount."""
         return self.total_repaid >= self.total_repayable
 
     @property
     def repayment_progress_pct(self):
-        """How much has been repaid, as a percentage (0–100)."""
         total = self.total_repayable
         if total <= 0:
             return 0
         return min(100, float((self.total_repaid / total) * 100))
+
+    # ============================================================
+    # BORROWER HELPERS
+    # ============================================================
+    @property
+    def borrower_name(self):
+        if self.member:
+            return self.member.full_name
+        if self.guest:
+            return self.guest.full_name
+        return 'Unknown'
+
+    @property
+    def borrower_phone(self):
+        if self.member:
+            return self.member.phone
+        if self.guest:
+            return self.guest.phone
+        return ''
 
 
 class LoanRepayment(TimeStampedModel):
@@ -573,6 +580,7 @@ class LoanRepayment(TimeStampedModel):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     date = models.DateField(default=timezone.localdate)
     reference = models.CharField(max_length=100, blank=True)
+    notes = models.TextField(blank=True)   # 👈 ADDED
 
     class Meta:
         ordering = ['-date', '-created_at']
@@ -582,7 +590,7 @@ class LoanRepayment(TimeStampedModel):
 
 
 # ============================================================
-# ACCOUNTS (Bank, Cash, M-Pesa, Welfare, Loans, Projects)
+# ACCOUNTS
 # ============================================================
 class Account(TimeStampedModel):
     ACCOUNT_TYPES = [
@@ -592,7 +600,7 @@ class Account(TimeStampedModel):
     ]
 
     PURPOSE_CHOICES = [
-        ('pool', 'Main Account'),   
+        ('pool', 'Main Account'),
         ('welfare', 'Welfare Fund'),
         ('loans', 'Loan Fund'),
         ('projects', 'Project Fund'),
@@ -606,14 +614,14 @@ class Account(TimeStampedModel):
     )
     name = models.CharField(max_length=100)
     account_type = models.CharField(max_length=20, choices=ACCOUNT_TYPES, default='cash')
-    
+
     purpose = models.CharField(
-        max_length=20, 
-        choices=PURPOSE_CHOICES, 
-        default='pool', # Default to pool for new accounts
+        max_length=20,
+        choices=PURPOSE_CHOICES,
+        default='pool',
         help_text="Determines what this account is used for (e.g., Pool, Welfare, Loans)."
     )
-    
+
     opening_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     is_active = models.BooleanField(default=True)
 
@@ -627,21 +635,22 @@ class Account(TimeStampedModel):
     @property
     def current_balance(self):
         from django.db.models import Sum
-        
-        # Sum of Money In
         total_in = self.transactions.filter(transaction_type='in').aggregate(Sum('amount'))['amount__sum'] or 0
-        # Sum of Money Out
         total_out = self.transactions.filter(transaction_type='out').aggregate(Sum('amount'))['amount__sum'] or 0
-        
         return self.opening_balance + total_in - total_out
 
 
-
-
 # ============================================================
-# PROJECTS (New Feature)
+# PROJECTS
 # ============================================================
 class Project(TimeStampedModel):
+    STATUS_CHOICES = [
+        ('planned', 'Planned'),
+        ('ongoing', 'Ongoing'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+
     company = models.ForeignKey(
         'companies.Company', on_delete=models.CASCADE,
         related_name='chama_projects',
@@ -652,6 +661,13 @@ class Project(TimeStampedModel):
     start_date = models.DateField(default=timezone.localdate)
     end_date = models.DateField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default='ongoing',
+    )   # 👈 ADDED
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='chama_projects_created',
+    )   # 👈 ADDED
 
     class Meta:
         ordering = ['-start_date']
@@ -660,6 +676,9 @@ class Project(TimeStampedModel):
         return self.name
 
 
+# ============================================================
+# TRANSACTIONS
+# ============================================================
 class Transaction(TimeStampedModel):
     TYPE_CHOICES = [
         ('in', 'Money In'),
@@ -678,9 +697,11 @@ class Transaction(TimeStampedModel):
     date = models.DateField(default=timezone.localdate)
     description = models.CharField(max_length=255, blank=True)
     reference = models.CharField(max_length=100, blank=True)
-    project = models.ForeignKey(Project, on_delete=models.SET_NULL, null=True, blank=True, related_name='transactions')
+    project = models.ForeignKey(
+        Project, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='transactions',
+    )
 
-    # 👇 NEW: mark rows created automatically by Contribution/Loan/Savings/etc.
     auto_generated = models.BooleanField(
         default=False,
         help_text="True if this row mirrors another record (contribution, loan, etc.).",
@@ -697,6 +718,17 @@ class Transaction(TimeStampedModel):
 # EXPENSES
 # ============================================================
 class Expense(TimeStampedModel):
+    CATEGORY_CHOICES = [
+        ('operations', 'Operations'),
+        ('utilities', 'Utilities'),
+        ('transport', 'Transport'),
+        ('meetings', 'Meetings'),
+        ('welfare', 'Welfare'),
+        ('maintenance', 'Maintenance'),
+        ('office', 'Office Supplies'),
+        ('other', 'Other'),
+    ]
+
     company = models.ForeignKey(
         'companies.Company', on_delete=models.CASCADE,
         related_name='chama_expenses',
@@ -708,8 +740,14 @@ class Expense(TimeStampedModel):
     title = models.CharField(max_length=200)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     date = models.DateField(default=timezone.localdate)
-    category = models.CharField(max_length=100, blank=True)
-    notes = models.TextField(blank=True)
+    category = models.CharField(
+        max_length=100, choices=CATEGORY_CHOICES, blank=True,
+    )
+    description = models.TextField(blank=True)          # 👈 ADDED
+    reference = models.CharField(max_length=100, blank=True)  # 👈 ADDED
+    receipt = models.FileField(
+        upload_to='chama/expenses/receipts/', null=True, blank=True,
+    )   # 👈 ADDED
 
     class Meta:
         ordering = ['-date', '-created_at']
@@ -717,18 +755,20 @@ class Expense(TimeStampedModel):
     def __str__(self):
         return f'{self.title} — {self.amount}'
 
+    @property
+    def receipt_url(self):
+        return _build_cloudinary_url(self.receipt, resource_type='raw')
 
 
 # ============================================================
 # MEETINGS
 # ============================================================
-
 class Meeting(TimeStampedModel):
     MEETING_TYPE_CHOICES = [
         ('physical', 'Physical Meeting'),
         ('online', 'Online Meeting'),
     ]
-    
+
     TARGET_AUDIENCE_CHOICES = [
         ('all', 'All Members'),
         ('executive', 'Executive Committee'),
@@ -744,13 +784,18 @@ class Meeting(TimeStampedModel):
     scheduled_for = models.DateTimeField(help_text="Meeting Date")
     start_time = models.TimeField(null=True, blank=True)
     end_time = models.TimeField(null=True, blank=True)
-    
+
     meeting_type = models.CharField(max_length=20, choices=MEETING_TYPE_CHOICES, default='physical')
     target_audience = models.CharField(max_length=30, choices=TARGET_AUDIENCE_CHOICES, default='all')
-    
+
     location = models.CharField(max_length=200, blank=True, help_text="Physical location or online link")
     agenda = models.TextField(blank=True)
     minutes = models.TextField(blank=True)
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='chama_meetings_created',
+    )   # 👈 ADDED
 
     class Meta:
         ordering = ['-scheduled_for']
@@ -794,7 +839,7 @@ class Committee(TimeStampedModel):
         'companies.Company', on_delete=models.CASCADE,
         related_name='chama_committees',
     )
-    name = models.CharField(max_length=100)  # e.g., "Finance Committee", "Welfare"
+    name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
 
@@ -813,7 +858,7 @@ class CommitteeMember(TimeStampedModel):
     member = models.ForeignKey(
         'Member', on_delete=models.CASCADE, related_name='committees',
     )
-    role_in_committee = models.CharField(max_length=100, blank=True)  # e.g., "Chair", "Secretary"
+    role_in_committee = models.CharField(max_length=100, blank=True)
 
     class Meta:
         unique_together = [('committee', 'member')]
@@ -822,6 +867,9 @@ class CommitteeMember(TimeStampedModel):
         return f'{self.member.full_name} - {self.committee.name}'
 
 
+# ============================================================
+# ANNOUNCEMENTS
+# ============================================================
 class Announcement(TimeStampedModel):
     company = models.ForeignKey(
         'companies.Company', on_delete=models.CASCADE,
@@ -834,12 +882,11 @@ class Announcement(TimeStampedModel):
         null=True, blank=True, related_name='chama_announcements',
     )
     is_active = models.BooleanField(default=True)
+    is_pinned = models.BooleanField(default=False)              # 👈 ADDED
+    expires_at = models.DateTimeField(null=True, blank=True)    # 👈 ADDED
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ['-is_pinned', '-created_at']
 
     def __str__(self):
         return self.title
-
-
-

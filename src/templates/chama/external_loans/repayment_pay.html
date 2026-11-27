@@ -1,0 +1,37 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}Pay Loan #{{ loan.pk }} — M-Pesa{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:560px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold mb-1"><i class="fas fa-mobile-alt me-2"></i> Pay via M-Pesa</h4>
+            <p class="text-muted small mb-0">Loan #{{ loan.pk }} — {{ loan.guest.full_name }}</p>
+        </div>
+        <a href="{% url 'chama:external_loan_detail' loan.pk %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;"><i class="fas fa-arrow-left me-1"></i> Back</a>
+    </div>
+
+    <div class="card mb-3" style="border:2px solid #000;">
+        <div class="card-body">
+            <div class="d-flex justify-content-between"><span class="text-muted">Balance Remaining</span><strong class="text-danger">KES {{ loan.balance_remaining|floatformat:2 }}</strong></div>
+        </div>
+    </div>
+
+    <div class="card" style="border:2px solid #000;">
+        <div class="card-body p-4">
+            <p class="text-muted small mb-3"><i class="fas fa-info-circle me-1"></i> You will receive an STK Push on your phone. Enter your M-Pesa PIN to complete the payment.</p>
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3"><label class="form-label fw-bold">Amount (KES) *</label><input type="number" step="1" min="1" max="{{ loan.balance_remaining }}" name="amount" class="form-control" value="{{ suggested_amount|floatformat:0 }}" required style="border:2px solid #000;"></div>
+                <div class="mb-3"><label class="form-label fw-bold">M-Pesa Phone Number *</label><input type="tel" name="phone" class="form-control" value="{{ loan.guest.phone|default:'' }}" placeholder="07XX XXX XXX" required style="border:2px solid #000;"></div>
+                <div class="d-flex gap-2 justify-content-end">
+                    <a href="{% url 'chama:external_loan_detail' loan.pk %}" class="btn btn-outline-dark fw-bold" style="border:2px solid #000;">Cancel</a>
+                    <button type="submit" class="btn btn-success fw-bold" style="border:2px solid #000;"><i class="fas fa-paper-plane me-1"></i> Send STK Push</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,146 @@
+{% extends 'chama_base.html' %}
+{% load static %}
+
+{% block title %}Internal Borrowers{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dash-panel { background:#fff; border:2px solid #000; border-radius:4px; }
+    .table-custom th {
+        border-bottom:2px solid #000 !important;
+        background:#f8f9fa; font-weight:700; font-size:0.75rem;
+        text-transform:uppercase; padding:12px 16px;
+    }
+    .table-custom td {
+        padding:12px 16px; font-size:0.85rem;
+        border-bottom:1px solid #dee2e6; vertical-align:middle;
+    }
+    .table-custom tbody tr:hover { background:#f8f9fa; }
+    .filter-bar {
+        background:#fff; border:2px solid #000; border-radius:4px;
+        padding:10px 15px; margin-bottom:15px;
+        display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+    }
+    .filter-bar input, .filter-bar select {
+        border:2px solid #ccc; border-radius:4px;
+        padding:6px 10px; font-size:0.85rem;
+    }
+    .btn-custom {
+        border:2px solid #000; border-radius:4px;
+        font-weight:700; font-size:0.85rem;
+        padding:6px 15px; text-decoration:none;
+        display:inline-flex; align-items:center; gap:6px;
+    }
+    .btn-primary-custom { background:var(--primary-color); color:#fff; }
+    .btn-primary-custom:hover { background:color-mix(in srgb, var(--primary-color) 85%, #000); color:#fff; }
+    .btn-outline-custom { background:#fff; color:#000; }
+    .badge-status {
+        padding:4px 10px; border-radius:50px; font-weight:700;
+        font-size:0.7rem; border:1px solid #000;
+        text-transform:uppercase; display:inline-block;
+    }
+    .badge-active { background:#d4edda; color:#155724; }
+    .badge-none { background:#e2e3e5; color:#383d41; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold mb-1">
+                <i class="fas fa-users me-2"></i> Internal Borrowers
+            </h4>
+            <p class="text-muted small mb-0">
+                {{ total_count }} member{{ total_count|pluralize }} — loan summary per member.
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'chama:internal_loan_limits' %}" class="btn-custom btn-outline-custom">
+                <i class="fas fa-shield-halved"></i> Loan Limits
+            </a>
+            <a href="{% url 'chama:loan_list' %}" class="btn-custom btn-primary-custom">
+                <i class="fas fa-file-invoice-dollar"></i> All Loans
+            </a>
+        </div>
+    </div>
+
+    <form method="get" class="filter-bar">
+        <div class="flex-grow-1" style="min-width:200px;">
+            <input type="text" name="q" class="w-100"
+                   placeholder="Search by name, member number, or phone..."
+                   value="{{ request.GET.q|default:'' }}">
+        </div>
+        <div>
+            <select name="filter">
+                <option value="">All Members</option>
+                <option value="active" {% if request.GET.filter == 'active' %}selected{% endif %}>With Active Loans</option>
+            </select>
+        </div>
+        <button type="submit" class="btn-custom btn-primary-custom">
+            <i class="fas fa-search"></i> Filter
+        </button>
+        {% if request.GET.q or request.GET.filter %}
+        <a href="{% url 'chama:member_loan_list' %}" class="btn-custom btn-outline-custom">
+            <i class="fas fa-times"></i> Clear
+        </a>
+        {% endif %}
+    </form>
+
+    <div class="dash-panel">
+        <div class="table-responsive">
+            <table class="table table-hover table-custom mb-0">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Member</th>
+                        <th>Membership</th>
+                        <th class="text-end">Available Power</th>
+                        <th class="text-end">Active Loans</th>
+                        <th class="text-end">Lifetime Borrowed</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        <td><strong>{{ forloop.counter }}</strong></td>
+                        <td>
+                            <div class="fw-bold">{{ row.member.full_name }}</div>
+                            <small class="text-muted">{{ row.member.member_number }}</small>
+                        </td>
+                        <td>{{ row.member.membership_type.name|default:"—" }}</td>
+                        <td class="text-end">
+                            <strong class="text-success">KES {{ row.available_borrowing_power|floatformat:2 }}</strong>
+                            <div class="small text-muted">Limit: {{ row.eligible_limit|floatformat:2 }}</div>
+                        </td>
+                        <td class="text-end">
+                            {% if row.active_loan_count > 0 %}
+                                <strong class="text-danger">KES {{ row.active_loans_total|floatformat:2 }}</strong>
+                                <div class="small text-muted">{{ row.active_loan_count }} loan{{ row.active_loan_count|pluralize }}</div>
+                            {% else %}<span class="text-muted">—</span>{% endif %}
+                        </td>
+                        <td class="text-end">KES {{ row.lifetime_borrowed|floatformat:2 }}</td>
+                        <td class="text-center">
+                            {% if row.has_good_history %}<span class="badge-status badge-active">Good</span>
+                            {% else %}<span class="badge-status badge-none">Standard</span>{% endif %}
+                        </td>
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end gap-1 flex-wrap">
+                                <a href="{% url 'chama:member_detail' row.member.pk %}" class="btn btn-sm btn-outline-dark fw-bold" style="border:1px solid #000; border-radius:4px; padding:4px 8px; font-size:0.72rem;" title="View"><i class="fas fa-eye"></i></a>
+                                <a href="{% url 'chama:loan_create' %}" class="btn btn-sm btn-primary fw-bold" style="border:1px solid #000; border-radius:4px; padding:4px 8px; font-size:0.72rem;" title="New Loan"><i class="fas fa-plus"></i></a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="8" class="text-center py-5"><i class="fas fa-users fa-3x text-muted mb-3" style="opacity:0.3;"></i><h6 class="fw-bold text-muted">No borrowers found</h6><p class="text-muted small mb-0">Adjust your filters or register new members.</p></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

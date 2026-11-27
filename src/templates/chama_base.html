@@ -18,14 +18,10 @@
     <link rel="stylesheet" href="{% static 'vendor/fontawesome/css/all.min.css' %}">
 
     <style>
-        /* ============================================
-           CHAMA BIZ PALETTE + GLOBAL
-        ============================================ */
         :root {
             --sidebar-width: 280px;
             --sidebar-collapsed: 70px;
 
-            /* Tenant palette */
             --primary-color:   {{ site_primary_color|default:"#2d5f7c" }};
             --sidebar-bg:      {{ site_accent_color|default:"#1e4e6d" }};
             --accent-green:    #7bc043;
@@ -74,22 +70,16 @@
         }
         .sidebar.collapsed { width: var(--sidebar-collapsed); }
 
-        /* --- Brand --- */
-
-        /* --- Brand --- */
         .sidebar-brand {
             padding: 20px 20px 15px;
             border-bottom: 3px solid #000000;
             text-align: center;
             flex-shrink: 0;
-            
-            /* 👇 VIDEO BACKGROUND LOGIC */
             position: relative;
-            overflow: hidden; /* Keeps the video inside the rounded/border area */
-            background-color: #000; /* Fallback background */
+            overflow: hidden;
+            background-color: #000;
         }
-        
-        /* The Video Element */
+
         .sidebar-brand .brand-video {
             position: absolute;
             top: 50%;
@@ -100,19 +90,17 @@
             height: auto;
             transform: translate(-50%, -50%);
             object-fit: cover;
-            z-index: 0; /* Sits behind the overlay */
+            z-index: 0;
         }
 
-        /* Dark overlay to keep text readable over the video */
         .sidebar-brand::before {
             content: '';
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.6); /* 60% dark overlay */
+            background: rgba(0, 0, 0, 0.6);
             z-index: 1;
         }
 
-        /* Ensure content sits above the video and overlay */
         .sidebar-brand > *:not(.brand-video) {
             position: relative;
             z-index: 2;
@@ -125,8 +113,8 @@
         .sidebar-brand .logo-img {
             max-width: 80px;
             max-height: 80px;
-            border-radius: 50%; /* 👈 Makes it a perfect circle */
-            object-fit: cover;  /* 👈 Prevents the image from stretching */
+            border-radius: 50%;
+            object-fit: cover;
             margin-bottom: 8px;
             border: 2px solid #000000;
         }
@@ -135,7 +123,7 @@
             margin: 8px 0 0;
             color: #fff;
             letter-spacing: 0.5px;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.8); /* Better contrast */
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
         }
         .sidebar-brand .company-name {
             font-size: 0.7rem;
@@ -143,15 +131,11 @@
             margin-top: 2px;
             display: block;
         }
-        /* Collapsed state adjustments */
         .sidebar.collapsed .sidebar-brand h5,
         .sidebar.collapsed .sidebar-brand .company-name { display: none; }
         .sidebar.collapsed .sidebar-brand .logo-img { max-width: 45px; max-height: 45px; border-radius: 50%;}
         .sidebar.collapsed .sidebar-brand .logo-icon { font-size: 1.5rem; }
 
-
-
-        /* --- Nav wrapper --- */
         .sidebar-nav-wrapper {
             flex: 1;
             overflow-y: auto;
@@ -246,7 +230,6 @@
         .sidebar.collapsed .sidebar-nav .nav-link .badge { display: none; }
         .sidebar.collapsed .sidebar-nav .nav-link i { font-size: 1.3rem; margin: 0; }
 
-        /* --- Sidebar footer --- */
         .sidebar-footer {
             flex-shrink: 0;
             border-top: 3px solid #000000;
@@ -545,7 +528,7 @@
         }
 
         /* ============================================
-           RESPONSIVE (matches main base.html)
+           RESPONSIVE
         ============================================ */
         @media (max-width: 992px) {
             .sidebar {
@@ -579,7 +562,6 @@
                 white-space: nowrap;
             }
 
-            /* Force-show labels on mobile even if collapsed */
             .sidebar.collapsed .sidebar-brand h5,
             .sidebar.collapsed .sidebar-brand .company-name,
             .sidebar.collapsed .sidebar-nav .nav-label,
@@ -609,8 +591,6 @@
             .top-navbar .user-profile .user-name,
             .top-navbar .user-profile .user-role { display: none; }
             .content-area { padding: 10px; }
-            .search-input { width: 120px; }
-            .search-input:focus { width: 150px; }
         }
     </style>
     {% block extra_css %}{% endblock %}
@@ -620,21 +600,15 @@
     {% if not is_embed %}
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-    <!-- ============================================
-         SIDEBAR
-    ============================================ -->
     <aside class="sidebar" id="sidebar">
 
-
         <div class="sidebar-brand">
-            {# VIDEO WITH FALLBACK #}
             {% if current_company and current_company.hero_video_url %}
                 <video autoplay loop muted playsinline class="brand-video">
                     <source src="{{ current_company.hero_video_url }}" type="video/mp4">
                 </video>
             {% endif %}
 
-            {# LOGO WITH FALLBACK #}
             {% if current_company %}
                 {% if current_company.logo_url %}
                     <img src="{{ current_company.logo_url }}" alt="{{ current_company.display_name }}" class="logo-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
@@ -649,7 +623,6 @@
                     <h5>{{ current_company.display_name }}</h5>
                 </span>
             {% else %}
-                {# System Fallbacks for Super Admin #}
                 {% if site_logo_url %}
                     <img src="{{ site_logo_url }}" alt="{{ system_name }}" class="logo-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
                     <div class="logo-icon" style="display: none;"><i class="fas fa-hand-holding-usd"></i></div>
@@ -662,68 +635,54 @@
             {% endif %}
         </div>
 
-        
         <div class="sidebar-nav-wrapper" id="sidebarNavWrapper">
             <nav class="sidebar-nav">
                 <ul class="nav flex-column">
-                    {% with role=user.role %}
+                    {% with role=user.role url_name=request.resolver_match.url_name %}
 
                     {# ========== MAIN HOME ========== #}
                     {% if role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or role == 'chairperson' or role == 'vice_chairperson' or role == 'treasurer' or role == 'secretary' or role == 'vice_secretary' or role == 'coopted_member' or role == 'loan_officer' or role == 'member' or user.is_superuser %}
                     <li class="nav-label">Main Home</li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/chama/dashboard/' %}active{% endif %}"
+                        <a class="nav-link {% if url_name == 'dashboard' %}active{% endif %}"
                            href="{% url 'chama:dashboard' %}">
                             <i class="fas fa-chart-pie"></i> <span>Dashboard</span>
                         </a>
                     </li>
-                    {% endif %}
 
-
-
-                    {% if role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or role == 'chairperson' or role == 'vice_chairperson' or role == 'secretary' or role == 'vice_secretary' or role == 'treasurer' or role == 'loan_officer' or role == 'coopted_member' or role == 'member' or user.is_superuser %}
                     <li class="nav-item">
-                        <a class="nav-link {% if '/chama/meetings/' in request.path %}active{% endif %}"
+                        <a class="nav-link {% if url_name == 'meeting_list' or url_name == 'meeting_create' or url_name == 'meeting_detail' or url_name == 'meeting_edit' %}active{% endif %}"
                            href="{% url 'chama:meeting_list' %}">
                             <i class="fas fa-calendar-alt"></i> <span>Meetings</span>
                         </a>
                     </li>
 
                     <li class="nav-item">
-                        <a class="nav-link {% if '/chama/projects/' in request.path %}active{% endif %}"
+                        <a class="nav-link {% if url_name == 'project_list' or url_name == 'project_create' %}active{% endif %}"
                            href="{% url 'chama:project_list' %}">
                             <i class="fas fa-wallet"></i> <span>Projects</span>
                         </a>
                     </li>
-
                     {% endif %}
-
-
 
                     {# ========== MEMBERS ========== #}
                     {% if role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or role == 'chairperson' or role == 'vice_chairperson' or role == 'secretary' or role == 'vice_secretary' or role == 'treasurer' or user.is_superuser %}
                     <li class="nav-label">Members</li>
 
                     <li class="nav-item">
-                        <a class="nav-link {% if '/chama/members/' in request.path %}active{% endif %}"
+                        <a class="nav-link {% if url_name == 'member_list' or url_name == 'member_detail' or url_name == 'member_create' or url_name == 'member_edit' %}active{% endif %}"
                            href="{% url 'chama:member_list' %}">
                             <i class="fas fa-user-friends"></i> <span>Members</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if '/chama/customers/' in request.path %}active{% endif %}"
-                           href="{% url 'chama:customer_list' %}">
-                            <i class="fas fa-users"></i> <span>Customers</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/chama/membership-types/' in request.path %}active{% endif %}"
+                        <a class="nav-link {% if url_name == 'membership_type_list' or url_name == 'membership_type_create' or url_name == 'membership_type_edit' %}active{% endif %}"
                            href="{% url 'chama:membership_type_list' %}">
                             <i class="fas fa-id-card"></i> <span>Membership</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if '/chama/registrations/' in request.path %}active{% endif %}"
+                        <a class="nav-link {% if url_name == 'registration_list' %}active{% endif %}"
                            href="{% url 'chama:registration_list' %}">
                             <i class="fas fa-user-plus"></i> <span>Registrations</span>
                             {% if pending_registrations_count and pending_registrations_count > 0 %}
@@ -736,115 +695,152 @@
                     </li>
                     {% endif %}
 
-
-
-
+                    {# ========== SAVINGS ========== #}
                     {% if role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or role == 'chairperson' or role == 'vice_chairperson' or role == 'treasurer' or role == 'secretary' or role == 'vice_secretary' or role == 'coopted_member' or role == 'loan_officer' or role == 'member' or user.is_superuser %}
-                    <li class="nav-label">SAVINGS</li>
+                    <li class="nav-label">Savings</li>
 
                     <li class="nav-item">
-                        <!-- Added 'and 'pay' not in request.path' so it doesn't highlight when on the pay page -->
-                        <a class="nav-link {% if '/chama/contributions/' in request.path and 'pay' not in request.path %}active{% endif %}"
-                        href="{% url 'chama:contribution_list' %}">
+                        <a class="nav-link {% if url_name == 'contribution_list' or url_name == 'contribution_create' or url_name == 'contribution_edit' or url_name == 'contribution_pay' or url_name == 'contribution_pay_self_service' %}active{% endif %}"
+                           href="{% url 'chama:contribution_list' %}">
                             <i class="fas fa-hand-holding-usd"></i> <span>Contributions</span>
                         </a>
                     </li>
 
                     <li class="nav-item">
-                        <a class="nav-link {% if '/chama/savings/' in request.path %}active{% endif %}"
+                        <a class="nav-link {% if url_name == 'savings_list' or url_name == 'savings_create' or url_name == 'savings_edit' %}active{% endif %}"
                            href="{% url 'chama:savings_list' %}">
                             <i class="fas fa-piggy-bank"></i> <span>Savings</span>
                         </a>
                     </li>
 
                     <li class="nav-item">
-                        <a class="nav-link {% if '/chama/fines/' in request.path %}active{% endif %}"
+                        <a class="nav-link {% if url_name == 'fine_list' or url_name == 'fine_create' or url_name == 'fine_edit' or url_name == 'fine_pay' %}active{% endif %}"
                            href="{% url 'chama:fine_list' %}">
                             <i class="fas fa-gavel"></i> <span>Late Fines</span>
                         </a>
                     </li>
                     {% endif %}
 
-
-
-                    {% if role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or role == 'chairperson' or role == 'vice_chairperson' or role == 'treasurer' or role == 'loan_officer' or role == 'member' or user.is_superuser %}
-                    <li class="nav-label">LOANS</li>
-                    
+                    {# ========== LOAN TYPES (shared) ========== #}
+                    {% if role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or role == 'chairperson' or role == 'vice_chairperson' or role == 'treasurer' or role == 'loan_officer' or user.is_superuser %}
                     <li class="nav-item">
-                        <a class="nav-link {% if '/chama/loans/' in request.path and 'types' not in request.path and 'repayments' not in request.path %}active{% endif %}"
-                           href="{% url 'chama:loan_list' %}">
-                            <i class="fas fa-file-invoice-dollar"></i> <span>Loans</span>
-                            {% if pending_loans_count and pending_loans_count > 0 %}
-                                <span class="badge bg-danger"
-                                      title="{{ pending_loans_count }} loan application{{ pending_loans_count|pluralize }} awaiting approval">
-                                    {{ pending_loans_count }}
-                                </span>
-                            {% endif %}
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/chama/loan-types/' in request.path %}active{% endif %}"
+                        <a class="nav-link {% if url_name == 'loan_type_list' or url_name == 'loan_type_create' or url_name == 'loan_type_edit' %}active{% endif %}"
                            href="{% url 'chama:loan_type_list' %}">
                             <i class="fas fa-tags"></i> <span>Loan Types</span>
                         </a>
                     </li>
+                    {% endif %}
+
+                    {# ========== INTERNAL LOANS ========== #}
+                    {% if role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or role == 'chairperson' or role == 'vice_chairperson' or role == 'treasurer' or role == 'loan_officer' or role == 'member' or user.is_superuser %}
+                    <li class="nav-label">Internal Loans</li>
+
                     <li class="nav-item">
-                        <a class="nav-link {% if '/chama/loan-repayments/' in request.path %}active{% endif %}"
+                        <a class="nav-link {% if url_name == 'internal_loan_limits' %}active{% endif %}"
+                           href="{% url 'chama:internal_loan_limits' %}">
+                            <i class="fas fa-shield-halved"></i>
+                            <span>Loan Limits</span>
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link {% if url_name == 'loan_list' or url_name == 'loan_create' or url_name == 'loan_detail' or url_name == 'loan_edit' or url_name == 'loan_approve' or url_name == 'loan_reject' or url_name == 'loan_disburse' %}active{% endif %}"
+                           href="{% url 'chama:loan_list' %}">
+                            <i class="fas fa-file-invoice-dollar"></i> <span>Internal Loans</span>
+                            {% if pending_internal_loans_count and pending_internal_loans_count > 0 %}
+                                <span class="badge bg-danger"
+                                      title="{{ pending_internal_loans_count }} internal loan{{ pending_internal_loans_count|pluralize }} awaiting approval">
+                                    {{ pending_internal_loans_count }}
+                                </span>
+                            {% endif %}
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link {% if url_name == 'member_loan_list' %}active{% endif %}"
+                        href="{% url 'chama:member_loan_list' %}">
+                            <i class="fas fa-users"></i> <span>Internal Borrowers</span>
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link {% if url_name == 'loan_repayment_list' or url_name == 'loan_repayment_create' or url_name == 'loan_repayment_pay' %}active{% endif %}"
                            href="{% url 'chama:loan_repayment_list' %}">
                             <i class="fas fa-receipt"></i> <span>Repayments</span>
                         </a>
                     </li>
-
-
-                    {% if request.user.role == 'company_admin' or request.user.role == 'super_admin' or request.user.role == 'chairperson' or request.user.role == 'loan_officer' or request.user.role == 'company_manager' or request.user.role == 'vice_chairperson' or request.user.role == 'treasurer' or request.user.role == 'secretary' %}
-                        <li class="nav-item">
-                            <!-- External Loans -->
-                            <a class="nav-link {% if '/chama/external-loans/limits/' in request.path %}active{% endif %}"
-                            href="{% url 'chama:external_loan_limits' %}">
-                                <i class="fas fa-user-plus"></i> <span>External Loans</span>
-                            </a>
-
-                            <!-- Internal Loans -->
-                            <a class="nav-link d-flex align-items-center {% if '/chama/internal-loans/' in request.path %}active{% endif %}"
-                            href="{% url 'chama:internal_loan_limits' %}">
-                                <i class="fas fa-shield-halved me-2"></i>
-                                <span>Internal Loans</span>
-                            </a>
-                        </li>
                     {% endif %}
 
-                    {% endif %}
+                    {# ========== EXTERNAL LOANS (officers only) ========== #}
+                    {% if role == 'company_admin' or role == 'super_admin' or role == 'chairperson' or role == 'loan_officer' or role == 'company_manager' or role == 'vice_chairperson' or role == 'treasurer' or role == 'secretary' or user.is_superuser %}
+                    <li class="nav-label">External Loans</li>
 
-                    {% if role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or role == 'chairperson' or role == 'treasurer' or user.is_superuser %}
-                    <li class="nav-label">TREASURY</li>
                     <li class="nav-item">
-                        <a class="nav-link {% if '/chama/transactions/' in request.path %}active{% endif %}"
+                        <a class="nav-link {% if url_name == 'external_loan_limits' %}active{% endif %}"
+                           href="{% url 'chama:external_loan_limits' %}">
+                            <i class="fas fa-user-plus"></i> <span>Loan Limits</span>
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link {% if url_name == 'external_loan_list' or url_name == 'external_loan_detail' or url_name == 'loan_create_external' or url_name == 'loan_edit_external' or url_name == 'loan_approve_external' or url_name == 'loan_reject_external' or url_name == 'loan_disburse_external' %}active{% endif %}"
+                           href="{% url 'chama:external_loan_list' %}">
+                            <i class="fas fa-file-invoice-dollar"></i> <span>External Loans</span>
+                            {% if pending_external_loans_count and pending_external_loans_count > 0 %}
+                                <span class="badge bg-danger"
+                                      title="{{ pending_external_loans_count }} external loan{{ pending_external_loans_count|pluralize }} awaiting approval">
+                                    {{ pending_external_loans_count }}
+                                </span>
+                            {% endif %}
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link {% if url_name == 'guest_list' or url_name == 'guest_detail' or url_name == 'guest_create' or url_name == 'guest_edit' or url_name == 'customer_list' %}active{% endif %}"
+                           href="{% url 'chama:guest_list' %}">
+                            <i class="fas fa-users"></i> <span>External Borrowers</span>
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link {% if url_name == 'external_loan_repayment_list' or url_name == 'external_loan_repayment_create' or url_name == 'external_loan_repayment_pay' %}active{% endif %}"
+                           href="{% url 'chama:external_loan_repayment_list' %}">
+                            <i class="fas fa-receipt"></i> <span>Repayments</span>
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    {# ========== TREASURY ========== #}
+                    {% if role == 'super_admin' or role == 'company_admin' or role == 'company_manager' or role == 'chairperson' or role == 'treasurer' or user.is_superuser %}
+                    <li class="nav-label">Treasury</li>
+
+                    <li class="nav-item">
+                        <a class="nav-link {% if url_name == 'transaction_list' %}active{% endif %}"
                            href="{% url 'chama:transaction_list' %}">
                             <i class="fas fa-exchange-alt"></i> <span>Cashbook</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if '/chama/expenses/' in request.path %}active{% endif %}"
+                        <a class="nav-link {% if url_name == 'expense_list' %}active{% endif %}"
                            href="{% url 'chama:expense_list' %}">
                             <i class="fas fa-wallet"></i> <span>Expenses</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if '/chama/accounts/' in request.path %}active{% endif %}"
+                        <a class="nav-link {% if url_name == 'account_list' or url_name == 'account_create' or url_name == 'account_edit' or url_name == 'account_transfer' %}active{% endif %}"
                            href="{% url 'chama:account_list' %}">
                             <i class="fas fa-university"></i> <span>Accounts</span>
                         </a>
                     </li>
 
-                    <li class="nav-label">SETTINGS</li>
+                    <li class="nav-label">Settings</li>
                     <li class="nav-item">
-                        <a class="nav-link {% if '/companies/settings/' in request.path %}active{% endif %}" href="/companies/settings/">
+                        <a class="nav-link {% if '/companies/settings/' in request.path %}active{% endif %}"
+                           href="/companies/settings/">
                             <i class="fas fa-gear"></i> <span>Settings</span>
                         </a>
                     </li>
                     {% endif %}
-
-
 
                     {# ========== SUPER ADMIN EXTRAS ========== #}
                     {% if role == 'super_admin' and not is_support_mode and not current_company %}
@@ -877,8 +873,6 @@
         </div>
 
         <div class="sidebar-footer">
-
-            <!-- Sidebar Collapse Button -->
             <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Sidebar">
                 <i class="fas fa-chevron-left" id="toggleIcon"></i>
                 <span id="toggleText">Collapse</span>
@@ -887,11 +881,6 @@
     </aside>
     {% endif %}
 
-
-    
-    <!-- ============================================
-         MAIN CONTENT
-    ============================================ -->
     <div class="main-content{% if is_embed %} no-sidebar{% endif %}" id="mainContent">
 
         {% if is_support_mode and support_company %}
@@ -930,22 +919,20 @@
             </div>
 
             <div class="navbar-actions">
-                {# SYSTEM WEB BUTTON (SUPER ADMIN ONLY) #}
                 {% if user.is_authenticated and user.role == 'super_admin' %}
                 <a href="{{ system_website_url|default:'/' }}"
-                class="user-profile text-decoration-none me-2"
-                title="Go to system website"
-                style="background: #fff;"
-                {% if current_company %}target="_blank" rel="noopener"{% endif %}>
+                   class="user-profile text-decoration-none me-2"
+                   title="Go to system website"
+                   style="background: #fff;"
+                   {% if current_company %}target="_blank" rel="noopener"{% endif %}>
                     <i class="fas fa-globe" style="font-size: 1.1rem; color: #00bdf7;"></i>
                     <div class="d-none d-sm-block fw-bold" style="font-size: 0.9rem; color: #0011ff;">Website</div>
                 </a>
                 {% endif %}
 
-                {# COMPANY DOMAIN NOTIFICATIONS #}
                 {% if current_company %}
-                <a href="/" 
-                   class="user-profile text-decoration-none me-2" 
+                <a href="/"
+                   class="user-profile text-decoration-none me-2"
                    title="Go to {{ current_company.display_name }} website"
                    style="background: #fff;">
                     <i class="fas fa-globe" style="font-size: 1.1rem; color: #00f7ff;"></i>
@@ -953,13 +940,13 @@
                 </a>
 
                 {% if user.is_authenticated and user.role == 'company_admin' or user.role == 'company_manager' %}
-                <a href="{% url 'notification_center' %}" 
-                   class="user-profile text-decoration-none position-relative me-2" 
+                <a href="{% url 'notification_center' %}"
+                   class="user-profile text-decoration-none position-relative me-2"
                    title="View Notifications"
                    style="background: #fff;">
                     <i class="fas fa-bell" style="font-size: 1.1rem; color: #08105e;"></i>
                     {% if total_notifications_count and total_notifications_count > 0 %}
-                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" 
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
                               style="border: 2px solid #000; font-size: 10px; padding: 3px 6px; transform: translate(-50%, -50%) !important;">
                             {{ total_notifications_count }}
                         </span>
@@ -968,15 +955,14 @@
                 {% endif %}
                 {% endif %}
 
-                {# SYSTEM DOMAIN NOTIFICATIONS (SUPER ADMIN) #}
                 {% if not is_custom_domain and user.is_authenticated and user.role == 'super_admin' %}
-                <a href="{% url 'notification_center' %}" 
-                   class="user-profile text-decoration-none position-relative me-2" 
+                <a href="{% url 'notification_center' %}"
+                   class="user-profile text-decoration-none position-relative me-2"
                    title="View System Notifications"
                    style="background: #fff;">
                     <i class="fas fa-bell" style="font-size: 1.1rem; color: #7c6601;"></i>
                     {% if total_notifications_count and total_notifications_count > 0 %}
-                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" 
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
                               style="border: 2px solid #000; font-size: 10px; padding: 3px 6px; transform: translate(-50%, -50%) !important;">
                             {{ total_notifications_count }}
                         </span>
@@ -998,7 +984,7 @@
                     </div>
                     <i class="fas fa-chevron-down text-muted" style="font-size: 0.7rem; color: #000000 !important;"></i>
                 </a>
-                
+
                 <ul class="dropdown-menu dropdown-menu-end" style="border: 2px solid #000000; border-radius: 4px;">
                     <li><span class="dropdown-item-text">
                         <strong style="color: #000000;">{{ user.first_name|default:user.username }}</strong>
@@ -1047,12 +1033,8 @@
         {% endif %}
     </div>
 
-    <!-- JS -->
     <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
     <script>
-        // ============================================================
-        // SIDEBAR COLLAPSE / EXPAND + MOBILE
-        // ============================================================
         (function () {
             const sidebar = document.getElementById('sidebar');
             const mainContent = document.getElementById('mainContent');
@@ -1080,7 +1062,6 @@
                 try { localStorage.setItem('sidebarCollapsed', isCollapsed); } catch (e) {}
             });
 
-            // Mobile toggle
             const mobileToggle = document.getElementById('sidebarToggleMobile');
             const overlay = document.getElementById('sidebarOverlay');
 
@@ -1103,7 +1084,6 @@
                 });
             }
 
-            // Sidebar scroll persistence
             const wrapper = document.getElementById('sidebarNavWrapper');
             if (wrapper) {
                 const STORAGE_KEY = 'sidebar_scroll_{{ user.id|default:"anon" }}';
@@ -1128,7 +1108,6 @@
                 });
             }
 
-            // Ctrl+B shortcut
             document.addEventListener('keydown', function (e) {
                 if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
                     e.preventDefault();
@@ -1137,9 +1116,6 @@
             });
         })();
 
-        // ============================================================
-        // SUPPORT MODE TIMER
-        // ============================================================
         {% if is_support_mode %}
         (function () {
             const startedAtStr = "{{ request.session.support_started_at|default:'' }}";
