@@ -188,6 +188,12 @@
             margin-left: auto;
         }
 
+        /* Fix Bootstrap dropdown inside skewed tool item */
+        .ff-tool-item.dropdown .dropdown-menu {
+            transform: skewX(10deg);
+            margin-top: 4px;
+        }
+
         /* ============================================
            4. MOBILE HEADER
            ============================================ */
@@ -819,7 +825,28 @@
         #customInstallModal .btn-cancel:hover { background: #dcdfe3; }
 
         /* ============================================
-           10. RESPONSIVE
+           10. LOGOUT BUTTON STYLE (Fixes the blocked page)
+           ============================================ */
+        .logout-form-btn {
+            display: block;
+            width: 100%;
+            padding: 0.25rem 1rem;
+            clear: both;
+            font-weight: 400;
+            color: #dc3545;
+            text-align: inherit;
+            text-decoration: none;
+            white-space: nowrap;
+            background-color: transparent;
+            border: 0;
+        }
+        .logout-form-btn:hover {
+            color: #a71d2a;
+            background-color: #e9ecef;
+        }
+
+        /* ============================================
+           11. RESPONSIVE
            ============================================ */
         @media (max-width: 992px) {
             .desktop-header { display: none; }
@@ -927,10 +954,27 @@
                 <div class="ff-tool-item-inner"><i class="far fa-clock"></i> <span id="desktop-clock">--:--</span></div>
             </a>
             {% if user.is_authenticated %}
-                <!-- Point to your existing router -->
-                <a href="{% url 'dashboard-router' %}" class="ff-tool-item">
-                    <div class="ff-tool-item-inner"><i class="fas fa-tachometer-alt"></i> <span>Dashboard</span></div>
-                </a>
+                <div class="ff-tool-item dropdown">
+                    <a href="#" class="ff-tool-item-inner dropdown-toggle" id="desktopUserDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="color: var(--nav-text); text-decoration: none;">
+                        <i class="fas fa-tachometer-alt"></i> <span>Dashboard</span>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="desktopUserDropdown">
+                        <li>
+                            <a href="{% url 'dashboard-router' %}" class="dropdown-item">
+                                <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+                            </a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <form method="post" action="{% url 'web_accounts:logout' %}" class="m-0 p-0">
+                                {% csrf_token %}
+                                <button type="submit" class="logout-form-btn">
+                                    <i class="fas fa-sign-out-alt me-2"></i> Logout
+                                </button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
             {% else %}
                 <a href="{% url 'account_login' %}" class="ff-tool-item {% if request.resolver_match.url_name == 'account_login' %}active{% endif %}">
                     <div class="ff-tool-item-inner"><i class="fas fa-sign-in-alt"></i> <span>Sign In</span></div>
@@ -965,15 +1009,33 @@
             </div>
 
             <div class="mobile-header-right">
-                {% if user.is_authenticated %}
-                    <a href="/dashboard/" class="mobile-header-btn">
-                        <i class="fas fa-tachometer-alt"></i> Dashboard
+            {% if user.is_authenticated %}
+                <div class="dropdown">
+                <button class="mobile-header-btn dropdown-toggle" type="button" id="mobileUserDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-user-circle"></i> Account
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="mobileUserDropdown">
+                    <li>
+                    <a href="/dashboard/" class="dropdown-item">
+                        <i class="fas fa-tachometer-alt me-2"></i> Dashboard
                     </a>
-                {% else %}
-                    <a href="{% url 'account_login' %}" class="mobile-header-btn">
-                        <i class="fas fa-sign-in-alt"></i> Sign In
-                    </a>
-                {% endif %}
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <form method="post" action="{% url 'web_accounts:logout' %}" class="m-0 p-0">
+                            {% csrf_token %}
+                            <button type="submit" class="logout-form-btn">
+                                <i class="fas fa-sign-out-alt me-2"></i> Logout
+                            </button>
+                        </form>
+                    </li>
+                </ul>
+                </div>
+            {% else %}
+                <a href="{% url 'account_login' %}" class="mobile-header-btn">
+                <i class="fas fa-sign-in-alt"></i> Sign In
+                </a>
+            {% endif %}
             </div>
         </div>
 

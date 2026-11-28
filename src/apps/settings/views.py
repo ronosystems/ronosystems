@@ -19,7 +19,7 @@ from django.db.models import Q
 # ======================================================================
 SETTINGS_SCHEMA = [
     # --- General ---
-    {'key': 'SITE_NAME', 'type': 'text', 'category': 'general',
+    {'key': 'SYSTEM_NAME', 'type': 'text', 'category': 'general',
      'label': 'Site Name', 'default': 'RonoSystems', 'required': True, 'order': 1},
     {'key': 'SITE_TAGLINE', 'type': 'text', 'category': 'general',
      'label': 'Tagline', 'default': 'Management Platform helping to streamline operations', 'order': 2},

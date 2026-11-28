@@ -64,7 +64,7 @@ def system_settings(request):
 
     return {
         # --- Branding text ---
-        'system_name': s('SITE_NAME', 'RonoSystems'),
+        'system_name': s('SYSTEM_NAME', 'RonoSystems'),
         'site_tagline': s('SITE_TAGLINE', ''),
         'primary_color': s('PRIMARY_COLOR', '#036a77'),
         'secondary_color': s('SECONDARY_COLOR', '#00b4d8'),

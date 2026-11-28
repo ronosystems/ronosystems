@@ -622,7 +622,7 @@ def manifest_view(request):
         
         if SystemSetting:
             try:
-                db_name = SystemSetting.get_setting('SITE_NAME')
+                db_name = SystemSetting.get_setting('SYSTEM_NAME')
                 if db_name:
                     company_name = db_name.upper()
                 

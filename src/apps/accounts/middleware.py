@@ -8,9 +8,21 @@ from django.contrib.auth.views import redirect_to_login
 from django.urls import resolve, Resolver404
 
 PUBLIC_PREFIXES = (
-    '/auth/', '/admin/', '/api/', '/accounts/',
-    '/static/', '/media/', '/subscription-expired/',
-    '/payments/', '/plans/', '/',
+    '/auth/',
+    '/admin/',
+    '/api/',
+    '/accounts/',
+    '/static/',
+    '/media/',
+    '/subscription-expired/',
+    '/payments/',
+    '/plans/',
+    '/contact/', '/about/', '/features/', '/pricing/',   # public marketing pages
+    '/manifest.json', '/sw.js', '/favicon.ico',
+)
+
+PUBLIC_PATHS = (
+    '/',
 )
 
 class LoginRequiredMiddleware:
@@ -20,7 +32,9 @@ class LoginRequiredMiddleware:
     def __call__(self, request):
         if not request.user.is_authenticated:
             path = request.path_info
-            if not any(path == p or path.startswith(p) for p in PUBLIC_PREFIXES):
+            if path in PUBLIC_PATHS:
+                return self.get_response(request)
+            if not any(path.startswith(p) for p in PUBLIC_PREFIXES):
                 try:
                     resolve(path)
                     return redirect_to_login(request.get_full_path())

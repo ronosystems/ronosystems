@@ -14,8 +14,9 @@ DEFAULT_SYSTEM_NAME = 'RonoSystems'
 DEFAULT_PRIMARY_COLOR = '#87CEEB'
 DEFAULT_ACCENT_COLOR = '#036a77'
 
+
 # ============================================
-# HELPERS - HII NDIO MOYO
+# HELPERS
 # ============================================
 def _get_effective_company(request):
     cached = getattr(request, '_effective_company', False)
@@ -32,19 +33,18 @@ def _get_effective_company(request):
         if support_mode and viewing_company_id:
             company = Company.objects.filter(id=viewing_company_id).first()
 
-    # 2. Tenant kutoka kwa Middleware (DOMAIN) - THIS IS THE MOST RELIABLE
+    # 2. Tenant from Middleware (DOMAIN) - most reliable
     if company is None:
         company = getattr(request, 'tenant', None)
 
-    # 3. Fallback kwa backwards compat
+    # 3. Backwards compat
     if company is None:
         company = getattr(request, 'company', None)
 
-    # 4. Kama bado hakuna company, tumia Membership ya user
+    # 4. Membership fallback
     if company is None and user and user.is_authenticated:
         if not _is_super_admin(user):
             try:
-                # Try to find the last tenant they visited
                 last_tenant_id = request.session.get('current_tenant_id')
                 if last_tenant_id:
                     m = user.memberships.filter(
@@ -53,7 +53,6 @@ def _get_effective_company(request):
                     if m and m.company:
                         company = m.company
 
-                # If still no company, fall back to their primary membership
                 if company is None:
                     m = user.memberships.filter(
                         is_active=True
@@ -66,28 +65,51 @@ def _get_effective_company(request):
     request._effective_company = company
     return company
 
+
 def _get_user_role_in_company(user, company):
-    """
-    Badala ya user.role, tunatafuta role yake KWENYE HIYO COMPANY.
-    Mtu anaweza kuwa Manager hapa, Chairperson kwingine.
-    Returns: 'company_manager', 'chairperson', 'company_admin', etc au None
-    """
     if not user or not user.is_authenticated or not company:
         return None
     try:
-        # FIXED: company=, is_active=, role ni CharField (haina .slug, haina select_related)
         membership = user.memberships.filter(company=company, is_active=True).first()
         if membership and membership.role:
             return membership.role
-        # Fallback kwa code ya zamani kama bado una User.role
         return getattr(user, 'role', None)
     except Exception:
         return getattr(user, 'role', None)
+
 
 def _is_super_admin(user):
     if not user or not user.is_authenticated:
         return False
     return user.is_superuser or getattr(user, 'role', '') == 'super_admin'
+
+
+def _get_global_system_name():
+    """
+    FIX: Read the global SYSTEM_NAME setting with a safe lazy import.
+    Falls back to DEFAULT_SYSTEM_NAME if the settings app is unavailable.
+    """
+    try:
+        from apps.settings.models import SystemSetting
+        return SystemSetting.get_setting('SYSTEM_NAME', DEFAULT_SYSTEM_NAME) or DEFAULT_SYSTEM_NAME
+    except Exception:
+        return DEFAULT_SYSTEM_NAME
+
+
+def _get_global_colors():
+    """
+    FIX: Read global PRIMARY_COLOR / SECONDARY_COLOR settings.
+    Falls back to module defaults if unavailable.
+    """
+    try:
+        from apps.settings.models import SystemSetting
+        return (
+            SystemSetting.get_setting('PRIMARY_COLOR', DEFAULT_PRIMARY_COLOR) or DEFAULT_PRIMARY_COLOR,
+            SystemSetting.get_setting('SECONDARY_COLOR', DEFAULT_ACCENT_COLOR) or DEFAULT_ACCENT_COLOR,
+        )
+    except Exception:
+        return DEFAULT_PRIMARY_COLOR, DEFAULT_ACCENT_COLOR
+
 
 # ============================================
 # ACTIVE BASE TEMPLATE
@@ -109,6 +131,7 @@ def active_base_template(request):
             return {'base_template': 'base.html'}
     return {'base_template': 'base.html'}
 
+
 # ============================================
 # PENDING JOIN REQUESTS
 # ============================================
@@ -124,6 +147,7 @@ def pending_join_requests(request):
     except Exception:
         count = 0
     return {'pending_join_requests_count': count}
+
 
 # ============================================
 # SUPPORT MODE
@@ -143,6 +167,7 @@ def support_mode_context(request):
         'is_support_mode': support_company is not None,
     }
 
+
 # ============================================
 # COMPANY BRANDING
 # ============================================
@@ -154,14 +179,19 @@ def company_branding_context(request):
         if company.custom_domain and host == company.custom_domain.lower():
             is_custom_domain = True
 
+    # FIX: Global defaults come from SystemSetting, not hardcoded constants.
+    # Tenant-specific overrides (below) still take precedence when present.
+    global_system_name = _get_global_system_name()
+    global_primary, global_accent = _get_global_colors()
+
     ctx = {
         'company': company,
         'current_company': company,
         'current_tenant': company,
         'is_custom_domain': is_custom_domain,
-        'system_name': DEFAULT_SYSTEM_NAME,
-        'site_primary_color': DEFAULT_PRIMARY_COLOR,
-        'site_accent_color': DEFAULT_ACCENT_COLOR,
+        'system_name': global_system_name,
+        'site_primary_color': global_primary,
+        'site_accent_color': global_accent,
         'CLOUDINARY_CLOUD_NAME': getattr(settings, 'CLOUDINARY_STORAGE', {}).get('CLOUD_NAME', ''),
         'CLOUDINARY_UNSIGNED_PRESET': getattr(settings, 'CLOUDINARY_STORAGE', {}).get('UNSIGNED_PRESET', ''),
     }
@@ -186,6 +216,7 @@ def company_branding_context(request):
         ctx['current_user_role'] = _get_user_role_in_company(request.user, company)
 
     return ctx
+
 
 # ============================================
 # RECEIPT SETTINGS
@@ -216,6 +247,7 @@ def receipt_settings_context(request):
     request._receipt_settings = settings_dict
     return {'receipt_settings': settings_dict}
 
+
 # ============================================
 # PENDING FEEDBACK COUNT
 # ============================================
@@ -230,6 +262,7 @@ def pending_feedback_count(request):
         return {'pending_feedback_count': 0}
     count = TenantFeedback.objects.filter(status=TenantFeedback.STATUS_NEW).count()
     return {'pending_feedback_count': count}
+
 
 # ============================================
 # COMPANY FEATURE FLAGS
@@ -256,6 +289,7 @@ def company_features_context(request):
         'company_has_treasury': has_treasury,
         'company_has_workshop': has_workshop,
     }
+
 
 # ============================================
 # SYSTEM WEBSITE URL
@@ -286,6 +320,7 @@ def system_website_url(request):
     port_part = f':{port}' if port else ''
     return {'system_website_url': f'{scheme}://{host}{port_part}/'}
 
+
 # ============================================
 # UNREAD CONTACT MESSAGES
 # ============================================
@@ -311,6 +346,7 @@ def unread_messages_count(request):
         count = 0
     return {'unread_messages_count': count}
 
+
 def pending_applications_count(request):
     user = getattr(request, 'user', None)
     if not user or not user.is_authenticated:
@@ -323,6 +359,7 @@ def pending_applications_count(request):
     except Exception:
         count = 0
     return {'pending_applications_count': count}
+
 
 def total_notifications_count(request):
     user = getattr(request, 'user', None)
